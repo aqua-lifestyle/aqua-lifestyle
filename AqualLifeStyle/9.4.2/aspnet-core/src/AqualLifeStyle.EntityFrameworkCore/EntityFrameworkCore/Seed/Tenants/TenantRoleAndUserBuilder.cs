@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -16,11 +17,16 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
     {
         private readonly AqualLifeStyleDbContext _context;
         private readonly int _tenantId;
+        private readonly bool _seedDemoData;
 
-        public TenantRoleAndUserBuilder(AqualLifeStyleDbContext context, int tenantId)
+        public TenantRoleAndUserBuilder(
+            AqualLifeStyleDbContext context,
+            int tenantId,
+            bool? seedDemoData = null)
         {
             _context = context;
             _tenantId = tenantId;
+            _seedDemoData = seedDemoData ?? IsDemoDataEnabled();
         }
 
         public void Create()
@@ -67,6 +73,10 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
                 _context.SaveChanges();
             }
 
+            // Business roles + permission grants
+
+            new BusinessRolesAndPermissionsBuilder(_context, _tenantId).Create();
+
             // Admin user
 
             var adminUser = _context.Users.IgnoreQueryFilters().FirstOrDefault(u => u.TenantId == _tenantId && u.UserName == AbpUserBase.AdminUserName);
@@ -84,6 +94,22 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
                 _context.UserRoles.Add(new UserRole(_tenantId, adminUser.Id, adminRole.Id));
                 _context.SaveChanges();
             }
+
+            new DefaultCustomerUserLinker(_context, passwordHasher: new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()))).Link(_tenantId);
+            new DefaultCustomerAccountProvisioner(_context).Provision(_tenantId);
+            if (_seedDemoData)
+            {
+                new AreaLeaderDemoDataBuilder(_context, _tenantId).Create();
+                new FacilitatorDemoDataBuilder(_context, _tenantId).Create();
+                new CustomerDemoDataBuilder(_context, _tenantId).Create();
+            }
+            new DefaultUserRoleAssigner(_context).AssignRoles(_tenantId);
         }
+
+        private static bool IsDemoDataEnabled() =>
+            string.Equals(
+                Environment.GetEnvironmentVariable("AQUA_SEED_DEMO_DATA"),
+                "true",
+                StringComparison.OrdinalIgnoreCase);
     }
 }

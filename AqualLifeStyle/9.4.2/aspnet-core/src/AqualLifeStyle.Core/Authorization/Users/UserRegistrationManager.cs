@@ -18,6 +18,8 @@ namespace AqualLifeStyle.Authorization.Users
     {
         public IAbpSession AbpSession { get; set; }
 
+        public int? DefaultTenantId { get; set; }
+
         private readonly TenantManager _tenantManager;
         private readonly UserManager _userManager;
         private readonly RoleManager _roleManager;
@@ -56,7 +58,7 @@ namespace AqualLifeStyle.Authorization.Users
             };
 
             user.SetNormalizedNames();
-           
+            
             foreach (var defaultRole in await _roleManager.Roles.Where(r => r.IsDefault).ToListAsync())
             {
                 user.Roles.Add(new UserRole(tenant.Id, user.Id, defaultRole.Id));
@@ -72,7 +74,7 @@ namespace AqualLifeStyle.Authorization.Users
 
         private void CheckForTenant()
         {
-            if (!AbpSession.TenantId.HasValue)
+            if (!AbpSession.TenantId.HasValue && !DefaultTenantId.HasValue)
             {
                 throw new InvalidOperationException("Can not register host users!");
             }
@@ -80,12 +82,13 @@ namespace AqualLifeStyle.Authorization.Users
 
         private async Task<Tenant> GetActiveTenantAsync()
         {
-            if (!AbpSession.TenantId.HasValue)
+            var tenantId = AbpSession.TenantId ?? DefaultTenantId;
+            if (!tenantId.HasValue)
             {
                 return null;
             }
 
-            return await GetActiveTenantAsync(AbpSession.TenantId.Value);
+            return await GetActiveTenantAsync(tenantId.Value);
         }
 
         private async Task<Tenant> GetActiveTenantAsync(int tenantId)

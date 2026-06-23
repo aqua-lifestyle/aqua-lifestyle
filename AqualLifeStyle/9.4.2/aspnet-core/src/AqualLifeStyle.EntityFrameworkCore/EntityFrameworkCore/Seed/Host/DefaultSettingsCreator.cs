@@ -18,12 +18,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
 
         public void Create()
         {
-            int? tenantId = null;
-
-            if (AqualLifeStyleConsts.MultiTenancyEnabled == false)
-            {
-                tenantId = MultiTenancyConsts.DefaultTenantId;
-            }
+            int? tenantId = AqualLifeStyleConsts.MultiTenancyEnabled ? (int?)null : (int?)MultiTenancyConsts.DefaultTenantId;
 
             // Emailing
             AddSettingIfNotExists(EmailSettingNames.DefaultFromAddress, "admin@mydomain.com", tenantId);

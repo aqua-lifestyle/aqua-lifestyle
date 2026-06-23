@@ -1,4 +1,4 @@
-﻿using System;
+﻿using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Castle.MicroKernel.Registration;
@@ -17,12 +17,26 @@ namespace AqualLifeStyle.Tests.DependencyInjection
 
             IdentityRegistrar.Register(services);
 
-            services.AddEntityFrameworkInMemoryDatabase();
+            services.AddEntityFrameworkSqlite();
 
             var serviceProvider = WindsorRegistrationHelper.CreateServiceProvider(iocManager.IocContainer, services);
 
+            // A SQLite in-memory database only lives while its connection is open, so keep a single
+            // shared connection alive for the lifetime of this test's IoC scope. Using a real relational
+            // provider (instead of the EF InMemory provider) lets integration tests exercise relational
+            // behaviour such as ExecuteUpdate, matching production (PostgreSQL).
+            var connection = new SqliteConnection("DataSource=:memory:");
+            connection.Open();
+
             var builder = new DbContextOptionsBuilder<AqualLifeStyleDbContext>();
-            builder.UseInMemoryDatabase(Guid.NewGuid().ToString()).UseInternalServiceProvider(serviceProvider);
+            builder.UseSqlite(connection).UseInternalServiceProvider(serviceProvider);
+
+            iocManager.IocContainer.Register(
+                Component
+                    .For<SqliteConnection>()
+                    .Instance(connection)
+                    .LifestyleSingleton()
+            );
 
             iocManager.IocContainer.Register(
                 Component

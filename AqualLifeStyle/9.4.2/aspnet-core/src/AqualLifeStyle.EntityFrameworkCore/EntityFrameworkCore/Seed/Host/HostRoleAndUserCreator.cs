@@ -93,6 +93,12 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
 
                 _context.SaveChanges();
             }
+
+            if (!adminUserForHost.IsSystemAdmin())
+            {
+                adminUserForHost.SetRole(AqualLifeStyle.Domain.Enums.AquaUserRole.SystemAdmin);
+                _context.SaveChanges();
+            }
         }
     }
 }

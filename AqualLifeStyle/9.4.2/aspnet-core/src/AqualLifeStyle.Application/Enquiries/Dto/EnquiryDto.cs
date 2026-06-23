@@ -1,0 +1,28 @@
+using System;
+using System.Collections.Generic;
+
+namespace AqualLifeStyle.Application.Enquiries.Dto
+{
+    public class EnquiryDto
+    {
+        public int Id { get; set; }
+        public int CustomerId { get; set; }
+        public int ProductId { get; set; }
+        public string Message { get; set; }
+        public string Response { get; set; }
+        public int Status { get; set; }
+        public string CreatedAt { get; set; }
+        public bool IsClosed { get; set; }
+        public bool IsPending { get; set; }
+        public int? AssignedToMemberId { get; set; }
+        public bool IsConverted { get; set; }
+        public string? ConvertedAt { get; set; }
+
+        // Follow-up workflow fields
+        public decimal ConversionProbability { get; set; }
+        public DateTime? LastFollowUpDate { get; set; }
+        public int FollowUpCount { get; set; }
+        public bool IsSalesReady { get; set; }
+        public List<EnquiryFollowUpDto> FollowUps { get; set; } = new();
+    }
+}

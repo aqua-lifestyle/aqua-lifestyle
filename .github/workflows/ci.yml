@@ -1,0 +1,105 @@
+name: Continuous integration
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop, "feature/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  backend:
+    name: Backend build and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: AqualLifeStyle/9.4.2/aspnet-core
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore AqualLifeStyle.sln
+      - name: Build
+        run: dotnet build AqualLifeStyle.sln --configuration Release --no-restore
+      - name: Test
+        run: dotnet test AqualLifeStyle.sln --configuration Release --no-build --logger "trx;LogFileName=backend-tests.trx" --results-directory TestResults
+      - name: Upload backend test results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: backend-test-results
+          path: AqualLifeStyle/9.4.2/aspnet-core/TestResults
+          if-no-files-found: ignore
+          retention-days: 7
+
+  frontend:
+    name: Frontend quality checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: AqualLifeStyle/9.4.2/aqua-frontend
+    env:
+      NEXT_PUBLIC_ABP_API_URL: https://api.example.test
+      NEXT_PUBLIC_DEFAULT_TENANT_NAME: Default
+      NEXTAUTH_SECRET: ci-only-placeholder-secret-at-least-32-characters
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: AqualLifeStyle/9.4.2/aqua-frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
+      - name: Lint
+        run: npm run lint
+      - name: Type check
+        run: npm run type-check
+      - name: Test
+        run: npm test
+      - name: Production build
+        run: npm run build
+
+  containers:
+    name: Validate container images
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v3
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/api/Dockerfile
+          push: false
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+      - name: Build web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/web/Dockerfile
+          push: false
+          build-args: |
+            NEXT_PUBLIC_ABP_API_URL=https://api.example.test
+            NEXT_PUBLIC_DEFAULT_TENANT_NAME=Default
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web

@@ -11,6 +11,7 @@ using Abp.Zero.Configuration;
 using Abp.Zero.EntityFrameworkCore;
 using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.Tests.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 
 namespace AqualLifeStyle.Tests
 {
@@ -29,6 +30,16 @@ namespace AqualLifeStyle.Tests
 
         public override void PreInitialize()
         {
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new[]
+                {
+                    new System.Collections.Generic.KeyValuePair<string, string>(
+                        "App:ClientRootAddress",
+                        "https://customers.example.test")
+                })
+                .Build();
+            IocManager.IocContainer.Register(Component.For<IConfiguration>().Instance(configuration));
+
             Configuration.UnitOfWork.Timeout = TimeSpan.FromMinutes(30);
             Configuration.UnitOfWork.IsTransactional = false;
 
@@ -48,6 +59,14 @@ namespace AqualLifeStyle.Tests
         public override void Initialize()
         {
             ServiceCollectionRegistrar.Register(IocManager);
+
+            // The default event bus resolves handlers from the global IocManager; register the
+            // network handlers explicitly against the test's LocalIocManager so conversion/approval
+            // side-effects fire within the integrated test's unit of work.
+            Abp.Events.Bus.EventBus.Default.Register<AqualLifeStyle.Domain.Enquiries.EnquiryConvertedEvent>(e =>
+                IocManager.Resolve<AqualLifeStyle.Application.Enquiries.EnquiryConvertedEventHandler>().HandleEventAsync(e).GetAwaiter().GetResult());
+            Abp.Events.Bus.EventBus.Default.Register<AqualLifeStyle.Domain.AreaLeaders.AreaSpaceApprovedEvent>(e =>
+                IocManager.Resolve<AqualLifeStyle.Application.AreaLeaders.AreaSpaceApprovedEventHandler>().HandleEventAsync(e).GetAwaiter().GetResult());
         }
 
         private void RegisterFakeService<TService>() where TService : class

@@ -1,9 +1,14 @@
 ﻿using System;
+using System.IO;
 using Castle.Facilities.Logging;
+using DotNetEnv;
 using Abp;
-using Abp.Castle.Logging.Log4Net;
 using Abp.Collections.Extensions;
 using Abp.Dependency;
+using Castle.Services.Logging.SerilogIntegration;
+using Serilog;
+using Serilog.Formatting.Compact;
+using SerilogLog = Serilog.Log;
 
 namespace AqualLifeStyle.Migrator
 {
@@ -11,35 +16,75 @@ namespace AqualLifeStyle.Migrator
     {
         private static bool _quietMode;
 
-        public static void Main(string[] args)
+        public static int Main(string[] args)
         {
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+            LoadEnvFile();
             ParseArgs(args);
-
-            using (var bootstrapper = AbpBootstrapper.Create<AqualLifeStyleMigratorModule>())
+            var isProduction = string.Equals(
+                Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
+                "Production",
+                StringComparison.OrdinalIgnoreCase);
+            var loggerConfiguration = new LoggerConfiguration()
+                .MinimumLevel.Information()
+                .Enrich.FromLogContext()
+                .Enrich.WithProperty("Application", "AqualLifeStyle.Migrator");
+            SerilogLog.Logger = isProduction
+                ? loggerConfiguration.WriteTo.Console(new RenderedCompactJsonFormatter()).CreateLogger()
+                : loggerConfiguration.WriteTo.Console().CreateLogger();
+            try
             {
-                bootstrapper.IocManager.IocContainer
-                    .AddFacility<LoggingFacility>(
-                        f => f.UseAbpLog4Net().WithConfig("log4net.config")
-                    );
-
-                bootstrapper.Initialize();
-
-                using (var migrateExecuter = bootstrapper.IocManager.ResolveAsDisposable<MultiTenantMigrateExecuter>())
+                using (var bootstrapper = AbpBootstrapper.Create<AqualLifeStyleMigratorModule>())
                 {
-                    var migrationSucceeded = migrateExecuter.Object.Run(_quietMode);
-                    
-                    if (_quietMode)
+                    bootstrapper.IocManager.IocContainer
+                        .AddFacility<LoggingFacility>(f => f.LogUsing<SerilogFactory>());
+
+                    bootstrapper.Initialize();
+
+                    using (var migrateExecuter = bootstrapper.IocManager.ResolveAsDisposable<MultiTenantMigrateExecuter>())
                     {
-                        // exit clean (with exit code 0) if migration is a success, otherwise exit with code 1
-                        var exitCode = Convert.ToInt32(!migrationSucceeded);
-                        Environment.Exit(exitCode);
-                    }
-                    else
-                    {
-                        Console.WriteLine("Press ENTER to exit...");
-                        Console.ReadLine();
+                        var migrationSucceeded = migrateExecuter.Object.Run(_quietMode);
+                        if (!_quietMode)
+                        {
+                            Console.WriteLine("Press ENTER to exit...");
+                            Console.ReadLine();
+                        }
+                        return migrationSucceeded ? 0 : 1;
                     }
                 }
+            }
+            catch (Exception exception)
+            {
+                SerilogLog.Fatal(exception, "Database migration failed unexpectedly");
+                return 1;
+            }
+            finally
+            {
+                SerilogLog.CloseAndFlush();
+            }
+        }
+
+        private static void LoadEnvFile()
+        {
+            if (!string.Equals(
+                    Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
+                    "Development",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var directory = Directory.GetCurrentDirectory();
+            while (!string.IsNullOrEmpty(directory))
+            {
+                var envPath = Path.Combine(directory, ".env");
+                if (File.Exists(envPath))
+                {
+                    Env.Load(envPath);
+                    return;
+                }
+
+                directory = Directory.GetParent(directory)?.FullName;
             }
         }
 

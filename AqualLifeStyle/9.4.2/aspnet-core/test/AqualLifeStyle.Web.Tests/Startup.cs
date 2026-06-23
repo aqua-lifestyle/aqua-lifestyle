@@ -11,6 +11,7 @@ using AqualLifeStyle.Web.Startup;
 using Castle.MicroKernel.Registration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,7 +30,7 @@ namespace AqualLifeStyle.Web.Tests
 
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
-            services.AddEntityFrameworkInMemoryDatabase();
+            services.AddEntityFrameworkSqlite();
 
             services.AddMvc();
             
@@ -70,11 +71,30 @@ namespace AqualLifeStyle.Web.Tests
 
         private void UseInMemoryDb(IServiceProvider serviceProvider)
         {
+            // A SQLite in-memory database only lives while its connection is open, so keep a single
+            // shared connection alive for the lifetime of the test server. Using a real relational
+            // provider (instead of the EF InMemory provider) keeps the web tests consistent with
+            // production (PostgreSQL) relational behaviour.
+            var connection = new SqliteConnection("DataSource=:memory:");
+            connection.Open();
+
             var builder = new DbContextOptionsBuilder<AqualLifeStyleDbContext>();
-            builder.UseInMemoryDatabase(Guid.NewGuid().ToString()).UseInternalServiceProvider(serviceProvider);
+            builder.UseSqlite(connection).UseInternalServiceProvider(serviceProvider);
             var options = builder.Options;
 
+            // The database starts empty; create the schema before ABP runs its data seeders.
+            using (var context = new AqualLifeStyleDbContext(options))
+            {
+                context.Database.EnsureCreated();
+            }
+
             var iocManager = serviceProvider.GetRequiredService<IIocManager>();
+            iocManager.IocContainer
+                .Register(
+                    Component.For<SqliteConnection>()
+                        .Instance(connection)
+                        .LifestyleSingleton()
+                );
             iocManager.IocContainer
                 .Register(
                     Component.For<DbContextOptions<AqualLifeStyleDbContext>>()

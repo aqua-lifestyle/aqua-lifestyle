@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging;
 using Castle.Facilities.Logging;
 using Abp.AspNetCore;
 using Abp.AspNetCore.Mvc.Antiforgery;
-using Abp.Castle.Logging.Log4Net;
 using Abp.Extensions;
 using AqualLifeStyle.Configuration;
 using AqualLifeStyle.Identity;
@@ -17,6 +16,7 @@ using Abp.AspNetCore.SignalR.Hubs;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using System.IO;
+using Castle.Services.Logging.SerilogIntegration;
 
 namespace AqualLifeStyle.Web.Host.Startup
 {
@@ -27,11 +27,8 @@ namespace AqualLifeStyle.Web.Host.Startup
         private const string _apiVersion = "v1";
 
         private readonly IConfigurationRoot _appConfiguration;
-        private readonly IWebHostEnvironment _hostingEnvironment;
-
         public Startup(IWebHostEnvironment env)
         {
-            _hostingEnvironment = env;
             _appConfiguration = env.GetAppConfiguration();
         }
 
@@ -69,20 +66,25 @@ namespace AqualLifeStyle.Web.Host.Startup
             // Swagger - Enable this line and the related lines in Configure method to enable swagger UI
             ConfigureSwagger(services);
 
+            // Register IHttpContextAccessor so ABP exception converters can access the current request correlation id.
+            services.AddHttpContextAccessor();
+
             // Configure Abp and Dependency Injection
             services.AddAbpWithoutCreatingServiceProvider<AqualLifeStyleWebHostModule>(
-                // Configure Log4Net logging
+                // Route ABP's Castle logger through the same Serilog console pipeline.
                 options => options.IocManager.IocContainer.AddFacility<LoggingFacility>(
-                    f => f.UseAbpLog4Net().WithConfig(_hostingEnvironment.IsDevelopment()
-                        ? "log4net.config"
-                        : "log4net.Production.config"
-                    )
+                    f => f.LogUsing<SerilogFactory>()
                 )
             );
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerFactory)
         {
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+
             app.UseAbp(options => { options.UseAbpRequestLocalization = false; }); // Initializes ABP framework.
 
             app.UseCors(_defaultCorsPolicyName); // Enable CORS!
@@ -95,6 +97,8 @@ namespace AqualLifeStyle.Web.Host.Startup
             app.UseAuthorization();
 
             app.UseAbpRequestLocalization();
+
+            app.UseMiddleware<ErrorHandlingMiddleware>();
 
             app.UseEndpoints(endpoints =>
             {

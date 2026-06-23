@@ -15,9 +15,6 @@
     <PreserveCompilationReferences>true</PreserveCompilationReferences>
   </PropertyGroup>
   <ItemGroup>
-    <None Update="Dockerfile">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Update="log4net.config">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
@@ -40,6 +37,7 @@
     <PackageReference Include="Abp.HangFire" Version="9.4.1" />
     <PackageReference Include="Abp.RedisCache" Version="9.4.1" />
     <PackageReference Include="Abp.Castle.Log4Net" Version="9.4.1" />
+    <PackageReference Include="DotNetEnv" Version="3.1.0" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="wwwroot\libs\" />

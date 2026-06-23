@@ -253,4 +253,8 @@ paket-files/
 
 src/AqualLifeStyle.Web.Mvc/secrets.json
 src/AqualLifeStyle.Web.Host/secrets.json
+src/AqualLifeStyle.Web.Host/App_Data/
 src/AqualLifeStyle.Migrator/secrets.json
+
+# Ignore ASP.NET runtime local data folder
+AqualLifeStyle.Web.Host/App_Data/
