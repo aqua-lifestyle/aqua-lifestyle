@@ -11,5 +11,8 @@ namespace AqualLifeStyle.Application.Memberships
         Task<MembershipDto> GetAsync(int id);
         Task<MembershipDto> UpdateAsync(MembershipDto input);
         Task CreateAsync(CreateMembershipDto input);
+        Task<MembershipDto> SetActivationDateAsync(int id, SetMembershipActivationDto input);
+        Task<MembershipDto> SetMonthlyObligationAsync(int id, SetMonthlyObligationDto input);
+        Task<MembershipDto> MarkObligationMetAsync(int id, MarkObligationMetDto input);
     }
 }

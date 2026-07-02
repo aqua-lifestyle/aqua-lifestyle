@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -22,27 +23,13 @@ namespace AqualLifeStyle.Application.Memberships
         public async Task<IReadOnlyList<MembershipDto>> GetAllAsync()
         {
             var memberships = await _membershipRepository.GetAllListAsync();
-            return memberships.Select(m => new MembershipDto
-            {
-                Id = m.Id,
-                Name = m.Name,
-                Description = m.Description,
-                IsActive = m.IsActive,
-                MembershipType = m.MembershipType
-            }).ToList();
+            return memberships.Select(MapToDto).ToList();
         }
 
         public async Task<MembershipDto> GetAsync(int id)
         {
             var membership = await _membershipRepository.GetAsync(id);
-            return new MembershipDto
-            {
-                Id = membership.Id,
-                Name = membership.Name,
-                Description = membership.Description,
-                IsActive = membership.IsActive,
-                MembershipType = membership.MembershipType
-            };
+            return MapToDto(membership);
         }
 
         public async Task<MembershipDto> UpdateAsync(MembershipDto input)
@@ -53,20 +40,67 @@ namespace AqualLifeStyle.Application.Memberships
             membership.ChangeType(input.MembershipType);
             await _membershipRepository.UpdateAsync(membership);
 
-            return new MembershipDto
-            {
-                Id = membership.Id,
-                Name = membership.Name,
-                Description = membership.Description,
-                IsActive = membership.IsActive,
-                MembershipType = membership.MembershipType
-            };
+            return MapToDto(membership);
         }
 
         public async Task CreateAsync(CreateMembershipDto input)
         {
             var membership = Membership.Create(input.Name, input.Description, input.MembershipType);
             await _membershipRepository.InsertAsync(membership);
+        }
+
+        public async Task<MembershipDto> SetActivationDateAsync(int id, SetMembershipActivationDto input)
+        {
+            var membership = await _membershipRepository.GetAsync(id);
+            
+            if (!DateTime.TryParse(input.ActivationDate, out var activationDate))
+            {
+                throw new ArgumentException("Invalid activation date format.", nameof(input.ActivationDate));
+            }
+
+            membership.SetActivationDate(activationDate);
+            await _membershipRepository.UpdateAsync(membership);
+
+            return MapToDto(membership);
+        }
+
+        public async Task<MembershipDto> SetMonthlyObligationAsync(int id, SetMonthlyObligationDto input)
+        {
+            var membership = await _membershipRepository.GetAsync(id);
+            membership.SetMonthlyObligation(input.Amount);
+            await _membershipRepository.UpdateAsync(membership);
+
+            return MapToDto(membership);
+        }
+
+        public async Task<MembershipDto> MarkObligationMetAsync(int id, MarkObligationMetDto input)
+        {
+            var membership = await _membershipRepository.GetAsync(id);
+
+            if (!DateTime.TryParse(input.AsOfDate, out var asOfDate))
+            {
+                throw new ArgumentException("Invalid date format.", nameof(input.AsOfDate));
+            }
+
+            membership.MarkObligationMet(asOfDate);
+            await _membershipRepository.UpdateAsync(membership);
+
+            return MapToDto(membership);
+        }
+
+        private static MembershipDto MapToDto(Membership membership)
+        {
+            return new MembershipDto
+            {
+                Id = membership.Id,
+                Name = membership.Name,
+                Description = membership.Description,
+                IsActive = membership.IsActive,
+                MembershipType = membership.MembershipType,
+                ActivationDate = membership.ActivationDate?.ToString("u"),
+                MonthlyObligationAmount = membership.MonthlyObligationAmount,
+                LastObligationMetDate = membership.LastObligationMetDate?.ToString("u")
+            };
         }
     }
 }

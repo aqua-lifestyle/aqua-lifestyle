@@ -9,5 +9,8 @@ namespace AqualLifeStyle.Application.Memberships.Dto
         public string Description { get; set; }
         public bool IsActive { get; set; }
         public MembershipType MembershipType { get; set; }
+        public string? ActivationDate { get; set; }
+        public decimal MonthlyObligationAmount { get; set; }
+        public string? LastObligationMetDate { get; set; }
     }
 }

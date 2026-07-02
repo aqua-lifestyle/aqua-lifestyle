@@ -10,6 +10,9 @@ namespace AqualLifeStyle.Domain.Memberships
         public string Description { get; private set; }
         public bool IsActive { get; private set; }
         public MembershipType MembershipType { get; private set; }
+        public DateTime? ActivationDate { get; private set; }
+        public decimal MonthlyObligationAmount { get; private set; }
+        public DateTime? LastObligationMetDate { get; private set; }
 
         protected Membership()
         {
@@ -21,6 +24,7 @@ namespace AqualLifeStyle.Domain.Memberships
             Description = description?.Trim();
             MembershipType = membershipType;
             IsActive = isActive;
+            MonthlyObligationAmount = GetDefaultMonthlyObligation(membershipType);
         }
 
         public static Membership Create(string name, string description, MembershipType membershipType = MembershipType.Standard)
@@ -51,6 +55,55 @@ namespace AqualLifeStyle.Domain.Memberships
         public void ChangeType(MembershipType membershipType)
         {
             MembershipType = membershipType;
+            MonthlyObligationAmount = GetDefaultMonthlyObligation(membershipType);
+        }
+
+        public void SetActivationDate(DateTime activationDate)
+        {
+            if (activationDate == default)
+            {
+                throw new ArgumentException("Activation date must be valid.", nameof(activationDate));
+            }
+
+            ActivationDate = activationDate;
+        }
+
+        public void SetMonthlyObligation(decimal amount)
+        {
+            if (amount < 0)
+            {
+                throw new ArgumentException("Monthly obligation amount cannot be negative.", nameof(amount));
+            }
+
+            MonthlyObligationAmount = amount;
+        }
+
+        public void MarkObligationMet(DateTime asOf)
+        {
+            if (asOf == default)
+            {
+                throw new ArgumentException("Date must be valid.", nameof(asOf));
+            }
+
+            LastObligationMetDate = asOf;
+        }
+
+        public bool IsObligationMetForMonth(DateTime month)
+        {
+            if (!ActivationDate.HasValue)
+            {
+                return false;
+            }
+
+            if (!LastObligationMetDate.HasValue)
+            {
+                return false;
+            }
+
+            var targetMonth = new DateTime(month.Year, month.Month, 1);
+            var obligationMonth = new DateTime(LastObligationMetDate.Value.Year, LastObligationMetDate.Value.Month, 1);
+
+            return obligationMonth >= targetMonth;
         }
 
         public void EnsureCanBeAssignedToCustomer()
@@ -69,6 +122,17 @@ namespace AqualLifeStyle.Domain.Memberships
             }
 
             Name = name.Trim();
+        }
+
+        private static decimal GetDefaultMonthlyObligation(MembershipType type)
+        {
+            return type switch
+            {
+                MembershipType.Standard => 100m,
+                MembershipType.Premium => 250m,
+                MembershipType.Vip => 500m,
+                _ => 100m
+            };
         }
     }
 }
