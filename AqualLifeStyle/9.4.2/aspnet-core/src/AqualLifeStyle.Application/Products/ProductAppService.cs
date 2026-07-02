@@ -41,9 +41,9 @@ namespace AqualLifeStyle.Application.Products
             }
 
             var customer = await _customerRepository.GetAsync(customerId.Value);
-            if (customer == null)
+            if (customer == null || !customer.IsActive)
             {
-                return MapProducts(products);
+                return MapProducts(products.Where(product => product.MembershipId == null).ToList());
             }
 
             var membership = customer.MembershipId.HasValue
@@ -54,7 +54,7 @@ namespace AqualLifeStyle.Application.Products
             var visibleProducts = new List<ProductDto>();
             foreach (var product in products)
             {
-                if (eligibilityManager.CanViewProduct(customer, product, membership))
+                if (await eligibilityManager.CanViewProductAsync(customer, product, membership))
                 {
                     visibleProducts.Add(MapProduct(product));
                 }
