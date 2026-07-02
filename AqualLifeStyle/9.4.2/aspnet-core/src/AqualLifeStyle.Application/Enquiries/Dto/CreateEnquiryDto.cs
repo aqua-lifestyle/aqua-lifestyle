@@ -11,4 +11,17 @@ namespace AqualLifeStyle.Application.Enquiries.Dto
     {
         public string Response { get; set; }
     }
+
+    public class AssignEnquiryDto
+    {
+        public int MemberId { get; set; }
+    }
+
+    public class ConvertEnquiryToCustomerDto
+    {
+    }
+
+    public class ClearAssignmentDto
+    {
+    }
 }

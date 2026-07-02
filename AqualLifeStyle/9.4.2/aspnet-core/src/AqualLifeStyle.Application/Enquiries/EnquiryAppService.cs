@@ -59,6 +59,30 @@ namespace AqualLifeStyle.Application.Enquiries
             return MapToDto(enquiry);
         }
 
+        public async Task<EnquiryDto> AssignToMemberAsync(int id, AssignEnquiryDto input)
+        {
+            var enquiry = await _enquiryRepository.GetAsync(id);
+            enquiry.AssignToMember(input.MemberId);
+            await _enquiryRepository.UpdateAsync(enquiry);
+            return MapToDto(enquiry);
+        }
+
+        public async Task<EnquiryDto> ConvertToCustomerAsync(int id, ConvertEnquiryToCustomerDto input)
+        {
+            var enquiry = await _enquiryRepository.GetAsync(id);
+            enquiry.ConvertToCustomer();
+            await _enquiryRepository.UpdateAsync(enquiry);
+            return MapToDto(enquiry);
+        }
+
+        public async Task<EnquiryDto> ClearAssignmentAsync(int id, ClearAssignmentDto input)
+        {
+            var enquiry = await _enquiryRepository.GetAsync(id);
+            enquiry.ClearAssignment();
+            await _enquiryRepository.UpdateAsync(enquiry);
+            return MapToDto(enquiry);
+        }
+
         private static EnquiryDto MapToDto(Enquiry enquiry)
         {
             return new EnquiryDto
@@ -71,7 +95,10 @@ namespace AqualLifeStyle.Application.Enquiries
                 Status = (int)enquiry.Status,
                 CreatedAt = enquiry.CreatedAt.ToString("u"),
                 IsClosed = enquiry.Status == EnquiryStatus.Closed,
-                IsPending = enquiry.Status == EnquiryStatus.Pending
+                IsPending = enquiry.Status == EnquiryStatus.Pending,
+                AssignedToMemberId = enquiry.AssignedToMemberId,
+                IsConverted = enquiry.IsConverted,
+                ConvertedAt = enquiry.ConvertedAt?.ToString("u")
             };
         }
     }

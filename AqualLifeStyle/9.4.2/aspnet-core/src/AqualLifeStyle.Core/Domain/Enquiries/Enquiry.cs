@@ -12,6 +12,9 @@ namespace AqualLifeStyle.Domain.Enquiries
         public string Response { get; private set; }
         public EnquiryStatus Status { get; private set; }
         public DateTime CreatedAt { get; private set; }
+        public int? AssignedToMemberId { get; private set; }
+        public bool IsConverted { get; private set; }
+        public DateTime? ConvertedAt { get; private set; }
 
         protected Enquiry() { }
 
@@ -24,6 +27,7 @@ namespace AqualLifeStyle.Domain.Enquiries
             Status = EnquiryStatus.Pending;
             CreatedAt = DateTime.UtcNow;
             Response = string.Empty;
+            IsConverted = false;
         }
 
         public static Enquiry Create(int customerId, int productId, string message)
@@ -53,6 +57,27 @@ namespace AqualLifeStyle.Domain.Enquiries
             if (Status != EnquiryStatus.Closed) throw new InvalidOperationException("Only closed enquiries can be reopened.");
             Status = EnquiryStatus.Pending;
             Response = string.Empty;
+        }
+
+        public void AssignToMember(int memberId)
+        {
+            if (memberId <= 0) throw new ArgumentException("Member ID must be valid.", nameof(memberId));
+            if (IsConverted) throw new InvalidOperationException("Converted enquiries cannot be re-assigned.");
+            AssignedToMemberId = memberId;
+        }
+
+        public void ConvertToCustomer()
+        {
+            if (IsConverted) throw new InvalidOperationException("Enquiry has already been converted.");
+            IsConverted = true;
+            ConvertedAt = DateTime.UtcNow;
+            Status = EnquiryStatus.Closed;
+        }
+
+        public void ClearAssignment()
+        {
+            if (IsConverted) throw new InvalidOperationException("Converted enquiries cannot be un-assigned.");
+            AssignedToMemberId = null;
         }
     }
 }

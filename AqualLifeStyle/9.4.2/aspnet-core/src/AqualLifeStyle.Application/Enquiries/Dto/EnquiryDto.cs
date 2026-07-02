@@ -11,5 +11,8 @@ namespace AqualLifeStyle.Application.Enquiries.Dto
         public string CreatedAt { get; set; }
         public bool IsClosed { get; set; }
         public bool IsPending { get; set; }
+        public int? AssignedToMemberId { get; set; }
+        public bool IsConverted { get; set; }
+        public string? ConvertedAt { get; set; }
     }
 }
