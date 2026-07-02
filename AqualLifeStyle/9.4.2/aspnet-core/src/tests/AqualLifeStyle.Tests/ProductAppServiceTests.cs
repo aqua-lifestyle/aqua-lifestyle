@@ -70,6 +70,34 @@ namespace AqualLifeStyle.Tests
         }
 
         [Fact]
+        public async Task GetAllAsync_WithCustomerWithoutMembership_ReturnsOnlyFreeProducts()
+        {
+            var products = new List<Product>
+            {
+                Product.Create("Free Product", 0.01m, null),
+                Product.Create("Premium Product", 10m, 2)
+            };
+
+            var productRepositoryMock = new Mock<IProductRepository>();
+            productRepositoryMock.Setup(r => r.GetAllListAsync())
+                .ReturnsAsync(products);
+
+            var customerRepositoryMock = new Mock<ICustomerRepository>();
+            var customer = Customer.Create("John Doe", new EmailAddress("john@example.com"), null);
+            customerRepositoryMock.Setup(r => r.GetAsync(99))
+                .ReturnsAsync(customer);
+
+            var membershipLookupMock = new Mock<IMembershipLookup>();
+
+            var appService = new ProductAppService(productRepositoryMock.Object, customerRepositoryMock.Object, membershipLookupMock.Object);
+
+            var result = await appService.GetAllAsync(99);
+
+            Assert.Single(result);
+            Assert.Equal("Free Product", result[0].Name);
+        }
+
+        [Fact]
         public async Task CreateAsync_InsertsProduct()
         {
             var repositoryMock = new Mock<IProductRepository>();

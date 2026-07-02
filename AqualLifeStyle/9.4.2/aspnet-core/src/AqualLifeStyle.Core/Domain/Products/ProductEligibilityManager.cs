@@ -26,14 +26,26 @@ namespace AqualLifeStyle.Domain.Products
             if (!customer.MembershipId.HasValue) return false;
 
             var membership = await _membershipLookup.GetAsync(customer.MembershipId.Value);
-            if (membership == null || !membership.IsActive) return false;
-
-            return IsMembershipEligible(membership.MembershipType, product.MembershipId.Value);
+            return CanViewProduct(customer, product, membership);
         }
 
         public bool CanViewProduct(Customer customer, Product product)
         {
             return CanViewProductAsync(customer, product).GetAwaiter().GetResult();
+        }
+
+        public bool CanViewProduct(Customer customer, Product product, Membership membership)
+        {
+            if (customer == null) throw new ArgumentNullException(nameof(customer));
+            if (product == null) throw new ArgumentNullException(nameof(product));
+
+            if (!customer.IsActive) return false;
+            if (!product.IsActive) return false;
+            if (product.MembershipId == null) return true;
+            if (!customer.MembershipId.HasValue) return false;
+            if (membership == null || !membership.IsActive) return false;
+
+            return IsMembershipEligible(membership.MembershipType, product.MembershipId.Value);
         }
 
         private static bool IsMembershipEligible(MembershipType membershipType, int requiredMembershipId)

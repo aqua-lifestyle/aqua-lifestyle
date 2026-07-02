@@ -36,7 +36,7 @@ namespace AqualLifeStyle.Tests
         public async Task CreateAsync_InsertsProduct()
         {
             var repository = Substitute.For<IProductRepository>();
-            repository.InsertAsync(Arg.Any<Product>()).Returns(Task.CompletedTask);
+            repository.InsertAsync(Arg.Any<Product>()).Returns(Task.FromResult(default(Product)));
 
             var service = new ProductAppService(repository);
 

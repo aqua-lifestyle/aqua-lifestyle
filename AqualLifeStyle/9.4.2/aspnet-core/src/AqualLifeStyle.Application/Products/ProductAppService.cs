@@ -46,11 +46,15 @@ namespace AqualLifeStyle.Application.Products
                 return MapProducts(products);
             }
 
+            var membership = customer.MembershipId.HasValue
+                ? await _membershipLookup.GetAsync(customer.MembershipId.Value)
+                : null;
+
             var eligibilityManager = new ProductEligibilityManager(_membershipLookup);
             var visibleProducts = new List<ProductDto>();
             foreach (var product in products)
             {
-                if (await eligibilityManager.CanViewProductAsync(customer, product))
+                if (eligibilityManager.CanViewProduct(customer, product, membership))
                 {
                     visibleProducts.Add(MapProduct(product));
                 }
