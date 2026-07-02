@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
@@ -14,7 +15,7 @@ namespace AqualLifeStyle.Domain.Products
             _membershipLookup = membershipLookup ?? throw new ArgumentNullException(nameof(membershipLookup));
         }
 
-        public bool CanViewProduct(Customer customer, Product product)
+        public async Task<bool> CanViewProductAsync(Customer customer, Product product)
         {
             if (customer == null) throw new ArgumentNullException(nameof(customer));
             if (product == null) throw new ArgumentNullException(nameof(product));
@@ -24,10 +25,15 @@ namespace AqualLifeStyle.Domain.Products
             if (product.MembershipId == null) return true;
             if (!customer.MembershipId.HasValue) return false;
 
-            var membership = _membershipLookup.GetAsync(customer.MembershipId.Value).GetAwaiter().GetResult();
+            var membership = await _membershipLookup.GetAsync(customer.MembershipId.Value);
             if (membership == null || !membership.IsActive) return false;
 
             return IsMembershipEligible(membership.MembershipType, product.MembershipId.Value);
+        }
+
+        public bool CanViewProduct(Customer customer, Product product)
+        {
+            return CanViewProductAsync(customer, product).GetAwaiter().GetResult();
         }
 
         private static bool IsMembershipEligible(MembershipType membershipType, int requiredMembershipId)
