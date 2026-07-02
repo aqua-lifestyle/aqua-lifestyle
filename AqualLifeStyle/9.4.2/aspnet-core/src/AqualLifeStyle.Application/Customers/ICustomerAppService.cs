@@ -10,5 +10,6 @@ namespace AqualLifeStyle.Application.Customers
         Task<IReadOnlyList<CustomerDto>> GetAllAsync();
         Task<CustomerDto> GetAsync(int id);
         Task CreateAsync(CreateCustomerDto input);
+        Task<CustomerDto> UpdateAsync(CustomerDto input);
     }
 }

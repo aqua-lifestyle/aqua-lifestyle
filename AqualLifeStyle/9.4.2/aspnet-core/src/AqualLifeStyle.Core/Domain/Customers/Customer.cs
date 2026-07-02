@@ -36,6 +36,16 @@ namespace AqualLifeStyle.Domain.Customers
             MembershipId = newMembershipId;
         }
 
+        public void Rename(string name)
+        {
+            SetName(name);
+        }
+
+        public void ChangeEmail(EmailAddress email)
+        {
+            Email = email ?? throw new ArgumentNullException(nameof(email));
+        }
+
         public void Activate() => IsActive = true;
 
         public void Deactivate() => IsActive = false;
