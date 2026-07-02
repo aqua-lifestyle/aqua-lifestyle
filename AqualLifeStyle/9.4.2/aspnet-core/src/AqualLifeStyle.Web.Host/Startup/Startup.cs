@@ -96,6 +96,8 @@ namespace AqualLifeStyle.Web.Host.Startup
 
             app.UseAbpRequestLocalization();
 
+            app.UseExceptionHandler("/Error");
+
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapHub<AbpCommonHub>("/signalr");
