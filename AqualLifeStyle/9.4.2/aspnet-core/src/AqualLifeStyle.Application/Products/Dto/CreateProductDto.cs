@@ -1,3 +1,5 @@
+using System;
+
 namespace AqualLifeStyle.Application.Products.Dto
 {
     public class CreateProductDto
