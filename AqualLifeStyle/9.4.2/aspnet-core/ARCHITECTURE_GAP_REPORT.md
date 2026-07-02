@@ -51,6 +51,23 @@ This report updates the earlier architecture assessment to match the current cod
 
 ---
 
+## Prompt Coverage Summary
+
+The current codebase only partially implements the business prompt. It supports customer, enquiry, membership, and product eligibility basics, but it does not yet reflect the prompt's full business model.
+
+Missing prompt-aligned capabilities:
+- Formal customer-to-member journey with membership application, approval, and activation workflows
+- Explicit membership tiers: `Jasper`, `Onyx`, `AQGreen`, `Business Premier`
+- Product combo structure with member pricing, Jasper pricing, and order windows
+- Savings window enforcement, refund triggers, and profit-share administration
+- Area Leader licence, rank progression, capacity/target tracking, and territory rules
+- Area Space lifecycle, approval, and affiliation with Area Leaders
+- Facilitator registration, ranking, referral tracking, training attendance, and incentive management
+- Commission and referral calculation workflows
+- Admin registration/payment validation, order release, and collection workflows
+
+---
+
 ## Identified Gaps
 
 ### 1. **Business-Rule Depth Is Still Shallow** (HIGH PRIORITY → REDUCING)
@@ -253,6 +270,8 @@ This report updates the earlier architecture assessment to match the current cod
 - [ ] Add richer savings-account workflows and domain services with repository/app-service wiring
 - [ ] Model Area Leader and Area Space behaviour with licensing and approval workflows
 - [ ] Model Facilitator management and commission/referral rules
+- [ ] Add product combo pricing and order window rules for Jasper/Onyx/AQGreen
+- [ ] Model customer-to-member conversion workflows and membership application approval
 - [ ] Expand enquiry with follow-up tracking and sales outcome metrics
 - [ ] Add centralized validation and error handling middleware
 - [ ] Rebuild solution: `dotnet build`

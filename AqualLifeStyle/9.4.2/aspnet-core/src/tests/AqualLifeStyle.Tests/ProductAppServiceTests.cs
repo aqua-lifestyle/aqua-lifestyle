@@ -58,7 +58,7 @@ namespace AqualLifeStyle.Tests
 
             var membershipLookupMock = new Mock<IMembershipLookup>();
             membershipLookupMock.Setup(r => r.GetAsync(2))
-                .ReturnsAsync(Membership.Create("Premium", "Premium membership", MembershipType.Premium));
+                .ReturnsAsync(Membership.Create("Onyx", "Onyx membership", MembershipType.Onyx));
 
             var appService = new ProductAppService(productRepositoryMock.Object, customerRepositoryMock.Object, membershipLookupMock.Object);
 

@@ -57,8 +57,9 @@ namespace AqualLifeStyle.Domain.Products
         {
             return membershipType switch
             {
-                MembershipType.Premium => requiredMembershipId <= 2,
-                MembershipType.Vip => requiredMembershipId <= 3,
+                MembershipType.Onyx => requiredMembershipId <= 2,
+                MembershipType.AQGreen => requiredMembershipId <= 3,
+                MembershipType.BusinessPremier => requiredMembershipId <= 4,
                 _ => requiredMembershipId == 1
             };
         }

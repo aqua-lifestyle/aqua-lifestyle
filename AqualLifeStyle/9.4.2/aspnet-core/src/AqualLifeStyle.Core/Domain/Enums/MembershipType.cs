@@ -2,8 +2,9 @@ namespace AqualLifeStyle.Domain.Enums
 {
     public enum MembershipType
     {
-        Standard = 0,
-        Premium = 1,
-        Vip = 2
+        Jasper = 0,
+        Onyx = 1,
+        AQGreen = 2,
+        BusinessPremier = 3
     }
 }

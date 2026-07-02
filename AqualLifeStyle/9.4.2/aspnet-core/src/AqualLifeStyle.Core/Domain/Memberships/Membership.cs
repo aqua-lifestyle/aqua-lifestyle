@@ -27,7 +27,7 @@ namespace AqualLifeStyle.Domain.Memberships
             MonthlyObligationAmount = GetDefaultMonthlyObligation(membershipType);
         }
 
-        public static Membership Create(string name, string description, MembershipType membershipType = MembershipType.Standard)
+        public static Membership Create(string name, string description, MembershipType membershipType = MembershipType.Jasper)
         {
             return new Membership(name, description, membershipType, true);
         }
@@ -128,9 +128,10 @@ namespace AqualLifeStyle.Domain.Memberships
         {
             return type switch
             {
-                MembershipType.Standard => 100m,
-                MembershipType.Premium => 250m,
-                MembershipType.Vip => 500m,
+                MembershipType.Jasper => 100m,
+                MembershipType.Onyx => 250m,
+                MembershipType.AQGreen => 500m,
+                MembershipType.BusinessPremier => 750m,
                 _ => 100m
             };
         }

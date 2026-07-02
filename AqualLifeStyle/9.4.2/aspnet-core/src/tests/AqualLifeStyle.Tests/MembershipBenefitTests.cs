@@ -10,21 +10,21 @@ namespace AqualLifeStyle.Tests
         public void Create_DefaultsToActiveBenefit()
         {
             var benefit = MembershipBenefit.Create(
-                MembershipType.Premium,
+                MembershipType.Onyx,
                 "20% Discount",
                 "Get 20% off on all purchases"
             );
 
             Assert.True(benefit.IsActive);
             Assert.Equal("20% Discount", benefit.BenefitName);
-            Assert.Equal(MembershipType.Premium, benefit.MembershipType);
+            Assert.Equal(MembershipType.Onyx, benefit.MembershipType);
         }
 
         [Fact]
         public void Create_WithBenefitValue()
         {
             var benefit = MembershipBenefit.Create(
-                MembershipType.Vip,
+                MembershipType.AQGreen,
                 "Point Multiplier",
                 "Earn 2x points on every purchase",
                 benefitValue: 2m
@@ -37,7 +37,7 @@ namespace AqualLifeStyle.Tests
         public void UpdateBenefit_ModifiesProperties()
         {
             var benefit = MembershipBenefit.Create(
-                MembershipType.Standard,
+                MembershipType.Jasper,
                 "Free Shipping",
                 "Free shipping on orders over $50"
             );
@@ -55,7 +55,7 @@ namespace AqualLifeStyle.Tests
         public void ActivateAndDeactivate_ChangeLifecycleState()
         {
             var benefit = MembershipBenefit.Create(
-                MembershipType.Premium,
+                MembershipType.Onyx,
                 "Birthday Bonus",
                 "Extra 500 points on your birthday"
             );
@@ -72,11 +72,10 @@ namespace AqualLifeStyle.Tests
         {
             Assert.Throws<System.ArgumentException>(
                 () => MembershipBenefit.Create(
-                    MembershipType.Standard,
+                    MembershipType.Jasper,
                     null,
                     "Description"
                 )
             );
-        }
     }
 }

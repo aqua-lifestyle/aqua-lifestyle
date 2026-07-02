@@ -12,18 +12,18 @@ namespace AqualLifeStyle.Tests
             var membership = Membership.Create("Aqua Plus", "Premium access");
 
             Assert.True(membership.IsActive);
-            Assert.Equal(MembershipType.Standard, membership.MembershipType);
+            Assert.Equal(MembershipType.Jasper, membership.MembershipType);
             Assert.Equal("Aqua Plus", membership.Name);
         }
 
         [Fact]
         public void ChangeMembershipType_UpdatesTier()
         {
-            var membership = Membership.Create("Aqua Plus", "Premium access", MembershipType.Standard);
+            var membership = Membership.Create("Aqua Plus", "Premium access", MembershipType.Jasper);
 
-            membership.ChangeType(MembershipType.Premium);
+            membership.ChangeType(MembershipType.Onyx);
 
-            Assert.Equal(MembershipType.Premium, membership.MembershipType);
+            Assert.Equal(MembershipType.Onyx, membership.MembershipType);
         }
 
         [Fact]
