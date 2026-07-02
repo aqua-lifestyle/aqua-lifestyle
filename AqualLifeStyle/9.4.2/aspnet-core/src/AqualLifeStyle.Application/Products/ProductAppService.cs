@@ -31,14 +31,14 @@ namespace AqualLifeStyle.Application.Products
 
         public async Task<ProductDto> GetAsync(int id)
         {
-            var p = await _productRepository.GetByIdAsync(id);
+            var product = await _productRepository.GetAsync(id);
             return new ProductDto
             {
-                Id = p.Id,
-                Name = p.Name,
-                Price = p.Price,
-                MembershipId = p.MembershipId,
-                IsActive = p.IsActive
+                Id = product.Id,
+                Name = product.Name,
+                Price = product.Price,
+                MembershipId = product.MembershipId,
+                IsActive = product.IsActive
             };
         }
 
