@@ -9,5 +9,7 @@ namespace AqualLifeStyle.Application.Enquiries.Dto
         public string Response { get; set; }
         public int Status { get; set; }
         public string CreatedAt { get; set; }
+        public bool IsClosed { get; set; }
+        public bool IsPending { get; set; }
     }
 }

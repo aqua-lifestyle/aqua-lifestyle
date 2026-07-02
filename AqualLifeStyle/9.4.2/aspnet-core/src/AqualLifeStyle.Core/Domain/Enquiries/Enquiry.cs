@@ -42,5 +42,17 @@ namespace AqualLifeStyle.Domain.Enquiries
             if (Status == EnquiryStatus.Closed) return;
             Status = EnquiryStatus.Closed;
         }
+
+        public void MarkAsResponded(string response)
+        {
+            Respond(response);
+        }
+
+        public void Reopen()
+        {
+            if (Status != EnquiryStatus.Closed) throw new InvalidOperationException("Only closed enquiries can be reopened.");
+            Status = EnquiryStatus.Pending;
+            Response = string.Empty;
+        }
     }
 }

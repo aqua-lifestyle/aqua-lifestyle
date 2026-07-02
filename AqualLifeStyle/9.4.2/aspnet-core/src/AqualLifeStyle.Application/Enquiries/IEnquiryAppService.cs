@@ -10,5 +10,8 @@ namespace AqualLifeStyle.Application.Enquiries
         Task<IReadOnlyList<EnquiryDto>> GetAllAsync();
         Task<EnquiryDto> GetAsync(int id);
         Task CreateAsync(CreateEnquiryDto input);
+        Task<EnquiryDto> RespondAsync(int id, RespondToEnquiryDto input);
+        Task<EnquiryDto> CloseAsync(int id);
+        Task<EnquiryDto> ReopenAsync(int id);
     }
 }
