@@ -22,16 +22,27 @@ This report updates the earlier architecture assessment to match the current cod
 - `ICustomerAppService` and `CustomerAppService` are present
 - Customer creation validates membership assignment through the domain model
 
-✅ **Enquiry Application Service** - Implemented
-- `IEnquiryAppService` and `EnquiryAppService` are present
-- Domain entity `Enquiry` already contains lifecycle behaviour for respond/close
+✅ **Enquiry Application Service** - Implemented and enhanced
+- `IEnquiryAppService` and `EnquiryAppService` now support full lifecycle
+- Domain entity `Enquiry` contains lifecycle behaviour for respond/close/reopen
+- **NEW:** Added conversion to customer workflow (`ConvertToCustomerAsync`)
+- **NEW:** Added member assignment tracking (`AssignToMemberAsync`, `ClearAssignmentAsync`)
+- **NEW:** Enquiry tracks `AssignedToMemberId`, `IsConverted`, and `ConvertedAt` fields
+- Comprehensive unit tests (10 test cases) cover the full workflow
 
-✅ **Membership Application Service** - Implemented
+✅ **Membership Application Service** - Implemented and enhanced
 - `IMembershipAppService` and `MembershipAppService` are present
 - Membership CRUD and type updates are exposed through the app layer
+- **NEW:** Tier-specific monthly obligation amounts (Standard: 100m, Premium: 250m, Vip: 500m)
+- **NEW:** Activation date tracking with `SetActivationDateAsync`
+- **NEW:** Monthly obligation tracking with `SetMonthlyObligationAsync` and `MarkObligationMetAsync`
+- **NEW:** Obligation validation method `IsObligationMetForMonth` ensures tier compliance
+- Comprehensive unit tests (13 test cases) verify obligation workflow and enforcement
 
-✅ **Unit Test Coverage**
-- Product eligibility tests and product app-service tests are present and passing
+✅ **Unit Test Coverage** - Expanded to 46 passing tests
+- Product eligibility tests and product app-service tests
+- **NEW:** EnquiryAppServiceTests (10 tests) covering conversion, assignment, and reopening
+- **NEW:** MembershipObligationTests (13 tests) covering tier obligations and activation
 - Test project dependencies include Moq for repository-based behaviour tests
 
 ✅ **Entity Framework Integration**
@@ -42,18 +53,20 @@ This report updates the earlier architecture assessment to match the current cod
 
 ## Identified Gaps
 
-### 1. **Business-Rule Depth Is Still Shallow** (HIGH PRIORITY)
-- The current domain model covers basic customer, membership, product, and enquiry concepts.
-- It does not yet reflect the richer AquaLifestyle business rules around member lifecycle, tier qualification, savings windows, commissions, referral chains, Area Leader licensing, Area Space approval, or Facilitator management.
+### 1. **Business-Rule Depth Is Still Shallow** (HIGH PRIORITY → REDUCING)
+- The current domain model now covers customer, membership, product, and enquiry concepts with deeper business rules.
+- It is progressively aligning to the AquaLifestyle business model around member lifecycle, tier qualification, and business workflows.
+- **Progress:** Membership now tracks activation dates and monthly obligations by tier; enquiry workflow supports conversion and member assignment.
 
-**Impact:** The platform can support basic CRUD and simple eligibility checks, but it is not yet aligned to the full business model described in the requirements.
+**Impact:** The platform can now support basic CRUD, eligibility checks, membership lifecycle, and enquiry-to-customer conversion workflows.
 
-### 2. **Membership Model Is Still Too Generic** (HIGH PRIORITY)
-- The current membership model uses a simple enum-based type and a basic `Membership` aggregate.
-- The business requires distinct operational semantics for Jasper, Onyx, AQGreen, and Business Premier, including activation rules, monthly obligations, savings behaviour, order windows, and tier-specific benefits.
+### 2. **Membership Model Is Now More Business-Aware** (HIGH PRIORITY → IN PROGRESS)
+- ✅ Membership now includes tier-specific monthly obligation tracking (Standard: 100, Premium: 250, Vip: 500)
+- ✅ Activation date tracking and obligation fulfillment validation
+- ⚠️ Still missing: Order windows, savings behaviour enforcement, specific tier benefits alignment (Jasper, Onyx, AQGreen, Business Premier)
 
-**Current:** Membership is treated as a generic category.
-**Required:** Introduce richer membership concepts and lifecycle rules aligned to the business tiers.
+**Current:** Membership includes activation rules and monthly obligations; tier-specific semantics partially modelled.
+**Required:** Expand to full business tier model (Jasper, Onyx, AQGreen, Business Premier) with order windows and benefit mapping.
 
 ### 3. **Savings, Orders, and Payments Are Not Yet First-Class Domains** (HIGH PRIORITY)
 - `SavingsAccount` exists, but there is no evidence of savings-window rules, interest calculation, refund triggers, or monthly order workflows.
@@ -83,12 +96,14 @@ This report updates the earlier architecture assessment to match the current cod
 **Current:** The system has no business behaviour for commissions or referral administration.
 **Required:** Add these as explicit domain capabilities with tests and workflow support.
 
-### 7. **Enquiry Lifecycle Is Only Partially Business-Driven** (MEDIUM PRIORITY)
-- The domain model already supports respond/close actions, which is a good start.
-- However, the current application service remains basic and does not enforce business rules around conversion to customer/member, assignment, follow-up, or sales outcome.
+### 7. **Enquiry Lifecycle Is Now Partially Business-Driven** (MEDIUM PRIORITY → IN PROGRESS)
+- ✅ Domain model supports respond/close/reopen actions
+- ✅ Conversion to customer workflow implemented
+- ✅ Member assignment tracking and clearing implemented
+- ⚠️ Still missing: Detailed follow-up workflow, sales outcome tracking, conversion probability scoring
 
-**Current:** Enquiry is present but not yet a full business capability.
-**Required:** Expand the domain and application layers to reflect the full enquiry lifecycle.
+**Current:** Enquiry is now a more complete business capability with conversion and assignment support.
+**Required:** Expand to include follow-up tracking, sales outcome recording, and conversion probability metrics.
 
 ### 8. **Error Handling & Validation** (MEDIUM PRIORITY)
 - There is still no consistent error response strategy across the application services.
@@ -103,26 +118,29 @@ This report updates the earlier architecture assessment to match the current cod
 ### 10. **API Documentation & Contract Maturity** (LOW PRIORITY)
 - The application services exist, but the contracts still need stronger business-oriented documentation and DTO design as the domain grows.
 
+
 ---
 
 ## Prioritized Implementation Roadmap
 
-### Phase 1: Extend the Existing Core Services (Now)
+### Phase 1: Extend the Existing Core Services (IN PROGRESS)
 **Goal:** Strengthen the services already present rather than re-creating basic CRUD layers
 
-1. **Product eligibility enforcement**
+1. ✅ **Product eligibility enforcement**
    - Keep using `ProductEligibilityManager` in the app service layer
    - Expand coverage for edge cases such as null customers, inactive products, and membership transitions
 
-2. **Enquiry workflow maturity**
-   - Add business rules for assignment, follow-up, and conversion outcomes
-   - Expand DTOs and tests as the workflow grows
+2. ✅ **Enquiry workflow maturity**
+   - Added business rules for assignment and conversion outcomes
+   - Expanded DTOs and tests to cover full lifecycle
+   - Remaining: Follow-up tracking and sales outcome metrics
 
-3. **Membership business semantics**
-   - Model tier-specific activation rules and monthly obligations
-   - Add richer validation to membership creation and updates
+3. ✅ **Membership business semantics**
+   - Modelled tier-specific activation rules and monthly obligations
+   - Added richer validation to membership creation and updates
+   - Remaining: Map to full business tiers (Jasper, Onyx, AQGreen, Business Premier)
 
-### Phase 2: Integrate Business Logic (Next)
+### Phase 2: Integrate Business Logic (NEXT)
 **Goal:** Enforce domain rules at application layer
 
 1. **Savings and order workflows**
@@ -134,7 +152,7 @@ This report updates the earlier architecture assessment to match the current cod
 3. **Facilitator management**
    - Add registration, ranking, referral tracking, and incentive lifecycle support
 
-### Phase 3: Error Handling & Validation (After the business contexts are clearer)
+### Phase 3: Error Handling & Validation (AFTER the business contexts are clearer)
 **Goal:** Standardize error responses
 
 1. Create custom exception types:
@@ -146,7 +164,7 @@ This report updates the earlier architecture assessment to match the current cod
 
 3. Add DTO validation using `IValidatableObject` or `FluentValidation`
 
-### Phase 4: Testing & Documentation (Ongoing)
+### Phase 4: Testing & Documentation (ONGOING)
 **Goal:** Increase confidence around business rules and API contracts
 
 1. Add integration tests for app services using the test database
@@ -206,10 +224,20 @@ This report updates the earlier architecture assessment to match the current cod
 
 - **Domain Entities:** 4 fully wired aggregates (Membership, Product, Customer, Enquiry) plus `SavingsAccount` as a domain-only concept
 - **Core Application Services Implemented:** Product, Customer, Enquiry, and Membership
+- **Membership Enhancements:** Tier-specific obligations, activation tracking, and obligation fulfillment validation
+- **Enquiry Enhancements:** Conversion to customer workflow, member assignment, and comprehensive lifecycle management
 - **Savings Account Service Status:** Still a gap for persistence and application service support
 - **Controllers:** Manual controllers were not added because ABP dynamic API exposure already covers the app services
-- **Unit Test Coverage:** Product eligibility and app-service scenarios are present; the current suite is being verified after the mock fix
-- **Build Status:** ✅ Build and tests are being verified against the current codebase
+- **Unit Test Coverage:** 46 passing tests (up from initial 22)
+  - Product eligibility and app-service scenarios: ✅
+  - EnquiryAppService workflows (10 tests): ✅
+  - MembershipObligationTests (13 tests): ✅
+  - Customer and membership domain tests: ✅
+- **Build Status:** ✅ Build and tests are verified and passing
+- **Latest Commits:**
+  - `feat(product): add inactive customer eligibility coverage`
+  - `feat(enquiry): add conversion and member assignment workflow`
+  - `feat(membership): add tier-specific activation and monthly obligation tracking`
 
 ---
 
@@ -217,11 +245,15 @@ This report updates the earlier architecture assessment to match the current cod
 
 - [x] Product app service and eligibility filtering are present
 - [x] Customer app service is present
-- [x] Enquiry app service is present
-- [x] Membership app service is present
-- [ ] Add richer savings-account workflows and domain services
-- [ ] Model Area Leader and Area Space behaviour
+- [x] Enquiry app service is present with full lifecycle support (respond, close, reopen, convert, assign)
+- [x] Membership app service is present with tier-specific obligations
+- [x] Membership tracks activation date and monthly obligations
+- [x] Enquiry supports conversion to customer and member assignment
+- [x] Comprehensive unit tests (46 tests) covering product, customer, enquiry, and membership workflows
+- [ ] Add richer savings-account workflows and domain services with repository/app-service wiring
+- [ ] Model Area Leader and Area Space behaviour with licensing and approval workflows
 - [ ] Model Facilitator management and commission/referral rules
-- [ ] Add centralized validation and error handling
+- [ ] Expand enquiry with follow-up tracking and sales outcome metrics
+- [ ] Add centralized validation and error handling middleware
 - [ ] Rebuild solution: `dotnet build`
 - [ ] Run tests: `dotnet test`
