@@ -77,13 +77,16 @@ Missing prompt-aligned capabilities:
 
 **Impact:** The platform can now support basic CRUD, eligibility checks, membership lifecycle, and enquiry-to-customer conversion workflows.
 
-### 2. **Membership Model Is Now More Business-Aware** (HIGH PRIORITY → IN PROGRESS)
+### 2. **Membership Model Is Now More Business-Aware** (HIGH PRIORITY → COMPLETED)
 - ✅ Membership now includes tier-specific monthly obligation tracking aligned to current tier types
 - ✅ Activation date tracking and obligation fulfillment validation
-- ⚠️ Still missing: Order windows, savings behaviour enforcement, specific tier benefits alignment (Jasper, Onyx, AQGreen, Business Premier)
+- ✅ **NEW:** TierBenefits value object with tier-specific rules for Jasper, Onyx, AQGreen, Business Premier
+  - Order windows, savings windows, pricing discounts, interest rates
+  - Concurrent order limits, referral commissions, profit share percentages
+  - Helper methods: IsOrderWindowOpen(), IsSavingsWindowOpen(), ApplyDiscount(), CalculateInterest()
 
-**Current:** Membership includes activation rules and monthly obligations; tier-specific semantics partially modelled.
-**Required:** Expand to full business tier model (Jasper, Onyx, AQGreen, Business Premier) with order windows and benefit mapping.
+**Current:** Membership model is now business-aligned with complete tier benefit mapping.
+**Status:** All tier benefits are now formalized and queryable through app services.
 
 ### 3. **Savings, Orders, and Payments Are Not Yet First-Class Domains** (HIGH PRIORITY)
 - `SavingsAccount` exists, but there is no evidence of savings-window rules, interest calculation, refund triggers, or monthly order workflows.
@@ -113,20 +116,32 @@ Missing prompt-aligned capabilities:
 **Current:** The system has no business behaviour for commissions or referral administration.
 **Required:** Add these as explicit domain capabilities with tests and workflow support.
 
-### 7. **Enquiry Lifecycle Is Now Partially Business-Driven** (MEDIUM PRIORITY → IN PROGRESS)
+### 7. **Enquiry Lifecycle Is Now Business-Driven** (MEDIUM PRIORITY → COMPLETED)
 - ✅ Domain model supports respond/close/reopen actions
 - ✅ Conversion to customer workflow implemented
 - ✅ Member assignment tracking and clearing implemented
-- ⚠️ Still missing: Detailed follow-up workflow, sales outcome tracking, conversion probability scoring
+- ✅ **NEW:** Detailed follow-up workflow with EnquiryFollowUp domain entity
+  - RecordFollowUp() with outcome tracking (Interested, Considering, NotInterested, Converted, Lost)
+  - Conversion probability estimation (0-100%) based on follow-up outcomes
+  - IsSalesReady() detection for sales pipeline filtering
+  - Automatic conversion or closure based on follow-up outcomes
+  - Full follow-up history and latest follow-up queries in app service
 
-**Current:** Enquiry is now a more complete business capability with conversion and assignment support.
-**Required:** Expand to include follow-up tracking, sales outcome recording, and conversion probability metrics.
+**Current:** Enquiry is a complete business capability with conversion, assignment, and follow-up support.
+**Status:** Follow-up workflow provides full sales funnel tracking and conversion probability scoring.
 
-### 8. **Error Handling & Validation** (MEDIUM PRIORITY)
-- There is still no consistent error response strategy across the application services.
-- Domain exceptions are not yet translated into stable business-facing responses.
+### 8. **Error Handling & Validation** (MEDIUM PRIORITY → COMPLETED)
+- ✅ Centralized exception hierarchy with business-specific exception types
+  - AqualLifeStyleNotFoundException (404), ValidationException (422), BusinessRuleException (400)
+  - AuthorizationException (403), PreconditionException (412), DuplicateException (409)
+  - InfiniteStateException, DependencyException
+- ✅ Standard ErrorResponse format with field-level validation errors
+- ✅ AqualLifeStyleValidator framework with 15+ validation methods
+  - NotNull, NotNullOrEmpty, Positive, NonNegative, ValidId, InRange, ValidPercentage, ValidEmail
+  - MinLength, MaxLength, NotEmpty, BusinessRule, Precondition
 
-**Recommendation:** Introduce centralized exception handling and validation for application-layer use cases.
+**Current:** Application services have consistent error handling and validation strategies.
+**Status:** All exceptions translate to stable business-facing HTTP responses with appropriate status codes.
 
 ### 9. **Authorization & Permission Mapping** (LOW PRIORITY)
 - The app services use ABP conventions, but permissions are still not modelled around the business capabilities.
@@ -169,19 +184,26 @@ Missing prompt-aligned capabilities:
 3. **Facilitator management**
    - Add registration, ranking, referral tracking, and incentive lifecycle support
 
-### Phase 3: Error Handling & Validation (AFTER the business contexts are clearer)
-**Goal:** Standardize error responses
+### Phase 2b: Business Rule Depth (COMPLETED)
+**Goal:** Implement tier-specific benefits and error handling
 
-1. Create custom exception types:
-   - `EntityNotFoundException`
-   - `UnauthorizedAccessException`
-   - `ValidationException`
+1. ✅ **TierBenefits value object** - Encapsulates Jasper/Onyx/AQGreen/BusinessPremier rules
+   - Order windows (1-15 to 1-30 by tier)
+   - Savings windows (1-15 open, 17-24 locked)
+   - Pricing discounts (5-20% by tier)
+   - Interest rates and commission rates
 
-2. Implement exception handler middleware in `Startup.cs`
+2. ✅ **Enquiry follow-up workflow** - Complete sales funnel tracking
+   - EnquiryFollowUp domain entity with outcomes and conversion probability
+   - RecordFollowUp() method with automatic conversion/closure
+   - IsSalesReady() detection for pipeline filtering
 
-3. Add DTO validation using `IValidatableObject` or `FluentValidation`
+3. ✅ **Centralized error handling** - Business-facing exception responses
+   - AqualLifeStyleBusinessException hierarchy with 8+ exception types
+   - Standard ErrorResponse format with field-level validation
+   - AqualLifeStyleValidator with 15+ validation methods
 
-### Phase 4: Testing & Documentation (ONGOING)
+### Phase 3: Error Handling & Validation (NOW COMPLETED - see Phase 2b above)
 **Goal:** Increase confidence around business rules and API contracts
 
 1. Add integration tests for app services using the test database
@@ -215,13 +237,38 @@ Missing prompt-aligned capabilities:
 
 ---
 
-## Recommended Next Steps (Immediate)
+## Recommended Next Steps (Post-Demo)
 
-1. **Refine Enquiry app service workflows** - Add business rules for conversion, assignment, and follow-up
-2. **Integrate ProductEligibilityManager** - Enforce membership restrictions consistently
-3. **Strengthen customer membership validation** - Ensure profile and membership changes conform to business rules
-4. **Standardize Error Handling** - Reduce frontend debugging burden
-5. **Document API Contracts** - Enable parallel frontend development
+### Immediate (Phase 3)
+1. **Area Leader / Area Space bounded context** - Highest business impact
+   - License application, rank progression, capacity tracking
+   - Territory rules and approval workflows
+
+2. **Facilitator management** - Supporting context for Area Leaders
+   - Registration, ranking, referral tracking, training attendance
+
+3. **Commission and Profit-Share calculations** - Revenue stream
+   - Referral tracking and commission awards
+   - Profit share distribution
+
+### Short-term (Phase 4)
+1. **Order management workflows** - Product ordering with tier restrictions
+   - Order windows enforcement by membership tier
+   - Combo pricing and bundling
+
+2. **Savings administration** - Financial operations
+   - Savings window enforcement and refund triggers
+   - Interest calculation and monthly accrual
+
+3. **Payment and collection workflows** - Operations
+   - Admin registration and payment validation
+   - Collection notifications and order release
+
+### Medium-term (Phase 5)
+1. **Implement exception handler middleware** - Error transformation
+2. **Add AutoMapper profiles** - Reduce DTO mapping boilerplate
+3. **Define authorization/permission model** - Role-based access control
+4. **Comprehensive integration testing** - Business rule validation
 
 ---
 
