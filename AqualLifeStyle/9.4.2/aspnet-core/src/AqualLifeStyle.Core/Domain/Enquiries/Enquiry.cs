@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Abp.Domain.Entities;
 using AqualLifeStyle.Domain.Enums;
 
@@ -16,6 +18,13 @@ namespace AqualLifeStyle.Domain.Enquiries
         public bool IsConverted { get; private set; }
         public DateTime? ConvertedAt { get; private set; }
 
+        // Follow-up workflow fields
+        private readonly List<EnquiryFollowUp> _followUps = new();
+        public IReadOnlyList<EnquiryFollowUp> FollowUps => _followUps.AsReadOnly();
+        
+        public decimal ConversionProbability { get; private set; } // Aggregate conversion probability (0-100)
+        public DateTime? LastFollowUpDate { get; private set; }
+
         protected Enquiry() { }
 
         private Enquiry(int customerId, int productId, string message)
@@ -28,6 +37,7 @@ namespace AqualLifeStyle.Domain.Enquiries
             CreatedAt = DateTime.UtcNow;
             Response = string.Empty;
             IsConverted = false;
+            ConversionProbability = 0m;
         }
 
         public static Enquiry Create(int customerId, int productId, string message)
@@ -72,12 +82,66 @@ namespace AqualLifeStyle.Domain.Enquiries
             IsConverted = true;
             ConvertedAt = DateTime.UtcNow;
             Status = EnquiryStatus.Closed;
+            ConversionProbability = 100m;
         }
 
         public void ClearAssignment()
         {
             if (IsConverted) throw new InvalidOperationException("Converted enquiries cannot be un-assigned.");
             AssignedToMemberId = null;
+        }
+
+        /// <summary>
+        /// Record a follow-up attempt on this enquiry with outcome tracking and probability estimation.
+        /// </summary>
+        public void RecordFollowUp(int? memberId, string notes, EnquiryFollowUpOutcome outcome)
+        {
+            if (IsConverted)
+            {
+                throw new InvalidOperationException("Cannot record follow-ups on already-converted enquiries.");
+            }
+
+            var followUp = EnquiryFollowUp.Create(Id, memberId, notes, outcome);
+            _followUps.Add(followUp);
+            LastFollowUpDate = followUp.FollowUpDate;
+
+            // Update conversion probability based on latest follow-up
+            ConversionProbability = followUp.ConversionProbability;
+
+            // Auto-convert if follow-up indicates conversion
+            if (outcome == EnquiryFollowUpOutcome.Converted)
+            {
+                ConvertToCustomer();
+            }
+            // Mark as closed if lead is lost
+            else if (outcome == EnquiryFollowUpOutcome.Lost && Status != EnquiryStatus.Closed)
+            {
+                Close();
+            }
+        }
+
+        /// <summary>
+        /// Get the most recent follow-up on this enquiry.
+        /// </summary>
+        public EnquiryFollowUp GetLatestFollowUp()
+        {
+            return _followUps.OrderByDescending(f => f.FollowUpDate).FirstOrDefault();
+        }
+
+        /// <summary>
+        /// Get total number of follow-ups recorded for this enquiry.
+        /// </summary>
+        public int GetFollowUpCount()
+        {
+            return _followUps.Count;
+        }
+
+        /// <summary>
+        /// Check if this enquiry is sales-ready based on follow-up engagement.
+        /// </summary>
+        public bool IsSalesReady()
+        {
+            return ConversionProbability >= 50m && Status == EnquiryStatus.Responded;
         }
     }
 }

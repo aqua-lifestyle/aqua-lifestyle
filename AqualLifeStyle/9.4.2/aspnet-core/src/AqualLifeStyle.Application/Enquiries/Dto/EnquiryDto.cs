@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace AqualLifeStyle.Application.Enquiries.Dto
 {
     public class EnquiryDto
@@ -14,5 +17,12 @@ namespace AqualLifeStyle.Application.Enquiries.Dto
         public int? AssignedToMemberId { get; set; }
         public bool IsConverted { get; set; }
         public string? ConvertedAt { get; set; }
+
+        // Follow-up workflow fields
+        public decimal ConversionProbability { get; set; }
+        public DateTime? LastFollowUpDate { get; set; }
+        public int FollowUpCount { get; set; }
+        public bool IsSalesReady { get; set; }
+        public List<EnquiryFollowUpDto> FollowUps { get; set; } = new();
     }
 }

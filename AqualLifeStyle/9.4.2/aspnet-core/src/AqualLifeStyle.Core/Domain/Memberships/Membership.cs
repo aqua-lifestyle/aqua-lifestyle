@@ -113,7 +113,46 @@ namespace AqualLifeStyle.Domain.Memberships
                 throw new InvalidOperationException("Inactive memberships cannot be assigned to new customers.");
             }
         }
+        /// <summary>
+        /// Get tier-specific benefits for this membership.
+        /// Benefits include order windows, savings behaviour, discounts, and commission rates.
+        /// </summary>
+        public TierBenefits GetTierBenefits()
+        {
+            return TierBenefits.ForTier(MembershipType);
+        }
 
+        /// <summary>
+        /// Check if it's within the order window for this membership tier.
+        /// </summary>
+        public bool IsOrderWindowOpen(DateTime? date = null)
+        {
+            return GetTierBenefits().IsOrderWindowOpen(date);
+        }
+
+        /// <summary>
+        /// Check if it's within the savings window (open period) for this membership tier.
+        /// </summary>
+        public bool IsSavingsWindowOpen(DateTime? date = null)
+        {
+            return GetTierBenefits().IsSavingsWindowOpen(date);
+        }
+
+        /// <summary>
+        /// Get the maximum number of concurrent orders allowed for this tier.
+        /// </summary>
+        public int GetMaxConcurrentOrders()
+        {
+            return GetTierBenefits().MaxConcurrentOrders;
+        }
+
+        /// <summary>
+        /// Calculate effective price after applying tier discount.
+        /// </summary>
+        public decimal ApplyTierDiscount(decimal basePrice)
+        {
+            return GetTierBenefits().ApplyDiscount(basePrice);
+        }
         private void SetName(string name)
         {
             if (string.IsNullOrWhiteSpace(name))

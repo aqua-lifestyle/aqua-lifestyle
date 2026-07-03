@@ -1,8 +1,11 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Application.Services;
 using AqualLifeStyle.Application.Enquiries.Dto;
+using AqualLifeStyle.Application.Exceptions;
+using AqualLifeStyle.Application.Validation;
 using AqualLifeStyle.Domain.Enquiries;
 using AqualLifeStyle.Domain.Enums;
 
@@ -25,27 +28,63 @@ namespace AqualLifeStyle.Application.Enquiries
 
         public async Task<EnquiryDto> GetAsync(int id)
         {
+            AqualLifeStyleValidator.ValidId(id);
+            
             var enquiry = await _enquiryRepository.GetAsync(id);
+            if (enquiry == null)
+            {
+                throw new AqualLifeStyleNotFoundException("Enquiry", id);
+            }
+
             return MapToDto(enquiry);
         }
 
         public async Task CreateAsync(CreateEnquiryDto input)
         {
+            AqualLifeStyleValidator.NotNull(input, nameof(input));
+            AqualLifeStyleValidator.ValidId(input.CustomerId, nameof(input.CustomerId));
+            AqualLifeStyleValidator.ValidId(input.ProductId, nameof(input.ProductId));
+            AqualLifeStyleValidator.NotNullOrEmpty(input.Message, nameof(input.Message));
+
             var enquiry = Enquiry.Create(input.CustomerId, input.ProductId, input.Message);
             await _enquiryRepository.InsertAsync(enquiry);
         }
 
         public async Task<EnquiryDto> RespondAsync(int id, RespondToEnquiryDto input)
         {
+            AqualLifeStyleValidator.ValidId(id);
+            AqualLifeStyleValidator.NotNull(input, nameof(input));
+            AqualLifeStyleValidator.NotNullOrEmpty(input.Response, nameof(input.Response));
+
             var enquiry = await _enquiryRepository.GetAsync(id);
-            enquiry.MarkAsResponded(input.Response);
+            if (enquiry == null)
+            {
+                throw new AqualLifeStyleNotFoundException("Enquiry", id);
+            }
+
+            try
+            {
+                enquiry.MarkAsResponded(input.Response);
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw new AqualLifeStyleInvalidStateException("Enquiry", enquiry.Status.ToString(), "respond");
+            }
+
             await _enquiryRepository.UpdateAsync(enquiry);
             return MapToDto(enquiry);
         }
 
         public async Task<EnquiryDto> CloseAsync(int id)
         {
+            AqualLifeStyleValidator.ValidId(id);
+
             var enquiry = await _enquiryRepository.GetAsync(id);
+            if (enquiry == null)
+            {
+                throw new AqualLifeStyleNotFoundException("Enquiry", id);
+            }
+
             enquiry.Close();
             await _enquiryRepository.UpdateAsync(enquiry);
             return MapToDto(enquiry);
@@ -53,34 +92,158 @@ namespace AqualLifeStyle.Application.Enquiries
 
         public async Task<EnquiryDto> ReopenAsync(int id)
         {
+            AqualLifeStyleValidator.ValidId(id);
+
             var enquiry = await _enquiryRepository.GetAsync(id);
-            enquiry.Reopen();
+            if (enquiry == null)
+            {
+                throw new AqualLifeStyleNotFoundException("Enquiry", id);
+            }
+
+            try
+            {
+                enquiry.Reopen();
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw new AqualLifeStyleInvalidStateException("Enquiry", enquiry.Status.ToString(), "reopen");
+            }
+
             await _enquiryRepository.UpdateAsync(enquiry);
             return MapToDto(enquiry);
         }
 
         public async Task<EnquiryDto> AssignToMemberAsync(int id, AssignEnquiryDto input)
         {
+            AqualLifeStyleValidator.ValidId(id);
+            AqualLifeStyleValidator.NotNull(input, nameof(input));
+            AqualLifeStyleValidator.ValidId(input.MemberId, nameof(input.MemberId));
+
             var enquiry = await _enquiryRepository.GetAsync(id);
-            enquiry.AssignToMember(input.MemberId);
+            if (enquiry == null)
+            {
+                throw new AqualLifeStyleNotFoundException("Enquiry", id);
+            }
+
+            try
+            {
+                enquiry.AssignToMember(input.MemberId);
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw new AqualLifeStyleBusinessRuleException(ex.Message);
+            }
+
             await _enquiryRepository.UpdateAsync(enquiry);
             return MapToDto(enquiry);
         }
 
         public async Task<EnquiryDto> ConvertToCustomerAsync(int id, ConvertEnquiryToCustomerDto input)
         {
+            AqualLifeStyleValidator.ValidId(id);
+
             var enquiry = await _enquiryRepository.GetAsync(id);
-            enquiry.ConvertToCustomer();
+            if (enquiry == null)
+            {
+                throw new AqualLifeStyleNotFoundException("Enquiry", id);
+            }
+
+            try
+            {
+                enquiry.ConvertToCustomer();
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw new AqualLifeStyleBusinessRuleException(ex.Message);
+            }
+
             await _enquiryRepository.UpdateAsync(enquiry);
             return MapToDto(enquiry);
         }
 
         public async Task<EnquiryDto> ClearAssignmentAsync(int id, ClearAssignmentDto input)
         {
+            AqualLifeStyleValidator.ValidId(id);
+
             var enquiry = await _enquiryRepository.GetAsync(id);
-            enquiry.ClearAssignment();
+            if (enquiry == null)
+            {
+                throw new AqualLifeStyleNotFoundException("Enquiry", id);
+            }
+
+            try
+            {
+                enquiry.ClearAssignment();
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw new AqualLifeStyleBusinessRuleException(ex.Message);
+            }
+
             await _enquiryRepository.UpdateAsync(enquiry);
             return MapToDto(enquiry);
+        }
+
+        /// <summary>
+        /// Record a follow-up attempt on an enquiry with outcome tracking.
+        /// </summary>
+        public async Task<EnquiryFollowUpDto> RecordFollowUpAsync(int id, CreateEnquiryFollowUpDto input)
+        {
+            AqualLifeStyleValidator.ValidId(id);
+            AqualLifeStyleValidator.NotNull(input, nameof(input));
+            AqualLifeStyleValidator.NotNullOrEmpty(input.FollowUpNotes, nameof(input.FollowUpNotes));
+
+            var enquiry = await _enquiryRepository.GetAsync(id);
+            if (enquiry == null)
+            {
+                throw new AqualLifeStyleNotFoundException("Enquiry", id);
+            }
+
+            try
+            {
+                var followUpOutcome = (EnquiryFollowUpOutcome)input.Outcome;
+                enquiry.RecordFollowUp(input.FollowUpByMemberId, input.FollowUpNotes, followUpOutcome);
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw new AqualLifeStyleBusinessRuleException(ex.Message);
+            }
+
+            await _enquiryRepository.UpdateAsync(enquiry);
+
+            var followUp = enquiry.GetLatestFollowUp();
+            return MapFollowUpToDto(followUp);
+        }
+
+        /// <summary>
+        /// Get all follow-ups for an enquiry.
+        /// </summary>
+        public async Task<List<EnquiryFollowUpDto>> GetFollowUpsAsync(int id)
+        {
+            AqualLifeStyleValidator.ValidId(id);
+
+            var enquiry = await _enquiryRepository.GetAsync(id);
+            if (enquiry == null)
+            {
+                throw new AqualLifeStyleNotFoundException("Enquiry", id);
+            }
+
+            return enquiry.FollowUps
+                .OrderByDescending(f => f.FollowUpDate)
+                .Select(MapFollowUpToDto)
+                .ToList();
+        }
+
+        /// <summary>
+        /// Get enquiries that are ready for sales action based on conversion probability.
+        /// </summary>
+        public async Task<List<EnquiryDto>> GetSalesReadyEnquiriesAsync()
+        {
+            var enquiries = await _enquiryRepository.GetAllListAsync();
+            return enquiries
+                .Where(e => e.IsSalesReady())
+                .Select(MapToDto)
+                .ToList();
         }
 
         private static EnquiryDto MapToDto(Enquiry enquiry)
@@ -98,7 +261,31 @@ namespace AqualLifeStyle.Application.Enquiries
                 IsPending = enquiry.Status == EnquiryStatus.Pending,
                 AssignedToMemberId = enquiry.AssignedToMemberId,
                 IsConverted = enquiry.IsConverted,
-                ConvertedAt = enquiry.ConvertedAt?.ToString("u")
+                ConvertedAt = enquiry.ConvertedAt?.ToString("u"),
+                ConversionProbability = enquiry.ConversionProbability,
+                LastFollowUpDate = enquiry.LastFollowUpDate,
+                FollowUpCount = enquiry.GetFollowUpCount(),
+                IsSalesReady = enquiry.IsSalesReady(),
+                FollowUps = enquiry.FollowUps
+                    .OrderByDescending(f => f.FollowUpDate)
+                    .Select(MapFollowUpToDto)
+                    .ToList()
+            };
+        }
+
+        private static EnquiryFollowUpDto MapFollowUpToDto(EnquiryFollowUp followUp)
+        {
+            return new EnquiryFollowUpDto
+            {
+                Id = followUp.Id,
+                EnquiryId = followUp.EnquiryId,
+                FollowUpDate = followUp.FollowUpDate,
+                FollowUpByMemberId = followUp.FollowUpByMemberId,
+                FollowUpNotes = followUp.FollowUpNotes,
+                Outcome = (int)followUp.Outcome,
+                OutcomeText = followUp.Outcome.ToString(),
+                ConversionProbability = followUp.ConversionProbability,
+                IsResolved = followUp.IsResolved
             };
         }
     }
