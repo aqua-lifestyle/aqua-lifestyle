@@ -16,5 +16,8 @@ namespace AqualLifeStyle.Application.Enquiries
         Task<EnquiryDto> AssignToMemberAsync(int id, AssignEnquiryDto input);
         Task<EnquiryDto> ConvertToCustomerAsync(int id, ConvertEnquiryToCustomerDto input);
         Task<EnquiryDto> ClearAssignmentAsync(int id, ClearAssignmentDto input);
+        Task<EnquiryFollowUpDto> RecordFollowUpAsync(int id, CreateEnquiryFollowUpDto input);
+        Task<List<EnquiryFollowUpDto>> GetFollowUpsAsync(int id);
+        Task<List<EnquiryDto>> GetSalesReadyEnquiriesAsync();
     }
 }

@@ -1612,11 +1612,26 @@ namespace AqualLifeStyle.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AssignedToMemberId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("ConversionProbability")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTime?>("ConvertedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("CustomerId")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("IsConverted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastFollowUpDate")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Message")
                         .IsRequired()
@@ -1637,6 +1652,44 @@ namespace AqualLifeStyle.Migrations
                     b.ToTable("Enquiries", (string)null);
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.Domain.Enquiries.EnquiryFollowUp", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("ConversionProbability")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("EnquiryId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("FollowUpByMemberId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("FollowUpDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FollowUpNotes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsResolved")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnquiryId");
+
+                    b.ToTable("EnquiryFollowUps", (string)null);
+                });
+
             modelBuilder.Entity("AqualLifeStyle.Domain.Memberships.Membership", b =>
                 {
                     b.Property<int>("Id")
@@ -1645,6 +1698,9 @@ namespace AqualLifeStyle.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("ActivationDate")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Description")
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
@@ -1652,8 +1708,14 @@ namespace AqualLifeStyle.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTime?>("LastObligationMetDate")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("MembershipType")
                         .HasColumnType("integer");
+
+                    b.Property<decimal>("MonthlyObligationAmount")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -2029,6 +2091,15 @@ namespace AqualLifeStyle.Migrations
                     b.Navigation("Email");
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.Domain.Enquiries.EnquiryFollowUp", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Enquiries.Enquiry", null)
+                        .WithMany("FollowUps")
+                        .HasForeignKey("EnquiryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("AqualLifeStyle.MultiTenancy.Tenant", b =>
                 {
                     b.HasOne("AqualLifeStyle.Authorization.Users.User", "CreatorUser")
@@ -2125,6 +2196,11 @@ namespace AqualLifeStyle.Migrations
                     b.Navigation("Settings");
 
                     b.Navigation("Tokens");
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Enquiries.Enquiry", b =>
+                {
+                    b.Navigation("FollowUps");
                 });
 #pragma warning restore 612, 618
         }

@@ -17,6 +17,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<Customer> Customers { get; set; }
         public virtual DbSet<Product> Products { get; set; }
         public virtual DbSet<Enquiry> Enquiries { get; set; }
+        public virtual DbSet<EnquiryFollowUp> EnquiryFollowUps { get; set; }
 
         public AqualLifeStyleDbContext(DbContextOptions<AqualLifeStyleDbContext> options)
             : base(options)
@@ -62,6 +63,19 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 entity.Property(e => e.IsActive).IsRequired();
             });
 
+            modelBuilder.Entity<EnquiryFollowUp>(entity =>
+            {
+                entity.ToTable("EnquiryFollowUps");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.EnquiryId).IsRequired();
+                entity.Property(e => e.FollowUpDate).IsRequired();
+                entity.Property(e => e.FollowUpByMemberId);
+                entity.Property(e => e.FollowUpNotes).IsRequired().HasMaxLength(2000);
+                entity.Property(e => e.Outcome).IsRequired();
+                entity.Property(e => e.ConversionProbability).IsRequired();
+                entity.Property(e => e.IsResolved).IsRequired();
+            });
+
             modelBuilder.Entity<Enquiry>(entity =>
             {
                 entity.ToTable("Enquiries");
@@ -70,6 +84,15 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 entity.Property(e => e.Message).IsRequired().HasMaxLength(2000);
                 entity.Property(e => e.Status).IsRequired();
                 entity.Property(e => e.CreatedAt).IsRequired();
+
+                entity.HasMany(e => e.FollowUps)
+                    .WithOne()
+                    .HasForeignKey(f => f.EnquiryId)
+                    .IsRequired()
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Navigation(e => e.FollowUps)
+                    .UsePropertyAccessMode(PropertyAccessMode.Field);
             });
         }
     }

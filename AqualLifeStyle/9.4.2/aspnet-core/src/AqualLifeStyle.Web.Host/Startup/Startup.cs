@@ -96,7 +96,7 @@ namespace AqualLifeStyle.Web.Host.Startup
 
             app.UseAbpRequestLocalization();
 
-            app.UseExceptionHandler("/Error");
+            app.UseMiddleware<ErrorHandlingMiddleware>();
 
             app.UseEndpoints(endpoints =>
             {
