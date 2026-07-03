@@ -1,8 +1,9 @@
 using System.Threading.Tasks;
-using Moq;
+using NSubstitute;
 using Xunit;
 using AqualLifeStyle.Application.Enquiries;
 using AqualLifeStyle.Application.Enquiries.Dto;
+using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Enquiries;
 
 namespace AqualLifeStyle.Tests
@@ -14,11 +15,11 @@ namespace AqualLifeStyle.Tests
         {
             var enquiry = Enquiry.Create(1, 2, "Initial message");
 
-            var repo = new Mock<IEnquiryRepository>();
-            repo.Setup(r => r.GetAsync(10)).ReturnsAsync(enquiry);
-            repo.Setup(r => r.UpdateAsync(enquiry)).ReturnsAsync(enquiry);
+            var repo = Substitute.For<IEnquiryRepository>();
+            repo.GetAsync(10).Returns(enquiry);
+            repo.UpdateAsync(enquiry).Returns(enquiry);
 
-            var svc = new EnquiryAppService(repo.Object);
+            var svc = new EnquiryAppService(repo);
 
             var result = await svc.RespondAsync(10, new RespondToEnquiryDto { Response = "Thanks" });
 
@@ -31,11 +32,11 @@ namespace AqualLifeStyle.Tests
         {
             var enquiry = Enquiry.Create(1, 2, "Question");
 
-            var repo = new Mock<IEnquiryRepository>();
-            repo.Setup(r => r.GetAsync(11)).ReturnsAsync(enquiry);
-            repo.Setup(r => r.UpdateAsync(enquiry)).ReturnsAsync(enquiry);
+            var repo = Substitute.For<IEnquiryRepository>();
+            repo.GetAsync(11).Returns(enquiry);
+            repo.UpdateAsync(enquiry).Returns(enquiry);
 
-            var svc = new EnquiryAppService(repo.Object);
+            var svc = new EnquiryAppService(repo);
 
             var result = await svc.CloseAsync(11);
 
@@ -50,11 +51,11 @@ namespace AqualLifeStyle.Tests
             enquiry.MarkAsResponded("ok");
             enquiry.Close();
 
-            var repo = new Mock<IEnquiryRepository>();
-            repo.Setup(r => r.GetAsync(12)).ReturnsAsync(enquiry);
-            repo.Setup(r => r.UpdateAsync(enquiry)).ReturnsAsync(enquiry);
+            var repo = Substitute.For<IEnquiryRepository>();
+            repo.GetAsync(12).Returns(enquiry);
+            repo.UpdateAsync(enquiry).Returns(enquiry);
 
-            var svc = new EnquiryAppService(repo.Object);
+            var svc = new EnquiryAppService(repo);
 
             var result = await svc.ReopenAsync(12);
 
