@@ -70,6 +70,9 @@ export const ProductsCatalog = () => {
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
+            <LinkButton href="/enquiries">
+              View enquiries
+            </LinkButton>
             <LinkButton href="/memberships">
               View memberships
             </LinkButton>
