@@ -77,5 +77,6 @@ namespace AqualLifeStyle.Tests
                     "Description"
                 )
             );
+        }
     }
 }
