@@ -1,14 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { z } from "zod";
 
-import { useCustomersActions, useCustomersState } from "@/src/providers";
-import { Button, StatusMessage, TextField } from "@/src/shared/ui";
+import {
+  useCustomersActions,
+  useCustomersState,
+  useMembershipsActions,
+  useMembershipsState,
+} from "@/src/providers";
+import { Button, SelectField, StatusMessage, TextField } from "@/src/shared/ui";
 
 const customerRegistrationSchema = z.object({
   email: z.string().trim().email("Enter a valid email address."),
+  membershipId: z
+    .union([z.literal(""), z.coerce.number().int().positive()])
+    .transform((value) => (value === "" ? null : value)),
   name: z
     .string()
     .trim()
@@ -38,13 +46,24 @@ const getFieldErrors = (
 
 export const CustomerRegistrationForm = () => {
   const { createCustomer } = useCustomersActions();
+  const { getMemberships } = useMembershipsActions();
   const {
     createErrorMessage,
     isCreateError,
     isCreatePending,
     isCreateSuccess,
   } = useCustomersState();
+  const {
+    errorMessage: membershipsErrorMessage,
+    isError: isMembershipsError,
+    isPending: isMembershipsPending,
+    memberships,
+  } = useMembershipsState();
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  useEffect(() => {
+    void getMemberships();
+  }, [getMemberships]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -53,6 +72,7 @@ export const CustomerRegistrationForm = () => {
     const formData = new FormData(form);
     const result = customerRegistrationSchema.safeParse({
       email: formData.get("email"),
+      membershipId: formData.get("membershipId"),
       name: formData.get("name"),
     });
 
@@ -65,7 +85,7 @@ export const CustomerRegistrationForm = () => {
 
     const wasCreated = await createCustomer({
       email: result.data.email,
-      membershipId: null,
+      membershipId: result.data.membershipId,
       name: result.data.name,
     });
 
@@ -92,8 +112,8 @@ export const CustomerRegistrationForm = () => {
               Customer registration
             </h1>
             <p className="max-w-2xl text-base text-zinc-600">
-              Create a customer record in the ABP backend. Membership assignment
-              is intentionally deferred to the next validated slice.
+              Create a customer record in the ABP backend with optional
+              membership assignment.
             </p>
           </div>
         </header>
@@ -121,6 +141,26 @@ export const CustomerRegistrationForm = () => {
               required
               type="email"
             />
+            <SelectField
+              disabled={isMembershipsPending || isCreatePending}
+              errorMessage={fieldErrors.membershipId}
+              label="Membership"
+              name="membershipId"
+            >
+              <option value="">No membership assigned</option>
+              {memberships.map((membership) => (
+                <option key={membership.id} value={membership.id}>
+                  {membership.name}
+                </option>
+              ))}
+            </SelectField>
+
+            {isMembershipsError ? (
+              <StatusMessage tone="error">
+                {membershipsErrorMessage ??
+                  "Unable to load memberships for assignment."}
+              </StatusMessage>
+            ) : null}
 
             {isCreateError ? (
               <StatusMessage tone="error">
