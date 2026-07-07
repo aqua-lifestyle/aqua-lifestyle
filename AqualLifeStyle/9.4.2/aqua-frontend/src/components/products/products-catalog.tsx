@@ -5,17 +5,13 @@ import { useEffect } from "react";
 
 import {
   type Product,
+  useMembershipsActions,
+  useMembershipsState,
   useProductsActions,
   useProductsState,
 } from "@/src/providers";
+import { getMembershipNameById } from "@/src/shared/domain";
 import { Badge, Card, StatusMessage } from "@/src/shared/ui";
-
-const membershipLabels: Record<number, string> = {
-  1: "Jasper",
-  2: "Onyx",
-  3: "AQGreen",
-  4: "Business Premier",
-};
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-ZA", {
@@ -23,23 +19,19 @@ const formatCurrency = (amount: number) =>
     currency: "ZAR",
   }).format(amount);
 
-const getMembershipLabel = (membershipId: number | null) => {
-  if (membershipId === null) {
-    return "Open access";
-  }
-
-  return membershipLabels[membershipId] ?? `Membership ${membershipId}`;
-};
-
-const ProductCard = ({ product }: { product: Product }) => {
+const ProductCard = ({
+  membershipName,
+  product,
+}: {
+  membershipName: string;
+  product: Product;
+}) => {
   return (
     <Card>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-zinc-950">{product.name}</h2>
-          <p className="mt-1 text-sm text-zinc-600">
-            {getMembershipLabel(product.membershipId)}
-          </p>
+          <p className="mt-1 text-sm text-zinc-600">{membershipName}</p>
         </div>
         <Badge tone={product.isActive ? "success" : "neutral"}>
           {product.isActive ? "Active" : "Inactive"}
@@ -54,12 +46,15 @@ const ProductCard = ({ product }: { product: Product }) => {
 };
 
 export const ProductsCatalog = () => {
+  const { getMemberships } = useMembershipsActions();
   const { getProducts } = useProductsActions();
+  const { memberships } = useMembershipsState();
   const { errorMessage, isError, isPending, products } = useProductsState();
 
   useEffect(() => {
     void getProducts();
-  }, [getProducts]);
+    void getMemberships();
+  }, [getMemberships, getProducts]);
 
   return (
     <main className="min-h-dvh bg-zinc-50 px-6 py-8 text-zinc-950 sm:px-8 lg:px-12">
@@ -114,7 +109,15 @@ export const ProductsCatalog = () => {
         {products.length > 0 ? (
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard
+                key={product.id}
+                membershipName={getMembershipNameById(
+                  memberships,
+                  product.membershipId,
+                  "Open access",
+                )}
+                product={product}
+              />
             ))}
           </section>
         ) : null}

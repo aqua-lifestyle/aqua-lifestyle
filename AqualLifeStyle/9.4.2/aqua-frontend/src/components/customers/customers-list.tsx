@@ -7,25 +7,19 @@ import {
   type Customer,
   useCustomersActions,
   useCustomersState,
+  useMembershipsActions,
+  useMembershipsState,
 } from "@/src/providers";
+import { getMembershipNameById } from "@/src/shared/domain";
 import { Badge, Card, StatusMessage } from "@/src/shared/ui";
 
-const membershipLabels: Record<number, string> = {
-  1: "Jasper",
-  2: "Onyx",
-  3: "AQGreen",
-  4: "Business Premier",
-};
-
-const getMembershipLabel = (membershipId: number | null) => {
-  if (membershipId === null) {
-    return "No membership assigned";
-  }
-
-  return membershipLabels[membershipId] ?? `Membership ${membershipId}`;
-};
-
-const CustomerCard = ({ customer }: { customer: Customer }) => {
+const CustomerCard = ({
+  customer,
+  membershipName,
+}: {
+  customer: Customer;
+  membershipName: string;
+}) => {
   return (
     <Card>
       <div className="flex items-start justify-between gap-4">
@@ -43,7 +37,7 @@ const CustomerCard = ({ customer }: { customer: Customer }) => {
       </div>
 
       <p className="mt-6 text-sm font-medium text-zinc-700">
-        {getMembershipLabel(customer.membershipId)}
+        {membershipName}
       </p>
     </Card>
   );
@@ -51,16 +45,19 @@ const CustomerCard = ({ customer }: { customer: Customer }) => {
 
 export const CustomersList = () => {
   const { getCustomers } = useCustomersActions();
+  const { getMemberships } = useMembershipsActions();
   const {
     customers,
     isLoadError,
     isLoadPending,
     loadErrorMessage,
   } = useCustomersState();
+  const { memberships } = useMembershipsState();
 
   useEffect(() => {
     void getCustomers();
-  }, [getCustomers]);
+    void getMemberships();
+  }, [getCustomers, getMemberships]);
 
   return (
     <main className="min-h-dvh bg-zinc-50 px-6 py-8 text-zinc-950 sm:px-8 lg:px-12">
@@ -115,7 +112,15 @@ export const CustomersList = () => {
         {customers.length > 0 ? (
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {customers.map((customer) => (
-              <CustomerCard customer={customer} key={customer.id} />
+              <CustomerCard
+                customer={customer}
+                key={customer.id}
+                membershipName={getMembershipNameById(
+                  memberships,
+                  customer.membershipId,
+                  "No membership assigned",
+                )}
+              />
             ))}
           </section>
         ) : null}
