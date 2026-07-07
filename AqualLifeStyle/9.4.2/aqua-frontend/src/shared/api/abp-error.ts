@@ -20,6 +20,15 @@ export type AbpErrorEnvelope = {
   correlationId?: string;
 };
 
+export type AbpResponseEnvelope<TResponse> = {
+  result: TResponse;
+  targetUrl: string | null;
+  success: boolean;
+  error: AbpErrorPayload | null;
+  unAuthorizedRequest: boolean;
+  __abp: true;
+};
+
 export class AbpHttpError extends Error {
   readonly status: number;
   readonly code?: string;
@@ -51,4 +60,26 @@ export const normalizeAbpError = (
     validationErrors: payload.validationErrors,
     correlationId: payload.correlationId,
   });
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+export const isAbpResponseEnvelope = <TResponse>(
+  data: TResponse | AbpResponseEnvelope<TResponse>,
+): data is AbpResponseEnvelope<TResponse> =>
+  isRecord(data) && data.__abp === true && typeof data.success === "boolean";
+
+export const unwrapAbpResponse = <TResponse>(
+  data: TResponse | AbpResponseEnvelope<TResponse>,
+): TResponse => {
+  if (!isAbpResponseEnvelope(data)) {
+    return data;
+  }
+
+  if (!data.success) {
+    throw new AbpHttpError(200, data.error ?? { message: "The request failed." });
+  }
+
+  return data.result;
 };
