@@ -13,9 +13,15 @@ import {
   createEnquiryError,
   createEnquiryPending,
   createEnquirySuccess,
+  enquiryActionError,
+  enquiryActionPending,
+  enquiryActionSuccess,
   getEnquiriesError,
   getEnquiriesPending,
   getEnquiriesSuccess,
+  getEnquiryError,
+  getEnquiryPending,
+  getEnquirySuccess,
 } from "./actions";
 import {
   type CreateEnquiryInput,
@@ -23,6 +29,7 @@ import {
   EnquiriesActionsContext,
   EnquiriesStateContext,
   initialEnquiriesState,
+  type RespondToEnquiryInput,
 } from "./context";
 import { enquiriesReducer } from "./reducer";
 
@@ -74,12 +81,87 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
     }
   }, []);
 
+  const getEnquiry = useCallback(async (id: number) => {
+    dispatch(getEnquiryPending());
+
+    try {
+      const enquiry = await httpClient.get<Enquiry>(
+        apiEndpoints.enquiries.getById(id),
+      );
+      dispatch(getEnquirySuccess(enquiry));
+    } catch (error) {
+      dispatch(getEnquiryError(getErrorMessage(error)));
+    }
+  }, []);
+
+  const respondToEnquiry = useCallback(
+    async (id: number, input: RespondToEnquiryInput) => {
+      dispatch(enquiryActionPending());
+
+      try {
+        const enquiry = await httpClient.post<Enquiry, RespondToEnquiryInput>(
+          apiEndpoints.enquiries.respond(id),
+          input,
+        );
+        dispatch(enquiryActionSuccess(enquiry));
+        return true;
+      } catch (error) {
+        dispatch(enquiryActionError(getErrorMessage(error)));
+        return false;
+      }
+    },
+    [],
+  );
+
+  const closeEnquiry = useCallback(async (id: number) => {
+    dispatch(enquiryActionPending());
+
+    try {
+      const enquiry = await httpClient.post<Enquiry, Record<string, never>>(
+        apiEndpoints.enquiries.close(id),
+        {},
+      );
+      dispatch(enquiryActionSuccess(enquiry));
+      return true;
+    } catch (error) {
+      dispatch(enquiryActionError(getErrorMessage(error)));
+      return false;
+    }
+  }, []);
+
+  const reopenEnquiry = useCallback(async (id: number) => {
+    dispatch(enquiryActionPending());
+
+    try {
+      const enquiry = await httpClient.post<Enquiry, Record<string, never>>(
+        apiEndpoints.enquiries.reopen(id),
+        {},
+      );
+      dispatch(enquiryActionSuccess(enquiry));
+      return true;
+    } catch (error) {
+      dispatch(enquiryActionError(getErrorMessage(error)));
+      return false;
+    }
+  }, []);
+
   const actions = useMemo(
     () => ({
+      closeEnquiry,
       createEnquiry,
       getEnquiries,
+      getEnquiry,
+      reopenEnquiry,
+      respondToEnquiry,
     }),
-    [createEnquiry, getEnquiries],
+    [
+      closeEnquiry,
+      createEnquiry,
+      getEnquiries,
+      getEnquiry,
+      reopenEnquiry,
+      respondToEnquiry,
+    ],
   );
 
   return (
@@ -110,4 +192,5 @@ export type {
   Enquiry,
   EnquiryFollowUp,
   EnquiryStatus,
+  RespondToEnquiryInput,
 } from "./context";

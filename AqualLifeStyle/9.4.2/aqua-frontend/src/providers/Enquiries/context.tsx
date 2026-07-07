@@ -40,33 +40,62 @@ export type CreateEnquiryInput = {
   message: string;
 };
 
+export type RespondToEnquiryInput = {
+  response: string;
+};
+
 export type EnquiriesState = {
+  actionErrorMessage: string | null;
   createErrorMessage: string | null;
   enquiries: Enquiry[];
+  isActionError: boolean;
+  isActionPending: boolean;
+  isActionSuccess: boolean;
   isCreateError: boolean;
   isCreatePending: boolean;
   isCreateSuccess: boolean;
+  isSelectedError: boolean;
+  isSelectedPending: boolean;
+  isSelectedSuccess: boolean;
   isLoadError: boolean;
   isLoadPending: boolean;
   isLoadSuccess: boolean;
   loadErrorMessage: string | null;
+  selectedEnquiry: Enquiry | null;
+  selectedErrorMessage: string | null;
 };
 
 export type EnquiriesActions = {
+  closeEnquiry: (id: number) => Promise<boolean>;
   createEnquiry: (input: CreateEnquiryInput) => Promise<boolean>;
   getEnquiries: () => Promise<void>;
+  getEnquiry: (id: number) => Promise<void>;
+  reopenEnquiry: (id: number) => Promise<boolean>;
+  respondToEnquiry: (
+    id: number,
+    input: RespondToEnquiryInput,
+  ) => Promise<boolean>;
 };
 
 export const initialEnquiriesState: EnquiriesState = {
+  actionErrorMessage: null,
   createErrorMessage: null,
   enquiries: [],
+  isActionError: false,
+  isActionPending: false,
+  isActionSuccess: false,
   isCreateError: false,
   isCreatePending: false,
   isCreateSuccess: false,
+  isSelectedError: false,
+  isSelectedPending: false,
+  isSelectedSuccess: false,
   isLoadError: false,
   isLoadPending: false,
   isLoadSuccess: false,
   loadErrorMessage: null,
+  selectedEnquiry: null,
+  selectedErrorMessage: null,
 };
 
 export const EnquiriesStateContext =

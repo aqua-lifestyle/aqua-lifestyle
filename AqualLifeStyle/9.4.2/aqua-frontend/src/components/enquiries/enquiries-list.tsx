@@ -86,6 +86,10 @@ const EnquiryCard = ({
           </dd>
         </div>
       </dl>
+
+      <div className="mt-6">
+        <LinkButton href={`/enquiries/${enquiry.id}`}>Open enquiry</LinkButton>
+      </div>
     </Card>
   );
 };

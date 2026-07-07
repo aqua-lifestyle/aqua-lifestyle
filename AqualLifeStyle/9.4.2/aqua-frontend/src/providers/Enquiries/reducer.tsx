@@ -7,6 +7,37 @@ export const enquiriesReducer = (
   action: EnquiriesAction,
 ): EnquiriesState => {
   switch (action.type) {
+    case EnquiriesActionTypes.enquiryActionError:
+      return {
+        ...state,
+        actionErrorMessage: action.payload,
+        isActionError: true,
+        isActionPending: false,
+        isActionSuccess: false,
+      };
+
+    case EnquiriesActionTypes.enquiryActionPending:
+      return {
+        ...state,
+        actionErrorMessage: null,
+        isActionError: false,
+        isActionPending: true,
+        isActionSuccess: false,
+      };
+
+    case EnquiriesActionTypes.enquiryActionSuccess:
+      return {
+        ...state,
+        actionErrorMessage: null,
+        enquiries: state.enquiries.map((enquiry) =>
+          enquiry.id === action.payload.id ? action.payload : enquiry,
+        ),
+        isActionError: false,
+        isActionPending: false,
+        isActionSuccess: true,
+        selectedEnquiry: action.payload,
+      };
+
     case EnquiriesActionTypes.createEnquiryError:
       return {
         ...state,
@@ -60,6 +91,35 @@ export const enquiriesReducer = (
         isLoadPending: false,
         isLoadSuccess: true,
         loadErrorMessage: null,
+      };
+
+    case EnquiriesActionTypes.getEnquiryError:
+      return {
+        ...state,
+        isSelectedError: true,
+        isSelectedPending: false,
+        isSelectedSuccess: false,
+        selectedEnquiry: null,
+        selectedErrorMessage: action.payload,
+      };
+
+    case EnquiriesActionTypes.getEnquiryPending:
+      return {
+        ...state,
+        isSelectedError: false,
+        isSelectedPending: true,
+        isSelectedSuccess: false,
+        selectedErrorMessage: null,
+      };
+
+    case EnquiriesActionTypes.getEnquirySuccess:
+      return {
+        ...state,
+        isSelectedError: false,
+        isSelectedPending: false,
+        isSelectedSuccess: true,
+        selectedEnquiry: action.payload,
+        selectedErrorMessage: null,
       };
 
     default:
