@@ -29,10 +29,10 @@ namespace AqualLifeStyle.Application.Products
 
         public async Task<IReadOnlyList<ProductDto>> GetAllAsync()
         {
-            return await GetAllAsync(null);
+            return await GetAllForCustomerAsync(null);
         }
 
-        public async Task<IReadOnlyList<ProductDto>> GetAllAsync(int? customerId)
+        public async Task<IReadOnlyList<ProductDto>> GetAllForCustomerAsync(int? customerId)
         {
             var products = await _productRepository.GetAllListAsync();
             if (!customerId.HasValue || _customerRepository == null || _membershipLookup == null)

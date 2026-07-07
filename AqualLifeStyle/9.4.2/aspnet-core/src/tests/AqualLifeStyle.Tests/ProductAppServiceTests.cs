@@ -62,7 +62,7 @@ namespace AqualLifeStyle.Tests
 
             var appService = new ProductAppService(productRepositoryMock.Object, customerRepositoryMock.Object, membershipLookupMock.Object);
 
-            var result = await appService.GetAllAsync(42);
+            var result = await appService.GetAllForCustomerAsync(42);
 
             Assert.Equal(2, result.Count);
             Assert.Equal("Free Product", result[0].Name);
@@ -91,7 +91,7 @@ namespace AqualLifeStyle.Tests
 
             var appService = new ProductAppService(productRepositoryMock.Object, customerRepositoryMock.Object, membershipLookupMock.Object);
 
-            var result = await appService.GetAllAsync(99);
+            var result = await appService.GetAllForCustomerAsync(99);
 
             Assert.Single(result);
             Assert.Equal("Free Product", result[0].Name);
@@ -120,7 +120,7 @@ namespace AqualLifeStyle.Tests
 
             var appService = new ProductAppService(productRepositoryMock.Object, customerRepositoryMock.Object, membershipLookupMock.Object);
 
-            var result = await appService.GetAllAsync(100);
+            var result = await appService.GetAllForCustomerAsync(100);
 
             Assert.Single(result);
             Assert.Equal("Free Product", result[0].Name);

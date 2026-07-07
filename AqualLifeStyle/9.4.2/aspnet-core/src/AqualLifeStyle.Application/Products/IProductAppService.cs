@@ -8,7 +8,7 @@ namespace AqualLifeStyle.Application.Products
     public interface IProductAppService : IApplicationService
     {
         Task<IReadOnlyList<ProductDto>> GetAllAsync();
-        Task<IReadOnlyList<ProductDto>> GetAllAsync(int? customerId);
+        Task<IReadOnlyList<ProductDto>> GetAllForCustomerAsync(int? customerId);
         Task<ProductDto> GetAsync(int id);
         Task CreateAsync(CreateProductDto input);
     }
