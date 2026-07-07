@@ -1,4 +1,11 @@
 export {
+  CustomersProvider,
+  useCustomersActions,
+  useCustomersState,
+} from "./Customers";
+export type { CreateCustomerInput, Customer } from "./Customers";
+
+export {
   ProductsProvider,
   useProductsActions,
   useProductsState,
