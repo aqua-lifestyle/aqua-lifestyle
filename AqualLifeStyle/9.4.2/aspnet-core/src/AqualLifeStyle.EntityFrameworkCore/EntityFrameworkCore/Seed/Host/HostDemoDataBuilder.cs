@@ -20,10 +20,22 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
 
         public void Create()
         {
-            CreateMembershipTiers();
-            CreateDemoProducts();
-            CreateDemoCustomers();
-            CreateDemoEnquiries();
+            try
+            {
+                // Only seed if tables are empty and database is ready
+                if (!_context.Memberships.Any())
+                {
+                    CreateMembershipTiers();
+                    CreateDemoProducts();
+                    CreateDemoCustomers();
+                    CreateDemoEnquiries();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log but don't crash - database may still be initializing
+                System.Diagnostics.Debug.WriteLine($"HostDemoDataBuilder.Create failed: {ex.Message}");
+            }
         }
 
         private void CreateMembershipTiers()
