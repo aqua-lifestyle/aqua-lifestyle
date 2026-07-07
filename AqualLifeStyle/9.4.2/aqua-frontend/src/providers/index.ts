@@ -6,6 +6,13 @@ export {
 export type { CreateCustomerInput, Customer } from "./Customers";
 
 export {
+  MembershipsProvider,
+  useMembershipsActions,
+  useMembershipsState,
+} from "./Memberships";
+export type { Membership, MembershipType } from "./Memberships";
+
+export {
   ProductsProvider,
   useProductsActions,
   useProductsState,

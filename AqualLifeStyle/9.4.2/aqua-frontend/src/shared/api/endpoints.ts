@@ -3,6 +3,9 @@ export const apiEndpoints = {
     create: "/api/services/app/Customer/Create",
     getAll: "/api/services/app/Customer/GetAll",
   },
+  memberships: {
+    getAll: "/api/services/app/Membership/GetAll",
+  },
   products: {
     getAll: "/api/services/app/Product/GetAll",
   },
