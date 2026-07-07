@@ -7,9 +7,9 @@ Next.js App Router frontend for the AquaLifeStyle ABP backend.
 - Products: read live product data from ABP.
 - Customers: register customers and view customer records.
 - Memberships: view membership tiers and assign a membership during customer registration.
-- Enquiries: create enquiries and view enquiry records in-app.
+- Enquiries: create enquiries, view enquiry records, and manage response/close/reopen workflow actions.
 
-The root route redirects to `/products`.
+The root route is a demo hub that guides the current end-to-end validation path.
 
 ## Architecture Baseline
 
@@ -24,6 +24,7 @@ The root route redirects to `/products`.
   - `index.tsx`
   - `reducer.tsx`
 - Feature code should not import raw Axios or read `process.env` directly.
+- We work with a lean startup mindset: build the smallest useful slice, validate it against the running app, then commit the learning before expanding scope.
 
 ## Environment
 
@@ -52,6 +53,7 @@ npm run dev
 
 Open:
 
+- Demo hub: [http://localhost:3000](http://localhost:3000)
 - Products: [http://localhost:3000/products](http://localhost:3000/products)
 - Customers: [http://localhost:3000/customers](http://localhost:3000/customers)
 - Register customer: [http://localhost:3000/customers/register](http://localhost:3000/customers/register)
