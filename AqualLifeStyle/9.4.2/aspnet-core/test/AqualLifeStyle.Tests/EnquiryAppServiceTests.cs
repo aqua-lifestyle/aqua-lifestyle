@@ -63,5 +63,25 @@ namespace AqualLifeStyle.Tests
             Assert.Equal((int)EnquiryStatus.Pending, result.Status);
             Assert.Equal(string.Empty, result.Response);
         }
+
+        [Fact]
+        public async Task RespondAsync_ClosedEnquiry_ThrowsInvalidStateException()
+        {
+            var enquiry = Enquiry.Create(1, 2, "Question");
+            enquiry.MarkAsResponded("ok");
+            enquiry.Close();
+
+            var repo = Substitute.For<IEnquiryRepository>();
+            repo.GetAsync(13).Returns(enquiry);
+
+            var svc = new EnquiryAppService(repo);
+
+            var exception = await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleInvalidStateException>(
+                () => svc.RespondAsync(13, new RespondToEnquiryDto { Response = "Thank you" }));
+
+            Assert.Equal("Enquiry in state 'Closed' cannot respond.", exception.Message);
+            Assert.Equal(400, exception.StatusCode);
+            Assert.Equal("INVALID_STATE", exception.ErrorCode);
+        }
     }
 }
