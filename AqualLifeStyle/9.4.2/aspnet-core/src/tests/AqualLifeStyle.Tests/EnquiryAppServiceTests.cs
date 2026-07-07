@@ -92,7 +92,7 @@ namespace AqualLifeStyle.Tests
             _enquiryRepositoryMock.Setup(r => r.GetAsync(5)).ReturnsAsync(enquiry);
 
             // Act & Assert
-            await Assert.ThrowsAsync<System.ArgumentException>(() => 
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleValidationException>(() => 
                 _service.AssignToMemberAsync(5, new AssignEnquiryDto { MemberId = 0 }));
         }
 
@@ -122,7 +122,7 @@ namespace AqualLifeStyle.Tests
             _enquiryRepositoryMock.Setup(r => r.GetAsync(7)).ReturnsAsync(enquiry);
 
             // Act & Assert
-            await Assert.ThrowsAsync<System.InvalidOperationException>(() => 
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(() => 
                 _service.ConvertToCustomerAsync(7, new ConvertEnquiryToCustomerDto()));
         }
 
@@ -152,7 +152,7 @@ namespace AqualLifeStyle.Tests
             _enquiryRepositoryMock.Setup(r => r.GetAsync(9)).ReturnsAsync(enquiry);
 
             // Act & Assert
-            await Assert.ThrowsAsync<System.InvalidOperationException>(() => 
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(() => 
                 _service.ClearAssignmentAsync(9, new ClearAssignmentDto()));
         }
 
@@ -165,7 +165,7 @@ namespace AqualLifeStyle.Tests
             _enquiryRepositoryMock.Setup(r => r.GetAsync(10)).ReturnsAsync(enquiry);
 
             // Act & Assert
-            await Assert.ThrowsAsync<System.InvalidOperationException>(() => 
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(() => 
                 _service.AssignToMemberAsync(10, new AssignEnquiryDto { MemberId = 20 }));
         }
     }

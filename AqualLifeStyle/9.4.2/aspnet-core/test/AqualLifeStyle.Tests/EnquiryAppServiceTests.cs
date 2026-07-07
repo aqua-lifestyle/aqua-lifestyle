@@ -65,6 +65,124 @@ namespace AqualLifeStyle.Tests
         }
 
         [Fact]
+        public async Task AssignToMemberAsync_WithValidMemberId_AssignsSuccessfully()
+        {
+            var enquiry = Enquiry.Create(1, 5, "Question");
+
+            var repo = Substitute.For<IEnquiryRepository>();
+            repo.GetAsync(14).Returns(enquiry);
+            repo.UpdateAsync(enquiry).Returns(enquiry);
+
+            var svc = new EnquiryAppService(repo);
+
+            var result = await svc.AssignToMemberAsync(14, new AssignEnquiryDto { MemberId = 10 });
+
+            Assert.Equal(10, enquiry.AssignedToMemberId);
+            Assert.False(enquiry.IsConverted);
+            Assert.Equal(10, result.AssignedToMemberId);
+            await repo.Received(1).UpdateAsync(enquiry);
+        }
+
+        [Fact]
+        public async Task AssignToMemberAsync_WithInvalidMemberId_Throws()
+        {
+            var enquiry = Enquiry.Create(1, 5, "Question");
+
+            var repo = Substitute.For<IEnquiryRepository>();
+            repo.GetAsync(15).Returns(enquiry);
+
+            var svc = new EnquiryAppService(repo);
+
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleValidationException>(
+                () => svc.AssignToMemberAsync(15, new AssignEnquiryDto { MemberId = 0 }));
+        }
+
+        [Fact]
+        public async Task ConvertToCustomerAsync_WithPendingEnquiry_ConvertsSuccessfully()
+        {
+            var enquiry = Enquiry.Create(1, 5, "Question");
+
+            var repo = Substitute.For<IEnquiryRepository>();
+            repo.GetAsync(16).Returns(enquiry);
+            repo.UpdateAsync(enquiry).Returns(enquiry);
+
+            var svc = new EnquiryAppService(repo);
+
+            var result = await svc.ConvertToCustomerAsync(16, new ConvertEnquiryToCustomerDto());
+
+            Assert.True(enquiry.IsConverted);
+            Assert.Equal(EnquiryStatus.Closed, enquiry.Status);
+            Assert.NotNull(enquiry.ConvertedAt);
+            Assert.True(result.IsConverted);
+            await repo.Received(1).UpdateAsync(enquiry);
+        }
+
+        [Fact]
+        public async Task ConvertToCustomerAsync_WithAlreadyConvertedEnquiry_Throws()
+        {
+            var enquiry = Enquiry.Create(1, 5, "Question");
+            enquiry.ConvertToCustomer();
+
+            var repo = Substitute.For<IEnquiryRepository>();
+            repo.GetAsync(17).Returns(enquiry);
+
+            var svc = new EnquiryAppService(repo);
+
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(
+                () => svc.ConvertToCustomerAsync(17, new ConvertEnquiryToCustomerDto()));
+        }
+
+        [Fact]
+        public async Task ClearAssignmentAsync_WithAssignedEnquiry_ClearsSuccessfully()
+        {
+            var enquiry = Enquiry.Create(1, 5, "Question");
+            enquiry.AssignToMember(10);
+
+            var repo = Substitute.For<IEnquiryRepository>();
+            repo.GetAsync(18).Returns(enquiry);
+            repo.UpdateAsync(enquiry).Returns(enquiry);
+
+            var svc = new EnquiryAppService(repo);
+
+            var result = await svc.ClearAssignmentAsync(18, new ClearAssignmentDto());
+
+            Assert.Null(enquiry.AssignedToMemberId);
+            Assert.Null(result.AssignedToMemberId);
+            await repo.Received(1).UpdateAsync(enquiry);
+        }
+
+        [Fact]
+        public async Task ClearAssignmentAsync_WithConvertedEnquiry_Throws()
+        {
+            var enquiry = Enquiry.Create(1, 5, "Question");
+            enquiry.AssignToMember(10);
+            enquiry.ConvertToCustomer();
+
+            var repo = Substitute.For<IEnquiryRepository>();
+            repo.GetAsync(19).Returns(enquiry);
+
+            var svc = new EnquiryAppService(repo);
+
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(
+                () => svc.ClearAssignmentAsync(19, new ClearAssignmentDto()));
+        }
+
+        [Fact]
+        public async Task AssignToMemberAsync_AfterConversion_Throws()
+        {
+            var enquiry = Enquiry.Create(1, 5, "Question");
+            enquiry.ConvertToCustomer();
+
+            var repo = Substitute.For<IEnquiryRepository>();
+            repo.GetAsync(20).Returns(enquiry);
+
+            var svc = new EnquiryAppService(repo);
+
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(
+                () => svc.AssignToMemberAsync(20, new AssignEnquiryDto { MemberId = 20 }));
+        }
+
+        [Fact]
         public async Task RespondAsync_ClosedEnquiry_ThrowsInvalidStateException()
         {
             var enquiry = Enquiry.Create(1, 2, "Question");
