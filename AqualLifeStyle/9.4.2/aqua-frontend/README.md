@@ -7,6 +7,7 @@ Next.js App Router frontend for the AquaLifeStyle ABP backend.
 - Products: read live product data from ABP.
 - Customers: register customers and view customer records.
 - Memberships: view membership tiers and assign a membership during customer registration.
+- Enquiries: create enquiries and view enquiry records in-app.
 
 The root route redirects to `/products`.
 
@@ -54,6 +55,8 @@ Open:
 - Products: [http://localhost:3000/products](http://localhost:3000/products)
 - Customers: [http://localhost:3000/customers](http://localhost:3000/customers)
 - Register customer: [http://localhost:3000/customers/register](http://localhost:3000/customers/register)
+- Enquiries: [http://localhost:3000/enquiries](http://localhost:3000/enquiries)
+- Create enquiry: [http://localhost:3000/enquiries/create](http://localhost:3000/enquiries/create)
 - Memberships: [http://localhost:3000/memberships](http://localhost:3000/memberships)
 
 Use a normal browser such as Chrome or Edge for local HTTPS backend testing. VS Code's embedded preview can report generic network errors with local development certificates.
