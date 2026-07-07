@@ -69,6 +69,9 @@ namespace AqualLifeStyle.Web.Host.Startup
             // Swagger - Enable this line and the related lines in Configure method to enable swagger UI
             ConfigureSwagger(services);
 
+            // Register IHttpContextAccessor so ABP exception converters can access the current request correlation id.
+            services.AddHttpContextAccessor();
+
             // Configure Abp and Dependency Injection
             services.AddAbpWithoutCreatingServiceProvider<AqualLifeStyleWebHostModule>(
                 // Configure Log4Net logging
@@ -83,6 +86,11 @@ namespace AqualLifeStyle.Web.Host.Startup
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerFactory)
         {
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+
             app.UseAbp(options => { options.UseAbpRequestLocalization = false; }); // Initializes ABP framework.
 
             app.UseCors(_defaultCorsPolicyName); // Enable CORS!
