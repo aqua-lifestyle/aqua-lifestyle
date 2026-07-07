@@ -2,12 +2,26 @@
 
 Next.js App Router frontend for the AquaLifeStyle ABP backend.
 
+## Current Demo Scope
+
+- Products: read live product data from ABP.
+- Customers: register customers and view customer records.
+- Memberships: view membership tiers and assign a membership during customer registration.
+
+The root route redirects to `/products`.
+
 ## Architecture Baseline
 
 - TypeScript strict mode is required.
+- Tailwind CSS is the primary styling solution.
 - Runtime environment variables are validated with Zod in `src/shared/config`.
 - Backend access goes through the shared Axios boundary in `src/shared/api`.
-- ABP error envelopes are normalized once in `src/shared/api/abp-error.ts`.
+- ABP response envelopes and error envelopes are normalized centrally.
+- Feature state uses the agreed four-file provider structure:
+  - `actions.tsx`
+  - `context.tsx`
+  - `index.tsx`
+  - `reducer.tsx`
 - Feature code should not import raw Axios or read `process.env` directly.
 
 ## Environment
@@ -18,46 +32,44 @@ Create a local environment file:
 cp .env.example .env.local
 ```
 
-Then adjust values as needed:
+Default local backend settings:
 
 ```env
-NEXT_PUBLIC_ABP_API_URL=https://localhost:44305
+NEXT_PUBLIC_ABP_API_URL=https://localhost:44311
 NEXTAUTH_SECRET=replace_with_a_32_character_minimum_secret
 ```
 
 `NEXT_PUBLIC_ABP_API_URL` is intentionally public because browser code needs the backend base URL. `NEXTAUTH_SECRET` is server-only and must not be exposed to client modules.
 
-## Getting Started
+## Development
 
-First, run the development server:
+Start the backend first, then run:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Products: [http://localhost:3000/products](http://localhost:3000/products)
+- Customers: [http://localhost:3000/customers](http://localhost:3000/customers)
+- Register customer: [http://localhost:3000/customers/register](http://localhost:3000/customers/register)
+- Memberships: [http://localhost:3000/memberships](http://localhost:3000/memberships)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Use a normal browser such as Chrome or Edge for local HTTPS backend testing. VS Code's embedded preview can report generic network errors with local development certificates.
 
-## Learn More
+## Validation
 
-To learn more about Next.js, take a look at the following resources:
+Before committing frontend changes, run:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run lint
+npm run build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Next Steps
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Add authentication with OIDC Authorization Code Flow + PKCE.
+- Add tenant resolution and `__tenant` header selection UI.
+- Generate type-safe API clients from OpenAPI once the backend Swagger JSON endpoint is available.
+- Add focused tests for API client behavior, provider reducers, and registration validation.
