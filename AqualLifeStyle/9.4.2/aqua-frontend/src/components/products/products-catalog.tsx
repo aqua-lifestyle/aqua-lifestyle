@@ -78,6 +78,12 @@ export const ProductsCatalog = () => {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-center text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
+              href="/memberships"
+            >
+              View memberships
+            </Link>
+            <Link
+              className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-center text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
               href="/customers"
             >
               View customers
