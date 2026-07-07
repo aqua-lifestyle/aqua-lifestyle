@@ -73,6 +73,9 @@ export const ProductsCatalog = () => {
             <LinkButton href="/enquiries">
               View enquiries
             </LinkButton>
+            <LinkButton href="/enquiries/create">
+              Create enquiry
+            </LinkButton>
             <LinkButton href="/memberships">
               View memberships
             </LinkButton>

@@ -126,8 +126,8 @@ export const EnquiriesList = () => {
           <div className="flex flex-col gap-3 sm:flex-row">
             <LinkButton href="/customers">View customers</LinkButton>
             <LinkButton href="/products">View products</LinkButton>
-            <LinkButton href="/customers/register" variant="primary">
-              Register customer
+            <LinkButton href="/enquiries/create" variant="primary">
+              Create enquiry
             </LinkButton>
           </div>
         </header>
