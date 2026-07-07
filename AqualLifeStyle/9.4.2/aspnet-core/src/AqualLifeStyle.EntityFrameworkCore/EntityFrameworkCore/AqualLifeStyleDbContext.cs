@@ -52,6 +52,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 entity.OwnsOne(e => e.Email, email =>
                 {
                     email.Property(p => p.Value).HasColumnName("Email").IsRequired().HasMaxLength(256);
+                    email.HasIndex(p => p.Value).IsUnique();
                 });
             });
 

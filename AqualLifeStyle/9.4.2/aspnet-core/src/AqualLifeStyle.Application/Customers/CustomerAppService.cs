@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Application.Services;
+using Abp.UI;
 using AqualLifeStyle.Application.Customers.Dto;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
@@ -43,6 +44,11 @@ namespace AqualLifeStyle.Application.Customers
         {
             var customer = await _customerRepository.GetAsync(input.Id);
 
+            if (await _customerRepository.ExistsByEmailAsync(input.Email, input.Id))
+            {
+                throw new UserFriendlyException("Customer update failed.", "A customer with that email already exists.");
+            }
+
             if (input.MembershipId.HasValue)
             {
                 var membership = await _membershipRepository.GetAsync(input.MembershipId.Value);
@@ -68,6 +74,11 @@ namespace AqualLifeStyle.Application.Customers
 
         public async Task CreateAsync(CreateCustomerDto input)
         {
+            if (await _customerRepository.ExistsByEmailAsync(input.Email))
+            {
+                throw new UserFriendlyException("Customer creation failed.", "A customer with that email already exists.");
+            }
+
             if (input.MembershipId.HasValue)
             {
                 var membership = await _membershipRepository.GetAsync(input.MembershipId.Value);

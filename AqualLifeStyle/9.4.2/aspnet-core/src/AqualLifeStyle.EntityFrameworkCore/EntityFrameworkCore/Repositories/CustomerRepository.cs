@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Abp.Domain.Repositories;
 using Abp.EntityFrameworkCore;
@@ -16,7 +17,19 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
 
         public Task<bool> ExistsByEmailAsync(string email)
         {
-            return GetAll().AnyAsync(c => c.Email.Value == email.Trim());
+            return ExistsByEmailAsync(email, null);
+        }
+
+        public Task<bool> ExistsByEmailAsync(string email, int? excludeCustomerId)
+        {
+            var normalizedEmail = email?.Trim();
+            var query = GetAll().Where(c => c.Email.Value == normalizedEmail);
+            if (excludeCustomerId.HasValue)
+            {
+                query = query.Where(c => c.Id != excludeCustomerId.Value);
+            }
+
+            return query.AnyAsync();
         }
 
         public Task<Customer> GetByIdAsync(int id)

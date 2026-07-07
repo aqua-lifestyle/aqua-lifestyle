@@ -6,5 +6,6 @@ namespace AqualLifeStyle.Domain.Customers
     public interface ICustomerRepository : IRepository<Customer, int>
     {
         Task<bool> ExistsByEmailAsync(string email);
+        Task<bool> ExistsByEmailAsync(string email, int? excludeCustomerId);
     }
 }
