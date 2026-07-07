@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -42,52 +43,109 @@ namespace AqualLifeStyle.Application.Customers
 
         public async Task<CustomerDto> UpdateAsync(CustomerDto input)
         {
-            var customer = await _customerRepository.GetAsync(input.Id);
-
-            if (await _customerRepository.ExistsByEmailAsync(input.Email, input.Id))
+            if (input == null)
             {
-                throw new UserFriendlyException("Customer update failed.", "A customer with that email already exists.");
+                throw new UserFriendlyException("Customer update failed.", "The request body was empty.");
             }
 
-            if (input.MembershipId.HasValue)
+            if (input.Id <= 0)
             {
-                var membership = await _membershipRepository.GetAsync(input.MembershipId.Value);
-                membership.EnsureCanBeAssignedToCustomer();
+                throw new UserFriendlyException("Customer update failed.", "A valid customer Id is required.");
             }
 
-            customer.Rename(input.Name);
-            customer.ChangeEmail(new EmailAddress(input.Email));
-            customer.ChangeMembership(input.MembershipId);
-
-            if (input.IsActive)
+            if (string.IsNullOrWhiteSpace(input.Name))
             {
-                customer.Activate();
-            }
-            else
-            {
-                customer.Deactivate();
+                throw new UserFriendlyException("Customer update failed.", "Customer name is required.");
             }
 
-            await _customerRepository.UpdateAsync(customer);
-            return MapToDto(customer);
+            if (string.IsNullOrWhiteSpace(input.Email))
+            {
+                throw new UserFriendlyException("Customer update failed.", "Customer email is required.");
+            }
+
+            try
+            {
+                var customer = await _customerRepository.GetAsync(input.Id);
+
+                if (await _customerRepository.ExistsByEmailAsync(input.Email, input.Id))
+                {
+                    throw new UserFriendlyException("Customer update failed.", "A customer with that email already exists.");
+                }
+
+                if (input.MembershipId.HasValue)
+                {
+                    var membership = await _membershipRepository.GetAsync(input.MembershipId.Value);
+                    membership.EnsureCanBeAssignedToCustomer();
+                }
+
+                customer.Rename(input.Name);
+                customer.ChangeEmail(new EmailAddress(input.Email));
+                customer.ChangeMembership(input.MembershipId);
+
+                if (input.IsActive)
+                {
+                    customer.Activate();
+                }
+                else
+                {
+                    customer.Deactivate();
+                }
+
+                await _customerRepository.UpdateAsync(customer);
+                return MapToDto(customer);
+            }
+            catch (UserFriendlyException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new UserFriendlyException("Customer update failed.", ex.Message);
+            }
         }
 
         public async Task CreateAsync(CreateCustomerDto input)
         {
+            if (input == null)
+            {
+                throw new UserFriendlyException("Customer creation failed.", "The request body was empty.");
+            }
+
+            if (string.IsNullOrWhiteSpace(input.Name))
+            {
+                throw new UserFriendlyException("Customer creation failed.", "Customer name is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(input.Email))
+            {
+                throw new UserFriendlyException("Customer creation failed.", "Customer email is required.");
+            }
+
             if (await _customerRepository.ExistsByEmailAsync(input.Email))
             {
                 throw new UserFriendlyException("Customer creation failed.", "A customer with that email already exists.");
             }
 
-            if (input.MembershipId.HasValue)
+            try
             {
-                var membership = await _membershipRepository.GetAsync(input.MembershipId.Value);
-                membership.EnsureCanBeAssignedToCustomer();
-            }
+                if (input.MembershipId.HasValue)
+                {
+                    var membership = await _membershipRepository.GetAsync(input.MembershipId.Value);
+                    membership.EnsureCanBeAssignedToCustomer();
+                }
 
-            var email = new EmailAddress(input.Email);
-            var customer = Customer.Create(input.Name, email, input.MembershipId);
-            await _customerRepository.InsertAsync(customer);
+                var email = new EmailAddress(input.Email);
+                var customer = Customer.Create(input.Name, email, input.MembershipId);
+                await _customerRepository.InsertAsync(customer);
+            }
+            catch (UserFriendlyException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new UserFriendlyException("Customer creation failed.", ex.Message);
+            }
         }
 
         private static CustomerDto MapToDto(Customer customer)
