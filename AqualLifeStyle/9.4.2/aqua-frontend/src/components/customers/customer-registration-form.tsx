@@ -79,8 +79,8 @@ export const CustomerRegistrationForm = () => {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <header className="flex flex-col gap-4">
           <Link
-            href="/products"
             className="text-sm font-medium text-emerald-700 hover:text-emerald-800"
+            href="/products"
           >
             Back to products
           </Link>
@@ -130,7 +130,10 @@ export const CustomerRegistrationForm = () => {
 
             {isCreateSuccess ? (
               <StatusMessage tone="success">
-                Customer registered successfully.
+                Customer registered successfully.{" "}
+                <Link className="font-semibold underline" href="/customers">
+                  View customers
+                </Link>
               </StatusMessage>
             ) : null}
 
