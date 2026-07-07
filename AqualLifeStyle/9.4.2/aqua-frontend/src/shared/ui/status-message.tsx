@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-type StatusMessageTone = "error" | "neutral";
+type StatusMessageTone = "error" | "neutral" | "success";
 
 type StatusMessageProps = {
   children: ReactNode;
@@ -10,6 +10,7 @@ type StatusMessageProps = {
 const toneClassNames: Record<StatusMessageTone, string> = {
   error: "border-red-200 bg-red-50 text-red-800",
   neutral: "border-zinc-300 bg-white text-zinc-600",
+  success: "border-emerald-200 bg-emerald-50 text-emerald-800",
 };
 
 export const StatusMessage = ({
