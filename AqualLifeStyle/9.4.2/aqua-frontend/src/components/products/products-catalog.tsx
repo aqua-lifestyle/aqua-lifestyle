@@ -7,6 +7,7 @@ import {
   useProductsActions,
   useProductsState,
 } from "@/src/providers";
+import { Badge, Card, StatusMessage } from "@/src/shared/ui";
 
 const membershipLabels: Record<number, string> = {
   1: "Jasper",
@@ -31,7 +32,7 @@ const getMembershipLabel = (membershipId: number | null) => {
 
 const ProductCard = ({ product }: { product: Product }) => {
   return (
-    <article className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+    <Card>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-zinc-950">{product.name}</h2>
@@ -39,15 +40,15 @@ const ProductCard = ({ product }: { product: Product }) => {
             {getMembershipLabel(product.membershipId)}
           </p>
         </div>
-        <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
+        <Badge tone={product.isActive ? "success" : "neutral"}>
           {product.isActive ? "Active" : "Inactive"}
-        </span>
+        </Badge>
       </div>
 
       <p className="mt-6 text-2xl font-semibold text-zinc-950">
         {formatCurrency(product.price)}
       </p>
-    </article>
+    </Card>
   );
 };
 
@@ -74,21 +75,17 @@ export const ProductsCatalog = () => {
         </header>
 
         {isPending ? (
-          <section className="rounded-lg border border-dashed border-zinc-300 bg-white p-8 text-zinc-600">
-            Loading products...
-          </section>
+          <StatusMessage>Loading products...</StatusMessage>
         ) : null}
 
         {isError ? (
-          <section className="rounded-lg border border-red-200 bg-red-50 p-5 text-red-800">
+          <StatusMessage tone="error">
             {errorMessage ?? "Unable to load products."}
-          </section>
+          </StatusMessage>
         ) : null}
 
         {!isPending && !isError && products.length === 0 ? (
-          <section className="rounded-lg border border-dashed border-zinc-300 bg-white p-8 text-zinc-600">
-            No products are available yet.
-          </section>
+          <StatusMessage>No products are available yet.</StatusMessage>
         ) : null}
 
         {products.length > 0 ? (
