@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import {
   CustomersProvider,
+  EnquiriesProvider,
   MembershipsProvider,
   ProductsProvider,
 } from "@/src/providers";
@@ -15,9 +16,11 @@ type AppProvidersProps = {
 export const AppProviders = ({ children }: AppProvidersProps) => {
   return (
     <CustomersProvider>
-      <MembershipsProvider>
-        <ProductsProvider>{children}</ProductsProvider>
-      </MembershipsProvider>
+      <EnquiriesProvider>
+        <MembershipsProvider>
+          <ProductsProvider>{children}</ProductsProvider>
+        </MembershipsProvider>
+      </EnquiriesProvider>
     </CustomersProvider>
   );
 };
