@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect } from "react";
 
 import {
@@ -11,7 +10,7 @@ import {
   useMembershipsState,
 } from "@/src/providers";
 import { getMembershipNameById } from "@/src/shared/domain";
-import { Badge, Card, StatusMessage } from "@/src/shared/ui";
+import { Badge, Card, LinkButton, StatusMessage } from "@/src/shared/ui";
 
 const CustomerCard = ({
   customer,
@@ -74,24 +73,15 @@ export const CustomersList = () => {
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Link
-              className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-center text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
-              href="/memberships"
-            >
+            <LinkButton href="/memberships">
               View memberships
-            </Link>
-            <Link
-              className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-center text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
-              href="/products"
-            >
+            </LinkButton>
+            <LinkButton href="/products">
               View products
-            </Link>
-            <Link
-              className="rounded-lg bg-emerald-700 px-4 py-2 text-center text-sm font-semibold text-white transition hover:bg-emerald-800"
-              href="/customers/register"
-            >
+            </LinkButton>
+            <LinkButton href="/customers/register" variant="primary">
               Register customer
-            </Link>
+            </LinkButton>
           </div>
         </header>
 
