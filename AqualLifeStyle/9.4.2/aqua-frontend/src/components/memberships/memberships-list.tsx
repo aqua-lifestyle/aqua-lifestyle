@@ -8,6 +8,7 @@ import {
   useMembershipsActions,
   useMembershipsState,
 } from "@/src/providers";
+import { getMembershipTypeLabel } from "@/src/shared/domain";
 import { Badge, Card, StatusMessage } from "@/src/shared/ui";
 
 const formatCurrency = (amount: number) =>
@@ -17,6 +18,11 @@ const formatCurrency = (amount: number) =>
   }).format(amount);
 
 const MembershipCard = ({ membership }: { membership: Membership }) => {
+  const membershipTypeLabel = getMembershipTypeLabel(membership.membershipType);
+  const shouldShowType =
+    membership.name.trim().toLocaleLowerCase() !==
+    membershipTypeLabel.toLocaleLowerCase();
+
   return (
     <Card>
       <div className="flex items-start justify-between gap-4">
@@ -40,12 +46,14 @@ const MembershipCard = ({ membership }: { membership: Membership }) => {
             {formatCurrency(membership.monthlyObligationAmount)}
           </dd>
         </div>
-        <div className="flex justify-between gap-4">
-          <dt className="text-zinc-600">Type</dt>
-          <dd className="font-medium text-zinc-950">
-            {membership.membershipType}
-          </dd>
-        </div>
+        {shouldShowType ? (
+          <div className="flex justify-between gap-4">
+            <dt className="text-zinc-600">Type</dt>
+            <dd className="font-medium text-zinc-950">
+              {membershipTypeLabel}
+            </dd>
+          </div>
+        ) : null}
       </dl>
     </Card>
   );

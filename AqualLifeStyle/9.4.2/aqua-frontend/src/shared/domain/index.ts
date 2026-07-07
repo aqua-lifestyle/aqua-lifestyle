@@ -1,1 +1,1 @@
-export { getMembershipNameById } from "./memberships";
+export { getMembershipNameById, getMembershipTypeLabel } from "./memberships";

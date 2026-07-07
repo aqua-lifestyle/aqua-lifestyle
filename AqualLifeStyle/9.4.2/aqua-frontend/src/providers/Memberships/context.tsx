@@ -1,6 +1,6 @@
 import { createContext } from "react";
 
-export type MembershipType = 1 | 2 | 3 | 4;
+export type MembershipType = 0 | 1 | 2 | 3;
 
 export type Membership = {
   id: number;

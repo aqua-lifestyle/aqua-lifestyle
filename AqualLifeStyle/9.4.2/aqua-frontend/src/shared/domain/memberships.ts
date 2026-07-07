@@ -1,4 +1,15 @@
-import type { Membership } from "@/src/providers";
+import type { Membership, MembershipType } from "@/src/providers";
+
+const membershipTypeLabels: Record<MembershipType, string> = {
+  0: "Jasper",
+  1: "Onyx",
+  2: "AQGreen",
+  3: "Business Premier",
+};
+
+export const getMembershipTypeLabel = (membershipType: MembershipType) => {
+  return membershipTypeLabels[membershipType];
+};
 
 export const getMembershipNameById = (
   memberships: Membership[],
