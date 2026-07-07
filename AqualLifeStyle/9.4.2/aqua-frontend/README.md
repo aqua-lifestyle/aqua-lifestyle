@@ -1,4 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Aqua Frontend
+
+Next.js App Router frontend for the AquaLifeStyle ABP backend.
+
+## Architecture Baseline
+
+- TypeScript strict mode is required.
+- Runtime environment variables are validated with Zod in `src/shared/config`.
+- Backend access goes through the shared Axios boundary in `src/shared/api`.
+- ABP error envelopes are normalized once in `src/shared/api/abp-error.ts`.
+- Feature code should not import raw Axios or read `process.env` directly.
+
+## Environment
+
+Create a local environment file:
+
+```bash
+cp .env.example .env.local
+```
+
+Then adjust values as needed:
+
+```env
+NEXT_PUBLIC_ABP_API_URL=https://localhost:44305
+NEXTAUTH_SECRET=replace_with_a_32_character_minimum_secret
+```
+
+`NEXT_PUBLIC_ABP_API_URL` is intentionally public because browser code needs the backend base URL. `NEXTAUTH_SECRET` is server-only and must not be exposed to client modules.
 
 ## Getting Started
 
