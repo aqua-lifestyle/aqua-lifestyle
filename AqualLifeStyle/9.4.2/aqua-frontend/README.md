@@ -77,8 +77,7 @@ Why this order:
 - Backend access goes through the shared Axios boundary in `src/shared/api`.
 - ABP response envelopes and error envelopes are normalized centrally.
 - Auth and tenant readiness providers register access-token and `__tenant` resolvers with the shared Axios boundary.
-- The auth readiness banner keeps demo mode explicit so protected workflows are not treated as production-ready.
-- The tenant switcher persists the local tenant selection and keeps host mode as the safe default.
+- The app context bar keeps auth mode explicit and persists the local tenant selection while host mode remains the safe default.
 - Feature state uses the agreed four-file provider structure:
   - `actions.tsx`
   - `context.tsx`
