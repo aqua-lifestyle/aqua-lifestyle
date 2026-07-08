@@ -10,6 +10,8 @@ export const apiEndpoints = {
     create: "/api/services/app/Enquiry/Create",
     getAll: "/api/services/app/Enquiry/GetAll",
     getById: (id: number) => `/api/services/app/Enquiry/Get?id=${id}`,
+    recordFollowUp: (id: number) =>
+      `/api/services/app/Enquiry/RecordFollowUp?id=${id}`,
     reopen: (id: number) => `/api/services/app/Enquiry/Reopen?id=${id}`,
     respond: (id: number) => `/api/services/app/Enquiry/Respond?id=${id}`,
   },

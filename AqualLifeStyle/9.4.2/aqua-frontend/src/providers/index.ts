@@ -11,9 +11,11 @@ export {
   useEnquiriesState,
 } from "./Enquiries";
 export type {
+  CreateEnquiryFollowUpInput,
   CreateEnquiryInput,
   Enquiry,
   EnquiryFollowUp,
+  EnquiryFollowUpOutcome,
   EnquiryStatus,
 } from "./Enquiries";
 

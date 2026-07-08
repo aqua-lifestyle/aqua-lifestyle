@@ -25,6 +25,7 @@ import {
 } from "./actions";
 import {
   type CreateEnquiryInput,
+  type CreateEnquiryFollowUpInput,
   type Enquiry,
   EnquiriesActionsContext,
   EnquiriesStateContext,
@@ -113,6 +114,28 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
     [],
   );
 
+  const recordFollowUp = useCallback(
+    async (id: number, input: CreateEnquiryFollowUpInput) => {
+      dispatch(enquiryActionPending());
+
+      try {
+        await httpClient.post<void, CreateEnquiryFollowUpInput>(
+          apiEndpoints.enquiries.recordFollowUp(id),
+          input,
+        );
+        const enquiry = await httpClient.get<Enquiry>(
+          apiEndpoints.enquiries.getById(id),
+        );
+        dispatch(enquiryActionSuccess(enquiry));
+        return true;
+      } catch (error) {
+        dispatch(enquiryActionError(getErrorMessage(error)));
+        return false;
+      }
+    },
+    [],
+  );
+
   const closeEnquiry = useCallback(async (id: number) => {
     dispatch(enquiryActionPending());
 
@@ -151,6 +174,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       createEnquiry,
       getEnquiries,
       getEnquiry,
+      recordFollowUp,
       reopenEnquiry,
       respondToEnquiry,
     }),
@@ -159,6 +183,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       createEnquiry,
       getEnquiries,
       getEnquiry,
+      recordFollowUp,
       reopenEnquiry,
       respondToEnquiry,
     ],
@@ -188,8 +213,10 @@ export const useEnquiriesActions = () => {
 };
 
 export type {
+  CreateEnquiryFollowUpInput,
   CreateEnquiryInput,
   Enquiry,
+  EnquiryFollowUpOutcome,
   EnquiryFollowUp,
   EnquiryStatus,
   RespondToEnquiryInput,

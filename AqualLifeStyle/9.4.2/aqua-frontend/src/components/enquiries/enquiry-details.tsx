@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import {
+  type EnquiryFollowUpOutcome,
   type EnquiryStatus,
   useCustomersActions,
   useCustomersState,
@@ -16,6 +17,7 @@ import {
   Button,
   Card,
   LinkButton,
+  SelectField,
   StatusMessage,
   TextAreaField,
 } from "@/src/shared/ui";
@@ -26,6 +28,21 @@ const enquiryStatusLabels: Record<EnquiryStatus, string> = {
   2: "Closed",
 };
 
+const followUpOutcomeLabels: Record<EnquiryFollowUpOutcome, string> = {
+  0: "Interested",
+  1: "Considering",
+  2: "Not interested",
+  3: "Converted",
+  4: "Lost",
+};
+
+const followUpOutcomeOptions = Object.entries(followUpOutcomeLabels).map(
+  ([value, label]) => ({
+    label,
+    value: Number(value) as EnquiryFollowUpOutcome,
+  }),
+);
+
 const formatDate = (date: string) => {
   return new Intl.DateTimeFormat("en-ZA", {
     dateStyle: "medium",
@@ -33,17 +50,28 @@ const formatDate = (date: string) => {
   }).format(new Date(date));
 };
 
+const formatPercent = (value: number) => {
+  return new Intl.NumberFormat("en-ZA", {
+    maximumFractionDigits: 0,
+    style: "percent",
+  }).format(value / 100);
+};
+
 type EnquiryDetailsProps = {
   enquiryId: number;
 };
 
 export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
+  const [followUpNotes, setFollowUpNotes] = useState("");
+  const [followUpOutcome, setFollowUpOutcome] =
+    useState<EnquiryFollowUpOutcome>(0);
   const [response, setResponse] = useState("");
   const { getCustomers } = useCustomersActions();
   const { getProducts } = useProductsActions();
   const {
     closeEnquiry,
     getEnquiry,
+    recordFollowUp,
     reopenEnquiry,
     respondToEnquiry,
   } = useEnquiriesActions();
@@ -106,6 +134,26 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
 
     if (didRespond) {
       setResponse("");
+    }
+  };
+
+  const handleRecordFollowUp = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const trimmedNotes = followUpNotes.trim();
+    if (!selectedEnquiry || trimmedNotes.length === 0) {
+      return;
+    }
+
+    const didRecord = await recordFollowUp(selectedEnquiry.id, {
+      followUpByMemberId: null,
+      followUpNotes: trimmedNotes,
+      outcome: followUpOutcome,
+    });
+
+    if (didRecord) {
+      setFollowUpNotes("");
+      setFollowUpOutcome(0);
     }
   };
 
@@ -209,6 +257,20 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4">
+                    <dt className="text-zinc-600">Probability</dt>
+                    <dd className="font-medium text-zinc-950">
+                      {formatPercent(selectedEnquiry.conversionProbability)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-zinc-600">Last follow-up</dt>
+                    <dd className="text-right font-medium text-zinc-950">
+                      {selectedEnquiry.lastFollowUpDate
+                        ? formatDate(selectedEnquiry.lastFollowUpDate)
+                        : "Not yet"}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
                     <dt className="text-zinc-600">Sales ready</dt>
                     <dd className="font-medium text-zinc-950">
                       {selectedEnquiry.isSalesReady ? "Yes" : "No"}
@@ -246,6 +308,49 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
 
               {!selectedEnquiry.isClosed ? (
                 <Card>
+                  <form
+                    className="flex flex-col gap-4"
+                    onSubmit={handleRecordFollowUp}
+                  >
+                    <SelectField
+                      label="Follow-up outcome"
+                      name="followUpOutcome"
+                      onChange={(event) =>
+                        setFollowUpOutcome(
+                          Number(event.target.value) as EnquiryFollowUpOutcome,
+                        )
+                      }
+                      value={followUpOutcome}
+                    >
+                      {followUpOutcomeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </SelectField>
+                    <TextAreaField
+                      label="Follow-up notes"
+                      name="followUpNotes"
+                      onChange={(event) => setFollowUpNotes(event.target.value)}
+                      placeholder="Capture the customer conversation, next step, or decision"
+                      required
+                      rows={5}
+                      value={followUpNotes}
+                    />
+                    <Button
+                      disabled={
+                        isActionPending || followUpNotes.trim().length === 0
+                      }
+                      type="submit"
+                    >
+                      Record follow-up
+                    </Button>
+                  </form>
+                </Card>
+              ) : null}
+
+              {!selectedEnquiry.isClosed ? (
+                <Card>
                   <form className="flex flex-col gap-4" onSubmit={handleRespond}>
                     <TextAreaField
                       label="Response"
@@ -276,6 +381,49 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
                 </StatusMessage>
               ) : null}
             </aside>
+
+            <section className="lg:col-span-2">
+              <Card>
+                <div className="flex flex-col gap-2">
+                  <h2 className="text-lg font-semibold">Follow-up timeline</h2>
+                  <p className="text-sm leading-6 text-zinc-600">
+                    Track the conversion journey from interest to a sales-ready
+                    or resolved enquiry.
+                  </p>
+                </div>
+
+                {selectedEnquiry.followUps.length === 0 ? (
+                  <StatusMessage>No follow-ups recorded yet.</StatusMessage>
+                ) : (
+                  <ol className="mt-6 grid gap-4">
+                    {selectedEnquiry.followUps.map((followUp) => (
+                      <li
+                        className="rounded-lg border border-zinc-200 bg-zinc-50 p-4"
+                        key={followUp.id}
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="font-medium text-zinc-950">
+                              {followUpOutcomeLabels[followUp.outcome] ??
+                                followUp.outcomeText}
+                            </p>
+                            <p className="mt-1 text-sm text-zinc-600">
+                              {formatDate(followUp.followUpDate)}
+                            </p>
+                          </div>
+                          <Badge tone={followUp.isResolved ? "neutral" : "success"}>
+                            {formatPercent(followUp.conversionProbability)}
+                          </Badge>
+                        </div>
+                        <p className="mt-4 whitespace-pre-line text-sm leading-6 text-zinc-700">
+                          {followUp.followUpNotes}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </Card>
+            </section>
           </section>
         ) : null}
       </div>

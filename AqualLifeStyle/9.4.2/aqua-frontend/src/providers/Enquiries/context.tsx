@@ -1,6 +1,7 @@
 import { createContext } from "react";
 
 export type EnquiryStatus = 0 | 1 | 2;
+export type EnquiryFollowUpOutcome = 0 | 1 | 2 | 3 | 4;
 
 export type EnquiryFollowUp = {
   id: number;
@@ -8,7 +9,7 @@ export type EnquiryFollowUp = {
   followUpDate: string;
   followUpByMemberId: number | null;
   followUpNotes: string;
-  outcome: number;
+  outcome: EnquiryFollowUpOutcome;
   outcomeText: string;
   conversionProbability: number;
   isResolved: boolean;
@@ -44,6 +45,12 @@ export type RespondToEnquiryInput = {
   response: string;
 };
 
+export type CreateEnquiryFollowUpInput = {
+  followUpByMemberId: number | null;
+  followUpNotes: string;
+  outcome: EnquiryFollowUpOutcome;
+};
+
 export type EnquiriesState = {
   actionErrorMessage: string | null;
   createErrorMessage: string | null;
@@ -70,6 +77,10 @@ export type EnquiriesActions = {
   createEnquiry: (input: CreateEnquiryInput) => Promise<boolean>;
   getEnquiries: () => Promise<void>;
   getEnquiry: (id: number) => Promise<void>;
+  recordFollowUp: (
+    id: number,
+    input: CreateEnquiryFollowUpInput,
+  ) => Promise<boolean>;
   reopenEnquiry: (id: number) => Promise<boolean>;
   respondToEnquiry: (
     id: number,
