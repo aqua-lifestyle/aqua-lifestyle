@@ -13,6 +13,9 @@ export const EnquiriesActionTypes = {
   getEnquiryError: "enquiries/getEnquiryError",
   getEnquiryPending: "enquiries/getEnquiryPending",
   getEnquirySuccess: "enquiries/getEnquirySuccess",
+  getSalesReadyEnquiriesError: "enquiries/getSalesReadyEnquiriesError",
+  getSalesReadyEnquiriesPending: "enquiries/getSalesReadyEnquiriesPending",
+  getSalesReadyEnquiriesSuccess: "enquiries/getSalesReadyEnquiriesSuccess",
 } as const;
 
 export type EnquiriesAction =
@@ -58,6 +61,17 @@ export type EnquiriesAction =
   | {
       type: typeof EnquiriesActionTypes.getEnquirySuccess;
       payload: Enquiry;
+    }
+  | {
+      type: typeof EnquiriesActionTypes.getSalesReadyEnquiriesError;
+      payload: string;
+    }
+  | {
+      type: typeof EnquiriesActionTypes.getSalesReadyEnquiriesPending;
+    }
+  | {
+      type: typeof EnquiriesActionTypes.getSalesReadyEnquiriesSuccess;
+      payload: Enquiry[];
     };
 
 export const enquiryActionError = (message: string): EnquiriesAction => ({
@@ -113,4 +127,22 @@ export const getEnquiryPending = (): EnquiriesAction => ({
 export const getEnquirySuccess = (enquiry: Enquiry): EnquiriesAction => ({
   type: EnquiriesActionTypes.getEnquirySuccess,
   payload: enquiry,
+});
+
+export const getSalesReadyEnquiriesError = (
+  message: string,
+): EnquiriesAction => ({
+  type: EnquiriesActionTypes.getSalesReadyEnquiriesError,
+  payload: message,
+});
+
+export const getSalesReadyEnquiriesPending = (): EnquiriesAction => ({
+  type: EnquiriesActionTypes.getSalesReadyEnquiriesPending,
+});
+
+export const getSalesReadyEnquiriesSuccess = (
+  enquiries: Enquiry[],
+): EnquiriesAction => ({
+  type: EnquiriesActionTypes.getSalesReadyEnquiriesSuccess,
+  payload: enquiries,
 });

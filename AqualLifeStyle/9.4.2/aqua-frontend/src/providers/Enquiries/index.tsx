@@ -22,6 +22,9 @@ import {
   getEnquiryError,
   getEnquiryPending,
   getEnquirySuccess,
+  getSalesReadyEnquiriesError,
+  getSalesReadyEnquiriesPending,
+  getSalesReadyEnquiriesSuccess,
 } from "./actions";
 import {
   type CreateEnquiryInput,
@@ -92,6 +95,19 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       dispatch(getEnquirySuccess(enquiry));
     } catch (error) {
       dispatch(getEnquiryError(getErrorMessage(error)));
+    }
+  }, []);
+
+  const getSalesReadyEnquiries = useCallback(async () => {
+    dispatch(getSalesReadyEnquiriesPending());
+
+    try {
+      const enquiries = await httpClient.get<Enquiry[]>(
+        apiEndpoints.enquiries.getSalesReady,
+      );
+      dispatch(getSalesReadyEnquiriesSuccess(enquiries));
+    } catch (error) {
+      dispatch(getSalesReadyEnquiriesError(getErrorMessage(error)));
     }
   }, []);
 
@@ -174,6 +190,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       createEnquiry,
       getEnquiries,
       getEnquiry,
+      getSalesReadyEnquiries,
       recordFollowUp,
       reopenEnquiry,
       respondToEnquiry,
@@ -183,6 +200,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       createEnquiry,
       getEnquiries,
       getEnquiry,
+      getSalesReadyEnquiries,
       recordFollowUp,
       reopenEnquiry,
       respondToEnquiry,

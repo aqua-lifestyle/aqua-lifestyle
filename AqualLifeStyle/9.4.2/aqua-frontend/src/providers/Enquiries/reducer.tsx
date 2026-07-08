@@ -122,6 +122,35 @@ export const enquiriesReducer = (
         selectedErrorMessage: null,
       };
 
+    case EnquiriesActionTypes.getSalesReadyEnquiriesError:
+      return {
+        ...state,
+        isSalesReadyError: true,
+        isSalesReadyPending: false,
+        isSalesReadySuccess: false,
+        salesReadyEnquiries: [],
+        salesReadyErrorMessage: action.payload,
+      };
+
+    case EnquiriesActionTypes.getSalesReadyEnquiriesPending:
+      return {
+        ...state,
+        isSalesReadyError: false,
+        isSalesReadyPending: true,
+        isSalesReadySuccess: false,
+        salesReadyErrorMessage: null,
+      };
+
+    case EnquiriesActionTypes.getSalesReadyEnquiriesSuccess:
+      return {
+        ...state,
+        isSalesReadyError: false,
+        isSalesReadyPending: false,
+        isSalesReadySuccess: true,
+        salesReadyEnquiries: action.payload,
+        salesReadyErrorMessage: null,
+      };
+
     default:
       return state;
   }

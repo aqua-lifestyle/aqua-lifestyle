@@ -310,6 +310,11 @@ export const DemoDashboard = () => {
                   </dd>
                 </div>
               </dl>
+              <div className="mt-6">
+                <LinkButton href="/enquiries/sales-ready">
+                  Open sales-ready view
+                </LinkButton>
+              </div>
             </Card>
 
             <Card>

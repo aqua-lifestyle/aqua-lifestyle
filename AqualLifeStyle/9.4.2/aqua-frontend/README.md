@@ -7,7 +7,7 @@ Next.js App Router frontend for the AquaLifeStyle ABP backend.
 - Products: read live product data from ABP, open product details, and validate membership-based customer eligibility.
 - Customers: register, view, update customer records, and inspect eligible products.
 - Memberships: view membership tiers, open membership details with tier benefits, and assign a membership during customer registration.
-- Enquiries: create enquiries, view enquiry records, record follow-ups, and manage response/close/reopen workflow actions.
+- Enquiries: create enquiries, view enquiry records, record follow-ups, review sales-ready enquiries, and manage response/close/reopen workflow actions.
 
 The root route is a live demo dashboard that guides the current end-to-end validation path and summarizes backend data.
 
@@ -58,6 +58,7 @@ Open:
 - Customers: [http://localhost:3000/customers](http://localhost:3000/customers)
 - Register customer: [http://localhost:3000/customers/register](http://localhost:3000/customers/register)
 - Enquiries: [http://localhost:3000/enquiries](http://localhost:3000/enquiries)
+- Sales-ready enquiries: [http://localhost:3000/enquiries/sales-ready](http://localhost:3000/enquiries/sales-ready)
 - Create enquiry: [http://localhost:3000/enquiries/create](http://localhost:3000/enquiries/create)
 - Memberships: [http://localhost:3000/memberships](http://localhost:3000/memberships)
 

@@ -64,10 +64,15 @@ export type EnquiriesState = {
   isSelectedError: boolean;
   isSelectedPending: boolean;
   isSelectedSuccess: boolean;
+  isSalesReadyError: boolean;
+  isSalesReadyPending: boolean;
+  isSalesReadySuccess: boolean;
   isLoadError: boolean;
   isLoadPending: boolean;
   isLoadSuccess: boolean;
   loadErrorMessage: string | null;
+  salesReadyEnquiries: Enquiry[];
+  salesReadyErrorMessage: string | null;
   selectedEnquiry: Enquiry | null;
   selectedErrorMessage: string | null;
 };
@@ -77,6 +82,7 @@ export type EnquiriesActions = {
   createEnquiry: (input: CreateEnquiryInput) => Promise<boolean>;
   getEnquiries: () => Promise<void>;
   getEnquiry: (id: number) => Promise<void>;
+  getSalesReadyEnquiries: () => Promise<void>;
   recordFollowUp: (
     id: number,
     input: CreateEnquiryFollowUpInput,
@@ -101,10 +107,15 @@ export const initialEnquiriesState: EnquiriesState = {
   isSelectedError: false,
   isSelectedPending: false,
   isSelectedSuccess: false,
+  isSalesReadyError: false,
+  isSalesReadyPending: false,
+  isSalesReadySuccess: false,
   isLoadError: false,
   isLoadPending: false,
   isLoadSuccess: false,
   loadErrorMessage: null,
+  salesReadyEnquiries: [],
+  salesReadyErrorMessage: null,
   selectedEnquiry: null,
   selectedErrorMessage: null,
 };
