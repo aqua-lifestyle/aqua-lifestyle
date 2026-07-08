@@ -1,4 +1,8 @@
-import type { Membership, TierBenefits } from "./context";
+import type {
+  Membership,
+  SavingsWindowStatus,
+  TierBenefits,
+} from "./context";
 
 export const MembershipsActionTypes = {
   getMembershipError: "memberships/getMembershipError",
@@ -10,6 +14,11 @@ export const MembershipsActionTypes = {
   getTierBenefitsError: "memberships/getTierBenefitsError",
   getTierBenefitsPending: "memberships/getTierBenefitsPending",
   getTierBenefitsSuccess: "memberships/getTierBenefitsSuccess",
+  getSavingsWindowStatusesError: "memberships/getSavingsWindowStatusesError",
+  getSavingsWindowStatusesPending:
+    "memberships/getSavingsWindowStatusesPending",
+  getSavingsWindowStatusesSuccess:
+    "memberships/getSavingsWindowStatusesSuccess",
 } as const;
 
 export type MembershipsAction =
@@ -45,6 +54,17 @@ export type MembershipsAction =
   | {
       type: typeof MembershipsActionTypes.getTierBenefitsSuccess;
       payload: TierBenefits;
+    }
+  | {
+      type: typeof MembershipsActionTypes.getSavingsWindowStatusesError;
+      payload: string;
+    }
+  | {
+      type: typeof MembershipsActionTypes.getSavingsWindowStatusesPending;
+    }
+  | {
+      type: typeof MembershipsActionTypes.getSavingsWindowStatusesSuccess;
+      payload: SavingsWindowStatus[];
     };
 
 export const getMembershipError = (message: string): MembershipsAction => ({
@@ -93,4 +113,22 @@ export const getTierBenefitsSuccess = (
 ): MembershipsAction => ({
   type: MembershipsActionTypes.getTierBenefitsSuccess,
   payload: tierBenefits,
+});
+
+export const getSavingsWindowStatusesError = (
+  message: string,
+): MembershipsAction => ({
+  type: MembershipsActionTypes.getSavingsWindowStatusesError,
+  payload: message,
+});
+
+export const getSavingsWindowStatusesPending = (): MembershipsAction => ({
+  type: MembershipsActionTypes.getSavingsWindowStatusesPending,
+});
+
+export const getSavingsWindowStatusesSuccess = (
+  statuses: SavingsWindowStatus[],
+): MembershipsAction => ({
+  type: MembershipsActionTypes.getSavingsWindowStatusesSuccess,
+  payload: statuses,
 });

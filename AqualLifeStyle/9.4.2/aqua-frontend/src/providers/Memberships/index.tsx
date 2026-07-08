@@ -16,6 +16,9 @@ import {
   getMembershipsError,
   getMembershipsPending,
   getMembershipsSuccess,
+  getSavingsWindowStatusesError,
+  getSavingsWindowStatusesPending,
+  getSavingsWindowStatusesSuccess,
   getTierBenefitsError,
   getTierBenefitsPending,
   getTierBenefitsSuccess,
@@ -24,6 +27,7 @@ import {
   type Membership,
   MembershipsActionsContext,
   MembershipsStateContext,
+  type SavingsWindowStatus,
   type TierBenefits,
   initialMembershipsState,
 } from "./context";
@@ -90,13 +94,27 @@ export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {
     }
   }, []);
 
+  const getSavingsWindowStatuses = useCallback(async () => {
+    dispatch(getSavingsWindowStatusesPending());
+
+    try {
+      const statuses = await httpClient.get<SavingsWindowStatus[]>(
+        apiEndpoints.memberships.getSavingsWindowStatuses,
+      );
+      dispatch(getSavingsWindowStatusesSuccess(statuses));
+    } catch (error) {
+      dispatch(getSavingsWindowStatusesError(getErrorMessage(error)));
+    }
+  }, []);
+
   const actions = useMemo(
     () => ({
       getMembership,
       getMemberships,
+      getSavingsWindowStatuses,
       getTierBenefits,
     }),
-    [getMembership, getMemberships, getTierBenefits],
+    [getMembership, getMemberships, getSavingsWindowStatuses, getTierBenefits],
   );
 
   return (
@@ -124,4 +142,9 @@ export const useMembershipsActions = () => {
   return context;
 };
 
-export type { Membership, MembershipType, TierBenefits } from "./context";
+export type {
+  Membership,
+  MembershipType,
+  SavingsWindowStatus,
+  TierBenefits,
+} from "./context";

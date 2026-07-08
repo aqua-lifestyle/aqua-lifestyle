@@ -21,6 +21,8 @@ export const apiEndpoints = {
   memberships: {
     getAll: "/api/services/app/Membership/GetAll",
     getById: (id: number) => `/api/services/app/Membership/Get?id=${id}`,
+    getSavingsWindowStatuses:
+      "/api/services/app/Membership/GetSavingsWindowStatuses",
     getTierBenefits: (id: number) =>
       `/api/services/app/Membership/GetTierBenefits?id=${id}`,
   },

@@ -30,6 +30,17 @@ export type TierBenefits = {
   isSavingsWindowOpen: boolean;
 };
 
+export type SavingsWindowStatus = {
+  tier: MembershipType;
+  tierName: string;
+  savingsWindowOpenDay: number;
+  savingsWindowCloseDay: number;
+  currentDay: number;
+  asOfDate: string;
+  isSavingsWindowOpen: boolean;
+  statusLabel: string;
+};
+
 export type MembershipsState = {
   errorMessage: string | null;
   isError: boolean;
@@ -46,11 +57,17 @@ export type MembershipsState = {
   isTierBenefitsError: boolean;
   isTierBenefitsPending: boolean;
   isTierBenefitsSuccess: boolean;
+  savingsWindowStatuses: SavingsWindowStatus[];
+  savingsWindowStatusesErrorMessage: string | null;
+  isSavingsWindowStatusesError: boolean;
+  isSavingsWindowStatusesPending: boolean;
+  isSavingsWindowStatusesSuccess: boolean;
 };
 
 export type MembershipsActions = {
   getMembership: (id: number) => Promise<void>;
   getMemberships: () => Promise<void>;
+  getSavingsWindowStatuses: () => Promise<void>;
   getTierBenefits: (id: number) => Promise<void>;
 };
 
@@ -70,6 +87,11 @@ export const initialMembershipsState: MembershipsState = {
   isTierBenefitsError: false,
   isTierBenefitsPending: false,
   isTierBenefitsSuccess: false,
+  savingsWindowStatuses: [],
+  savingsWindowStatusesErrorMessage: null,
+  isSavingsWindowStatusesError: false,
+  isSavingsWindowStatusesPending: false,
+  isSavingsWindowStatusesSuccess: false,
 };
 
 export const MembershipsStateContext =

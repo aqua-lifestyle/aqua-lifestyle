@@ -82,13 +82,22 @@ export const MembershipsList = () => {
   const [statusFilter, setStatusFilter] =
     useState<MembershipStatusFilter>("all");
   const [tierFilter, setTierFilter] = useState("all");
-  const { getMemberships } = useMembershipsActions();
-  const { errorMessage, isError, isPending, memberships } =
-    useMembershipsState();
+  const { getMemberships, getSavingsWindowStatuses } = useMembershipsActions();
+  const {
+    errorMessage,
+    isError,
+    isPending,
+    isSavingsWindowStatusesError,
+    isSavingsWindowStatusesPending,
+    memberships,
+    savingsWindowStatuses,
+    savingsWindowStatusesErrorMessage,
+  } = useMembershipsState();
 
   useEffect(() => {
     void getMemberships();
-  }, [getMemberships]);
+    void getSavingsWindowStatuses();
+  }, [getMemberships, getSavingsWindowStatuses]);
 
   const filteredMemberships = memberships.filter((membership) => {
     const matchesStatus =
@@ -143,6 +152,64 @@ export const MembershipsList = () => {
             {errorMessage ?? "Unable to load memberships."}
           </StatusMessage>
         ) : null}
+
+        <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-2">
+            <h2 className="text-lg font-semibold text-zinc-950">
+              Savings window readiness
+            </h2>
+            <p className="max-w-3xl text-sm leading-6 text-zinc-600">
+              Backend-calculated monthly savings activity windows by tier. This
+              is a read-only demo signal, not full savings account management.
+            </p>
+          </div>
+
+          {isSavingsWindowStatusesPending ? (
+            <div className="mt-4">
+              <StatusMessage>Loading savings window readiness...</StatusMessage>
+            </div>
+          ) : null}
+
+          {isSavingsWindowStatusesError ? (
+            <div className="mt-4">
+              <StatusMessage tone="error">
+                {savingsWindowStatusesErrorMessage ??
+                  "Unable to load savings window readiness."}
+              </StatusMessage>
+            </div>
+          ) : null}
+
+          {savingsWindowStatuses.length > 0 ? (
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {savingsWindowStatuses.map((status) => (
+                <div
+                  className="rounded-lg border border-zinc-200 bg-zinc-50 p-4"
+                  key={status.tier}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-zinc-950">
+                        {status.tierName}
+                      </p>
+                      <p className="mt-1 text-sm text-zinc-600">
+                        Day {status.savingsWindowOpenDay}-
+                        {status.savingsWindowCloseDay}
+                      </p>
+                    </div>
+                    <Badge
+                      tone={status.isSavingsWindowOpen ? "success" : "neutral"}
+                    >
+                      {status.statusLabel}
+                    </Badge>
+                  </div>
+                  <p className="mt-4 text-sm leading-6 text-zinc-600">
+                    Checked for day {status.currentDay} on {status.asOfDate}.
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
 
         {!isPending && !isError && memberships.length === 0 ? (
           <StatusMessage>

@@ -94,6 +94,34 @@ export const membershipsReducer = (
         tierBenefitsErrorMessage: null,
       };
 
+    case MembershipsActionTypes.getSavingsWindowStatusesError:
+      return {
+        ...state,
+        isSavingsWindowStatusesError: true,
+        isSavingsWindowStatusesPending: false,
+        isSavingsWindowStatusesSuccess: false,
+        savingsWindowStatusesErrorMessage: action.payload,
+      };
+
+    case MembershipsActionTypes.getSavingsWindowStatusesPending:
+      return {
+        ...state,
+        isSavingsWindowStatusesError: false,
+        isSavingsWindowStatusesPending: true,
+        isSavingsWindowStatusesSuccess: false,
+        savingsWindowStatusesErrorMessage: null,
+      };
+
+    case MembershipsActionTypes.getSavingsWindowStatusesSuccess:
+      return {
+        ...state,
+        isSavingsWindowStatusesError: false,
+        isSavingsWindowStatusesPending: false,
+        isSavingsWindowStatusesSuccess: true,
+        savingsWindowStatuses: action.payload,
+        savingsWindowStatusesErrorMessage: null,
+      };
+
     default:
       return state;
   }
