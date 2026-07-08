@@ -2,14 +2,14 @@ import { CustomerDetails } from "@/src/components/customers/customer-details";
 
 type CustomerDetailsPageProps = {
   params: Promise<{
-    id: string;
+    customerId: string;
   }>;
 };
 
 export default async function CustomerDetailsPage({
   params,
 }: CustomerDetailsPageProps) {
-  const { id } = await params;
+  const { customerId } = await params;
 
-  return <CustomerDetails customerId={Number(id)} />;
+  return <CustomerDetails customerId={Number(customerId)} />;
 }
