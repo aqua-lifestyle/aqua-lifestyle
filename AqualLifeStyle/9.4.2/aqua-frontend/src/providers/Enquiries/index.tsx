@@ -168,6 +168,22 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
     }
   }, []);
 
+  const convertEnquiryToCustomer = useCallback(async (id: number) => {
+    dispatch(enquiryActionPending());
+
+    try {
+      const enquiry = await httpClient.post<Enquiry, Record<string, never>>(
+        apiEndpoints.enquiries.convertToCustomer(id),
+        {},
+      );
+      dispatch(enquiryActionSuccess(enquiry));
+      return true;
+    } catch (error) {
+      dispatch(enquiryActionError(getErrorMessage(error)));
+      return false;
+    }
+  }, []);
+
   const reopenEnquiry = useCallback(async (id: number) => {
     dispatch(enquiryActionPending());
 
@@ -187,6 +203,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
   const actions = useMemo(
     () => ({
       closeEnquiry,
+      convertEnquiryToCustomer,
       createEnquiry,
       getEnquiries,
       getEnquiry,
@@ -197,6 +214,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
     }),
     [
       closeEnquiry,
+      convertEnquiryToCustomer,
       createEnquiry,
       getEnquiries,
       getEnquiry,

@@ -70,6 +70,7 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
   const { getProducts } = useProductsActions();
   const {
     closeEnquiry,
+    convertEnquiryToCustomer,
     getEnquiry,
     recordFollowUp,
     reopenEnquiry,
@@ -160,6 +161,12 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
   const handleClose = async () => {
     if (selectedEnquiry) {
       await closeEnquiry(selectedEnquiry.id);
+    }
+  };
+
+  const handleConvert = async () => {
+    if (selectedEnquiry) {
+      await convertEnquiryToCustomer(selectedEnquiry.id);
     }
   };
 
@@ -285,6 +292,16 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
                 </dl>
 
                 <div className="mt-6 flex flex-col gap-3">
+                  {!selectedEnquiry.isConverted ? (
+                    <Button
+                      disabled={isActionPending}
+                      onClick={handleConvert}
+                      type="button"
+                    >
+                      Mark converted
+                    </Button>
+                  ) : null}
+
                   {selectedEnquiry.isClosed ? (
                     <Button
                       disabled={isActionPending}

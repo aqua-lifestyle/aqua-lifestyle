@@ -7,6 +7,8 @@ export const apiEndpoints = {
   },
   enquiries: {
     close: (id: number) => `/api/services/app/Enquiry/Close?id=${id}`,
+    convertToCustomer: (id: number) =>
+      `/api/services/app/Enquiry/ConvertToCustomer?id=${id}`,
     create: "/api/services/app/Enquiry/Create",
     getAll: "/api/services/app/Enquiry/GetAll",
     getById: (id: number) => `/api/services/app/Enquiry/Get?id=${id}`,
