@@ -1,15 +1,10 @@
 import { CustomerRegistrationForm } from "@/src/components/customers/customer-registration-form";
+import { toPositiveNumberOrNull } from "@/src/shared/routing";
 
 type CustomerRegistrationPageProps = {
   searchParams: Promise<{
     membershipId?: string;
   }>;
-};
-
-const toPositiveNumber = (value: string | undefined) => {
-  const numberValue = Number(value);
-
-  return Number.isInteger(numberValue) && numberValue > 0 ? numberValue : null;
 };
 
 export default async function CustomerRegistrationPage({
@@ -19,7 +14,7 @@ export default async function CustomerRegistrationPage({
 
   return (
     <CustomerRegistrationForm
-      initialMembershipId={toPositiveNumber(membershipId)}
+      initialMembershipId={toPositiveNumberOrNull(membershipId)}
     />
   );
 }

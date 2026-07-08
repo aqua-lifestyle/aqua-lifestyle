@@ -1,16 +1,11 @@
 import { EnquiryCreateForm } from "@/src/components/enquiries/enquiry-create-form";
+import { toPositiveNumberOrNull } from "@/src/shared/routing";
 
 type CreateEnquiryPageProps = {
   searchParams: Promise<{
     customerId?: string;
     productId?: string;
   }>;
-};
-
-const toPositiveNumber = (value: string | undefined) => {
-  const numberValue = Number(value);
-
-  return Number.isInteger(numberValue) && numberValue > 0 ? numberValue : null;
 };
 
 export default async function CreateEnquiryPage({
@@ -20,8 +15,8 @@ export default async function CreateEnquiryPage({
 
   return (
     <EnquiryCreateForm
-      initialCustomerId={toPositiveNumber(customerId)}
-      initialProductId={toPositiveNumber(productId)}
+      initialCustomerId={toPositiveNumberOrNull(customerId)}
+      initialProductId={toPositiveNumberOrNull(productId)}
     />
   );
 }
