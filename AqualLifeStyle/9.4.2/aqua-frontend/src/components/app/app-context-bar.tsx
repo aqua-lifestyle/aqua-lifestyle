@@ -44,6 +44,14 @@ const writeStoredTenant = (tenant: string | null) => {
   }
 };
 
+const formatCheckedAt = (checkedAtUtc: string) => {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(checkedAtUtc));
+};
+
 export const AppContextBar = () => {
   const { isAuthenticated, session } = useAuthState();
   const { checkHealth } = useSystemHealthActions();
@@ -61,6 +69,9 @@ export const AppContextBar = () => {
 
   const userLabel =
     session?.user?.name ?? session?.user?.email ?? session?.user?.id ?? null;
+  const checkedAtLabel = health?.checkedAtUtc
+    ? formatCheckedAt(health.checkedAtUtc)
+    : null;
 
   useEffect(() => {
     const storedTenant = readStoredTenant();
@@ -109,23 +120,37 @@ export const AppContextBar = () => {
       <div className="mx-auto grid w-full max-w-7xl gap-4 xl:grid-cols-[1fr_auto] xl:items-end">
         <div className="grid gap-3 md:grid-cols-3 md:items-start">
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold text-emerald-950">Backend</p>
-              <Badge
-                tone={
-                  isHealthSuccess && health?.isDatabaseReachable
-                    ? "success"
-                    : isHealthError || isHealthSuccess
-                      ? "danger"
-                      : "neutral"
-                }
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold text-emerald-950">
+                  Backend
+                </p>
+                <Badge
+                  tone={
+                    isHealthSuccess && health?.isDatabaseReachable
+                      ? "success"
+                      : isHealthError || isHealthSuccess
+                        ? "danger"
+                        : "neutral"
+                  }
+                >
+                  {isHealthPending
+                    ? "Checking"
+                    : isHealthSuccess
+                      ? health?.status ?? "Reachable"
+                      : "Unavailable"}
+                </Badge>
+              </div>
+              <Button
+                className="bg-white px-3 py-1 text-emerald-800 ring-1 ring-emerald-200 hover:bg-emerald-100 disabled:bg-white disabled:text-zinc-400"
+                disabled={isHealthPending}
+                onClick={() => {
+                  void checkHealth();
+                }}
+                type="button"
               >
-                {isHealthPending
-                  ? "Checking"
-                  : isHealthSuccess
-                    ? health?.status ?? "Reachable"
-                    : "Unavailable"}
-              </Badge>
+                Refresh
+              </Button>
             </div>
             <p className="mt-1 text-sm leading-6 text-emerald-900">
               {isHealthSuccess
@@ -133,6 +158,11 @@ export const AppContextBar = () => {
                 : healthErrorMessage ??
                   "Checking whether the frontend can reach ABP."}
             </p>
+            {checkedAtLabel ? (
+              <p className="mt-1 text-xs font-medium text-emerald-800">
+                Last checked at {checkedAtLabel}
+              </p>
+            ) : null}
           </div>
 
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">

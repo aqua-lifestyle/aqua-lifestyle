@@ -12,7 +12,7 @@ Next.js App Router frontend for the AquaLifeStyle ABP backend.
 - Order intents: create a lightweight reservation from a converted enquiry, review reserved/completed value, show member savings from tier discounts, then cancel or complete it without introducing payments prematurely.
 - Authentication context: show whether API calls are anonymous or include an access token from the auth boundary.
 - Tenant context: switch between host mode and a named tenant so subsequent API requests carry ABP's `__tenant` header.
-- Backend readiness: show whether the browser can reach ABP's `/api/health` endpoint, including version/environment and database reachability context.
+- Backend readiness: show whether the browser can reach ABP's `/api/health` endpoint, including refreshable version/environment and database reachability context.
 
 The root route is a live demo dashboard that guides the current end-to-end validation path and summarizes backend data.
 
