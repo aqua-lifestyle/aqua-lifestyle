@@ -28,6 +28,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\AqualLifeStyle.EntityFrameworkCore\AqualLifeStyle.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\AqualLifeStyle.Web.Core\AqualLifeStyle.Web.Core.csproj" />
   </ItemGroup>
   <ItemGroup>

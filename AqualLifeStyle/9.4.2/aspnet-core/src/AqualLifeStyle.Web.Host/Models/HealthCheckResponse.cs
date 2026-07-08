@@ -13,6 +13,16 @@ namespace AqualLifeStyle.Web.Host.Models
         public string Status { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether the configured database is reachable.
+        /// </summary>
+        public bool IsDatabaseReachable { get; set; }
+
+        /// <summary>
+        /// Gets or sets the database dependency status.
+        /// </summary>
+        public string DatabaseStatus { get; set; }
+
+        /// <summary>
         /// Gets or sets the application version.
         /// </summary>
         public string Version { get; set; }

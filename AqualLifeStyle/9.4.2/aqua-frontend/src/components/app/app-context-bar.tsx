@@ -113,9 +113,9 @@ export const AppContextBar = () => {
               <p className="text-sm font-semibold text-emerald-950">Backend</p>
               <Badge
                 tone={
-                  isHealthSuccess
+                  isHealthSuccess && health?.isDatabaseReachable
                     ? "success"
-                    : isHealthError
+                    : isHealthError || isHealthSuccess
                       ? "danger"
                       : "neutral"
                 }
@@ -129,7 +129,7 @@ export const AppContextBar = () => {
             </div>
             <p className="mt-1 text-sm leading-6 text-emerald-900">
               {isHealthSuccess
-                ? `${health?.environment ?? "Backend"} API ${health?.version ?? "version unknown"} is reachable.`
+                ? `${health?.environment ?? "Backend"} API ${health?.version ?? "version unknown"} is reachable; database is ${health?.databaseStatus?.toLowerCase() ?? "unknown"}.`
                 : healthErrorMessage ??
                   "Checking whether the frontend can reach ABP."}
             </p>

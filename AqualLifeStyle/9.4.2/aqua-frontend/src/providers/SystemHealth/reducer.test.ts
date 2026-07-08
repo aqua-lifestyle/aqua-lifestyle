@@ -26,6 +26,8 @@ describe("systemHealthReducer", () => {
   it("stores successful health metadata", () => {
     const health = {
       status: "Healthy",
+      isDatabaseReachable: true,
+      databaseStatus: "Healthy",
       version: "1.0.0",
       releaseDate: "2026-07-09T00:00:00Z",
       checkedAtUtc: "2026-07-09T10:00:00Z",
@@ -48,6 +50,8 @@ describe("systemHealthReducer", () => {
       initialSystemHealthState,
       checkHealthSuccess({
         status: "Healthy",
+        isDatabaseReachable: true,
+        databaseStatus: "Healthy",
         version: "1.0.0",
         releaseDate: "2026-07-09T00:00:00Z",
         checkedAtUtc: "2026-07-09T10:00:00Z",

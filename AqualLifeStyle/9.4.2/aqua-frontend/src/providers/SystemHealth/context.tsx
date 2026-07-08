@@ -2,6 +2,8 @@ import { createContext } from "react";
 
 export type SystemHealth = {
   status: string;
+  isDatabaseReachable: boolean;
+  databaseStatus: string;
   version: string;
   releaseDate: string;
   checkedAtUtc: string;
