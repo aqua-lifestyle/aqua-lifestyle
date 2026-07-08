@@ -8,6 +8,7 @@ import {
   EnquiriesProvider,
   MembershipsProvider,
   ProductsProvider,
+  TenantProvider,
 } from "@/src/providers";
 
 type AppProvidersProps = {
@@ -17,13 +18,15 @@ type AppProvidersProps = {
 export const AppProviders = ({ children }: AppProvidersProps) => {
   return (
     <AuthProvider>
-      <CustomersProvider>
-        <EnquiriesProvider>
-          <MembershipsProvider>
-            <ProductsProvider>{children}</ProductsProvider>
-          </MembershipsProvider>
-        </EnquiriesProvider>
-      </CustomersProvider>
+      <TenantProvider>
+        <CustomersProvider>
+          <EnquiriesProvider>
+            <MembershipsProvider>
+              <ProductsProvider>{children}</ProductsProvider>
+            </MembershipsProvider>
+          </EnquiriesProvider>
+        </CustomersProvider>
+      </TenantProvider>
     </AuthProvider>
   );
 };

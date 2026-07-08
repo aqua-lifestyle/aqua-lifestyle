@@ -1,6 +1,9 @@
 export { AuthProvider, useAuthActions, useAuthState } from "./Auth";
 export type { AuthSession, AuthState, AuthUser } from "./Auth";
 
+export { TenantProvider, useTenantActions, useTenantState } from "./Tenant";
+export type { TenantState } from "./Tenant";
+
 export {
   CustomersProvider,
   useCustomersActions,
