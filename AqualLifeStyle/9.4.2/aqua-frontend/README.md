@@ -7,6 +7,7 @@ Next.js App Router frontend for the AquaLifeStyle ABP backend.
 - Products: read live product data from ABP, open product details, and validate membership-based customer eligibility.
 - Customers: register, view, update customer records, and inspect eligible products.
 - Memberships: view membership tiers, open membership details with tier benefits, and assign a membership during customer registration.
+- Savings readiness: view read-only tier savings-window status as supporting membership context.
 - Enquiries: create enquiries, view enquiry records, record follow-ups, review sales-ready enquiries, mark conversions, and manage response/close/reopen workflow actions.
 - Order intents: create a lightweight reservation from a converted enquiry, then cancel or complete it without introducing payments prematurely.
 - Authentication context: show whether API calls are anonymous or include an access token from the auth boundary.
@@ -47,7 +48,7 @@ Use this path for the current end-to-end demo:
 Backend scan summary:
 
 - Products, memberships, customers, and enquiries have application services and are already used by the demo.
-- Savings exists in the domain model with tests, but there is no savings application service exposed to the frontend yet.
+- Savings-window readiness is exposed as a read-only membership endpoint and surfaced on the memberships page; full savings account/deposit workflows are not exposed yet.
 - Order intent application services are now exposed and used by the demo.
 - Payment, fulfillment, Area Space, Area Leader, event, training, and therapy workflows do not currently have confirmed application services for frontend integration.
 
@@ -61,7 +62,7 @@ Recommended next commerce slice:
 
 1. Decide whether the next learning target is payment intent/proof-of-payment or fulfillment workflow.
 2. Keep payment/proof-of-payment separate from order-intent creation so the reservation lifecycle remains reviewable.
-3. Surface savings-window status as supporting membership context, but do not build full savings account management until an application service exists.
+3. Keep savings-window status as supporting membership context, but do not build full savings account management until account/deposit application services exist.
 
 Why this order:
 
