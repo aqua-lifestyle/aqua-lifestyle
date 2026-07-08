@@ -47,8 +47,11 @@ const CustomerCard = ({
         {membershipName}
       </p>
 
-      <div className="mt-6">
+      <div className="mt-6 flex flex-col gap-3">
         <LinkButton href={`/customers/${customer.id}`}>Open customer</LinkButton>
+        <LinkButton href={`/enquiries/create?customerId=${customer.id}`}>
+          Create enquiry
+        </LinkButton>
       </div>
     </Card>
   );
