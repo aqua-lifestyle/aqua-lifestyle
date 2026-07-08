@@ -106,9 +106,9 @@ export const CustomerRegistrationForm = ({
         <header className="flex flex-col gap-4">
           <Link
             className="text-sm font-medium text-emerald-700 hover:text-emerald-800"
-            href="/products"
+            href="/customers"
           >
-            Back to products
+            Back to customers
           </Link>
           <div className="flex flex-col gap-2">
             <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">
