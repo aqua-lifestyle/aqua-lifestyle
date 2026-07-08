@@ -5,6 +5,13 @@ export { TenantProvider, useTenantActions, useTenantState } from "./Tenant";
 export type { TenantState } from "./Tenant";
 
 export {
+  SystemHealthProvider,
+  useSystemHealthActions,
+  useSystemHealthState,
+} from "./SystemHealth";
+export type { SystemHealth } from "./SystemHealth";
+
+export {
   CustomersProvider,
   useCustomersActions,
   useCustomersState,

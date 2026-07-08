@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-type BadgeTone = "success" | "neutral";
+type BadgeTone = "danger" | "success" | "neutral";
 
 type BadgeProps = {
   children: ReactNode;
@@ -8,6 +8,7 @@ type BadgeProps = {
 };
 
 const toneClassNames: Record<BadgeTone, string> = {
+  danger: "bg-rose-50 text-rose-700",
   neutral: "bg-zinc-100 text-zinc-700",
   success: "bg-emerald-50 text-emerald-700",
 };

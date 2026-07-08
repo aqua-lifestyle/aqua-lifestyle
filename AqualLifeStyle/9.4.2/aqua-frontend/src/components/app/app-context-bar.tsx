@@ -5,6 +5,8 @@ import { z } from "zod";
 
 import {
   useAuthState,
+  useSystemHealthActions,
+  useSystemHealthState,
   useTenantActions,
   useTenantState,
 } from "@/src/providers";
@@ -44,6 +46,14 @@ const writeStoredTenant = (tenant: string | null) => {
 
 export const AppContextBar = () => {
   const { isAuthenticated, session } = useAuthState();
+  const { checkHealth } = useSystemHealthActions();
+  const {
+    errorMessage: healthErrorMessage,
+    health,
+    isError: isHealthError,
+    isPending: isHealthPending,
+    isSuccess: isHealthSuccess,
+  } = useSystemHealthState();
   const { clearTenant, setTenant } = useTenantActions();
   const { currentTenant, isHost } = useTenantState();
   const [tenantInput, setTenantInput] = useState(currentTenant ?? "");
@@ -70,6 +80,10 @@ export const AppContextBar = () => {
     writeStoredTenant(currentTenant);
   }, [currentTenant]);
 
+  useEffect(() => {
+    void checkHealth();
+  }, [checkHealth]);
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -93,7 +107,34 @@ export const AppContextBar = () => {
   return (
     <aside className="border-b border-zinc-200 bg-white px-6 py-3 text-zinc-950 sm:px-8 lg:px-12">
       <div className="mx-auto grid w-full max-w-7xl gap-4 xl:grid-cols-[1fr_auto] xl:items-end">
-        <div className="grid gap-3 md:grid-cols-2 md:items-start">
+        <div className="grid gap-3 md:grid-cols-3 md:items-start">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold text-emerald-950">Backend</p>
+              <Badge
+                tone={
+                  isHealthSuccess
+                    ? "success"
+                    : isHealthError
+                      ? "danger"
+                      : "neutral"
+                }
+              >
+                {isHealthPending
+                  ? "Checking"
+                  : isHealthSuccess
+                    ? health?.status ?? "Reachable"
+                    : "Unavailable"}
+              </Badge>
+            </div>
+            <p className="mt-1 text-sm leading-6 text-emerald-900">
+              {isHealthSuccess
+                ? `${health?.environment ?? "Backend"} API ${health?.version ?? "version unknown"} is reachable.`
+                : healthErrorMessage ??
+                  "Checking whether the frontend can reach ABP."}
+            </p>
+          </div>
+
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold text-amber-950">
