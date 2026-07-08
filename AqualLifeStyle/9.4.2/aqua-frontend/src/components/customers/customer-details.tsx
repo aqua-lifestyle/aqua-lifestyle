@@ -11,7 +11,10 @@ import {
   useProductsActions,
   useProductsState,
 } from "@/src/providers";
-import { getMembershipNameById } from "@/src/shared/domain";
+import {
+  getMembershipNameById,
+  getMembershipTypeLabel,
+} from "@/src/shared/domain";
 import {
   Badge,
   Button,
@@ -46,6 +49,18 @@ const toFormState = (customer: Customer): CustomerFormState => ({
   membershipId: customer.membershipId?.toString() ?? "",
   name: customer.name,
 });
+
+const formatCurrency = (amount: number) =>
+  new Intl.NumberFormat("en-ZA", {
+    currency: "ZAR",
+    style: "currency",
+  }).format(amount);
+
+const formatPercent = (value: number) =>
+  new Intl.NumberFormat("en-ZA", {
+    maximumFractionDigits: 1,
+    style: "percent",
+  }).format(value / 100);
 
 const CustomerEditForm = ({
   customer,
@@ -149,7 +164,7 @@ const CustomerEditForm = ({
 
 export const CustomerDetails = ({ customerId }: CustomerDetailsProps) => {
   const { getCustomer, updateCustomer } = useCustomersActions();
-  const { getMemberships } = useMembershipsActions();
+  const { getMemberships, getTierBenefits } = useMembershipsActions();
   const { getEligibleProductsForCustomer } = useProductsActions();
   const {
     isSelectedError,
@@ -161,7 +176,13 @@ export const CustomerDetails = ({ customerId }: CustomerDetailsProps) => {
     selectedErrorMessage,
     updateErrorMessage,
   } = useCustomersState();
-  const { memberships } = useMembershipsState();
+  const {
+    isTierBenefitsError,
+    isTierBenefitsPending,
+    memberships,
+    tierBenefits,
+    tierBenefitsErrorMessage,
+  } = useMembershipsState();
   const {
     eligibleErrorMessage,
     eligibleProducts,
@@ -183,6 +204,25 @@ export const CustomerDetails = ({ customerId }: CustomerDetailsProps) => {
     getEligibleProductsForCustomer,
     getMemberships,
   ]);
+
+  useEffect(() => {
+    if (!selectedCustomer?.membershipId) {
+      return;
+    }
+
+    void getTierBenefits(selectedCustomer.membershipId);
+  }, [getTierBenefits, selectedCustomer?.membershipId]);
+
+  const assignedMembership = selectedCustomer?.membershipId
+    ? memberships.find(
+        (membership) => membership.id === selectedCustomer.membershipId,
+      ) ?? null
+    : null;
+
+  const assignedTierBenefits =
+    assignedMembership && tierBenefits?.tier === assignedMembership.membershipType
+      ? tierBenefits
+      : null;
 
   return (
     <main className="min-h-dvh bg-zinc-50 px-6 py-8 text-zinc-950 sm:px-8 lg:px-12">
@@ -351,6 +391,92 @@ export const CustomerDetails = ({ customerId }: CustomerDetailsProps) => {
                 ) : null}
               </Card>
             </section>
+
+            {assignedMembership ? (
+              <section className="lg:col-span-2">
+                <Card>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold">
+                        Membership context
+                      </h2>
+                      <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
+                        Backend-calculated tier rules explaining why this
+                        customer receives the eligible product set above.
+                      </p>
+                    </div>
+                    <LinkButton href={`/memberships/${assignedMembership.id}`}>
+                      Open membership
+                    </LinkButton>
+                  </div>
+
+                  {isTierBenefitsPending ? (
+                    <StatusMessage>Loading membership benefits...</StatusMessage>
+                  ) : null}
+
+                  {isTierBenefitsError ? (
+                    <StatusMessage tone="error">
+                      {tierBenefitsErrorMessage ??
+                        "Unable to load membership benefits."}
+                    </StatusMessage>
+                  ) : null}
+
+                  {assignedTierBenefits ? (
+                    <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                        <p className="text-sm text-zinc-600">Tier</p>
+                        <p className="mt-2 text-lg font-semibold text-zinc-950">
+                          {getMembershipTypeLabel(
+                            assignedMembership.membershipType,
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                        <p className="text-sm text-zinc-600">
+                          Monthly obligation
+                        </p>
+                        <p className="mt-2 text-lg font-semibold text-zinc-950">
+                          {formatCurrency(
+                            assignedTierBenefits.monthlyObligation,
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                        <p className="text-sm text-zinc-600">Product discount</p>
+                        <p className="mt-2 text-lg font-semibold text-zinc-950">
+                          {formatPercent(
+                            assignedTierBenefits.productPricingDiscount,
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                        <p className="text-sm text-zinc-600">Order window</p>
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <p className="text-lg font-semibold text-zinc-950">
+                            Day {assignedTierBenefits.orderWindowStartDay}-
+                            {assignedTierBenefits.orderWindowEndDay}
+                          </p>
+                          <Badge
+                            tone={
+                              assignedTierBenefits.isOrderWindowOpen
+                                ? "success"
+                                : "neutral"
+                            }
+                          >
+                            {assignedTierBenefits.isOrderWindowOpen
+                              ? "Open"
+                              : "Closed"}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </Card>
+              </section>
+            ) : null}
           </section>
         ) : null}
       </div>
