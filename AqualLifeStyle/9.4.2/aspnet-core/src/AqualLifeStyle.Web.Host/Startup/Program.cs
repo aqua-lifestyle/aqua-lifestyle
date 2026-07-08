@@ -25,16 +25,12 @@ namespace AqualLifeStyle.Web.Host.Startup
                 var envPath = Path.Combine(directory, ".env");
                 if (File.Exists(envPath))
                 {
-                    Console.WriteLine($"[DEBUG] Loading .env from {envPath}");
                     Env.Load(envPath);
-                    Console.WriteLine($"[DEBUG] ConnectionStrings__Default={Environment.GetEnvironmentVariable("ConnectionStrings__Default")}");
                     return;
                 }
 
                 directory = Directory.GetParent(directory)?.FullName;
             }
-
-            Console.WriteLine("[DEBUG] .env file not found in current or parent directories");
         }
 
         internal static IHostBuilder CreateHostBuilder(string[] args) =>

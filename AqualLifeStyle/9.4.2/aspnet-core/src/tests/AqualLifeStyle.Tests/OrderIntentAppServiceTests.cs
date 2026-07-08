@@ -52,8 +52,8 @@ namespace AqualLifeStyle.Tests
             _enquiryRepositoryMock.Setup(r => r.GetAsync(3)).ReturnsAsync(enquiry);
             _orderIntentRepositoryMock.Setup(r => r.GetByEnquiryIdAsync(3)).ReturnsAsync(default(OrderIntent)!);
             _orderIntentRepositoryMock.Setup(r => r.CountOpenForCustomerAsync(1)).ReturnsAsync(0);
-            _orderIntentRepositoryMock.Setup(r => r.InsertAsync(It.IsAny<OrderIntent>()))
-                .ReturnsAsync((OrderIntent orderIntent) => orderIntent);
+            _orderIntentRepositoryMock.Setup(r => r.InsertAndGetIdAsync(It.IsAny<OrderIntent>()))
+                .ReturnsAsync(11);
             _customerRepositoryMock.Setup(r => r.GetAsync(1)).ReturnsAsync(customer);
             _productRepositoryMock.Setup(r => r.GetAsync(2)).ReturnsAsync(product);
             _membershipRepositoryMock.Setup(r => r.GetAsync(1)).ReturnsAsync(membership);
@@ -66,7 +66,7 @@ namespace AqualLifeStyle.Tests
             Assert.Equal(100m, result.UnitPrice);
             Assert.Equal(95m, result.ReservedPrice);
             Assert.Equal((int)OrderIntentStatus.Reserved, result.Status);
-            _orderIntentRepositoryMock.Verify(r => r.InsertAsync(It.Is<OrderIntent>(orderIntent =>
+            _orderIntentRepositoryMock.Verify(r => r.InsertAndGetIdAsync(It.Is<OrderIntent>(orderIntent =>
                 orderIntent.CustomerId == 1 &&
                 orderIntent.ProductId == 2 &&
                 orderIntent.EnquiryId == 3 &&

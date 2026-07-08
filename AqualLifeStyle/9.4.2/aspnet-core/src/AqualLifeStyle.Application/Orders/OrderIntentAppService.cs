@@ -120,7 +120,8 @@ namespace AqualLifeStyle.Application.Orders
                 reservedPrice,
                 now);
 
-            await _orderIntentRepository.InsertAsync(orderIntent);
+            orderIntent.Id = await _orderIntentRepository.InsertAndGetIdAsync(orderIntent);
+
             return MapToDto(orderIntent);
         }
 
