@@ -222,6 +222,14 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
                     {customerName}
                   </h2>
                   <p className="mt-1 text-sm text-zinc-600">{productName}</p>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                    <LinkButton href={`/customers/${selectedEnquiry.customerId}`}>
+                      Open customer
+                    </LinkButton>
+                    <LinkButton href={`/products/${selectedEnquiry.productId}`}>
+                      Open product
+                    </LinkButton>
+                  </div>
                 </div>
                 <Badge tone={selectedEnquiry.isClosed ? "neutral" : "success"}>
                   {enquiryStatusLabels[selectedEnquiry.status]}
