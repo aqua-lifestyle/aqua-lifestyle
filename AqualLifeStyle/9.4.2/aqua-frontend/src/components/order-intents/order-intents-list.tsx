@@ -59,6 +59,10 @@ const getProductName = (
   );
 };
 
+const getOrderIntentSavings = (orderIntent: OrderIntent) => {
+  return Math.max(orderIntent.unitPrice - orderIntent.reservedPrice, 0);
+};
+
 type OrderIntentCardProps = {
   customerName: string;
   isActionPending: boolean;
@@ -184,6 +188,36 @@ export const OrderIntentsList = () => {
       orderIntents.filter((orderIntent) => orderIntent.status === 3).length,
     [orderIntents],
   );
+  const valueMetrics = useMemo(() => {
+    return orderIntents.reduce(
+      (metrics, orderIntent) => {
+        const savings = getOrderIntentSavings(orderIntent);
+
+        if (orderIntent.status === 1) {
+          return {
+            ...metrics,
+            memberSavings: metrics.memberSavings + savings,
+            reservedValue: metrics.reservedValue + orderIntent.reservedPrice,
+          };
+        }
+
+        if (orderIntent.status === 3) {
+          return {
+            ...metrics,
+            completedValue: metrics.completedValue + orderIntent.reservedPrice,
+            memberSavings: metrics.memberSavings + savings,
+          };
+        }
+
+        return metrics;
+      },
+      {
+        completedValue: 0,
+        memberSavings: 0,
+        reservedValue: 0,
+      },
+    );
+  }, [orderIntents]);
 
   return (
     <main className="min-h-dvh bg-zinc-50 px-6 py-8 text-zinc-950 sm:px-8 lg:px-12">
@@ -210,7 +244,7 @@ export const OrderIntentsList = () => {
           </div>
         </header>
 
-        <section className="grid gap-4 sm:grid-cols-3">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Card>
             <p className="text-sm text-zinc-600">Total intents</p>
             <p className="mt-3 text-3xl font-semibold">{orderIntents.length}</p>
@@ -218,10 +252,25 @@ export const OrderIntentsList = () => {
           <Card>
             <p className="text-sm text-zinc-600">Reserved</p>
             <p className="mt-3 text-3xl font-semibold">{reservedCount}</p>
+            <p className="mt-2 text-sm text-zinc-600">
+              {formatCurrency(valueMetrics.reservedValue)} reserved value
+            </p>
           </Card>
           <Card>
             <p className="text-sm text-zinc-600">Completed</p>
             <p className="mt-3 text-3xl font-semibold">{completedCount}</p>
+            <p className="mt-2 text-sm text-zinc-600">
+              {formatCurrency(valueMetrics.completedValue)} completed value
+            </p>
+          </Card>
+          <Card>
+            <p className="text-sm text-zinc-600">Member savings</p>
+            <p className="mt-3 text-3xl font-semibold">
+              {formatCurrency(valueMetrics.memberSavings)}
+            </p>
+            <p className="mt-2 text-sm text-zinc-600">
+              Tier discounts on reserved or completed intents
+            </p>
           </Card>
         </section>
 
