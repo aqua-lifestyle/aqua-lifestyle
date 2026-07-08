@@ -9,7 +9,7 @@ Next.js App Router frontend for the AquaLifeStyle ABP backend.
 - Memberships: view membership tiers, open membership details with tier benefits, and assign a membership during customer registration.
 - Savings readiness: view read-only tier savings-window status as supporting membership context.
 - Enquiries: create enquiries, view enquiry records, record follow-ups, review sales-ready enquiries, mark conversions, and manage response/close/reopen workflow actions.
-- Order intents: create a lightweight reservation from a converted enquiry, then cancel or complete it without introducing payments prematurely.
+- Order intents: create a lightweight reservation from a converted enquiry, review reserved/completed value, show member savings from tier discounts, then cancel or complete it without introducing payments prematurely.
 - Authentication context: show whether API calls are anonymous or include an access token from the auth boundary.
 - Tenant context: switch between host mode and a named tenant so subsequent API requests carry ABP's `__tenant` header.
 
@@ -23,7 +23,7 @@ Use this path for the current end-to-end demo:
 2. Open `/memberships`, filter by tier/status, then choose a membership and register a customer with that tier preselected.
 3. Open `/products`, filter by membership access, then start an enquiry from a product or from a customer eligible-product card.
 4. Open `/enquiries`, use the pipeline filter, respond to the enquiry, record follow-ups, and review sales-ready movement.
-5. Mark the enquiry converted, create an order intent from the enquiry detail page, then open `/order-intents` to review the reservation handoff.
+5. Mark the enquiry converted, create an order intent from the enquiry detail page, then open `/order-intents` to review the reservation handoff, reserved value, completed value, and member savings.
 6. Return to the dashboard to confirm conversion and order-intent metrics are reflected in the live readiness view.
 
 ## Known Backend Gaps For The Next Demo Level
@@ -32,7 +32,7 @@ Use this path for the current end-to-end demo:
 - Tenant switching is available as a demo control that feeds the shared API client; tenant discovery and tenant-specific login are not wired yet.
 - Email/SMS delivery for enquiry notifications is intentionally paused.
 - Payments, subscriptions, fulfillment, and real order settlement are not exposed as frontend workflows yet.
-- Order intents are available as the intentionally small pre-payment commerce handoff.
+- Order intents are available as the intentionally small pre-payment commerce handoff with read-only value metrics, not payment settlement.
 - Area Space, Area Leader, events, training, and therapy modules need backend/API confirmation before UI work.
 - OpenAPI-generated clients should replace hand-written DTOs once the Swagger contract is stable for frontend generation.
 
@@ -56,7 +56,7 @@ Completed commerce slice:
 
 1. Added an order-intent reservation backend workflow after enquiry conversion, before payment.
 2. Connected it to customer, product, membership eligibility, tier discounts, tier max-open-order rules, and order-window rules.
-3. Added a frontend `/order-intents` demo page and converted-enquiry handoff action.
+3. Added a frontend `/order-intents` demo page, converted-enquiry handoff action, and value metrics for reserved demand plus member savings.
 
 Recommended next commerce slice:
 
