@@ -29,6 +29,9 @@ export type AbpResponseEnvelope<TResponse> = {
   __abp: true;
 };
 
+const NETWORK_ERROR_MESSAGE =
+  "Unable to reach the backend API. Confirm the backend is running, the local HTTPS certificate is trusted, and CORS allows this frontend origin.";
+
 export class AbpHttpError extends Error {
   readonly status: number;
   readonly code?: string;
@@ -59,6 +62,13 @@ export const normalizeAbpError = (
     details: payload.details,
     validationErrors: payload.validationErrors,
     correlationId: payload.correlationId,
+  });
+};
+
+export const normalizeNetworkError = (): AbpHttpError => {
+  return new AbpHttpError(0, {
+    code: "Aqua:Network",
+    message: NETWORK_ERROR_MESSAGE,
   });
 };
 

@@ -5,7 +5,11 @@ import axios, {
 } from "axios";
 
 import { publicEnv } from "@/src/shared/config";
-import { normalizeAbpError, type AbpErrorEnvelope } from "./abp-error";
+import {
+  normalizeAbpError,
+  normalizeNetworkError,
+  type AbpErrorEnvelope,
+} from "./abp-error";
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const TENANT_HEADER = "__tenant";
@@ -60,6 +64,6 @@ apiClient.interceptors.response.use(
       throw normalizeAbpError(error.response.status, error.response.data);
     }
 
-    throw error;
+    throw normalizeNetworkError();
   },
 );

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AbpHttpError,
   normalizeAbpError,
+  normalizeNetworkError,
   unwrapAbpResponse,
 } from "./abp-error";
 
@@ -22,6 +23,19 @@ describe("normalizeAbpError", () => {
     expect(error.code).toBe("Aqua:Validation");
     expect(error.correlationId).toBe("corr-1");
     expect(error.validationErrors).toHaveLength(1);
+  });
+});
+
+describe("normalizeNetworkError", () => {
+  it("returns a user-actionable backend reachability error", () => {
+    const error = normalizeNetworkError();
+
+    expect(error).toBeInstanceOf(AbpHttpError);
+    expect(error.status).toBe(0);
+    expect(error.code).toBe("Aqua:Network");
+    expect(error.message).toContain("Unable to reach the backend API");
+    expect(error.message).toContain("HTTPS certificate");
+    expect(error.message).toContain("CORS");
   });
 });
 
