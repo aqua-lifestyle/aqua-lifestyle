@@ -147,6 +147,53 @@ export const DemoDashboard = () => {
     );
   }, [memberships]);
 
+  const demoReadinessItems = [
+    {
+      action: "Review memberships",
+      href: "/memberships",
+      isReady: dashboardMetrics.activeMemberships > 0,
+      label: "Membership tiers loaded",
+      readyText: "Ready",
+      waitingText: "Needs tiers",
+    },
+    {
+      action: "Filter catalog",
+      href: "/products",
+      isReady: dashboardMetrics.activeProducts > 0,
+      label: "Product catalog available",
+      readyText: "Ready",
+      waitingText: "Needs products",
+    },
+    {
+      action: "Register customer",
+      href: "/customers/register",
+      isReady: dashboardMetrics.activeCustomers > 0,
+      label: "Customer activation proven",
+      readyText: "Ready",
+      waitingText: "Next",
+    },
+    {
+      action: "Create enquiry",
+      href: "/enquiries/create",
+      isReady:
+        dashboardMetrics.pendingEnquiries +
+          dashboardMetrics.salesReadyEnquiries +
+          dashboardMetrics.convertedEnquiries >
+        0,
+      label: "Enquiry pipeline started",
+      readyText: "Ready",
+      waitingText: "Next",
+    },
+    {
+      action: "Open pipeline",
+      href: "/enquiries",
+      isReady: dashboardMetrics.convertedEnquiries > 0,
+      label: "Conversion handoff proven",
+      readyText: "Ready",
+      waitingText: "Next",
+    },
+  ] as const;
+
   const latestEnquiries = enquiries.slice(0, 3);
   const isLoading =
     isCustomersPending ||
@@ -198,12 +245,12 @@ export const DemoDashboard = () => {
               Next validated learning
             </p>
             <h2 className="mt-3 text-xl font-semibold">
-              Prove the conversion handoff
+              Run the full demo loop
             </h2>
             <p className="mt-3 text-sm leading-6 text-zinc-600">
-              Enquiries can now move from interest to a converted state in ABP.
-              The next best slice should show the customer-side outcome clearly
-              enough for a buyer or operator to understand the workflow.
+              Start with a tier, filter products by access, register a customer,
+              create an enquiry, record follow-ups, then mark the enquiry
+              converted. The dashboard now shows which parts are proven live.
             </p>
           </Card>
         </header>
@@ -290,6 +337,28 @@ export const DemoDashboard = () => {
           </div>
 
           <aside className="flex flex-col gap-6">
+            <Card>
+              <h2 className="text-lg font-semibold">Demo readiness</h2>
+              <div className="mt-5 grid gap-3">
+                {demoReadinessItems.map((item) => (
+                  <div
+                    className="flex items-center justify-between gap-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3"
+                    key={item.label}
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-zinc-950">
+                        {item.label}
+                      </p>
+                      <LinkButton href={item.href}>{item.action}</LinkButton>
+                    </div>
+                    <Badge tone={item.isReady ? "success" : "neutral"}>
+                      {item.isReady ? item.readyText : item.waitingText}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
             <Card>
               <h2 className="text-lg font-semibold">Enquiry health</h2>
               <dl className="mt-5 grid gap-3 text-sm">
