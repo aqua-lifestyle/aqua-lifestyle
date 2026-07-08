@@ -36,6 +36,27 @@ Use this path for the current end-to-end demo:
 - Type generation should wait until authentication, tenant behavior, and the demo DTO contracts stabilize.
 - The current handwritten DTOs remain intentionally small and live behind provider/shared API boundaries.
 
+## Commerce Next Step Analysis
+
+Backend scan summary:
+
+- Products, memberships, customers, and enquiries have application services and are already used by the demo.
+- Savings exists in the domain model with tests, but there is no savings application service exposed to the frontend yet.
+- Order, payment, fulfillment, Area Space, Area Leader, event, training, and therapy workflows do not currently have confirmed application services for frontend integration.
+
+Recommended next commerce slice:
+
+1. Add an order-intent or reservation backend workflow after enquiry conversion, before payment.
+2. Connect it to customer, product, membership eligibility, and order-window rules.
+3. Keep payment/proof-of-payment as a later slice once the order lifecycle is explicit.
+4. Surface savings-window status as supporting membership context, but do not build full savings account management until an application service exists.
+
+Why this order:
+
+- It extends the current proven journey naturally: membership -> product -> customer -> enquiry -> conversion -> order intent.
+- It validates buyer/operator behavior before committing to payment, fulfillment, or savings-led complexity.
+- It avoids creating frontend-only workflows for backend modules that are not yet exposed.
+
 ## Architecture Baseline
 
 - TypeScript strict mode is required.
