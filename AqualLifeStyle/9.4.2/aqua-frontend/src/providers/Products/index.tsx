@@ -10,6 +10,9 @@ import {
 
 import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
 import {
+  getProductError,
+  getProductPending,
+  getProductSuccess,
   getProductsError,
   getProductsPending,
   getProductsSuccess,
@@ -52,11 +55,25 @@ export const ProductsProvider = ({ children }: ProductsProviderProps) => {
     }
   }, []);
 
+  const getProduct = useCallback(async (id: number) => {
+    dispatch(getProductPending());
+
+    try {
+      const product = await httpClient.get<Product>(
+        apiEndpoints.products.getById(id),
+      );
+      dispatch(getProductSuccess(product));
+    } catch (error) {
+      dispatch(getProductError(getErrorMessage(error)));
+    }
+  }, []);
+
   const actions = useMemo(
     () => ({
+      getProduct,
       getProducts,
     }),
-    [getProducts],
+    [getProduct, getProducts],
   );
 
   return (

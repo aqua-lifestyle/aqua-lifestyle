@@ -40,6 +40,10 @@ const ProductCard = ({
       <p className="mt-6 text-2xl font-semibold text-zinc-950">
         {formatCurrency(product.price)}
       </p>
+
+      <div className="mt-6">
+        <LinkButton href={`/products/${product.id}`}>Open product</LinkButton>
+      </div>
     </Card>
   );
 };

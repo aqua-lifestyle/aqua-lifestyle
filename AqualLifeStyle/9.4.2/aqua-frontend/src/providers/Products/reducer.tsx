@@ -7,6 +7,35 @@ export const productsReducer = (
   action: ProductsAction,
 ): ProductsState => {
   switch (action.type) {
+    case ProductsActionTypes.getProductPending:
+      return {
+        ...state,
+        isSelectedPending: true,
+        isSelectedSuccess: false,
+        isSelectedError: false,
+        selectedErrorMessage: null,
+      };
+
+    case ProductsActionTypes.getProductSuccess:
+      return {
+        ...state,
+        isSelectedPending: false,
+        isSelectedSuccess: true,
+        isSelectedError: false,
+        selectedErrorMessage: null,
+        selectedProduct: action.payload,
+      };
+
+    case ProductsActionTypes.getProductError:
+      return {
+        ...state,
+        isSelectedPending: false,
+        isSelectedSuccess: false,
+        isSelectedError: true,
+        selectedErrorMessage: action.payload,
+        selectedProduct: null,
+      };
+
     case ProductsActionTypes.getProductsPending:
       return {
         ...state,

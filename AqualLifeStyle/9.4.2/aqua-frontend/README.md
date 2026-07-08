@@ -4,7 +4,7 @@ Next.js App Router frontend for the AquaLifeStyle ABP backend.
 
 ## Current Demo Scope
 
-- Products: read live product data from ABP.
+- Products: read live product data from ABP and open product details.
 - Customers: register, view, and update customer records.
 - Memberships: view membership tiers and assign a membership during customer registration.
 - Enquiries: create enquiries, view enquiry records, and manage response/close/reopen workflow actions.

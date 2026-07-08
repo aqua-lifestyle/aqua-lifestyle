@@ -18,5 +18,6 @@ export const apiEndpoints = {
   },
   products: {
     getAll: "/api/services/app/Product/GetAll",
+    getById: (id: number) => `/api/services/app/Product/Get?id=${id}`,
   },
 } as const;
