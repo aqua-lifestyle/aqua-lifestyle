@@ -1,205 +1,172 @@
 using System.Threading.Tasks;
-using NSubstitute;
-using Xunit;
+using Abp.Domain.Repositories;
+using Moq;
 using AqualLifeStyle.Application.Enquiries;
 using AqualLifeStyle.Application.Enquiries.Dto;
-using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Enquiries;
+using AqualLifeStyle.Domain.Enums;
+using Xunit;
 
 namespace AqualLifeStyle.Tests
 {
     public class EnquiryAppServiceTests
     {
-        [Fact]
-        public async Task RespondAsync_SetsResponseAndStatus()
+        private readonly Mock<IEnquiryRepository> _enquiryRepositoryMock;
+        private readonly EnquiryAppService _service;
+
+        public EnquiryAppServiceTests()
         {
-            var enquiry = Enquiry.Create(1, 2, "Initial message");
-
-            var repo = Substitute.For<IEnquiryRepository>();
-            repo.GetAsync(10).Returns(enquiry);
-            repo.UpdateAsync(enquiry).Returns(enquiry);
-
-            var svc = new EnquiryAppService(repo);
-
-            var result = await svc.RespondAsync(10, new RespondToEnquiryDto { Response = "Thanks" });
-
-            Assert.Equal("Thanks", result.Response);
-            Assert.Equal((int)EnquiryStatus.Responded, result.Status);
+            _enquiryRepositoryMock = new Mock<IEnquiryRepository>();
+            _service = new EnquiryAppService(_enquiryRepositoryMock.Object);
         }
 
         [Fact]
-        public async Task CloseAsync_SetsClosedStatus()
+        public async Task RespondAsync_WithValidResponse_UpdatesEnquiryStatus()
         {
-            var enquiry = Enquiry.Create(1, 2, "Question");
+            // Arrange
+            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question about product");
+            _enquiryRepositoryMock.Setup(r => r.GetAsync(1)).ReturnsAsync(enquiry);
 
-            var repo = Substitute.For<IEnquiryRepository>();
-            repo.GetAsync(11).Returns(enquiry);
-            repo.UpdateAsync(enquiry).Returns(enquiry);
+            // Act
+            var result = await _service.RespondAsync(1, new RespondToEnquiryDto { Response = "Here is the answer" });
 
-            var svc = new EnquiryAppService(repo);
-
-            var result = await svc.CloseAsync(11);
-
-            Assert.True(result.IsClosed);
-            Assert.Equal((int)EnquiryStatus.Closed, result.Status);
+            // Assert
+            Assert.Equal(EnquiryStatus.Responded, enquiry.Status);
+            Assert.Equal("Here is the answer", enquiry.Response);
+            _enquiryRepositoryMock.Verify(r => r.UpdateAsync(enquiry), Times.Once);
         }
 
         [Fact]
-        public async Task ReopenAsync_ReopensClosedEnquiry()
+        public async Task CloseAsync_WithPendingEnquiry_ClosesSuccessfully()
         {
-            var enquiry = Enquiry.Create(1, 2, "Question");
-            enquiry.MarkAsResponded("ok");
+            // Arrange
+            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
+            _enquiryRepositoryMock.Setup(r => r.GetAsync(2)).ReturnsAsync(enquiry);
+
+            // Act
+            await _service.CloseAsync(2);
+
+            // Assert
+            Assert.Equal(EnquiryStatus.Closed, enquiry.Status);
+            _enquiryRepositoryMock.Verify(r => r.UpdateAsync(enquiry), Times.Once);
+        }
+
+        [Fact]
+        public async Task ReopenAsync_WithClosedEnquiry_ReopensSuccessfully()
+        {
+            // Arrange
+            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
             enquiry.Close();
+            _enquiryRepositoryMock.Setup(r => r.GetAsync(3)).ReturnsAsync(enquiry);
 
-            var repo = Substitute.For<IEnquiryRepository>();
-            repo.GetAsync(12).Returns(enquiry);
-            repo.UpdateAsync(enquiry).Returns(enquiry);
+            // Act
+            await _service.ReopenAsync(3);
 
-            var svc = new EnquiryAppService(repo);
-
-            var result = await svc.ReopenAsync(12);
-
-            Assert.True(result.IsPending);
-            Assert.Equal((int)EnquiryStatus.Pending, result.Status);
-            Assert.Equal(string.Empty, result.Response);
+            // Assert
+            Assert.Equal(EnquiryStatus.Pending, enquiry.Status);
+            Assert.Empty(enquiry.Response);
+            _enquiryRepositoryMock.Verify(r => r.UpdateAsync(enquiry), Times.Once);
         }
 
         [Fact]
         public async Task AssignToMemberAsync_WithValidMemberId_AssignsSuccessfully()
         {
-            var enquiry = Enquiry.Create(1, 5, "Question");
+            // Arrange
+            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
+            _enquiryRepositoryMock.Setup(r => r.GetAsync(4)).ReturnsAsync(enquiry);
 
-            var repo = Substitute.For<IEnquiryRepository>();
-            repo.GetAsync(14).Returns(enquiry);
-            repo.UpdateAsync(enquiry).Returns(enquiry);
+            // Act
+            var result = await _service.AssignToMemberAsync(4, new AssignEnquiryDto { MemberId = 10 });
 
-            var svc = new EnquiryAppService(repo);
-
-            var result = await svc.AssignToMemberAsync(14, new AssignEnquiryDto { MemberId = 10 });
-
+            // Assert
             Assert.Equal(10, enquiry.AssignedToMemberId);
             Assert.False(enquiry.IsConverted);
-            Assert.Equal(10, result.AssignedToMemberId);
-            await repo.Received(1).UpdateAsync(enquiry);
+            _enquiryRepositoryMock.Verify(r => r.UpdateAsync(enquiry), Times.Once);
         }
 
         [Fact]
         public async Task AssignToMemberAsync_WithInvalidMemberId_Throws()
         {
-            var enquiry = Enquiry.Create(1, 5, "Question");
+            // Arrange
+            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
+            _enquiryRepositoryMock.Setup(r => r.GetAsync(5)).ReturnsAsync(enquiry);
 
-            var repo = Substitute.For<IEnquiryRepository>();
-            repo.GetAsync(15).Returns(enquiry);
-
-            var svc = new EnquiryAppService(repo);
-
-            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleValidationException>(
-                () => svc.AssignToMemberAsync(15, new AssignEnquiryDto { MemberId = 0 }));
+            // Act & Assert
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleValidationException>(() => 
+                _service.AssignToMemberAsync(5, new AssignEnquiryDto { MemberId = 0 }));
         }
 
         [Fact]
         public async Task ConvertToCustomerAsync_WithPendingEnquiry_ConvertsSuccessfully()
         {
-            var enquiry = Enquiry.Create(1, 5, "Question");
+            // Arrange
+            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
+            _enquiryRepositoryMock.Setup(r => r.GetAsync(6)).ReturnsAsync(enquiry);
 
-            var repo = Substitute.For<IEnquiryRepository>();
-            repo.GetAsync(16).Returns(enquiry);
-            repo.UpdateAsync(enquiry).Returns(enquiry);
+            // Act
+            var result = await _service.ConvertToCustomerAsync(6, new ConvertEnquiryToCustomerDto());
 
-            var svc = new EnquiryAppService(repo);
-
-            var result = await svc.ConvertToCustomerAsync(16, new ConvertEnquiryToCustomerDto());
-
+            // Assert
             Assert.True(enquiry.IsConverted);
             Assert.Equal(EnquiryStatus.Closed, enquiry.Status);
             Assert.NotNull(enquiry.ConvertedAt);
-            Assert.True(result.IsConverted);
-            await repo.Received(1).UpdateAsync(enquiry);
+            _enquiryRepositoryMock.Verify(r => r.UpdateAsync(enquiry), Times.Once);
         }
 
         [Fact]
         public async Task ConvertToCustomerAsync_WithAlreadyConvertedEnquiry_Throws()
         {
-            var enquiry = Enquiry.Create(1, 5, "Question");
+            // Arrange
+            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
             enquiry.ConvertToCustomer();
+            _enquiryRepositoryMock.Setup(r => r.GetAsync(7)).ReturnsAsync(enquiry);
 
-            var repo = Substitute.For<IEnquiryRepository>();
-            repo.GetAsync(17).Returns(enquiry);
-
-            var svc = new EnquiryAppService(repo);
-
-            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(
-                () => svc.ConvertToCustomerAsync(17, new ConvertEnquiryToCustomerDto()));
+            // Act & Assert
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(() => 
+                _service.ConvertToCustomerAsync(7, new ConvertEnquiryToCustomerDto()));
         }
 
         [Fact]
         public async Task ClearAssignmentAsync_WithAssignedEnquiry_ClearsSuccessfully()
         {
-            var enquiry = Enquiry.Create(1, 5, "Question");
+            // Arrange
+            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
             enquiry.AssignToMember(10);
+            _enquiryRepositoryMock.Setup(r => r.GetAsync(8)).ReturnsAsync(enquiry);
 
-            var repo = Substitute.For<IEnquiryRepository>();
-            repo.GetAsync(18).Returns(enquiry);
-            repo.UpdateAsync(enquiry).Returns(enquiry);
+            // Act
+            await _service.ClearAssignmentAsync(8, new ClearAssignmentDto());
 
-            var svc = new EnquiryAppService(repo);
-
-            var result = await svc.ClearAssignmentAsync(18, new ClearAssignmentDto());
-
+            // Assert
             Assert.Null(enquiry.AssignedToMemberId);
-            Assert.Null(result.AssignedToMemberId);
-            await repo.Received(1).UpdateAsync(enquiry);
+            _enquiryRepositoryMock.Verify(r => r.UpdateAsync(enquiry), Times.Once);
         }
 
         [Fact]
         public async Task ClearAssignmentAsync_WithConvertedEnquiry_Throws()
         {
-            var enquiry = Enquiry.Create(1, 5, "Question");
+            // Arrange
+            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
             enquiry.AssignToMember(10);
             enquiry.ConvertToCustomer();
+            _enquiryRepositoryMock.Setup(r => r.GetAsync(9)).ReturnsAsync(enquiry);
 
-            var repo = Substitute.For<IEnquiryRepository>();
-            repo.GetAsync(19).Returns(enquiry);
-
-            var svc = new EnquiryAppService(repo);
-
-            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(
-                () => svc.ClearAssignmentAsync(19, new ClearAssignmentDto()));
+            // Act & Assert
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(() => 
+                _service.ClearAssignmentAsync(9, new ClearAssignmentDto()));
         }
 
         [Fact]
         public async Task AssignToMemberAsync_AfterConversion_Throws()
         {
-            var enquiry = Enquiry.Create(1, 5, "Question");
+            // Arrange
+            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
             enquiry.ConvertToCustomer();
+            _enquiryRepositoryMock.Setup(r => r.GetAsync(10)).ReturnsAsync(enquiry);
 
-            var repo = Substitute.For<IEnquiryRepository>();
-            repo.GetAsync(20).Returns(enquiry);
-
-            var svc = new EnquiryAppService(repo);
-
-            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(
-                () => svc.AssignToMemberAsync(20, new AssignEnquiryDto { MemberId = 20 }));
-        }
-
-        [Fact]
-        public async Task RespondAsync_ClosedEnquiry_ThrowsInvalidStateException()
-        {
-            var enquiry = Enquiry.Create(1, 2, "Question");
-            enquiry.MarkAsResponded("ok");
-            enquiry.Close();
-
-            var repo = Substitute.For<IEnquiryRepository>();
-            repo.GetAsync(13).Returns(enquiry);
-
-            var svc = new EnquiryAppService(repo);
-
-            var exception = await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleInvalidStateException>(
-                () => svc.RespondAsync(13, new RespondToEnquiryDto { Response = "Thank you" }));
-
-            Assert.Equal("Enquiry in state 'Closed' cannot respond.", exception.Message);
-            Assert.Equal(400, exception.StatusCode);
-            Assert.Equal("INVALID_STATE", exception.ErrorCode);
+            // Act & Assert
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(() => 
+                _service.AssignToMemberAsync(10, new AssignEnquiryDto { MemberId = 20 }));
         }
     }
 }

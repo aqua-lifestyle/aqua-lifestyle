@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Moq;
 using AqualLifeStyle.Application.Products;
 using AqualLifeStyle.Application.Products.Dto;
 using AqualLifeStyle.Domain.Common;
@@ -7,38 +8,37 @@ using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Products;
-using NSubstitute;
-using Xunit;
 
 namespace AqualLifeStyle.Tests
 {
     public class ProductAppServiceTests
     {
         [Fact]
-        public async Task GetAllAsync_ReturnsAllProducts()
+        public async Task GetAllAsync_ReturnsMappedProducts()
         {
             var products = new List<Product>
             {
-                Product.Create("Basic", 10m, 1),
+                Product.Create("Test Product", 10m, 1),
                 Product.Create("Free Product", 0.01m, null)
             };
 
-            var repository = Substitute.For<IProductRepository>();
-            repository.GetAllListAsync().Returns(products);
+            var repositoryMock = new Mock<IProductRepository>();
+            repositoryMock.Setup(r => r.GetAllListAsync())
+                .ReturnsAsync(products);
 
-            var service = new ProductAppService(repository);
+            var appService = new ProductAppService(repositoryMock.Object);
 
-            var result = await service.GetAllAsync();
+            var result = await appService.GetAllAsync();
 
             Assert.Equal(2, result.Count);
-            Assert.Equal("Basic", result[0].Name);
+            Assert.Equal("Test Product", result[0].Name);
             Assert.Equal(1, result[0].MembershipId);
             Assert.Equal("Free Product", result[1].Name);
             Assert.Null(result[1].MembershipId);
         }
 
         [Fact]
-        public async Task GetAllForCustomerAsync_FiltersProductsByEligibility()
+        public async Task GetAllAsync_WithCustomerId_FiltersProductsByEligibility()
         {
             var products = new List<Product>
             {
@@ -47,19 +47,22 @@ namespace AqualLifeStyle.Tests
                 Product.Create("Vip Product", 20m, 3)
             };
 
-            var productRepository = Substitute.For<IProductRepository>();
-            productRepository.GetAllListAsync().Returns(products);
+            var productRepositoryMock = new Mock<IProductRepository>();
+            productRepositoryMock.Setup(r => r.GetAllListAsync())
+                .ReturnsAsync(products);
 
-            var customerRepository = Substitute.For<ICustomerRepository>();
+            var customerRepositoryMock = new Mock<ICustomerRepository>();
             var customer = Customer.Create("Jane Doe", new EmailAddress("jane@example.com"), 2);
-            customerRepository.GetAsync(42).Returns(customer);
+            customerRepositoryMock.Setup(r => r.GetAsync(42))
+                .ReturnsAsync(customer);
 
-            var membershipLookup = Substitute.For<IMembershipLookup>();
-            membershipLookup.GetAsync(2).Returns(Membership.Create("Onyx", "Onyx membership", MembershipType.Onyx));
+            var membershipLookupMock = new Mock<IMembershipLookup>();
+            membershipLookupMock.Setup(r => r.GetAsync(2))
+                .ReturnsAsync(Membership.Create("Onyx", "Onyx membership", MembershipType.Onyx));
 
-            var service = new ProductAppService(productRepository, customerRepository, membershipLookup);
+            var appService = new ProductAppService(productRepositoryMock.Object, customerRepositoryMock.Object, membershipLookupMock.Object);
 
-            var result = await service.GetAllForCustomerAsync(42);
+            var result = await appService.GetAllForCustomerAsync(42);
 
             Assert.Equal(2, result.Count);
             Assert.Equal("Free Product", result[0].Name);
@@ -67,7 +70,7 @@ namespace AqualLifeStyle.Tests
         }
 
         [Fact]
-        public async Task GetAllForCustomerAsync_WithCustomerWithoutMembership_ReturnsOnlyFreeProducts()
+        public async Task GetAllAsync_WithCustomerWithoutMembership_ReturnsOnlyFreeProducts()
         {
             var products = new List<Product>
             {
@@ -75,25 +78,27 @@ namespace AqualLifeStyle.Tests
                 Product.Create("Premium Product", 10m, 2)
             };
 
-            var productRepository = Substitute.For<IProductRepository>();
-            productRepository.GetAllListAsync().Returns(products);
+            var productRepositoryMock = new Mock<IProductRepository>();
+            productRepositoryMock.Setup(r => r.GetAllListAsync())
+                .ReturnsAsync(products);
 
-            var customerRepository = Substitute.For<ICustomerRepository>();
+            var customerRepositoryMock = new Mock<ICustomerRepository>();
             var customer = Customer.Create("John Doe", new EmailAddress("john@example.com"), null);
-            customerRepository.GetAsync(99).Returns(customer);
+            customerRepositoryMock.Setup(r => r.GetAsync(99))
+                .ReturnsAsync(customer);
 
-            var membershipLookup = Substitute.For<IMembershipLookup>();
+            var membershipLookupMock = new Mock<IMembershipLookup>();
 
-            var service = new ProductAppService(productRepository, customerRepository, membershipLookup);
+            var appService = new ProductAppService(productRepositoryMock.Object, customerRepositoryMock.Object, membershipLookupMock.Object);
 
-            var result = await service.GetAllForCustomerAsync(99);
+            var result = await appService.GetAllForCustomerAsync(99);
 
             Assert.Single(result);
             Assert.Equal("Free Product", result[0].Name);
         }
 
         [Fact]
-        public async Task GetAllForCustomerAsync_WithInactiveCustomer_ReturnsOnlyFreeProducts()
+        public async Task GetAllAsync_WithInactiveCustomer_ReturnsOnlyFreeProducts()
         {
             var products = new List<Product>
             {
@@ -101,19 +106,21 @@ namespace AqualLifeStyle.Tests
                 Product.Create("Premium Product", 10m, 2)
             };
 
-            var productRepository = Substitute.For<IProductRepository>();
-            productRepository.GetAllListAsync().Returns(products);
+            var productRepositoryMock = new Mock<IProductRepository>();
+            productRepositoryMock.Setup(r => r.GetAllListAsync())
+                .ReturnsAsync(products);
 
-            var customerRepository = Substitute.For<ICustomerRepository>();
+            var customerRepositoryMock = new Mock<ICustomerRepository>();
             var customer = Customer.Create("Jane Doe", new EmailAddress("jane@example.com"), 1);
             customer.Deactivate();
-            customerRepository.GetAsync(100).Returns(customer);
+            customerRepositoryMock.Setup(r => r.GetAsync(100))
+                .ReturnsAsync(customer);
 
-            var membershipLookup = Substitute.For<IMembershipLookup>();
+            var membershipLookupMock = new Mock<IMembershipLookup>();
 
-            var service = new ProductAppService(productRepository, customerRepository, membershipLookup);
+            var appService = new ProductAppService(productRepositoryMock.Object, customerRepositoryMock.Object, membershipLookupMock.Object);
 
-            var result = await service.GetAllForCustomerAsync(100);
+            var result = await appService.GetAllForCustomerAsync(100);
 
             Assert.Single(result);
             Assert.Equal("Free Product", result[0].Name);
@@ -122,22 +129,22 @@ namespace AqualLifeStyle.Tests
         [Fact]
         public async Task CreateAsync_InsertsProduct()
         {
-            var repository = Substitute.For<IProductRepository>();
-            repository.InsertAsync(Arg.Any<Product>()).Returns(Task.FromResult(default(Product)));
+            var repositoryMock = new Mock<IProductRepository>();
+            repositoryMock.Setup(r => r.InsertAsync(It.IsAny<Product>()))
+                .ReturnsAsync((Product p) => p);
 
-            var service = new ProductAppService(repository);
+            var appService = new ProductAppService(repositoryMock.Object);
 
-            await service.CreateAsync(new CreateProductDto
+            var input = new CreateProductDto
             {
                 Name = "New Product",
-                Price = 15m,
+                Price = 25m,
                 MembershipId = 2
-            });
+            };
 
-            await repository.Received(1).InsertAsync(Arg.Is<Product>(p =>
-                p.Name == "New Product" &&
-                p.Price == 15m &&
-                p.MembershipId == 2));
+            await appService.CreateAsync(input);
+
+            repositoryMock.Verify(r => r.InsertAsync(It.Is<Product>(p => p.Name == input.Name && p.Price == input.Price && p.MembershipId == input.MembershipId)), Times.Once);
         }
     }
 }
