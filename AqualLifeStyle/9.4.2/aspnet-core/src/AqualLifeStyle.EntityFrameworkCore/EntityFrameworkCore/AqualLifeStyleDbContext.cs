@@ -5,6 +5,7 @@ using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
 using AqualLifeStyle.Domain.Memberships;
+using AqualLifeStyle.Domain.Orders;
 using AqualLifeStyle.Domain.Products;
 using AqualLifeStyle.MultiTenancy;
 
@@ -18,6 +19,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<Product> Products { get; set; }
         public virtual DbSet<Enquiry> Enquiries { get; set; }
         public virtual DbSet<EnquiryFollowUp> EnquiryFollowUps { get; set; }
+        public virtual DbSet<OrderIntent> OrderIntents { get; set; }
 
         public AqualLifeStyleDbContext(DbContextOptions<AqualLifeStyleDbContext> options)
             : base(options)
@@ -94,6 +96,24 @@ namespace AqualLifeStyle.EntityFrameworkCore
 
                 entity.Navigation(e => e.FollowUps)
                     .UsePropertyAccessMode(PropertyAccessMode.Field);
+            });
+
+            modelBuilder.Entity<OrderIntent>(entity =>
+            {
+                entity.ToTable("OrderIntents");
+                entity.Property(e => e.CustomerId).IsRequired();
+                entity.Property(e => e.ProductId).IsRequired();
+                entity.Property(e => e.EnquiryId);
+                entity.Property(e => e.UnitPrice).IsRequired();
+                entity.Property(e => e.ReservedPrice).IsRequired();
+                entity.Property(e => e.Status).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.ReservedAt);
+                entity.Property(e => e.CancelledAt);
+                entity.Property(e => e.CompletedAt);
+
+                entity.HasIndex(e => e.CustomerId);
+                entity.HasIndex(e => e.EnquiryId);
             });
         }
     }
