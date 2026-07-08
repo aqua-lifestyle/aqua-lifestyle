@@ -38,6 +38,10 @@ const CustomerCard = ({
       <p className="mt-6 text-sm font-medium text-zinc-700">
         {membershipName}
       </p>
+
+      <div className="mt-6">
+        <LinkButton href={`/customers/${customer.id}`}>Open customer</LinkButton>
+      </div>
     </Card>
   );
 };

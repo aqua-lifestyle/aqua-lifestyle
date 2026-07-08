@@ -34,6 +34,35 @@ export const customersReducer = (
         isCreateSuccess: true,
       };
 
+    case CustomersActionTypes.getCustomerError:
+      return {
+        ...state,
+        isSelectedError: true,
+        isSelectedPending: false,
+        isSelectedSuccess: false,
+        selectedCustomer: null,
+        selectedErrorMessage: action.payload,
+      };
+
+    case CustomersActionTypes.getCustomerPending:
+      return {
+        ...state,
+        isSelectedError: false,
+        isSelectedPending: true,
+        isSelectedSuccess: false,
+        selectedErrorMessage: null,
+      };
+
+    case CustomersActionTypes.getCustomerSuccess:
+      return {
+        ...state,
+        isSelectedError: false,
+        isSelectedPending: false,
+        isSelectedSuccess: true,
+        selectedCustomer: action.payload,
+        selectedErrorMessage: null,
+      };
+
     case CustomersActionTypes.getCustomersError:
       return {
         ...state,
@@ -60,6 +89,37 @@ export const customersReducer = (
         isLoadPending: false,
         isLoadSuccess: true,
         loadErrorMessage: null,
+      };
+
+    case CustomersActionTypes.updateCustomerError:
+      return {
+        ...state,
+        isUpdateError: true,
+        isUpdatePending: false,
+        isUpdateSuccess: false,
+        updateErrorMessage: action.payload,
+      };
+
+    case CustomersActionTypes.updateCustomerPending:
+      return {
+        ...state,
+        isUpdateError: false,
+        isUpdatePending: true,
+        isUpdateSuccess: false,
+        updateErrorMessage: null,
+      };
+
+    case CustomersActionTypes.updateCustomerSuccess:
+      return {
+        ...state,
+        customers: state.customers.map((customer) =>
+          customer.id === action.payload.id ? action.payload : customer,
+        ),
+        isUpdateError: false,
+        isUpdatePending: false,
+        isUpdateSuccess: true,
+        selectedCustomer: action.payload,
+        updateErrorMessage: null,
       };
 
     default:

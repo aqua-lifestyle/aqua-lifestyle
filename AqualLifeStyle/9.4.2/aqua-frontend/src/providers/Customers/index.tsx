@@ -13,9 +13,15 @@ import {
   createCustomerError,
   createCustomerPending,
   createCustomerSuccess,
+  getCustomerError,
+  getCustomerPending,
+  getCustomerSuccess,
   getCustomersError,
   getCustomersPending,
   getCustomersSuccess,
+  updateCustomerError,
+  updateCustomerPending,
+  updateCustomerSuccess,
 } from "./actions";
 import {
   type CreateCustomerInput,
@@ -23,6 +29,7 @@ import {
   CustomersActionsContext,
   CustomersStateContext,
   initialCustomersState,
+  type UpdateCustomerInput,
 } from "./context";
 import { customersReducer } from "./reducer";
 
@@ -74,12 +81,43 @@ export const CustomersProvider = ({ children }: CustomersProviderProps) => {
     }
   }, []);
 
+  const getCustomer = useCallback(async (id: number) => {
+    dispatch(getCustomerPending());
+
+    try {
+      const customer = await httpClient.get<Customer>(
+        apiEndpoints.customers.getById(id),
+      );
+      dispatch(getCustomerSuccess(customer));
+    } catch (error) {
+      dispatch(getCustomerError(getErrorMessage(error)));
+    }
+  }, []);
+
+  const updateCustomer = useCallback(async (input: UpdateCustomerInput) => {
+    dispatch(updateCustomerPending());
+
+    try {
+      const customer = await httpClient.put<Customer, UpdateCustomerInput>(
+        apiEndpoints.customers.update,
+        input,
+      );
+      dispatch(updateCustomerSuccess(customer));
+      return true;
+    } catch (error) {
+      dispatch(updateCustomerError(getErrorMessage(error)));
+      return false;
+    }
+  }, []);
+
   const actions = useMemo(
     () => ({
       createCustomer,
+      getCustomer,
       getCustomers,
+      updateCustomer,
     }),
-    [createCustomer, getCustomers],
+    [createCustomer, getCustomer, getCustomers, updateCustomer],
   );
 
   return (
@@ -105,4 +143,4 @@ export const useCustomersActions = () => {
   return context;
 };
 
-export type { CreateCustomerInput, Customer };
+export type { CreateCustomerInput, Customer, UpdateCustomerInput };

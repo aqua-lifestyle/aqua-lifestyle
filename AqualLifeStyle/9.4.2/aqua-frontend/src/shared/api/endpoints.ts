@@ -2,6 +2,8 @@ export const apiEndpoints = {
   customers: {
     create: "/api/services/app/Customer/Create",
     getAll: "/api/services/app/Customer/GetAll",
+    getById: (id: number) => `/api/services/app/Customer/Get?id=${id}`,
+    update: "/api/services/app/Customer/Update",
   },
   enquiries: {
     close: (id: number) => `/api/services/app/Enquiry/Close?id=${id}`,
