@@ -106,7 +106,14 @@ export const CustomersList = () => {
         ) : null}
 
         {!isLoadPending && !isLoadError && customers.length === 0 ? (
-          <StatusMessage>No customers are available yet.</StatusMessage>
+          <StatusMessage>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <span>No customers are available yet.</span>
+              <LinkButton href="/customers/register" variant="primary">
+                Register customer
+              </LinkButton>
+            </div>
+          </StatusMessage>
         ) : null}
 
         {customers.length > 0 ? (

@@ -125,7 +125,12 @@ export const ProductsCatalog = () => {
         ) : null}
 
         {!isPending && !isError && products.length === 0 ? (
-          <StatusMessage>No products are available yet.</StatusMessage>
+          <StatusMessage>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <span>No products are available yet.</span>
+              <LinkButton href="/memberships">Check memberships</LinkButton>
+            </div>
+          </StatusMessage>
         ) : null}
 
         {products.length > 0 ? (
@@ -158,7 +163,10 @@ export const ProductsCatalog = () => {
 
         {products.length > 0 && filteredProducts.length === 0 ? (
           <StatusMessage>
-            No products match this membership access filter.
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <span>No products match this membership access filter.</span>
+              <LinkButton href="/memberships">Review memberships</LinkButton>
+            </div>
           </StatusMessage>
         ) : null}
 

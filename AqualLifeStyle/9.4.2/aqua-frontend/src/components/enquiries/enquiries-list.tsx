@@ -138,7 +138,14 @@ export const EnquiriesList = () => {
         ) : null}
 
         {!isLoadPending && !isLoadError && enquiries.length === 0 ? (
-          <StatusMessage>No enquiries are available yet.</StatusMessage>
+          <StatusMessage>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <span>No enquiries are available yet.</span>
+              <LinkButton href="/enquiries/create" variant="primary">
+                Create enquiry
+              </LinkButton>
+            </div>
+          </StatusMessage>
         ) : null}
 
         {enquiries.length > 0 ? (
@@ -194,7 +201,12 @@ export const EnquiriesList = () => {
 
         {enquiries.length > 0 && filteredEnquiries.length === 0 ? (
           <StatusMessage>
-            No enquiries match this pipeline view yet.
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <span>No enquiries match this pipeline view yet.</span>
+              <LinkButton href="/enquiries/create" variant="primary">
+                Create enquiry
+              </LinkButton>
+            </div>
           </StatusMessage>
         ) : null}
 

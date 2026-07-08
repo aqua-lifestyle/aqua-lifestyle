@@ -91,8 +91,14 @@ export const SalesReadyEnquiries = () => {
         !isSalesReadyError &&
         salesReadyEnquiries.length === 0 ? (
           <StatusMessage>
-            No enquiries are sales-ready yet. Record follow-ups with Interested
-            or Considering outcomes after responding to an enquiry.
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                No enquiries are sales-ready yet. Record follow-ups with
+                Interested or Considering outcomes after responding to an
+                enquiry.
+              </span>
+              <LinkButton href="/enquiries">Open pipeline</LinkButton>
+            </div>
           </StatusMessage>
         ) : null}
 
