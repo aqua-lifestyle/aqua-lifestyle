@@ -2,8 +2,7 @@
 
 import type { ReactNode } from "react";
 
-import { AuthReadinessBanner } from "@/src/components/auth/auth-readiness-banner";
-import { TenantSwitcher } from "@/src/components/tenant/tenant-switcher";
+import { AppContextBar } from "@/src/components/app/app-context-bar";
 import {
   AuthProvider,
   CustomersProvider,
@@ -27,8 +26,7 @@ export const AppProviders = ({ children }: AppProvidersProps) => {
             <MembershipsProvider>
               <ProductsProvider>
                 <OrderIntentsProvider>
-                  <AuthReadinessBanner />
-                  <TenantSwitcher />
+                  <AppContextBar />
                   {children}
                 </OrderIntentsProvider>
               </ProductsProvider>

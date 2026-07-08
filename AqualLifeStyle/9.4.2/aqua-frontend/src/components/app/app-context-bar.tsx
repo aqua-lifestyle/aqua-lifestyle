@@ -3,7 +3,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { z } from "zod";
 
-import { useTenantActions, useTenantState } from "@/src/providers";
+import {
+  useAuthState,
+  useTenantActions,
+  useTenantState,
+} from "@/src/providers";
 import { Badge, Button, TextField } from "@/src/shared/ui";
 
 const TENANT_STORAGE_KEY = "aqua.currentTenant";
@@ -38,11 +42,15 @@ const writeStoredTenant = (tenant: string | null) => {
   }
 };
 
-export const TenantSwitcher = () => {
+export const AppContextBar = () => {
+  const { isAuthenticated, session } = useAuthState();
   const { clearTenant, setTenant } = useTenantActions();
   const { currentTenant, isHost } = useTenantState();
   const [tenantInput, setTenantInput] = useState(currentTenant ?? "");
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
+
+  const userLabel =
+    session?.user?.name ?? session?.user?.email ?? session?.user?.id ?? null;
 
   useEffect(() => {
     const storedTenant = readStoredTenant();
@@ -84,18 +92,36 @@ export const TenantSwitcher = () => {
 
   return (
     <aside className="border-b border-zinc-200 bg-white px-6 py-3 text-zinc-950 sm:px-8 lg:px-12">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-semibold">Tenant context</p>
-            <Badge tone={isHost ? "neutral" : "success"}>
-              {isHost ? "Host mode" : currentTenant}
-            </Badge>
+      <div className="mx-auto grid w-full max-w-7xl gap-4 xl:grid-cols-[1fr_auto] xl:items-end">
+        <div className="grid gap-3 md:grid-cols-2 md:items-start">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold text-amber-950">
+                Authentication
+              </p>
+              <Badge tone={isAuthenticated ? "success" : "neutral"}>
+                {isAuthenticated ? "Signed in" : "Anonymous demo"}
+              </Badge>
+            </div>
+            <p className="mt-1 text-sm leading-6 text-amber-900">
+              {isAuthenticated
+                ? `Bearer token active for ${userLabel ?? "the active user"}.`
+                : "OIDC login is not wired yet; requests run without a bearer token."}
+            </p>
           </div>
-          <p className="text-sm text-zinc-600">
-            Sets the ABP <span className="font-mono">__tenant</span> header for
-            subsequent API requests.
-          </p>
+
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold text-zinc-950">Tenant</p>
+              <Badge tone={isHost ? "neutral" : "success"}>
+                {isHost ? "Host mode" : currentTenant}
+              </Badge>
+            </div>
+            <p className="mt-1 text-sm leading-6 text-zinc-600">
+              Tenant mode sends ABP{"'"}s{" "}
+              <span className="font-mono">__tenant</span> header on API calls.
+            </p>
+          </div>
         </div>
 
         <form
