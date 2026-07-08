@@ -41,6 +41,12 @@ export const ProductDetails = ({ productId }: ProductDetailsProps) => {
     void getMemberships();
   }, [getMemberships, getProduct, productId]);
 
+  const assignedMembership = selectedProduct?.membershipId
+    ? memberships.find(
+        (membership) => membership.id === selectedProduct.membershipId,
+      ) ?? null
+    : null;
+
   return (
     <main className="min-h-dvh bg-zinc-50 px-6 py-8 text-zinc-950 sm:px-8 lg:px-12">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
@@ -115,6 +121,11 @@ export const ProductDetails = ({ productId }: ProductDetailsProps) => {
                     Create enquiry
                   </LinkButton>
                   <LinkButton href="/enquiries">View enquiries</LinkButton>
+                  {assignedMembership ? (
+                    <LinkButton href={`/memberships/${assignedMembership.id}`}>
+                      Open membership
+                    </LinkButton>
+                  ) : null}
                 </div>
               </Card>
 
@@ -132,6 +143,14 @@ export const ProductDetails = ({ productId }: ProductDetailsProps) => {
                       {selectedProduct.membershipId ?? "None"}
                     </dd>
                   </div>
+                  {assignedMembership ? (
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-zinc-600">Membership</dt>
+                      <dd className="text-right font-medium text-zinc-950">
+                        {assignedMembership.name}
+                      </dd>
+                    </div>
+                  ) : null}
                 </dl>
               </Card>
             </aside>
