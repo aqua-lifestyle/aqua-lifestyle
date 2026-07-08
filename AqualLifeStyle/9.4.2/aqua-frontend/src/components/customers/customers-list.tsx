@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import {
   type Customer,
@@ -10,7 +10,15 @@ import {
   useMembershipsState,
 } from "@/src/providers";
 import { getMembershipNameById } from "@/src/shared/domain";
-import { Badge, Card, LinkButton, StatusMessage } from "@/src/shared/ui";
+import {
+  Badge,
+  Card,
+  LinkButton,
+  SelectField,
+  StatusMessage,
+} from "@/src/shared/ui";
+
+type CustomerStatusFilter = "all" | "active" | "inactive";
 
 const CustomerCard = ({
   customer,
@@ -47,6 +55,8 @@ const CustomerCard = ({
 };
 
 export const CustomersList = () => {
+  const [membershipFilter, setMembershipFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<CustomerStatusFilter>("all");
   const { getCustomers } = useCustomersActions();
   const { getMemberships } = useMembershipsActions();
   const {
@@ -61,6 +71,20 @@ export const CustomersList = () => {
     void getCustomers();
     void getMemberships();
   }, [getCustomers, getMemberships]);
+
+  const filteredCustomers = customers.filter((customer) => {
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "active" && customer.isActive) ||
+      (statusFilter === "inactive" && !customer.isActive);
+
+    const matchesMembership =
+      membershipFilter === "all" ||
+      (membershipFilter === "none" && customer.membershipId === null) ||
+      customer.membershipId === Number(membershipFilter);
+
+    return matchesStatus && matchesMembership;
+  });
 
   return (
     <main className="min-h-dvh bg-zinc-50 px-6 py-8 text-zinc-950 sm:px-8 lg:px-12">
@@ -117,8 +141,59 @@ export const CustomersList = () => {
         ) : null}
 
         {customers.length > 0 ? (
+          <section className="grid gap-4 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_14rem_18rem] md:items-end">
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-950">
+                Customer filters
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-600">
+                Filter live customer records by status and membership tier to
+                validate activation quality during the demo.
+              </p>
+            </div>
+            <SelectField
+              label="Status"
+              name="statusFilter"
+              onChange={(event) =>
+                setStatusFilter(event.target.value as CustomerStatusFilter)
+              }
+              value={statusFilter}
+            >
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </SelectField>
+            <SelectField
+              label="Membership"
+              name="membershipFilter"
+              onChange={(event) => setMembershipFilter(event.target.value)}
+              value={membershipFilter}
+            >
+              <option value="all">All memberships</option>
+              <option value="none">No membership assigned</option>
+              {memberships.map((membership) => (
+                <option key={membership.id} value={membership.id}>
+                  {membership.name}
+                </option>
+              ))}
+            </SelectField>
+          </section>
+        ) : null}
+
+        {customers.length > 0 && filteredCustomers.length === 0 ? (
+          <StatusMessage>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <span>No customers match these filters.</span>
+              <LinkButton href="/customers/register" variant="primary">
+                Register customer
+              </LinkButton>
+            </div>
+          </StatusMessage>
+        ) : null}
+
+        {filteredCustomers.length > 0 ? (
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {customers.map((customer) => (
+            {filteredCustomers.map((customer) => (
               <CustomerCard
                 customer={customer}
                 key={customer.id}
