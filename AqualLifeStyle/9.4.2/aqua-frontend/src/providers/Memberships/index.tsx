@@ -10,6 +10,9 @@ import {
 
 import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
 import {
+  getMembershipError,
+  getMembershipPending,
+  getMembershipSuccess,
   getMembershipsError,
   getMembershipsPending,
   getMembershipsSuccess,
@@ -57,11 +60,25 @@ export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {
     }
   }, []);
 
+  const getMembership = useCallback(async (id: number) => {
+    dispatch(getMembershipPending());
+
+    try {
+      const membership = await httpClient.get<Membership>(
+        apiEndpoints.memberships.getById(id),
+      );
+      dispatch(getMembershipSuccess(membership));
+    } catch (error) {
+      dispatch(getMembershipError(getErrorMessage(error)));
+    }
+  }, []);
+
   const actions = useMemo(
     () => ({
+      getMembership,
       getMemberships,
     }),
-    [getMemberships],
+    [getMembership, getMemberships],
   );
 
   return (

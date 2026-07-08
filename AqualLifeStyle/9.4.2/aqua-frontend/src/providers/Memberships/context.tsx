@@ -17,11 +17,17 @@ export type MembershipsState = {
   errorMessage: string | null;
   isError: boolean;
   isPending: boolean;
+  isSelectedError: boolean;
+  isSelectedPending: boolean;
+  isSelectedSuccess: boolean;
   isSuccess: boolean;
   memberships: Membership[];
+  selectedErrorMessage: string | null;
+  selectedMembership: Membership | null;
 };
 
 export type MembershipsActions = {
+  getMembership: (id: number) => Promise<void>;
   getMemberships: () => Promise<void>;
 };
 
@@ -29,8 +35,13 @@ export const initialMembershipsState: MembershipsState = {
   errorMessage: null,
   isError: false,
   isPending: false,
+  isSelectedError: false,
+  isSelectedPending: false,
+  isSelectedSuccess: false,
   isSuccess: false,
   memberships: [],
+  selectedErrorMessage: null,
+  selectedMembership: null,
 };
 
 export const MembershipsStateContext =

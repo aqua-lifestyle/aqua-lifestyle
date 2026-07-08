@@ -7,6 +7,35 @@ export const membershipsReducer = (
   action: MembershipsAction,
 ): MembershipsState => {
   switch (action.type) {
+    case MembershipsActionTypes.getMembershipError:
+      return {
+        ...state,
+        isSelectedError: true,
+        isSelectedPending: false,
+        isSelectedSuccess: false,
+        selectedErrorMessage: action.payload,
+        selectedMembership: null,
+      };
+
+    case MembershipsActionTypes.getMembershipPending:
+      return {
+        ...state,
+        isSelectedError: false,
+        isSelectedPending: true,
+        isSelectedSuccess: false,
+        selectedErrorMessage: null,
+      };
+
+    case MembershipsActionTypes.getMembershipSuccess:
+      return {
+        ...state,
+        isSelectedError: false,
+        isSelectedPending: false,
+        isSelectedSuccess: true,
+        selectedErrorMessage: null,
+        selectedMembership: action.payload,
+      };
+
     case MembershipsActionTypes.getMembershipsError:
       return {
         ...state,

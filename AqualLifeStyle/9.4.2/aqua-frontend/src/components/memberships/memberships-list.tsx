@@ -54,6 +54,12 @@ const MembershipCard = ({ membership }: { membership: Membership }) => {
           </div>
         ) : null}
       </dl>
+
+      <div className="mt-6">
+        <LinkButton href={`/memberships/${membership.id}`}>
+          Open membership
+        </LinkButton>
+      </div>
     </Card>
   );
 };
