@@ -11,6 +11,24 @@ Next.js App Router frontend for the AquaLifeStyle ABP backend.
 
 The root route is a live demo dashboard that guides the current end-to-end validation path and summarizes backend data.
 
+## Demo Walkthrough
+
+Use this path for the current end-to-end demo:
+
+1. Open the demo hub at `/` and confirm the readiness checklist is green where backend data exists.
+2. Open `/memberships`, filter by tier/status, then choose a membership and register a customer with that tier preselected.
+3. Open `/products`, filter by membership access, then start an enquiry from a product or from a customer eligible-product card.
+4. Open `/enquiries`, use the pipeline filter, respond to the enquiry, record follow-ups, and review sales-ready movement.
+5. Mark the enquiry converted and return to the dashboard to confirm the conversion handoff is reflected in live metrics.
+
+## Known Backend Gaps For The Next Demo Level
+
+- Authentication and tenant switching are not wired into the frontend yet.
+- Email/SMS delivery for enquiry notifications is intentionally paused.
+- Orders, payments, subscriptions, and fulfillment are not exposed as frontend workflows yet.
+- Area Space, Area Leader, events, training, and therapy modules need backend/API confirmation before UI work.
+- OpenAPI-generated clients should replace hand-written DTOs once the Swagger contract is stable for frontend generation.
+
 ## Architecture Baseline
 
 - TypeScript strict mode is required.
