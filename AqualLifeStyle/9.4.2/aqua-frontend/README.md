@@ -23,11 +23,18 @@ Use this path for the current end-to-end demo:
 
 ## Known Backend Gaps For The Next Demo Level
 
-- Authentication and tenant switching are not wired into the frontend yet.
+- Authentication and tenant switching now have frontend readiness boundaries, but real login, token refresh, and tenant selection UI are not wired yet.
 - Email/SMS delivery for enquiry notifications is intentionally paused.
 - Orders, payments, subscriptions, and fulfillment are not exposed as frontend workflows yet.
 - Area Space, Area Leader, events, training, and therapy modules need backend/API confirmation before UI work.
 - OpenAPI-generated clients should replace hand-written DTOs once the Swagger contract is stable for frontend generation.
+
+## API Contract
+
+- Backend Swagger UI is enabled by the ASP.NET Core host and `/` redirects to `/swagger`.
+- The verified local Swagger JSON endpoint is `https://localhost:44311/swagger/v1/swagger.json`.
+- Type generation should wait until authentication, tenant behavior, and the demo DTO contracts stabilize.
+- The current handwritten DTOs remain intentionally small and live behind provider/shared API boundaries.
 
 ## Architecture Baseline
 
@@ -36,6 +43,7 @@ Use this path for the current end-to-end demo:
 - Runtime environment variables are validated with Zod in `src/shared/config`.
 - Backend access goes through the shared Axios boundary in `src/shared/api`.
 - ABP response envelopes and error envelopes are normalized centrally.
+- Auth and tenant readiness providers register access-token and `__tenant` resolvers with the shared Axios boundary.
 - Feature state uses the agreed four-file provider structure:
   - `actions.tsx`
   - `context.tsx`
@@ -87,13 +95,14 @@ Use a normal browser such as Chrome or Edge for local HTTPS backend testing. VS 
 Before committing frontend changes, run:
 
 ```bash
+npm run test
 npm run lint
 npm run build
 ```
 
 ## Next Steps
 
-- Add authentication with OIDC Authorization Code Flow + PKCE.
-- Add tenant resolution and `__tenant` header selection UI.
-- Generate type-safe API clients from OpenAPI once the backend Swagger JSON endpoint is available.
-- Add focused tests for API client behavior, provider reducers, and registration validation.
+- Wire authentication with OIDC Authorization Code Flow + PKCE.
+- Add tenant selection UI that feeds the existing tenant provider.
+- Generate type-safe API clients from the verified Swagger JSON endpoint once auth/tenant contracts are stable.
+- Expand focused tests for API client behavior, provider reducers, and registration validation.
