@@ -193,6 +193,36 @@ namespace AqualLifeStyle.Application.Memberships
             return membership.IsSavingsWindowOpen();
         }
 
+        /// <summary>
+        /// Get read-only savings window status for each membership tier.
+        /// </summary>
+        public IReadOnlyList<SavingsWindowStatusDto> GetSavingsWindowStatuses(string asOfDate = null)
+        {
+            var date = ParseOptionalDate(asOfDate);
+
+            return Enum.GetValues(typeof(MembershipType))
+                .Cast<MembershipType>()
+                .Select(membershipType => MapSavingsWindowStatusToDto(
+                    TierBenefits.ForTier(membershipType),
+                    date))
+                .ToList();
+        }
+
+        private static DateTime ParseOptionalDate(string asOfDate)
+        {
+            if (string.IsNullOrWhiteSpace(asOfDate))
+            {
+                return DateTime.UtcNow.Date;
+            }
+
+            if (!DateTime.TryParse(asOfDate, out var parsedDate))
+            {
+                throw new AqualLifeStyleValidationException(nameof(asOfDate), "Invalid as-of date format.");
+            }
+
+            return parsedDate.Date;
+        }
+
         private static MembershipDto MapToDto(Membership membership)
         {
             return new MembershipDto
@@ -226,6 +256,23 @@ namespace AqualLifeStyle.Application.Memberships
                 ProfitSharePercentage = benefits.ProfitSharePercentage,
                 IsOrderWindowOpen = benefits.IsOrderWindowOpen(),
                 IsSavingsWindowOpen = benefits.IsSavingsWindowOpen()
+            };
+        }
+
+        private static SavingsWindowStatusDto MapSavingsWindowStatusToDto(TierBenefits benefits, DateTime date)
+        {
+            var isOpen = benefits.IsSavingsWindowOpen(date);
+
+            return new SavingsWindowStatusDto
+            {
+                Tier = (int)benefits.Tier,
+                TierName = benefits.TierName,
+                SavingsWindowOpenDay = benefits.SavingsWindowOpenDay,
+                SavingsWindowCloseDay = benefits.SavingsWindowCloseDay,
+                CurrentDay = date.Day,
+                AsOfDate = date.ToString("yyyy-MM-dd"),
+                IsSavingsWindowOpen = isOpen,
+                StatusLabel = isOpen ? "Open" : "Closed"
             };
         }
     }
