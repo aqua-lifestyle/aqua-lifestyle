@@ -1,0 +1,40 @@
+using System;
+
+namespace AqualLifeStyle.Web.Host.Models
+{
+    /// <summary>
+    /// Represents the public health status returned by the host API.
+    /// </summary>
+    public class HealthCheckResponse
+    {
+        /// <summary>
+        /// Gets or sets the current health status.
+        /// </summary>
+        public string Status { get; set; }
+
+        /// <summary>
+        /// Gets or sets the application version.
+        /// </summary>
+        public string Version { get; set; }
+
+        /// <summary>
+        /// Gets or sets the configured release date for this application version.
+        /// </summary>
+        public DateTime ReleaseDate { get; set; }
+
+        /// <summary>
+        /// Gets or sets the UTC timestamp when the health check was produced.
+        /// </summary>
+        public DateTime CheckedAtUtc { get; set; }
+
+        /// <summary>
+        /// Gets or sets the current hosting environment name.
+        /// </summary>
+        public string Environment { get; set; }
+
+        /// <summary>
+        /// Gets or sets the request trace identifier for correlation.
+        /// </summary>
+        public string TraceId { get; set; }
+    }
+}
