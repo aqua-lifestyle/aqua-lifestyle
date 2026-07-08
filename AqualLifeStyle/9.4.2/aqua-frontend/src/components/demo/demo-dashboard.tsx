@@ -41,7 +41,7 @@ const journeySteps = [
   },
   {
     description:
-      "Create, respond to, close, or reopen enquiries as the conversion path starts.",
+      "Create, respond, follow up, and mark converted enquiries as the pipeline matures.",
     href: "/enquiries",
     label: "Enquiry workflow",
     status: "Pipeline",
@@ -104,6 +104,7 @@ export const DemoDashboard = () => {
   const dashboardMetrics = useMemo(() => {
     const pendingEnquiries = enquiries.filter((enquiry) => enquiry.isPending);
     const closedEnquiries = enquiries.filter((enquiry) => enquiry.isClosed);
+    const convertedEnquiries = enquiries.filter((enquiry) => enquiry.isConverted);
     const salesReadyEnquiries = enquiries.filter(
       (enquiry) => enquiry.isSalesReady,
     );
@@ -125,6 +126,7 @@ export const DemoDashboard = () => {
       activeProducts: activeProducts.length,
       averageConversionProbability,
       closedEnquiries: closedEnquiries.length,
+      convertedEnquiries: convertedEnquiries.length,
       pendingEnquiries: pendingEnquiries.length,
       salesReadyEnquiries: salesReadyEnquiries.length,
     };
@@ -196,12 +198,12 @@ export const DemoDashboard = () => {
               Next validated learning
             </p>
             <h2 className="mt-3 text-xl font-semibold">
-              Prove the follow-up engine
+              Prove the conversion handoff
             </h2>
             <p className="mt-3 text-sm leading-6 text-zinc-600">
-              The backend already supports enquiry follow-ups. The next best
-              slice should show notes, conversion probability, and sales-ready
-              movement from enquiry to action.
+              Enquiries can now move from interest to a converted state in ABP.
+              The next best slice should show the customer-side outcome clearly
+              enough for a buyer or operator to understand the workflow.
             </p>
           </Card>
         </header>
@@ -304,6 +306,12 @@ export const DemoDashboard = () => {
                   </dd>
                 </div>
                 <div className="flex justify-between gap-4">
+                  <dt className="text-zinc-600">Converted</dt>
+                  <dd className="font-medium text-zinc-950">
+                    {dashboardMetrics.convertedEnquiries}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
                   <dt className="text-zinc-600">Avg. probability</dt>
                   <dd className="font-medium text-zinc-950">
                     {formatPercent(dashboardMetrics.averageConversionProbability)}
@@ -353,8 +361,16 @@ export const DemoDashboard = () => {
                   <div>
                     <div className="flex items-start justify-between gap-4">
                       <p className="font-semibold">Enquiry #{enquiry.id}</p>
-                      <Badge tone={enquiry.isClosed ? "neutral" : "success"}>
-                        {enquiryStatusLabels[enquiry.status]}
+                      <Badge
+                        tone={
+                          enquiry.isConverted || !enquiry.isClosed
+                            ? "success"
+                            : "neutral"
+                        }
+                      >
+                        {enquiry.isConverted
+                          ? "Converted"
+                          : enquiryStatusLabels[enquiry.status]}
                       </Badge>
                     </div>
                     <p className="mt-3 line-clamp-3 text-sm leading-6 text-zinc-600">

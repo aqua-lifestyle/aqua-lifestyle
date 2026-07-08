@@ -166,7 +166,11 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
 
   const handleConvert = async () => {
     if (selectedEnquiry) {
-      await convertEnquiryToCustomer(selectedEnquiry.id);
+      const didConvert = await convertEnquiryToCustomer(selectedEnquiry.id);
+
+      if (didConvert) {
+        void getCustomers();
+      }
     }
   };
 
@@ -289,6 +293,14 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
                       {selectedEnquiry.isConverted ? "Yes" : "No"}
                     </dd>
                   </div>
+                  {selectedEnquiry.convertedAt ? (
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-zinc-600">Converted at</dt>
+                      <dd className="text-right font-medium text-zinc-950">
+                        {formatDate(selectedEnquiry.convertedAt)}
+                      </dd>
+                    </div>
+                  ) : null}
                 </dl>
 
                 <div className="mt-6 flex flex-col gap-3">
@@ -298,7 +310,7 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
                       onClick={handleConvert}
                       type="button"
                     >
-                      Mark converted
+                      Mark converted in ABP
                     </Button>
                   ) : null}
 

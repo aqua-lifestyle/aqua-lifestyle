@@ -43,8 +43,14 @@ export const EnquiryCard = ({
           </h2>
           <p className="mt-1 text-sm text-zinc-600">{productName}</p>
         </div>
-        <Badge tone={enquiry.isClosed ? "neutral" : "success"}>
-          {enquiryStatusLabels[enquiry.status]}
+        <Badge
+          tone={
+            enquiry.isConverted || !enquiry.isClosed ? "success" : "neutral"
+          }
+        >
+          {enquiry.isConverted
+            ? "Converted"
+            : enquiryStatusLabels[enquiry.status]}
         </Badge>
       </div>
 
@@ -73,6 +79,12 @@ export const EnquiryCard = ({
           <dt className="text-zinc-600">Sales ready</dt>
           <dd className="font-medium text-zinc-950">
             {enquiry.isSalesReady ? "Yes" : "No"}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-zinc-600">Converted</dt>
+          <dd className="font-medium text-zinc-950">
+            {enquiry.isConverted ? "Yes" : "No"}
           </dd>
         </div>
       </dl>
