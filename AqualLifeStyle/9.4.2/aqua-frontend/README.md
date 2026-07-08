@@ -9,6 +9,7 @@ Next.js App Router frontend for the AquaLifeStyle ABP backend.
 - Memberships: view membership tiers, open membership details with tier benefits, and assign a membership during customer registration.
 - Enquiries: create enquiries, view enquiry records, record follow-ups, review sales-ready enquiries, mark conversions, and manage response/close/reopen workflow actions.
 - Order intents: create a lightweight reservation from a converted enquiry, then cancel or complete it without introducing payments prematurely.
+- Tenant context: switch between host mode and a named tenant so subsequent API requests carry ABP's `__tenant` header.
 
 The root route is a live demo dashboard that guides the current end-to-end validation path and summarizes backend data.
 
@@ -25,7 +26,8 @@ Use this path for the current end-to-end demo:
 
 ## Known Backend Gaps For The Next Demo Level
 
-- Authentication and tenant switching now have frontend readiness boundaries, but real login, token refresh, and tenant selection UI are not wired yet.
+- Authentication has a frontend readiness boundary, but real login and token refresh are not wired yet.
+- Tenant switching is available as a demo control that feeds the shared API client; tenant discovery and tenant-specific login are not wired yet.
 - Email/SMS delivery for enquiry notifications is intentionally paused.
 - Payments, subscriptions, fulfillment, and real order settlement are not exposed as frontend workflows yet.
 - Order intents are available as the intentionally small pre-payment commerce handoff.
@@ -74,6 +76,7 @@ Why this order:
 - Backend access goes through the shared Axios boundary in `src/shared/api`.
 - ABP response envelopes and error envelopes are normalized centrally.
 - Auth and tenant readiness providers register access-token and `__tenant` resolvers with the shared Axios boundary.
+- The tenant switcher persists the local tenant selection and keeps host mode as the safe default.
 - Feature state uses the agreed four-file provider structure:
   - `actions.tsx`
   - `context.tsx`
@@ -135,6 +138,6 @@ npm run build
 
 - Wire authentication with OIDC Authorization Code Flow + PKCE.
 - Add the next post-reservation commerce slice: payment intent/proof-of-payment or fulfillment, based on demo feedback.
-- Add tenant selection UI that feeds the existing tenant provider.
+- Replace manual tenant entry with tenant discovery once the backend contract is confirmed.
 - Generate type-safe API clients from the verified Swagger JSON endpoint once auth/tenant contracts are stable.
 - Expand focused tests for API client behavior, provider reducers, and registration validation.

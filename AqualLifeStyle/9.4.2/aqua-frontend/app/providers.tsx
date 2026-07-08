@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 
+import { TenantSwitcher } from "@/src/components/tenant/tenant-switcher";
 import {
   AuthProvider,
   CustomersProvider,
@@ -24,7 +25,10 @@ export const AppProviders = ({ children }: AppProvidersProps) => {
           <EnquiriesProvider>
             <MembershipsProvider>
               <ProductsProvider>
-                <OrderIntentsProvider>{children}</OrderIntentsProvider>
+                <OrderIntentsProvider>
+                  <TenantSwitcher />
+                  {children}
+                </OrderIntentsProvider>
               </ProductsProvider>
             </MembershipsProvider>
           </EnquiriesProvider>
