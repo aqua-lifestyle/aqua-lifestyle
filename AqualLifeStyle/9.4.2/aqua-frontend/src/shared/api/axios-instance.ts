@@ -1,4 +1,8 @@
-import axios, { AxiosError, type AxiosInstance } from "axios";
+import axios, {
+  AxiosError,
+  type AxiosInstance,
+  type InternalAxiosRequestConfig,
+} from "axios";
 
 import { publicEnv } from "@/src/shared/config";
 import { normalizeAbpError, type AbpErrorEnvelope } from "./abp-error";
@@ -28,7 +32,9 @@ export const apiClient: AxiosInstance = axios.create({
   },
 });
 
-apiClient.interceptors.request.use(async (config) => {
+export const applyRequestContext = async (
+  config: InternalAxiosRequestConfig,
+) => {
   const [accessToken, tenant] = await Promise.all([
     accessTokenProvider?.() ?? null,
     tenantProvider?.() ?? null,
@@ -43,7 +49,9 @@ apiClient.interceptors.request.use(async (config) => {
   }
 
   return config;
-});
+};
+
+apiClient.interceptors.request.use(applyRequestContext);
 
 apiClient.interceptors.response.use(
   (response) => response,
