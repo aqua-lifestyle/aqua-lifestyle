@@ -75,7 +75,7 @@ const getMetricTone = (value: number) => (value > 0 ? "success" : "neutral");
 export const DemoDashboard = () => {
   const { getCustomers } = useCustomersActions();
   const { getEnquiries } = useEnquiriesActions();
-  const { getMemberships } = useMembershipsActions();
+  const { getMemberships, getSavingsWindowStatuses } = useMembershipsActions();
   const { getOrderIntents } = useOrderIntentsActions();
   const { getProducts } = useProductsActions();
 
@@ -96,6 +96,7 @@ export const DemoDashboard = () => {
     isError: isMembershipsError,
     isPending: isMembershipsPending,
     memberships,
+    savingsWindowStatuses,
   } = useMembershipsState();
   const {
     isLoadError: isOrderIntentsError,
@@ -112,6 +113,7 @@ export const DemoDashboard = () => {
 
   useEffect(() => {
     void getMemberships();
+    void getSavingsWindowStatuses();
     void getProducts();
     void getCustomers();
     void getEnquiries();
@@ -120,6 +122,7 @@ export const DemoDashboard = () => {
     getCustomers,
     getEnquiries,
     getMemberships,
+    getSavingsWindowStatuses,
     getOrderIntents,
     getProducts,
   ]);
@@ -135,6 +138,9 @@ export const DemoDashboard = () => {
     const activeProducts = products.filter((product) => product.isActive);
     const activeMemberships = memberships.filter(
       (membership) => membership.isActive,
+    );
+    const openSavingsWindowTiers = savingsWindowStatuses.filter(
+      (status) => status.isSavingsWindowOpen,
     );
     const reservedOrderIntents = orderIntents.filter(
       (orderIntent) => orderIntent.status === 1,
@@ -160,8 +166,17 @@ export const DemoDashboard = () => {
       pendingEnquiries: pendingEnquiries.length,
       reservedOrderIntents: reservedOrderIntents.length,
       salesReadyEnquiries: salesReadyEnquiries.length,
+      openSavingsWindowTiers: openSavingsWindowTiers.length,
+      savingsWindowTiers: savingsWindowStatuses.length,
     };
-  }, [customers, enquiries, memberships, orderIntents, products]);
+  }, [
+    customers,
+    enquiries,
+    memberships,
+    orderIntents,
+    products,
+    savingsWindowStatuses,
+  ]);
 
   const membershipTypeCounts = useMemo(() => {
     return memberships.reduce<Record<MembershipType, number>>(
@@ -194,6 +209,14 @@ export const DemoDashboard = () => {
       label: "Product catalog available",
       readyText: "Ready",
       waitingText: "Needs products",
+    },
+    {
+      action: "Review savings",
+      href: "/memberships",
+      isReady: dashboardMetrics.savingsWindowTiers > 0,
+      label: "Savings windows visible",
+      readyText: "Ready",
+      waitingText: "Needs signal",
     },
     {
       action: "Register customer",
@@ -274,8 +297,8 @@ export const DemoDashboard = () => {
               <p className="mt-4 text-base leading-7 text-zinc-600">
                 A live, end-to-end view of the current demo: membership tiers,
                 product access, customer activation, and enquiry conversion.
-                Order intents now prove the first commerce handoff after a
-                converted enquiry.
+                Savings-window readiness and order intents now prove the first
+                commerce signals after membership access is selected.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -358,6 +381,21 @@ export const DemoDashboard = () => {
               </p>
               <Badge tone={getMetricTone(dashboardMetrics.reservedOrderIntents)}>
                 Handoff
+              </Badge>
+            </div>
+          </Card>
+
+          <Card>
+            <p className="text-sm text-zinc-600">Savings windows</p>
+            <div className="mt-3 flex items-end justify-between gap-4">
+              <p className="text-3xl font-semibold">
+                {dashboardMetrics.openSavingsWindowTiers}/
+                {dashboardMetrics.savingsWindowTiers}
+              </p>
+              <Badge
+                tone={getMetricTone(dashboardMetrics.openSavingsWindowTiers)}
+              >
+                Open tiers
               </Badge>
             </div>
           </Card>

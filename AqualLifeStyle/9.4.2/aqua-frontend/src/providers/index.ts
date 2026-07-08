@@ -30,7 +30,12 @@ export {
   useMembershipsActions,
   useMembershipsState,
 } from "./Memberships";
-export type { Membership, MembershipType, TierBenefits } from "./Memberships";
+export type {
+  Membership,
+  MembershipType,
+  SavingsWindowStatus,
+  TierBenefits,
+} from "./Memberships";
 
 export {
   OrderIntentsProvider,
