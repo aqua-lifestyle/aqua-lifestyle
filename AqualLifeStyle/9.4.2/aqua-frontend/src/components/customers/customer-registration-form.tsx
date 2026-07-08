@@ -44,7 +44,13 @@ const getFieldErrors = (
   }, {});
 };
 
-export const CustomerRegistrationForm = () => {
+type CustomerRegistrationFormProps = {
+  initialMembershipId?: number | null;
+};
+
+export const CustomerRegistrationForm = ({
+  initialMembershipId = null,
+}: CustomerRegistrationFormProps) => {
   const { createCustomer } = useCustomersActions();
   const { getMemberships } = useMembershipsActions();
   const {
@@ -113,7 +119,8 @@ export const CustomerRegistrationForm = () => {
             </h1>
             <p className="max-w-2xl text-base text-zinc-600">
               Create a customer record in the ABP backend with optional
-              membership assignment.
+              membership assignment. Contextual membership links can preselect
+              the tier for a faster demo path.
             </p>
           </div>
         </header>
@@ -146,6 +153,7 @@ export const CustomerRegistrationForm = () => {
               errorMessage={fieldErrors.membershipId}
               label="Membership"
               name="membershipId"
+              defaultValue={initialMembershipId ?? ""}
             >
               <option value="">No membership assigned</option>
               {memberships.map((membership) => (

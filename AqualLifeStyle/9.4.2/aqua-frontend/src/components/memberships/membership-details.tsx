@@ -143,7 +143,10 @@ export const MembershipDetails = ({ membershipId }: MembershipDetailsProps) => {
                   then verify product access from the catalog.
                 </p>
                 <div className="mt-6 flex flex-col gap-3">
-                  <LinkButton href="/customers/register" variant="primary">
+                  <LinkButton
+                    href={`/customers/register?membershipId=${selectedMembership.id}`}
+                    variant="primary"
+                  >
                     Register customer
                   </LinkButton>
                   <LinkButton href="/customers">View customers</LinkButton>

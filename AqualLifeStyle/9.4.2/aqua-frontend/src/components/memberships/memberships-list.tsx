@@ -55,9 +55,12 @@ const MembershipCard = ({ membership }: { membership: Membership }) => {
         ) : null}
       </dl>
 
-      <div className="mt-6">
+      <div className="mt-6 flex flex-col gap-3">
         <LinkButton href={`/memberships/${membership.id}`}>
           Open membership
+        </LinkButton>
+        <LinkButton href={`/customers/register?membershipId=${membership.id}`}>
+          Register customer
         </LinkButton>
       </div>
     </Card>
