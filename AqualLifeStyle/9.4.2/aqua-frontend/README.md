@@ -14,7 +14,7 @@ Next.js App Router frontend for the AquaLifeStyle ABP backend.
 - Tenant context: switch between host mode and a named tenant so subsequent API requests carry ABP's `__tenant` header.
 - Backend readiness: show whether the browser can reach ABP's `/api/health` endpoint, including refreshable version/environment and database reachability context.
 
-The root route is a live demo dashboard that guides the current end-to-end validation path and summarizes backend data.
+The root route is a live demo dashboard that guides the current end-to-end validation path, summarizes backend data, and includes backend/database readiness in the demo checklist.
 
 ## Demo Walkthrough
 

@@ -15,6 +15,7 @@ import {
   useOrderIntentsState,
   useProductsActions,
   useProductsState,
+  useSystemHealthState,
 } from "@/src/providers";
 import { getMembershipTypeLabel } from "@/src/shared/domain";
 import { Badge, Card, LinkButton, StatusMessage } from "@/src/shared/ui";
@@ -110,6 +111,12 @@ export const DemoDashboard = () => {
     isPending: isProductsPending,
     products,
   } = useProductsState();
+  const {
+    health,
+    isError: isSystemHealthError,
+    isPending: isSystemHealthPending,
+    isSuccess: isSystemHealthSuccess,
+  } = useSystemHealthState();
 
   useEffect(() => {
     void getMemberships();
@@ -195,6 +202,14 @@ export const DemoDashboard = () => {
 
   const demoReadinessItems = [
     {
+      action: "Check top bar",
+      href: "/",
+      isReady: isSystemHealthSuccess && health?.isDatabaseReachable === true,
+      label: "Backend and database reachable",
+      readyText: "Healthy",
+      waitingText: isSystemHealthError ? "Unavailable" : "Checking",
+    },
+    {
       action: "Review memberships",
       href: "/memberships",
       isReady: dashboardMetrics.activeMemberships > 0,
@@ -262,7 +277,8 @@ export const DemoDashboard = () => {
     isEnquiriesPending ||
     isMembershipsPending ||
     isOrderIntentsPending ||
-    isProductsPending;
+    isProductsPending ||
+    isSystemHealthPending;
   const errorMessages = [
     customersErrorMessage,
     enquiriesErrorMessage,
@@ -275,7 +291,8 @@ export const DemoDashboard = () => {
     isEnquiriesError ||
     isMembershipsError ||
     isOrderIntentsError ||
-    isProductsError;
+    isProductsError ||
+    isSystemHealthError;
 
   return (
     <main className="min-h-dvh bg-zinc-50 px-6 py-8 text-zinc-950 sm:px-8 lg:px-12">
