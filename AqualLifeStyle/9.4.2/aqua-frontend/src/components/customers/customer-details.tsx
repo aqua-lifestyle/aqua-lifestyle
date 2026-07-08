@@ -380,9 +380,14 @@ export const CustomerDetails = ({ customerId }: CustomerDetailsProps) => {
                             {product.isActive ? "Active" : "Inactive"}
                           </Badge>
                         </div>
-                        <div className="mt-5">
+                        <div className="mt-5 flex flex-col gap-3">
                           <LinkButton href={`/products/${product.id}`}>
                             Open product
+                          </LinkButton>
+                          <LinkButton
+                            href={`/enquiries/create?customerId=${selectedCustomer.id}&productId=${product.id}`}
+                          >
+                            Create enquiry
                           </LinkButton>
                         </div>
                       </div>

@@ -108,7 +108,10 @@ export const ProductDetails = ({ productId }: ProductDetailsProps) => {
                   enquiry workflow to respond or close it.
                 </p>
                 <div className="mt-6 flex flex-col gap-3">
-                  <LinkButton href="/enquiries/create" variant="primary">
+                  <LinkButton
+                    href={`/enquiries/create?productId=${selectedProduct.id}`}
+                    variant="primary"
+                  >
                     Create enquiry
                   </LinkButton>
                   <LinkButton href="/enquiries">View enquiries</LinkButton>

@@ -47,7 +47,15 @@ const getFieldErrors = (
   }, {});
 };
 
-export const EnquiryCreateForm = () => {
+type EnquiryCreateFormProps = {
+  initialCustomerId?: number | null;
+  initialProductId?: number | null;
+};
+
+export const EnquiryCreateForm = ({
+  initialCustomerId = null,
+  initialProductId = null,
+}: EnquiryCreateFormProps) => {
   const { getCustomers } = useCustomersActions();
   const { createEnquiry } = useEnquiriesActions();
   const { getProducts } = useProductsActions();
@@ -115,8 +123,8 @@ export const EnquiryCreateForm = () => {
               Create enquiry
             </h1>
             <p className="max-w-2xl text-base text-zinc-600">
-              Capture a customer enquiry against an existing product. Email
-              notifications will be added later behind the backend workflow.
+              Capture a customer enquiry against an existing product. Contextual
+              links can preselect the customer or product for a faster demo path.
             </p>
           </div>
         </header>
@@ -133,6 +141,7 @@ export const EnquiryCreateForm = () => {
               label="Customer"
               name="customerId"
               required
+              defaultValue={initialCustomerId ?? ""}
             >
               <option value="">Select customer</option>
               {customers.map((customer) => (
@@ -148,6 +157,7 @@ export const EnquiryCreateForm = () => {
               label="Product"
               name="productId"
               required
+              defaultValue={initialProductId ?? ""}
             >
               <option value="">Select product</option>
               {products.map((product) => (
