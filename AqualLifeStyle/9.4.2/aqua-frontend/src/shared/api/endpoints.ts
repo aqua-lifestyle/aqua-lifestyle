@@ -18,6 +18,8 @@ export const apiEndpoints = {
   memberships: {
     getAll: "/api/services/app/Membership/GetAll",
     getById: (id: number) => `/api/services/app/Membership/Get?id=${id}`,
+    getTierBenefits: (id: number) =>
+      `/api/services/app/Membership/GetTierBenefits?id=${id}`,
   },
   products: {
     getAll: "/api/services/app/Product/GetAll",

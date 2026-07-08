@@ -24,6 +24,7 @@ export const membershipsReducer = (
         isSelectedPending: true,
         isSelectedSuccess: false,
         selectedErrorMessage: null,
+        tierBenefits: null,
       };
 
     case MembershipsActionTypes.getMembershipSuccess:
@@ -62,6 +63,35 @@ export const membershipsReducer = (
         isPending: false,
         isSuccess: true,
         memberships: action.payload,
+      };
+
+    case MembershipsActionTypes.getTierBenefitsError:
+      return {
+        ...state,
+        isTierBenefitsError: true,
+        isTierBenefitsPending: false,
+        isTierBenefitsSuccess: false,
+        tierBenefits: null,
+        tierBenefitsErrorMessage: action.payload,
+      };
+
+    case MembershipsActionTypes.getTierBenefitsPending:
+      return {
+        ...state,
+        isTierBenefitsError: false,
+        isTierBenefitsPending: true,
+        isTierBenefitsSuccess: false,
+        tierBenefitsErrorMessage: null,
+      };
+
+    case MembershipsActionTypes.getTierBenefitsSuccess:
+      return {
+        ...state,
+        isTierBenefitsError: false,
+        isTierBenefitsPending: false,
+        isTierBenefitsSuccess: true,
+        tierBenefits: action.payload,
+        tierBenefitsErrorMessage: null,
       };
 
     default:

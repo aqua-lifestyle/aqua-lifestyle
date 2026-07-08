@@ -13,6 +13,23 @@ export type Membership = {
   lastObligationMetDate: string | null;
 };
 
+export type TierBenefits = {
+  tier: MembershipType;
+  tierName: string;
+  monthlyObligation: number;
+  orderWindowStartDay: number;
+  orderWindowEndDay: number;
+  savingsWindowOpenDay: number;
+  savingsWindowCloseDay: number;
+  productPricingDiscount: number;
+  interestRate: number;
+  maxConcurrentOrders: number;
+  referralCommissionRate: number;
+  profitSharePercentage: number;
+  isOrderWindowOpen: boolean;
+  isSavingsWindowOpen: boolean;
+};
+
 export type MembershipsState = {
   errorMessage: string | null;
   isError: boolean;
@@ -24,11 +41,17 @@ export type MembershipsState = {
   memberships: Membership[];
   selectedErrorMessage: string | null;
   selectedMembership: Membership | null;
+  tierBenefits: TierBenefits | null;
+  tierBenefitsErrorMessage: string | null;
+  isTierBenefitsError: boolean;
+  isTierBenefitsPending: boolean;
+  isTierBenefitsSuccess: boolean;
 };
 
 export type MembershipsActions = {
   getMembership: (id: number) => Promise<void>;
   getMemberships: () => Promise<void>;
+  getTierBenefits: (id: number) => Promise<void>;
 };
 
 export const initialMembershipsState: MembershipsState = {
@@ -42,6 +65,11 @@ export const initialMembershipsState: MembershipsState = {
   memberships: [],
   selectedErrorMessage: null,
   selectedMembership: null,
+  tierBenefits: null,
+  tierBenefitsErrorMessage: null,
+  isTierBenefitsError: false,
+  isTierBenefitsPending: false,
+  isTierBenefitsSuccess: false,
 };
 
 export const MembershipsStateContext =

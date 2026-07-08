@@ -16,6 +16,12 @@ const formatCurrency = (amount: number) =>
     currency: "ZAR",
   }).format(amount);
 
+const formatPercent = (value: number) =>
+  new Intl.NumberFormat("en-ZA", {
+    maximumFractionDigits: 1,
+    style: "percent",
+  }).format(value / 100);
+
 const formatDate = (date: string | null) => {
   if (!date) {
     return "Not set";
@@ -27,12 +33,16 @@ const formatDate = (date: string | null) => {
 };
 
 export const MembershipDetails = ({ membershipId }: MembershipDetailsProps) => {
-  const { getMembership } = useMembershipsActions();
+  const { getMembership, getTierBenefits } = useMembershipsActions();
   const {
     isSelectedError,
     isSelectedPending,
+    isTierBenefitsError,
+    isTierBenefitsPending,
     selectedErrorMessage,
     selectedMembership,
+    tierBenefits,
+    tierBenefitsErrorMessage,
   } = useMembershipsState();
 
   useEffect(() => {
@@ -41,7 +51,8 @@ export const MembershipDetails = ({ membershipId }: MembershipDetailsProps) => {
     }
 
     void getMembership(membershipId);
-  }, [getMembership, membershipId]);
+    void getTierBenefits(membershipId);
+  }, [getMembership, getTierBenefits, membershipId]);
 
   return (
     <main className="min-h-dvh bg-zinc-50 px-6 py-8 text-zinc-950 sm:px-8 lg:px-12">
@@ -140,6 +151,127 @@ export const MembershipDetails = ({ membershipId }: MembershipDetailsProps) => {
                 </div>
               </Card>
             </aside>
+
+            <section className="lg:col-span-2">
+              <Card>
+                <div className="flex flex-col gap-2">
+                  <h2 className="text-lg font-semibold">Tier benefits</h2>
+                  <p className="text-sm leading-6 text-zinc-600">
+                    Backend-calculated club access rules for this membership
+                    tier, including buying windows, savings windows, discounts,
+                    and participation benefits.
+                  </p>
+                </div>
+
+                {isTierBenefitsPending ? (
+                  <StatusMessage>Loading tier benefits...</StatusMessage>
+                ) : null}
+
+                {isTierBenefitsError ? (
+                  <StatusMessage tone="error">
+                    {tierBenefitsErrorMessage ??
+                      "Unable to load tier benefits for this membership."}
+                  </StatusMessage>
+                ) : null}
+
+                {tierBenefits ? (
+                  <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                      <p className="text-sm text-zinc-600">Monthly obligation</p>
+                      <p className="mt-2 text-xl font-semibold">
+                        {formatCurrency(tierBenefits.monthlyObligation)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm text-zinc-600">Order window</p>
+                          <p className="mt-2 text-xl font-semibold">
+                            Day {tierBenefits.orderWindowStartDay}-
+                            {tierBenefits.orderWindowEndDay}
+                          </p>
+                        </div>
+                        <Badge
+                          tone={
+                            tierBenefits.isOrderWindowOpen ? "success" : "neutral"
+                          }
+                        >
+                          {tierBenefits.isOrderWindowOpen ? "Open" : "Closed"}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm text-zinc-600">Savings window</p>
+                          <p className="mt-2 text-xl font-semibold">
+                            Day {tierBenefits.savingsWindowOpenDay}-
+                            {tierBenefits.savingsWindowCloseDay}
+                          </p>
+                        </div>
+                        <Badge
+                          tone={
+                            tierBenefits.isSavingsWindowOpen
+                              ? "success"
+                              : "neutral"
+                          }
+                        >
+                          {tierBenefits.isSavingsWindowOpen ? "Open" : "Closed"}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                      <p className="text-sm text-zinc-600">Product discount</p>
+                      <p className="mt-2 text-xl font-semibold">
+                        {formatPercent(tierBenefits.productPricingDiscount)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                      <p className="text-sm text-zinc-600">
+                        Referral commission
+                      </p>
+                      <p className="mt-2 text-xl font-semibold">
+                        {formatPercent(tierBenefits.referralCommissionRate)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                      <p className="text-sm text-zinc-600">Profit share</p>
+                      <p className="mt-2 text-xl font-semibold">
+                        {formatPercent(tierBenefits.profitSharePercentage)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 md:col-span-2 xl:col-span-3">
+                      <dl className="grid gap-3 text-sm sm:grid-cols-3">
+                        <div>
+                          <dt className="text-zinc-600">Tier</dt>
+                          <dd className="mt-1 font-medium text-zinc-950">
+                            {tierBenefits.tierName}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-zinc-600">Interest rate</dt>
+                          <dd className="mt-1 font-medium text-zinc-950">
+                            {formatPercent(tierBenefits.interestRate)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-zinc-600">Max concurrent orders</dt>
+                          <dd className="mt-1 font-medium text-zinc-950">
+                            {tierBenefits.maxConcurrentOrders}
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </div>
+                ) : null}
+              </Card>
+            </section>
           </section>
         ) : null}
       </div>

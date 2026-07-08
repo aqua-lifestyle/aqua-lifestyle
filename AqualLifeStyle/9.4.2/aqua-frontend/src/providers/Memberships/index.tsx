@@ -16,11 +16,15 @@ import {
   getMembershipsError,
   getMembershipsPending,
   getMembershipsSuccess,
+  getTierBenefitsError,
+  getTierBenefitsPending,
+  getTierBenefitsSuccess,
 } from "./actions";
 import {
   type Membership,
   MembershipsActionsContext,
   MembershipsStateContext,
+  type TierBenefits,
   initialMembershipsState,
 } from "./context";
 import { membershipsReducer } from "./reducer";
@@ -73,12 +77,26 @@ export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {
     }
   }, []);
 
+  const getTierBenefits = useCallback(async (id: number) => {
+    dispatch(getTierBenefitsPending());
+
+    try {
+      const tierBenefits = await httpClient.get<TierBenefits>(
+        apiEndpoints.memberships.getTierBenefits(id),
+      );
+      dispatch(getTierBenefitsSuccess(tierBenefits));
+    } catch (error) {
+      dispatch(getTierBenefitsError(getErrorMessage(error)));
+    }
+  }, []);
+
   const actions = useMemo(
     () => ({
       getMembership,
       getMemberships,
+      getTierBenefits,
     }),
-    [getMembership, getMemberships],
+    [getMembership, getMemberships, getTierBenefits],
   );
 
   return (
@@ -106,4 +124,4 @@ export const useMembershipsActions = () => {
   return context;
 };
 
-export type { Membership, MembershipType } from "./context";
+export type { Membership, MembershipType, TierBenefits } from "./context";

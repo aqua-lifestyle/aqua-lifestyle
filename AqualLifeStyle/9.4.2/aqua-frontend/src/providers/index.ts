@@ -24,7 +24,7 @@ export {
   useMembershipsActions,
   useMembershipsState,
 } from "./Memberships";
-export type { Membership, MembershipType } from "./Memberships";
+export type { Membership, MembershipType, TierBenefits } from "./Memberships";
 
 export {
   ProductsProvider,

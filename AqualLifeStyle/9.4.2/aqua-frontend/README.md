@@ -6,7 +6,7 @@ Next.js App Router frontend for the AquaLifeStyle ABP backend.
 
 - Products: read live product data from ABP, open product details, and validate membership-based customer eligibility.
 - Customers: register, view, update customer records, and inspect eligible products.
-- Memberships: view membership tiers, open membership details, and assign a membership during customer registration.
+- Memberships: view membership tiers, open membership details with tier benefits, and assign a membership during customer registration.
 - Enquiries: create enquiries, view enquiry records, record follow-ups, and manage response/close/reopen workflow actions.
 
 The root route is a live demo dashboard that guides the current end-to-end validation path and summarizes backend data.
