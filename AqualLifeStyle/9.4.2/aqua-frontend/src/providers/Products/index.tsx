@@ -10,6 +10,9 @@ import {
 
 import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
 import {
+  getEligibleProductsError,
+  getEligibleProductsPending,
+  getEligibleProductsSuccess,
   getProductError,
   getProductPending,
   getProductSuccess,
@@ -44,6 +47,22 @@ const getErrorMessage = (error: unknown): string => {
 export const ProductsProvider = ({ children }: ProductsProviderProps) => {
   const [state, dispatch] = useReducer(productsReducer, initialProductsState);
 
+  const getEligibleProductsForCustomer = useCallback(
+    async (customerId: number) => {
+      dispatch(getEligibleProductsPending());
+
+      try {
+        const products = await httpClient.get<Product[]>(
+          apiEndpoints.products.getAllForCustomer(customerId),
+        );
+        dispatch(getEligibleProductsSuccess(products));
+      } catch (error) {
+        dispatch(getEligibleProductsError(getErrorMessage(error)));
+      }
+    },
+    [],
+  );
+
   const getProducts = useCallback(async () => {
     dispatch(getProductsPending());
 
@@ -70,10 +89,11 @@ export const ProductsProvider = ({ children }: ProductsProviderProps) => {
 
   const actions = useMemo(
     () => ({
+      getEligibleProductsForCustomer,
       getProduct,
       getProducts,
     }),
-    [getProduct, getProducts],
+    [getEligibleProductsForCustomer, getProduct, getProducts],
   );
 
   return (

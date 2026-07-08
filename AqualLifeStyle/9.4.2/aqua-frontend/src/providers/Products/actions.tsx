@@ -1,6 +1,9 @@
 import type { Product } from "./context";
 
 export const ProductsActionTypes = {
+  getEligibleProductsError: "products/getEligibleProductsError",
+  getEligibleProductsPending: "products/getEligibleProductsPending",
+  getEligibleProductsSuccess: "products/getEligibleProductsSuccess",
   getProductPending: "products/getProductPending",
   getProductSuccess: "products/getProductSuccess",
   getProductError: "products/getProductError",
@@ -10,6 +13,17 @@ export const ProductsActionTypes = {
 } as const;
 
 export type ProductsAction =
+  | {
+      type: typeof ProductsActionTypes.getEligibleProductsPending;
+    }
+  | {
+      type: typeof ProductsActionTypes.getEligibleProductsSuccess;
+      payload: Product[];
+    }
+  | {
+      type: typeof ProductsActionTypes.getEligibleProductsError;
+      payload: string;
+    }
   | {
       type: typeof ProductsActionTypes.getProductPending;
     }
@@ -32,6 +46,22 @@ export type ProductsAction =
       type: typeof ProductsActionTypes.getProductsError;
       payload: string;
     };
+
+export const getEligibleProductsPending = (): ProductsAction => ({
+  type: ProductsActionTypes.getEligibleProductsPending,
+});
+
+export const getEligibleProductsSuccess = (
+  products: Product[],
+): ProductsAction => ({
+  type: ProductsActionTypes.getEligibleProductsSuccess,
+  payload: products,
+});
+
+export const getEligibleProductsError = (message: string): ProductsAction => ({
+  type: ProductsActionTypes.getEligibleProductsError,
+  payload: message,
+});
 
 export const getProductPending = (): ProductsAction => ({
   type: ProductsActionTypes.getProductPending,

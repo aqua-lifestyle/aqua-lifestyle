@@ -8,6 +8,8 @@ import {
   useCustomersState,
   useMembershipsActions,
   useMembershipsState,
+  useProductsActions,
+  useProductsState,
 } from "@/src/providers";
 import { getMembershipNameById } from "@/src/shared/domain";
 import {
@@ -148,6 +150,7 @@ const CustomerEditForm = ({
 export const CustomerDetails = ({ customerId }: CustomerDetailsProps) => {
   const { getCustomer, updateCustomer } = useCustomersActions();
   const { getMemberships } = useMembershipsActions();
+  const { getEligibleProductsForCustomer } = useProductsActions();
   const {
     isSelectedError,
     isSelectedPending,
@@ -159,6 +162,12 @@ export const CustomerDetails = ({ customerId }: CustomerDetailsProps) => {
     updateErrorMessage,
   } = useCustomersState();
   const { memberships } = useMembershipsState();
+  const {
+    eligibleErrorMessage,
+    eligibleProducts,
+    isEligibleError,
+    isEligiblePending,
+  } = useProductsState();
 
   useEffect(() => {
     if (!Number.isInteger(customerId) || customerId <= 0) {
@@ -166,8 +175,14 @@ export const CustomerDetails = ({ customerId }: CustomerDetailsProps) => {
     }
 
     void getCustomer(customerId);
+    void getEligibleProductsForCustomer(customerId);
     void getMemberships();
-  }, [customerId, getCustomer, getMemberships]);
+  }, [
+    customerId,
+    getCustomer,
+    getEligibleProductsForCustomer,
+    getMemberships,
+  ]);
 
   return (
     <main className="min-h-dvh bg-zinc-50 px-6 py-8 text-zinc-950 sm:px-8 lg:px-12">
@@ -266,6 +281,76 @@ export const CustomerDetails = ({ customerId }: CustomerDetailsProps) => {
                 </StatusMessage>
               ) : null}
             </aside>
+
+            <section className="lg:col-span-2">
+              <Card>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold">
+                      Eligible products
+                    </h2>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
+                      Products returned by the backend for this customer&apos;s
+                      active status and membership access.
+                    </p>
+                  </div>
+                  <LinkButton href="/products">Full catalog</LinkButton>
+                </div>
+
+                {isEligiblePending ? (
+                  <StatusMessage>Loading eligible products...</StatusMessage>
+                ) : null}
+
+                {isEligibleError ? (
+                  <StatusMessage tone="error">
+                    {eligibleErrorMessage ??
+                      "Unable to load eligible products for this customer."}
+                  </StatusMessage>
+                ) : null}
+
+                {!isEligiblePending &&
+                !isEligibleError &&
+                eligibleProducts.length === 0 ? (
+                  <StatusMessage>
+                    No eligible products are available for this customer yet.
+                  </StatusMessage>
+                ) : null}
+
+                {eligibleProducts.length > 0 ? (
+                  <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {eligibleProducts.map((product) => (
+                      <div
+                        className="rounded-lg border border-zinc-200 bg-zinc-50 p-4"
+                        key={product.id}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="font-medium text-zinc-950">
+                              {product.name}
+                            </h3>
+                            <p className="mt-1 text-sm text-zinc-600">
+                              {getMembershipNameById(
+                                memberships,
+                                product.membershipId,
+                                "Open access",
+                              )}
+                            </p>
+                          </div>
+                          <Badge tone={product.isActive ? "success" : "neutral"}>
+                            {product.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                        <div className="mt-5">
+                          <LinkButton href={`/products/${product.id}`}>
+                            Open product
+                          </LinkButton>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </Card>
+            </section>
           </section>
         ) : null}
       </div>
