@@ -1,14 +1,25 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import {
   type Membership,
+  type MembershipType,
   useMembershipsActions,
   useMembershipsState,
 } from "@/src/providers";
 import { getMembershipTypeLabel } from "@/src/shared/domain";
-import { Badge, Card, LinkButton, StatusMessage } from "@/src/shared/ui";
+import {
+  Badge,
+  Card,
+  LinkButton,
+  SelectField,
+  StatusMessage,
+} from "@/src/shared/ui";
+
+type MembershipStatusFilter = "all" | "active" | "inactive";
+
+const membershipTypes: MembershipType[] = [0, 1, 2, 3];
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-ZA", {
@@ -68,6 +79,9 @@ const MembershipCard = ({ membership }: { membership: Membership }) => {
 };
 
 export const MembershipsList = () => {
+  const [statusFilter, setStatusFilter] =
+    useState<MembershipStatusFilter>("all");
+  const [tierFilter, setTierFilter] = useState("all");
   const { getMemberships } = useMembershipsActions();
   const { errorMessage, isError, isPending, memberships } =
     useMembershipsState();
@@ -75,6 +89,18 @@ export const MembershipsList = () => {
   useEffect(() => {
     void getMemberships();
   }, [getMemberships]);
+
+  const filteredMemberships = memberships.filter((membership) => {
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "active" && membership.isActive) ||
+      (statusFilter === "inactive" && !membership.isActive);
+
+    const matchesTier =
+      tierFilter === "all" || membership.membershipType === Number(tierFilter);
+
+    return matchesStatus && matchesTier;
+  });
 
   return (
     <main className="min-h-dvh bg-zinc-50 px-6 py-8 text-zinc-950 sm:px-8 lg:px-12">
@@ -119,12 +145,65 @@ export const MembershipsList = () => {
         ) : null}
 
         {!isPending && !isError && memberships.length === 0 ? (
-          <StatusMessage>No memberships are available yet.</StatusMessage>
+          <StatusMessage>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <span>No memberships are available yet.</span>
+              <LinkButton href="/products">View products</LinkButton>
+            </div>
+          </StatusMessage>
         ) : null}
 
         {memberships.length > 0 ? (
+          <section className="grid gap-4 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_14rem_18rem] md:items-end">
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-950">
+                Membership filters
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-600">
+                Filter backend tiers by active status or club level before
+                assigning access to a customer.
+              </p>
+            </div>
+            <SelectField
+              label="Status"
+              name="membershipStatusFilter"
+              onChange={(event) =>
+                setStatusFilter(event.target.value as MembershipStatusFilter)
+              }
+              value={statusFilter}
+            >
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </SelectField>
+            <SelectField
+              label="Tier"
+              name="tierFilter"
+              onChange={(event) => setTierFilter(event.target.value)}
+              value={tierFilter}
+            >
+              <option value="all">All tiers</option>
+              {membershipTypes.map((membershipType) => (
+                <option key={membershipType} value={membershipType}>
+                  {getMembershipTypeLabel(membershipType)}
+                </option>
+              ))}
+            </SelectField>
+          </section>
+        ) : null}
+
+        {memberships.length > 0 && filteredMemberships.length === 0 ? (
+          <StatusMessage>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <span>No memberships match these filters.</span>
+              <LinkButton href="/products">Review products</LinkButton>
+            </div>
+          </StatusMessage>
+        ) : null}
+
+        {filteredMemberships.length > 0 ? (
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {memberships.map((membership) => (
+            {filteredMemberships.map((membership) => (
               <MembershipCard key={membership.id} membership={membership} />
             ))}
           </section>
