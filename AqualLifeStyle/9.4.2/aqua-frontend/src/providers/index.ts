@@ -33,6 +33,13 @@ export {
 export type { Membership, MembershipType, TierBenefits } from "./Memberships";
 
 export {
+  OrderIntentsProvider,
+  useOrderIntentsActions,
+  useOrderIntentsState,
+} from "./OrderIntents";
+export type { OrderIntent, OrderIntentStatus } from "./OrderIntents";
+
+export {
   ProductsProvider,
   useProductsActions,
   useProductsState,

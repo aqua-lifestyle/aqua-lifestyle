@@ -9,6 +9,8 @@ import {
   useCustomersState,
   useEnquiriesActions,
   useEnquiriesState,
+  useOrderIntentsActions,
+  useOrderIntentsState,
   useProductsActions,
   useProductsState,
 } from "@/src/providers";
@@ -68,6 +70,7 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
   const [response, setResponse] = useState("");
   const { getCustomers } = useCustomersActions();
   const { getProducts } = useProductsActions();
+  const { createFromEnquiry, getOrderIntents } = useOrderIntentsActions();
   const {
     closeEnquiry,
     convertEnquiryToCustomer,
@@ -88,6 +91,13 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
     selectedEnquiry,
     selectedErrorMessage,
   } = useEnquiriesState();
+  const {
+    actionErrorMessage: orderIntentActionErrorMessage,
+    isActionError: isOrderIntentActionError,
+    isActionPending: isOrderIntentActionPending,
+    isActionSuccess: isOrderIntentActionSuccess,
+    orderIntents,
+  } = useOrderIntentsState();
 
   useEffect(() => {
     if (!Number.isInteger(enquiryId) || enquiryId <= 0) {
@@ -97,7 +107,8 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
     void getCustomers();
     void getProducts();
     void getEnquiry(enquiryId);
-  }, [enquiryId, getCustomers, getEnquiry, getProducts]);
+    void getOrderIntents();
+  }, [enquiryId, getCustomers, getEnquiry, getOrderIntents, getProducts]);
 
   const customerName = useMemo(() => {
     if (!selectedEnquiry) {
@@ -120,6 +131,18 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
         ?.name ?? `Product ${selectedEnquiry.productId}`
     );
   }, [products, selectedEnquiry]);
+
+  const matchingOrderIntent = useMemo(() => {
+    if (!selectedEnquiry) {
+      return null;
+    }
+
+    return (
+      orderIntents.find(
+        (orderIntent) => orderIntent.enquiryId === selectedEnquiry.id,
+      ) ?? null
+    );
+  }, [orderIntents, selectedEnquiry]);
 
   const handleRespond = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -172,6 +195,14 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
         void getCustomers();
       }
     }
+  };
+
+  const handleCreateOrderIntent = async () => {
+    if (!selectedEnquiry) {
+      return;
+    }
+
+    await createFromEnquiry(selectedEnquiry.id);
   };
 
   const handleReopen = async () => {
@@ -322,6 +353,22 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
                     </Button>
                   ) : null}
 
+                  {selectedEnquiry.isConverted ? (
+                    matchingOrderIntent ? (
+                      <LinkButton href="/order-intents">
+                        View order intent
+                      </LinkButton>
+                    ) : (
+                      <Button
+                        disabled={isOrderIntentActionPending}
+                        onClick={handleCreateOrderIntent}
+                        type="button"
+                      >
+                        Create order intent
+                      </Button>
+                    )
+                  ) : null}
+
                   {selectedEnquiry.isClosed ? (
                     <Button
                       disabled={isActionPending}
@@ -415,6 +462,19 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
               {isActionError ? (
                 <StatusMessage tone="error">
                   {actionErrorMessage ?? "Unable to update this enquiry."}
+                </StatusMessage>
+              ) : null}
+
+              {isOrderIntentActionSuccess ? (
+                <StatusMessage tone="success">
+                  Order intent created from this enquiry.
+                </StatusMessage>
+              ) : null}
+
+              {isOrderIntentActionError ? (
+                <StatusMessage tone="error">
+                  {orderIntentActionErrorMessage ??
+                    "Unable to create an order intent."}
                 </StatusMessage>
               ) : null}
             </aside>

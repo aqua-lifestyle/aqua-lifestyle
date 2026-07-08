@@ -11,6 +11,8 @@ import {
   useEnquiriesState,
   useMembershipsActions,
   useMembershipsState,
+  useOrderIntentsActions,
+  useOrderIntentsState,
   useProductsActions,
   useProductsState,
 } from "@/src/providers";
@@ -46,6 +48,13 @@ const journeySteps = [
     label: "Enquiry workflow",
     status: "Pipeline",
   },
+  {
+    description:
+      "Turn converted demand into a lightweight reservation before adding payment complexity.",
+    href: "/order-intents",
+    label: "Order intent handoff",
+    status: "Reservation",
+  },
 ] as const;
 
 const enquiryStatusLabels: Record<EnquiryStatus, string> = {
@@ -67,6 +76,7 @@ export const DemoDashboard = () => {
   const { getCustomers } = useCustomersActions();
   const { getEnquiries } = useEnquiriesActions();
   const { getMemberships } = useMembershipsActions();
+  const { getOrderIntents } = useOrderIntentsActions();
   const { getProducts } = useProductsActions();
 
   const {
@@ -88,6 +98,12 @@ export const DemoDashboard = () => {
     memberships,
   } = useMembershipsState();
   const {
+    isLoadError: isOrderIntentsError,
+    isLoadPending: isOrderIntentsPending,
+    loadErrorMessage: orderIntentsErrorMessage,
+    orderIntents,
+  } = useOrderIntentsState();
+  const {
     errorMessage: productsErrorMessage,
     isError: isProductsError,
     isPending: isProductsPending,
@@ -99,7 +115,14 @@ export const DemoDashboard = () => {
     void getProducts();
     void getCustomers();
     void getEnquiries();
-  }, [getCustomers, getEnquiries, getMemberships, getProducts]);
+    void getOrderIntents();
+  }, [
+    getCustomers,
+    getEnquiries,
+    getMemberships,
+    getOrderIntents,
+    getProducts,
+  ]);
 
   const dashboardMetrics = useMemo(() => {
     const pendingEnquiries = enquiries.filter((enquiry) => enquiry.isPending);
@@ -112,6 +135,12 @@ export const DemoDashboard = () => {
     const activeProducts = products.filter((product) => product.isActive);
     const activeMemberships = memberships.filter(
       (membership) => membership.isActive,
+    );
+    const reservedOrderIntents = orderIntents.filter(
+      (orderIntent) => orderIntent.status === 1,
+    );
+    const completedOrderIntents = orderIntents.filter(
+      (orderIntent) => orderIntent.status === 3,
     );
     const totalConversionProbability = enquiries.reduce(
       (total, enquiry) => total + enquiry.conversionProbability,
@@ -126,11 +155,13 @@ export const DemoDashboard = () => {
       activeProducts: activeProducts.length,
       averageConversionProbability,
       closedEnquiries: closedEnquiries.length,
+      completedOrderIntents: completedOrderIntents.length,
       convertedEnquiries: convertedEnquiries.length,
       pendingEnquiries: pendingEnquiries.length,
+      reservedOrderIntents: reservedOrderIntents.length,
       salesReadyEnquiries: salesReadyEnquiries.length,
     };
-  }, [customers, enquiries, memberships, products]);
+  }, [customers, enquiries, memberships, orderIntents, products]);
 
   const membershipTypeCounts = useMemo(() => {
     return memberships.reduce<Record<MembershipType, number>>(
@@ -192,6 +223,14 @@ export const DemoDashboard = () => {
       readyText: "Ready",
       waitingText: "Next",
     },
+    {
+      action: "Open intents",
+      href: "/order-intents",
+      isReady: dashboardMetrics.reservedOrderIntents > 0,
+      label: "Order intent handoff proven",
+      readyText: "Ready",
+      waitingText: "Next",
+    },
   ] as const;
 
   const latestEnquiries = enquiries.slice(0, 3);
@@ -199,15 +238,21 @@ export const DemoDashboard = () => {
     isCustomersPending ||
     isEnquiriesPending ||
     isMembershipsPending ||
+    isOrderIntentsPending ||
     isProductsPending;
   const errorMessages = [
     customersErrorMessage,
     enquiriesErrorMessage,
     membershipsErrorMessage,
+    orderIntentsErrorMessage,
     productsErrorMessage,
   ].filter(Boolean);
   const hasError =
-    isCustomersError || isEnquiriesError || isMembershipsError || isProductsError;
+    isCustomersError ||
+    isEnquiriesError ||
+    isMembershipsError ||
+    isOrderIntentsError ||
+    isProductsError;
 
   return (
     <main className="min-h-dvh bg-zinc-50 px-6 py-8 text-zinc-950 sm:px-8 lg:px-12">
@@ -229,7 +274,8 @@ export const DemoDashboard = () => {
               <p className="mt-4 text-base leading-7 text-zinc-600">
                 A live, end-to-end view of the current demo: membership tiers,
                 product access, customer activation, and enquiry conversion.
-                This turns the PDF vision into a working club-commerce journey.
+                Order intents now prove the first commerce handoff after a
+                converted enquiry.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -237,6 +283,7 @@ export const DemoDashboard = () => {
                 Start with memberships
               </LinkButton>
               <LinkButton href="/enquiries">Open enquiry pipeline</LinkButton>
+              <LinkButton href="/order-intents">Order intents</LinkButton>
             </div>
           </div>
 
@@ -250,7 +297,8 @@ export const DemoDashboard = () => {
             <p className="mt-3 text-sm leading-6 text-zinc-600">
               Start with a tier, filter products by access, register a customer,
               create an enquiry, record follow-ups, then mark the enquiry
-              converted. The dashboard now shows which parts are proven live.
+              converted and create an order intent. The dashboard now shows
+              which parts are proven live.
             </p>
           </Card>
         </header>
@@ -303,13 +351,13 @@ export const DemoDashboard = () => {
           </Card>
 
           <Card>
-            <p className="text-sm text-zinc-600">Pending enquiries</p>
+            <p className="text-sm text-zinc-600">Reserved intents</p>
             <div className="mt-3 flex items-end justify-between gap-4">
               <p className="text-3xl font-semibold">
-                {dashboardMetrics.pendingEnquiries}
+                {dashboardMetrics.reservedOrderIntents}
               </p>
-              <Badge tone={getMetricTone(dashboardMetrics.pendingEnquiries)}>
-                Pipeline
+              <Badge tone={getMetricTone(dashboardMetrics.reservedOrderIntents)}>
+                Handoff
               </Badge>
             </div>
           </Card>
@@ -386,11 +434,24 @@ export const DemoDashboard = () => {
                     {formatPercent(dashboardMetrics.averageConversionProbability)}
                   </dd>
                 </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-zinc-600">Reserved intents</dt>
+                  <dd className="font-medium text-zinc-950">
+                    {dashboardMetrics.reservedOrderIntents}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-zinc-600">Completed intents</dt>
+                  <dd className="font-medium text-zinc-950">
+                    {dashboardMetrics.completedOrderIntents}
+                  </dd>
+                </div>
               </dl>
-              <div className="mt-6">
+              <div className="mt-6 flex flex-col gap-3">
                 <LinkButton href="/enquiries/sales-ready">
                   Open sales-ready view
                 </LinkButton>
+                <LinkButton href="/order-intents">Open order intents</LinkButton>
               </div>
             </Card>
 

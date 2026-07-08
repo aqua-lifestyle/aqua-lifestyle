@@ -24,6 +24,14 @@ export const apiEndpoints = {
     getTierBenefits: (id: number) =>
       `/api/services/app/Membership/GetTierBenefits?id=${id}`,
   },
+  orderIntents: {
+    cancel: (id: number) => `/api/services/app/OrderIntent/Cancel?id=${id}`,
+    complete: (id: number) => `/api/services/app/OrderIntent/Complete?id=${id}`,
+    createFromEnquiry: (enquiryId: number) =>
+      `/api/services/app/OrderIntent/CreateFromEnquiry?enquiryId=${enquiryId}`,
+    getAll: "/api/services/app/OrderIntent/GetAll",
+    getById: (id: number) => `/api/services/app/OrderIntent/Get?id=${id}`,
+  },
   products: {
     getAll: "/api/services/app/Product/GetAll",
     getAllForCustomer: (customerId: number) =>

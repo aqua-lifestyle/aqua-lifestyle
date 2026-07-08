@@ -7,6 +7,7 @@ import {
   CustomersProvider,
   EnquiriesProvider,
   MembershipsProvider,
+  OrderIntentsProvider,
   ProductsProvider,
   TenantProvider,
 } from "@/src/providers";
@@ -22,7 +23,9 @@ export const AppProviders = ({ children }: AppProvidersProps) => {
         <CustomersProvider>
           <EnquiriesProvider>
             <MembershipsProvider>
-              <ProductsProvider>{children}</ProductsProvider>
+              <ProductsProvider>
+                <OrderIntentsProvider>{children}</OrderIntentsProvider>
+              </ProductsProvider>
             </MembershipsProvider>
           </EnquiriesProvider>
         </CustomersProvider>
