@@ -1,0 +1,186 @@
+openapi: 3.0.3
+info:
+  title: aQua Lifestyle Club — Area Network API
+  version: 9.4.2
+  description: >
+    Curated subset of the aQua Lifestyle Club API covering the Area-Network bounded
+    context, Enquiry conversion, and authentication. Generated/derived from the ABP
+    dynamic services in `AqualLifeStyle.Application`.
+servers:
+  - url: /api/services/app
+  - url: /api
+security:
+  - bearerAuth: []
+paths:
+  /api/TokenAuth/Authenticate:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Authenticate and obtain a JWT bearer token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuthenticateInput' }
+      responses:
+        '200':
+          description: JWT result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AbpResultAuthenticateResult' }
+        '401': { description: Invalid credentials }
+  /api/services/app/Facilitator/Register:
+    post:
+      tags: [Facilitators]
+      summary: Register a facilitator under an area leader.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateFacilitatorDto' }
+      responses:
+        '200': { description: FacilitatorDto }
+  /api/services/app/Facilitator/Get:
+    get:
+      tags: [Facilitators]
+      parameters: [{ name: id, in: query, required: true, schema: { type: integer } }]
+      responses: { '200': { description: FacilitatorDto } }
+  /api/services/app/Facilitator/GetAll:
+    get:
+      tags: [Facilitators]
+      responses: { '200': { description: list of FacilitatorDto } }
+  /api/services/app/Referral/Confirm:
+    post:
+      tags: [Referrals]
+      summary: Confirm a pending referral and issue its award.
+      parameters: [{ name: id, in: query, required: true, schema: { type: integer } }]
+      responses: { '200': { description: ReferralDto } }
+  /api/services/app/AreaLeader/Apply:
+    post:
+      tags: [AreaLeaders]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateAreaLeaderDto' }
+      responses: { '200': { description: AreaLeaderDto } }
+  /api/services/app/AreaLeader/RecordPresentation:
+    post:
+      tags: [AreaLeaders]
+      parameters: [{ name: id, in: query, required: true, schema: { type: integer } }]
+      responses: { '200': { description: AreaLeaderDto } }
+  /api/services/app/AreaLeader/RecordStartupOrder:
+    post:
+      tags: [AreaLeaders]
+      parameters: [{ name: id, in: query, required: true, schema: { type: integer } }]
+      responses: { '200': { description: AreaLeaderDto } }
+  /api/services/app/AreaLeader/StartReview:
+    post:
+      tags: [AreaLeaders]
+      parameters: [{ name: id, in: query, required: true, schema: { type: integer } }]
+      responses: { '200': { description: AreaLeaderDto } }
+  /api/services/app/AreaLeader/Approve:
+    post:
+      tags: [AreaLeaders]
+      parameters: [{ name: id, in: query, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: AreaLeaderDto }
+        '400': { description: Approval guards not met }
+  /api/services/app/Enquiry/ConvertToCustomer:
+    post:
+      tags: [Enquiries]
+      parameters: [{ name: id, in: query, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConvertEnquiryToCustomerDto' }
+      responses:
+        '200': { description: EnquiryDto (converted, membership assigned) }
+  /api/services/app/Network/GetOverview:
+    get:
+      tags: [Network]
+      summary: CQRS read model for the admin network dashboard.
+      responses: { '200': { description: NetworkOverviewDto } }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    AuthenticateInput:
+      type: object
+      properties:
+        userNameOrEmailAddress: { type: string }
+        password: { type: string }
+    AbpResultAuthenticateResult:
+      type: object
+      properties:
+        result:
+          type: object
+          properties:
+            accessToken: { type: string }
+            expireInSeconds: { type: integer }
+    CreateFacilitatorDto:
+      type: object
+      properties:
+        customerId: { type: integer }
+        areaLeaderId: { type: integer }
+    CreateAreaLeaderDto:
+      type: object
+      properties:
+        customerId: { type: integer }
+        licenseType: { type: integer }
+        address: { type: string }
+        capacity: { type: string }
+    ConvertEnquiryToCustomerDto:
+      type: object
+      properties:
+        membershipId: { type: integer }
+    FacilitatorDto:
+      type: object
+      properties:
+        id: { type: integer }
+        customerId: { type: integer }
+        areaLeaderId: { type: integer }
+        rank: { type: integer }
+        directReferrals: { type: integer }
+        indirectReferrals: { type: integer }
+    AreaLeaderDto:
+      type: object
+      properties:
+        id: { type: integer }
+        customerId: { type: integer }
+        licenseType: { type: integer }
+        rank: { type: integer }
+        areaSpaceId: { type: integer }
+        directReferrals: { type: integer }
+        orderTarget: { type: integer }
+    ReferralDto:
+      type: object
+      properties:
+        id: { type: integer }
+        referrerFacilitatorId: { type: integer }
+        referrerAreaLeaderId: { type: integer }
+        referredCustomerId: { type: integer }
+        sourceEnquiryId: { type: integer }
+        type: { type: integer }
+        awardAmount: { type: number }
+        awardIssued: { type: boolean }
+    NetworkOverviewDto:
+      type: object
+      properties:
+        areaLeaderCount: { type: integer }
+        facilitatorCount: { type: integer }
+        referralCount: { type: integer }
+        totalCommissionAwarded: { type: number }
+        areaLeaders:
+          type: array
+          items:
+            type: object
+            properties:
+              areaLeaderId: { type: integer }
+              facilitatorCount: { type: integer }
+              referralCount: { type: integer }
+              commissionAwarded: { type: number }
