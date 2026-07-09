@@ -12,6 +12,7 @@ import {
   useProductsActions,
   useProductsState,
 } from "@/src/providers";
+import { formatCurrency, formatDate } from "@/src/shared/format";
 import { Badge, Button, Card, LinkButton, StatusMessage } from "@/src/shared/ui";
 
 const orderIntentStatusLabels: Record<OrderIntentStatus, string> = {
@@ -19,20 +20,6 @@ const orderIntentStatusLabels: Record<OrderIntentStatus, string> = {
   1: "Reserved",
   2: "Cancelled",
   3: "Completed",
-};
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat("en-ZA", {
-    currency: "ZAR",
-    style: "currency",
-  }).format(value);
-};
-
-const formatDate = (date: string) => {
-  return new Intl.DateTimeFormat("en-ZA", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(date));
 };
 
 const getStatusTone = (status: OrderIntentStatus) => {
@@ -113,7 +100,7 @@ const OrderIntentCard = ({
         <div className="flex justify-between gap-4">
           <dt className="text-zinc-600">Created</dt>
           <dd className="text-right font-medium text-zinc-950">
-            {formatDate(orderIntent.createdAt)}
+            {formatDate(orderIntent.createdAt, { withTime: true })}
           </dd>
         </div>
         <div className="flex justify-between gap-4">

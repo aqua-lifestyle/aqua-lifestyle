@@ -14,6 +14,7 @@ import {
   useProductsActions,
   useProductsState,
 } from "@/src/providers";
+import { formatDate, formatPercent } from "@/src/shared/format";
 import {
   Badge,
   Button,
@@ -44,20 +45,6 @@ const followUpOutcomeOptions = Object.entries(followUpOutcomeLabels).map(
     value: Number(value) as EnquiryFollowUpOutcome,
   }),
 );
-
-const formatDate = (date: string) => {
-  return new Intl.DateTimeFormat("en-ZA", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(date));
-};
-
-const formatPercent = (value: number) => {
-  return new Intl.NumberFormat("en-ZA", {
-    maximumFractionDigits: 0,
-    style: "percent",
-  }).format(value / 100);
-};
 
 type EnquiryDetailsProps = {
   enquiryId: number;
@@ -297,7 +284,7 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
                   <div className="flex justify-between gap-4">
                     <dt className="text-zinc-600">Created</dt>
                     <dd className="font-medium text-zinc-950">
-                      {formatDate(selectedEnquiry.createdAt)}
+                      {formatDate(selectedEnquiry.createdAt, { withTime: true })}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4">
@@ -316,7 +303,7 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
                     <dt className="text-zinc-600">Last follow-up</dt>
                     <dd className="text-right font-medium text-zinc-950">
                       {selectedEnquiry.lastFollowUpDate
-                        ? formatDate(selectedEnquiry.lastFollowUpDate)
+                        ? formatDate(selectedEnquiry.lastFollowUpDate, { withTime: true })
                         : "Not yet"}
                     </dd>
                   </div>
@@ -336,7 +323,7 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
                     <div className="flex justify-between gap-4">
                       <dt className="text-zinc-600">Converted at</dt>
                       <dd className="text-right font-medium text-zinc-950">
-                        {formatDate(selectedEnquiry.convertedAt)}
+                        {formatDate(selectedEnquiry.convertedAt, { withTime: true })}
                       </dd>
                     </div>
                   ) : null}
@@ -505,7 +492,7 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
                                 followUp.outcomeText}
                             </p>
                             <p className="mt-1 text-sm text-zinc-600">
-                              {formatDate(followUp.followUpDate)}
+                              {formatDate(followUp.followUpDate, { withTime: true })}
                             </p>
                           </div>
                           <Badge tone={followUp.isResolved ? "neutral" : "success"}>

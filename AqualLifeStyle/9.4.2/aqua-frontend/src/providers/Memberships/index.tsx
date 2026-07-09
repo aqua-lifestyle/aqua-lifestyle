@@ -8,7 +8,7 @@ import {
   useReducer,
 } from "react";
 
-import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
+import { apiEndpoints, getErrorMessage, httpClient } from "@/src/shared/api";
 import {
   getMembershipError,
   getMembershipPending,
@@ -37,18 +37,6 @@ type MembershipsProviderProps = {
   children: ReactNode;
 };
 
-const getErrorMessage = (error: unknown): string => {
-  if (error instanceof AbpHttpError) {
-    return error.details ?? error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Unable to load memberships.";
-};
-
 export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {
   const [state, dispatch] = useReducer(
     membershipsReducer,
@@ -64,7 +52,7 @@ export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {
       );
       dispatch(getMembershipsSuccess(memberships));
     } catch (error) {
-      dispatch(getMembershipsError(getErrorMessage(error)));
+      dispatch(getMembershipsError(getErrorMessage(error, "Unable to load memberships.")));
     }
   }, []);
 
@@ -77,7 +65,7 @@ export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {
       );
       dispatch(getMembershipSuccess(membership));
     } catch (error) {
-      dispatch(getMembershipError(getErrorMessage(error)));
+      dispatch(getMembershipError(getErrorMessage(error, "Unable to load memberships.")));
     }
   }, []);
 
@@ -90,7 +78,7 @@ export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {
       );
       dispatch(getTierBenefitsSuccess(tierBenefits));
     } catch (error) {
-      dispatch(getTierBenefitsError(getErrorMessage(error)));
+      dispatch(getTierBenefitsError(getErrorMessage(error, "Unable to load memberships.")));
     }
   }, []);
 
@@ -103,7 +91,7 @@ export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {
       );
       dispatch(getSavingsWindowStatusesSuccess(statuses));
     } catch (error) {
-      dispatch(getSavingsWindowStatusesError(getErrorMessage(error)));
+      dispatch(getSavingsWindowStatusesError(getErrorMessage(error, "Unable to load memberships.")));
     }
   }, []);
 

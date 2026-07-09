@@ -8,7 +8,7 @@ import {
   useReducer,
 } from "react";
 
-import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
+import { apiEndpoints, getErrorMessage, httpClient } from "@/src/shared/api";
 import {
   getOrderIntentsError,
   getOrderIntentsPending,
@@ -29,18 +29,6 @@ type OrderIntentsProviderProps = {
   children: ReactNode;
 };
 
-const getErrorMessage = (error: unknown): string => {
-  if (error instanceof AbpHttpError) {
-    return error.details ?? error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Unable to complete the order intent request.";
-};
-
 export const OrderIntentsProvider = ({
   children,
 }: OrderIntentsProviderProps) => {
@@ -58,7 +46,7 @@ export const OrderIntentsProvider = ({
       );
       dispatch(getOrderIntentsSuccess(orderIntents));
     } catch (error) {
-      dispatch(getOrderIntentsError(getErrorMessage(error)));
+      dispatch(getOrderIntentsError(getErrorMessage(error, "Unable to complete the order intent request.")));
     }
   }, []);
 
@@ -73,7 +61,7 @@ export const OrderIntentsProvider = ({
       dispatch(orderIntentActionSuccess(orderIntent));
       return true;
     } catch (error) {
-      dispatch(orderIntentActionError(getErrorMessage(error)));
+      dispatch(orderIntentActionError(getErrorMessage(error, "Unable to complete the order intent request.")));
       return false;
     }
   }, []);
@@ -89,7 +77,7 @@ export const OrderIntentsProvider = ({
       dispatch(orderIntentActionSuccess(orderIntent));
       return true;
     } catch (error) {
-      dispatch(orderIntentActionError(getErrorMessage(error)));
+      dispatch(orderIntentActionError(getErrorMessage(error, "Unable to complete the order intent request.")));
       return false;
     }
   }, []);
@@ -105,7 +93,7 @@ export const OrderIntentsProvider = ({
       dispatch(orderIntentActionSuccess(orderIntent));
       return true;
     } catch (error) {
-      dispatch(orderIntentActionError(getErrorMessage(error)));
+      dispatch(orderIntentActionError(getErrorMessage(error, "Unable to complete the order intent request.")));
       return false;
     }
   }, []);

@@ -17,6 +17,7 @@ import {
   useProductsState,
 } from "@/src/providers";
 import { getMembershipTypeLabel } from "@/src/shared/domain";
+import { formatPercent } from "@/src/shared/format";
 import { Badge, Card, LinkButton, StatusMessage } from "@/src/shared/ui";
 
 const journeySteps = [
@@ -61,13 +62,6 @@ const enquiryStatusLabels: Record<EnquiryStatus, string> = {
   0: "Pending",
   1: "Responded",
   2: "Closed",
-};
-
-const formatPercent = (value: number) => {
-  return new Intl.NumberFormat("en-ZA", {
-    maximumFractionDigits: 0,
-    style: "percent",
-  }).format(value / 100);
 };
 
 const getMetricTone = (value: number) => (value > 0 ? "success" : "neutral");

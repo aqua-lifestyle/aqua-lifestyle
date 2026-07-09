@@ -8,7 +8,7 @@ import {
   useReducer,
 } from "react";
 
-import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
+import { apiEndpoints, getErrorMessage, httpClient } from "@/src/shared/api";
 import {
   getEligibleProductsError,
   getEligibleProductsPending,
@@ -32,18 +32,6 @@ type ProductsProviderProps = {
   children: ReactNode;
 };
 
-const getErrorMessage = (error: unknown): string => {
-  if (error instanceof AbpHttpError) {
-    return error.details ?? error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Unable to load products.";
-};
-
 export const ProductsProvider = ({ children }: ProductsProviderProps) => {
   const [state, dispatch] = useReducer(productsReducer, initialProductsState);
 
@@ -57,7 +45,11 @@ export const ProductsProvider = ({ children }: ProductsProviderProps) => {
         );
         dispatch(getEligibleProductsSuccess(products));
       } catch (error) {
-        dispatch(getEligibleProductsError(getErrorMessage(error)));
+        dispatch(
+          getEligibleProductsError(
+            getErrorMessage(error, "Unable to load products."),
+          ),
+        );
       }
     },
     [],
@@ -70,7 +62,7 @@ export const ProductsProvider = ({ children }: ProductsProviderProps) => {
       const products = await httpClient.get<Product[]>(apiEndpoints.products.getAll);
       dispatch(getProductsSuccess(products));
     } catch (error) {
-      dispatch(getProductsError(getErrorMessage(error)));
+      dispatch(getProductsError(getErrorMessage(error, "Unable to load products.")));
     }
   }, []);
 
@@ -83,7 +75,7 @@ export const ProductsProvider = ({ children }: ProductsProviderProps) => {
       );
       dispatch(getProductSuccess(product));
     } catch (error) {
-      dispatch(getProductError(getErrorMessage(error)));
+      dispatch(getProductError(getErrorMessage(error, "Unable to load products.")));
     }
   }, []);
 

@@ -9,6 +9,7 @@ import {
   useMembershipsState,
 } from "@/src/providers";
 import { getMembershipTypeLabel } from "@/src/shared/domain";
+import { formatCurrency } from "@/src/shared/format";
 import {
   Badge,
   Card,
@@ -20,12 +21,6 @@ import {
 type MembershipStatusFilter = "all" | "active" | "inactive";
 
 const membershipTypes: MembershipType[] = [0, 1, 2, 3];
-
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-ZA", {
-    style: "currency",
-    currency: "ZAR",
-  }).format(amount);
 
 const MembershipCard = ({ membership }: { membership: Membership }) => {
   const membershipTypeLabel = getMembershipTypeLabel(membership.membershipType);

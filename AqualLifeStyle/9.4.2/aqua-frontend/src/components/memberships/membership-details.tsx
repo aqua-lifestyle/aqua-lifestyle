@@ -4,32 +4,11 @@ import { useEffect } from "react";
 
 import { useMembershipsActions, useMembershipsState } from "@/src/providers";
 import { getMembershipTypeLabel } from "@/src/shared/domain";
+import { formatCurrency, formatDate, formatPercent } from "@/src/shared/format";
 import { Badge, Card, LinkButton, StatusMessage } from "@/src/shared/ui";
 
 type MembershipDetailsProps = {
   membershipId: number;
-};
-
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-ZA", {
-    style: "currency",
-    currency: "ZAR",
-  }).format(amount);
-
-const formatPercent = (value: number) =>
-  new Intl.NumberFormat("en-ZA", {
-    maximumFractionDigits: 1,
-    style: "percent",
-  }).format(value / 100);
-
-const formatDate = (date: string | null) => {
-  if (!date) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-ZA", {
-    dateStyle: "medium",
-  }).format(new Date(date));
 };
 
 export const MembershipDetails = ({ membershipId }: MembershipDetailsProps) => {
@@ -229,7 +208,7 @@ export const MembershipDetails = ({ membershipId }: MembershipDetailsProps) => {
                     <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
                       <p className="text-sm text-zinc-600">Product discount</p>
                       <p className="mt-2 text-xl font-semibold">
-                        {formatPercent(tierBenefits.productPricingDiscount)}
+                        {formatPercent(tierBenefits.productPricingDiscount, 1)}
                       </p>
                     </div>
 
@@ -238,14 +217,14 @@ export const MembershipDetails = ({ membershipId }: MembershipDetailsProps) => {
                         Referral commission
                       </p>
                       <p className="mt-2 text-xl font-semibold">
-                        {formatPercent(tierBenefits.referralCommissionRate)}
+                        {formatPercent(tierBenefits.referralCommissionRate, 1)}
                       </p>
                     </div>
 
                     <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
                       <p className="text-sm text-zinc-600">Profit share</p>
                       <p className="mt-2 text-xl font-semibold">
-                        {formatPercent(tierBenefits.profitSharePercentage)}
+                        {formatPercent(tierBenefits.profitSharePercentage, 1)}
                       </p>
                     </div>
 
@@ -260,7 +239,7 @@ export const MembershipDetails = ({ membershipId }: MembershipDetailsProps) => {
                         <div>
                           <dt className="text-zinc-600">Interest rate</dt>
                           <dd className="mt-1 font-medium text-zinc-950">
-                            {formatPercent(tierBenefits.interestRate)}
+                            {formatPercent(tierBenefits.interestRate, 1)}
                           </dd>
                         </div>
                         <div>

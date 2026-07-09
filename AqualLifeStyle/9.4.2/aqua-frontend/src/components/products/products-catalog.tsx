@@ -10,6 +10,7 @@ import {
   useProductsState,
 } from "@/src/providers";
 import { getMembershipNameById } from "@/src/shared/domain";
+import { formatCurrency } from "@/src/shared/format";
 import {
   Badge,
   Card,
@@ -17,12 +18,6 @@ import {
   SelectField,
   StatusMessage,
 } from "@/src/shared/ui";
-
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-ZA", {
-    style: "currency",
-    currency: "ZAR",
-  }).format(amount);
 
 const ProductCard = ({
   membershipName,

@@ -15,6 +15,7 @@ import {
   getMembershipNameById,
   getMembershipTypeLabel,
 } from "@/src/shared/domain";
+import { formatCurrency, formatPercent } from "@/src/shared/format";
 import {
   Badge,
   Button,
@@ -49,18 +50,6 @@ const toFormState = (customer: Customer): CustomerFormState => ({
   membershipId: customer.membershipId?.toString() ?? "",
   name: customer.name,
 });
-
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-ZA", {
-    currency: "ZAR",
-    style: "currency",
-  }).format(amount);
-
-const formatPercent = (value: number) =>
-  new Intl.NumberFormat("en-ZA", {
-    maximumFractionDigits: 1,
-    style: "percent",
-  }).format(value / 100);
 
 const CustomerEditForm = ({
   customer,
@@ -453,6 +442,7 @@ export const CustomerDetails = ({ customerId }: CustomerDetailsProps) => {
                         <p className="mt-2 text-lg font-semibold text-zinc-950">
                           {formatPercent(
                             assignedTierBenefits.productPricingDiscount,
+                            1,
                           )}
                         </p>
                       </div>

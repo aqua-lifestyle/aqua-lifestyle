@@ -8,7 +8,7 @@ import {
   useReducer,
 } from "react";
 
-import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
+import { apiEndpoints, getErrorMessage, httpClient } from "@/src/shared/api";
 import {
   createCustomerError,
   createCustomerPending,
@@ -37,18 +37,6 @@ type CustomersProviderProps = {
   children: ReactNode;
 };
 
-const getErrorMessage = (error: unknown): string => {
-  if (error instanceof AbpHttpError) {
-    return error.details ?? error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Unable to complete the customer request.";
-};
-
 export const CustomersProvider = ({ children }: CustomersProviderProps) => {
   const [state, dispatch] = useReducer(customersReducer, initialCustomersState);
 
@@ -61,7 +49,7 @@ export const CustomersProvider = ({ children }: CustomersProviderProps) => {
       );
       dispatch(getCustomersSuccess(customers));
     } catch (error) {
-      dispatch(getCustomersError(getErrorMessage(error)));
+      dispatch(getCustomersError(getErrorMessage(error, "Unable to complete the customer request.")));
     }
   }, []);
 
@@ -76,7 +64,7 @@ export const CustomersProvider = ({ children }: CustomersProviderProps) => {
       dispatch(createCustomerSuccess());
       return true;
     } catch (error) {
-      dispatch(createCustomerError(getErrorMessage(error)));
+      dispatch(createCustomerError(getErrorMessage(error, "Unable to complete the customer request.")));
       return false;
     }
   }, []);
@@ -90,7 +78,7 @@ export const CustomersProvider = ({ children }: CustomersProviderProps) => {
       );
       dispatch(getCustomerSuccess(customer));
     } catch (error) {
-      dispatch(getCustomerError(getErrorMessage(error)));
+      dispatch(getCustomerError(getErrorMessage(error, "Unable to complete the customer request.")));
     }
   }, []);
 
@@ -105,7 +93,7 @@ export const CustomersProvider = ({ children }: CustomersProviderProps) => {
       dispatch(updateCustomerSuccess(customer));
       return true;
     } catch (error) {
-      dispatch(updateCustomerError(getErrorMessage(error)));
+      dispatch(updateCustomerError(getErrorMessage(error, "Unable to complete the customer request.")));
       return false;
     }
   }, []);

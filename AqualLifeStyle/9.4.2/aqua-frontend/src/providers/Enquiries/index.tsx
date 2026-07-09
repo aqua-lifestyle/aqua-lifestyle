@@ -8,7 +8,7 @@ import {
   useReducer,
 } from "react";
 
-import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
+import { apiEndpoints, getErrorMessage, httpClient } from "@/src/shared/api";
 import {
   createEnquiryError,
   createEnquiryPending,
@@ -41,18 +41,6 @@ type EnquiriesProviderProps = {
   children: ReactNode;
 };
 
-const getErrorMessage = (error: unknown): string => {
-  if (error instanceof AbpHttpError) {
-    return error.details ?? error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Unable to complete the enquiry request.";
-};
-
 export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
   const [state, dispatch] = useReducer(enquiriesReducer, initialEnquiriesState);
 
@@ -65,7 +53,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       );
       dispatch(getEnquiriesSuccess(enquiries));
     } catch (error) {
-      dispatch(getEnquiriesError(getErrorMessage(error)));
+      dispatch(getEnquiriesError(getErrorMessage(error, "Unable to complete the enquiry request.")));
     }
   }, []);
 
@@ -80,7 +68,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       dispatch(createEnquirySuccess());
       return true;
     } catch (error) {
-      dispatch(createEnquiryError(getErrorMessage(error)));
+      dispatch(createEnquiryError(getErrorMessage(error, "Unable to complete the enquiry request.")));
       return false;
     }
   }, []);
@@ -94,7 +82,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       );
       dispatch(getEnquirySuccess(enquiry));
     } catch (error) {
-      dispatch(getEnquiryError(getErrorMessage(error)));
+      dispatch(getEnquiryError(getErrorMessage(error, "Unable to complete the enquiry request.")));
     }
   }, []);
 
@@ -107,7 +95,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       );
       dispatch(getSalesReadyEnquiriesSuccess(enquiries));
     } catch (error) {
-      dispatch(getSalesReadyEnquiriesError(getErrorMessage(error)));
+      dispatch(getSalesReadyEnquiriesError(getErrorMessage(error, "Unable to complete the enquiry request.")));
     }
   }, []);
 
@@ -123,7 +111,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
         dispatch(enquiryActionSuccess(enquiry));
         return true;
       } catch (error) {
-        dispatch(enquiryActionError(getErrorMessage(error)));
+        dispatch(enquiryActionError(getErrorMessage(error, "Unable to complete the enquiry request.")));
         return false;
       }
     },
@@ -145,7 +133,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
         dispatch(enquiryActionSuccess(enquiry));
         return true;
       } catch (error) {
-        dispatch(enquiryActionError(getErrorMessage(error)));
+        dispatch(enquiryActionError(getErrorMessage(error, "Unable to complete the enquiry request.")));
         return false;
       }
     },
@@ -163,7 +151,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       dispatch(enquiryActionSuccess(enquiry));
       return true;
     } catch (error) {
-      dispatch(enquiryActionError(getErrorMessage(error)));
+      dispatch(enquiryActionError(getErrorMessage(error, "Unable to complete the enquiry request.")));
       return false;
     }
   }, []);
@@ -179,7 +167,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       dispatch(enquiryActionSuccess(enquiry));
       return true;
     } catch (error) {
-      dispatch(enquiryActionError(getErrorMessage(error)));
+      dispatch(enquiryActionError(getErrorMessage(error, "Unable to complete the enquiry request.")));
       return false;
     }
   }, []);
@@ -195,7 +183,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       dispatch(enquiryActionSuccess(enquiry));
       return true;
     } catch (error) {
-      dispatch(enquiryActionError(getErrorMessage(error)));
+      dispatch(enquiryActionError(getErrorMessage(error, "Unable to complete the enquiry request.")));
       return false;
     }
   }, []);

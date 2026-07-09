@@ -9,17 +9,12 @@ import {
   useProductsState,
 } from "@/src/providers";
 import { getMembershipNameById } from "@/src/shared/domain";
+import { formatCurrency } from "@/src/shared/format";
 import { Badge, Card, LinkButton, StatusMessage } from "@/src/shared/ui";
 
 type ProductDetailsProps = {
   productId: number;
 };
-
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-ZA", {
-    style: "currency",
-    currency: "ZAR",
-  }).format(amount);
 
 export const ProductDetails = ({ productId }: ProductDetailsProps) => {
   const { getMemberships } = useMembershipsActions();

@@ -1,26 +1,13 @@
 "use client";
 
 import type { Enquiry, EnquiryStatus } from "@/src/providers";
+import { formatDate, formatPercent } from "@/src/shared/format";
 import { Badge, Card, LinkButton } from "@/src/shared/ui";
 
 const enquiryStatusLabels: Record<EnquiryStatus, string> = {
   0: "Pending",
   1: "Responded",
   2: "Closed",
-};
-
-const formatDate = (date: string) => {
-  return new Intl.DateTimeFormat("en-ZA", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(date));
-};
-
-const formatPercent = (value: number) => {
-  return new Intl.NumberFormat("en-ZA", {
-    maximumFractionDigits: 0,
-    style: "percent",
-  }).format(value / 100);
 };
 
 type EnquiryCardProps = {
@@ -62,7 +49,7 @@ export const EnquiryCard = ({
         <div className="flex justify-between gap-4">
           <dt className="text-zinc-600">Created</dt>
           <dd className="font-medium text-zinc-950">
-            {formatDate(enquiry.createdAt)}
+            {formatDate(enquiry.createdAt, { withTime: true })}
           </dd>
         </div>
         <div className="flex justify-between gap-4">
