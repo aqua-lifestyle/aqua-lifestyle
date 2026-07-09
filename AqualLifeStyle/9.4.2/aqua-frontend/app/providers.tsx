@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 
-import { AppContextBar } from "@/src/components/app/app-context-bar";
 import {
   AuthProvider,
   CustomersProvider,
@@ -11,28 +10,40 @@ import {
   OrderIntentsProvider,
   ProductsProvider,
   TenantProvider,
+  ToastProvider,
+  useTenantState,
 } from "@/src/providers";
 
 type AppProvidersProps = {
   children: ReactNode;
 };
 
+const TenantAwareProviders = ({ children }: { children: ReactNode }) => {
+  const { currentTenant } = useTenantState();
+  const tenant = currentTenant ?? "host";
+
+  return (
+    <CustomersProvider key={`customers-${tenant}`}>
+      <EnquiriesProvider key={`enquiries-${tenant}`}>
+        <MembershipsProvider key={`memberships-${tenant}`}>
+          <ProductsProvider key={`products-${tenant}`}>
+            <OrderIntentsProvider key={`order-intents-${tenant}`}>
+              {children}
+            </OrderIntentsProvider>
+          </ProductsProvider>
+        </MembershipsProvider>
+      </EnquiriesProvider>
+    </CustomersProvider>
+  );
+};
+
 export const AppProviders = ({ children }: AppProvidersProps) => {
   return (
     <AuthProvider>
       <TenantProvider>
-        <CustomersProvider>
-          <EnquiriesProvider>
-            <MembershipsProvider>
-              <ProductsProvider>
-                <OrderIntentsProvider>
-                  <AppContextBar />
-                  {children}
-                </OrderIntentsProvider>
-              </ProductsProvider>
-            </MembershipsProvider>
-          </EnquiriesProvider>
-        </CustomersProvider>
+        <ToastProvider>
+          <TenantAwareProviders>{children}</TenantAwareProviders>
+        </ToastProvider>
       </TenantProvider>
     </AuthProvider>
   );
