@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 import { z } from "zod";
 
@@ -9,8 +8,17 @@ import {
   useCustomersState,
   useMembershipsActions,
   useMembershipsState,
+  useToast,
 } from "@/src/providers";
-import { Button, SelectField, StatusMessage, TextField } from "@/src/shared/ui";
+import {
+  Breadcrumb,
+  Button,
+  Card,
+  LinkButton,
+  SelectField,
+  StatusMessage,
+  TextField,
+} from "@/src/shared/ui";
 
 const customerRegistrationSchema = z.object({
   email: z.string().trim().email("Enter a valid email address."),
@@ -36,7 +44,7 @@ const getFieldErrors = (
   return error.issues.reduce<FieldErrors>((errors, issue) => {
     const field = issue.path[0];
 
-    if (field === "email" || field === "name") {
+    if (field === "email" || field === "name" || field === "membershipId") {
       errors[field] = issue.message;
     }
 
@@ -65,6 +73,7 @@ export const CustomerRegistrationForm = ({
     isPending: isMembershipsPending,
     memberships,
   } = useMembershipsState();
+  const { toast } = useToast();
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   useEffect(() => {
@@ -97,40 +106,36 @@ export const CustomerRegistrationForm = ({
 
     if (wasCreated) {
       form.reset();
+      toast({
+        message: "Customer registered successfully.",
+        title: "Success",
+        type: "success",
+      });
     }
   };
 
   return (
-    <main className="min-h-dvh bg-zinc-50 px-6 py-8 text-zinc-950 sm:px-8 lg:px-12">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
-        <header className="flex flex-col gap-4">
-          <Link
-            className="text-sm font-medium text-emerald-700 hover:text-emerald-800"
-            href="/customers"
-          >
-            Back to customers
-          </Link>
-          <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">
-              Aqua Lifestyle Club
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight">
-              Customer registration
-            </h1>
-            <p className="max-w-2xl text-base text-zinc-600">
-              Create a customer record in the ABP backend with optional
-              membership assignment. Contextual membership links can preselect
-              the tier for a faster demo path.
-            </p>
-          </div>
+    <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+        <header>
+          <Breadcrumb
+            items={[
+              { href: "/", label: "Dashboard" },
+              { href: "/customers", label: "Customers" },
+              { label: "Register" },
+            ]}
+          />
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">
+            Customer registration
+          </h1>
+          <p className="mt-2 text-base text-muted-foreground">
+            Create a customer record in the ABP backend with optional membership
+            assignment.
+          </p>
         </header>
 
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm"
-          noValidate
-        >
-          <div className="flex flex-col gap-5">
+        <Card>
+          <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-5">
             <TextField
               autoComplete="name"
               errorMessage={fieldErrors.name}
@@ -149,11 +154,11 @@ export const CustomerRegistrationForm = ({
               type="email"
             />
             <SelectField
+              defaultValue={initialMembershipId ?? ""}
               disabled={isMembershipsPending || isCreatePending}
               errorMessage={fieldErrors.membershipId}
               label="Membership"
               name="membershipId"
-              defaultValue={initialMembershipId ?? ""}
             >
               <option value="">No membership assigned</option>
               {memberships.map((membership) => (
@@ -179,19 +184,23 @@ export const CustomerRegistrationForm = ({
             {isCreateSuccess ? (
               <StatusMessage tone="success">
                 Customer registered successfully.{" "}
-                <Link className="font-semibold underline" href="/customers">
+                <LinkButton
+                  className="h-auto px-0 py-0 font-semibold underline"
+                  href="/customers"
+                  variant="ghost"
+                >
                   View customers
-                </Link>
+                </LinkButton>
               </StatusMessage>
             ) : null}
 
-            <div className="flex justify-end">
-              <Button disabled={isCreatePending} type="submit">
+            <div className="flex justify-end gap-2">
+              <Button disabled={isCreatePending} isLoading={isCreatePending} type="submit">
                 {isCreatePending ? "Registering..." : "Register customer"}
               </Button>
             </div>
-          </div>
-        </form>
+          </form>
+        </Card>
       </div>
     </main>
   );
