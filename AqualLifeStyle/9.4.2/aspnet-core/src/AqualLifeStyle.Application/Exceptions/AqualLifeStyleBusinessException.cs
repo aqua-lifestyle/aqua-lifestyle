@@ -80,6 +80,12 @@ namespace AqualLifeStyle.Application.Exceptions
         {
             StatusCode = 400;
         }
+
+        public AqualLifeStyleBusinessRuleException(string message, Exception innerException, string businessRuleCode = null)
+            : base(message, innerException, businessRuleCode ?? "BUSINESS_RULE_VIOLATION")
+        {
+            StatusCode = 400;
+        }
     }
 
     /// <summary>
@@ -93,8 +99,20 @@ namespace AqualLifeStyle.Application.Exceptions
             StatusCode = 400;
         }
 
+        public AqualLifeStyleInvalidStateException(string entityName, string currentState, string attemptedAction, Exception innerException)
+            : base($"{entityName} in state '{currentState}' cannot {attemptedAction}.", innerException, "INVALID_STATE")
+        {
+            StatusCode = 400;
+        }
+
         public AqualLifeStyleInvalidStateException(string message)
             : base(message, "INVALID_STATE")
+        {
+            StatusCode = 400;
+        }
+
+        public AqualLifeStyleInvalidStateException(string message, Exception innerException)
+            : base(message, innerException, "INVALID_STATE")
         {
             StatusCode = 400;
         }

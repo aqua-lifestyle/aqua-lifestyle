@@ -90,16 +90,23 @@ namespace AqualLifeStyle.Application.Validation
         public static void ValidEmail(string email, string fieldName = "Email")
         {
             NotNullOrEmpty(email, fieldName);
-            
+
+            bool isValidFormat;
             try
             {
                 var addr = new System.Net.Mail.MailAddress(email);
-                if (addr.Address != email)
-                {
-                    throw new Exceptions.AqualLifeStyleValidationException(fieldName, $"{fieldName} format is invalid.");
-                }
+                isValidFormat = addr.Address == email;
             }
-            catch
+            catch (FormatException)
+            {
+                isValidFormat = false;
+            }
+            catch (ArgumentException)
+            {
+                isValidFormat = false;
+            }
+
+            if (!isValidFormat)
             {
                 throw new Exceptions.AqualLifeStyleValidationException(fieldName, $"{fieldName} format is invalid.");
             }

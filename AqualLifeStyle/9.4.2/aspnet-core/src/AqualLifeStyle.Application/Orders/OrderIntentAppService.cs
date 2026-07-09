@@ -137,7 +137,7 @@ namespace AqualLifeStyle.Application.Orders
             }
             catch (InvalidOperationException ex)
             {
-                throw new AqualLifeStyleInvalidStateException(ex.Message);
+                throw new AqualLifeStyleInvalidStateException(ex.Message, ex);
             }
 
             await _orderIntentRepository.UpdateAsync(orderIntent);
@@ -156,7 +156,7 @@ namespace AqualLifeStyle.Application.Orders
             }
             catch (InvalidOperationException ex)
             {
-                throw new AqualLifeStyleInvalidStateException(ex.Message);
+                throw new AqualLifeStyleInvalidStateException(ex.Message, ex);
             }
 
             await _orderIntentRepository.UpdateAsync(orderIntent);

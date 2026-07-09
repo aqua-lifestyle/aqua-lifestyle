@@ -33,8 +33,10 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
             }
             catch (Exception ex)
             {
-                // Log but don't crash - database may still be initializing
-                System.Diagnostics.Debug.WriteLine($"HostDemoDataBuilder.Create failed: {ex.Message}");
+                // Don't crash startup - the database may still be initializing - but
+                // surface the failure through the application log so a genuine seeding
+                // problem is not silently swallowed (Debug.WriteLine is a no-op in Release).
+                Abp.Logging.LogHelper.Logger.Warn("HostDemoDataBuilder.Create failed; demo data was not seeded.", ex);
             }
         }
 

@@ -68,7 +68,7 @@ namespace AqualLifeStyle.Application.Enquiries
             }
             catch (InvalidOperationException ex)
             {
-                throw new AqualLifeStyleInvalidStateException("Enquiry", enquiry.Status.ToString(), "respond");
+                throw new AqualLifeStyleInvalidStateException("Enquiry", enquiry.Status.ToString(), "respond", ex);
             }
 
             await _enquiryRepository.UpdateAsync(enquiry);
@@ -106,7 +106,7 @@ namespace AqualLifeStyle.Application.Enquiries
             }
             catch (InvalidOperationException ex)
             {
-                throw new AqualLifeStyleInvalidStateException("Enquiry", enquiry.Status.ToString(), "reopen");
+                throw new AqualLifeStyleInvalidStateException("Enquiry", enquiry.Status.ToString(), "reopen", ex);
             }
 
             await _enquiryRepository.UpdateAsync(enquiry);
@@ -131,7 +131,7 @@ namespace AqualLifeStyle.Application.Enquiries
             }
             catch (InvalidOperationException ex)
             {
-                throw new AqualLifeStyleBusinessRuleException(ex.Message);
+                throw new AqualLifeStyleBusinessRuleException(ex.Message, ex);
             }
 
             await _enquiryRepository.UpdateAsync(enquiry);
@@ -154,7 +154,7 @@ namespace AqualLifeStyle.Application.Enquiries
             }
             catch (InvalidOperationException ex)
             {
-                throw new AqualLifeStyleBusinessRuleException(ex.Message);
+                throw new AqualLifeStyleBusinessRuleException(ex.Message, ex);
             }
 
             await _enquiryRepository.UpdateAsync(enquiry);
@@ -177,7 +177,7 @@ namespace AqualLifeStyle.Application.Enquiries
             }
             catch (InvalidOperationException ex)
             {
-                throw new AqualLifeStyleBusinessRuleException(ex.Message);
+                throw new AqualLifeStyleBusinessRuleException(ex.Message, ex);
             }
 
             await _enquiryRepository.UpdateAsync(enquiry);
@@ -206,7 +206,7 @@ namespace AqualLifeStyle.Application.Enquiries
             }
             catch (InvalidOperationException ex)
             {
-                throw new AqualLifeStyleBusinessRuleException(ex.Message);
+                throw new AqualLifeStyleBusinessRuleException(ex.Message, ex);
             }
 
             await _enquiryRepository.UpdateAsync(enquiry);

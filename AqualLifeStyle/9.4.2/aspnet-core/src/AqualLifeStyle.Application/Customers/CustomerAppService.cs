@@ -100,7 +100,7 @@ namespace AqualLifeStyle.Application.Customers
             }
             catch (Exception ex)
             {
-                throw new UserFriendlyException("Customer update failed.", ex.Message);
+                throw new UserFriendlyException("Customer update failed.", ex.Message, ex);
             }
         }
 
@@ -144,7 +144,7 @@ namespace AqualLifeStyle.Application.Customers
             }
             catch (Exception ex)
             {
-                throw new UserFriendlyException("Customer creation failed.", ex.Message);
+                throw new UserFriendlyException("Customer creation failed.", ex.Message, ex);
             }
         }
 

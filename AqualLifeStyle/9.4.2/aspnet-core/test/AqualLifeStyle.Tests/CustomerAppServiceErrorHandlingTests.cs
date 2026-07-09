@@ -33,5 +33,27 @@ namespace AqualLifeStyle.Tests
             Assert.Contains("Customer creation failed", ex.Message);
             Assert.Contains("Membership not found", ex.Details);
         }
+
+        [Fact]
+        public async Task CreateAsync_PreservesOriginalExceptionAsInner_WhenWrapping()
+        {
+            var customerRepository = new Mock<ICustomerRepository>();
+            var membershipRepository = new Mock<IMembershipRepository>();
+            var original = new InvalidOperationException("Membership not found.");
+            membershipRepository
+                .Setup(x => x.GetAsync(It.IsAny<int>()))
+                .ThrowsAsync(original);
+
+            var service = new CustomerAppService(customerRepository.Object, membershipRepository.Object);
+
+            var ex = await Assert.ThrowsAsync<UserFriendlyException>(() => service.CreateAsync(new CreateCustomerDto
+            {
+                Name = "Thabang",
+                Email = "molape@example.com",
+                MembershipId = 1
+            }));
+
+            Assert.Same(original, ex.InnerException);
+        }
     }
 }

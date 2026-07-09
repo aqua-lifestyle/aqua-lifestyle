@@ -38,10 +38,12 @@ namespace AqualLifeStyle.Web.Host.Startup
                 var converter = IocManager.Resolve<CustomExceptionToErrorInfoConverter>();
                 errorInfoBuilder.AddExceptionConverter(converter);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Swallow any errors here to avoid startup crash; ABP will fall back
-                // to default behavior if the ErrorInfoBuilder is not available.
+                // Don't crash startup; ABP will fall back to default behavior if the
+                // ErrorInfoBuilder is not available. Log the failure so the missing
+                // custom converter registration is visible instead of silently swallowed.
+                Logger.Warn("Failed to register CustomExceptionToErrorInfoConverter; falling back to default ABP error info conversion.", ex);
             }
         }
     }

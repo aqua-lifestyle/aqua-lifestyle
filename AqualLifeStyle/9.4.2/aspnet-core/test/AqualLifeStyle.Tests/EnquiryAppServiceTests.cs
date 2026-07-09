@@ -127,6 +127,21 @@ namespace AqualLifeStyle.Tests
         }
 
         [Fact]
+        public async Task ConvertToCustomerAsync_WhenDomainRejects_PreservesInnerException()
+        {
+            // Arrange
+            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
+            enquiry.ConvertToCustomer();
+            _enquiryRepositoryMock.Setup(r => r.GetAsync(11)).ReturnsAsync(enquiry);
+
+            // Act & Assert
+            var ex = await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(() =>
+                _service.ConvertToCustomerAsync(11, new ConvertEnquiryToCustomerDto()));
+
+            Assert.IsType<System.InvalidOperationException>(ex.InnerException);
+        }
+
+        [Fact]
         public async Task ClearAssignmentAsync_WithAssignedEnquiry_ClearsSuccessfully()
         {
             // Arrange

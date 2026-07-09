@@ -49,6 +49,15 @@ namespace AqualLifeStyle.Web.Host.Startup
                         _logger.LogError(ex, "Unhandled exception processing request {Method} {Path}", context.Request.Method, context.Request.Path);
                     }
 
+                    // If the response has already started, headers/body are on the wire and
+                    // cannot be rewritten. Re-throw so the failure propagates to the server
+                    // instead of being masked by an InvalidOperationException from Clear().
+                    if (context.Response.HasStarted)
+                    {
+                        _logger.LogWarning("Response already started; cannot write error payload for {Method} {Path}. Re-throwing.", context.Request.Method, context.Request.Path);
+                        throw;
+                    }
+
                     var errorResponse = ErrorResponseBuilder.Build(ex);
                     // Attach correlation id to the client response so support can map to logs
                     errorResponse.CorrelationId = correlationId;
