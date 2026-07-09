@@ -1,0 +1,101 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { useAuthActions, useTenantState, useToast } from "@/src/providers";
+
+import { SignupForm } from "./signup-form";
+
+vi.mock("@/src/providers", async () => {
+  const actual = await vi.importActual<typeof import("@/src/providers")>(
+    "@/src/providers",
+  );
+  return {
+    ...actual,
+    useAuthActions: vi.fn(),
+    useTenantState: vi.fn(),
+    useToast: vi.fn(),
+  };
+});
+
+describe("SignupForm", () => {
+  const setSession = vi.fn();
+  const toast = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useAuthActions).mockReturnValue({ setSession, clearSession: vi.fn() });
+    vi.mocked(useTenantState).mockReturnValue({ currentTenant: null, isHost: true });
+    vi.mocked(useToast).mockReturnValue({ toast });
+  });
+
+  it("shows validation errors on the first step", async () => {
+    render(<SignupForm />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(
+      await screen.findByText("Enter a valid email address."),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("Password must be at least 8 characters."),
+    ).toBeInTheDocument();
+  });
+
+  it("advances through the multi-step flow and creates an account", async () => {
+    render(<SignupForm />);
+
+    fireEvent.change(screen.getByLabelText("Email address"), {
+      target: { value: "jane@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "StrongPass1!" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm password"), {
+      target: { value: "StrongPass1!" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(
+      await screen.findByText("Personal info"),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Full name"), {
+      target: { value: "Jane Doe" },
+    });
+    fireEvent.change(screen.getByLabelText("Company / tenant"), {
+      target: { value: "Acme Club" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(
+      await screen.findByText("Review your details"),
+    ).toBeInTheDocument();
+
+    const terms = screen.getByRole("checkbox");
+    fireEvent.click(terms);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    await waitFor(() => expect(setSession).toHaveBeenCalledOnce(), {
+      timeout: 2000,
+    });
+
+    expect(setSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accessToken: "demo-access-token",
+        user: expect.objectContaining({
+          email: "jane@example.com",
+          name: "Jane Doe",
+        }),
+      }),
+    );
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Welcome",
+        type: "success",
+      }),
+    );
+  });
+});
