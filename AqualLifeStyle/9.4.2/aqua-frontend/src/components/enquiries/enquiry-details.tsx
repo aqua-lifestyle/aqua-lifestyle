@@ -3,84 +3,237 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import {
-  type EnquiryFollowUpOutcome,
-  type EnquiryStatus,
   useCustomersActions,
   useCustomersState,
   useEnquiriesActions,
   useEnquiriesState,
-  useOrderIntentsActions,
-  useOrderIntentsState,
+  useMembershipsActions,
+  useMembershipsState,
   useProductsActions,
   useProductsState,
+  useToast,
 } from "@/src/providers";
+import { getMembershipNameById } from "@/src/shared/domain";
 import {
+  Avatar,
   Badge,
+  Breadcrumb,
   Button,
   Card,
   LinkButton,
   SelectField,
+  Skeleton,
   StatusMessage,
   TextAreaField,
 } from "@/src/shared/ui";
-
-const enquiryStatusLabels: Record<EnquiryStatus, string> = {
-  0: "Pending",
-  1: "Responded",
-  2: "Closed",
-};
-
-const followUpOutcomeLabels: Record<EnquiryFollowUpOutcome, string> = {
-  0: "Interested",
-  1: "Considering",
-  2: "Not interested",
-  3: "Converted",
-  4: "Lost",
-};
-
-const followUpOutcomeOptions = Object.entries(followUpOutcomeLabels).map(
-  ([value, label]) => ({
-    label,
-    value: Number(value) as EnquiryFollowUpOutcome,
-  }),
-);
-
-const formatDate = (date: string) => {
-  return new Intl.DateTimeFormat("en-ZA", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(date));
-};
-
-const formatPercent = (value: number) => {
-  return new Intl.NumberFormat("en-ZA", {
-    maximumFractionDigits: 0,
-    style: "percent",
-  }).format(value / 100);
-};
 
 type EnquiryDetailsProps = {
   enquiryId: number;
 };
 
+type Priority = "low" | "medium" | "high";
+
+const statusOptions = [
+  { label: "New", value: 0 },
+  { label: "In progress", value: 1 },
+  { label: "Resolved", value: 2 },
+];
+
+const statusTone = (status: number): "info" | "warning" | "success" => {
+  switch (status) {
+    case 0:
+      return "info";
+    case 1:
+      return "warning";
+    case 2:
+      return "success";
+    default:
+      return "info";
+  }
+};
+
+const statusLabel = (status: number) => statusOptions[status]?.label ?? "Unknown";
+
+const getPriority = (enquiry: { id: number; isSalesReady: boolean; status: number }): Priority => {
+  const isNew = enquiry.status === 0;
+  if (enquiry.isSalesReady && isNew) return "high";
+  if (enquiry.isSalesReady) return "medium";
+  if (Math.abs(enquiry.id) % 3 === 0) return "medium";
+  if (Math.abs(enquiry.id) % 3 === 1) return "high";
+  return "low";
+};
+
+const priorityTone = (priority: Priority): "info" | "warning" | "error" => {
+  switch (priority) {
+    case "low":
+      return "info";
+    case "medium":
+      return "warning";
+    case "high":
+      return "error";
+  }
+};
+
+const formatDate = (date: string) =>
+  new Intl.DateTimeFormat("en-ZA", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(date));
+
+const ConversationThread = ({
+  enquiry,
+  customerName,
+}: {
+  customerName: string;
+  enquiry: { createdAt: string; message: string; response: string | null };
+}) => {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex gap-3">
+        <Avatar fallback={customerName} size="sm" />
+        <div className="max-w-3xl rounded-2xl rounded-tl-none bg-muted px-4 py-3 text-sm text-foreground">
+          <p className="font-semibold">{customerName}</p>
+          <p className="mt-1">{enquiry.message}</p>
+          <p className="mt-2 text-xs text-muted-foreground">{formatDate(enquiry.createdAt)}</p>
+        </div>
+      </div>
+
+      {enquiry.response ? (
+        <div className="flex flex-row-reverse gap-3">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">
+            A
+          </div>
+          <div className="max-w-3xl rounded-2xl rounded-tr-none bg-accent px-4 py-3 text-sm text-white">
+            <p className="font-semibold">Agent</p>
+            <p className="mt-1">{enquiry.response}</p>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+const CustomerSidebar = ({
+  customer,
+  productName,
+  membershipName,
+}: {
+  customer: { email: string; isActive: boolean; name: string } | undefined;
+  membershipName: string;
+  productName: string;
+}) => {
+  if (!customer) {
+    return (
+      <Card>
+        <p className="text-sm text-muted-foreground">Customer details not available.</p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <h3 className="text-lg font-semibold">Customer</h3>
+      <div className="mt-4 flex items-center gap-3">
+        <Avatar fallback={customer.name} size="md" />
+        <div>
+          <p className="font-semibold text-foreground">{customer.name}</p>
+          <p className="text-sm text-muted-foreground">{customer.email}</p>
+        </div>
+      </div>
+      <dl className="mt-6 space-y-3 text-sm">
+        <div className="flex justify-between gap-4">
+          <dt className="text-muted-foreground">Status</dt>
+          <dd>
+            <Badge tone={customer.isActive ? "success" : "neutral"}>
+              {customer.isActive ? "Active" : "Inactive"}
+            </Badge>
+          </dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-muted-foreground">Membership</dt>
+          <dd className="font-medium">{membershipName}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-muted-foreground">Product</dt>
+          <dd className="font-medium">{productName}</dd>
+        </div>
+      </dl>
+    </Card>
+  );
+};
+
+type ResponseFormProps = {
+  enquiry: {
+    id: number;
+    isClosed: boolean;
+    response: string | null;
+    status: number;
+  };
+  isActionError: boolean;
+  isActionPending: boolean;
+  actionErrorMessage: string | null;
+  onSubmit: (status: number, response: string) => Promise<void>;
+};
+
+const ResponseForm = ({
+  enquiry,
+  isActionError,
+  isActionPending,
+  actionErrorMessage,
+  onSubmit,
+}: ResponseFormProps) => {
+  const [responseText, setResponseText] = useState(enquiry.response ?? "");
+  const [status, setStatus] = useState<string>(String(enquiry.status));
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await onSubmit(Number(status), responseText.trim());
+  };
+
+  return (
+    <Card>
+      <h3 className="text-lg font-semibold">Respond & update</h3>
+      <form className="mt-4 flex flex-col gap-4" onSubmit={handleSubmit}>
+        <SelectField
+          label="Status"
+          name="status"
+          onChange={(event) => setStatus(event.target.value)}
+          value={status}
+        >
+          {statusOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </SelectField>
+        <TextAreaField
+          label="Response message"
+          name="responseMessage"
+          onChange={(event) => setResponseText(event.target.value)}
+          placeholder="Enter a reply to the customer..."
+          rows={4}
+          value={responseText}
+        />
+        {isActionError ? (
+          <StatusMessage tone="error">
+            {actionErrorMessage ?? "Unable to update this enquiry."}
+          </StatusMessage>
+        ) : null}
+        <div className="flex justify-end">
+          <Button disabled={isActionPending} isLoading={isActionPending} type="submit">
+            Save response
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+};
+
 export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
-  const [followUpNotes, setFollowUpNotes] = useState("");
-  const [followUpOutcome, setFollowUpOutcome] =
-    useState<EnquiryFollowUpOutcome>(0);
-  const [response, setResponse] = useState("");
+  const { getEnquiry, respondToEnquiry, closeEnquiry, reopenEnquiry } = useEnquiriesActions();
   const { getCustomers } = useCustomersActions();
   const { getProducts } = useProductsActions();
-  const { createFromEnquiry, getOrderIntents } = useOrderIntentsActions();
-  const {
-    closeEnquiry,
-    convertEnquiryToCustomer,
-    getEnquiry,
-    recordFollowUp,
-    reopenEnquiry,
-    respondToEnquiry,
-  } = useEnquiriesActions();
-  const { customers } = useCustomersState();
-  const { products } = useProductsState();
+  const { toast } = useToast();
   const {
     actionErrorMessage,
     isActionError,
@@ -91,153 +244,80 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
     selectedEnquiry,
     selectedErrorMessage,
   } = useEnquiriesState();
-  const {
-    actionErrorMessage: orderIntentActionErrorMessage,
-    isActionError: isOrderIntentActionError,
-    isActionPending: isOrderIntentActionPending,
-    isActionSuccess: isOrderIntentActionSuccess,
-    orderIntents,
-  } = useOrderIntentsState();
+  const { customers } = useCustomersState();
+  const { products } = useProductsState();
+  const { getMemberships } = useMembershipsActions();
+  const { memberships } = useMembershipsState();
 
   useEffect(() => {
-    if (!Number.isInteger(enquiryId) || enquiryId <= 0) {
-      return;
-    }
-
+    if (!Number.isInteger(enquiryId) || enquiryId <= 0) return;
+    void getEnquiry(enquiryId);
     void getCustomers();
     void getProducts();
-    void getEnquiry(enquiryId);
-    void getOrderIntents();
-  }, [enquiryId, getCustomers, getEnquiry, getOrderIntents, getProducts]);
+    void getMemberships();
+  }, [enquiryId, getEnquiry, getCustomers, getProducts, getMemberships]);
 
-  const customerName = useMemo(() => {
-    if (!selectedEnquiry) {
-      return null;
+  useEffect(() => {
+    if (isActionSuccess) {
+      toast({
+        message: "Enquiry updated successfully.",
+        title: "Success",
+        type: "success",
+      });
     }
+  }, [isActionSuccess, toast]);
 
-    return (
-      customers.find((customer) => customer.id === selectedEnquiry.customerId)
-        ?.name ?? `Customer ${selectedEnquiry.customerId}`
-    );
-  }, [customers, selectedEnquiry]);
+  const isInvalid = !Number.isInteger(enquiryId) || enquiryId <= 0;
 
-  const productName = useMemo(() => {
-    if (!selectedEnquiry) {
-      return null;
-    }
+  const customer = useMemo(
+    () => customers.find((c) => c.id === selectedEnquiry?.customerId),
+    [customers, selectedEnquiry],
+  );
+  const product = useMemo(
+    () => products.find((p) => p.id === selectedEnquiry?.productId),
+    [products, selectedEnquiry],
+  );
 
-    return (
-      products.find((product) => product.id === selectedEnquiry.productId)
-        ?.name ?? `Product ${selectedEnquiry.productId}`
-    );
-  }, [products, selectedEnquiry]);
+  const handleSubmit = async (newStatus: number, response: string) => {
+    if (!selectedEnquiry) return;
 
-  const matchingOrderIntent = useMemo(() => {
-    if (!selectedEnquiry) {
-      return null;
-    }
+    await respondToEnquiry(selectedEnquiry.id, { response });
 
-    return (
-      orderIntents.find(
-        (orderIntent) => orderIntent.enquiryId === selectedEnquiry.id,
-      ) ?? null
-    );
-  }, [orderIntents, selectedEnquiry]);
-
-  const handleRespond = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    const trimmedResponse = response.trim();
-    if (!selectedEnquiry || trimmedResponse.length === 0) {
-      return;
-    }
-
-    const didRespond = await respondToEnquiry(selectedEnquiry.id, {
-      response: trimmedResponse,
-    });
-
-    if (didRespond) {
-      setResponse("");
-    }
-  };
-
-  const handleRecordFollowUp = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    const trimmedNotes = followUpNotes.trim();
-    if (!selectedEnquiry || trimmedNotes.length === 0) {
-      return;
-    }
-
-    const didRecord = await recordFollowUp(selectedEnquiry.id, {
-      followUpByMemberId: null,
-      followUpNotes: trimmedNotes,
-      outcome: followUpOutcome,
-    });
-
-    if (didRecord) {
-      setFollowUpNotes("");
-      setFollowUpOutcome(0);
-    }
-  };
-
-  const handleClose = async () => {
-    if (selectedEnquiry) {
+    if (newStatus === 2 && !selectedEnquiry.isClosed) {
       await closeEnquiry(selectedEnquiry.id);
-    }
-  };
-
-  const handleConvert = async () => {
-    if (selectedEnquiry) {
-      const didConvert = await convertEnquiryToCustomer(selectedEnquiry.id);
-
-      if (didConvert) {
-        void getCustomers();
-      }
-    }
-  };
-
-  const handleCreateOrderIntent = async () => {
-    if (!selectedEnquiry) {
-      return;
-    }
-
-    await createFromEnquiry(selectedEnquiry.id);
-  };
-
-  const handleReopen = async () => {
-    if (selectedEnquiry) {
+    } else if (newStatus !== 2 && selectedEnquiry.isClosed) {
       await reopenEnquiry(selectedEnquiry.id);
     }
   };
 
   return (
-    <main className="min-h-dvh bg-zinc-50 px-6 py-8 text-zinc-950 sm:px-8 lg:px-12">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
+    <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">
-              Aqua Lifestyle Club
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight">
-              Enquiry details
-            </h1>
-            <p className="max-w-2xl text-base text-zinc-600">
-              Review the customer request and perform the backend enquiry
-              workflow actions.
+          <div>
+            <Breadcrumb
+              items={[
+                { href: "/", label: "Dashboard" },
+                { href: "/enquiries", label: "Enquiries" },
+                { label: "Enquiry details" },
+              ]}
+            />
+            <h1 className="mt-2 text-3xl font-bold tracking-tight">Enquiry details</h1>
+            <p className="mt-2 max-w-2xl text-base text-muted-foreground">
+              Review the conversation, update status, and respond to the customer.
             </p>
           </div>
-          <LinkButton href="/enquiries">Back to enquiries</LinkButton>
+          <LinkButton href="/enquiries" variant="outline">
+            Back to enquiries
+          </LinkButton>
         </header>
 
-        {!Number.isInteger(enquiryId) || enquiryId <= 0 ? (
+        {isInvalid ? (
           <StatusMessage tone="error">This enquiry id is invalid.</StatusMessage>
         ) : null}
-
         {isSelectedPending ? (
-          <StatusMessage>Loading enquiry...</StatusMessage>
+          <Skeleton className="h-96" />
         ) : null}
-
         {isSelectedError ? (
           <StatusMessage tone="error">
             {selectedErrorMessage ?? "Unable to load this enquiry."}
@@ -245,283 +325,65 @@ export const EnquiryDetails = ({ enquiryId }: EnquiryDetailsProps) => {
         ) : null}
 
         {selectedEnquiry ? (
-          <section className="grid gap-6 lg:grid-cols-[1fr_24rem]">
-            <Card>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <h2 className="text-2xl font-semibold tracking-tight">
-                    {customerName}
-                  </h2>
-                  <p className="mt-1 text-sm text-zinc-600">{productName}</p>
-                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                    <LinkButton href={`/customers/${selectedEnquiry.customerId}`}>
-                      Open customer
-                    </LinkButton>
-                    <LinkButton href={`/products/${selectedEnquiry.productId}`}>
-                      Open product
-                    </LinkButton>
-                  </div>
-                </div>
-                <Badge tone={selectedEnquiry.isClosed ? "neutral" : "success"}>
-                  {enquiryStatusLabels[selectedEnquiry.status]}
-                </Badge>
-              </div>
-
-              <div className="mt-8 space-y-6">
-                <div>
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
-                    Customer message
-                  </h3>
-                  <p className="mt-3 whitespace-pre-line text-sm leading-6 text-zinc-800">
-                    {selectedEnquiry.message}
-                  </p>
-                </div>
-
-                {selectedEnquiry.response ? (
+          <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
+            <div className="flex flex-col gap-6">
+              <Card>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
-                      Response
-                    </h3>
-                    <p className="mt-3 whitespace-pre-line text-sm leading-6 text-zinc-800">
-                      {selectedEnquiry.response}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-lg font-semibold">
+                        Enquiry #{selectedEnquiry.id}
+                      </h2>
+                      <Badge tone={statusTone(selectedEnquiry.status)}>
+                        {statusLabel(selectedEnquiry.status)}
+                      </Badge>
+                      <Badge tone={priorityTone(getPriority(selectedEnquiry))}>
+                        {getPriority(selectedEnquiry)} priority
+                      </Badge>
+                      {selectedEnquiry.isSalesReady ? (
+                        <Badge tone="accent">sales ready</Badge>
+                      ) : null}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {product?.name ?? `Product ${selectedEnquiry.productId}`} ·{" "}
+                      {formatDate(selectedEnquiry.createdAt)}
                     </p>
                   </div>
-                ) : null}
-              </div>
-            </Card>
+                  {selectedEnquiry.isConverted ? (
+                    <Badge tone="success">Converted</Badge>
+                  ) : null}
+                </div>
+
+                <div className="mt-6">
+                  <ConversationThread
+                    customerName={customer?.name ?? `Customer ${selectedEnquiry.customerId}`}
+                    enquiry={selectedEnquiry}
+                  />
+                </div>
+              </Card>
+
+              <ResponseForm
+                actionErrorMessage={actionErrorMessage}
+                enquiry={selectedEnquiry}
+                isActionError={isActionError}
+                isActionPending={isActionPending}
+                key={`${selectedEnquiry.id}-${selectedEnquiry.status}-${selectedEnquiry.response ?? ""}`}
+                onSubmit={handleSubmit}
+              />
+            </div>
 
             <aside className="flex flex-col gap-6">
-              <Card>
-                <h2 className="text-lg font-semibold">Workflow</h2>
-                <dl className="mt-5 grid gap-3 text-sm">
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-zinc-600">Created</dt>
-                    <dd className="font-medium text-zinc-950">
-                      {formatDate(selectedEnquiry.createdAt)}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-zinc-600">Follow-ups</dt>
-                    <dd className="font-medium text-zinc-950">
-                      {selectedEnquiry.followUpCount}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-zinc-600">Probability</dt>
-                    <dd className="font-medium text-zinc-950">
-                      {formatPercent(selectedEnquiry.conversionProbability)}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-zinc-600">Last follow-up</dt>
-                    <dd className="text-right font-medium text-zinc-950">
-                      {selectedEnquiry.lastFollowUpDate
-                        ? formatDate(selectedEnquiry.lastFollowUpDate)
-                        : "Not yet"}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-zinc-600">Sales ready</dt>
-                    <dd className="font-medium text-zinc-950">
-                      {selectedEnquiry.isSalesReady ? "Yes" : "No"}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-zinc-600">Converted</dt>
-                    <dd className="font-medium text-zinc-950">
-                      {selectedEnquiry.isConverted ? "Yes" : "No"}
-                    </dd>
-                  </div>
-                  {selectedEnquiry.convertedAt ? (
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-zinc-600">Converted at</dt>
-                      <dd className="text-right font-medium text-zinc-950">
-                        {formatDate(selectedEnquiry.convertedAt)}
-                      </dd>
-                    </div>
-                  ) : null}
-                </dl>
-
-                <div className="mt-6 flex flex-col gap-3">
-                  {!selectedEnquiry.isConverted ? (
-                    <Button
-                      disabled={isActionPending}
-                      onClick={handleConvert}
-                      type="button"
-                    >
-                      Mark converted in ABP
-                    </Button>
-                  ) : null}
-
-                  {selectedEnquiry.isConverted ? (
-                    matchingOrderIntent ? (
-                      <LinkButton href="/order-intents">
-                        View order intent
-                      </LinkButton>
-                    ) : (
-                      <Button
-                        disabled={isOrderIntentActionPending}
-                        onClick={handleCreateOrderIntent}
-                        type="button"
-                      >
-                        Create order intent
-                      </Button>
-                    )
-                  ) : null}
-
-                  {selectedEnquiry.isClosed ? (
-                    <Button
-                      disabled={isActionPending}
-                      onClick={handleReopen}
-                      type="button"
-                    >
-                      Reopen enquiry
-                    </Button>
-                  ) : (
-                    <Button
-                      disabled={isActionPending}
-                      className="bg-zinc-800 hover:bg-zinc-900"
-                      onClick={handleClose}
-                      type="button"
-                    >
-                      Close enquiry
-                    </Button>
-                  )}
-                </div>
-              </Card>
-
-              {!selectedEnquiry.isClosed ? (
-                <Card>
-                  <form
-                    className="flex flex-col gap-4"
-                    onSubmit={handleRecordFollowUp}
-                  >
-                    <SelectField
-                      label="Follow-up outcome"
-                      name="followUpOutcome"
-                      onChange={(event) =>
-                        setFollowUpOutcome(
-                          Number(event.target.value) as EnquiryFollowUpOutcome,
-                        )
-                      }
-                      value={followUpOutcome}
-                    >
-                      {followUpOutcomeOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </SelectField>
-                    <TextAreaField
-                      label="Follow-up notes"
-                      name="followUpNotes"
-                      onChange={(event) => setFollowUpNotes(event.target.value)}
-                      placeholder="Capture the customer conversation, next step, or decision"
-                      required
-                      rows={5}
-                      value={followUpNotes}
-                    />
-                    <Button
-                      disabled={
-                        isActionPending || followUpNotes.trim().length === 0
-                      }
-                      type="submit"
-                    >
-                      Record follow-up
-                    </Button>
-                  </form>
-                </Card>
-              ) : null}
-
-              {!selectedEnquiry.isClosed ? (
-                <Card>
-                  <form className="flex flex-col gap-4" onSubmit={handleRespond}>
-                    <TextAreaField
-                      label="Response"
-                      name="response"
-                      onChange={(event) => setResponse(event.target.value)}
-                      placeholder="Write the response sent to this customer"
-                      required
-                      rows={5}
-                      value={response}
-                    />
-                    <Button
-                      disabled={isActionPending || response.trim().length === 0}
-                      type="submit"
-                    >
-                      Save response
-                    </Button>
-                  </form>
-                </Card>
-              ) : null}
-
-              {isActionSuccess ? (
-                <StatusMessage tone="success">Enquiry updated.</StatusMessage>
-              ) : null}
-
-              {isActionError ? (
-                <StatusMessage tone="error">
-                  {actionErrorMessage ?? "Unable to update this enquiry."}
-                </StatusMessage>
-              ) : null}
-
-              {isOrderIntentActionSuccess ? (
-                <StatusMessage tone="success">
-                  Order intent created from this enquiry.
-                </StatusMessage>
-              ) : null}
-
-              {isOrderIntentActionError ? (
-                <StatusMessage tone="error">
-                  {orderIntentActionErrorMessage ??
-                    "Unable to create an order intent."}
-                </StatusMessage>
-              ) : null}
-            </aside>
-
-            <section className="lg:col-span-2">
-              <Card>
-                <div className="flex flex-col gap-2">
-                  <h2 className="text-lg font-semibold">Follow-up timeline</h2>
-                  <p className="text-sm leading-6 text-zinc-600">
-                    Track the conversion journey from interest to a sales-ready
-                    or resolved enquiry.
-                  </p>
-                </div>
-
-                {selectedEnquiry.followUps.length === 0 ? (
-                  <StatusMessage>No follow-ups recorded yet.</StatusMessage>
-                ) : (
-                  <ol className="mt-6 grid gap-4">
-                    {selectedEnquiry.followUps.map((followUp) => (
-                      <li
-                        className="rounded-lg border border-zinc-200 bg-zinc-50 p-4"
-                        key={followUp.id}
-                      >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div>
-                            <p className="font-medium text-zinc-950">
-                              {followUpOutcomeLabels[followUp.outcome] ??
-                                followUp.outcomeText}
-                            </p>
-                            <p className="mt-1 text-sm text-zinc-600">
-                              {formatDate(followUp.followUpDate)}
-                            </p>
-                          </div>
-                          <Badge tone={followUp.isResolved ? "neutral" : "success"}>
-                            {formatPercent(followUp.conversionProbability)}
-                          </Badge>
-                        </div>
-                        <p className="mt-4 whitespace-pre-line text-sm leading-6 text-zinc-700">
-                          {followUp.followUpNotes}
-                        </p>
-                      </li>
-                    ))}
-                  </ol>
+              <CustomerSidebar
+                customer={customer}
+                membershipName={getMembershipNameById(
+                  memberships,
+                  customer?.membershipId ?? null,
+                  "No membership",
                 )}
-              </Card>
-            </section>
-          </section>
+                productName={product?.name ?? `Product ${selectedEnquiry.productId}`}
+              />
+            </aside>
+          </div>
         ) : null}
       </div>
     </main>

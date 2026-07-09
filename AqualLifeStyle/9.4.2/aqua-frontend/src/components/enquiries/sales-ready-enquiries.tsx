@@ -1,5 +1,6 @@
 "use client";
 
+import { MessageSquare } from "lucide-react";
 import { useEffect } from "react";
 
 import {
@@ -10,7 +11,13 @@ import {
   useProductsActions,
   useProductsState,
 } from "@/src/providers";
-import { LinkButton, StatusMessage } from "@/src/shared/ui";
+import {
+  Breadcrumb,
+  EmptyState,
+  LinkButton,
+  Skeleton,
+  StatusMessage,
+} from "@/src/shared/ui";
 import { EnquiryCard } from "./enquiry-card";
 
 const getCustomerName = (
@@ -53,23 +60,29 @@ export const SalesReadyEnquiries = () => {
   }, [getCustomers, getProducts, getSalesReadyEnquiries]);
 
   return (
-    <main className="min-h-dvh bg-zinc-50 px-6 py-8 text-zinc-950 sm:px-8 lg:px-12">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
+    <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">
-              Aqua Lifestyle Club
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight">
+          <div>
+            <Breadcrumb
+              items={[
+                { href: "/", label: "Dashboard" },
+                { href: "/enquiries", label: "Enquiries" },
+                { label: "Sales ready" },
+              ]}
+            />
+            <h1 className="mt-2 text-3xl font-bold tracking-tight">
               Sales-ready enquiries
             </h1>
-            <p className="max-w-2xl text-base text-zinc-600">
+            <p className="mt-2 max-w-2xl text-base text-muted-foreground">
               Backend-qualified enquiries with enough follow-up engagement to
               justify focused sales action.
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <LinkButton href="/enquiries">All enquiries</LinkButton>
+            <LinkButton href="/enquiries" variant="outline">
+              All enquiries
+            </LinkButton>
             <LinkButton href="/enquiries/create" variant="primary">
               Create enquiry
             </LinkButton>
@@ -77,7 +90,7 @@ export const SalesReadyEnquiries = () => {
         </header>
 
         {isSalesReadyPending ? (
-          <StatusMessage>Loading sales-ready enquiries...</StatusMessage>
+          <Skeleton className="h-96" />
         ) : null}
 
         {isSalesReadyError ? (
@@ -90,16 +103,16 @@ export const SalesReadyEnquiries = () => {
         {!isSalesReadyPending &&
         !isSalesReadyError &&
         salesReadyEnquiries.length === 0 ? (
-          <StatusMessage>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <span>
-                No enquiries are sales-ready yet. Record follow-ups with
-                Interested or Considering outcomes after responding to an
-                enquiry.
-              </span>
-              <LinkButton href="/enquiries">Open pipeline</LinkButton>
-            </div>
-          </StatusMessage>
+          <EmptyState
+            action={
+              <LinkButton href="/enquiries" variant="primary">
+                Open pipeline
+              </LinkButton>
+            }
+            description="No enquiries are sales-ready yet. Record follow-ups after responding to an enquiry."
+            icon={MessageSquare}
+            title="No sales-ready enquiries"
+          />
         ) : null}
 
         {salesReadyEnquiries.length > 0 ? (
