@@ -15,11 +15,11 @@ import {
   checkHealthSuccess,
 } from "./actions";
 import {
-  type SystemHealth,
   SystemHealthActionsContext,
   SystemHealthStateContext,
   initialSystemHealthState,
 } from "./context";
+import { isSystemHealthContractError, parseSystemHealth } from "./contract";
 import { systemHealthReducer } from "./reducer";
 
 type SystemHealthProviderProps = {
@@ -29,6 +29,10 @@ type SystemHealthProviderProps = {
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof AbpHttpError) {
     return error.details ?? error.message;
+  }
+
+  if (isSystemHealthContractError(error)) {
+    return "Backend health response did not match the expected contract.";
   }
 
   if (error instanceof Error) {
@@ -50,7 +54,8 @@ export const SystemHealthProvider = ({
     dispatch(checkHealthPending());
 
     try {
-      const health = await httpClient.get<SystemHealth>(apiEndpoints.health.get);
+      const response = await httpClient.get<unknown>(apiEndpoints.health.get);
+      const health = parseSystemHealth(response);
       dispatch(checkHealthSuccess(health));
     } catch (error) {
       dispatch(checkHealthError(getErrorMessage(error)));

@@ -1,15 +1,6 @@
 import { createContext } from "react";
 
-export type SystemHealth = {
-  status: string;
-  isDatabaseReachable: boolean;
-  databaseStatus: string;
-  version: string;
-  releaseDate: string;
-  checkedAtUtc: string;
-  environment: string;
-  traceId: string;
-};
+import type { SystemHealth } from "./contract";
 
 export type SystemHealthState = {
   errorMessage: string | null;
@@ -36,3 +27,5 @@ export const SystemHealthStateContext =
 
 export const SystemHealthActionsContext =
   createContext<SystemHealthActions | null>(null);
+
+export type { SystemHealth } from "./contract";

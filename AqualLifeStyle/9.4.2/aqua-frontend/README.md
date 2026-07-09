@@ -78,6 +78,7 @@ Why this order:
 - Runtime environment variables are validated with Zod in `src/shared/config`.
 - Backend access goes through the shared Axios boundary in `src/shared/api`.
 - ABP response envelopes and error envelopes are normalized centrally.
+- Demo-critical API responses, starting with backend health, are validated at runtime before entering provider state.
 - Auth and tenant readiness providers register access-token and `__tenant` resolvers with the shared Axios boundary.
 - The app context bar keeps backend reachability, auth mode, and tenant mode explicit while host mode remains the safe default.
 - Feature state uses the agreed four-file provider structure:
