@@ -1,15 +1,19 @@
 import type { TextareaHTMLAttributes } from "react";
 
+import { cn } from "@/src/shared/lib/utils";
+
 type TextAreaFieldProps = Omit<
   TextareaHTMLAttributes<HTMLTextAreaElement>,
   "className"
 > & {
+  className?: string;
   errorMessage?: string;
   label: string;
   name: string;
 };
 
 export const TextAreaField = ({
+  className,
   errorMessage,
   id,
   label,
@@ -20,20 +24,28 @@ export const TextAreaField = ({
   const errorId = `${textareaId}-error`;
 
   return (
-    <div className="flex flex-col gap-2">
-      <label className="text-sm font-medium text-zinc-800" htmlFor={textareaId}>
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <label
+        className="text-sm font-medium text-foreground"
+        htmlFor={textareaId}
+      >
         {label}
       </label>
       <textarea
         aria-describedby={errorMessage ? errorId : undefined}
         aria-invalid={Boolean(errorMessage)}
-        className="resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base text-zinc-950 outline-none transition placeholder:text-zinc-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+        className={cn(
+          "resize-y rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition",
+          "placeholder:text-muted-foreground",
+          "focus:border-accent focus:ring-2 focus:ring-accent/20",
+          errorMessage && "border-error focus:border-error focus:ring-error/20",
+        )}
         id={textareaId}
         name={name}
         {...props}
       />
       {errorMessage ? (
-        <p className="text-sm text-red-700" id={errorId}>
+        <p className="text-sm text-error" id={errorId}>
           {errorMessage}
         </p>
       ) : null}

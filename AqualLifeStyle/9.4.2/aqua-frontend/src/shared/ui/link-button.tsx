@@ -1,35 +1,47 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 
-type LinkButtonVariant = "primary" | "secondary";
+import { cn } from "@/src/shared/lib/utils";
+
+type LinkButtonVariant = "primary" | "secondary" | "outline" | "ghost";
+type LinkButtonSize = "sm" | "md" | "lg";
 
 type LinkButtonProps = ComponentProps<typeof Link> & {
   children: ReactNode;
+  size?: LinkButtonSize;
   variant?: LinkButtonVariant;
 };
 
 const variantClassNames: Record<LinkButtonVariant, string> = {
+  ghost: "bg-transparent text-foreground hover:bg-muted",
+  outline:
+    "border border-border bg-card text-foreground hover:bg-muted hover:border-border/80",
   primary:
-    "bg-emerald-700 text-white hover:bg-emerald-800",
-  secondary:
-    "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100",
+    "bg-accent text-white hover:bg-accent-dark shadow-sm shadow-accent/20",
+  secondary: "bg-primary text-white hover:bg-primary-light",
+};
+
+const sizeClassNames: Record<LinkButtonSize, string> = {
+  sm: "h-8 px-3 text-xs",
+  md: "h-10 px-4 text-sm",
+  lg: "h-12 px-6 text-base",
 };
 
 export const LinkButton = ({
   children,
   className,
-  variant = "secondary",
+  size = "md",
+  variant = "outline",
   ...props
 }: LinkButtonProps) => {
   return (
     <Link
-      className={[
-        "rounded-lg px-4 py-2 text-center text-sm font-semibold transition",
+      className={cn(
+        "inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-all",
         variantClassNames[variant],
+        sizeClassNames[size],
         className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
+      )}
       {...props}
     >
       {children}

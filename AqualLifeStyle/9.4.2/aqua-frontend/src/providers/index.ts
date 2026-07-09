@@ -4,6 +4,8 @@ export type { AuthSession, AuthState, AuthUser } from "./Auth";
 export { TenantProvider, useTenantActions, useTenantState } from "./Tenant";
 export type { TenantState } from "./Tenant";
 
+export { ToastProvider, useToast } from "./Toast";
+
 export {
   CustomersProvider,
   useCustomersActions,

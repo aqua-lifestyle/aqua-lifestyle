@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { cn } from "@/src/shared/lib/utils";
+
 type CardProps = {
   children: ReactNode;
   className?: string;
@@ -8,12 +10,10 @@ type CardProps = {
 export const Card = ({ children, className }: CardProps) => {
   return (
     <article
-      className={[
-        "rounded-lg border border-zinc-200 bg-white p-5 shadow-sm",
+      className={cn(
+        "rounded-xl border border-border bg-card p-5 shadow-sm transition-all",
         className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
+      )}
     >
       {children}
     </article>
