@@ -49,8 +49,17 @@ Frontend (`aqua-frontend`, Next.js): pages exist for customers, enquiries, membe
 | Funeral plan auto-link (6-month waiting, R30,000 plan) | ❌ Missing | |
 | Therapy plan bookings (3-in-1 / 2-in-1 packages) | ❌ Missing | |
 | Training & events scheduling (weekly/monthly training calendar) | ❌ Missing | |
-| Enquiry lifecycle (respond/close/reopen, follow-ups, conversion) | ✅ Implemented | |
-| Multi-tenancy | ✅ Implemented | ABP built-in |
+| Enquiry→Customer conversion (was fake: only flipped `IsConverted`, never created Customer) | 🔧 In progress | **Fixed in Phase 4** — `ConvertToCustomerAsync` now assigns/activates the membership tier on the referenced Customer; raises `EnquiryConvertedEvent` |
+| Enquiry `ReferredByFacilitatorId` + referral attribution | 🔧 In progress | **Phase 4** — `ReferralAttributionService` creates direct (facilitator) + indirect (area leader) referrals on conversion |
+| Area Leader licensing, application (20+ interested, 42h review, 4 presentations, 20 startup orders) | 🔧 In progress | **Phase 3** — `AreaLeader` + `AreaSpace` aggregates with Fail-Fast approval guards |
+| Area Leader ranks (Ruby → Ambassador) with order targets | 🔧 In progress | **Phase 3** — `RankProgressionPolicy` over `AreaLeaderRankConfiguration` |
+| Area Space approval & lifecycle | 🔧 In progress | **Phase 3** — `AreaSpace` workflow (Applied→UnderReview→Approved/Suspended) |
+| Facilitator registration, ranking (Bronze → Premier T/60), referral awards | 🔧 In progress | **Phase 2** — `Facilitator` + `Referral` aggregates; `RankProgressionPolicy` over `FacilitatorRankConfiguration` |
+| Referral / commission tracking | 🔧 In progress | **Phase 2/4** — `Referral` aggregate + `CommissionCalculator` (seeded amounts, flagged V-03) |
+| Real Admin (JWT auth + RBAC on business services) | ❌ Missing → planned | **Phase 5** — `TokenAuth` login + `[AbpAuthorize]` + Admin role grants |
+| Admin network dashboard | ❌ Missing → planned | **Phase 6** — `GetNetworkOverviewAsync` read model |
+| Enquiry lifecycle (respond/close/reopen, follow-ups, conversion) | ✅ Implemented | base lifecycle; conversion semantics fixed in Phase 4 |
+| Multi-tenancy | ✅ Implemented | ABP built-in; new aggregates `IMustHaveTenant` (ADR-001) |
 
 ## 4. Document Status Matrix
 
@@ -68,11 +77,15 @@ Frontend (`aqua-frontend`, Next.js): pages exist for customers, enquiries, membe
 
 ## 5. Priority Recommendations
 
-1. **Savings domain (HIGH)** — wire `SavingsAccount` to persistence + app service; enforce deposit windows, minimums per tier, refund rule, interest accrual.
-2. **Order cycle enforcement (HIGH)** — apply opening/cut-off/delivery date rules and monthly-buying obligation to `OrderIntent`.
-3. **Combos & dual pricing (HIGH)** — model product combos with member/Jasper/retail price tiers.
-4. **Registration pipeline (MEDIUM)** — payment-verified registration with proof-of-payment upload and confirmation notifications.
-5. **Area Leader / Area Space / Facilitator contexts (MEDIUM)** — new aggregates for licensing, ranks, referrals, and incentives.
-6. **Investment projects & profit share (LOW/LATER)** — depends on savings + membership maturity.
+Implementation is sequenced by the Mission Plan (`docs/MissionPlan.md`):
 
-See `docs/BusinessDocs/future-roadmap.md` for the phased plan and `docs/Assumptions.md` for assumptions needing business validation.
+1. **Area Leader / Area Space / Facilitator / Referral contexts (IN PROGRESS, Phase 2–4)** — new `FullAuditedAggregateRoot` aggregates with ranks, referral attribution, and commission calculation; fixes the broken Enquiry→Customer conversion.
+2. **Real Admin — auth + RBAC (Phase 5, PAUSED for approval)** — wire `TokenAuth` login on the frontend, `[AbpAuthorize]` on business services, seed Admin grants. **Sequencing trap:** authorizing services instantly locks down currently-unauthenticated endpoints, so login + seed must land in the same batch.
+3. **Admin network dashboard (Phase 6)** — `GetNetworkOverviewAsync` read model + frontend widget.
+4. **Savings domain (DEFERRED)** — wire `SavingsAccount` to persistence + app service; enforce deposit windows, minimums per tier, refund rule, interest accrual.
+5. **Order cycle enforcement (DEFERRED)** — apply opening/cut-off/delivery date rules and monthly-buying obligation to `OrderIntent`.
+6. **Combos & dual pricing (DEFERRED)** — model product combos with member/Jasper/retail price tiers.
+7. **Registration pipeline (DEFERRED)** — payment-verified registration with proof-of-payment upload and confirmation notifications.
+8. **Investment projects & profit share (LOW/LATER)** — depends on savings + membership maturity.
+
+See `docs/BusinessDocs/future-roadmap.md` for the phased plan and `docs/Assumptions.md` for assumptions needing business validation. ADRs for the new work live in `docs/adr/`.
