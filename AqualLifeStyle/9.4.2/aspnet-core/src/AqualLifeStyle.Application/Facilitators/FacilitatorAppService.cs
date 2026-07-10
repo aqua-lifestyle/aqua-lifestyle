@@ -1,7 +1,9 @@
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
+using Abp.Domain.Uow;
 using Abp.UI;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Facilitators.Dto;
@@ -17,11 +19,16 @@ namespace AqualLifeStyle.Application.Facilitators
     {
         private readonly IFacilitatorRepository _facilitatorRepository;
         private readonly IAreaLeaderRepository _areaLeaderRepository;
+        private readonly IUnitOfWorkManager _unitOfWorkManager;
 
-        public FacilitatorAppService(IFacilitatorRepository facilitatorRepository, IAreaLeaderRepository areaLeaderRepository)
+        public FacilitatorAppService(
+            IFacilitatorRepository facilitatorRepository,
+            IAreaLeaderRepository areaLeaderRepository,
+            IUnitOfWorkManager unitOfWorkManager)
         {
             _facilitatorRepository = facilitatorRepository;
             _areaLeaderRepository = areaLeaderRepository;
+            _unitOfWorkManager = unitOfWorkManager;
         }
 
         [AbpAuthorize(PermissionNames.Pages_Facilitators_Manage)]
@@ -36,17 +43,32 @@ namespace AqualLifeStyle.Application.Facilitators
                 throw new UserFriendlyException("Facilitator registration failed.", "A tenant context is required.");
             }
 
-            var facilitator = Facilitator.Register(AbpSession.TenantId.Value, input.CustomerId, input.AreaLeaderId);
-            await _facilitatorRepository.InsertAndGetIdAsync(facilitator);
-
-            var leader = await _areaLeaderRepository.FirstOrDefaultAsync(l => l.Id == input.AreaLeaderId);
-            if (leader != null)
+            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
             {
-                leader.RecordFacilitator();
-                await _areaLeaderRepository.UpdateAsync(leader);
-            }
+                IsTransactional = true,
+                IsolationLevel = System.Transactions.IsolationLevel.Serializable
+            }))
+            {
+                var existing = await _facilitatorRepository.GetByCustomerIdAsync(input.CustomerId);
+                if (existing != null)
+                {
+                    throw new UserFriendlyException("Facilitator registration failed.", "A facilitator for this customer already exists.");
+                }
 
-            return MapToDto(facilitator);
+                var facilitator = Facilitator.Register(AbpSession.TenantId.Value, input.CustomerId, input.AreaLeaderId);
+                await _facilitatorRepository.InsertAndGetIdAsync(facilitator);
+
+                var leader = await _areaLeaderRepository.FirstOrDefaultAsync(l => l.Id == input.AreaLeaderId);
+                if (leader != null)
+                {
+                    leader.RecordFacilitator();
+                    await _areaLeaderRepository.UpdateAsync(leader);
+                }
+
+                await uow.CompleteAsync();
+
+                return MapToDto(facilitator);
+            }
         }
 
         public async Task<IReadOnlyList<FacilitatorDto>> GetAllAsync()
