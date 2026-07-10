@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
+using Abp.UI;
 using Microsoft.EntityFrameworkCore;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.AreaLeaders.Dto;
@@ -48,6 +49,46 @@ namespace AqualLifeStyle.Tests.Application
 
             var updatedLeader = await _areaLeaderAppService.GetAsync(leader.Id);
             updatedLeader.DirectReferrals.ShouldBe(1);
+        }
+
+        [Fact]
+        public async Task RegisterAsync_WhenMultipleFacilitatorsRegisterUnderSameLeader_IncrementsLeaderCountPerRegistration()
+        {
+            var leaderCustomerId = await CreateCustomerAsync("LeaderMulti");
+            var leader = await _areaLeaderAppService.ApplyAsync(
+                new RegisterAreaLeaderDto { CustomerId = leaderCustomerId, LicenseType = (int)LicenseType.EntreLevel });
+
+            var firstFacilitatorCustomerId = await CreateCustomerAsync("FacilitatorMultiOne");
+            var secondFacilitatorCustomerId = await CreateCustomerAsync("FacilitatorMultiTwo");
+
+            await _facilitatorAppService.RegisterAsync(
+                new RegisterFacilitatorDto { CustomerId = firstFacilitatorCustomerId, AreaLeaderId = leader.Id });
+            await _facilitatorAppService.RegisterAsync(
+                new RegisterFacilitatorDto { CustomerId = secondFacilitatorCustomerId, AreaLeaderId = leader.Id });
+
+            var updatedLeader = await _areaLeaderAppService.GetAsync(leader.Id);
+            updatedLeader.DirectReferrals.ShouldBe(2);
+
+            var facilitators = await _facilitatorAppService.GetAllAsync();
+            facilitators.Count(f => f.AreaLeaderId == leader.Id).ShouldBe(2);
+        }
+
+        [Fact]
+        public async Task RegisterAsync_ShouldThrow_WhenFacilitatorAlreadyExistsForCustomer()
+        {
+            var leaderCustomerId = await CreateCustomerAsync("LeaderDuplicate");
+            var leader = await _areaLeaderAppService.ApplyAsync(
+                new RegisterAreaLeaderDto { CustomerId = leaderCustomerId, LicenseType = (int)LicenseType.EntreLevel });
+
+            var facilitatorCustomerId = await CreateCustomerAsync("FacilitatorDuplicate");
+            await _facilitatorAppService.RegisterAsync(
+                new RegisterFacilitatorDto { CustomerId = facilitatorCustomerId, AreaLeaderId = leader.Id });
+
+            var ex = await Assert.ThrowsAsync<UserFriendlyException>(() => _facilitatorAppService.RegisterAsync(
+                new RegisterFacilitatorDto { CustomerId = facilitatorCustomerId, AreaLeaderId = leader.Id }));
+
+            ex.Message.ShouldBe("Facilitator registration failed.");
+            ex.Details.ShouldBe("A facilitator for this customer already exists.");
         }
 
         [Fact]
