@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Abp.Dependency;
 using Abp.Domain.Repositories;
@@ -51,24 +52,32 @@ namespace AqualLifeStyle.Application.Enquiries
                 return;
             }
 
+            var currentUow = _unitOfWorkManager.Current
+                ?? throw new InvalidOperationException(
+                    $"{nameof(EnquiryConvertedEventHandler)} must run inside an existing unit of work.");
+
             // The conversion may be handled outside the tenant's ambient session (e.g. a host-level
             // trigger), so scope the whole attribution to the tenant carried by the event. This makes
             // ABP's MayHaveTenant filter and the explicit TenantId predicates in the repositories agree.
-            using (var uow = _unitOfWorkManager.Begin())
+            using (currentUow.SetTenantId(evt.TenantId))
             {
-                using (_unitOfWorkManager.Current.SetTenantId(evt.TenantId))
-                {
-                    await AttributeReferralsAsync(evt);
-                    await LinkCustomerAsync(evt);
-                }
-
-                await uow.CompleteAsync();
+                await AttributeReferralsAsync(evt);
+                await LinkCustomerAsync(evt);
             }
         }
 
         private async Task AttributeReferralsAsync(EnquiryConvertedEvent evt)
         {
             if (!evt.ReferredByFacilitatorId.HasValue)
+            {
+                return;
+            }
+
+            // Referral attribution creates one direct and one indirect row per conversion, so any
+            // existing referral for the same source enquiry within the tenant means this event was
+            // already processed and must not be applied again.
+            var existingReferral = await _referralRepository.GetBySourceEnquiryAsync(evt.EnquiryId, evt.TenantId);
+            if (existingReferral != null)
             {
                 return;
             }

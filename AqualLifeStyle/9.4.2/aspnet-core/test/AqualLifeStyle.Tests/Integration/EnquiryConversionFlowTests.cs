@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
+using Abp.Domain.Uow;
 using Microsoft.EntityFrameworkCore;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.AreaLeaders.Dto;
@@ -84,6 +85,50 @@ namespace AqualLifeStyle.Tests.Integration
         }
 
         [Fact]
+        public async Task HandleEventAsync_WhenConversionEventIsRetried_DoesNotDuplicateReferrals()
+        {
+            var leaderCustomerId = await CreateCustomerAsync("RetryLeader");
+            var leader = await _areaLeaderAppService.ApplyAsync(
+                new RegisterAreaLeaderDto { CustomerId = leaderCustomerId, LicenseType = (int)LicenseType.EntreLevel });
+
+            var facilitatorCustomerId = await CreateCustomerAsync("RetryFacilitator");
+            var facilitator = await _facilitatorAppService.RegisterAsync(
+                new RegisterFacilitatorDto { CustomerId = facilitatorCustomerId, AreaLeaderId = leader.Id });
+
+            var prospectCustomerId = await CreateCustomerAsync("RetryProspect");
+            await _enquiryAppService.CreateAsync(new AqualLifeStyle.Application.Enquiries.Dto.CreateEnquiryDto
+            {
+                CustomerId = prospectCustomerId,
+                ProductId = 1,
+                Message = "Retry conversion event"
+            });
+
+            var enquiryId = await UsingDbContextAsync(async ctx =>
+                (await ctx.Enquiries.FirstAsync(e => e.CustomerId == prospectCustomerId)).Id);
+
+            await SetReferredByFacilitatorAsync(enquiryId, facilitator.Id);
+
+            await _enquiryAppService.ConvertToCustomerAsync(enquiryId, new AqualLifeStyle.Application.Enquiries.Dto.ConvertEnquiryToCustomerDto());
+
+            await HandleConvertedEventAsync(
+                new EnquiryConvertedEvent(enquiryId, prospectCustomerId, 1, facilitator.Id, System.DateTime.UtcNow, tenantId: 1));
+
+            await UsingDbContextAsync(async ctx =>
+            {
+                var referrals = ctx.Referrals.Where(r => r.SourceEnquiryId == enquiryId).ToList();
+                referrals.Count.ShouldBe(2);
+                referrals.Count(r => r.Type == ReferralType.Direct).ShouldBe(1);
+                referrals.Count(r => r.Type == ReferralType.Indirect).ShouldBe(1);
+
+                var updatedFacilitator = await ctx.Facilitators.FirstAsync(f => f.Id == facilitator.Id);
+                updatedFacilitator.DirectReferrals.ShouldBe(1);
+
+                var updatedLeader = await ctx.AreaLeaders.FirstAsync(a => a.Id == leader.Id);
+                updatedLeader.IndirectReferrals.ShouldBe(1);
+            });
+        }
+
+        [Fact]
         public async Task ConvertEnquiry_AssignsLowestIdActiveMembership_WithoutOverwritingExistingAssignment()
         {
             var firstMembershipId = await CreateMembershipAsync("FlowJasper");
@@ -102,7 +147,7 @@ namespace AqualLifeStyle.Tests.Integration
                 (await ctx.Enquiries.FirstAsync(e => e.CustomerId == customerId)).Id);
 
             await _enquiryAppService.ConvertToCustomerAsync(enquiryId, new AqualLifeStyle.Application.Enquiries.Dto.ConvertEnquiryToCustomerDto());
-            await Resolve<AqualLifeStyle.Application.Enquiries.EnquiryConvertedEventHandler>().HandleEventAsync(
+            await HandleConvertedEventAsync(
                 new EnquiryConvertedEvent(enquiryId, customerId, 1, null, System.DateTime.UtcNow, tenantId: 1));
 
             await UsingDbContextAsync(async ctx =>
@@ -123,7 +168,7 @@ namespace AqualLifeStyle.Tests.Integration
 
             using (UsingTenantId(null))
             {
-                await Resolve<AqualLifeStyle.Application.Enquiries.EnquiryConvertedEventHandler>().HandleEventAsync(
+                await HandleConvertedEventAsync(
                     new EnquiryConvertedEvent(101, tenantOneCustomerId, 1, null, System.DateTime.UtcNow, tenantId: 1));
             }
 
@@ -132,6 +177,17 @@ namespace AqualLifeStyle.Tests.Integration
                 var customer = await ctx.Customers.FirstAsync(c => c.Id == tenantOneCustomerId);
                 customer.MembershipId.ShouldBe(tenantOneMembershipId);
             });
+        }
+
+        private async Task HandleConvertedEventAsync(EnquiryConvertedEvent evt)
+        {
+            // The handler scopes its work to evt.TenantId via the ambient unit of work, so simulate
+            // the production path (where the event fires inside ConvertToCustomerAsync's UoW).
+            using (var uow = Resolve<IUnitOfWorkManager>().Begin())
+            {
+                await Resolve<AqualLifeStyle.Application.Enquiries.EnquiryConvertedEventHandler>().HandleEventAsync(evt);
+                await uow.CompleteAsync();
+            }
         }
 
         private async Task SetReferredByFacilitatorAsync(int enquiryId, int facilitatorId)

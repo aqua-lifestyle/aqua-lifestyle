@@ -16,6 +16,9 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
         public Task<Referral> GetBySourceEnquiryAsync(int enquiryId)
             => GetAll().FirstOrDefaultAsync(r => r.SourceEnquiryId == enquiryId);
 
+        public Task<Referral> GetBySourceEnquiryAsync(int enquiryId, int? tenantId)
+            => GetAll().FirstOrDefaultAsync(r => r.SourceEnquiryId == enquiryId && r.TenantId == tenantId);
+
         public Task<int> CountDirectByFacilitatorAsync(int facilitatorId)
             => GetAll().CountAsync(r => r.ReferrerFacilitatorId == facilitatorId);
 
