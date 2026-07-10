@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
 using Abp.UI;
+using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Referrals.Dto;
 using AqualLifeStyle.Application.Validation;
 using AqualLifeStyle.Authorization;
@@ -39,7 +40,13 @@ namespace AqualLifeStyle.Application.Referrals
         public async Task<ReferralDto> ConfirmAwardAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
-            var referral = await _referralRepository.GetAsync(id);
+            var tenantId = GetRequiredTenantId("Referral lookup failed.");
+            var referral = await _referralRepository.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenantId);
+            if (referral == null)
+            {
+                throw new AqualLifeStyleNotFoundException("Referral", id);
+            }
+
             referral.ConfirmAward();
             await _referralRepository.UpdateAsync(referral);
             return MapToDto(referral);

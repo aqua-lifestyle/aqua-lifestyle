@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Referrals;
 using AqualLifeStyle.Domain.Facilitators;
 using AqualLifeStyle.EntityFrameworkCore;
@@ -48,6 +49,33 @@ namespace AqualLifeStyle.Tests.Application
                 var fromDb = await ctx.Referrals.FirstAsync(r => r.Id == referralId);
                 fromDb.AwardIssued.ShouldBeTrue();
             });
+        }
+
+        [Fact]
+        public async Task ConfirmAwardAsync_ThrowsNotFound_WhenReferralBelongsToDifferentTenant()
+        {
+            var tenantTwoReferralId = await CreateReferralAsync(tenantId: 2, sourceEnquiryId: 3003);
+
+            using (UsingTenantId(1))
+            {
+                await Assert.ThrowsAsync<AqualLifeStyleNotFoundException>(() => _referralAppService.ConfirmAwardAsync(tenantTwoReferralId));
+            }
+
+            await UsingDbContextAsync(2, async ctx =>
+            {
+                var fromDb = await ctx.Referrals.FirstAsync(r => r.Id == tenantTwoReferralId);
+                fromDb.AwardIssued.ShouldBeFalse();
+                fromDb.ConfirmedAt.ShouldBeNull();
+            });
+        }
+
+        [Fact]
+        public async Task ConfirmAwardAsync_ThrowsNotFound_WhenReferralDoesNotExist()
+        {
+            using (UsingTenantId(1))
+            {
+                await Assert.ThrowsAsync<AqualLifeStyleNotFoundException>(() => _referralAppService.ConfirmAwardAsync(int.MaxValue));
+            }
         }
 
         [Fact]
