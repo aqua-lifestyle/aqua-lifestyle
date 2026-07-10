@@ -44,8 +44,7 @@ namespace AqualLifeStyle.Domain.AreaNetwork
             decimal facilitatorAward = 0m;
             foreach (var config in FacilitatorRankTable.All.OrderBy(c => c.DirectReferralThreshold))
             {
-                // A single referral raises DirectReferrals by exactly one, so at most one rank
-                // threshold can be crossed; award it and stop.
+                // Issue the award for each rank threshold crossed by this single referral.
                 if (config.DirectReferralThreshold > previousDirect && config.DirectReferralThreshold <= currentDirect)
                 {
                     var award = _commissionCalculator.ComputeFacilitatorAward(config.Rank).Amount;
