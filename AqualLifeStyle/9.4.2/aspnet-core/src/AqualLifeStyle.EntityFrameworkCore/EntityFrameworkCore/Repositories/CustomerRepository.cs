@@ -39,26 +39,10 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
 
         public async Task<bool> AssignMembershipIfUnassignedAsync(int customerId, int? tenantId, int membershipId)
         {
-            var query = GetAll()
-                .Where(c => c.Id == customerId && c.TenantId == tenantId && !c.MembershipId.HasValue);
-
-            // Relational providers (PostgreSQL in production) execute a single atomic,
-            // concurrency-safe set-based UPDATE. The EF Core InMemory provider used by tests
-            // cannot translate ExecuteUpdate, so fall back to an equivalent tracked update there.
-            if (GetDbContext().Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
-            {
-                var customer = await query.FirstOrDefaultAsync();
-                if (customer == null)
-                {
-                    return false;
-                }
-
-                customer.ChangeMembership(membershipId);
-                await UpdateAsync(customer);
-                return true;
-            }
-
-            var rowsAffected = await query
+            // Single atomic, concurrency-safe set-based UPDATE. Only assigns when the customer is
+            // still unassigned, so concurrent conversions can never overwrite an existing membership.
+            var rowsAffected = await GetAll()
+                .Where(c => c.Id == customerId && c.TenantId == tenantId && !c.MembershipId.HasValue)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(c => c.MembershipId, membershipId));
 
             return rowsAffected == 1;
