@@ -41,7 +41,7 @@ namespace AqualLifeStyle.Tests
         public async Task RespondAsync_WithValidResponse_UpdatesEnquiryStatus()
         {
             // Arrange
-            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question about product");
+            var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question about product");
             SetupEnquiry(enquiry);
 
             // Act
@@ -57,7 +57,7 @@ namespace AqualLifeStyle.Tests
         public async Task CloseAsync_WithPendingEnquiry_ClosesSuccessfully()
         {
             // Arrange
-            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
+            var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
             SetupEnquiry(enquiry);
 
             // Act
@@ -72,7 +72,7 @@ namespace AqualLifeStyle.Tests
         public async Task ReopenAsync_WithClosedEnquiry_ReopensSuccessfully()
         {
             // Arrange
-            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
+            var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
             enquiry.Close();
             SetupEnquiry(enquiry);
 
@@ -89,7 +89,7 @@ namespace AqualLifeStyle.Tests
         public async Task AssignToMemberAsync_WithValidMemberId_AssignsSuccessfully()
         {
             // Arrange
-            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
+            var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
             SetupEnquiry(enquiry);
 
             // Act
@@ -105,7 +105,7 @@ namespace AqualLifeStyle.Tests
         public async Task AssignToMemberAsync_WithInvalidMemberId_Throws()
         {
             // Arrange
-            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
+            var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
             SetupEnquiry(enquiry);
 
             // Act & Assert
@@ -117,7 +117,7 @@ namespace AqualLifeStyle.Tests
         public async Task ConvertToCustomerAsync_WithPendingEnquiry_ConvertsSuccessfully()
         {
             // Arrange
-            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
+            var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
             SetupEnquiry(enquiry);
 
             // Act
@@ -134,7 +134,7 @@ namespace AqualLifeStyle.Tests
         public async Task ConvertToCustomerAsync_WithAlreadyConvertedEnquiry_Throws()
         {
             // Arrange
-            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
+            var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
             enquiry.ConvertToCustomer(null);
             SetupEnquiry(enquiry);
 
@@ -147,7 +147,7 @@ namespace AqualLifeStyle.Tests
         public async Task ClearAssignmentAsync_WithAssignedEnquiry_ClearsSuccessfully()
         {
             // Arrange
-            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
+            var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
             enquiry.AssignToMember(10);
             SetupEnquiry(enquiry);
 
@@ -163,7 +163,7 @@ namespace AqualLifeStyle.Tests
         public async Task ClearAssignmentAsync_WithConvertedEnquiry_Throws()
         {
             // Arrange
-            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
+            var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
             enquiry.AssignToMember(10);
             enquiry.ConvertToCustomer(null);
             SetupEnquiry(enquiry);
@@ -177,7 +177,7 @@ namespace AqualLifeStyle.Tests
         public async Task AssignToMemberAsync_AfterConversion_Throws()
         {
             // Arrange
-            var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
+            var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
             enquiry.ConvertToCustomer(null);
             SetupEnquiry(enquiry);
 

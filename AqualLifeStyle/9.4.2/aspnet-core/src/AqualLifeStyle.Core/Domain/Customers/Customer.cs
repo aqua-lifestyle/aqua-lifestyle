@@ -28,9 +28,6 @@ namespace AqualLifeStyle.Domain.Customers
             return new Customer(tenantId, name, email, membershipId, true);
         }
 
-        public static Customer Create(string name, EmailAddress email, int? membershipId = null)
-            => Create(1, name, email, membershipId);
-
         public void ChangeMembership(int? newMembershipId)
         {
             if (newMembershipId.HasValue && newMembershipId.Value <= 0)

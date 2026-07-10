@@ -34,9 +34,6 @@ namespace AqualLifeStyle.Domain.Memberships
             return new Membership(tenantId, name, description, membershipType, true);
         }
 
-        public static Membership Create(string name, string description, MembershipType membershipType = MembershipType.Jasper)
-            => Create(1, name, description, membershipType);
-
         public void Rename(string name)
         {
             SetName(name);

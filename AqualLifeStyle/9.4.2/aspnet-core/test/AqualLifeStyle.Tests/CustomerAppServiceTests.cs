@@ -15,8 +15,8 @@ namespace AqualLifeStyle.Tests
         [Fact]
         public async Task UpdateAsync_ChangesNameEmailMembershipAndStatus()
         {
-            var customer = Customer.Create("Old Name", new EmailAddress("old@example.com"), 1);
-            var membership = Membership.Create("Onyx", "Onyx membership", MembershipType.Onyx);
+            var customer = Customer.Create(1, "Old Name", new EmailAddress("old@example.com"), 1);
+            var membership = Membership.Create(1, "Onyx", "Onyx membership", MembershipType.Onyx);
 
             var customerRepo = new Mock<ICustomerRepository>();
             customerRepo.Setup(r => r.GetAsync(10)).ReturnsAsync(customer);

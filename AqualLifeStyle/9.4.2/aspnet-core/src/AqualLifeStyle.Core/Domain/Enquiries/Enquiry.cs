@@ -46,9 +46,6 @@ namespace AqualLifeStyle.Domain.Enquiries
         public static Enquiry Create(int? tenantId, int customerId, int productId, string message)
             => new Enquiry(tenantId, customerId, productId, message);
 
-        public static Enquiry Create(int customerId, int productId, string message)
-            => Create(1, customerId, productId, message);
-
         public void Respond(string response)
         {
             if (Status != EnquiryStatus.Pending) throw new InvalidOperationException("Only pending enquiries can be responded to.");
