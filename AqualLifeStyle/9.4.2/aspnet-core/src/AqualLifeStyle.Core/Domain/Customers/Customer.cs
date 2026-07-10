@@ -4,8 +4,9 @@ using AqualLifeStyle.Domain.Common;
 
 namespace AqualLifeStyle.Domain.Customers
 {
-    public class Customer : Entity<int>
+    public class Customer : Entity<int>, IMayHaveTenant
     {
+        public int? TenantId { get; set; }
         public string Name { get; private set; }
         public EmailAddress Email { get; private set; }
         public int? MembershipId { get; private set; }
@@ -13,18 +14,22 @@ namespace AqualLifeStyle.Domain.Customers
 
         protected Customer() { }
 
-        private Customer(string name, EmailAddress email, int? membershipId = null, bool isActive = true)
+        private Customer(int? tenantId, string name, EmailAddress email, int? membershipId = null, bool isActive = true)
         {
+            TenantId = tenantId;
             SetName(name);
             Email = email ?? throw new ArgumentNullException(nameof(email));
             MembershipId = membershipId;
             IsActive = isActive;
         }
 
-        public static Customer Create(string name, EmailAddress email, int? membershipId = null)
+        public static Customer Create(int? tenantId, string name, EmailAddress email, int? membershipId = null)
         {
-            return new Customer(name, email, membershipId, true);
+            return new Customer(tenantId, name, email, membershipId, true);
         }
+
+        public static Customer Create(string name, EmailAddress email, int? membershipId = null)
+            => Create(1, name, email, membershipId);
 
         public void ChangeMembership(int? newMembershipId)
         {

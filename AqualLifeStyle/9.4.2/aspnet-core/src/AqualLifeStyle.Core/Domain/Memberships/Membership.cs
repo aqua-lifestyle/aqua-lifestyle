@@ -4,8 +4,9 @@ using AqualLifeStyle.Domain.Enums;
 
 namespace AqualLifeStyle.Domain.Memberships
 {
-    public class Membership : Entity<int>
+    public class Membership : Entity<int>, IMayHaveTenant
     {
+        public int? TenantId { get; set; }
         public string Name { get; private set; }
         public string Description { get; private set; }
         public bool IsActive { get; private set; }
@@ -18,8 +19,9 @@ namespace AqualLifeStyle.Domain.Memberships
         {
         }
 
-        private Membership(string name, string description, MembershipType membershipType, bool isActive = true)
+        private Membership(int? tenantId, string name, string description, MembershipType membershipType, bool isActive = true)
         {
+            TenantId = tenantId;
             SetName(name);
             Description = description?.Trim();
             MembershipType = membershipType;
@@ -27,10 +29,13 @@ namespace AqualLifeStyle.Domain.Memberships
             MonthlyObligationAmount = GetDefaultMonthlyObligation(membershipType);
         }
 
-        public static Membership Create(string name, string description, MembershipType membershipType = MembershipType.Jasper)
+        public static Membership Create(int? tenantId, string name, string description, MembershipType membershipType = MembershipType.Jasper)
         {
-            return new Membership(name, description, membershipType, true);
+            return new Membership(tenantId, name, description, membershipType, true);
         }
+
+        public static Membership Create(string name, string description, MembershipType membershipType = MembershipType.Jasper)
+            => Create(1, name, description, membershipType);
 
         public void Rename(string name)
         {

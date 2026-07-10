@@ -6,8 +6,9 @@ using AqualLifeStyle.Domain.Enums;
 
 namespace AqualLifeStyle.Domain.Enquiries
 {
-    public class Enquiry : Entity<int>
+    public class Enquiry : Entity<int>, IMayHaveTenant
     {
+        public int? TenantId { get; set; }
         public int CustomerId { get; private set; }
         public int ProductId { get; private set; }
         public string Message { get; private set; }
@@ -28,9 +29,10 @@ namespace AqualLifeStyle.Domain.Enquiries
 
         protected Enquiry() { }
 
-        private Enquiry(int customerId, int productId, string message)
+        private Enquiry(int? tenantId, int customerId, int productId, string message)
         {
             if (string.IsNullOrWhiteSpace(message)) throw new ArgumentException("Message is required.", nameof(message));
+            TenantId = tenantId;
             CustomerId = customerId;
             ProductId = productId;
             Message = message.Trim();
@@ -41,8 +43,11 @@ namespace AqualLifeStyle.Domain.Enquiries
             ConversionProbability = 0m;
         }
 
+        public static Enquiry Create(int? tenantId, int customerId, int productId, string message)
+            => new Enquiry(tenantId, customerId, productId, message);
+
         public static Enquiry Create(int customerId, int productId, string message)
-            => new Enquiry(customerId, productId, message);
+            => Create(1, customerId, productId, message);
 
         public void Respond(string response)
         {

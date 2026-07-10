@@ -12,14 +12,16 @@ namespace AqualLifeStyle.Domain.Enquiries
     [Serializable]
     public class EnquiryConvertedEvent : EventData
     {
+        public int? TenantId { get; }
         public int EnquiryId { get; }
         public int CustomerId { get; }
         public int ProductId { get; }
         public int? ReferredByFacilitatorId { get; }
         public DateTime ConvertedAt { get; }
 
-        public EnquiryConvertedEvent(int enquiryId, int customerId, int productId, int? referredByFacilitatorId, DateTime convertedAt)
+        public EnquiryConvertedEvent(int enquiryId, int customerId, int productId, int? referredByFacilitatorId, DateTime convertedAt, int? tenantId = null)
         {
+            TenantId = tenantId;
             EnquiryId = enquiryId;
             CustomerId = customerId;
             ProductId = productId;
