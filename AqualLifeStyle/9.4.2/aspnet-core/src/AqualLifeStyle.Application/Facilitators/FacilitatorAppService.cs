@@ -55,15 +55,13 @@ namespace AqualLifeStyle.Application.Facilitators
                     throw new UserFriendlyException("Facilitator registration failed.", "A facilitator for this customer already exists.");
                 }
 
+                var leader = await GetAreaLeaderForCurrentTenantAsync(input.AreaLeaderId);
+
                 var facilitator = Facilitator.Register(AbpSession.TenantId.Value, input.CustomerId, input.AreaLeaderId);
                 await _facilitatorRepository.InsertAndGetIdAsync(facilitator);
 
-                var leader = await _areaLeaderRepository.FirstOrDefaultAsync(l => l.Id == input.AreaLeaderId);
-                if (leader != null)
-                {
-                    leader.RecordFacilitator();
-                    await _areaLeaderRepository.UpdateAsync(leader);
-                }
+                leader.RecordFacilitator();
+                await _areaLeaderRepository.UpdateAsync(leader);
 
                 await uow.CompleteAsync();
 
@@ -118,6 +116,18 @@ namespace AqualLifeStyle.Application.Facilitators
         {
             var tenantId = GetRequiredTenantId("Facilitator lookup failed.");
             return await _facilitatorRepository.FirstOrDefaultAsync(f => f.CustomerId == customerId && f.TenantId == tenantId);
+        }
+
+        private async Task<AreaLeader> GetAreaLeaderForCurrentTenantAsync(int id)
+        {
+            var tenantId = GetRequiredTenantId("Area leader lookup failed.");
+            var leader = await _areaLeaderRepository.FirstOrDefaultAsync(l => l.Id == id && l.TenantId == tenantId);
+            if (leader == null)
+            {
+                throw new AqualLifeStyleNotFoundException("AreaLeader", id);
+            }
+
+            return leader;
         }
 
         private static FacilitatorDto MapToDto(Facilitator facilitator)

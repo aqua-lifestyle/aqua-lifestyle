@@ -51,9 +51,9 @@ namespace AqualLifeStyle.Tests.Integration
         [Fact]
         public async Task ConvertEnquiry_SourcedByFacilitator_AttributesReferralsAndUpdatesNetwork()
         {
-            var leaderCustomerId = await CreateCustomerAsync("FlowLeader");
+            var customerToLeaderId = await CreateCustomerAsync("FlowLeader");
             var leader = await _areaLeaderAppService.ApplyAsync(
-                new RegisterAreaLeaderDto { CustomerId = leaderCustomerId, LicenseType = (int)LicenseType.EntreLevel });
+                new RegisterAreaLeaderDto { CustomerId = customerToLeaderId, LicenseType = (int)LicenseType.EntreLevel });
 
             var facilitatorCustomerId = await CreateCustomerAsync("FlowFacilitator");
             var facilitator = await _facilitatorAppService.RegisterAsync(
@@ -93,9 +93,9 @@ namespace AqualLifeStyle.Tests.Integration
         [Fact]
         public async Task HandleEventAsync_WhenConversionEventIsRetried_DoesNotDuplicateReferrals()
         {
-            var leaderCustomerId = await CreateCustomerAsync("RetryLeader");
+            var customerToLeaderId = await CreateCustomerAsync("RetryLeader");
             var leader = await _areaLeaderAppService.ApplyAsync(
-                new RegisterAreaLeaderDto { CustomerId = leaderCustomerId, LicenseType = (int)LicenseType.EntreLevel });
+                new RegisterAreaLeaderDto { CustomerId = customerToLeaderId, LicenseType = (int)LicenseType.EntreLevel });
 
             var facilitatorCustomerId = await CreateCustomerAsync("RetryFacilitator");
             var facilitator = await _facilitatorAppService.RegisterAsync(
@@ -284,9 +284,9 @@ namespace AqualLifeStyle.Tests.Integration
 
         private async Task<(int areaLeaderId, int facilitatorId, int prospectCustomerId, int enquiryId)> CreateOrphanedReferralScenarioAsync(string namePrefix)
         {
-            var leaderCustomerId = await CreateCustomerAsync($"{namePrefix}Leader");
+            var customerToLeaderId = await CreateCustomerAsync($"{namePrefix}Leader");
             var leader = await _areaLeaderAppService.ApplyAsync(
-                new RegisterAreaLeaderDto { CustomerId = leaderCustomerId, LicenseType = (int)LicenseType.EntreLevel });
+                new RegisterAreaLeaderDto { CustomerId = customerToLeaderId, LicenseType = (int)LicenseType.EntreLevel });
 
             var facilitatorCustomerId = await CreateCustomerAsync($"{namePrefix}Facilitator");
             var facilitator = await _facilitatorAppService.RegisterAsync(

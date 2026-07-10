@@ -37,9 +37,9 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task RegisterAsync_CreatesFacilitatorUnderLeader_AndIncrementsLeaderCount()
         {
-            var leaderCustomerId = await CreateCustomerAsync("Leader");
+            var customerToLeaderId = await CreateCustomerAsync("Leader");
             var leader = await _areaLeaderAppService.ApplyAsync(
-                new RegisterAreaLeaderDto { CustomerId = leaderCustomerId, LicenseType = (int)LicenseType.EntreLevel });
+                new RegisterAreaLeaderDto { CustomerId = customerToLeaderId, LicenseType = (int)LicenseType.EntreLevel });
 
             var facilitatorCustomerId = await CreateCustomerAsync("Facilitator");
             var facilitator = await _facilitatorAppService.RegisterAsync(
@@ -56,9 +56,9 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task RegisterAsync_WhenMultipleFacilitatorsRegisterUnderSameLeader_IncrementsLeaderCountPerRegistration()
         {
-            var leaderCustomerId = await CreateCustomerAsync("LeaderMulti");
+            var customerToLeaderId = await CreateCustomerAsync("LeaderMulti");
             var leader = await _areaLeaderAppService.ApplyAsync(
-                new RegisterAreaLeaderDto { CustomerId = leaderCustomerId, LicenseType = (int)LicenseType.EntreLevel });
+                new RegisterAreaLeaderDto { CustomerId = customerToLeaderId, LicenseType = (int)LicenseType.EntreLevel });
 
             var firstFacilitatorCustomerId = await CreateCustomerAsync("FacilitatorMultiOne");
             var secondFacilitatorCustomerId = await CreateCustomerAsync("FacilitatorMultiTwo");
@@ -76,11 +76,30 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task RegisterAsync_ShouldThrowNotFound_WhenAreaLeaderBelongsToDifferentTenant()
+        {
+            var tenantTwoLeader = await CreateAreaLeaderAsync("TenantTwoLeaderForRegister", tenantId: 2);
+            var facilitatorCustomerId = await CreateCustomerAsync("FacilitatorCrossTenant");
+
+            var ex = await Assert.ThrowsAsync<AqualLifeStyleNotFoundException>(() => _facilitatorAppService.RegisterAsync(
+                new RegisterFacilitatorDto { CustomerId = facilitatorCustomerId, AreaLeaderId = tenantTwoLeader.Id }));
+
+            ex.Message.ShouldContain("AreaLeader");
+
+            var facilitator = await _facilitatorAppService.GetByCustomerAsync(facilitatorCustomerId);
+            facilitator.ShouldBeNull();
+
+            var tenantTwoLeaderAfter = await UsingDbContextAsync(2, async ctx =>
+                await ctx.AreaLeaders.AsNoTracking().FirstAsync(a => a.Id == tenantTwoLeader.Id));
+            tenantTwoLeaderAfter.DirectReferrals.ShouldBe(0);
+        }
+
+        [Fact]
         public async Task RegisterAsync_ShouldThrow_WhenFacilitatorAlreadyExistsForCustomer()
         {
-            var leaderCustomerId = await CreateCustomerAsync("LeaderDuplicate");
+            var customerToLeaderId = await CreateCustomerAsync("LeaderDuplicate");
             var leader = await _areaLeaderAppService.ApplyAsync(
-                new RegisterAreaLeaderDto { CustomerId = leaderCustomerId, LicenseType = (int)LicenseType.EntreLevel });
+                new RegisterAreaLeaderDto { CustomerId = customerToLeaderId, LicenseType = (int)LicenseType.EntreLevel });
 
             var facilitatorCustomerId = await CreateCustomerAsync("FacilitatorDuplicate");
             await _facilitatorAppService.RegisterAsync(
@@ -96,9 +115,9 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task GetByCustomerAsync_ReturnsRegisteredFacilitator()
         {
-            var leaderCustomerId = await CreateCustomerAsync("Leader2");
+            var customerToLeaderId = await CreateCustomerAsync("Leader2");
             var leader = await _areaLeaderAppService.ApplyAsync(
-                new RegisterAreaLeaderDto { CustomerId = leaderCustomerId, LicenseType = (int)LicenseType.EntreLevel });
+                new RegisterAreaLeaderDto { CustomerId = customerToLeaderId, LicenseType = (int)LicenseType.EntreLevel });
 
             var facilitatorCustomerId = await CreateCustomerAsync("Facilitator2");
             var facilitator = await _facilitatorAppService.RegisterAsync(
@@ -173,17 +192,27 @@ namespace AqualLifeStyle.Tests.Application
             });
         }
 
+        private async Task<AreaLeader> CreateAreaLeaderAsync(string leaderName, int tenantId)
+        {
+            return await UsingDbContextAsync(tenantId, async ctx =>
+            {
+                var customerToLeader = Customer.Create(tenantId, leaderName, new EmailAddress($"{leaderName.ToLower()}@example.com"));
+                ctx.Customers.Add(customerToLeader);
+                await ctx.SaveChangesAsync();
+
+                var leader = AreaLeader.Apply(tenantId, customerToLeader.Id, LicenseType.EntreLevel);
+                ctx.AreaLeaders.Add(leader);
+                await ctx.SaveChangesAsync();
+
+                return leader;
+            });
+        }
+
         private async Task<Facilitator> CreateFacilitatorAsync(string leaderName, string facilitatorName, int tenantId)
         {
             return await UsingDbContextAsync(tenantId, async ctx =>
             {
-                var leaderCustomer = Customer.Create(tenantId, leaderName, new EmailAddress($"{leaderName.ToLower()}@example.com"));
-                ctx.Customers.Add(leaderCustomer);
-                await ctx.SaveChangesAsync();
-
-                var leader = AreaLeader.Apply(tenantId, leaderCustomer.Id, LicenseType.EntreLevel);
-                ctx.AreaLeaders.Add(leader);
-                await ctx.SaveChangesAsync();
+                var leader = await CreateAreaLeaderAsync(leaderName, tenantId);
 
                 var facilitatorCustomer = Customer.Create(tenantId, facilitatorName, new EmailAddress($"{facilitatorName.ToLower()}@example.com"));
                 ctx.Customers.Add(facilitatorCustomer);
