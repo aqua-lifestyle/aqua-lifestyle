@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Abp.Authorization;
 using Abp.UI;
 using AqualLifeStyle.Application.AreaLeaders.Dto;
+using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Validation;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.AreaLeaders;
@@ -45,14 +46,15 @@ namespace AqualLifeStyle.Application.AreaLeaders
 
         public async Task<IReadOnlyList<AreaLeaderDto>> GetAllAsync()
         {
-            var leaders = await _areaLeaderRepository.GetAllListAsync();
+            var tenantId = GetRequiredTenantId("Area leader lookup failed.");
+            var leaders = await _areaLeaderRepository.GetAllListAsync(l => l.TenantId == tenantId);
             return leaders.Select(MapToDto).ToList();
         }
 
         public async Task<AreaLeaderDto> GetAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
-            var leader = await _areaLeaderRepository.GetAsync(id);
+            var leader = await GetLeaderForCurrentTenantAsync(id);
             return MapToDto(leader);
         }
 
@@ -60,7 +62,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
         public async Task<AreaLeaderDto> RecordStartupOrderAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
-            var leader = await _areaLeaderRepository.GetAsync(id);
+            var leader = await GetLeaderForCurrentTenantAsync(id);
             leader.RecordStartupOrder();
             await _areaLeaderRepository.UpdateAsync(leader);
             return MapToDto(leader);
@@ -70,10 +72,32 @@ namespace AqualLifeStyle.Application.AreaLeaders
         public async Task<AreaLeaderDto> PromoteAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
-            var leader = await _areaLeaderRepository.GetAsync(id);
+            var leader = await GetLeaderForCurrentTenantAsync(id);
             leader.PromoteToCurrentRank(new RankProgressionPolicy());
             await _areaLeaderRepository.UpdateAsync(leader);
             return MapToDto(leader);
+        }
+
+        private int GetRequiredTenantId(string operation)
+        {
+            if (!AbpSession.TenantId.HasValue)
+            {
+                throw new UserFriendlyException(operation, "A tenant context is required.");
+            }
+
+            return AbpSession.TenantId.Value;
+        }
+
+        private async Task<AreaLeader> GetLeaderForCurrentTenantAsync(int id)
+        {
+            var tenantId = GetRequiredTenantId("Area leader lookup failed.");
+            var leader = await _areaLeaderRepository.FirstOrDefaultAsync(l => l.Id == id && l.TenantId == tenantId);
+            if (leader == null)
+            {
+                throw new AqualLifeStyleNotFoundException("AreaLeader", id);
+            }
+
+            return leader;
         }
 
         private static AreaLeaderDto MapToDto(AreaLeader leader)

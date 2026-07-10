@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 using Abp.Dependency;
-using Abp.Domain.Repositories;
+using Abp.Domain.Uow;
 using Abp.Events.Bus;
 using Abp.Events.Bus.Handlers;
 using AqualLifeStyle.Domain.AreaLeaders;
@@ -13,10 +13,12 @@ namespace AqualLifeStyle.Application.AreaLeaders
     public class AreaSpaceApprovedEventHandler : IAsyncEventHandler<AreaSpaceApprovedEvent>, ITransientDependency
     {
         private readonly IAreaLeaderRepository _areaLeaderRepository;
+        private readonly IUnitOfWorkManager _unitOfWorkManager;
 
-        public AreaSpaceApprovedEventHandler(IAreaLeaderRepository areaLeaderRepository)
+        public AreaSpaceApprovedEventHandler(IAreaLeaderRepository areaLeaderRepository, IUnitOfWorkManager unitOfWorkManager)
         {
             _areaLeaderRepository = areaLeaderRepository;
+            _unitOfWorkManager = unitOfWorkManager;
         }
 
         public async Task HandleEventAsync(AreaSpaceApprovedEvent evt)
@@ -26,14 +28,23 @@ namespace AqualLifeStyle.Application.AreaLeaders
                 return;
             }
 
-            var leader = await _areaLeaderRepository.FirstOrDefaultAsync(l => l.Id == evt.AreaLeaderId);
-            if (leader == null)
+            using (var uow = _unitOfWorkManager.Begin())
             {
-                return;
-            }
+                using (_unitOfWorkManager.Current.SetTenantId(evt.TenantId))
+                {
+                    var leader = await _areaLeaderRepository.FirstOrDefaultAsync(
+                        l => l.Id == evt.AreaLeaderId && l.TenantId == evt.TenantId);
+                    if (leader == null)
+                    {
+                        return;
+                    }
 
-            leader.LinkAreaSpace(evt.AreaSpaceId);
-            await _areaLeaderRepository.UpdateAsync(leader);
+                    leader.LinkAreaSpace(evt.AreaSpaceId);
+                    await _areaLeaderRepository.UpdateAsync(leader);
+                }
+
+                await uow.CompleteAsync();
+            }
         }
     }
 }

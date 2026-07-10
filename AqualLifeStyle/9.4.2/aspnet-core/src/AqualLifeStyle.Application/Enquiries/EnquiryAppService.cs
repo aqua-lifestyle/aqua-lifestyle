@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Abp.Application.Services;
 using Abp.Events.Bus;
 using AqualLifeStyle.Application.Enquiries.Dto;
 using AqualLifeStyle.Application.Exceptions;
@@ -25,19 +24,15 @@ namespace AqualLifeStyle.Application.Enquiries
 
         public async Task<IReadOnlyList<EnquiryDto>> GetAllAsync()
         {
-            var enquiries = await _enquiryRepository.GetAllListAsync();
+            var tenantId = GetRequiredTenantId("Enquiry lookup failed.");
+            var enquiries = await _enquiryRepository.GetAllListAsync(e => e.TenantId == tenantId);
             return enquiries.Select(MapToDto).ToList();
         }
 
         public async Task<EnquiryDto> GetAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
-            
-            var enquiry = await _enquiryRepository.GetAsync(id);
-            if (enquiry == null)
-            {
-                throw new AqualLifeStyleNotFoundException("Enquiry", id);
-            }
+            var enquiry = await GetEnquiryForCurrentTenantAsync(id);
 
             return MapToDto(enquiry);
         }
@@ -49,7 +44,8 @@ namespace AqualLifeStyle.Application.Enquiries
             AqualLifeStyleValidator.ValidId(input.ProductId, nameof(input.ProductId));
             AqualLifeStyleValidator.NotNullOrEmpty(input.Message, nameof(input.Message));
 
-            var enquiry = Enquiry.Create(AbpSession.TenantId, input.CustomerId, input.ProductId, input.Message);
+            var tenantId = GetRequiredTenantId("Enquiry creation failed.");
+            var enquiry = Enquiry.Create(tenantId, input.CustomerId, input.ProductId, input.Message);
             await _enquiryRepository.InsertAsync(enquiry);
         }
 
@@ -59,11 +55,7 @@ namespace AqualLifeStyle.Application.Enquiries
             AqualLifeStyleValidator.NotNull(input, nameof(input));
             AqualLifeStyleValidator.NotNullOrEmpty(input.Response, nameof(input.Response));
 
-            var enquiry = await _enquiryRepository.GetAsync(id);
-            if (enquiry == null)
-            {
-                throw new AqualLifeStyleNotFoundException("Enquiry", id);
-            }
+            var enquiry = await GetEnquiryForCurrentTenantAsync(id);
 
             try
             {
@@ -82,11 +74,7 @@ namespace AqualLifeStyle.Application.Enquiries
         {
             AqualLifeStyleValidator.ValidId(id);
 
-            var enquiry = await _enquiryRepository.GetAsync(id);
-            if (enquiry == null)
-            {
-                throw new AqualLifeStyleNotFoundException("Enquiry", id);
-            }
+            var enquiry = await GetEnquiryForCurrentTenantAsync(id);
 
             enquiry.Close();
             await _enquiryRepository.UpdateAsync(enquiry);
@@ -97,11 +85,7 @@ namespace AqualLifeStyle.Application.Enquiries
         {
             AqualLifeStyleValidator.ValidId(id);
 
-            var enquiry = await _enquiryRepository.GetAsync(id);
-            if (enquiry == null)
-            {
-                throw new AqualLifeStyleNotFoundException("Enquiry", id);
-            }
+            var enquiry = await GetEnquiryForCurrentTenantAsync(id);
 
             try
             {
@@ -122,11 +106,7 @@ namespace AqualLifeStyle.Application.Enquiries
             AqualLifeStyleValidator.NotNull(input, nameof(input));
             AqualLifeStyleValidator.ValidId(input.MemberId, nameof(input.MemberId));
 
-            var enquiry = await _enquiryRepository.GetAsync(id);
-            if (enquiry == null)
-            {
-                throw new AqualLifeStyleNotFoundException("Enquiry", id);
-            }
+            var enquiry = await GetEnquiryForCurrentTenantAsync(id);
 
             try
             {
@@ -145,11 +125,7 @@ namespace AqualLifeStyle.Application.Enquiries
         {
             AqualLifeStyleValidator.ValidId(id);
 
-            var enquiry = await _enquiryRepository.GetAsync(id);
-            if (enquiry == null)
-            {
-                throw new AqualLifeStyleNotFoundException("Enquiry", id);
-            }
+            var enquiry = await GetEnquiryForCurrentTenantAsync(id);
 
             try
             {
@@ -177,11 +153,7 @@ namespace AqualLifeStyle.Application.Enquiries
         {
             AqualLifeStyleValidator.ValidId(id);
 
-            var enquiry = await _enquiryRepository.GetAsync(id);
-            if (enquiry == null)
-            {
-                throw new AqualLifeStyleNotFoundException("Enquiry", id);
-            }
+            var enquiry = await GetEnquiryForCurrentTenantAsync(id);
 
             try
             {
@@ -205,11 +177,7 @@ namespace AqualLifeStyle.Application.Enquiries
             AqualLifeStyleValidator.NotNull(input, nameof(input));
             AqualLifeStyleValidator.NotNullOrEmpty(input.FollowUpNotes, nameof(input.FollowUpNotes));
 
-            var enquiry = await _enquiryRepository.GetAsync(id);
-            if (enquiry == null)
-            {
-                throw new AqualLifeStyleNotFoundException("Enquiry", id);
-            }
+            var enquiry = await GetEnquiryForCurrentTenantAsync(id);
 
             try
             {
@@ -234,11 +202,7 @@ namespace AqualLifeStyle.Application.Enquiries
         {
             AqualLifeStyleValidator.ValidId(id);
 
-            var enquiry = await _enquiryRepository.GetAsync(id);
-            if (enquiry == null)
-            {
-                throw new AqualLifeStyleNotFoundException("Enquiry", id);
-            }
+            var enquiry = await GetEnquiryForCurrentTenantAsync(id);
 
             return enquiry.FollowUps
                 .OrderByDescending(f => f.FollowUpDate)
@@ -251,11 +215,34 @@ namespace AqualLifeStyle.Application.Enquiries
         /// </summary>
         public async Task<List<EnquiryDto>> GetSalesReadyEnquiriesAsync()
         {
-            var enquiries = await _enquiryRepository.GetAllListAsync();
+            var tenantId = GetRequiredTenantId("Enquiry lookup failed.");
+            var enquiries = await _enquiryRepository.GetAllListAsync(e => e.TenantId == tenantId);
             return enquiries
                 .Where(e => e.IsSalesReady())
                 .Select(MapToDto)
                 .ToList();
+        }
+
+        private int GetRequiredTenantId(string operation)
+        {
+            if (!AbpSession.TenantId.HasValue)
+            {
+                throw new AqualLifeStyleAuthorizationException($"{operation} A tenant context is required.");
+            }
+
+            return AbpSession.TenantId.Value;
+        }
+
+        private async Task<Enquiry> GetEnquiryForCurrentTenantAsync(int id)
+        {
+            var tenantId = GetRequiredTenantId("Enquiry lookup failed.");
+            var enquiry = await _enquiryRepository.FirstOrDefaultAsync(e => e.Id == id && e.TenantId == tenantId);
+            if (enquiry == null)
+            {
+                throw new AqualLifeStyleNotFoundException("Enquiry", id);
+            }
+
+            return enquiry;
         }
 
         private static EnquiryDto MapToDto(Enquiry enquiry)
