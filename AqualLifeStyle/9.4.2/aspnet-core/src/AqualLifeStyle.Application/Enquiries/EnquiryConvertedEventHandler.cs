@@ -5,6 +5,8 @@ using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
 using Abp.Events.Bus;
 using Abp.Events.Bus.Handlers;
+using Abp.Runtime.Session;
+using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Domain.AreaNetwork;
 using AqualLifeStyle.Domain.AreaLeaders;
 using AqualLifeStyle.Domain.Customers;
@@ -28,6 +30,7 @@ namespace AqualLifeStyle.Application.Enquiries
         private readonly ICustomerRepository _customerRepository;
         private readonly IMembershipRepository _membershipRepository;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        private readonly IAbpSession _abpSession;
 
         public EnquiryConvertedEventHandler(
             IFacilitatorRepository facilitatorRepository,
@@ -35,7 +38,8 @@ namespace AqualLifeStyle.Application.Enquiries
             IReferralRepository referralRepository,
             ICustomerRepository customerRepository,
             IMembershipRepository membershipRepository,
-            IUnitOfWorkManager unitOfWorkManager)
+            IUnitOfWorkManager unitOfWorkManager,
+            IAbpSession abpSession)
         {
             _facilitatorRepository = facilitatorRepository;
             _areaLeaderRepository = areaLeaderRepository;
@@ -43,6 +47,7 @@ namespace AqualLifeStyle.Application.Enquiries
             _customerRepository = customerRepository;
             _membershipRepository = membershipRepository;
             _unitOfWorkManager = unitOfWorkManager;
+            _abpSession = abpSession;
         }
 
         public async Task HandleEventAsync(EnquiryConvertedEvent evt)
@@ -55,15 +60,31 @@ namespace AqualLifeStyle.Application.Enquiries
             var currentUow = _unitOfWorkManager.Current
                 ?? throw new InvalidOperationException(
                     $"{nameof(EnquiryConvertedEventHandler)} must run inside an existing unit of work.");
+            var tenantId = GetValidatedTenantId(evt);
 
             // The conversion may be handled outside the tenant's ambient session (e.g. a host-level
             // trigger), so scope the whole attribution to the tenant carried by the event. This makes
             // ABP's MayHaveTenant filter and the explicit TenantId predicates in the repositories agree.
-            using (currentUow.SetTenantId(evt.TenantId))
+            using (currentUow.SetTenantId(tenantId))
             {
                 await AttributeReferralsAsync(evt);
                 await LinkCustomerAsync(evt);
             }
+        }
+
+        private int GetValidatedTenantId(EnquiryConvertedEvent evt)
+        {
+            if (!_abpSession.TenantId.HasValue)
+            {
+                throw new AqualLifeStyleAuthorizationException("Enquiry conversion handling requires a tenant context.");
+            }
+
+            if (_abpSession.TenantId.Value != evt.TenantId)
+            {
+                throw new AqualLifeStyleAuthorizationException("Enquiry conversion event tenant does not match the current tenant context.");
+            }
+
+            return _abpSession.TenantId.Value;
         }
 
         private async Task AttributeReferralsAsync(EnquiryConvertedEvent evt)
@@ -76,7 +97,7 @@ namespace AqualLifeStyle.Application.Enquiries
             // Referral attribution creates one direct and one indirect row per conversion, so any
             // existing referral for the same source enquiry within the tenant means this event was
             // already processed and must not be applied again.
-            var existingReferral = await _referralRepository.GetBySourceEnquiryAsync(evt.EnquiryId, evt.TenantId);
+            var existingReferral = await _referralRepository.GetBySourceEnquiryAsync(evt.EnquiryId);
             if (existingReferral != null)
             {
                 return;

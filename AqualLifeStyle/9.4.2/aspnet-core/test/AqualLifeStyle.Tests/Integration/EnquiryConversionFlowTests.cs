@@ -7,6 +7,7 @@ using AqualLifeStyle.Application.AreaLeaders.Dto;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Customers.Dto;
 using AqualLifeStyle.Application.Enquiries;
+using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Facilitators;
 using AqualLifeStyle.Application.Facilitators.Dto;
 using AqualLifeStyle.Domain.AreaLeaders;
@@ -158,24 +159,46 @@ namespace AqualLifeStyle.Tests.Integration
         }
 
         [Fact]
-        public async Task LinkCustomerAsync_FiltersMembershipsByEventTenant()
+        public async Task HandleEventAsync_WithoutTenantContext_ThrowsAuthorizationException()
         {
-            var tenantTwoMembershipId = await CreateMembershipAsync("TenantTwoTier", MembershipType.Onyx, tenantId: 2);
-            var tenantOneMembershipId = await CreateMembershipAsync("TenantOneTier", MembershipType.Jasper, tenantId: 1);
-            tenantTwoMembershipId.ShouldBeLessThan(tenantOneMembershipId);
-
+            await CreateMembershipAsync("TenantOneTier", MembershipType.Jasper, tenantId: 1);
             var tenantOneCustomerId = await CreateCustomerAsync("TenantScopedProspect", tenantId: 1);
 
             using (UsingTenantId(null))
             {
-                await HandleConvertedEventAsync(
-                    new EnquiryConvertedEvent(101, tenantOneCustomerId, 1, null, System.DateTime.UtcNow, tenantId: 1));
+                var ex = await Assert.ThrowsAsync<AqualLifeStyleAuthorizationException>(() =>
+                    HandleConvertedEventAsync(
+                        new EnquiryConvertedEvent(101, tenantOneCustomerId, 1, null, System.DateTime.UtcNow, tenantId: 1)));
+
+                ex.Message.ShouldContain("tenant context");
             }
 
             await UsingDbContextAsync(1, async ctx =>
             {
                 var customer = await ctx.Customers.FirstAsync(c => c.Id == tenantOneCustomerId);
-                customer.MembershipId.ShouldBe(tenantOneMembershipId);
+                customer.MembershipId.ShouldBeNull();
+            });
+        }
+
+        [Fact]
+        public async Task HandleEventAsync_WithMismatchedTenantContext_ThrowsAuthorizationException()
+        {
+            await CreateMembershipAsync("TenantOneTierMismatch", MembershipType.Jasper, tenantId: 1);
+            var tenantOneCustomerId = await CreateCustomerAsync("TenantMismatchProspect", tenantId: 1);
+
+            using (UsingTenantId(2))
+            {
+                var ex = await Assert.ThrowsAsync<AqualLifeStyleAuthorizationException>(() =>
+                    HandleConvertedEventAsync(
+                        new EnquiryConvertedEvent(202, tenantOneCustomerId, 1, null, System.DateTime.UtcNow, tenantId: 1)));
+
+                ex.Message.ShouldContain("does not match");
+            }
+
+            await UsingDbContextAsync(1, async ctx =>
+            {
+                var customer = await ctx.Customers.FirstAsync(c => c.Id == tenantOneCustomerId);
+                customer.MembershipId.ShouldBeNull();
             });
         }
 
