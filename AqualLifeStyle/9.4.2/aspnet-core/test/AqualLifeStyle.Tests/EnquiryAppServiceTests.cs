@@ -17,7 +17,7 @@ namespace AqualLifeStyle.Tests
         public EnquiryAppServiceTests()
         {
             _enquiryRepositoryMock = new Mock<IEnquiryRepository>();
-            _service = new EnquiryAppService(_enquiryRepositoryMock.Object);
+            _service = new EnquiryAppService(_enquiryRepositoryMock.Object, null);
         }
 
         [Fact]
