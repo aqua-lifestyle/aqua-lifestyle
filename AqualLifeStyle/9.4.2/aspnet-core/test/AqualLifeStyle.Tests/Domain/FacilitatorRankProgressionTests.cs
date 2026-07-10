@@ -25,6 +25,12 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
+        public void NextRank_WhenThresholdsTie_PrefersHigherRankOrder()
+        {
+            _policy.NextRank(FacilitatorRank.Platinum).ShouldBe(FacilitatorRank.PremierT60);
+        }
+
+        [Fact]
         public void EvaluateFacilitatorRank_Negative_Throws()
         {
             Should.Throw<System.ArgumentException>(() => _policy.EvaluateFacilitatorRank(-1));

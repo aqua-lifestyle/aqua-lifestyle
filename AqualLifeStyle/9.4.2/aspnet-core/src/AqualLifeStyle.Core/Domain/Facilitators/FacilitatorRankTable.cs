@@ -22,8 +22,24 @@ namespace AqualLifeStyle.Domain.Facilitators
             new FacilitatorRankConfiguration(FacilitatorRank.PremierT60, 60, Money.Of(68750m), "Premier T/60")
         };
 
+        /// <summary>
+        /// Canonical facilitator-rank progression order. When thresholds tie, the higher rank wins.
+        /// </summary>
+        public static IReadOnlyList<FacilitatorRankConfiguration> OrderedByProgression { get; } = All
+            .OrderBy(c => c.DirectReferralThreshold)
+            .ThenBy(c => c.Rank)
+            .ToList();
+
         public static FacilitatorRankConfiguration For(FacilitatorRank rank)
             => All.FirstOrDefault(c => c.Rank == rank)
                 ?? throw new System.ArgumentException($"No facilitator rank configuration exists for rank '{rank}'.", nameof(rank));
+
+        public static FacilitatorRankConfiguration HighestSatisfiedBy(int directReferrals)
+            => OrderedByProgression.LastOrDefault(c => directReferrals >= c.DirectReferralThreshold);
+
+        public static FacilitatorRankConfiguration HighestCrossedBetween(int previousDirectReferrals, int currentDirectReferrals)
+            => OrderedByProgression.LastOrDefault(c =>
+                c.DirectReferralThreshold > previousDirectReferrals &&
+                c.DirectReferralThreshold <= currentDirectReferrals);
     }
 }

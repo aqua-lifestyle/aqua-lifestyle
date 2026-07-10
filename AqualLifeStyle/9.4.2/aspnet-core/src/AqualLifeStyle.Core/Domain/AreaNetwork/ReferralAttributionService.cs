@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using AqualLifeStyle.Domain.AreaLeaders;
 using AqualLifeStyle.Domain.Enquiries;
 using AqualLifeStyle.Domain.Facilitators;
@@ -42,16 +41,12 @@ namespace AqualLifeStyle.Domain.AreaNetwork
             var previousDirect = facilitator.DirectReferrals - 1;
             var currentDirect = facilitator.DirectReferrals;
             decimal facilitatorAward = 0m;
-            foreach (var config in FacilitatorRankTable.All.OrderBy(c => c.DirectReferralThreshold))
+            var crossedRank = FacilitatorRankTable.HighestCrossedBetween(previousDirect, currentDirect);
+            if (crossedRank != null)
             {
-                // Issue the award for each rank threshold crossed by this single referral.
-                if (config.DirectReferralThreshold > previousDirect && config.DirectReferralThreshold <= currentDirect)
-                {
-                    var award = _commissionCalculator.ComputeFacilitatorAward(config.Rank).Amount;
-                    facilitator.AwardRank(config.Rank, award);
-                    facilitatorAward += award;
-                    break;
-                }
+                var award = _commissionCalculator.ComputeFacilitatorAward(crossedRank.Rank).Amount;
+                facilitator.AwardRank(crossedRank.Rank, award);
+                facilitatorAward += award;
             }
 
             // Indirect referral → upline area leader

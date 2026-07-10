@@ -35,16 +35,11 @@ namespace AqualLifeStyle.Domain.Facilitators
                 throw new ArgumentException("Direct referral count cannot be negative.", nameof(directReferrals));
             }
 
-            var best = FacilitatorRank.Bronze;
-            foreach (var config in _table.OrderBy(c => c.DirectReferralThreshold))
-            {
-                if (directReferrals >= config.DirectReferralThreshold)
-                {
-                    best = config.Rank;
-                }
-            }
-
-            return best;
+            return _table
+                .OrderBy(c => c.DirectReferralThreshold)
+                .ThenBy(c => c.Rank)
+                .LastOrDefault(c => directReferrals >= c.DirectReferralThreshold)
+                ?.Rank ?? FacilitatorRank.Bronze;
         }
 
         /// <summary>
@@ -52,7 +47,10 @@ namespace AqualLifeStyle.Domain.Facilitators
         /// </summary>
         public FacilitatorRank? NextRank(FacilitatorRank current)
         {
-            var ordered = _table.OrderBy(c => c.DirectReferralThreshold).ToList();
+            var ordered = _table
+                .OrderBy(c => c.DirectReferralThreshold)
+                .ThenBy(c => c.Rank)
+                .ToList();
             var index = ordered.FindIndex(c => c.Rank == current);
             if (index < 0 || index + 1 >= ordered.Count)
             {

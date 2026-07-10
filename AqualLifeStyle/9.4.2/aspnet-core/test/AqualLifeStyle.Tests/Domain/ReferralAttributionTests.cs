@@ -88,6 +88,21 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
+        public void Attribute_AtSharedThreshold_AwardsOnlyHighestRankOnce()
+        {
+            var (facilitator, areaLeader, evt) = Arrange(directReferralsAlready: 59);
+
+            var service = new AqualLifeStyle.Domain.AreaNetwork.ReferralAttributionService(_commissionCalculator);
+            var result = service.Attribute(evt, facilitator, areaLeader);
+
+            facilitator.DirectReferrals.ShouldBe(60);
+            facilitator.Rank.ShouldBe(FacilitatorRank.PremierT60);
+            facilitator.AwardBalance.ShouldBe(68750m);
+            result.FacilitatorAward.ShouldBe(68750m);
+            result.DirectReferral.AwardAmount.ShouldBe(68750m);
+        }
+
+        [Fact]
         public void Attribute_RequiresSourcingFacilitator()
         {
             var (facilitator, areaLeader, _) = Arrange();
