@@ -130,7 +130,7 @@ namespace AqualLifeStyle.Tests
         {
             var enquiry = Enquiry.Create(1, 2, "Question about bundle");
             enquiry.Id = 3;
-            enquiry.ConvertToCustomer();
+            enquiry.ConvertToCustomer(null);
             return enquiry;
         }
 

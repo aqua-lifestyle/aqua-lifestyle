@@ -118,7 +118,7 @@ namespace AqualLifeStyle.Tests
         {
             // Arrange
             var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
-            enquiry.ConvertToCustomer();
+            enquiry.ConvertToCustomer(null);
             _enquiryRepositoryMock.Setup(r => r.GetAsync(7)).ReturnsAsync(enquiry);
 
             // Act & Assert
@@ -148,7 +148,7 @@ namespace AqualLifeStyle.Tests
             // Arrange
             var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
             enquiry.AssignToMember(10);
-            enquiry.ConvertToCustomer();
+            enquiry.ConvertToCustomer(null);
             _enquiryRepositoryMock.Setup(r => r.GetAsync(9)).ReturnsAsync(enquiry);
 
             // Act & Assert
@@ -161,7 +161,7 @@ namespace AqualLifeStyle.Tests
         {
             // Arrange
             var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
-            enquiry.ConvertToCustomer();
+            enquiry.ConvertToCustomer(null);
             _enquiryRepositoryMock.Setup(r => r.GetAsync(10)).ReturnsAsync(enquiry);
 
             // Act & Assert

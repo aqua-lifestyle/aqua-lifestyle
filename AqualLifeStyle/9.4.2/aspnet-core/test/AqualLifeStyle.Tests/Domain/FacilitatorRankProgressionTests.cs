@@ -39,6 +39,14 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
+        public void FacilitatorRankTable_For_UnknownRank_ThrowsClearArgumentException()
+        {
+            var ex = Should.Throw<System.ArgumentException>(() => FacilitatorRankTable.For((FacilitatorRank)999));
+            ex.ParamName.ShouldBe("rank");
+            ex.Message.ShouldContain("No facilitator rank configuration exists for rank '999'.");
+        }
+
+        [Fact]
         public void Money_Add_CombinesSameCurrency()
         {
             var total = Money.Of(50m).Add(Money.Of(250m));

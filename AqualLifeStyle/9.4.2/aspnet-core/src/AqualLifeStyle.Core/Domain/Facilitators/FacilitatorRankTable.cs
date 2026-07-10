@@ -23,6 +23,7 @@ namespace AqualLifeStyle.Domain.Facilitators
         };
 
         public static FacilitatorRankConfiguration For(FacilitatorRank rank)
-            => All.First(c => c.Rank == rank);
+            => All.FirstOrDefault(c => c.Rank == rank)
+                ?? throw new System.ArgumentException($"No facilitator rank configuration exists for rank '{rank}'.", nameof(rank));
     }
 }

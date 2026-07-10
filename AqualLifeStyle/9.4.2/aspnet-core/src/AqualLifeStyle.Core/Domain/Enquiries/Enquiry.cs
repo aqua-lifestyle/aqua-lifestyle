@@ -92,9 +92,6 @@ namespace AqualLifeStyle.Domain.Enquiries
             ReferredByFacilitatorId = facilitatorId;
         }
 
-        public void ConvertToCustomer()
-            => ConvertToCustomer(ReferredByFacilitatorId);
-
         public void ConvertToCustomer(int? referredByFacilitatorId)
         {
             if (IsConverted) throw new InvalidOperationException("Enquiry has already been converted.");
@@ -136,7 +133,7 @@ namespace AqualLifeStyle.Domain.Enquiries
             // Auto-convert if follow-up indicates conversion
             if (outcome == EnquiryFollowUpOutcome.Converted)
             {
-                ConvertToCustomer();
+                ConvertToCustomer(ReferredByFacilitatorId);
             }
             // Mark as closed if lead is lost
             else if (outcome == EnquiryFollowUpOutcome.Lost && Status != EnquiryStatus.Closed)

@@ -27,7 +27,7 @@ namespace AqualLifeStyle.Tests.Domain
             var enquiry = Enquiry.Create(customerId: 1, productId: 2, "Interested");
             enquiry.SetReferredByFacilitator(42);
 
-            enquiry.ConvertToCustomer();
+            enquiry.ConvertToCustomer(42);
 
             enquiry.IsConverted.ShouldBeTrue();
             enquiry.ReferredByFacilitatorId.ShouldBe(42);
@@ -38,7 +38,7 @@ namespace AqualLifeStyle.Tests.Domain
         public void ConvertToCustomer_Default_KeepsNoReferral()
         {
             var enquiry = Enquiry.Create(customerId: 1, productId: 2, "Interested");
-            enquiry.ConvertToCustomer();
+            enquiry.ConvertToCustomer(null);
             enquiry.ReferredByFacilitatorId.ShouldBeNull();
         }
     }
