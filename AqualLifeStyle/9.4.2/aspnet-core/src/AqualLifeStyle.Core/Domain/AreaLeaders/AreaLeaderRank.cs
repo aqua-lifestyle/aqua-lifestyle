@@ -9,7 +9,7 @@ namespace AqualLifeStyle.Domain.AreaLeaders
         Ruby = 0,
         Emerald = 1,
         Premier = 2,
-        Dimond = 3,
+        Diamond = 3,
         VIP = 4,
         Presidential = 5,
         ChairmansCircle = 6,

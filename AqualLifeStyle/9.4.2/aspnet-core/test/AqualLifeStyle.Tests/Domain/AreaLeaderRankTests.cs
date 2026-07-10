@@ -15,7 +15,7 @@ namespace AqualLifeStyle.Tests.Domain
         [InlineData(20, AreaLeaderRank.Ruby)]
         [InlineData(60, AreaLeaderRank.Emerald)]
         [InlineData(100, AreaLeaderRank.Premier)]
-        [InlineData(200, AreaLeaderRank.Dimond)]
+        [InlineData(200, AreaLeaderRank.Diamond)]
         [InlineData(18000, AreaLeaderRank.Ambassador)]
         public void EvaluateAreaLeaderRank_MapsOrderTarget(int orderTarget, AreaLeaderRank expected)
         {

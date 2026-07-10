@@ -35,7 +35,7 @@ namespace AqualLifeStyle.Domain.AreaLeaders
             new AreaLeaderRankConfiguration(AreaLeaderRank.Ruby, 20, "Ruby"),
             new AreaLeaderRankConfiguration(AreaLeaderRank.Emerald, 60, "Emerald"),
             new AreaLeaderRankConfiguration(AreaLeaderRank.Premier, 100, "Premier"),
-            new AreaLeaderRankConfiguration(AreaLeaderRank.Dimond, 200, "Dimond"),
+            new AreaLeaderRankConfiguration(AreaLeaderRank.Diamond, 200, "Diamond"),
             new AreaLeaderRankConfiguration(AreaLeaderRank.VIP, 400, "VIP"),
             new AreaLeaderRankConfiguration(AreaLeaderRank.Presidential, 1200, "Presidential"),
             new AreaLeaderRankConfiguration(AreaLeaderRank.ChairmansCircle, 3600, "Chairman's Circle"),
