@@ -41,5 +41,17 @@ namespace AqualLifeStyle.Tests.Domain
             enquiry.ConvertToCustomer(null);
             enquiry.ReferredByFacilitatorId.ShouldBeNull();
         }
+
+        [Fact]
+        public void ConvertToCustomer_WithoutArgument_RemainsBackwardCompatible()
+        {
+            var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 2, "Interested");
+
+            enquiry.ConvertToCustomer();
+
+            enquiry.IsConverted.ShouldBeTrue();
+            enquiry.ReferredByFacilitatorId.ShouldBeNull();
+            enquiry.ConvertedAt.ShouldNotBeNull();
+        }
     }
 }

@@ -89,7 +89,7 @@ namespace AqualLifeStyle.Domain.Enquiries
             ReferredByFacilitatorId = facilitatorId;
         }
 
-        public void ConvertToCustomer(int? referredByFacilitatorId)
+        public void ConvertToCustomer(int? referredByFacilitatorId = null)
         {
             if (IsConverted) throw new InvalidOperationException("Enquiry has already been converted.");
             if (referredByFacilitatorId.HasValue && referredByFacilitatorId.Value <= 0)
