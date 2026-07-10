@@ -1,12 +1,15 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Abp.Authorization;
 using AqualLifeStyle.Application.Referrals.Dto;
 using AqualLifeStyle.Application.Validation;
+using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Facilitators;
 
 namespace AqualLifeStyle.Application.Referrals
 {
+    [AbpAuthorize(PermissionNames.Pages_Referrals)]
     public class ReferralAppService : AqualLifeStyleAppServiceBase, IReferralAppService
     {
         private readonly IReferralRepository _referralRepository;
@@ -29,6 +32,7 @@ namespace AqualLifeStyle.Application.Referrals
             return referral == null ? null : MapToDto(referral);
         }
 
+        [AbpAuthorize(PermissionNames.Pages_Referrals_Manage)]
         public async Task<ReferralDto> ConfirmAwardAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);

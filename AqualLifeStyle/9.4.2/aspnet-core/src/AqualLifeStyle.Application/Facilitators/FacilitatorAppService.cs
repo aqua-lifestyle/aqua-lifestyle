@@ -1,14 +1,17 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Abp.Authorization;
 using Abp.UI;
 using AqualLifeStyle.Application.Facilitators.Dto;
 using AqualLifeStyle.Application.Validation;
+using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.AreaLeaders;
 using AqualLifeStyle.Domain.Facilitators;
 
 namespace AqualLifeStyle.Application.Facilitators
 {
+    [AbpAuthorize(PermissionNames.Pages_Facilitators)]
     public class FacilitatorAppService : AqualLifeStyleAppServiceBase, IFacilitatorAppService
     {
         private readonly IFacilitatorRepository _facilitatorRepository;
@@ -20,6 +23,7 @@ namespace AqualLifeStyle.Application.Facilitators
             _areaLeaderRepository = areaLeaderRepository;
         }
 
+        [AbpAuthorize(PermissionNames.Pages_Facilitators_Manage)]
         public async Task<FacilitatorDto> RegisterAsync(RegisterFacilitatorDto input)
         {
             AqualLifeStyleValidator.NotNull(input, nameof(input));

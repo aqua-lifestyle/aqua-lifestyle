@@ -2,14 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Abp.Authorization;
 using Abp.UI;
 using AqualLifeStyle.Application.AreaLeaders.Dto;
 using AqualLifeStyle.Application.Validation;
+using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.AreaLeaders;
 using AqualLifeStyle.Domain.Facilitators;
 
 namespace AqualLifeStyle.Application.AreaLeaders
 {
+    [AbpAuthorize(PermissionNames.Pages_AreaLeaders)]
     public class AreaLeaderAppService : AqualLifeStyleAppServiceBase, IAreaLeaderAppService
     {
         private readonly IAreaLeaderRepository _areaLeaderRepository;
@@ -19,6 +22,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             _areaLeaderRepository = areaLeaderRepository;
         }
 
+        [AbpAuthorize(PermissionNames.Pages_AreaLeaders_Manage)]
         public async Task<AreaLeaderDto> ApplyAsync(RegisterAreaLeaderDto input)
         {
             AqualLifeStyleValidator.NotNull(input, nameof(input));
@@ -52,6 +56,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             return MapToDto(leader);
         }
 
+        [AbpAuthorize(PermissionNames.Pages_AreaLeaders_Manage)]
         public async Task<AreaLeaderDto> RecordStartupOrderAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -61,6 +66,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             return MapToDto(leader);
         }
 
+        [AbpAuthorize(PermissionNames.Pages_AreaLeaders_Manage)]
         public async Task<AreaLeaderDto> PromoteAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
