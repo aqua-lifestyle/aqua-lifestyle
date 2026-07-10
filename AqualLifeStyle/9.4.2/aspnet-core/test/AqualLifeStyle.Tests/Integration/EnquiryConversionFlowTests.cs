@@ -135,6 +135,53 @@ namespace AqualLifeStyle.Tests.Integration
         }
 
         [Fact]
+        public async Task HandleEventAsync_WhenAnotherTenantHasSameSourceEnquiryId_StillAttributesCurrentTenantReferrals()
+        {
+            var customerToLeaderId = await CreateCustomerAsync("CrossTenantLeader");
+            var leader = await _areaLeaderAppService.ApplyAsync(
+                new RegisterAreaLeaderDto { CustomerId = customerToLeaderId, LicenseType = (int)LicenseType.EntreLevel });
+
+            var facilitatorCustomerId = await CreateCustomerAsync("CrossTenantFacilitator");
+            var facilitator = await _facilitatorAppService.RegisterAsync(
+                new RegisterFacilitatorDto { CustomerId = facilitatorCustomerId, AreaLeaderId = leader.Id });
+
+            var prospectCustomerId = await CreateCustomerAsync("CrossTenantProspect");
+            await _enquiryAppService.CreateAsync(new AqualLifeStyle.Application.Enquiries.Dto.CreateEnquiryDto
+            {
+                CustomerId = prospectCustomerId,
+                ProductId = 1,
+                Message = "Cross-tenant idempotency guard"
+            });
+
+            var enquiryId = await UsingDbContextAsync(async ctx =>
+                (await ctx.Enquiries.FirstAsync(e => e.CustomerId == prospectCustomerId)).Id);
+
+            await SetReferredByFacilitatorAsync(enquiryId, facilitator.Id);
+            await CreateDirectReferralAsync(tenantId: 2, sourceEnquiryId: enquiryId);
+
+            await HandleConvertedEventAsync(
+                new EnquiryConvertedEvent(enquiryId, prospectCustomerId, 1, facilitator.Id, System.DateTime.UtcNow, tenantId: 1));
+
+            await UsingDbContextAsync(async ctx =>
+            {
+                var tenantOneReferrals = ctx.Referrals
+                    .Where(r => r.TenantId == 1 && r.SourceEnquiryId == enquiryId)
+                    .ToList();
+
+                tenantOneReferrals.Count.ShouldBe(2);
+                tenantOneReferrals.Count(r => r.Type == ReferralType.Direct).ShouldBe(1);
+                tenantOneReferrals.Count(r => r.Type == ReferralType.Indirect).ShouldBe(1);
+                ctx.Referrals.Count(r => r.TenantId == 2 && r.SourceEnquiryId == enquiryId).ShouldBe(1);
+
+                var updatedFacilitator = await ctx.Facilitators.FirstAsync(f => f.Id == facilitator.Id);
+                updatedFacilitator.DirectReferrals.ShouldBe(1);
+
+                var updatedLeader = await ctx.AreaLeaders.FirstAsync(a => a.Id == leader.Id);
+                updatedLeader.IndirectReferrals.ShouldBe(1);
+            });
+        }
+
+        [Fact]
         public async Task HandleEventAsync_WhenFacilitatorReferencesMissingAreaLeader_DoesNotCreateReferrals()
         {
             var scenario = await CreateOrphanedReferralScenarioAsync("MissingLeader");
@@ -352,6 +399,23 @@ namespace AqualLifeStyle.Tests.Integration
                 ctx.Memberships.Add(membership);
                 await ctx.SaveChangesAsync();
                 return membership.Id;
+            });
+        }
+
+        private Task<int> CreateDirectReferralAsync(int tenantId, int sourceEnquiryId)
+        {
+            return UsingDbContextAsync(tenantId, async ctx =>
+            {
+                var referral = Referral.CreateDirect(
+                    tenantId,
+                    referrerFacilitatorId: tenantId * 10,
+                    referredCustomerId: tenantId * 100,
+                    sourceEnquiryId: sourceEnquiryId,
+                    awardAmount: 100m,
+                    convertedAt: System.DateTime.UtcNow);
+                ctx.Referrals.Add(referral);
+                await ctx.SaveChangesAsync();
+                return referral.Id;
             });
         }
     }

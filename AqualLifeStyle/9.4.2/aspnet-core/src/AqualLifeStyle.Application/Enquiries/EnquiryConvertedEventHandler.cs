@@ -94,7 +94,7 @@ namespace AqualLifeStyle.Application.Enquiries
             // Referral attribution creates one direct and one indirect row per conversion, so any
             // existing referral for the same source enquiry within the tenant means this event was
             // already processed and must not be applied again.
-            var existingReferral = await _referralRepository.GetBySourceEnquiryAsync(evt.EnquiryId);
+            var existingReferral = await _referralRepository.GetBySourceEnquiryAsync(evt.EnquiryId, evt.TenantId);
             if (existingReferral != null)
             {
                 return;
