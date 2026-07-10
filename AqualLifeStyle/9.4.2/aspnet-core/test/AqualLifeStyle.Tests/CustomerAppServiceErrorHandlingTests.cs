@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Abp.Runtime.Session;
 using Abp.UI;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Customers.Dto;
@@ -21,7 +22,10 @@ namespace AqualLifeStyle.Tests
                 .Setup(x => x.GetAsync(It.IsAny<int>()))
                 .ThrowsAsync(new InvalidOperationException("Membership not found."));
 
-            var service = new CustomerAppService(customerRepository.Object, membershipRepository.Object);
+            var service = new CustomerAppService(customerRepository.Object, membershipRepository.Object)
+            {
+                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
+            };
 
             var ex = await Assert.ThrowsAsync<UserFriendlyException>(() => service.CreateAsync(new CreateCustomerDto
             {

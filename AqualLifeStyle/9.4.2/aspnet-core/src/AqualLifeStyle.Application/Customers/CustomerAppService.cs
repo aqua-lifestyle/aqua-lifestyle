@@ -24,7 +24,8 @@ namespace AqualLifeStyle.Application.Customers
 
         public async Task<IReadOnlyList<CustomerDto>> GetAllAsync()
         {
-            var customers = await _customerRepository.GetAllListAsync();
+            var tenantId = GetRequiredTenantId("Customer lookup failed.");
+            var customers = await _customerRepository.GetAllListAsync(c => c.TenantId == tenantId);
             return customers.Select(c => new CustomerDto
             {
                 Id = c.Id,
@@ -37,7 +38,7 @@ namespace AqualLifeStyle.Application.Customers
 
         public async Task<CustomerDto> GetAsync(int id)
         {
-            var customer = await _customerRepository.GetAsync(id);
+            var customer = await GetCustomerForCurrentTenantAsync(id);
             return MapToDto(customer);
         }
 
@@ -65,7 +66,7 @@ namespace AqualLifeStyle.Application.Customers
 
             try
             {
-                var customer = await _customerRepository.GetAsync(input.Id);
+                var customer = await GetCustomerForCurrentTenantAsync(input.Id);
 
                 if (await _customerRepository.ExistsByEmailAsync(input.Email, input.Id))
                 {
@@ -121,6 +122,8 @@ namespace AqualLifeStyle.Application.Customers
                 throw new UserFriendlyException("Customer creation failed.", "Customer email is required.");
             }
 
+            var tenantId = GetRequiredTenantId("Customer creation failed.");
+
             if (await _customerRepository.ExistsByEmailAsync(input.Email))
             {
                 throw new UserFriendlyException("Customer creation failed.", "A customer with that email already exists.");
@@ -135,7 +138,7 @@ namespace AqualLifeStyle.Application.Customers
                 }
 
                 var email = new EmailAddress(input.Email);
-                var customer = Customer.Create(AbpSession.TenantId, input.Name, email, input.MembershipId);
+                var customer = Customer.Create(tenantId, input.Name, email, input.MembershipId);
                 await _customerRepository.InsertAsync(customer);
             }
             catch (UserFriendlyException)
@@ -158,6 +161,28 @@ namespace AqualLifeStyle.Application.Customers
                 MembershipId = customer.MembershipId,
                 IsActive = customer.IsActive
             };
+        }
+
+        private int GetRequiredTenantId(string operation)
+        {
+            if (!AbpSession.TenantId.HasValue)
+            {
+                throw new UserFriendlyException(operation, "A tenant context is required.");
+            }
+
+            return AbpSession.TenantId.Value;
+        }
+
+        private async Task<Customer> GetCustomerForCurrentTenantAsync(int id)
+        {
+            var tenantId = GetRequiredTenantId("Customer lookup failed.");
+            var customer = await _customerRepository.FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId);
+            if (customer == null)
+            {
+                throw new UserFriendlyException("Customer lookup failed.", $"Customer with id {id} was not found.");
+            }
+
+            return customer;
         }
     }
 }
