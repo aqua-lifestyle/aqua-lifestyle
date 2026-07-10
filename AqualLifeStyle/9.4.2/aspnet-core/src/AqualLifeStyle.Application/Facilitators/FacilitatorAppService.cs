@@ -32,7 +32,7 @@ namespace AqualLifeStyle.Application.Facilitators
             }
 
             var facilitator = Facilitator.Register(AbpSession.TenantId.Value, input.CustomerId, input.AreaLeaderId);
-            await _facilitatorRepository.InsertAsync(facilitator);
+            await _facilitatorRepository.InsertAndGetIdAsync(facilitator);
 
             var leader = await _areaLeaderRepository.FirstOrDefaultAsync(l => l.Id == input.AreaLeaderId);
             if (leader != null)

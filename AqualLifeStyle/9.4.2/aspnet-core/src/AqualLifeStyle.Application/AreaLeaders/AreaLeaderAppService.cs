@@ -35,7 +35,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             }
 
             var leader = AreaLeader.Apply(AbpSession.TenantId.Value, input.CustomerId, (LicenseType)input.LicenseType);
-            await _areaLeaderRepository.InsertAsync(leader);
+            await _areaLeaderRepository.InsertAndGetIdAsync(leader);
             return MapToDto(leader);
         }
 

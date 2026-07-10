@@ -36,7 +36,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
 
             var address = new Address(input.AddressLine, null, null, null);
             var space = AreaSpace.Apply(AbpSession.TenantId.Value, input.AreaLeaderId, address, input.Capacity, input.InterestedMembers);
-            await _areaSpaceRepository.InsertAsync(space);
+            await _areaSpaceRepository.InsertAndGetIdAsync(space);
             return MapToDto(space);
         }
 
