@@ -1,5 +1,8 @@
+using System;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Abp.Domain.Repositories;
+using Abp.Runtime.Session;
 using Moq;
 using AqualLifeStyle.Application.Enquiries;
 using AqualLifeStyle.Application.Enquiries.Dto;
@@ -17,7 +20,21 @@ namespace AqualLifeStyle.Tests
         public EnquiryAppServiceTests()
         {
             _enquiryRepositoryMock = new Mock<IEnquiryRepository>();
-            _service = new EnquiryAppService(_enquiryRepositoryMock.Object, null);
+            _service = new EnquiryAppService(_enquiryRepositoryMock.Object, null)
+            {
+                // The service now scopes every enquiry to the current tenant, so unit tests
+                // must supply a tenant context.
+                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
+            };
+        }
+
+        private void SetupEnquiry(Enquiry enquiry)
+        {
+            // The app service looks up the enquiry via FirstOrDefaultAsync(e => e.Id == id && e.TenantId == tenantId)
+            // now that tenant isolation is enforced.
+            _enquiryRepositoryMock
+                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<Enquiry, bool>>>()))
+                .ReturnsAsync(enquiry);
         }
 
         [Fact]
@@ -25,7 +42,7 @@ namespace AqualLifeStyle.Tests
         {
             // Arrange
             var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question about product");
-            _enquiryRepositoryMock.Setup(r => r.GetAsync(1)).ReturnsAsync(enquiry);
+            SetupEnquiry(enquiry);
 
             // Act
             var result = await _service.RespondAsync(1, new RespondToEnquiryDto { Response = "Here is the answer" });
@@ -41,7 +58,7 @@ namespace AqualLifeStyle.Tests
         {
             // Arrange
             var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
-            _enquiryRepositoryMock.Setup(r => r.GetAsync(2)).ReturnsAsync(enquiry);
+            SetupEnquiry(enquiry);
 
             // Act
             await _service.CloseAsync(2);
@@ -57,7 +74,7 @@ namespace AqualLifeStyle.Tests
             // Arrange
             var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
             enquiry.Close();
-            _enquiryRepositoryMock.Setup(r => r.GetAsync(3)).ReturnsAsync(enquiry);
+            SetupEnquiry(enquiry);
 
             // Act
             await _service.ReopenAsync(3);
@@ -73,7 +90,7 @@ namespace AqualLifeStyle.Tests
         {
             // Arrange
             var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
-            _enquiryRepositoryMock.Setup(r => r.GetAsync(4)).ReturnsAsync(enquiry);
+            SetupEnquiry(enquiry);
 
             // Act
             var result = await _service.AssignToMemberAsync(4, new AssignEnquiryDto { MemberId = 10 });
@@ -89,10 +106,10 @@ namespace AqualLifeStyle.Tests
         {
             // Arrange
             var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
-            _enquiryRepositoryMock.Setup(r => r.GetAsync(5)).ReturnsAsync(enquiry);
+            SetupEnquiry(enquiry);
 
             // Act & Assert
-            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleValidationException>(() => 
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleValidationException>(() =>
                 _service.AssignToMemberAsync(5, new AssignEnquiryDto { MemberId = 0 }));
         }
 
@@ -101,7 +118,7 @@ namespace AqualLifeStyle.Tests
         {
             // Arrange
             var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
-            _enquiryRepositoryMock.Setup(r => r.GetAsync(6)).ReturnsAsync(enquiry);
+            SetupEnquiry(enquiry);
 
             // Act
             var result = await _service.ConvertToCustomerAsync(6, new ConvertEnquiryToCustomerDto());
@@ -119,10 +136,10 @@ namespace AqualLifeStyle.Tests
             // Arrange
             var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
             enquiry.ConvertToCustomer(null);
-            _enquiryRepositoryMock.Setup(r => r.GetAsync(7)).ReturnsAsync(enquiry);
+            SetupEnquiry(enquiry);
 
             // Act & Assert
-            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(() => 
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(() =>
                 _service.ConvertToCustomerAsync(7, new ConvertEnquiryToCustomerDto()));
         }
 
@@ -132,7 +149,7 @@ namespace AqualLifeStyle.Tests
             // Arrange
             var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
             enquiry.AssignToMember(10);
-            _enquiryRepositoryMock.Setup(r => r.GetAsync(8)).ReturnsAsync(enquiry);
+            SetupEnquiry(enquiry);
 
             // Act
             await _service.ClearAssignmentAsync(8, new ClearAssignmentDto());
@@ -149,10 +166,10 @@ namespace AqualLifeStyle.Tests
             var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
             enquiry.AssignToMember(10);
             enquiry.ConvertToCustomer(null);
-            _enquiryRepositoryMock.Setup(r => r.GetAsync(9)).ReturnsAsync(enquiry);
+            SetupEnquiry(enquiry);
 
             // Act & Assert
-            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(() => 
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(() =>
                 _service.ClearAssignmentAsync(9, new ClearAssignmentDto()));
         }
 
@@ -162,10 +179,10 @@ namespace AqualLifeStyle.Tests
             // Arrange
             var enquiry = Enquiry.Create(customerId: 1, productId: 5, message: "Question");
             enquiry.ConvertToCustomer(null);
-            _enquiryRepositoryMock.Setup(r => r.GetAsync(10)).ReturnsAsync(enquiry);
+            SetupEnquiry(enquiry);
 
             // Act & Assert
-            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(() => 
+            await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(() =>
                 _service.AssignToMemberAsync(10, new AssignEnquiryDto { MemberId = 20 }));
         }
     }
