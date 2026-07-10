@@ -138,6 +138,11 @@ namespace AqualLifeStyle.Domain.AreaLeaders
                     $"Area space must be under review for at least {AreaSpaceApprovalRules.ReviewWindowHours} hours.");
             }
 
+            if (Id <= 0)
+            {
+                throw new InvalidOperationException("Area space must be persisted before approval can raise events.");
+            }
+
             Status = AreaSpaceStatus.Approved;
             ApprovedAt = now;
             DomainEvents.Add(new AreaSpaceApprovedEvent(TenantId, Id, AreaLeaderId));
