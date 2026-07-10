@@ -1,7 +1,9 @@
 using System;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
+using Abp.Domain.Uow;
 using Abp.Domain.Repositories;
+using Abp.Events.Bus;
 using Abp.Runtime.Session;
 using Moq;
 using AqualLifeStyle.Application.Enquiries;
@@ -20,7 +22,7 @@ namespace AqualLifeStyle.Tests
         public EnquiryAppServiceTests()
         {
             _enquiryRepositoryMock = new Mock<IEnquiryRepository>();
-            _service = new EnquiryAppService(_enquiryRepositoryMock.Object, null)
+            _service = new TestableEnquiryAppService(_enquiryRepositoryMock.Object, null)
             {
                 // The service now scopes every enquiry to the current tenant, so unit tests
                 // must supply a tenant context.
@@ -131,6 +133,49 @@ namespace AqualLifeStyle.Tests
         }
 
         [Fact]
+        public async Task ConvertToCustomerAsync_RegistersSingleCompletionCallback_AndTriggersEventOnCompletion()
+        {
+            // Arrange
+            var enquiry = Enquiry.Create(tenantId: 1, customerId: 11, productId: 5, message: "Question");
+            SetupEnquiry(enquiry);
+            var eventBusMock = new Mock<IEventBus>();
+
+            var unitOfWorkManagerMock = new Mock<IUnitOfWorkManager>();
+            var activeUnitOfWorkMock = new Mock<IActiveUnitOfWork>();
+            EventHandler completionHandler = null;
+            var service = new TestableEnquiryAppService(_enquiryRepositoryMock.Object, eventBusMock.Object)
+            {
+                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
+            };
+
+            activeUnitOfWorkMock
+                .SetupAdd(m => m.Completed += It.IsAny<EventHandler>())
+                .Callback((EventHandler h) => completionHandler = h);
+            unitOfWorkManagerMock
+                .Setup(m => m.Current)
+                .Returns(activeUnitOfWorkMock.Object);
+
+            service.SetUnitOfWorkManager(unitOfWorkManagerMock.Object);
+
+            // Act
+            await service.ConvertToCustomerAsync(6, new ConvertEnquiryToCustomerDto());
+
+            // Assert
+            activeUnitOfWorkMock.VerifyAdd(m => m.Completed += It.IsAny<EventHandler>(), Times.Once);
+            eventBusMock.Verify(b => b.Trigger(It.IsAny<EnquiryConvertedEvent>()), Times.Never);
+
+            Assert.NotNull(completionHandler);
+            completionHandler(activeUnitOfWorkMock.Object, EventArgs.Empty);
+
+            eventBusMock.Verify(b => b.Trigger(It.Is<EnquiryConvertedEvent>(evt =>
+                evt.EnquiryId == enquiry.Id &&
+                evt.CustomerId == enquiry.CustomerId &&
+                evt.ProductId == enquiry.ProductId &&
+                evt.ReferredByFacilitatorId == enquiry.ReferredByFacilitatorId &&
+                evt.TenantId == enquiry.TenantId)), Times.Once);
+        }
+
+        [Fact]
         public async Task ConvertToCustomerAsync_WithAlreadyConvertedEnquiry_Throws()
         {
             // Arrange
@@ -184,6 +229,19 @@ namespace AqualLifeStyle.Tests
             // Act & Assert
             await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleBusinessRuleException>(() =>
                 _service.AssignToMemberAsync(10, new AssignEnquiryDto { MemberId = 20 }));
+        }
+
+        private sealed class TestableEnquiryAppService : EnquiryAppService
+        {
+            public TestableEnquiryAppService(IEnquiryRepository enquiryRepository, IEventBus eventBus)
+                : base(enquiryRepository, eventBus)
+            {
+            }
+
+            public void SetUnitOfWorkManager(IUnitOfWorkManager unitOfWorkManager)
+            {
+                UnitOfWorkManager = unitOfWorkManager;
+            }
         }
     }
 }
