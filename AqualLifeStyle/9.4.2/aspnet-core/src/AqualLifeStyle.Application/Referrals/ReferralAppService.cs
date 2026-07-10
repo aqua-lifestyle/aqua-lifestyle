@@ -30,7 +30,8 @@ namespace AqualLifeStyle.Application.Referrals
         public async Task<ReferralDto> GetByEnquiryAsync(int enquiryId)
         {
             AqualLifeStyleValidator.ValidId(enquiryId, nameof(enquiryId));
-            var referral = await _referralRepository.GetBySourceEnquiryAsync(enquiryId);
+            var tenantId = GetRequiredTenantId("Referral lookup failed.");
+            var referral = await _referralRepository.GetBySourceEnquiryAsync(enquiryId, tenantId);
             return referral == null ? null : MapToDto(referral);
         }
 

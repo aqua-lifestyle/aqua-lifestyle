@@ -13,10 +13,12 @@ namespace AqualLifeStyle.Tests.Application
     public class ReferralAppServiceTests : AqualLifeStyleTestBase
     {
         private readonly IReferralAppService _referralAppService;
+        private readonly IReferralRepository _referralRepository;
 
         public ReferralAppServiceTests()
         {
             _referralAppService = Resolve<IReferralAppService>();
+            _referralRepository = Resolve<IReferralRepository>();
         }
 
         [Fact]
@@ -71,6 +73,23 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task GetByEnquiryAsync_ReturnsCurrentTenantReferral_WhenSourceEnquiryExistsInMultipleTenants()
+        {
+            const int enquiryId = 4242;
+            var tenantOneReferralId = await CreateReferralAsync(tenantId: 1, sourceEnquiryId: enquiryId);
+            await CreateReferralAsync(tenantId: 2, sourceEnquiryId: enquiryId);
+
+            using (UsingTenantId(1))
+            {
+                var found = await _referralAppService.GetByEnquiryAsync(enquiryId);
+
+                found.ShouldNotBeNull();
+                found.Id.ShouldBe(tenantOneReferralId);
+                found.TenantId.ShouldBe(1);
+            }
+        }
+
+        [Fact]
         public async Task GetAllAsync_ReturnsOnlyCurrentTenantReferrals()
         {
             var tenantOneReferralId = await CreateReferralAsync(tenantId: 1, sourceEnquiryId: 1001);
@@ -81,6 +100,24 @@ namespace AqualLifeStyle.Tests.Application
             referrals.ShouldContain(r => r.Id == tenantOneReferralId);
             referrals.ShouldAllBe(r => r.TenantId == 1);
             referrals.ShouldNotContain(r => r.TenantId == 2);
+        }
+
+        [Fact]
+        public async Task RepositoryGetBySourceEnquiryAsync_UsesAmbientTenantFilter_WhenTenantIsNotPassedExplicitly()
+        {
+            const int enquiryId = 5252;
+            var tenantOneReferralId = await CreateReferralAsync(tenantId: 1, sourceEnquiryId: enquiryId);
+            var tenantTwoReferralId = await CreateReferralAsync(tenantId: 2, sourceEnquiryId: enquiryId);
+
+            using (UsingTenantId(1))
+            {
+                var found = await _referralRepository.GetBySourceEnquiryAsync(enquiryId);
+
+                found.ShouldNotBeNull();
+                found.Id.ShouldBe(tenantOneReferralId);
+                found.TenantId.ShouldBe(1);
+                found.Id.ShouldNotBe(tenantTwoReferralId);
+            }
         }
 
         private Task<int> CreateReferralAsync(int tenantId, int sourceEnquiryId)
