@@ -9,11 +9,13 @@ namespace AqualLifeStyle.Domain.AreaLeaders
     [Serializable]
     public class AreaSpaceApprovedEvent : EventData
     {
+        public int TenantId { get; }
         public int AreaSpaceId { get; }
         public int AreaLeaderId { get; }
 
-        public AreaSpaceApprovedEvent(int areaSpaceId, int areaLeaderId)
+        public AreaSpaceApprovedEvent(int tenantId, int areaSpaceId, int areaLeaderId)
         {
+            TenantId = tenantId;
             AreaSpaceId = areaSpaceId;
             AreaLeaderId = areaLeaderId;
         }

@@ -140,7 +140,7 @@ namespace AqualLifeStyle.Domain.AreaLeaders
 
             Status = AreaSpaceStatus.Approved;
             ApprovedAt = now;
-            DomainEvents.Add(new AreaSpaceApprovedEvent(Id, AreaLeaderId));
+            DomainEvents.Add(new AreaSpaceApprovedEvent(TenantId, Id, AreaLeaderId));
         }
 
         public void Suspend()
