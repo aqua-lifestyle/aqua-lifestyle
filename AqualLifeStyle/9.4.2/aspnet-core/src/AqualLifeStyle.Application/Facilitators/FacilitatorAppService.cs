@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
 using Abp.UI;
+using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Facilitators.Dto;
 using AqualLifeStyle.Application.Validation;
 using AqualLifeStyle.Authorization;
@@ -50,22 +51,51 @@ namespace AqualLifeStyle.Application.Facilitators
 
         public async Task<IReadOnlyList<FacilitatorDto>> GetAllAsync()
         {
-            var facilitators = await _facilitatorRepository.GetAllListAsync();
+            var tenantId = GetRequiredTenantId("Facilitator lookup failed.");
+            var facilitators = await _facilitatorRepository.GetAllListAsync(f => f.TenantId == tenantId);
             return facilitators.Select(MapToDto).ToList();
         }
 
         public async Task<FacilitatorDto> GetAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
-            var facilitator = await _facilitatorRepository.GetAsync(id);
+            var facilitator = await GetFacilitatorForCurrentTenantAsync(id);
             return MapToDto(facilitator);
         }
 
         public async Task<FacilitatorDto> GetByCustomerAsync(int customerId)
         {
             AqualLifeStyleValidator.ValidId(customerId, nameof(customerId));
-            var facilitator = await _facilitatorRepository.GetByCustomerIdAsync(customerId);
+            var facilitator = await GetFacilitatorByCustomerForCurrentTenantAsync(customerId);
             return facilitator == null ? null : MapToDto(facilitator);
+        }
+
+        private int GetRequiredTenantId(string operation)
+        {
+            if (!AbpSession.TenantId.HasValue)
+            {
+                throw new UserFriendlyException(operation, "A tenant context is required.");
+            }
+
+            return AbpSession.TenantId.Value;
+        }
+
+        private async Task<Facilitator> GetFacilitatorForCurrentTenantAsync(int id)
+        {
+            var tenantId = GetRequiredTenantId("Facilitator lookup failed.");
+            var facilitator = await _facilitatorRepository.FirstOrDefaultAsync(f => f.Id == id && f.TenantId == tenantId);
+            if (facilitator == null)
+            {
+                throw new AqualLifeStyleNotFoundException("Facilitator", id);
+            }
+
+            return facilitator;
+        }
+
+        private async Task<Facilitator> GetFacilitatorByCustomerForCurrentTenantAsync(int customerId)
+        {
+            var tenantId = GetRequiredTenantId("Facilitator lookup failed.");
+            return await _facilitatorRepository.FirstOrDefaultAsync(f => f.CustomerId == customerId && f.TenantId == tenantId);
         }
 
         private static FacilitatorDto MapToDto(Facilitator facilitator)

@@ -69,5 +69,35 @@ namespace AqualLifeStyle.Tests.Application
             found.ShouldNotBeNull();
             found.SourceEnquiryId.ShouldBe(enquiryId);
         }
+
+        [Fact]
+        public async Task GetAllAsync_ReturnsOnlyCurrentTenantReferrals()
+        {
+            var tenantOneReferralId = await CreateReferralAsync(tenantId: 1, sourceEnquiryId: 1001);
+            await CreateReferralAsync(tenantId: 2, sourceEnquiryId: 2002);
+
+            var referrals = await _referralAppService.GetAllAsync();
+
+            referrals.ShouldContain(r => r.Id == tenantOneReferralId);
+            referrals.ShouldAllBe(r => r.TenantId == 1);
+            referrals.ShouldNotContain(r => r.TenantId == 2);
+        }
+
+        private Task<int> CreateReferralAsync(int tenantId, int sourceEnquiryId)
+        {
+            return UsingDbContextAsync(tenantId, async ctx =>
+            {
+                var referral = Referral.CreateDirect(
+                    tenantId,
+                    referrerFacilitatorId: tenantId * 10,
+                    referredCustomerId: tenantId * 100,
+                    sourceEnquiryId: sourceEnquiryId,
+                    awardAmount: 100m,
+                    convertedAt: DateTime.UtcNow);
+                ctx.Referrals.Add(referral);
+                await ctx.SaveChangesAsync();
+                return referral.Id;
+            });
+        }
     }
 }

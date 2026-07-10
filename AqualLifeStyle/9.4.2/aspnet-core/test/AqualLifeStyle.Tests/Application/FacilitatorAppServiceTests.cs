@@ -5,9 +5,12 @@ using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.AreaLeaders.Dto;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Customers.Dto;
+using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Facilitators;
 using AqualLifeStyle.Application.Facilitators.Dto;
 using AqualLifeStyle.Domain.AreaLeaders;
+using AqualLifeStyle.Domain.Common;
+using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Facilitators;
 using AqualLifeStyle.EntityFrameworkCore;
 using Shouldly;
@@ -63,6 +66,42 @@ namespace AqualLifeStyle.Tests.Application
             found.Id.ShouldBe(facilitator.Id);
         }
 
+        [Fact]
+        public async Task GetAsync_ShouldThrowNotFound_WhenFacilitatorBelongsToDifferentTenant()
+        {
+            var tenantTwoFacilitator = await CreateFacilitatorAsync("TenantTwoLeaderForGet", "TenantTwoFacilitatorForGet", tenantId: 2);
+
+            using (UsingTenantId(1))
+            {
+                await Assert.ThrowsAsync<AqualLifeStyleNotFoundException>(() => _facilitatorAppService.GetAsync(tenantTwoFacilitator.Id));
+            }
+        }
+
+        [Fact]
+        public async Task GetByCustomerAsync_ShouldReturnNull_WhenFacilitatorBelongsToDifferentTenant()
+        {
+            var tenantTwoFacilitator = await CreateFacilitatorAsync("TenantTwoLeaderForCustomer", "TenantTwoFacilitatorForCustomer", tenantId: 2);
+
+            using (UsingTenantId(1))
+            {
+                var found = await _facilitatorAppService.GetByCustomerAsync(tenantTwoFacilitator.CustomerId);
+                found.ShouldBeNull();
+            }
+        }
+
+        [Fact]
+        public async Task GetAllAsync_ReturnsOnlyCurrentTenantFacilitators()
+        {
+            var tenantOneFacilitator = await CreateFacilitatorAsync("TenantOneLeader", "TenantOneFacilitator", tenantId: 1);
+            await CreateFacilitatorAsync("TenantTwoLeader", "TenantTwoFacilitator", tenantId: 2);
+
+            var facilitators = await _facilitatorAppService.GetAllAsync();
+
+            facilitators.ShouldContain(f => f.Id == tenantOneFacilitator.Id);
+            facilitators.ShouldAllBe(f => f.TenantId == 1);
+            facilitators.ShouldNotContain(f => f.TenantId == 2);
+        }
+
         private async Task<int> CreateCustomerAsync(string name)
         {
             await _customerAppService.CreateAsync(new CreateCustomerDto
@@ -75,6 +114,30 @@ namespace AqualLifeStyle.Tests.Application
             {
                 var customer = await ctx.Customers.FirstAsync(c => c.Email.Value == $"{name.ToLower()}@example.com");
                 return customer.Id;
+            });
+        }
+
+        private async Task<Facilitator> CreateFacilitatorAsync(string leaderName, string facilitatorName, int tenantId)
+        {
+            return await UsingDbContextAsync(tenantId, async ctx =>
+            {
+                var leaderCustomer = Customer.Create(tenantId, leaderName, new EmailAddress($"{leaderName.ToLower()}@example.com"));
+                ctx.Customers.Add(leaderCustomer);
+                await ctx.SaveChangesAsync();
+
+                var leader = AreaLeader.Apply(tenantId, leaderCustomer.Id, LicenseType.EntreLevel);
+                ctx.AreaLeaders.Add(leader);
+                await ctx.SaveChangesAsync();
+
+                var facilitatorCustomer = Customer.Create(tenantId, facilitatorName, new EmailAddress($"{facilitatorName.ToLower()}@example.com"));
+                ctx.Customers.Add(facilitatorCustomer);
+                await ctx.SaveChangesAsync();
+
+                var facilitator = Facilitator.Register(tenantId, facilitatorCustomer.Id, leader.Id);
+                ctx.Facilitators.Add(facilitator);
+                await ctx.SaveChangesAsync();
+
+                return facilitator;
             });
         }
     }
