@@ -1730,12 +1730,17 @@ namespace AqualLifeStyle.Migrations
                     b.Property<int?>("MembershipId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("Customers", (string)null);
                 });
@@ -1786,9 +1791,14 @@ namespace AqualLifeStyle.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ReferredByFacilitatorId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("Enquiries", (string)null);
                 });
@@ -1992,7 +2002,12 @@ namespace AqualLifeStyle.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("Memberships", (string)null);
                 });

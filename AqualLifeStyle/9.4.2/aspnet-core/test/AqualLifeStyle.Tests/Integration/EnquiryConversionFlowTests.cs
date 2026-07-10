@@ -9,8 +9,11 @@ using AqualLifeStyle.Application.Enquiries;
 using AqualLifeStyle.Application.Facilitators;
 using AqualLifeStyle.Application.Facilitators.Dto;
 using AqualLifeStyle.Domain.AreaLeaders;
+using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
+using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Facilitators;
+using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.EntityFrameworkCore.Repositories;
 using Shouldly;
@@ -80,6 +83,57 @@ namespace AqualLifeStyle.Tests.Integration
             });
         }
 
+        [Fact]
+        public async Task ConvertEnquiry_AssignsLowestIdActiveMembership_WithoutOverwritingExistingAssignment()
+        {
+            var firstMembershipId = await CreateMembershipAsync("FlowJasper");
+            var secondMembershipId = await CreateMembershipAsync("FlowOnyx", MembershipType.Onyx);
+            secondMembershipId.ShouldBeGreaterThan(firstMembershipId);
+
+            var customerId = await CreateCustomerAsync("MembershipProspect");
+            await _enquiryAppService.CreateAsync(new AqualLifeStyle.Application.Enquiries.Dto.CreateEnquiryDto
+            {
+                CustomerId = customerId,
+                ProductId = 1,
+                Message = "Assign membership on conversion"
+            });
+
+            var enquiryId = await UsingDbContextAsync(async ctx =>
+                (await ctx.Enquiries.FirstAsync(e => e.CustomerId == customerId)).Id);
+
+            await _enquiryAppService.ConvertToCustomerAsync(enquiryId, new AqualLifeStyle.Application.Enquiries.Dto.ConvertEnquiryToCustomerDto());
+            await Resolve<AqualLifeStyle.Application.Enquiries.EnquiryConvertedEventHandler>().HandleEventAsync(
+                new EnquiryConvertedEvent(enquiryId, customerId, 1, null, System.DateTime.UtcNow, tenantId: 1));
+
+            await UsingDbContextAsync(async ctx =>
+            {
+                var customer = await ctx.Customers.FirstAsync(c => c.Id == customerId);
+                customer.MembershipId.ShouldBe(firstMembershipId);
+            });
+        }
+
+        [Fact]
+        public async Task LinkCustomerAsync_FiltersMembershipsByEventTenant()
+        {
+            var tenantTwoMembershipId = await CreateMembershipAsync("TenantTwoTier", MembershipType.Onyx, tenantId: 2);
+            var tenantOneMembershipId = await CreateMembershipAsync("TenantOneTier", MembershipType.Jasper, tenantId: 1);
+            tenantTwoMembershipId.ShouldBeLessThan(tenantOneMembershipId);
+
+            var tenantOneCustomerId = await CreateCustomerAsync("TenantScopedProspect", tenantId: 1);
+
+            using (UsingTenantId(null))
+            {
+                await Resolve<AqualLifeStyle.Application.Enquiries.EnquiryConvertedEventHandler>().HandleEventAsync(
+                    new EnquiryConvertedEvent(101, tenantOneCustomerId, 1, null, System.DateTime.UtcNow, tenantId: 1));
+            }
+
+            await UsingDbContextAsync(1, async ctx =>
+            {
+                var customer = await ctx.Customers.FirstAsync(c => c.Id == tenantOneCustomerId);
+                customer.MembershipId.ShouldBe(tenantOneMembershipId);
+            });
+        }
+
         private async Task SetReferredByFacilitatorAsync(int enquiryId, int facilitatorId)
         {
             var repo = Resolve<IEnquiryRepository>();
@@ -88,16 +142,38 @@ namespace AqualLifeStyle.Tests.Integration
             await repo.UpdateAsync(enquiry);
         }
 
-        private async Task<int> CreateCustomerAsync(string name)
+        private async Task<int> CreateCustomerAsync(string name, int? tenantId = 1)
         {
-            await _customerAppService.CreateAsync(new CreateCustomerDto
+            if (tenantId == AbpSession.TenantId)
             {
-                Name = name,
-                Email = $"{name.ToLower()}@example.com"
-            });
+                await _customerAppService.CreateAsync(new CreateCustomerDto
+                {
+                    Name = name,
+                    Email = $"{name.ToLower()}@example.com"
+                });
+            }
+            else
+            {
+                await UsingDbContextAsync(tenantId, async ctx =>
+                {
+                    ctx.Customers.Add(Customer.Create(tenantId, name, new AqualLifeStyle.Domain.Common.EmailAddress($"{name.ToLower()}@example.com")));
+                    await ctx.SaveChangesAsync();
+                });
+            }
 
-            return await UsingDbContextAsync(async ctx =>
+            return await UsingDbContextAsync(tenantId, async ctx =>
                 (await ctx.Customers.FirstAsync(c => c.Email.Value == $"{name.ToLower()}@example.com")).Id);
+        }
+
+        private Task<int> CreateMembershipAsync(string name, MembershipType membershipType = MembershipType.Jasper, int? tenantId = 1)
+        {
+            return UsingDbContextAsync(tenantId, async ctx =>
+            {
+                var membership = Membership.Create(tenantId, name, $"{name} description", membershipType);
+                ctx.Memberships.Add(membership);
+                await ctx.SaveChangesAsync();
+                return membership.Id;
+            });
         }
     }
 }

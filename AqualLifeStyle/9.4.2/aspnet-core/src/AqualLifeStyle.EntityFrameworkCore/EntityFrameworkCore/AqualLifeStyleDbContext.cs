@@ -40,6 +40,8 @@ namespace AqualLifeStyle.EntityFrameworkCore
             modelBuilder.Entity<Membership>(entity =>
             {
                 entity.ToTable("Memberships");
+                entity.Property(e => e.TenantId);
+                entity.HasIndex(e => e.TenantId);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(128);
                 entity.Property(e => e.Description).HasMaxLength(512);
                 entity.Property(e => e.MembershipType).IsRequired();
@@ -57,6 +59,8 @@ namespace AqualLifeStyle.EntityFrameworkCore
             modelBuilder.Entity<Customer>(entity =>
             {
                 entity.ToTable("Customers");
+                entity.Property(e => e.TenantId);
+                entity.HasIndex(e => e.TenantId);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(128);
                 entity.OwnsOne(e => e.Email, email =>
                 {
@@ -89,6 +93,8 @@ namespace AqualLifeStyle.EntityFrameworkCore
             modelBuilder.Entity<Enquiry>(entity =>
             {
                 entity.ToTable("Enquiries");
+                entity.Property(e => e.TenantId);
+                entity.HasIndex(e => e.TenantId);
                 entity.Property(e => e.CustomerId).IsRequired();
                 entity.Property(e => e.ProductId).IsRequired();
                 entity.Property(e => e.Message).IsRequired().HasMaxLength(2000);
