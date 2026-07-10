@@ -67,7 +67,7 @@ namespace AqualLifeStyle.Application.Memberships
             AqualLifeStyleValidator.NotNull(input, nameof(input));
             AqualLifeStyleValidator.NotNullOrEmpty(input.Name, nameof(input.Name));
 
-            var membership = Membership.Create(input.Name, input.Description, input.MembershipType);
+            var membership = Membership.Create(AbpSession.TenantId, input.Name, input.Description, input.MembershipType);
             await _membershipRepository.InsertAsync(membership);
         }
 

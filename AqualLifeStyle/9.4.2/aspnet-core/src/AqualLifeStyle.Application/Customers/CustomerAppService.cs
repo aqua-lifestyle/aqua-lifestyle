@@ -135,7 +135,7 @@ namespace AqualLifeStyle.Application.Customers
                 }
 
                 var email = new EmailAddress(input.Email);
-                var customer = Customer.Create(input.Name, email, input.MembershipId);
+                var customer = Customer.Create(AbpSession.TenantId, input.Name, email, input.MembershipId);
                 await _customerRepository.InsertAsync(customer);
             }
             catch (UserFriendlyException)

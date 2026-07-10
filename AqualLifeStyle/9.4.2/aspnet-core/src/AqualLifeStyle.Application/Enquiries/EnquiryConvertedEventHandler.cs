@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using Abp.Dependency;
 using Abp.Domain.Repositories;
+using Abp.Domain.Uow;
 using Abp.Events.Bus;
 using Abp.Events.Bus.Handlers;
 using AqualLifeStyle.Domain.AreaNetwork;
@@ -25,19 +26,22 @@ namespace AqualLifeStyle.Application.Enquiries
         private readonly IReferralRepository _referralRepository;
         private readonly ICustomerRepository _customerRepository;
         private readonly IMembershipRepository _membershipRepository;
+        private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public EnquiryConvertedEventHandler(
             IFacilitatorRepository facilitatorRepository,
             IAreaLeaderRepository areaLeaderRepository,
             IReferralRepository referralRepository,
             ICustomerRepository customerRepository,
-            IMembershipRepository membershipRepository)
+            IMembershipRepository membershipRepository,
+            IUnitOfWorkManager unitOfWorkManager)
         {
             _facilitatorRepository = facilitatorRepository;
             _areaLeaderRepository = areaLeaderRepository;
             _referralRepository = referralRepository;
             _customerRepository = customerRepository;
             _membershipRepository = membershipRepository;
+            _unitOfWorkManager = unitOfWorkManager;
         }
 
         public async Task HandleEventAsync(EnquiryConvertedEvent evt)
@@ -47,44 +51,60 @@ namespace AqualLifeStyle.Application.Enquiries
                 return;
             }
 
-            if (evt.ReferredByFacilitatorId.HasValue)
+            // The conversion may be handled outside the tenant's ambient session (e.g. a host-level
+            // trigger), so scope the whole attribution to the tenant carried by the event. This makes
+            // ABP's MayHaveTenant filter and the explicit TenantId predicates in the repositories agree.
+            using (var uow = _unitOfWorkManager.Begin())
             {
-                var facilitator = await _facilitatorRepository.FirstOrDefaultAsync(f => f.Id == evt.ReferredByFacilitatorId.Value);
-                var areaLeader = facilitator == null
-                    ? null
-                    : await _areaLeaderRepository.FirstOrDefaultAsync(a => a.Id == facilitator.AreaLeaderId);
-
-                if (facilitator != null && areaLeader != null)
+                using (_unitOfWorkManager.Current.SetTenantId(evt.TenantId))
                 {
-                    var attribution = new ReferralAttributionService(new CommissionCalculator())
-                        .Attribute(evt, facilitator, areaLeader);
-
-                    await _referralRepository.InsertAsync(attribution.DirectReferral);
-                    await _referralRepository.InsertAsync(attribution.IndirectReferral);
-                    await _facilitatorRepository.UpdateAsync(facilitator);
-                    await _areaLeaderRepository.UpdateAsync(areaLeader);
+                    await AttributeReferralsAsync(evt);
+                    await LinkCustomerAsync(evt);
                 }
+
+                await uow.CompleteAsync();
+            }
+        }
+
+        private async Task AttributeReferralsAsync(EnquiryConvertedEvent evt)
+        {
+            if (!evt.ReferredByFacilitatorId.HasValue)
+            {
+                return;
             }
 
-            await LinkCustomerAsync(evt);
+            var facilitator = await _facilitatorRepository.FirstOrDefaultAsync(f => f.Id == evt.ReferredByFacilitatorId.Value);
+            var areaLeader = facilitator == null
+                ? null
+                : await _areaLeaderRepository.FirstOrDefaultAsync(a => a.Id == facilitator.AreaLeaderId);
+
+            if (facilitator != null && areaLeader != null)
+            {
+                var attribution = new ReferralAttributionService(new CommissionCalculator())
+                    .Attribute(evt, facilitator, areaLeader);
+
+                await _referralRepository.InsertAsync(attribution.DirectReferral);
+                await _referralRepository.InsertAsync(attribution.IndirectReferral);
+                await _facilitatorRepository.UpdateAsync(facilitator);
+                await _areaLeaderRepository.UpdateAsync(areaLeader);
+            }
         }
 
         private async Task LinkCustomerAsync(EnquiryConvertedEvent evt)
         {
-            var customer = await _customerRepository.FirstOrDefaultAsync(c => c.Id == evt.CustomerId);
+            var customer = await _customerRepository.FirstOrDefaultAsync(c => c.Id == evt.CustomerId && c.TenantId == evt.TenantId);
             if (customer == null || customer.MembershipId.HasValue)
             {
                 return;
             }
 
-            var membership = await _membershipRepository.FirstOrDefaultAsync(m => m.IsActive);
+            var membership = await _membershipRepository.GetFirstActiveAsync(evt.TenantId);
             if (membership == null)
             {
                 return;
             }
 
-            customer.ChangeMembership(membership.Id);
-            await _customerRepository.UpdateAsync(customer);
+            await _customerRepository.AssignMembershipIfUnassignedAsync(customer.Id, evt.TenantId, membership.Id);
         }
     }
 }

@@ -49,7 +49,7 @@ namespace AqualLifeStyle.Application.Enquiries
             AqualLifeStyleValidator.ValidId(input.ProductId, nameof(input.ProductId));
             AqualLifeStyleValidator.NotNullOrEmpty(input.Message, nameof(input.Message));
 
-            var enquiry = Enquiry.Create(input.CustomerId, input.ProductId, input.Message);
+            var enquiry = Enquiry.Create(AbpSession.TenantId, input.CustomerId, input.ProductId, input.Message);
             await _enquiryRepository.InsertAsync(enquiry);
         }
 
@@ -167,7 +167,8 @@ namespace AqualLifeStyle.Application.Enquiries
                 enquiry.CustomerId,
                 enquiry.ProductId,
                 enquiry.ReferredByFacilitatorId,
-                enquiry.ConvertedAt ?? System.DateTime.UtcNow));
+                enquiry.ConvertedAt ?? System.DateTime.UtcNow,
+                enquiry.TenantId));
 
             return MapToDto(enquiry);
         }
