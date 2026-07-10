@@ -117,6 +117,14 @@
     <text name="ResetPasswordStepOneInfo">1. Enter your administrator password</text>
     <text name="ResetPasswordStepTwoInfo">2. Copy this random password so you can send it to the user</text>
     <text name="UsersActivation">Users activation</text>
+    <text name="AreaLeaders" value="Area leaders" />
+    <text name="AreaLeadersManage" value="Manage area leaders" />
+    <text name="AreaSpaces" value="Area spaces" />
+    <text name="AreaSpacesManage" value="Manage area spaces" />
+    <text name="Facilitators" value="Facilitators" />
+    <text name="FacilitatorsManage" value="Manage facilitators" />
+    <text name="Referrals" value="Referrals" />
+    <text name="ReferralsManage" value="Manage referrals" />
     <text name="403PageHeader">Forbidden</text>
     <text name="403PageDescription">You don't have permission to access this resource. Please contact your administrator.</text>
     <text name="403PageButton">Go back to Dashboard</text>
