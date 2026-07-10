@@ -1,13 +1,16 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Castle.Core.Logging;
 using Microsoft.EntityFrameworkCore;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.AreaLeaders.Dto;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Customers.Dto;
+using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Domain.AreaLeaders;
 using AqualLifeStyle.EntityFrameworkCore;
+using NSubstitute;
 using Shouldly;
 using Xunit;
 
@@ -92,6 +95,12 @@ namespace AqualLifeStyle.Tests.Application
 
             approved.Status.ShouldBe((int)AreaSpaceStatus.Approved);
             approved.ApprovedAt.ShouldNotBeNull();
+
+            await UsingDbContextAsync(async ctx =>
+            {
+                var updatedLeader = await ctx.AreaLeaders.FirstAsync(a => a.Id == leader.Id);
+                updatedLeader.AreaSpaceId.ShouldBe(space.Id);
+            });
         }
 
         [Fact]
@@ -124,6 +133,44 @@ namespace AqualLifeStyle.Tests.Application
 
             await Should.ThrowAsync<System.Exception>(async () =>
                 await _areaSpaceAppService.ApproveAsync(space.Id, tooSoon));
+        }
+
+        [Fact]
+        public async Task HandleEventAsync_WhenLeaderMissing_LogsErrorAndThrowsDependencyException()
+        {
+            var customerId = await CreateCustomerAsync("LeaderE");
+            var leader = await _areaLeaderAppService.ApplyAsync(
+                new RegisterAreaLeaderDto { CustomerId = customerId, LicenseType = (int)LicenseType.EntreLevel });
+
+            var space = await _areaSpaceAppService.ApplyAsync(new CreateAreaSpaceDto
+            {
+                AreaLeaderId = leader.Id,
+                AddressLine = "3 Aqua Street",
+                Capacity = "50",
+                InterestedMembers = 20
+            });
+
+            await UsingDbContextAsync(async ctx =>
+            {
+                var persistedLeader = await ctx.AreaLeaders.FirstAsync(a => a.Id == leader.Id);
+                ctx.AreaLeaders.Remove(persistedLeader);
+            });
+
+            var logger = Substitute.For<ILogger>();
+            var handler = Resolve<AreaSpaceApprovedEventHandler>();
+            handler.Logger = logger;
+
+            var ex = await Assert.ThrowsAsync<AqualLifeStyleDependencyException>(() =>
+                handler.HandleEventAsync(new AreaSpaceApprovedEvent(1, space.Id, leader.Id)));
+
+            ex.Message.ShouldContain($"area space {space.Id}");
+            ex.Message.ShouldContain("tenant 1");
+            ex.Message.ShouldContain($"area leader {leader.Id}");
+
+            logger.Received(1).Error(Arg.Is<string>(message =>
+                message.Contains($"area space {space.Id}")
+                && message.Contains("tenant 1")
+                && message.Contains($"area leader {leader.Id}")));
         }
 
         private async Task<int> CreateCustomerAsync(string name)

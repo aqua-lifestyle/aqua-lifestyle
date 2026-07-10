@@ -5,8 +5,9 @@ using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
 using Abp.Events.Bus;
 using Abp.Events.Bus.Handlers;
-using Abp.Runtime.Session;
+using Castle.Core.Logging;
 using AqualLifeStyle.Application.Exceptions;
+using AqualLifeStyle.Application.Memberships;
 using AqualLifeStyle.Domain.AreaNetwork;
 using AqualLifeStyle.Domain.AreaLeaders;
 using AqualLifeStyle.Domain.Customers;
@@ -20,7 +21,7 @@ namespace AqualLifeStyle.Application.Enquiries
     /// Reacts to an enquiry conversion: links the converted customer to an active membership tier
     /// (idempotent) and, when the lead was sourced by a facilitator, attributes the direct and
     /// indirect referrals to the network via <see cref="ReferralAttributionService"/>.
-    /// Runs synchronously inside the converting enquiry's unit of work.
+    /// Runs in its own tenant-scoped unit of work after the conversion commits.
     /// </summary>
     public class EnquiryConvertedEventHandler : IAsyncEventHandler<EnquiryConvertedEvent>, ITransientDependency
     {
@@ -28,26 +29,26 @@ namespace AqualLifeStyle.Application.Enquiries
         private readonly IAreaLeaderRepository _areaLeaderRepository;
         private readonly IReferralRepository _referralRepository;
         private readonly ICustomerRepository _customerRepository;
-        private readonly IMembershipRepository _membershipRepository;
+        private readonly IActiveMembershipCache _activeMembershipCache;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
-        private readonly IAbpSession _abpSession;
+
+        public ILogger Logger { get; set; }
 
         public EnquiryConvertedEventHandler(
             IFacilitatorRepository facilitatorRepository,
             IAreaLeaderRepository areaLeaderRepository,
             IReferralRepository referralRepository,
             ICustomerRepository customerRepository,
-            IMembershipRepository membershipRepository,
-            IUnitOfWorkManager unitOfWorkManager,
-            IAbpSession abpSession)
+            IActiveMembershipCache activeMembershipCache,
+            IUnitOfWorkManager unitOfWorkManager)
         {
             _facilitatorRepository = facilitatorRepository;
             _areaLeaderRepository = areaLeaderRepository;
             _referralRepository = referralRepository;
             _customerRepository = customerRepository;
-            _membershipRepository = membershipRepository;
+            _activeMembershipCache = activeMembershipCache;
             _unitOfWorkManager = unitOfWorkManager;
-            _abpSession = abpSession;
+            Logger = NullLogger.Instance;
         }
 
         public async Task HandleEventAsync(EnquiryConvertedEvent evt)
@@ -57,34 +58,30 @@ namespace AqualLifeStyle.Application.Enquiries
                 return;
             }
 
-            var currentUow = _unitOfWorkManager.Current
-                ?? throw new InvalidOperationException(
-                    $"{nameof(EnquiryConvertedEventHandler)} must run inside an existing unit of work.");
             var tenantId = GetValidatedTenantId(evt);
 
-            // The conversion may be handled outside the tenant's ambient session (e.g. a host-level
-            // trigger), so scope the whole attribution to the tenant carried by the event. This makes
-            // ABP's MayHaveTenant filter and the explicit TenantId predicates in the repositories agree.
-            using (currentUow.SetTenantId(tenantId))
+            using (var uow = _unitOfWorkManager.Begin())
             {
-                await AttributeReferralsAsync(evt);
-                await LinkCustomerAsync(evt);
+                // The conversion event runs after the originating UoW commits, so it needs its own
+                // tenant-scoped UoW for any follow-up reads and writes.
+                using (_unitOfWorkManager.Current.SetTenantId(tenantId))
+                {
+                    await AttributeReferralsAsync(evt);
+                    await LinkCustomerAsync(evt);
+                }
+
+                await uow.CompleteAsync();
             }
         }
 
         private int GetValidatedTenantId(EnquiryConvertedEvent evt)
         {
-            if (!_abpSession.TenantId.HasValue)
+            if (!evt.TenantId.HasValue || evt.TenantId.Value <= 0)
             {
-                throw new AqualLifeStyleAuthorizationException("Enquiry conversion handling requires a tenant context.");
+                throw new AqualLifeStyleAuthorizationException("Enquiry conversion handling requires a valid tenant context.");
             }
 
-            if (_abpSession.TenantId.Value != evt.TenantId)
-            {
-                throw new AqualLifeStyleAuthorizationException("Enquiry conversion event tenant does not match the current tenant context.");
-            }
-
-            return _abpSession.TenantId.Value;
+            return evt.TenantId.Value;
         }
 
         private async Task AttributeReferralsAsync(EnquiryConvertedEvent evt)
@@ -103,10 +100,15 @@ namespace AqualLifeStyle.Application.Enquiries
                 return;
             }
 
-            var facilitator = await _facilitatorRepository.FirstOrDefaultAsync(f => f.Id == evt.ReferredByFacilitatorId.Value);
-            var areaLeader = facilitator == null
-                ? null
-                : await _areaLeaderRepository.FirstOrDefaultAsync(a => a.Id == facilitator.AreaLeaderId);
+            var facilitator = await _facilitatorRepository.GetWithAreaLeaderAsync(evt.ReferredByFacilitatorId.Value);
+            var areaLeader = facilitator?.AreaLeader;
+
+            if (facilitator != null && areaLeader == null)
+            {
+                Logger.Warn(
+                    $"Skipping referral attribution for enquiry {evt.EnquiryId} in tenant {evt.TenantId}: facilitator {facilitator.Id} references missing area leader {facilitator.AreaLeaderId}.");
+                return;
+            }
 
             if (facilitator != null && areaLeader != null)
             {
@@ -128,13 +130,13 @@ namespace AqualLifeStyle.Application.Enquiries
                 return;
             }
 
-            var membership = await _membershipRepository.GetFirstActiveAsync(evt.TenantId);
-            if (membership == null)
+            var membershipId = await _activeMembershipCache.GetFirstActiveMembershipIdAsync(evt.TenantId);
+            if (!membershipId.HasValue)
             {
                 return;
             }
 
-            await _customerRepository.AssignMembershipIfUnassignedAsync(customer.Id, evt.TenantId, membership.Id);
+            await _customerRepository.AssignMembershipIfUnassignedAsync(customer.Id, evt.TenantId, membershipId.Value);
         }
     }
 }

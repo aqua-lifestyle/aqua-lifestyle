@@ -22,12 +22,14 @@ namespace AqualLifeStyle.Tests.Application
     public class FacilitatorAppServiceTests : AqualLifeStyleTestBase
     {
         private readonly IFacilitatorAppService _facilitatorAppService;
+        private readonly IFacilitatorRepository _facilitatorRepository;
         private readonly IAreaLeaderAppService _areaLeaderAppService;
         private readonly ICustomerAppService _customerAppService;
 
         public FacilitatorAppServiceTests()
         {
             _facilitatorAppService = Resolve<IFacilitatorAppService>();
+            _facilitatorRepository = Resolve<IFacilitatorRepository>();
             _areaLeaderAppService = Resolve<IAreaLeaderAppService>();
             _customerAppService = Resolve<ICustomerAppService>();
         }
@@ -141,6 +143,19 @@ namespace AqualLifeStyle.Tests.Application
             facilitators.ShouldContain(f => f.Id == tenantOneFacilitator.Id);
             facilitators.ShouldAllBe(f => f.TenantId == 1);
             facilitators.ShouldNotContain(f => f.TenantId == 2);
+        }
+
+        [Fact]
+        public async Task GetWithAreaLeaderAsync_LoadsLinkedAreaLeader()
+        {
+            var facilitator = await CreateFacilitatorAsync("LeaderWithInclude", "FacilitatorWithInclude", tenantId: 1);
+
+            var found = await _facilitatorRepository.GetWithAreaLeaderAsync(facilitator.Id);
+
+            found.ShouldNotBeNull();
+            found.Id.ShouldBe(facilitator.Id);
+            found.AreaLeader.ShouldNotBeNull();
+            found.AreaLeader.Id.ShouldBe(facilitator.AreaLeaderId);
         }
 
         private async Task<int> CreateCustomerAsync(string name)

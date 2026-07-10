@@ -140,6 +140,10 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 entity.Property(e => e.DirectReferrals).IsRequired();
                 entity.Property(e => e.IndirectReferrals).IsRequired();
                 entity.Property(e => e.AwardBalance).IsRequired();
+                entity.HasOne(e => e.AreaLeader)
+                    .WithMany()
+                    .HasForeignKey(e => e.AreaLeaderId)
+                    .OnDelete(DeleteBehavior.Restrict);
                 entity.HasIndex(e => e.AreaLeaderId);
                 entity.HasIndex(e => e.CustomerId);
             });

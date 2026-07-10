@@ -1,6 +1,7 @@
 using System;
 using Abp.Domain.Entities.Auditing;
 using Abp.Domain.Entities;
+using AqualLifeStyle.Domain.AreaLeaders;
 
 namespace AqualLifeStyle.Domain.Facilitators
 {
@@ -14,6 +15,7 @@ namespace AqualLifeStyle.Domain.Facilitators
 
         public int CustomerId { get; private set; }
         public int AreaLeaderId { get; private set; }
+        public AreaLeader AreaLeader { get; private set; }
         public FacilitatorRank Rank { get; private set; }
         public int DirectReferrals { get; private set; }
         public int IndirectReferrals { get; private set; }

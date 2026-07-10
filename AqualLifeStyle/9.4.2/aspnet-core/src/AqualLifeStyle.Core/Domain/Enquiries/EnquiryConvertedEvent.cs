@@ -6,8 +6,8 @@ namespace AqualLifeStyle.Domain.Enquiries
     /// <summary>
     /// Raised when an enquiry is converted to a customer. Carries enough context for the network
     /// bounded context to attribute direct/indirect referrals without coupling to <see cref="Enquiry"/>.
-    /// Triggered by the application layer (the existing <c>Enquiry</c> aggregate is intentionally
-    /// not retrofitted to <c>AggregateRoot</c> — see ADR-001).
+    /// Triggered after the converting unit of work completes so handlers can safely re-query the
+    /// converted enquiry and related tenant data.
     /// </summary>
     [Serializable]
     public class EnquiryConvertedEvent : EventData

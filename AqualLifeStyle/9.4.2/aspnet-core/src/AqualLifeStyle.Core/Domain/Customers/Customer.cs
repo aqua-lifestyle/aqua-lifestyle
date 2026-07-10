@@ -16,6 +16,11 @@ namespace AqualLifeStyle.Domain.Customers
 
         private Customer(int? tenantId, string name, EmailAddress email, int? membershipId = null, bool isActive = true)
         {
+            if (tenantId.HasValue && tenantId.Value <= 0)
+            {
+                throw new ArgumentException("TenantId must be valid.", nameof(tenantId));
+            }
+
             TenantId = tenantId;
             SetName(name);
             Email = email ?? throw new ArgumentNullException(nameof(email));

@@ -3,7 +3,9 @@ using Abp.Dependency;
 using Abp.Domain.Uow;
 using Abp.Events.Bus;
 using Abp.Events.Bus.Handlers;
+using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Domain.AreaLeaders;
+using Castle.Core.Logging;
 
 namespace AqualLifeStyle.Application.AreaLeaders
 {
@@ -14,11 +16,13 @@ namespace AqualLifeStyle.Application.AreaLeaders
     {
         private readonly IAreaLeaderRepository _areaLeaderRepository;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        public ILogger Logger { get; set; }
 
         public AreaSpaceApprovedEventHandler(IAreaLeaderRepository areaLeaderRepository, IUnitOfWorkManager unitOfWorkManager)
         {
             _areaLeaderRepository = areaLeaderRepository;
             _unitOfWorkManager = unitOfWorkManager;
+            Logger = NullLogger.Instance;
         }
 
         public async Task HandleEventAsync(AreaSpaceApprovedEvent evt)
@@ -36,7 +40,10 @@ namespace AqualLifeStyle.Application.AreaLeaders
                         l => l.Id == evt.AreaLeaderId && l.TenantId == evt.TenantId);
                     if (leader == null)
                     {
-                        return;
+                        Logger.Error(
+                            $"Failed to link approved area space {evt.AreaSpaceId} in tenant {evt.TenantId}: missing area leader {evt.AreaLeaderId}.");
+                        throw new AqualLifeStyleDependencyException(
+                            $"Cannot link approved area space {evt.AreaSpaceId} in tenant {evt.TenantId}: required area leader {evt.AreaLeaderId} was not found.");
                     }
 
                     leader.LinkAreaSpace(evt.AreaSpaceId);

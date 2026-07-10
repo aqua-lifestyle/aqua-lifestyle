@@ -138,13 +138,18 @@ namespace AqualLifeStyle.Application.Enquiries
 
             await _enquiryRepository.UpdateAsync(enquiry);
 
-            _eventBus?.Trigger(new EnquiryConvertedEvent(
-                enquiry.Id,
-                enquiry.CustomerId,
-                enquiry.ProductId,
-                enquiry.ReferredByFacilitatorId,
-                enquiry.ConvertedAt ?? System.DateTime.UtcNow,
-                enquiry.TenantId));
+            if (_eventBus != null)
+            {
+                var convertedEvent = new EnquiryConvertedEvent(
+                    enquiry.Id,
+                    enquiry.CustomerId,
+                    enquiry.ProductId,
+                    enquiry.ReferredByFacilitatorId,
+                    enquiry.ConvertedAt ?? System.DateTime.UtcNow,
+                    enquiry.TenantId);
+
+                CurrentUnitOfWork.Completed += (sender, args) => _eventBus.Trigger(convertedEvent);
+            }
 
             return MapToDto(enquiry);
         }

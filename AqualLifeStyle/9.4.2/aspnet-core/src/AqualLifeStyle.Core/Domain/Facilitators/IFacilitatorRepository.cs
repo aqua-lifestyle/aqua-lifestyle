@@ -6,6 +6,7 @@ namespace AqualLifeStyle.Domain.Facilitators
     public interface IFacilitatorRepository : IRepository<Facilitator, int>
     {
         Task<Facilitator> GetByCustomerIdAsync(int customerId);
+        Task<Facilitator> GetWithAreaLeaderAsync(int facilitatorId);
         Task<int> CountByAreaLeaderAsync(int areaLeaderId);
     }
 }

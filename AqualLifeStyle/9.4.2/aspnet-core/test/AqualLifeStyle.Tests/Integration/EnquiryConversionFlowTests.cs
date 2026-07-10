@@ -1,7 +1,7 @@
 using System.Linq;
 using System.Threading.Tasks;
-using Abp.Domain.Uow;
 using Microsoft.EntityFrameworkCore;
+using Castle.Core.Logging;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.AreaLeaders.Dto;
 using AqualLifeStyle.Application.Customers;
@@ -10,6 +10,8 @@ using AqualLifeStyle.Application.Enquiries;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Facilitators;
 using AqualLifeStyle.Application.Facilitators.Dto;
+using AqualLifeStyle.Application.Memberships;
+using AqualLifeStyle.Application.Memberships.Dto;
 using AqualLifeStyle.Domain.AreaLeaders;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
@@ -18,6 +20,7 @@ using AqualLifeStyle.Domain.Facilitators;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.EntityFrameworkCore.Repositories;
+using NSubstitute;
 using Shouldly;
 using Xunit;
 
@@ -34,6 +37,7 @@ namespace AqualLifeStyle.Tests.Integration
         private readonly IFacilitatorAppService _facilitatorAppService;
         private readonly IEnquiryAppService _enquiryAppService;
         private readonly ICustomerAppService _customerAppService;
+        private readonly IMembershipAppService _membershipAppService;
 
         public EnquiryConversionFlowTests()
         {
@@ -41,6 +45,7 @@ namespace AqualLifeStyle.Tests.Integration
             _facilitatorAppService = Resolve<IFacilitatorAppService>();
             _enquiryAppService = Resolve<IEnquiryAppService>();
             _customerAppService = Resolve<ICustomerAppService>();
+            _membershipAppService = Resolve<IMembershipAppService>();
         }
 
         [Fact]
@@ -130,6 +135,57 @@ namespace AqualLifeStyle.Tests.Integration
         }
 
         [Fact]
+        public async Task HandleEventAsync_WhenFacilitatorReferencesMissingAreaLeader_DoesNotCreateReferrals()
+        {
+            var scenario = await CreateOrphanedReferralScenarioAsync("MissingLeader");
+
+            await HandleConvertedEventAsync(
+                new EnquiryConvertedEvent(
+                    scenario.enquiryId,
+                    scenario.prospectCustomerId,
+                    1,
+                    scenario.facilitatorId,
+                    System.DateTime.UtcNow,
+                    tenantId: 1));
+
+            await UsingDbContextAsync(async ctx =>
+            {
+                ctx.Referrals.Count(r => r.SourceEnquiryId == scenario.enquiryId).ShouldBe(0);
+
+                var facilitator = await ctx.Facilitators.FirstAsync(f => f.Id == scenario.facilitatorId);
+                facilitator.DirectReferrals.ShouldBe(0);
+
+                var areaLeader = await ctx.AreaLeaders.IgnoreQueryFilters().FirstOrDefaultAsync(a => a.Id == scenario.areaLeaderId);
+                areaLeader.ShouldNotBeNull();
+                areaLeader.IsDeleted.ShouldBeTrue();
+            });
+        }
+
+        [Fact]
+        public async Task HandleEventAsync_WhenFacilitatorReferencesMissingAreaLeader_LogsWarning()
+        {
+            var scenario = await CreateOrphanedReferralScenarioAsync("MissingLeaderWarn");
+            var logger = Substitute.For<ILogger>();
+            var handler = Resolve<AqualLifeStyle.Application.Enquiries.EnquiryConvertedEventHandler>();
+            handler.Logger = logger;
+
+            await handler.HandleEventAsync(
+                new EnquiryConvertedEvent(
+                    scenario.enquiryId,
+                    scenario.prospectCustomerId,
+                    1,
+                    scenario.facilitatorId,
+                    System.DateTime.UtcNow,
+                    tenantId: 1));
+
+            logger.Received(1).Warn(Arg.Is<string>(message =>
+                message.Contains($"enquiry {scenario.enquiryId}")
+                && message.Contains("tenant 1")
+                && message.Contains($"facilitator {scenario.facilitatorId}")
+                && message.Contains($"area leader {scenario.areaLeaderId}")));
+        }
+
+        [Fact]
         public async Task ConvertEnquiry_AssignsLowestIdActiveMembership_WithoutOverwritingExistingAssignment()
         {
             var firstMembershipId = await CreateMembershipAsync("FlowJasper");
@@ -148,8 +204,6 @@ namespace AqualLifeStyle.Tests.Integration
                 (await ctx.Enquiries.FirstAsync(e => e.CustomerId == customerId)).Id);
 
             await _enquiryAppService.ConvertToCustomerAsync(enquiryId, new AqualLifeStyle.Application.Enquiries.Dto.ConvertEnquiryToCustomerDto());
-            await HandleConvertedEventAsync(
-                new EnquiryConvertedEvent(enquiryId, customerId, 1, null, System.DateTime.UtcNow, tenantId: 1));
 
             await UsingDbContextAsync(async ctx =>
             {
@@ -159,41 +213,54 @@ namespace AqualLifeStyle.Tests.Integration
         }
 
         [Fact]
-        public async Task HandleEventAsync_WithoutTenantContext_ThrowsAuthorizationException()
+        public async Task ConvertEnquiry_AssignsMembershipAfterMembershipCreateInvalidatesCachedMiss()
         {
-            await CreateMembershipAsync("TenantOneTier", MembershipType.Jasper, tenantId: 1);
-            var tenantOneCustomerId = await CreateCustomerAsync("TenantScopedProspect", tenantId: 1);
+            var activeMembershipCache = Resolve<IActiveMembershipCache>();
+            (await activeMembershipCache.GetFirstActiveMembershipIdAsync(1)).ShouldBeNull();
 
-            using (UsingTenantId(null))
+            await _membershipAppService.CreateAsync(new CreateMembershipDto
             {
-                var ex = await Assert.ThrowsAsync<AqualLifeStyleAuthorizationException>(() =>
-                    HandleConvertedEventAsync(
-                        new EnquiryConvertedEvent(101, tenantOneCustomerId, 1, null, System.DateTime.UtcNow, tenantId: 1)));
+                Name = "CachedMissRecoveryTier",
+                Description = "Created after empty cache result",
+                MembershipType = MembershipType.Jasper
+            });
 
-                ex.Message.ShouldContain("tenant context");
-            }
+            var membershipId = await UsingDbContextAsync(async ctx =>
+                (await ctx.Memberships.FirstAsync(m => m.Name == "CachedMissRecoveryTier")).Id);
 
-            await UsingDbContextAsync(1, async ctx =>
+            var customerId = await CreateCustomerAsync("CachedMissProspect");
+            await _enquiryAppService.CreateAsync(new AqualLifeStyle.Application.Enquiries.Dto.CreateEnquiryDto
             {
-                var customer = await ctx.Customers.FirstAsync(c => c.Id == tenantOneCustomerId);
-                customer.MembershipId.ShouldBeNull();
+                CustomerId = customerId,
+                ProductId = 1,
+                Message = "Membership should assign after cache invalidation"
+            });
+
+            var enquiryId = await UsingDbContextAsync(async ctx =>
+                (await ctx.Enquiries.FirstAsync(e => e.CustomerId == customerId)).Id);
+
+            await _enquiryAppService.ConvertToCustomerAsync(
+                enquiryId,
+                new AqualLifeStyle.Application.Enquiries.Dto.ConvertEnquiryToCustomerDto());
+
+            await UsingDbContextAsync(async ctx =>
+            {
+                var customer = await ctx.Customers.FirstAsync(c => c.Id == customerId);
+                customer.MembershipId.ShouldBe(membershipId);
             });
         }
 
         [Fact]
-        public async Task HandleEventAsync_WithMismatchedTenantContext_ThrowsAuthorizationException()
+        public async Task HandleEventAsync_WithoutTenantIdOnEvent_ThrowsAuthorizationException()
         {
-            await CreateMembershipAsync("TenantOneTierMismatch", MembershipType.Jasper, tenantId: 1);
-            var tenantOneCustomerId = await CreateCustomerAsync("TenantMismatchProspect", tenantId: 1);
+            await CreateMembershipAsync("TenantOneTier", MembershipType.Jasper, tenantId: 1);
+            var tenantOneCustomerId = await CreateCustomerAsync("TenantScopedProspect", tenantId: 1);
 
-            using (UsingTenantId(2))
-            {
-                var ex = await Assert.ThrowsAsync<AqualLifeStyleAuthorizationException>(() =>
-                    HandleConvertedEventAsync(
-                        new EnquiryConvertedEvent(202, tenantOneCustomerId, 1, null, System.DateTime.UtcNow, tenantId: 1)));
+            var ex = await Assert.ThrowsAsync<AqualLifeStyleAuthorizationException>(() =>
+                HandleConvertedEventAsync(
+                    new EnquiryConvertedEvent(101, tenantOneCustomerId, 1, null, System.DateTime.UtcNow, tenantId: null)));
 
-                ex.Message.ShouldContain("does not match");
-            }
+            ex.Message.ShouldContain("tenant context");
 
             await UsingDbContextAsync(1, async ctx =>
             {
@@ -204,13 +271,7 @@ namespace AqualLifeStyle.Tests.Integration
 
         private async Task HandleConvertedEventAsync(EnquiryConvertedEvent evt)
         {
-            // The handler scopes its work to evt.TenantId via the ambient unit of work, so simulate
-            // the production path (where the event fires inside ConvertToCustomerAsync's UoW).
-            using (var uow = Resolve<IUnitOfWorkManager>().Begin())
-            {
-                await Resolve<AqualLifeStyle.Application.Enquiries.EnquiryConvertedEventHandler>().HandleEventAsync(evt);
-                await uow.CompleteAsync();
-            }
+            await Resolve<AqualLifeStyle.Application.Enquiries.EnquiryConvertedEventHandler>().HandleEventAsync(evt);
         }
 
         private async Task SetReferredByFacilitatorAsync(int enquiryId, int facilitatorId)
@@ -219,6 +280,45 @@ namespace AqualLifeStyle.Tests.Integration
             var enquiry = await repo.GetAsync(enquiryId);
             enquiry.SetReferredByFacilitator(facilitatorId);
             await repo.UpdateAsync(enquiry);
+        }
+
+        private async Task<(int areaLeaderId, int facilitatorId, int prospectCustomerId, int enquiryId)> CreateOrphanedReferralScenarioAsync(string namePrefix)
+        {
+            var leaderCustomerId = await CreateCustomerAsync($"{namePrefix}Leader");
+            var leader = await _areaLeaderAppService.ApplyAsync(
+                new RegisterAreaLeaderDto { CustomerId = leaderCustomerId, LicenseType = (int)LicenseType.EntreLevel });
+
+            var facilitatorCustomerId = await CreateCustomerAsync($"{namePrefix}Facilitator");
+            var facilitator = await _facilitatorAppService.RegisterAsync(
+                new RegisterFacilitatorDto { CustomerId = facilitatorCustomerId, AreaLeaderId = leader.Id });
+
+            var prospectCustomerId = await CreateCustomerAsync($"{namePrefix}Prospect");
+            await _enquiryAppService.CreateAsync(new AqualLifeStyle.Application.Enquiries.Dto.CreateEnquiryDto
+            {
+                CustomerId = prospectCustomerId,
+                ProductId = 1,
+                Message = $"Orphaned area leader scenario for {namePrefix}"
+            });
+
+            var enquiryId = await UsingDbContextAsync(async ctx =>
+                (await ctx.Enquiries.FirstAsync(e => e.CustomerId == prospectCustomerId)).Id);
+
+            await SetReferredByFacilitatorAsync(enquiryId, facilitator.Id);
+
+            // Simulate a facilitator whose area leader has been removed. The Facilitator -> AreaLeader
+            // relationship is required with OnDelete(Restrict), so the leader cannot be hard-deleted;
+            // instead it is soft-deleted. The conversion handler's lookup applies the soft-delete
+            // filter to the included AreaLeader, so the facilitator is loaded with a null AreaLeader.
+            await UsingDbContextAsync(async ctx =>
+            {
+                var areaLeader = await ctx.AreaLeaders.FirstAsync(a => a.Id == leader.Id);
+                areaLeader.IsDeleted = true;
+                areaLeader.DeletionTime = System.DateTime.Now;
+                areaLeader.DeleterUserId = AbpSession.UserId;
+                await ctx.SaveChangesAsync();
+            });
+
+            return (leader.Id, facilitator.Id, prospectCustomerId, enquiryId);
         }
 
         private async Task<int> CreateCustomerAsync(string name, int? tenantId = 1)
