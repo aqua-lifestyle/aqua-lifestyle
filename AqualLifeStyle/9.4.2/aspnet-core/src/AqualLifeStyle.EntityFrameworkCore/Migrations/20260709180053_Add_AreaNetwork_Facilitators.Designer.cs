@@ -3,6 +3,7 @@ using System;
 using AqualLifeStyle.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AqualLifeStyle.Migrations
 {
     [DbContext(typeof(AqualLifeStyleDbContext))]
-    partial class AqualLifeStyleDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260709180053_Add_AreaNetwork_Facilitators")]
+    partial class Add_AreaNetwork_Facilitators
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1580,142 +1583,6 @@ namespace AqualLifeStyle.Migrations
                     b.ToTable("AbpUsers");
                 });
 
-            modelBuilder.Entity("AqualLifeStyle.Domain.AreaLeaders.AreaLeader", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("AreaSpaceId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("CreatorUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("CustomerId")
-                        .HasColumnType("integer");
-
-                    b.Property<long?>("DeleterUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("DirectReferrals")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("IndirectReferrals")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("LastModifierUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<decimal>("LicenseFee")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("LicenseType")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("MonthlySubscription")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("OrderTarget")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Rank")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TenantId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CustomerId");
-
-                    b.ToTable("AreaLeaders", (string)null);
-                });
-
-            modelBuilder.Entity("AqualLifeStyle.Domain.AreaLeaders.AreaSpace", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("AddressLine")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<DateTime?>("ApprovedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("AreaLeaderId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Capacity")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("CreatorUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("DeleterUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("InterestedMembers")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("LastModifierUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("PresentationsCompleted")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("ReviewStartedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("StartupOrdersCompleted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TenantId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AreaLeaderId");
-
-                    b.ToTable("AreaSpaces", (string)null);
-                });
-
             modelBuilder.Entity("AqualLifeStyle.Domain.Customers.Customer", b =>
                 {
                     b.Property<int>("Id")
@@ -1787,8 +1654,6 @@ namespace AqualLifeStyle.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ReferredByFacilitatorId");
 
                     b.ToTable("Enquiries", (string)null);
                 });

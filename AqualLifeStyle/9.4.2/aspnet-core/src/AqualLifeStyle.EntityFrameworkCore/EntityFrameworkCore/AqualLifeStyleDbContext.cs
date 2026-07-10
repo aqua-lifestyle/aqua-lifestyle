@@ -2,8 +2,10 @@
 using Abp.Zero.EntityFrameworkCore;
 using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.Domain.AreaLeaders;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
+using AqualLifeStyle.Domain.Facilitators;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Orders;
 using AqualLifeStyle.Domain.Products;
@@ -20,6 +22,11 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<Enquiry> Enquiries { get; set; }
         public virtual DbSet<EnquiryFollowUp> EnquiryFollowUps { get; set; }
         public virtual DbSet<OrderIntent> OrderIntents { get; set; }
+
+        public virtual DbSet<Facilitator> Facilitators { get; set; }
+        public virtual DbSet<Referral> Referrals { get; set; }
+        public virtual DbSet<AreaLeader> AreaLeaders { get; set; }
+        public virtual DbSet<AreaSpace> AreaSpaces { get; set; }
 
         public AqualLifeStyleDbContext(DbContextOptions<AqualLifeStyleDbContext> options)
             : base(options)
@@ -87,6 +94,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 entity.Property(e => e.Message).IsRequired().HasMaxLength(2000);
                 entity.Property(e => e.Status).IsRequired();
                 entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.ReferredByFacilitatorId);
 
                 entity.HasMany(e => e.FollowUps)
                     .WithOne()
@@ -114,6 +122,64 @@ namespace AqualLifeStyle.EntityFrameworkCore
 
                 entity.HasIndex(e => e.CustomerId);
                 entity.HasIndex(e => e.EnquiryId);
+            });
+
+            modelBuilder.Entity<Facilitator>(entity =>
+            {
+                entity.ToTable("Facilitators");
+                entity.Property(e => e.TenantId).IsRequired();
+                entity.Property(e => e.CustomerId).IsRequired();
+                entity.Property(e => e.AreaLeaderId).IsRequired();
+                entity.Property(e => e.Rank).IsRequired();
+                entity.Property(e => e.DirectReferrals).IsRequired();
+                entity.Property(e => e.IndirectReferrals).IsRequired();
+                entity.Property(e => e.AwardBalance).IsRequired();
+                entity.HasIndex(e => e.AreaLeaderId);
+                entity.HasIndex(e => e.CustomerId);
+            });
+
+            modelBuilder.Entity<Referral>(entity =>
+            {
+                entity.ToTable("Referrals");
+                entity.Property(e => e.TenantId).IsRequired();
+                entity.Property(e => e.ReferredCustomerId).IsRequired();
+                entity.Property(e => e.SourceEnquiryId).IsRequired();
+                entity.Property(e => e.Type).IsRequired();
+                entity.Property(e => e.AwardAmount).IsRequired();
+                entity.Property(e => e.AwardIssued).IsRequired();
+                entity.HasIndex(e => e.ReferrerFacilitatorId);
+                entity.HasIndex(e => e.ReferrerAreaLeaderId);
+                entity.HasIndex(e => e.SourceEnquiryId);
+            });
+
+            modelBuilder.Entity<AreaLeader>(entity =>
+            {
+                entity.ToTable("AreaLeaders");
+                entity.Property(e => e.TenantId).IsRequired();
+                entity.Property(e => e.CustomerId).IsRequired();
+                entity.Property(e => e.LicenseType).IsRequired();
+                entity.Property(e => e.LicenseFee).IsRequired();
+                entity.Property(e => e.Rank).IsRequired();
+                entity.Property(e => e.AreaSpaceId);
+                entity.Property(e => e.MonthlySubscription).IsRequired();
+                entity.Property(e => e.DirectReferrals).IsRequired();
+                entity.Property(e => e.IndirectReferrals).IsRequired();
+                entity.Property(e => e.OrderTarget).IsRequired();
+                entity.HasIndex(e => e.CustomerId);
+            });
+
+            modelBuilder.Entity<AreaSpace>(entity =>
+            {
+                entity.ToTable("AreaSpaces");
+                entity.Property(e => e.TenantId).IsRequired();
+                entity.Property(e => e.AreaLeaderId).IsRequired();
+                entity.Property(e => e.AddressLine).IsRequired().HasMaxLength(512);
+                entity.Property(e => e.Capacity).IsRequired().HasMaxLength(64);
+                entity.Property(e => e.InterestedMembers).IsRequired();
+                entity.Property(e => e.Status).IsRequired();
+                entity.Property(e => e.PresentationsCompleted).IsRequired();
+                entity.Property(e => e.StartupOrdersCompleted).IsRequired();
+                entity.HasIndex(e => e.AreaLeaderId);
             });
         }
     }
