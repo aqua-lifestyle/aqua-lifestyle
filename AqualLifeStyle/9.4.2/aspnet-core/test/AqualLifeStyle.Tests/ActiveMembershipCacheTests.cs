@@ -64,5 +64,40 @@ namespace AqualLifeStyle.Tests
             Assert.Equal(7, secondLookup);
             membershipRepository.Verify(x => x.GetFirstActiveAsync(1), Times.Exactly(2));
         }
+
+        [Fact]
+        public async Task GetFirstActiveMembershipIdAsync_SeparatesHostAndTenantCacheKeys()
+        {
+            var membershipRepository = new Mock<IMembershipRepository>();
+            var cachingConfig = new Mock<ICachingConfiguration>();
+            cachingConfig.Setup(x => x.Configurators).Returns(new System.Collections.Generic.List<ICacheConfigurator>());
+            var cacheManager = new AbpMemoryCacheManager(cachingConfig.Object);
+
+            var hostMembership = Membership.Create(null, "HostJasper", "Host tier", MembershipType.Jasper);
+            hostMembership.Id = 2;
+            var tenantMembership = Membership.Create(1, "TenantJasper", "Tenant tier", MembershipType.Jasper);
+            tenantMembership.Id = 5;
+
+            membershipRepository
+                .Setup(x => x.GetFirstActiveAsync(null))
+                .ReturnsAsync(hostMembership);
+            membershipRepository
+                .Setup(x => x.GetFirstActiveAsync(1))
+                .ReturnsAsync(tenantMembership);
+
+            var cache = new ActiveMembershipCache(membershipRepository.Object, cacheManager);
+
+            var firstHostLookup = await cache.GetFirstActiveMembershipIdAsync(null);
+            var firstTenantLookup = await cache.GetFirstActiveMembershipIdAsync(1);
+            var secondHostLookup = await cache.GetFirstActiveMembershipIdAsync(null);
+            var secondTenantLookup = await cache.GetFirstActiveMembershipIdAsync(1);
+
+            Assert.Equal(2, firstHostLookup);
+            Assert.Equal(5, firstTenantLookup);
+            Assert.Equal(firstHostLookup, secondHostLookup);
+            Assert.Equal(firstTenantLookup, secondTenantLookup);
+            membershipRepository.Verify(x => x.GetFirstActiveAsync(null), Times.Once);
+            membershipRepository.Verify(x => x.GetFirstActiveAsync(1), Times.Once);
+        }
     }
 }

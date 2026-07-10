@@ -6,6 +6,7 @@ using Abp.Application.Services;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
 using Abp.AutoMapper;
+using Abp.UI;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Memberships.Dto;
 using AqualLifeStyle.Application.Validation;
@@ -60,7 +61,7 @@ namespace AqualLifeStyle.Application.Memberships
             membership.UpdateDescription(input.Description);
             membership.ChangeType(input.MembershipType);
             await _membershipRepository.UpdateAsync(membership);
-            InvalidateActiveMembershipCache();
+            InvalidateActiveMembershipCache(membership.TenantId);
 
             return MapToDto(membership);
         }
@@ -70,9 +71,10 @@ namespace AqualLifeStyle.Application.Memberships
             AqualLifeStyleValidator.NotNull(input, nameof(input));
             AqualLifeStyleValidator.NotNullOrEmpty(input.Name, nameof(input.Name));
 
-            var membership = Membership.Create(AbpSession.TenantId, input.Name, input.Description, input.MembershipType);
+            var tenantId = GetRequiredTenantId("Membership creation failed.");
+            var membership = Membership.Create(tenantId, input.Name, input.Description, input.MembershipType);
             await _membershipRepository.InsertAsync(membership);
-            InvalidateActiveMembershipCache();
+            InvalidateActiveMembershipCache(tenantId);
         }
 
         public async Task<MembershipDto> SetActivationDateAsync(int id, SetMembershipActivationDto input)
@@ -94,7 +96,7 @@ namespace AqualLifeStyle.Application.Memberships
 
             membership.SetActivationDate(activationDate);
             await _membershipRepository.UpdateAsync(membership);
-            InvalidateActiveMembershipCache();
+            InvalidateActiveMembershipCache(membership.TenantId);
 
             return MapToDto(membership);
         }
@@ -113,7 +115,7 @@ namespace AqualLifeStyle.Application.Memberships
 
             membership.SetMonthlyObligation(input.Amount);
             await _membershipRepository.UpdateAsync(membership);
-            InvalidateActiveMembershipCache();
+            InvalidateActiveMembershipCache(membership.TenantId);
 
             return MapToDto(membership);
         }
@@ -137,14 +139,24 @@ namespace AqualLifeStyle.Application.Memberships
 
             membership.MarkObligationMet(asOfDate);
             await _membershipRepository.UpdateAsync(membership);
-            InvalidateActiveMembershipCache();
+            InvalidateActiveMembershipCache(membership.TenantId);
 
             return MapToDto(membership);
         }
 
-        private void InvalidateActiveMembershipCache()
+        private int GetRequiredTenantId(string operation)
         {
-            _activeMembershipCache.Remove(AbpSession.TenantId);
+            if (!AbpSession.TenantId.HasValue)
+            {
+                throw new UserFriendlyException(operation, "A tenant context is required.");
+            }
+
+            return AbpSession.TenantId.Value;
+        }
+
+        private void InvalidateActiveMembershipCache(int? tenantId)
+        {
+            _activeMembershipCache.Remove(tenantId);
         }
 
         /// <summary>

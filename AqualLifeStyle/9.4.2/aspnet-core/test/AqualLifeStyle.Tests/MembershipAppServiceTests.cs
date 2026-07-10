@@ -1,5 +1,7 @@
 using System.Linq;
 using System.Threading.Tasks;
+using Abp.Runtime.Session;
+using Abp.UI;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Memberships;
 using AqualLifeStyle.Application.Memberships.Dto;
@@ -53,6 +55,8 @@ namespace AqualLifeStyle.Tests
         [Fact]
         public async Task CreateAsync_InvalidatesActiveMembershipCache()
         {
+            _service.AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 7);
+
             await _service.CreateAsync(new CreateMembershipDto
             {
                 Name = "Jasper",
@@ -60,14 +64,32 @@ namespace AqualLifeStyle.Tests
                 MembershipType = MembershipType.Jasper
             });
 
-            _membershipRepository.Verify(x => x.InsertAsync(It.IsAny<Membership>()), Times.Once);
-            _activeMembershipCache.Verify(x => x.Remove(null), Times.Once);
+            _membershipRepository.Verify(x => x.InsertAsync(It.Is<Membership>(m => m.TenantId == 7)), Times.Once);
+            _activeMembershipCache.Verify(x => x.Remove(7), Times.Once);
+        }
+
+        [Fact]
+        public async Task CreateAsync_ThrowsUserFriendlyException_WhenTenantContextIsMissing()
+        {
+            _service.AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == (int?)null);
+
+            var ex = await Assert.ThrowsAsync<UserFriendlyException>(() => _service.CreateAsync(new CreateMembershipDto
+            {
+                Name = "Host Membership",
+                Description = "Should not be created from host context",
+                MembershipType = MembershipType.Jasper
+            }));
+
+            Assert.Equal("Membership creation failed.", ex.Message);
+            Assert.Equal("A tenant context is required.", ex.Details);
+            _membershipRepository.Verify(x => x.InsertAsync(It.IsAny<Membership>()), Times.Never);
+            _activeMembershipCache.Verify(x => x.Remove(It.IsAny<int?>()), Times.Never);
         }
 
         [Fact]
         public async Task UpdateAsync_InvalidatesActiveMembershipCache()
         {
-            var membership = Membership.Create(tenantId: null, name: "Jasper", description: "Initial", membershipType: MembershipType.Jasper);
+            var membership = Membership.Create(tenantId: 11, name: "Jasper", description: "Initial", membershipType: MembershipType.Jasper);
 
             _membershipRepository
                 .Setup(x => x.GetAsync(7))
@@ -82,7 +104,61 @@ namespace AqualLifeStyle.Tests
             });
 
             _membershipRepository.Verify(x => x.UpdateAsync(membership), Times.Once);
-            _activeMembershipCache.Verify(x => x.Remove(null), Times.Once);
+            _activeMembershipCache.Verify(x => x.Remove(11), Times.Once);
+        }
+
+        [Fact]
+        public async Task SetActivationDateAsync_InvalidatesActiveMembershipCacheForMembershipTenant()
+        {
+            var membership = Membership.Create(tenantId: 13, name: "Jasper", description: "Initial", membershipType: MembershipType.Jasper);
+
+            _membershipRepository
+                .Setup(x => x.GetAsync(9))
+                .ReturnsAsync(membership);
+
+            await _service.SetActivationDateAsync(9, new SetMembershipActivationDto
+            {
+                ActivationDate = "2026-07-10"
+            });
+
+            _membershipRepository.Verify(x => x.UpdateAsync(membership), Times.Once);
+            _activeMembershipCache.Verify(x => x.Remove(13), Times.Once);
+        }
+
+        [Fact]
+        public async Task SetMonthlyObligationAsync_InvalidatesActiveMembershipCacheForMembershipTenant()
+        {
+            var membership = Membership.Create(tenantId: 17, name: "Onyx", description: "Initial", membershipType: MembershipType.Onyx);
+
+            _membershipRepository
+                .Setup(x => x.GetAsync(12))
+                .ReturnsAsync(membership);
+
+            await _service.SetMonthlyObligationAsync(12, new SetMonthlyObligationDto
+            {
+                Amount = 300m
+            });
+
+            _membershipRepository.Verify(x => x.UpdateAsync(membership), Times.Once);
+            _activeMembershipCache.Verify(x => x.Remove(17), Times.Once);
+        }
+
+        [Fact]
+        public async Task MarkObligationMetAsync_InvalidatesActiveMembershipCacheForMembershipTenant()
+        {
+            var membership = Membership.Create(tenantId: 19, name: "AQ Green", description: "Initial", membershipType: MembershipType.AQGreen);
+
+            _membershipRepository
+                .Setup(x => x.GetAsync(14))
+                .ReturnsAsync(membership);
+
+            await _service.MarkObligationMetAsync(14, new MarkObligationMetDto
+            {
+                AsOfDate = "2026-07-10"
+            });
+
+            _membershipRepository.Verify(x => x.UpdateAsync(membership), Times.Once);
+            _activeMembershipCache.Verify(x => x.Remove(19), Times.Once);
         }
     }
 }
