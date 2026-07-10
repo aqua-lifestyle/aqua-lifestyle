@@ -15,6 +15,7 @@ namespace AqualLifeStyle.Domain.Enquiries
         public EnquiryStatus Status { get; private set; }
         public DateTime CreatedAt { get; private set; }
         public int? AssignedToMemberId { get; private set; }
+        public int? ReferredByFacilitatorId { get; private set; }
         public bool IsConverted { get; private set; }
         public DateTime? ConvertedAt { get; private set; }
 
@@ -76,9 +77,28 @@ namespace AqualLifeStyle.Domain.Enquiries
             AssignedToMemberId = memberId;
         }
 
+        /// <summary>
+        /// Record the facilitator who sourced this lead (used for referral attribution on conversion).
+        /// </summary>
+        public void SetReferredByFacilitator(int facilitatorId)
+        {
+            if (facilitatorId <= 0) throw new ArgumentException("Facilitator ID must be valid.", nameof(facilitatorId));
+            if (IsConverted) throw new InvalidOperationException("Converted enquiries cannot be re-linked.");
+            ReferredByFacilitatorId = facilitatorId;
+        }
+
         public void ConvertToCustomer()
+            => ConvertToCustomer(ReferredByFacilitatorId);
+
+        public void ConvertToCustomer(int? referredByFacilitatorId)
         {
             if (IsConverted) throw new InvalidOperationException("Enquiry has already been converted.");
+            if (referredByFacilitatorId.HasValue && referredByFacilitatorId.Value <= 0)
+            {
+                throw new ArgumentException("Facilitator ID must be valid.", nameof(referredByFacilitatorId));
+            }
+
+            ReferredByFacilitatorId = referredByFacilitatorId;
             IsConverted = true;
             ConvertedAt = DateTime.UtcNow;
             Status = EnquiryStatus.Closed;
