@@ -47,6 +47,8 @@ namespace AqualLifeStyle.Application.Facilitators
                 throw new UserFriendlyException("Facilitator registration failed.", "A tenant context is required.");
             }
 
+            var tenantId = AbpSession.TenantId.Value;
+
             using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
             {
                 IsTransactional = true,
@@ -58,7 +60,7 @@ namespace AqualLifeStyle.Application.Facilitators
                     throw new AqualLifeStyleNotFoundException("Customer", input.CustomerId);
                 }
 
-                var existing = await _facilitatorRepository.GetByCustomerIdAsync(input.CustomerId);
+                var existing = await _facilitatorRepository.GetByCustomerIdAsync(input.CustomerId, tenantId);
                 if (existing != null)
                 {
                     throw new UserFriendlyException("Facilitator registration failed.", "A facilitator for this customer already exists.");
@@ -66,7 +68,7 @@ namespace AqualLifeStyle.Application.Facilitators
 
                 var leader = await GetAreaLeaderForCurrentTenantAsync(input.AreaLeaderId);
 
-                var facilitator = Facilitator.Register(AbpSession.TenantId.Value, input.CustomerId, input.AreaLeaderId);
+                var facilitator = Facilitator.Register(tenantId, input.CustomerId, input.AreaLeaderId);
                 await _facilitatorRepository.InsertAndGetIdAsync(facilitator);
 
                 leader.RecordFacilitator();

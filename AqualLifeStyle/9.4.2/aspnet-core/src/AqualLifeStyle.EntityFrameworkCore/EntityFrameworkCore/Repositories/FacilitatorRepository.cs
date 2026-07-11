@@ -16,8 +16,8 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
             _dbContextProvider = dbContextProvider;
         }
 
-        public Task<Facilitator> GetByCustomerIdAsync(int customerId)
-            => GetAll().FirstOrDefaultAsync(f => f.CustomerId == customerId);
+        public Task<Facilitator> GetByCustomerIdAsync(int customerId, int tenantId)
+            => GetAll().FirstOrDefaultAsync(f => f.CustomerId == customerId && f.TenantId == tenantId);
 
         public async Task<Facilitator> GetWithAreaLeaderAsync(int facilitatorId)
         {

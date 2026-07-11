@@ -129,6 +129,37 @@ namespace AqualLifeStyle.Tests.Application
             ex.Details.ShouldBe("A facilitator for this customer already exists.");
         }
 
+        [MultiTenantFact]
+        public async Task RegisterAsync_ShouldIgnoreDuplicateFacilitatorFromDifferentTenant()
+        {
+            var customerToLeaderId = await CreateCustomerAsync("LeaderTenantScoped");
+            var leader = await _areaLeaderAppService.ApplyAsync(
+                new RegisterAreaLeaderDto { CustomerId = customerToLeaderId, LicenseType = (int)LicenseType.EntreLevel });
+            var facilitatorCustomerId = await CreateCustomerAsync("FacilitatorTenantScoped");
+            var tenantTwoLeader = await CreateAreaLeaderAsync("TenantTwoLeaderDuplicateScope", tenantId: 2);
+
+            await UsingDbContextAsync(2, async ctx =>
+            {
+                ctx.Facilitators.Add(Facilitator.Register(2, facilitatorCustomerId, tenantTwoLeader.Id));
+                await ctx.SaveChangesAsync();
+            });
+
+            var facilitator = await _facilitatorAppService.RegisterAsync(
+                new RegisterFacilitatorDto { CustomerId = facilitatorCustomerId, AreaLeaderId = leader.Id });
+
+            facilitator.ShouldNotBeNull();
+            facilitator.CustomerId.ShouldBe(facilitatorCustomerId);
+            facilitator.TenantId.ShouldBe(1);
+
+            var tenantOneFacilitatorCount = await UsingDbContextAsync(1, ctx =>
+                ctx.Facilitators.CountAsync(f => f.CustomerId == facilitatorCustomerId && f.TenantId == 1));
+            var tenantTwoFacilitatorCount = await UsingDbContextAsync(2, ctx =>
+                ctx.Facilitators.CountAsync(f => f.CustomerId == facilitatorCustomerId && f.TenantId == 2));
+
+            tenantOneFacilitatorCount.ShouldBe(1);
+            tenantTwoFacilitatorCount.ShouldBe(1);
+        }
+
         [Fact]
         public async Task GetByCustomerAsync_ReturnsRegisteredFacilitator()
         {

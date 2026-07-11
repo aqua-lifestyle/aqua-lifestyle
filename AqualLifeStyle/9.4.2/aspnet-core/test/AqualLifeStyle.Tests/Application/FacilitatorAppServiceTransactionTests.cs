@@ -61,6 +61,9 @@ namespace AqualLifeStyle.Tests.Application
             var leader = AreaLeader.Apply(tenantId: 1, customerId: 10, LicenseType.EntreLevel);
 
             _facilitatorRepositoryMock
+                .Setup(r => r.GetByCustomerIdAsync(22, 1))
+                .ReturnsAsync((Facilitator)null);
+            _facilitatorRepositoryMock
                 .Setup(r => r.InsertAndGetIdAsync(It.IsAny<Facilitator>()))
                 .ReturnsAsync(42);
             _areaLeaderRepositoryMock
@@ -85,6 +88,7 @@ namespace AqualLifeStyle.Tests.Application
             _unitOfWorkManagerMock.Verify(m => m.Begin(It.Is<UnitOfWorkOptions>(o =>
                 o.IsTransactional == true &&
                 o.IsolationLevel == System.Transactions.IsolationLevel.Serializable)), Times.Once);
+            _facilitatorRepositoryMock.Verify(r => r.GetByCustomerIdAsync(22, 1), Times.Once);
             _facilitatorRepositoryMock.Verify(r => r.InsertAndGetIdAsync(It.IsAny<Facilitator>()), Times.Once);
             _areaLeaderRepositoryMock.Verify(r => r.UpdateAsync(leader), Times.Once);
             _unitOfWorkMock.Verify(u => u.CompleteAsync(), Times.Once);
@@ -94,7 +98,7 @@ namespace AqualLifeStyle.Tests.Application
         public async Task RegisterAsync_Throws_WhenFacilitatorAlreadyExistsForCustomer()
         {
             _facilitatorRepositoryMock
-                .Setup(r => r.GetByCustomerIdAsync(22))
+                .Setup(r => r.GetByCustomerIdAsync(22, 1))
                 .ReturnsAsync(Facilitator.Register(1, 22, 33));
 
             var ex = await Assert.ThrowsAsync<UserFriendlyException>(() => _service.RegisterAsync(new RegisterFacilitatorDto
@@ -106,6 +110,7 @@ namespace AqualLifeStyle.Tests.Application
             ex.Message.ShouldBe("Facilitator registration failed.");
             ex.Details.ShouldBe("A facilitator for this customer already exists.");
 
+            _facilitatorRepositoryMock.Verify(r => r.GetByCustomerIdAsync(22, 1), Times.Once);
             _facilitatorRepositoryMock.Verify(r => r.InsertAndGetIdAsync(It.IsAny<Facilitator>()), Times.Never);
             _areaLeaderRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<AreaLeader>()), Times.Never);
             _unitOfWorkMock.Verify(u => u.CompleteAsync(), Times.Never);
@@ -127,7 +132,7 @@ namespace AqualLifeStyle.Tests.Application
 
             ex.Message.ShouldContain("Customer");
 
-            _facilitatorRepositoryMock.Verify(r => r.GetByCustomerIdAsync(It.IsAny<int>()), Times.Never);
+            _facilitatorRepositoryMock.Verify(r => r.GetByCustomerIdAsync(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
             _facilitatorRepositoryMock.Verify(r => r.InsertAndGetIdAsync(It.IsAny<Facilitator>()), Times.Never);
             _areaLeaderRepositoryMock.Verify(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<AreaLeader, bool>>>()), Times.Never);
             _areaLeaderRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<AreaLeader>()), Times.Never);
