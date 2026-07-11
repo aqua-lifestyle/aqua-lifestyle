@@ -52,13 +52,13 @@ namespace AqualLifeStyle.Tests
                 .ReturnsAsync(products);
 
             var customerRepositoryMock = new Mock<ICustomerRepository>();
-            var customer = Customer.Create("Jane Doe", new EmailAddress("jane@example.com"), 2);
+            var customer = Customer.Create(1, "Jane Doe", new EmailAddress("jane@example.com"), 2);
             customerRepositoryMock.Setup(r => r.GetAsync(42))
                 .ReturnsAsync(customer);
 
             var membershipLookupMock = new Mock<IMembershipLookup>();
             membershipLookupMock.Setup(r => r.GetAsync(2))
-                .ReturnsAsync(Membership.Create("Onyx", "Onyx membership", MembershipType.Onyx));
+                .ReturnsAsync(Membership.Create(1, "Onyx", "Onyx membership", MembershipType.Onyx));
 
             var appService = new ProductAppService(productRepositoryMock.Object, customerRepositoryMock.Object, membershipLookupMock.Object);
 
@@ -83,7 +83,7 @@ namespace AqualLifeStyle.Tests
                 .ReturnsAsync(products);
 
             var customerRepositoryMock = new Mock<ICustomerRepository>();
-            var customer = Customer.Create("John Doe", new EmailAddress("john@example.com"), null);
+            var customer = Customer.Create(1, "John Doe", new EmailAddress("john@example.com"), null);
             customerRepositoryMock.Setup(r => r.GetAsync(99))
                 .ReturnsAsync(customer);
 
@@ -111,7 +111,7 @@ namespace AqualLifeStyle.Tests
                 .ReturnsAsync(products);
 
             var customerRepositoryMock = new Mock<ICustomerRepository>();
-            var customer = Customer.Create("Jane Doe", new EmailAddress("jane@example.com"), 1);
+            var customer = Customer.Create(1, "Jane Doe", new EmailAddress("jane@example.com"), 1);
             customer.Deactivate();
             customerRepositoryMock.Setup(r => r.GetAsync(100))
                 .ReturnsAsync(customer);

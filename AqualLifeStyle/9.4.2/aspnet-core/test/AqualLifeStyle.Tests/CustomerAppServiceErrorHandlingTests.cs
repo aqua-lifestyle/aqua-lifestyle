@@ -1,11 +1,13 @@
 using System;
 using System.Threading.Tasks;
+using Abp.Runtime.Session;
 using Abp.UI;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Customers.Dto;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Memberships;
 using Moq;
+using Abp.ObjectMapping;
 using Xunit;
 
 namespace AqualLifeStyle.Tests
@@ -16,12 +18,16 @@ namespace AqualLifeStyle.Tests
         public async Task CreateAsync_ThrowsUserFriendlyException_WhenMembershipIsInvalid()
         {
             var customerRepository = new Mock<ICustomerRepository>();
+            var objectMapperMock = new Mock<IObjectMapper>();
             var membershipRepository = new Mock<IMembershipRepository>();
             membershipRepository
                 .Setup(x => x.GetAsync(It.IsAny<int>()))
                 .ThrowsAsync(new InvalidOperationException("Membership not found."));
 
-            var service = new CustomerAppService(customerRepository.Object, membershipRepository.Object);
+            var service = new CustomerAppService(customerRepository.Object, membershipRepository.Object, objectMapperMock.Object)
+            {
+                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
+            };
 
             var ex = await Assert.ThrowsAsync<UserFriendlyException>(() => service.CreateAsync(new CreateCustomerDto
             {

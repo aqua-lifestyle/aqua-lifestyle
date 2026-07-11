@@ -19,8 +19,8 @@ namespace AqualLifeStyle.Tests
         [Fact]
         public async Task CanViewProduct_AllowsStandardProductForStandardMember()
         {
-            var membership = Membership.Create("Jasper", "Base access", MembershipType.Jasper);
-            var customer = Customer.Create("Alicia", new EmailAddress("alicia@example.com"), 1);
+            var membership = Membership.Create(1, "Jasper", "Base access", MembershipType.Jasper);
+            var customer = Customer.Create(1, "Alicia", new EmailAddress("alicia@example.com"), 1);
             var product = Product.Create("Basic Plan", 20m, 1);
             var manager = new ProductEligibilityManager(new StubMembershipRepository(membership));
 
@@ -30,9 +30,9 @@ namespace AqualLifeStyle.Tests
         [Fact]
         public async Task CanViewProduct_DeniesProductForInactiveMembership()
         {
-            var membership = Membership.Create("Onyx", "Onyx access", MembershipType.Onyx);
+            var membership = Membership.Create(1, "Onyx", "Onyx access", MembershipType.Onyx);
             membership.Deactivate();
-            var customer = Customer.Create("Alicia", new EmailAddress("alicia@example.com"), 1);
+            var customer = Customer.Create(1, "Alicia", new EmailAddress("alicia@example.com"), 1);
             var product = Product.Create("Premium Plan", 50m, 2);
             var manager = new ProductEligibilityManager(new StubMembershipRepository(membership));
 
@@ -42,9 +42,9 @@ namespace AqualLifeStyle.Tests
         [Fact]
         public async Task CanViewProduct_DeniesMembershipRestrictedProductWithoutMembership()
         {
-            var customer = Customer.Create("Alicia", new EmailAddress("alicia@example.com"));
+            var customer = Customer.Create(1, "Alicia", new EmailAddress("alicia@example.com"), null);
             var product = Product.Create("Premium Plan", 50m, 2);
-            var manager = new ProductEligibilityManager(new StubMembershipRepository(Membership.Create("Jasper", "Base access", MembershipType.Jasper)));
+            var manager = new ProductEligibilityManager(new StubMembershipRepository(Membership.Create(1, "Jasper", "Base access", MembershipType.Jasper)));
 
             Assert.False(await manager.CanViewProductAsync(customer, product));
         }

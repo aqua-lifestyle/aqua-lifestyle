@@ -30,6 +30,15 @@ namespace AqualLifeStyle.Tests
 
             // Seed initial data for host
             AbpSession.TenantId = null;
+
+            // The SQLite in-memory database starts empty, so create the schema from the model
+            // before any seeding runs.
+            UsingDbContext(context =>
+            {
+                NormalizeDbContext(context);
+                context.Database.EnsureCreated();
+            });
+
             UsingDbContext(context =>
             {
                 NormalizeDbContext(context);

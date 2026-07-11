@@ -7,5 +7,6 @@ namespace AqualLifeStyle.Domain.Customers
     {
         Task<bool> ExistsByEmailAsync(string email);
         Task<bool> ExistsByEmailAsync(string email, int? excludeCustomerId);
+        Task<bool> AssignMembershipIfUnassignedAsync(int customerId, int? tenantId, int membershipId);
     }
 }

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Orders;
+using AqualLifeStyle.Application.Orders.Dto;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
@@ -10,6 +11,7 @@ using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Orders;
 using AqualLifeStyle.Domain.Products;
 using Moq;
+using Abp.ObjectMapping;
 using Xunit;
 
 namespace AqualLifeStyle.Tests
@@ -21,6 +23,7 @@ namespace AqualLifeStyle.Tests
         private readonly Mock<ICustomerRepository> _customerRepositoryMock;
         private readonly Mock<IProductRepository> _productRepositoryMock;
         private readonly Mock<IMembershipRepository> _membershipRepositoryMock;
+        private readonly Mock<IObjectMapper> _objectMapperMock;
         private readonly OrderIntentAppService _service;
 
         public OrderIntentAppServiceTests()
@@ -30,13 +33,32 @@ namespace AqualLifeStyle.Tests
             _customerRepositoryMock = new Mock<ICustomerRepository>();
             _productRepositoryMock = new Mock<IProductRepository>();
             _membershipRepositoryMock = new Mock<IMembershipRepository>();
+            _objectMapperMock = new Mock<IObjectMapper>();
+            _objectMapperMock
+                .Setup(m => m.Map<OrderIntentDto>(It.IsAny<OrderIntent>()))
+                .Returns((OrderIntent oi) => new OrderIntentDto
+                {
+                    Id = oi.Id,
+                    CustomerId = oi.CustomerId,
+                    ProductId = oi.ProductId,
+                    EnquiryId = oi.EnquiryId,
+                    UnitPrice = oi.UnitPrice,
+                    ReservedPrice = oi.ReservedPrice,
+                    Status = (int)oi.Status,
+                    StatusText = oi.Status.ToString(),
+                    CreatedAt = oi.CreatedAt,
+                    ReservedAt = oi.ReservedAt,
+                    CancelledAt = oi.CancelledAt,
+                    CompletedAt = oi.CompletedAt
+                });
 
             _service = new OrderIntentAppService(
                 _orderIntentRepositoryMock.Object,
                 _enquiryRepositoryMock.Object,
                 _customerRepositoryMock.Object,
                 _productRepositoryMock.Object,
-                _membershipRepositoryMock.Object);
+                _membershipRepositoryMock.Object,
+                _objectMapperMock.Object);
         }
 
         [Fact]
@@ -46,7 +68,7 @@ namespace AqualLifeStyle.Tests
             var customer = CreateCustomer(membershipId: 1);
             var product = Product.Create("Jasper Bundle", 100m, membershipId: 1);
             product.Id = 2;
-            var membership = Membership.Create("Jasper", "Entry tier", MembershipType.Jasper);
+            var membership = Membership.Create(1, "Jasper", "Entry tier", MembershipType.Jasper);
             membership.Id = 1;
 
             _enquiryRepositoryMock.Setup(r => r.GetAsync(3)).ReturnsAsync(enquiry);
@@ -76,7 +98,7 @@ namespace AqualLifeStyle.Tests
         [Fact]
         public async Task CreateFromEnquiryAsync_WithUnconvertedEnquiry_ThrowsBusinessRuleException()
         {
-            var enquiry = Enquiry.Create(1, 2, "Question about bundle");
+            var enquiry = Enquiry.Create(1, 1, 2, "Question about bundle");
             enquiry.Id = 3;
             _enquiryRepositoryMock.Setup(r => r.GetAsync(3)).ReturnsAsync(enquiry);
 
@@ -101,7 +123,7 @@ namespace AqualLifeStyle.Tests
             var customer = CreateCustomer(membershipId: 1);
             var product = Product.Create("Jasper Bundle", 100m, membershipId: 1);
             product.Id = 2;
-            var membership = Membership.Create("Jasper", "Entry tier", MembershipType.Jasper);
+            var membership = Membership.Create(1, "Jasper", "Entry tier", MembershipType.Jasper);
             membership.Id = 1;
 
             _enquiryRepositoryMock.Setup(r => r.GetAsync(3)).ReturnsAsync(enquiry);
@@ -128,15 +150,15 @@ namespace AqualLifeStyle.Tests
 
         private static Enquiry CreateConvertedEnquiry()
         {
-            var enquiry = Enquiry.Create(1, 2, "Question about bundle");
+            var enquiry = Enquiry.Create(1, 1, 2, "Question about bundle");
             enquiry.Id = 3;
-            enquiry.ConvertToCustomer();
+            enquiry.ConvertToCustomer(null);
             return enquiry;
         }
 
         private static Customer CreateCustomer(int membershipId)
         {
-            var customer = Customer.Create("Jane Doe", new EmailAddress("jane@example.com"), membershipId);
+            var customer = Customer.Create(1, "Jane Doe", new EmailAddress("jane@example.com"), membershipId);
             customer.Id = 1;
             return customer;
         }

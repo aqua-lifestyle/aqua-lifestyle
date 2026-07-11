@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
-using Abp.Application.Services;
+using Abp.ObjectMapping;
 using Abp.UI;
 using AqualLifeStyle.Application.Customers.Dto;
 using AqualLifeStyle.Domain.Common;
@@ -15,30 +14,26 @@ namespace AqualLifeStyle.Application.Customers
     {
         private readonly ICustomerRepository _customerRepository;
         private readonly IMembershipRepository _membershipRepository;
+        private readonly IObjectMapper _objectMapper;
 
-        public CustomerAppService(ICustomerRepository customerRepository, IMembershipRepository membershipRepository)
+        public CustomerAppService(ICustomerRepository customerRepository, IMembershipRepository membershipRepository, IObjectMapper objectMapper)
         {
             _customerRepository = customerRepository;
             _membershipRepository = membershipRepository;
+            _objectMapper = objectMapper;
         }
 
         public async Task<IReadOnlyList<CustomerDto>> GetAllAsync()
         {
-            var customers = await _customerRepository.GetAllListAsync();
-            return customers.Select(c => new CustomerDto
-            {
-                Id = c.Id,
-                Name = c.Name,
-                Email = c.Email?.Value,
-                MembershipId = c.MembershipId,
-                IsActive = c.IsActive
-            }).ToList();
+            var tenantId = GetRequiredTenantId("Customer lookup failed.");
+            var customers = await _customerRepository.GetAllListAsync(c => c.TenantId == tenantId);
+            return _objectMapper.Map<List<CustomerDto>>(customers);
         }
 
         public async Task<CustomerDto> GetAsync(int id)
         {
-            var customer = await _customerRepository.GetAsync(id);
-            return MapToDto(customer);
+            var customer = await GetCustomerForCurrentTenantAsync(id);
+            return _objectMapper.Map<CustomerDto>(customer);
         }
 
         public async Task<CustomerDto> UpdateAsync(CustomerDto input)
@@ -65,7 +60,7 @@ namespace AqualLifeStyle.Application.Customers
 
             try
             {
-                var customer = await _customerRepository.GetAsync(input.Id);
+                var customer = await GetCustomerForCurrentTenantAsync(input.Id);
 
                 if (await _customerRepository.ExistsByEmailAsync(input.Email, input.Id))
                 {
@@ -92,7 +87,7 @@ namespace AqualLifeStyle.Application.Customers
                 }
 
                 await _customerRepository.UpdateAsync(customer);
-                return MapToDto(customer);
+                return _objectMapper.Map<CustomerDto>(customer);
             }
             catch (UserFriendlyException)
             {
@@ -121,6 +116,8 @@ namespace AqualLifeStyle.Application.Customers
                 throw new UserFriendlyException("Customer creation failed.", "Customer email is required.");
             }
 
+            var tenantId = GetRequiredTenantId("Customer creation failed.");
+
             if (await _customerRepository.ExistsByEmailAsync(input.Email))
             {
                 throw new UserFriendlyException("Customer creation failed.", "A customer with that email already exists.");
@@ -135,7 +132,7 @@ namespace AqualLifeStyle.Application.Customers
                 }
 
                 var email = new EmailAddress(input.Email);
-                var customer = Customer.Create(input.Name, email, input.MembershipId);
+                var customer = Customer.Create(tenantId, input.Name, email, input.MembershipId);
                 await _customerRepository.InsertAsync(customer);
             }
             catch (UserFriendlyException)
@@ -148,16 +145,16 @@ namespace AqualLifeStyle.Application.Customers
             }
         }
 
-        private static CustomerDto MapToDto(Customer customer)
+        private async Task<Customer> GetCustomerForCurrentTenantAsync(int id)
         {
-            return new CustomerDto
+            var tenantId = GetRequiredTenantId("Customer lookup failed.");
+            var customer = await _customerRepository.FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId);
+            if (customer == null)
             {
-                Id = customer.Id,
-                Name = customer.Name,
-                Email = customer.Email?.Value,
-                MembershipId = customer.MembershipId,
-                IsActive = customer.IsActive
-            };
+                throw new UserFriendlyException("Customer lookup failed.", $"Customer with id {id} was not found.");
+            }
+
+            return customer;
         }
     }
 }

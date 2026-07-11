@@ -37,6 +37,17 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
             return GetAsync(id);
         }
 
+        public async Task<bool> AssignMembershipIfUnassignedAsync(int customerId, int? tenantId, int membershipId)
+        {
+            // Single atomic, concurrency-safe set-based UPDATE. Only assigns when the customer is
+            // still unassigned, so concurrent conversions can never overwrite an existing membership.
+            var rowsAffected = await GetAll()
+                .Where(c => c.Id == customerId && c.TenantId == tenantId && !c.MembershipId.HasValue)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(c => c.MembershipId, membershipId));
+
+            return rowsAffected == 1;
+        }
+
         public Task AddAsync(Customer customer)
         {
             return InsertAsync(customer);

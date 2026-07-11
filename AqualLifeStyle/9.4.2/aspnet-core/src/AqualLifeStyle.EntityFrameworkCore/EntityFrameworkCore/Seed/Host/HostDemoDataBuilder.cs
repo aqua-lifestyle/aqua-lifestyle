@@ -44,10 +44,10 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
 
             var tiers = new List<Membership>
             {
-                Membership.Create("Jasper", "Entry-level membership tier with starter benefits", Domain.Enums.MembershipType.Jasper),
-                Membership.Create("Onyx", "Mid-tier membership with greater discounts", Domain.Enums.MembershipType.Onyx),
-                Membership.Create("AQGreen", "High-tier membership with profit-sharing benefits", Domain.Enums.MembershipType.AQGreen),
-                Membership.Create("Business Premier", "Top-tier business membership with maximum benefits", Domain.Enums.MembershipType.BusinessPremier)
+                Membership.Create(null, "Jasper", "Entry-level membership tier with starter benefits", Domain.Enums.MembershipType.Jasper),
+                Membership.Create(null, "Onyx", "Mid-tier membership with greater discounts", Domain.Enums.MembershipType.Onyx),
+                Membership.Create(null, "AQGreen", "High-tier membership with profit-sharing benefits", Domain.Enums.MembershipType.AQGreen),
+                Membership.Create(null, "Business Premier", "Top-tier business membership with maximum benefits", Domain.Enums.MembershipType.BusinessPremier)
             };
 
             _context.Memberships.AddRange(tiers);
@@ -77,9 +77,9 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
 
             var customers = new List<Customer>
             {
-                Customer.Create("Alice Johnson", new EmailAddress("alice@example.com"), _context.Memberships.First(m => m.MembershipType == Domain.Enums.MembershipType.Jasper).Id),
-                Customer.Create("Brian Okoro", new EmailAddress("brian@example.com"), _context.Memberships.First(m => m.MembershipType == Domain.Enums.MembershipType.Onyx).Id),
-                Customer.Create("Cynthia Nwosu", new EmailAddress("cynthia@example.com"), _context.Memberships.First(m => m.MembershipType == Domain.Enums.MembershipType.AQGreen).Id)
+                Customer.Create(null, "Alice Johnson", new EmailAddress("alice@example.com"), _context.Memberships.First(m => m.MembershipType == Domain.Enums.MembershipType.Jasper).Id),
+                Customer.Create(null, "Brian Okoro", new EmailAddress("brian@example.com"), _context.Memberships.First(m => m.MembershipType == Domain.Enums.MembershipType.Onyx).Id),
+                Customer.Create(null, "Cynthia Nwosu", new EmailAddress("cynthia@example.com"), _context.Memberships.First(m => m.MembershipType == Domain.Enums.MembershipType.AQGreen).Id)
             };
 
             _context.Customers.AddRange(customers);
@@ -93,7 +93,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
             var defaultCustomer = _context.Customers.First();
             var defaultProduct = _context.Products.First();
 
-            var enquiry = Enquiry.Create(defaultCustomer.Id, defaultProduct.Id, "I would like to learn more about the membership product and pricing.");
+            var enquiry = Enquiry.Create(null, defaultCustomer.Id, defaultProduct.Id, "I would like to learn more about the membership product and pricing.");
             enquiry.Respond("Thank you for your question. We can support your order with a starter bundle.");
             _context.Enquiries.Add(enquiry);
             _context.SaveChanges();

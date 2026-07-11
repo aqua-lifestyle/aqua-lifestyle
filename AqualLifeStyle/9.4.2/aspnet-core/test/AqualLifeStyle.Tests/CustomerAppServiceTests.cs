@@ -1,5 +1,9 @@
 using System.Threading.Tasks;
+using System.Linq.Expressions;
+using Abp.Runtime.Session;
+using Abp.UI;
 using Moq;
+using Abp.ObjectMapping;
 using Xunit;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Customers.Dto;
@@ -15,17 +19,35 @@ namespace AqualLifeStyle.Tests
         [Fact]
         public async Task UpdateAsync_ChangesNameEmailMembershipAndStatus()
         {
-            var customer = Customer.Create("Old Name", new EmailAddress("old@example.com"), 1);
-            var membership = Membership.Create("Onyx", "Onyx membership", MembershipType.Onyx);
+            var customer = Customer.Create(1, "Old Name", new EmailAddress("old@example.com"), 1);
+            customer.Id = 10;
+            var membership = Membership.Create(1, "Onyx", "Onyx membership", MembershipType.Onyx);
 
             var customerRepo = new Mock<ICustomerRepository>();
-            customerRepo.Setup(r => r.GetAsync(10)).ReturnsAsync(customer);
+            customerRepo
+                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<System.Func<Customer, bool>>>()))
+                .ReturnsAsync(customer);
             customerRepo.Setup(r => r.UpdateAsync(customer)).ReturnsAsync(customer);
 
             var membershipRepo = new Mock<IMembershipRepository>();
             membershipRepo.Setup(r => r.GetAsync(2)).ReturnsAsync(membership);
 
-            var appService = new CustomerAppService(customerRepo.Object, membershipRepo.Object);
+            var objectMapperMock = new Mock<IObjectMapper>();
+            objectMapperMock
+                .Setup(m => m.Map<CustomerDto>(It.IsAny<Customer>()))
+                .Returns((Customer c) => new CustomerDto
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    Email = c.Email.Value,
+                    MembershipId = c.MembershipId,
+                    IsActive = c.IsActive
+                });
+
+            var appService = new CustomerAppService(customerRepo.Object, membershipRepo.Object, objectMapperMock.Object)
+            {
+                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
+            };
 
             var input = new CustomerDto
             {
@@ -43,6 +65,30 @@ namespace AqualLifeStyle.Tests
             Assert.Equal(2, result.MembershipId);
             Assert.False(result.IsActive);
             customerRepo.Verify(r => r.UpdateAsync(It.Is<Customer>(c => c.Name == "New Name" && c.Email.Value == "new@example.com" && c.MembershipId == 2 && c.IsActive == false)), Times.Once);
+        }
+
+        [Fact]
+        public async Task CreateAsync_Throws_WhenTenantContextIsMissing()
+        {
+            var customerRepo = new Mock<ICustomerRepository>();
+            var membershipRepo = new Mock<IMembershipRepository>();
+            var objectMapperMock = new Mock<IObjectMapper>();
+
+            var appService = new CustomerAppService(customerRepo.Object, membershipRepo.Object, objectMapperMock.Object)
+            {
+                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == (int?)null)
+            };
+
+            var ex = await Assert.ThrowsAsync<UserFriendlyException>(() => appService.CreateAsync(new CreateCustomerDto
+            {
+                Name = "Host Customer",
+                Email = "host@example.com"
+            }));
+
+            Assert.Equal("Customer creation failed.", ex.Message);
+            Assert.Equal("A tenant context is required.", ex.Details);
+            customerRepo.Verify(r => r.ExistsByEmailAsync(It.IsAny<string>()), Times.Never);
+            customerRepo.Verify(r => r.InsertAsync(It.IsAny<Customer>()), Times.Never);
         }
     }
 }

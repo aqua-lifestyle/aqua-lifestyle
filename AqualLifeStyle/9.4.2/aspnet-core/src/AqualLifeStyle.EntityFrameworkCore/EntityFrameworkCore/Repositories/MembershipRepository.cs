@@ -3,6 +3,7 @@ using Abp.Domain.Repositories;
 using Abp.EntityFrameworkCore;
 using Abp.EntityFrameworkCore.Repositories;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 using AqualLifeStyle.Domain.Memberships;
 
 namespace AqualLifeStyle.EntityFrameworkCore.Repositories
@@ -22,6 +23,14 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
         public Task<Membership> GetByIdAsync(int id)
         {
             return GetAsync(id);
+        }
+
+        public Task<Membership> GetFirstActiveAsync(int? tenantId)
+        {
+            return GetAll()
+                .Where(x => x.IsActive && x.TenantId == tenantId)
+                .OrderBy(x => x.Id)
+                .FirstOrDefaultAsync();
         }
 
         public Task AddAsync(Membership membership)

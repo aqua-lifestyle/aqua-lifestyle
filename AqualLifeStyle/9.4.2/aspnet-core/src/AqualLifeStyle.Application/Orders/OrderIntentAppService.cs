@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
+using Abp.ObjectMapping;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Orders.Dto;
 using AqualLifeStyle.Application.Validation;
@@ -20,25 +20,28 @@ namespace AqualLifeStyle.Application.Orders
         private readonly ICustomerRepository _customerRepository;
         private readonly IProductRepository _productRepository;
         private readonly IMembershipRepository _membershipRepository;
+        private readonly IObjectMapper _objectMapper;
 
         public OrderIntentAppService(
             IOrderIntentRepository orderIntentRepository,
             IEnquiryRepository enquiryRepository,
             ICustomerRepository customerRepository,
             IProductRepository productRepository,
-            IMembershipRepository membershipRepository)
+            IMembershipRepository membershipRepository,
+            IObjectMapper objectMapper)
         {
             _orderIntentRepository = orderIntentRepository;
             _enquiryRepository = enquiryRepository;
             _customerRepository = customerRepository;
             _productRepository = productRepository;
             _membershipRepository = membershipRepository;
+            _objectMapper = objectMapper;
         }
 
         public async Task<IReadOnlyList<OrderIntentDto>> GetAllAsync()
         {
             var orderIntents = await _orderIntentRepository.GetAllListAsync();
-            return orderIntents.Select(MapToDto).ToList();
+            return _objectMapper.Map<List<OrderIntentDto>>(orderIntents);
         }
 
         public async Task<OrderIntentDto> GetAsync(int id)
@@ -51,7 +54,7 @@ namespace AqualLifeStyle.Application.Orders
                 throw new AqualLifeStyleNotFoundException("OrderIntent", id);
             }
 
-            return MapToDto(orderIntent);
+            return _objectMapper.Map<OrderIntentDto>(orderIntent);
         }
 
         public async Task<OrderIntentDto> CreateFromEnquiryAsync(int enquiryId)
@@ -122,7 +125,7 @@ namespace AqualLifeStyle.Application.Orders
 
             orderIntent.Id = await _orderIntentRepository.InsertAndGetIdAsync(orderIntent);
 
-            return MapToDto(orderIntent);
+            return _objectMapper.Map<OrderIntentDto>(orderIntent);
         }
 
         public async Task<OrderIntentDto> CancelAsync(int id)
@@ -141,7 +144,7 @@ namespace AqualLifeStyle.Application.Orders
             }
 
             await _orderIntentRepository.UpdateAsync(orderIntent);
-            return MapToDto(orderIntent);
+            return _objectMapper.Map<OrderIntentDto>(orderIntent);
         }
 
         public async Task<OrderIntentDto> CompleteAsync(int id)
@@ -160,7 +163,7 @@ namespace AqualLifeStyle.Application.Orders
             }
 
             await _orderIntentRepository.UpdateAsync(orderIntent);
-            return MapToDto(orderIntent);
+            return _objectMapper.Map<OrderIntentDto>(orderIntent);
         }
 
         private async Task<OrderIntent> GetOrderIntentOrThrowAsync(int id)
@@ -189,23 +192,5 @@ namespace AqualLifeStyle.Application.Orders
             }
         }
 
-        private static OrderIntentDto MapToDto(OrderIntent orderIntent)
-        {
-            return new OrderIntentDto
-            {
-                Id = orderIntent.Id,
-                CustomerId = orderIntent.CustomerId,
-                ProductId = orderIntent.ProductId,
-                EnquiryId = orderIntent.EnquiryId,
-                UnitPrice = orderIntent.UnitPrice,
-                ReservedPrice = orderIntent.ReservedPrice,
-                Status = (int)orderIntent.Status,
-                StatusText = orderIntent.Status.ToString(),
-                CreatedAt = orderIntent.CreatedAt,
-                ReservedAt = orderIntent.ReservedAt,
-                CancelledAt = orderIntent.CancelledAt,
-                CompletedAt = orderIntent.CompletedAt
-            };
-        }
     }
 }
