@@ -8,6 +8,7 @@ using AqualLifeStyle.Application.Memberships.Dto;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using Moq;
+using Abp.ObjectMapping;
 using Xunit;
 
 namespace AqualLifeStyle.Tests
@@ -15,14 +16,17 @@ namespace AqualLifeStyle.Tests
     public class MembershipAppServiceTests
     {
         private readonly Mock<IMembershipRepository> _membershipRepository;
-        private readonly MembershipAppService _service;
         private readonly Mock<IActiveMembershipCache> _activeMembershipCache;
+        private readonly Mock<IObjectMapper> _objectMapperMock;
+        private readonly MembershipAppService _service;
 
         public MembershipAppServiceTests()
         {
             _membershipRepository = new Mock<IMembershipRepository>();
             _activeMembershipCache = new Mock<IActiveMembershipCache>();
-            _service = new MembershipAppService(_membershipRepository.Object, _activeMembershipCache.Object);
+            _objectMapperMock = new Mock<IObjectMapper>();
+            _service = new MembershipAppService(_membershipRepository.Object, _activeMembershipCache.Object,
+                _objectMapperMock.Object);
         }
 
         [Fact]

@@ -3,6 +3,7 @@ using System.Linq.Expressions;
 using Abp.Runtime.Session;
 using Abp.UI;
 using Moq;
+using Abp.ObjectMapping;
 using Xunit;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Customers.Dto;
@@ -31,7 +32,19 @@ namespace AqualLifeStyle.Tests
             var membershipRepo = new Mock<IMembershipRepository>();
             membershipRepo.Setup(r => r.GetAsync(2)).ReturnsAsync(membership);
 
-            var appService = new CustomerAppService(customerRepo.Object, membershipRepo.Object)
+            var objectMapperMock = new Mock<IObjectMapper>();
+            objectMapperMock
+                .Setup(m => m.Map<CustomerDto>(It.IsAny<Customer>()))
+                .Returns((Customer c) => new CustomerDto
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    Email = c.Email.Value,
+                    MembershipId = c.MembershipId,
+                    IsActive = c.IsActive
+                });
+
+            var appService = new CustomerAppService(customerRepo.Object, membershipRepo.Object, objectMapperMock.Object)
             {
                 AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
             };
@@ -59,8 +72,9 @@ namespace AqualLifeStyle.Tests
         {
             var customerRepo = new Mock<ICustomerRepository>();
             var membershipRepo = new Mock<IMembershipRepository>();
+            var objectMapperMock = new Mock<IObjectMapper>();
 
-            var appService = new CustomerAppService(customerRepo.Object, membershipRepo.Object)
+            var appService = new CustomerAppService(customerRepo.Object, membershipRepo.Object, objectMapperMock.Object)
             {
                 AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == (int?)null)
             };

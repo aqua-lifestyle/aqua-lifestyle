@@ -4,6 +4,7 @@ using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Abp.Runtime.Session;
 using Moq;
+using Abp.ObjectMapping;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.AreaLeaders.Dto;
 using AqualLifeStyle.Application.Exceptions;
@@ -17,15 +18,18 @@ namespace AqualLifeStyle.Tests.Application
     {
         private readonly Mock<IAreaSpaceRepository> _areaSpaceRepositoryMock;
         private readonly Mock<IAreaLeaderRepository> _areaLeaderRepositoryMock;
+        private readonly Mock<IObjectMapper> _objectMapperMock;
         private readonly AreaSpaceAppService _service;
 
         public AreaSpaceAppServiceTests()
         {
             _areaSpaceRepositoryMock = new Mock<IAreaSpaceRepository>();
+            _objectMapperMock = new Mock<IObjectMapper>();
             _areaLeaderRepositoryMock = new Mock<IAreaLeaderRepository>();
             _service = new AreaSpaceAppService(
                 _areaSpaceRepositoryMock.Object,
-                _areaLeaderRepositoryMock.Object)
+                _areaLeaderRepositoryMock.Object,
+                _objectMapperMock.Object)
             {
                 AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
             };

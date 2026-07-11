@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using Abp.Runtime.Session;
 using Abp.UI;
 using Moq;
+using Abp.ObjectMapping;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.AreaLeaders.Dto;
 using AqualLifeStyle.Domain.AreaLeaders;
@@ -14,12 +15,15 @@ namespace AqualLifeStyle.Tests.Application
     public class AreaLeaderAppServiceTests
     {
         private readonly Mock<IAreaLeaderRepository> _areaLeaderRepositoryMock;
+        private readonly Mock<IObjectMapper> _objectMapperMock;
         private readonly AreaLeaderAppService _service;
 
         public AreaLeaderAppServiceTests()
         {
             _areaLeaderRepositoryMock = new Mock<IAreaLeaderRepository>();
-            _service = new AreaLeaderAppService(_areaLeaderRepositoryMock.Object)
+            _objectMapperMock = new Mock<IObjectMapper>();
+            _service = new AreaLeaderAppService(_areaLeaderRepositoryMock.Object,
+                _objectMapperMock.Object)
             {
                 AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
             };

@@ -5,6 +5,7 @@ using Abp.Domain.Uow;
 using Abp.Runtime.Session;
 using Abp.UI;
 using Moq;
+using Abp.ObjectMapping;
 using AqualLifeStyle.Application.Facilitators;
 using AqualLifeStyle.Application.Facilitators.Dto;
 using AqualLifeStyle.Domain.AreaLeaders;
@@ -20,6 +21,7 @@ namespace AqualLifeStyle.Tests.Application
         private readonly Mock<IFacilitatorRepository> _facilitatorRepositoryMock;
         private readonly Mock<IAreaLeaderRepository> _areaLeaderRepositoryMock;
         private readonly Mock<ICustomerRepository> _customerRepositoryMock;
+        private readonly Mock<IObjectMapper> _objectMapperMock;
         private readonly Mock<IUnitOfWorkManager> _unitOfWorkManagerMock;
         private readonly Mock<IUnitOfWorkCompleteHandle> _unitOfWorkMock;
         private readonly FacilitatorAppService _service;
@@ -29,6 +31,7 @@ namespace AqualLifeStyle.Tests.Application
             _facilitatorRepositoryMock = new Mock<IFacilitatorRepository>();
             _areaLeaderRepositoryMock = new Mock<IAreaLeaderRepository>();
             _customerRepositoryMock = new Mock<ICustomerRepository>();
+            _objectMapperMock = new Mock<IObjectMapper>();
             _unitOfWorkManagerMock = new Mock<IUnitOfWorkManager>();
             _unitOfWorkMock = new Mock<IUnitOfWorkCompleteHandle>();
 
@@ -45,11 +48,26 @@ namespace AqualLifeStyle.Tests.Application
                 .Setup(m => m.Begin(It.IsAny<UnitOfWorkOptions>()))
                 .Returns(_unitOfWorkMock.Object);
 
+            _objectMapperMock
+                .Setup(m => m.Map<FacilitatorDto>(It.IsAny<Facilitator>()))
+                .Returns((Facilitator f) => new FacilitatorDto
+                {
+                    Id = f.Id,
+                    TenantId = f.TenantId,
+                    CustomerId = f.CustomerId,
+                    AreaLeaderId = f.AreaLeaderId,
+                    Rank = (int)f.Rank,
+                    DirectReferrals = f.DirectReferrals,
+                    IndirectReferrals = f.IndirectReferrals,
+                    AwardBalance = f.AwardBalance
+                });
+
             _service = new FacilitatorAppService(
                 _facilitatorRepositoryMock.Object,
                 _areaLeaderRepositoryMock.Object,
                 _customerRepositoryMock.Object,
-                _unitOfWorkManagerMock.Object)
+                _unitOfWorkManagerMock.Object,
+                _objectMapperMock.Object)
             {
                 AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
             };

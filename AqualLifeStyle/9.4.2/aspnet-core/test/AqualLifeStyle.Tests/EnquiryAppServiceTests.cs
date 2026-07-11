@@ -6,6 +6,7 @@ using Abp.Domain.Uow;
 using Abp.Domain.Repositories;
 using Abp.Runtime.Session;
 using Moq;
+using Abp.ObjectMapping;
 using Shouldly;
 using Xunit;
 using AqualLifeStyle.Application.Enquiries;
@@ -18,12 +19,15 @@ namespace AqualLifeStyle.Tests
     public class EnquiryAppServiceTests
     {
         private readonly Mock<IEnquiryRepository> _enquiryRepositoryMock;
+        private readonly Mock<IObjectMapper> _objectMapperMock;
         private readonly EnquiryAppService _service;
 
         public EnquiryAppServiceTests()
         {
             _enquiryRepositoryMock = new Mock<IEnquiryRepository>();
-            _service = new TestableEnquiryAppService(_enquiryRepositoryMock.Object)
+            _objectMapperMock = new Mock<IObjectMapper>();
+            _service = new TestableEnquiryAppService(_enquiryRepositoryMock.Object,
+                _objectMapperMock.Object)
             {
                 AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
             };
@@ -215,8 +219,8 @@ namespace AqualLifeStyle.Tests
 
         private sealed class TestableEnquiryAppService : EnquiryAppService
         {
-            public TestableEnquiryAppService(IEnquiryRepository enquiryRepository)
-                : base(enquiryRepository)
+            public TestableEnquiryAppService(IEnquiryRepository enquiryRepository, IObjectMapper objectMapper)
+                : base(enquiryRepository, objectMapper)
             {
             }
         }

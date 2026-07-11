@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Orders;
+using AqualLifeStyle.Application.Orders.Dto;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
@@ -10,6 +11,7 @@ using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Orders;
 using AqualLifeStyle.Domain.Products;
 using Moq;
+using Abp.ObjectMapping;
 using Xunit;
 
 namespace AqualLifeStyle.Tests
@@ -21,6 +23,7 @@ namespace AqualLifeStyle.Tests
         private readonly Mock<ICustomerRepository> _customerRepositoryMock;
         private readonly Mock<IProductRepository> _productRepositoryMock;
         private readonly Mock<IMembershipRepository> _membershipRepositoryMock;
+        private readonly Mock<IObjectMapper> _objectMapperMock;
         private readonly OrderIntentAppService _service;
 
         public OrderIntentAppServiceTests()
@@ -30,13 +33,32 @@ namespace AqualLifeStyle.Tests
             _customerRepositoryMock = new Mock<ICustomerRepository>();
             _productRepositoryMock = new Mock<IProductRepository>();
             _membershipRepositoryMock = new Mock<IMembershipRepository>();
+            _objectMapperMock = new Mock<IObjectMapper>();
+            _objectMapperMock
+                .Setup(m => m.Map<OrderIntentDto>(It.IsAny<OrderIntent>()))
+                .Returns((OrderIntent oi) => new OrderIntentDto
+                {
+                    Id = oi.Id,
+                    CustomerId = oi.CustomerId,
+                    ProductId = oi.ProductId,
+                    EnquiryId = oi.EnquiryId,
+                    UnitPrice = oi.UnitPrice,
+                    ReservedPrice = oi.ReservedPrice,
+                    Status = (int)oi.Status,
+                    StatusText = oi.Status.ToString(),
+                    CreatedAt = oi.CreatedAt,
+                    ReservedAt = oi.ReservedAt,
+                    CancelledAt = oi.CancelledAt,
+                    CompletedAt = oi.CompletedAt
+                });
 
             _service = new OrderIntentAppService(
                 _orderIntentRepositoryMock.Object,
                 _enquiryRepositoryMock.Object,
                 _customerRepositoryMock.Object,
                 _productRepositoryMock.Object,
-                _membershipRepositoryMock.Object);
+                _membershipRepositoryMock.Object,
+                _objectMapperMock.Object);
         }
 
         [Fact]
