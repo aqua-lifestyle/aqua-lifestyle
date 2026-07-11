@@ -101,7 +101,10 @@ namespace AqualLifeStyle.Domain.Enquiries
                 throw new InvalidOperationException("Enquiry must be persisted before conversion can raise events.");
             }
 
-            ReferredByFacilitatorId = referredByFacilitatorId;
+            if (referredByFacilitatorId.HasValue)
+            {
+                ReferredByFacilitatorId = referredByFacilitatorId.Value;
+            }
             IsConverted = true;
             ConvertedAt = DateTime.UtcNow;
             Status = EnquiryStatus.Closed;

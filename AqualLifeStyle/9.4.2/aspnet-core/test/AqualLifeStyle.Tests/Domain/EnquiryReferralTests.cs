@@ -45,6 +45,20 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
+        public void ConvertToCustomer_NullArgument_PreservesExistingReferral()
+        {
+            var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 2, "Interested");
+            enquiry.Id = 1;
+            enquiry.SetReferredByFacilitator(42);
+
+            enquiry.ConvertToCustomer(null);
+
+            enquiry.IsConverted.ShouldBeTrue();
+            enquiry.ReferredByFacilitatorId.ShouldBe(42);
+            enquiry.ConvertedAt.ShouldNotBeNull();
+        }
+
+        [Fact]
         public void ConvertToCustomer_WithoutArgument_RemainsBackwardCompatible()
         {
             var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 2, "Interested");

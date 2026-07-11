@@ -18,7 +18,9 @@ namespace AqualLifeStyle.Application.AreaLeaders
         private readonly IAreaSpaceRepository _areaSpaceRepository;
         private readonly IAreaLeaderRepository _areaLeaderRepository;
 
-        public AreaSpaceAppService(IAreaSpaceRepository areaSpaceRepository, IAreaLeaderRepository areaLeaderRepository)
+        public AreaSpaceAppService(
+            IAreaSpaceRepository areaSpaceRepository,
+            IAreaLeaderRepository areaLeaderRepository)
         {
             _areaSpaceRepository = areaSpaceRepository;
             _areaLeaderRepository = areaLeaderRepository;
@@ -86,6 +88,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             var space = await GetSpaceForCurrentTenantAsync(id);
             space.Approve(atUtc);
             await _areaSpaceRepository.UpdateAsync(space);
+
             return MapToDto(space);
         }
 
