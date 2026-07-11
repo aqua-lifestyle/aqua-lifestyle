@@ -1,15 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Abp.Authorization;
 using Abp.ObjectMapping;
 using Abp.UI;
 using AqualLifeStyle.Application.Customers.Dto;
+using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Memberships;
 
 namespace AqualLifeStyle.Application.Customers
 {
+    [AbpAuthorize(PermissionNames.Pages_Customers)]
     public class CustomerAppService : AqualLifeStyleAppServiceBase, ICustomerAppService
     {
         private readonly ICustomerRepository _customerRepository;
@@ -23,6 +26,7 @@ namespace AqualLifeStyle.Application.Customers
             _objectMapper = objectMapper;
         }
 
+        [AbpAuthorize(PermissionNames.Pages_Customers)]
         public async Task<IReadOnlyList<CustomerDto>> GetAllAsync()
         {
             var tenantId = GetRequiredTenantId("Customer lookup failed.");
@@ -36,6 +40,7 @@ namespace AqualLifeStyle.Application.Customers
             return _objectMapper.Map<CustomerDto>(customer);
         }
 
+        [AbpAuthorize(PermissionNames.Pages_Customers_Manage)]
         public async Task<CustomerDto> UpdateAsync(CustomerDto input)
         {
             if (input == null)
@@ -99,6 +104,7 @@ namespace AqualLifeStyle.Application.Customers
             }
         }
 
+        [AbpAuthorize(PermissionNames.Pages_Customers_Manage)]
         public async Task CreateAsync(CreateCustomerDto input)
         {
             if (input == null)

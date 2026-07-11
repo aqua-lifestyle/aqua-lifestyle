@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Abp.Authorization;
 using Abp.ObjectMapping;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Orders.Dto;
+using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Application.Validation;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
@@ -13,6 +15,7 @@ using AqualLifeStyle.Domain.Products;
 
 namespace AqualLifeStyle.Application.Orders
 {
+    [AbpAuthorize(PermissionNames.Pages_Orders)]
     public class OrderIntentAppService : AqualLifeStyleAppServiceBase, IOrderIntentAppService
     {
         private readonly IOrderIntentRepository _orderIntentRepository;
@@ -57,6 +60,7 @@ namespace AqualLifeStyle.Application.Orders
             return _objectMapper.Map<OrderIntentDto>(orderIntent);
         }
 
+        [AbpAuthorize(PermissionNames.Pages_Orders_Manage)]
         public async Task<OrderIntentDto> CreateFromEnquiryAsync(int enquiryId)
         {
             AqualLifeStyleValidator.ValidId(enquiryId, nameof(enquiryId));
@@ -128,6 +132,7 @@ namespace AqualLifeStyle.Application.Orders
             return _objectMapper.Map<OrderIntentDto>(orderIntent);
         }
 
+        [AbpAuthorize(PermissionNames.Pages_Orders_Manage)]
         public async Task<OrderIntentDto> CancelAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -147,6 +152,7 @@ namespace AqualLifeStyle.Application.Orders
             return _objectMapper.Map<OrderIntentDto>(orderIntent);
         }
 
+        [AbpAuthorize(PermissionNames.Pages_Orders_Manage)]
         public async Task<OrderIntentDto> CompleteAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);

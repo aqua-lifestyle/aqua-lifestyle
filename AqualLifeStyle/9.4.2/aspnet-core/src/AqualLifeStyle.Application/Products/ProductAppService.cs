@@ -2,13 +2,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Application.Services;
+using Abp.Authorization;
 using AqualLifeStyle.Application.Products.Dto;
+using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Products;
 
 namespace AqualLifeStyle.Application.Products
 {
+    [AbpAuthorize(PermissionNames.Pages_Products)]
     public class ProductAppService : AqualLifeStyleAppServiceBase, IProductAppService
     {
         private readonly IProductRepository _productRepository;
@@ -69,6 +72,7 @@ namespace AqualLifeStyle.Application.Products
             return MapProduct(product);
         }
 
+        [AbpAuthorize(PermissionNames.Pages_Products_Manage)]
         public async Task CreateAsync(CreateProductDto input)
         {
             var product = Product.Create(input.Name, input.Price, input.MembershipId);

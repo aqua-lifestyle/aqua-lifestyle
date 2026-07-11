@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Abp.Authorization;
 using Abp.UI;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Customers.Dto;
@@ -46,39 +47,31 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task CreateAsync_Throws_WhenTenantContextIsMissing()
+        public async Task CreateAsync_ThrowsAuthorizationException_WhenTenantContextIsMissing()
         {
-            UserFriendlyException ex;
-
             using (UsingTenantId(null))
             {
-                ex = await Should.ThrowAsync<UserFriendlyException>(() => _customerAppService.CreateAsync(new CreateCustomerDto
-                {
-                    Name = "Host Customer",
-                    Email = "host-customer@example.com"
-                }));
+                await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                    _customerAppService.CreateAsync(new CreateCustomerDto
+                    {
+                        Name = "Host Customer",
+                        Email = "host-customer@example.com"
+                    }));
             }
-
-            ex.Message.ShouldBe("Customer creation failed.");
-            ex.Details.ShouldBe("A tenant context is required.");
         }
 
         [Fact]
-        public async Task GetAllAsync_Throws_WhenTenantContextIsMissing()
+        public async Task GetAllAsync_ThrowsAuthorizationException_WhenTenantContextIsMissing()
         {
-            UserFriendlyException ex;
-
             using (UsingTenantId(null))
             {
-                ex = await Should.ThrowAsync<UserFriendlyException>(() => _customerAppService.GetAllAsync());
+                await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                    _customerAppService.GetAllAsync());
             }
-
-            ex.Message.ShouldBe("Customer lookup failed.");
-            ex.Details.ShouldBe("A tenant context is required.");
         }
 
         [Fact]
-        public async Task GetAsync_Throws_WhenTenantContextIsMissing()
+        public async Task GetAsync_ThrowsAuthorizationException_WhenTenantContextIsMissing()
         {
             var customerId = 0;
 
@@ -90,15 +83,11 @@ namespace AqualLifeStyle.Tests.Application
                 customerId = customer.Id;
             });
 
-            UserFriendlyException ex;
-
             using (UsingTenantId(null))
             {
-                ex = await Should.ThrowAsync<UserFriendlyException>(() => _customerAppService.GetAsync(customerId));
+                await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                    _customerAppService.GetAsync(customerId));
             }
-
-            ex.Message.ShouldBe("Customer lookup failed.");
-            ex.Details.ShouldBe("A tenant context is required.");
         }
     }
 }
