@@ -10,6 +10,7 @@ using AqualLifeStyle.Application.Facilitators.Dto;
 using AqualLifeStyle.Application.Validation;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.AreaLeaders;
+using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Facilitators;
 
 namespace AqualLifeStyle.Application.Facilitators
@@ -19,15 +20,18 @@ namespace AqualLifeStyle.Application.Facilitators
     {
         private readonly IFacilitatorRepository _facilitatorRepository;
         private readonly IAreaLeaderRepository _areaLeaderRepository;
+        private readonly ICustomerRepository _customerRepository;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public FacilitatorAppService(
             IFacilitatorRepository facilitatorRepository,
             IAreaLeaderRepository areaLeaderRepository,
+            ICustomerRepository customerRepository,
             IUnitOfWorkManager unitOfWorkManager)
         {
             _facilitatorRepository = facilitatorRepository;
             _areaLeaderRepository = areaLeaderRepository;
+            _customerRepository = customerRepository;
             _unitOfWorkManager = unitOfWorkManager;
         }
 
@@ -49,6 +53,11 @@ namespace AqualLifeStyle.Application.Facilitators
                 IsolationLevel = System.Transactions.IsolationLevel.Serializable
             }))
             {
+                if (!await CustomerBelongsToCurrentTenantAsync(input.CustomerId))
+                {
+                    throw new AqualLifeStyleNotFoundException("Customer", input.CustomerId);
+                }
+
                 var existing = await _facilitatorRepository.GetByCustomerIdAsync(input.CustomerId);
                 if (existing != null)
                 {
@@ -86,6 +95,12 @@ namespace AqualLifeStyle.Application.Facilitators
         public async Task<FacilitatorDto> GetByCustomerAsync(int customerId)
         {
             AqualLifeStyleValidator.ValidId(customerId, nameof(customerId));
+
+            if (!await CustomerBelongsToCurrentTenantAsync(customerId))
+            {
+                return null;
+            }
+
             var facilitator = await GetFacilitatorByCustomerForCurrentTenantAsync(customerId);
             return facilitator == null ? null : MapToDto(facilitator);
         }
@@ -116,6 +131,13 @@ namespace AqualLifeStyle.Application.Facilitators
         {
             var tenantId = GetRequiredTenantId("Facilitator lookup failed.");
             return await _facilitatorRepository.FirstOrDefaultAsync(f => f.CustomerId == customerId && f.TenantId == tenantId);
+        }
+
+        private async Task<bool> CustomerBelongsToCurrentTenantAsync(int customerId)
+        {
+            var tenantId = GetRequiredTenantId("Facilitator lookup failed.");
+            var customer = await _customerRepository.FirstOrDefaultAsync(c => c.Id == customerId && c.TenantId == tenantId);
+            return customer != null;
         }
 
         private async Task<AreaLeader> GetAreaLeaderForCurrentTenantAsync(int id)

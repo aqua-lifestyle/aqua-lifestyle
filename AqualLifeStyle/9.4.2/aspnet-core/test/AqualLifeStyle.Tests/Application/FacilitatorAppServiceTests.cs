@@ -95,6 +95,23 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task RegisterAsync_ShouldThrowNotFound_WhenCustomerBelongsToDifferentTenant()
+        {
+            var customerToLeaderId = await CreateCustomerAsync("LeaderForeignCustomer");
+            var leader = await _areaLeaderAppService.ApplyAsync(
+                new RegisterAreaLeaderDto { CustomerId = customerToLeaderId, LicenseType = (int)LicenseType.EntreLevel });
+            var tenantTwoCustomerId = await CreateCustomerAsync("ForeignTenantFacilitator", tenantId: 2);
+
+            var ex = await Assert.ThrowsAsync<AqualLifeStyleNotFoundException>(() => _facilitatorAppService.RegisterAsync(
+                new RegisterFacilitatorDto { CustomerId = tenantTwoCustomerId, AreaLeaderId = leader.Id }));
+
+            ex.Message.ShouldContain("Customer");
+
+            var facilitators = await _facilitatorAppService.GetAllAsync();
+            facilitators.ShouldNotContain(f => f.CustomerId == tenantTwoCustomerId);
+        }
+
+        [Fact]
         public async Task RegisterAsync_ShouldThrow_WhenFacilitatorAlreadyExistsForCustomer()
         {
             var customerToLeaderId = await CreateCustomerAsync("LeaderDuplicate");
@@ -152,6 +169,18 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task GetByCustomerAsync_ShouldReturnNull_WhenCustomerBelongsToDifferentTenant()
+        {
+            var tenantTwoCustomerId = await CreateCustomerAsync("TenantTwoCustomerWithoutFacilitator", tenantId: 2);
+
+            using (UsingTenantId(1))
+            {
+                var found = await _facilitatorAppService.GetByCustomerAsync(tenantTwoCustomerId);
+                found.ShouldBeNull();
+            }
+        }
+
+        [Fact]
         public async Task GetAllAsync_ReturnsOnlyCurrentTenantFacilitators()
         {
             var tenantOneFacilitator = await CreateFacilitatorAsync("TenantOneLeader", "TenantOneFacilitator", tenantId: 1);
@@ -179,13 +208,30 @@ namespace AqualLifeStyle.Tests.Application
 
         private async Task<int> CreateCustomerAsync(string name)
         {
-            await _customerAppService.CreateAsync(new CreateCustomerDto
-            {
-                Name = name,
-                Email = $"{name.ToLower()}@example.com"
-            });
+            return await CreateCustomerAsync(name, tenantId: 1);
+        }
 
-            return await UsingDbContextAsync(async ctx =>
+        private async Task<int> CreateCustomerAsync(string name, int tenantId)
+        {
+            if (tenantId == 1)
+            {
+                await _customerAppService.CreateAsync(new CreateCustomerDto
+                {
+                    Name = name,
+                    Email = $"{name.ToLower()}@example.com"
+                });
+            }
+            else
+            {
+                await UsingDbContextAsync(tenantId, async ctx =>
+                {
+                    var customer = Customer.Create(tenantId, name, new EmailAddress($"{name.ToLower()}@example.com"));
+                    ctx.Customers.Add(customer);
+                    await ctx.SaveChangesAsync();
+                });
+            }
+
+            return await UsingDbContextAsync(tenantId, async ctx =>
             {
                 var customer = await ctx.Customers.FirstAsync(c => c.Email.Value == $"{name.ToLower()}@example.com");
                 return customer.Id;

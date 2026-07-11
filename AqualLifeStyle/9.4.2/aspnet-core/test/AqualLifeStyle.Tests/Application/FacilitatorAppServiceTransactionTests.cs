@@ -1,3 +1,4 @@
+using System;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Abp.Domain.Uow;
@@ -7,6 +8,8 @@ using Moq;
 using AqualLifeStyle.Application.Facilitators;
 using AqualLifeStyle.Application.Facilitators.Dto;
 using AqualLifeStyle.Domain.AreaLeaders;
+using AqualLifeStyle.Domain.Common;
+using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Facilitators;
 using Shouldly;
 
@@ -16,6 +19,7 @@ namespace AqualLifeStyle.Tests.Application
     {
         private readonly Mock<IFacilitatorRepository> _facilitatorRepositoryMock;
         private readonly Mock<IAreaLeaderRepository> _areaLeaderRepositoryMock;
+        private readonly Mock<ICustomerRepository> _customerRepositoryMock;
         private readonly Mock<IUnitOfWorkManager> _unitOfWorkManagerMock;
         private readonly Mock<IUnitOfWorkCompleteHandle> _unitOfWorkMock;
         private readonly FacilitatorAppService _service;
@@ -24,8 +28,18 @@ namespace AqualLifeStyle.Tests.Application
         {
             _facilitatorRepositoryMock = new Mock<IFacilitatorRepository>();
             _areaLeaderRepositoryMock = new Mock<IAreaLeaderRepository>();
+            _customerRepositoryMock = new Mock<ICustomerRepository>();
             _unitOfWorkManagerMock = new Mock<IUnitOfWorkManager>();
             _unitOfWorkMock = new Mock<IUnitOfWorkCompleteHandle>();
+
+            _customerRepositoryMock
+                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<Customer, bool>>>()))
+                .ReturnsAsync(() =>
+                {
+                    var c = Customer.Create(1, "TransactionTest", new EmailAddress("tx@example.com"));
+                    c.Id = 22;
+                    return c;
+                });
 
             _unitOfWorkManagerMock
                 .Setup(m => m.Begin(It.IsAny<UnitOfWorkOptions>()))
@@ -34,6 +48,7 @@ namespace AqualLifeStyle.Tests.Application
             _service = new FacilitatorAppService(
                 _facilitatorRepositoryMock.Object,
                 _areaLeaderRepositoryMock.Object,
+                _customerRepositoryMock.Object,
                 _unitOfWorkManagerMock.Object)
             {
                 AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
