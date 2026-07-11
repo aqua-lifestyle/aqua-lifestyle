@@ -77,15 +77,16 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
-        public void RecordStartupOrder_BeforeApproval_IsAllowed()
+        public void RecordStartupOrder_OnlyAllowedUnderReview()
         {
             var space = NewSpace();
 
-            space.RecordStartupOrder();
+            Should.Throw<InvalidOperationException>(() => space.RecordStartupOrder());
+
             space.StartReview();
             space.RecordStartupOrder();
 
-            space.StartupOrdersCompleted.ShouldBe(2);
+            space.StartupOrdersCompleted.ShouldBe(1);
         }
 
         [Fact]

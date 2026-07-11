@@ -82,9 +82,9 @@ namespace AqualLifeStyle.Domain.AreaLeaders
 
         public void RecordStartupOrder()
         {
-            if (Status == AreaSpaceStatus.Approved || Status == AreaSpaceStatus.Suspended)
+            if (Status != AreaSpaceStatus.UnderReview)
             {
-                throw new InvalidOperationException("Startup orders cannot be recorded after the space is approved/suspended.");
+                throw new InvalidOperationException("Startup orders can only be recorded while under review.");
             }
 
             StartupOrdersCompleted++;
