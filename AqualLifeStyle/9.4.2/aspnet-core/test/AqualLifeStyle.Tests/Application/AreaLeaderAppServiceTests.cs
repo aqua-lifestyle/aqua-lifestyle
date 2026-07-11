@@ -33,7 +33,7 @@ namespace AqualLifeStyle.Tests.Application
         public async Task ApplyAsync_Throws_WhenActiveAreaLeaderCapIsReached()
         {
             _areaLeaderRepositoryMock
-                .Setup(r => r.GetByCustomerIdAsync(It.IsAny<int>()))
+                .Setup(r => r.GetByCustomerIdAsync(It.IsAny<int>(), It.IsAny<int>()))
                 .ReturnsAsync((AreaLeader)null);
             _areaLeaderRepositoryMock
                 .Setup(r => r.CountActiveAsync())

@@ -5,7 +5,7 @@ namespace AqualLifeStyle.Domain.AreaLeaders
 {
     public interface IAreaLeaderRepository : IRepository<AreaLeader, int>
     {
-        Task<AreaLeader> GetByCustomerIdAsync(int customerId);
+        Task<AreaLeader> GetByCustomerIdAsync(int tenantId, int customerId);
         Task<int> CountActiveAsync();
     }
 }

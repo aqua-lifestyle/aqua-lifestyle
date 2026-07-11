@@ -37,7 +37,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             }
 
             var tenantId = GetRequiredTenantId("Area leader application failed.");
-            var existing = await _areaLeaderRepository.GetByCustomerIdAsync(input.CustomerId);
+            var existing = await _areaLeaderRepository.GetByCustomerIdAsync(tenantId, input.CustomerId);
             if (existing != null)
             {
                 throw new UserFriendlyException("Area leader application failed.", "An area leader for this customer already exists.");
