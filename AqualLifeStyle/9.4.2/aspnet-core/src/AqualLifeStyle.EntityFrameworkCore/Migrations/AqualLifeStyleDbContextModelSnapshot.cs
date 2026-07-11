@@ -1895,7 +1895,8 @@ namespace AqualLifeStyle.Migrations
 
                     b.HasIndex("AreaLeaderId");
 
-                    b.HasIndex("CustomerId");
+                    b.HasIndex("TenantId", "CustomerId")
+                        .IsUnique();
 
                     b.ToTable("Facilitators", (string)null);
                 });

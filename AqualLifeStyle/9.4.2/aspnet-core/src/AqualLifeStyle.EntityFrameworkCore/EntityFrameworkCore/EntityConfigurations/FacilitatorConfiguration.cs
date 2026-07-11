@@ -20,7 +20,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
             builder.Property(e => e.IndirectReferrals).IsRequired();
             builder.Property(e => e.AwardBalance).IsRequired();
 
-            builder.HasIndex(e => new { e.TenantId, e.CustomerId });
+            builder.HasIndex(e => new { e.TenantId, e.CustomerId }).IsUnique();
             builder.HasIndex(e => new { e.TenantId, e.AreaLeaderId });
 
             builder.HasOne(e => e.AreaLeader)
