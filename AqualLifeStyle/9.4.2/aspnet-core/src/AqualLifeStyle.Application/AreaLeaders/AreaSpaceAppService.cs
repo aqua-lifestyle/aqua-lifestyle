@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Abp.Authorization;
+using Abp.Events.Bus;
 using Abp.ObjectMapping;
 using Abp.UI;
 using AqualLifeStyle.Application.AreaLeaders.Dto;
@@ -18,15 +19,18 @@ namespace AqualLifeStyle.Application.AreaLeaders
         private readonly IAreaSpaceRepository _areaSpaceRepository;
         private readonly IAreaLeaderRepository _areaLeaderRepository;
         private readonly IObjectMapper _objectMapper;
+        private readonly IEventBus _eventBus;
 
         public AreaSpaceAppService(
             IAreaSpaceRepository areaSpaceRepository,
             IAreaLeaderRepository areaLeaderRepository,
-            IObjectMapper objectMapper)
+            IObjectMapper objectMapper,
+            IEventBus eventBus)
         {
             _areaSpaceRepository = areaSpaceRepository;
             _areaLeaderRepository = areaLeaderRepository;
             _objectMapper = objectMapper;
+            _eventBus = eventBus;
         }
 
         [AbpAuthorize(PermissionNames.Pages_AreaSpaces_Manage)]
@@ -85,8 +89,30 @@ namespace AqualLifeStyle.Application.AreaLeaders
         {
             AqualLifeStyleValidator.ValidId(id);
             var space = await GetSpaceForCurrentTenantAsync(id);
+            var shouldPublishApprovedEvent = space.Status != AreaSpaceStatus.Approved;
             space.Approve(atUtc);
             await _areaSpaceRepository.UpdateAsync(space);
+
+            if (shouldPublishApprovedEvent && _eventBus != null)
+            {
+                var approvedEvent = new AreaSpaceApprovedEvent(space.TenantId, space.Id, space.AreaLeaderId);
+                var currentUow = CurrentUnitOfWork;
+                if (currentUow != null)
+                {
+                    EventHandler completedHandler = null;
+                    completedHandler = (sender, args) =>
+                    {
+                        currentUow.Completed -= completedHandler;
+                        _eventBus.Trigger(approvedEvent);
+                    };
+
+                    currentUow.Completed += completedHandler;
+                }
+                else
+                {
+                    _eventBus.Trigger(approvedEvent);
+                }
+            }
 
             return _objectMapper.Map<AreaSpaceDto>(space);
         }

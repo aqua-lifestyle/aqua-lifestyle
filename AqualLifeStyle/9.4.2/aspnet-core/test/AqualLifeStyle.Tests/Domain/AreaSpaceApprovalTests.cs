@@ -69,7 +69,7 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
-        public void Approve_WithoutPersistedId_Throws()
+        public void Approve_WithoutPersistedId_Succeeds()
         {
             var space = NewSpace(AreaSpaceApprovalRules.MinInterestedMembers);
             space.StartReview();
@@ -78,8 +78,8 @@ namespace AqualLifeStyle.Tests.Domain
 
             var afterWindow = Clock.Now.AddHours(AreaSpaceApprovalRules.ReviewWindowHours + 1);
 
-            Should.Throw<InvalidOperationException>(() => space.Approve(afterWindow))
-                .Message.ShouldBe("Area space must be persisted before approval can raise events.");
+            space.Approve(afterWindow);
+            space.Status.ShouldBe(AreaSpaceStatus.Approved);
         }
 
         [Fact]

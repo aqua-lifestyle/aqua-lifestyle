@@ -93,6 +93,7 @@ namespace AqualLifeStyle.Domain.AreaLeaders
         /// <summary>
         /// Approve the area space. Fail-Fast: 20+ interested members, 4 presentations,
         /// 20 startup orders, and the 42-hour review window must all be satisfied.
+        /// Follow-up events should be published after persistence by the application layer.
         /// </summary>
         public void Approve(DateTime? atUtc = null)
         {
@@ -129,11 +130,6 @@ namespace AqualLifeStyle.Domain.AreaLeaders
                 throw new InvalidOperationException("Review must be started before approval.");
             }
 
-            if (Id <= 0)
-            {
-                throw new InvalidOperationException("Area space must be persisted before approval can raise events.");
-            }
-
             var now = atUtc ?? Clock.Now;
             var elapsed = now - ReviewStartedAt.Value;
             if (elapsed < TimeSpan.FromHours(AreaSpaceApprovalRules.ReviewWindowHours))
@@ -144,7 +140,6 @@ namespace AqualLifeStyle.Domain.AreaLeaders
 
             Status = AreaSpaceStatus.Approved;
             ApprovedAt = now;
-            DomainEvents.Add(new AreaSpaceApprovedEvent(TenantId, Id, AreaLeaderId));
         }
 
         public void Suspend()

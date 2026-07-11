@@ -160,8 +160,8 @@ namespace AqualLifeStyle.Tests.Domain
 
             var afterWindow = Clock.Now.AddHours(AreaSpaceApprovalRules.ReviewWindowHours + 1);
 
-            Should.Throw<InvalidOperationException>(() => space.Approve(afterWindow))
-                .Message.ShouldBe("Area space must be persisted before approval can raise events.");
+            space.Approve(afterWindow);
+            space.Status.ShouldBe(AreaSpaceStatus.Approved);
         }
 
         [Fact]
@@ -174,12 +174,7 @@ namespace AqualLifeStyle.Tests.Domain
 
             space.Status.ShouldBe(AreaSpaceStatus.Approved);
             space.ApprovedAt.ShouldBe(approvedAt);
-            space.DomainEvents.Count.ShouldBe(1);
-
-            var evt = space.DomainEvents.Single().ShouldBeOfType<AreaSpaceApprovedEvent>();
-            evt.TenantId.ShouldBe(1);
-            evt.AreaSpaceId.ShouldBe(space.Id);
-            evt.AreaLeaderId.ShouldBe(5);
+            space.DomainEvents.ShouldBeEmpty();
         }
 
         [Fact]
@@ -193,7 +188,6 @@ namespace AqualLifeStyle.Tests.Domain
             space.Approve(secondApprovedAt);
 
             space.ApprovedAt.ShouldBe(firstApprovedAt);
-            space.DomainEvents.Count.ShouldBe(1);
         }
 
         [Fact]

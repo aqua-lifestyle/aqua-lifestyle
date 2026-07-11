@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using Abp.Runtime.Session;
 using Moq;
 using Abp.ObjectMapping;
+using Abp.Events.Bus;
+using Abp.Domain.Uow;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.AreaLeaders.Dto;
 using AqualLifeStyle.Application.Exceptions;
@@ -19,6 +21,9 @@ namespace AqualLifeStyle.Tests.Application
         private readonly Mock<IAreaSpaceRepository> _areaSpaceRepositoryMock;
         private readonly Mock<IAreaLeaderRepository> _areaLeaderRepositoryMock;
         private readonly Mock<IObjectMapper> _objectMapperMock;
+        private readonly Mock<IEventBus> _eventBusMock;
+        private readonly Mock<IUnitOfWorkManager> _unitOfWorkManagerMock;
+        private readonly Mock<IActiveUnitOfWork> _activeUnitOfWorkMock;
         private readonly AreaSpaceAppService _service;
 
         public AreaSpaceAppServiceTests()
@@ -26,12 +31,19 @@ namespace AqualLifeStyle.Tests.Application
             _areaSpaceRepositoryMock = new Mock<IAreaSpaceRepository>();
             _objectMapperMock = new Mock<IObjectMapper>();
             _areaLeaderRepositoryMock = new Mock<IAreaLeaderRepository>();
+            _eventBusMock = new Mock<IEventBus>();
+            _activeUnitOfWorkMock = new Mock<IActiveUnitOfWork>();
+            _unitOfWorkManagerMock = new Mock<IUnitOfWorkManager>();
+            _unitOfWorkManagerMock.Setup(m => m.Current).Returns(_activeUnitOfWorkMock.Object);
+
             _service = new AreaSpaceAppService(
                 _areaSpaceRepositoryMock.Object,
                 _areaLeaderRepositoryMock.Object,
-                _objectMapperMock.Object)
+                _objectMapperMock.Object,
+                _eventBusMock.Object)
             {
-                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
+                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1),
+                UnitOfWorkManager = _unitOfWorkManagerMock.Object
             };
         }
 
@@ -56,7 +68,7 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task ApproveAsync_AddsAreaSpaceApprovedEventToDomainEvents()
+        public async Task ApproveAsync_TriggersAreaSpaceApprovedEventWhenUnitOfWorkCompletes()
         {
             var space = AreaSpace.Apply(
                 tenantId: 1,
@@ -78,12 +90,14 @@ namespace AqualLifeStyle.Tests.Application
             await _service.ApproveAsync(space.Id, approvedAt);
 
             _areaSpaceRepositoryMock.Verify(r => r.UpdateAsync(space), Times.Once);
+            _eventBusMock.Verify(e => e.Trigger(It.IsAny<AreaSpaceApprovedEvent>()), Times.Never);
 
-            var domainEvent = space.DomainEvents.OfType<AreaSpaceApprovedEvent>().SingleOrDefault();
-            domainEvent.ShouldNotBeNull();
-            domainEvent.TenantId.ShouldBe(1);
-            domainEvent.AreaSpaceId.ShouldBe(44);
-            domainEvent.AreaLeaderId.ShouldBe(9);
+            _activeUnitOfWorkMock.Raise(uow => uow.Completed += null, EventArgs.Empty);
+
+            _eventBusMock.Verify(e => e.Trigger(It.Is<AreaSpaceApprovedEvent>(evt =>
+                evt.TenantId == 1 &&
+                evt.AreaSpaceId == 44 &&
+                evt.AreaLeaderId == 9)), Times.Once);
         }
     }
 }
