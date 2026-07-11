@@ -1,6 +1,5 @@
 using System.Linq;
 using System.Threading.Tasks;
-using Abp.UI;
 using Microsoft.EntityFrameworkCore;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Customers.Dto;
@@ -48,25 +47,49 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task CreateAsync_Throws_WhenTenantContextIsMissing()
+        public async Task CreateAsync_CreatesHostCustomer_WhenTenantContextIsMissing()
         {
             using (UsingTenantId(null))
             {
-                var ex = await Assert.ThrowsAsync<UserFriendlyException>(() => _customerAppService.CreateAsync(new CreateCustomerDto
+                await _customerAppService.CreateAsync(new CreateCustomerDto
                 {
                     Name = "Host Customer",
                     Email = "host-customer@example.com"
-                }));
-
-                ex.Message.ShouldBe("Customer creation failed.");
-                ex.Details.ShouldBe("A tenant context is required.");
+                });
             }
 
             await UsingDbContextAsync(null, async ctx =>
             {
-                var hostCustomerExists = await ctx.Customers.AnyAsync(c => c.Email.Value == "host-customer@example.com");
-                hostCustomerExists.ShouldBeFalse();
+                var hostCustomer = await ctx.Customers.SingleAsync(c => c.Email.Value == "host-customer@example.com");
+                hostCustomer.TenantId.ShouldBeNull();
             });
+        }
+
+        [Fact]
+        public async Task GetAllAsync_ReturnsOnlyHostCustomers_WhenTenantContextIsMissing()
+        {
+            var hostEmail = "host-scope-customer@example.com";
+            var tenantEmail = "tenant-scope-customer@example.com";
+
+            await UsingDbContextAsync(null, async ctx =>
+            {
+                ctx.Customers.Add(Customer.Create(null, "Host Scope Customer", new EmailAddress(hostEmail)));
+                await ctx.SaveChangesAsync();
+            });
+
+            await UsingDbContextAsync(1, async ctx =>
+            {
+                ctx.Customers.Add(Customer.Create(1, "Tenant Scope Customer", new EmailAddress(tenantEmail)));
+                await ctx.SaveChangesAsync();
+            });
+
+            using (UsingTenantId(null))
+            {
+                var customers = await _customerAppService.GetAllAsync();
+
+                customers.ShouldContain(c => c.Email == hostEmail);
+                customers.ShouldNotContain(c => c.Email == tenantEmail);
+            }
         }
     }
 }

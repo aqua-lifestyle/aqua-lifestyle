@@ -24,7 +24,7 @@ namespace AqualLifeStyle.Application.Customers
 
         public async Task<IReadOnlyList<CustomerDto>> GetAllAsync()
         {
-            var tenantId = GetRequiredTenantId("Customer lookup failed.");
+            var tenantId = GetCurrentTenantId();
             var customers = await _customerRepository.GetAllListAsync(c => c.TenantId == tenantId);
             return customers.Select(c => new CustomerDto
             {
@@ -122,7 +122,7 @@ namespace AqualLifeStyle.Application.Customers
                 throw new UserFriendlyException("Customer creation failed.", "Customer email is required.");
             }
 
-            var tenantId = GetRequiredTenantId("Customer creation failed.");
+            var tenantId = GetCurrentTenantId();
 
             if (await _customerRepository.ExistsByEmailAsync(input.Email))
             {
@@ -163,19 +163,11 @@ namespace AqualLifeStyle.Application.Customers
             };
         }
 
-        private int GetRequiredTenantId(string operation)
-        {
-            if (!AbpSession.TenantId.HasValue)
-            {
-                throw new UserFriendlyException(operation, "A tenant context is required.");
-            }
-
-            return AbpSession.TenantId.Value;
-        }
+        private int? GetCurrentTenantId() => AbpSession.TenantId;
 
         private async Task<Customer> GetCustomerForCurrentTenantAsync(int id)
         {
-            var tenantId = GetRequiredTenantId("Customer lookup failed.");
+            var tenantId = GetCurrentTenantId();
             var customer = await _customerRepository.FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId);
             if (customer == null)
             {
