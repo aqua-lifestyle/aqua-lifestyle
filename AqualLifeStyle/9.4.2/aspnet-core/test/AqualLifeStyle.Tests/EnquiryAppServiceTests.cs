@@ -1,16 +1,17 @@
 using System;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Abp.Domain.Uow;
 using Abp.Domain.Repositories;
-using Abp.Events.Bus;
 using Abp.Runtime.Session;
 using Moq;
+using Shouldly;
+using Xunit;
 using AqualLifeStyle.Application.Enquiries;
 using AqualLifeStyle.Application.Enquiries.Dto;
 using AqualLifeStyle.Domain.Enquiries;
 using AqualLifeStyle.Domain.Enums;
-using Xunit;
 
 namespace AqualLifeStyle.Tests
 {
@@ -22,18 +23,19 @@ namespace AqualLifeStyle.Tests
         public EnquiryAppServiceTests()
         {
             _enquiryRepositoryMock = new Mock<IEnquiryRepository>();
-            _service = new TestableEnquiryAppService(_enquiryRepositoryMock.Object, null)
+            _service = new TestableEnquiryAppService(_enquiryRepositoryMock.Object)
             {
-                // The service now scopes every enquiry to the current tenant, so unit tests
-                // must supply a tenant context.
                 AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
             };
         }
 
         private void SetupEnquiry(Enquiry enquiry)
         {
-            // The app service looks up the enquiry via FirstOrDefaultAsync(e => e.Id == id && e.TenantId == tenantId)
-            // now that tenant isolation is enforced.
+            if (enquiry.Id == 0)
+            {
+                enquiry.Id = 1;
+            }
+
             _enquiryRepositoryMock
                 .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<Enquiry, bool>>>()))
                 .ReturnsAsync(enquiry);
@@ -133,59 +135,23 @@ namespace AqualLifeStyle.Tests
         }
 
         [Fact]
-        public async Task ConvertToCustomerAsync_RegistersSingleCompletionCallback_AndTriggersEventOnCompletion()
+        public async Task ConvertToCustomerAsync_AddsEnquiryConvertedEventToDomainEvents()
         {
             // Arrange
             var enquiry = Enquiry.Create(tenantId: 1, customerId: 11, productId: 5, message: "Question");
+            enquiry.Id = 7;
             SetupEnquiry(enquiry);
-            var eventBusMock = new Mock<IEventBus>();
-
-            var unitOfWorkManagerMock = new Mock<IUnitOfWorkManager>();
-            var activeUnitOfWorkMock = new Mock<IActiveUnitOfWork>();
-            EventHandler completionHandlers = null;
-            EventHandler removedHandler = null;
-            var service = new TestableEnquiryAppService(_enquiryRepositoryMock.Object, eventBusMock.Object)
-            {
-                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
-            };
-
-            activeUnitOfWorkMock
-                .SetupAdd(m => m.Completed += It.IsAny<EventHandler>())
-                .Callback((EventHandler h) => completionHandlers += h);
-            activeUnitOfWorkMock
-                .SetupRemove(m => m.Completed -= It.IsAny<EventHandler>())
-                .Callback((EventHandler h) =>
-                {
-                    removedHandler = h;
-                    completionHandlers -= h;
-                });
-            unitOfWorkManagerMock
-                .Setup(m => m.Current)
-                .Returns(activeUnitOfWorkMock.Object);
-
-            service.SetUnitOfWorkManager(unitOfWorkManagerMock.Object);
 
             // Act
-            await service.ConvertToCustomerAsync(6, new ConvertEnquiryToCustomerDto());
+            await _service.ConvertToCustomerAsync(7, new ConvertEnquiryToCustomerDto());
 
             // Assert
-            activeUnitOfWorkMock.VerifyAdd(m => m.Completed += It.IsAny<EventHandler>(), Times.Once);
-            eventBusMock.Verify(b => b.Trigger(It.IsAny<EnquiryConvertedEvent>()), Times.Never);
-
-            Assert.NotNull(completionHandlers);
-            completionHandlers(activeUnitOfWorkMock.Object, EventArgs.Empty);
-
-            activeUnitOfWorkMock.VerifyRemove(m => m.Completed -= It.IsAny<EventHandler>(), Times.Once);
-            Assert.Null(completionHandlers);
-            Assert.NotNull(removedHandler);
-            eventBusMock.Verify(b => b.Trigger(It.Is<EnquiryConvertedEvent>(evt =>
-                evt.EnquiryId == enquiry.Id &&
-                evt.CustomerId == enquiry.CustomerId &&
-                evt.ProductId == enquiry.ProductId &&
-                evt.ReferredByFacilitatorId == enquiry.ReferredByFacilitatorId &&
-                evt.TenantId == enquiry.TenantId)), Times.Once);
-
-            eventBusMock.Verify(b => b.Trigger(It.IsAny<EnquiryConvertedEvent>()), Times.Once);
+            var domainEvent = enquiry.DomainEvents.OfType<EnquiryConvertedEvent>().SingleOrDefault();
+            domainEvent.ShouldNotBeNull();
+            domainEvent.EnquiryId.ShouldBe(7);
+            domainEvent.CustomerId.ShouldBe(11);
+            domainEvent.ProductId.ShouldBe(5);
+            domainEvent.TenantId.ShouldBe(1);
         }
 
         [Fact]
@@ -193,6 +159,7 @@ namespace AqualLifeStyle.Tests
         {
             // Arrange
             var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
+            enquiry.Id = 1;
             enquiry.ConvertToCustomer(null);
             SetupEnquiry(enquiry);
 
@@ -222,6 +189,7 @@ namespace AqualLifeStyle.Tests
         {
             // Arrange
             var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
+            enquiry.Id = 1;
             enquiry.AssignToMember(10);
             enquiry.ConvertToCustomer(null);
             SetupEnquiry(enquiry);
@@ -236,6 +204,7 @@ namespace AqualLifeStyle.Tests
         {
             // Arrange
             var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
+            enquiry.Id = 1;
             enquiry.ConvertToCustomer(null);
             SetupEnquiry(enquiry);
 
@@ -246,14 +215,9 @@ namespace AqualLifeStyle.Tests
 
         private sealed class TestableEnquiryAppService : EnquiryAppService
         {
-            public TestableEnquiryAppService(IEnquiryRepository enquiryRepository, IEventBus eventBus)
-                : base(enquiryRepository, eventBus)
+            public TestableEnquiryAppService(IEnquiryRepository enquiryRepository)
+                : base(enquiryRepository)
             {
-            }
-
-            public void SetUnitOfWorkManager(IUnitOfWorkManager unitOfWorkManager)
-            {
-                UnitOfWorkManager = unitOfWorkManager;
             }
         }
     }

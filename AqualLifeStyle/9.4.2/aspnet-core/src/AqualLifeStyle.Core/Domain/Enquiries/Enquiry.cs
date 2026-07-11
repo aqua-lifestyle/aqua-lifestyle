@@ -6,7 +6,7 @@ using AqualLifeStyle.Domain.Enums;
 
 namespace AqualLifeStyle.Domain.Enquiries
 {
-    public class Enquiry : Entity<int>, IMayHaveTenant
+    public class Enquiry : AggregateRoot<int>, IMayHaveTenant
     {
         public int? TenantId { get; set; }
         public int CustomerId { get; private set; }
@@ -96,12 +96,23 @@ namespace AqualLifeStyle.Domain.Enquiries
             {
                 throw new ArgumentException("Facilitator ID must be valid.", nameof(referredByFacilitatorId));
             }
+            if (Id <= 0)
+            {
+                throw new InvalidOperationException("Enquiry must be persisted before conversion can raise events.");
+            }
 
             ReferredByFacilitatorId = referredByFacilitatorId;
             IsConverted = true;
             ConvertedAt = DateTime.UtcNow;
             Status = EnquiryStatus.Closed;
             ConversionProbability = 100m;
+            DomainEvents.Add(new EnquiryConvertedEvent(
+                Id,
+                CustomerId,
+                ProductId,
+                ReferredByFacilitatorId,
+                ConvertedAt.Value,
+                TenantId));
         }
 
         public void ClearAssignment()

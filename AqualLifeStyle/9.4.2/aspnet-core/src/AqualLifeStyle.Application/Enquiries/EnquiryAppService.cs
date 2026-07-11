@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Abp.Events.Bus;
 using AqualLifeStyle.Application.Enquiries.Dto;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Validation;
@@ -14,12 +13,10 @@ namespace AqualLifeStyle.Application.Enquiries
     public class EnquiryAppService : AqualLifeStyleAppServiceBase, IEnquiryAppService
     {
         private readonly IEnquiryRepository _enquiryRepository;
-        private readonly IEventBus _eventBus;
 
-        public EnquiryAppService(IEnquiryRepository enquiryRepository, IEventBus eventBus)
+        public EnquiryAppService(IEnquiryRepository enquiryRepository)
         {
             _enquiryRepository = enquiryRepository;
-            _eventBus = eventBus;
         }
 
         public async Task<IReadOnlyList<EnquiryDto>> GetAllAsync()
@@ -137,27 +134,6 @@ namespace AqualLifeStyle.Application.Enquiries
             }
 
             await _enquiryRepository.UpdateAsync(enquiry);
-
-            if (_eventBus != null)
-            {
-                var convertedEvent = new EnquiryConvertedEvent(
-                    enquiry.Id,
-                    enquiry.CustomerId,
-                    enquiry.ProductId,
-                    enquiry.ReferredByFacilitatorId,
-                    enquiry.ConvertedAt ?? System.DateTime.UtcNow,
-                    enquiry.TenantId);
-
-                var currentUow = CurrentUnitOfWork;
-                EventHandler completedHandler = null;
-                completedHandler = (sender, args) =>
-                {
-                    currentUow.Completed -= completedHandler;
-                    _eventBus.Trigger(convertedEvent);
-                };
-
-                currentUow.Completed += completedHandler;
-            }
 
             return MapToDto(enquiry);
         }
