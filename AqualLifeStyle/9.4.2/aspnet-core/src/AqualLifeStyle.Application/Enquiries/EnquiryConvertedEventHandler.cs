@@ -59,18 +59,30 @@ namespace AqualLifeStyle.Application.Enquiries
             }
 
             var tenantId = GetValidatedTenantId(evt);
+            Logger.Info(
+                $"Received enquiry conversion event: enquiryId={evt.EnquiryId}, customerId={evt.CustomerId}, tenantId={tenantId}, referredByFacilitatorId={evt.ReferredByFacilitatorId}.");
 
-            using (var uow = _unitOfWorkManager.Begin())
+            try
             {
-                // The conversion event runs after the originating UoW commits, so it needs its own
-                // tenant-scoped UoW for any follow-up reads and writes.
-                using (_unitOfWorkManager.Current.SetTenantId(tenantId))
+                using (var uow = _unitOfWorkManager.Begin())
                 {
-                    await AttributeReferralsAsync(evt);
-                    await LinkCustomerAsync(evt);
-                }
+                    // The conversion event runs after the originating UoW commits, so it needs its own
+                    // tenant-scoped UoW for any follow-up reads and writes.
+                    using (_unitOfWorkManager.Current.SetTenantId(tenantId))
+                    {
+                        await AttributeReferralsAsync(evt);
+                        await LinkCustomerAsync(evt);
+                    }
 
-                await uow.CompleteAsync();
+                    await uow.CompleteAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(
+                    $"Failed to process enquiry conversion event: enquiryId={evt.EnquiryId}, customerId={evt.CustomerId}, tenantId={tenantId}, referredByFacilitatorId={evt.ReferredByFacilitatorId}.",
+                    ex);
+                throw;
             }
         }
 
@@ -97,6 +109,8 @@ namespace AqualLifeStyle.Application.Enquiries
             var existingReferral = await _referralRepository.GetBySourceEnquiryAsync(evt.EnquiryId, evt.TenantId);
             if (existingReferral != null)
             {
+                Logger.Info(
+                    $"Skipping referral attribution for enquiry {evt.EnquiryId} in tenant {evt.TenantId}: attribution already exists.");
                 return;
             }
 
@@ -119,6 +133,8 @@ namespace AqualLifeStyle.Application.Enquiries
                 await _referralRepository.InsertAsync(attribution.IndirectReferral);
                 await _facilitatorRepository.UpdateAsync(facilitator);
                 await _areaLeaderRepository.UpdateAsync(areaLeader);
+                Logger.Info(
+                    $"Applied referral attribution for enquiry {evt.EnquiryId} in tenant {evt.TenantId}: facilitatorId={facilitator.Id}, areaLeaderId={areaLeader.Id}, directReferralCustomerId={attribution.DirectReferral.ReferredCustomerId}, indirectReferralCustomerId={attribution.IndirectReferral.ReferredCustomerId}.");
             }
         }
 
@@ -137,6 +153,8 @@ namespace AqualLifeStyle.Application.Enquiries
             }
 
             await _customerRepository.AssignMembershipIfUnassignedAsync(customer.Id, evt.TenantId, membershipId.Value);
+            Logger.Info(
+                $"Linked converted enquiry customer to active membership: enquiryId={evt.EnquiryId}, customerId={customer.Id}, tenantId={evt.TenantId}, membershipId={membershipId.Value}.");
         }
     }
 }
