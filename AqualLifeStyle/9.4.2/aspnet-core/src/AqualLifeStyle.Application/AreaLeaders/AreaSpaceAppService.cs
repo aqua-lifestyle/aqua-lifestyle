@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
+using Abp.ObjectMapping;
 using Abp.UI;
 using AqualLifeStyle.Application.AreaLeaders.Dto;
 using AqualLifeStyle.Application.Exceptions;
@@ -17,13 +17,16 @@ namespace AqualLifeStyle.Application.AreaLeaders
     {
         private readonly IAreaSpaceRepository _areaSpaceRepository;
         private readonly IAreaLeaderRepository _areaLeaderRepository;
+        private readonly IObjectMapper _objectMapper;
 
         public AreaSpaceAppService(
             IAreaSpaceRepository areaSpaceRepository,
-            IAreaLeaderRepository areaLeaderRepository)
+            IAreaLeaderRepository areaLeaderRepository,
+            IObjectMapper objectMapper)
         {
             _areaSpaceRepository = areaSpaceRepository;
             _areaLeaderRepository = areaLeaderRepository;
+            _objectMapper = objectMapper;
         }
 
         [AbpAuthorize(PermissionNames.Pages_AreaSpaces_Manage)]
@@ -44,7 +47,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             var address = new Address(input.AddressLine, null, null, null);
             var space = AreaSpace.Apply(tenantId, input.AreaLeaderId, address, input.Capacity, input.InterestedMembers);
             await _areaSpaceRepository.InsertAndGetIdAsync(space);
-            return MapToDto(space);
+            return _objectMapper.Map<AreaSpaceDto>(space);
         }
 
         [AbpAuthorize(PermissionNames.Pages_AreaSpaces_Manage)]
@@ -54,7 +57,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             var space = await GetSpaceForCurrentTenantAsync(id);
             space.StartReview();
             await _areaSpaceRepository.UpdateAsync(space);
-            return MapToDto(space);
+            return _objectMapper.Map<AreaSpaceDto>(space);
         }
 
         [AbpAuthorize(PermissionNames.Pages_AreaSpaces_Manage)]
@@ -64,7 +67,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             var space = await GetSpaceForCurrentTenantAsync(id);
             space.RecordPresentation();
             await _areaSpaceRepository.UpdateAsync(space);
-            return MapToDto(space);
+            return _objectMapper.Map<AreaSpaceDto>(space);
         }
 
         [AbpAuthorize(PermissionNames.Pages_AreaSpaces_Manage)]
@@ -74,7 +77,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             var space = await GetSpaceForCurrentTenantAsync(id);
             space.RecordStartupOrder();
             await _areaSpaceRepository.UpdateAsync(space);
-            return MapToDto(space);
+            return _objectMapper.Map<AreaSpaceDto>(space);
         }
 
         [AbpAuthorize(PermissionNames.Pages_AreaSpaces_Manage)]
@@ -85,7 +88,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             space.Approve(atUtc);
             await _areaSpaceRepository.UpdateAsync(space);
 
-            return MapToDto(space);
+            return _objectMapper.Map<AreaSpaceDto>(space);
         }
 
         [AbpAuthorize(PermissionNames.Pages_AreaSpaces_Manage)]
@@ -95,21 +98,21 @@ namespace AqualLifeStyle.Application.AreaLeaders
             var space = await GetSpaceForCurrentTenantAsync(id);
             space.Suspend();
             await _areaSpaceRepository.UpdateAsync(space);
-            return MapToDto(space);
+            return _objectMapper.Map<AreaSpaceDto>(space);
         }
 
         public async Task<IReadOnlyList<AreaSpaceDto>> GetAllAsync()
         {
             var tenantId = GetRequiredTenantId("Area space lookup failed.");
             var spaces = await _areaSpaceRepository.GetAllListAsync(s => s.TenantId == tenantId);
-            return spaces.Select(MapToDto).ToList();
+            return _objectMapper.Map<List<AreaSpaceDto>>(spaces);
         }
 
         public async Task<AreaSpaceDto> GetAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
             var space = await GetSpaceForCurrentTenantAsync(id);
-            return MapToDto(space);
+            return _objectMapper.Map<AreaSpaceDto>(space);
         }
 
         private async Task<AreaSpace> GetSpaceForCurrentTenantAsync(int id)
@@ -136,22 +139,5 @@ namespace AqualLifeStyle.Application.AreaLeaders
             return leader;
         }
 
-        private static AreaSpaceDto MapToDto(AreaSpace space)
-        {
-            return new AreaSpaceDto
-            {
-                Id = space.Id,
-                TenantId = space.TenantId,
-                AreaLeaderId = space.AreaLeaderId,
-                AddressLine = space.AddressLine,
-                Capacity = space.Capacity,
-                InterestedMembers = space.InterestedMembers,
-                Status = (int)space.Status,
-                ReviewStartedAt = space.ReviewStartedAt,
-                PresentationsCompleted = space.PresentationsCompleted,
-                StartupOrdersCompleted = space.StartupOrdersCompleted,
-                ApprovedAt = space.ApprovedAt
-            };
-        }
     }
 }

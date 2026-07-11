@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
+using Abp.ObjectMapping;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Referrals.Dto;
 using AqualLifeStyle.Application.Validation;
@@ -14,17 +14,19 @@ namespace AqualLifeStyle.Application.Referrals
     public class ReferralAppService : AqualLifeStyleAppServiceBase, IReferralAppService
     {
         private readonly IReferralRepository _referralRepository;
+        private readonly IObjectMapper _objectMapper;
 
-        public ReferralAppService(IReferralRepository referralRepository)
+        public ReferralAppService(IReferralRepository referralRepository, IObjectMapper objectMapper)
         {
             _referralRepository = referralRepository;
+            _objectMapper = objectMapper;
         }
 
         public async Task<IReadOnlyList<ReferralDto>> GetAllAsync()
         {
             var tenantId = GetRequiredTenantId("Referral lookup failed.");
             var referrals = await _referralRepository.GetAllListAsync(r => r.TenantId == tenantId);
-            return referrals.Select(MapToDto).ToList();
+            return _objectMapper.Map<List<ReferralDto>>(referrals);
         }
 
         public async Task<ReferralDto> GetByEnquiryAsync(int enquiryId)
@@ -32,7 +34,7 @@ namespace AqualLifeStyle.Application.Referrals
             AqualLifeStyleValidator.ValidId(enquiryId, nameof(enquiryId));
             var tenantId = GetRequiredTenantId("Referral lookup failed.");
             var referral = await _referralRepository.GetBySourceEnquiryAsync(enquiryId, tenantId);
-            return referral == null ? null : MapToDto(referral);
+            return referral == null ? null : _objectMapper.Map<ReferralDto>(referral);
         }
 
         [AbpAuthorize(PermissionNames.Pages_Referrals_Manage)]
@@ -48,25 +50,8 @@ namespace AqualLifeStyle.Application.Referrals
 
             referral.ConfirmAward();
             await _referralRepository.UpdateAsync(referral);
-            return MapToDto(referral);
+            return _objectMapper.Map<ReferralDto>(referral);
         }
 
-        private static ReferralDto MapToDto(Referral referral)
-        {
-            return new ReferralDto
-            {
-                Id = referral.Id,
-                TenantId = referral.TenantId,
-                ReferrerFacilitatorId = referral.ReferrerFacilitatorId,
-                ReferrerAreaLeaderId = referral.ReferrerAreaLeaderId,
-                ReferredCustomerId = referral.ReferredCustomerId,
-                SourceEnquiryId = referral.SourceEnquiryId,
-                Type = (int)referral.Type,
-                AwardAmount = referral.AwardAmount,
-                AwardIssued = referral.AwardIssued,
-                ConfirmedAt = referral.ConfirmedAt,
-                ConvertedAt = referral.ConvertedAt
-            };
-        }
     }
 }

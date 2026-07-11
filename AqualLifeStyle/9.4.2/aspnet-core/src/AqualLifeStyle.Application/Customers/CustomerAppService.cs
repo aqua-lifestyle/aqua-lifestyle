@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
-using Abp.Application.Services;
+using Abp.ObjectMapping;
 using Abp.UI;
 using AqualLifeStyle.Application.Customers.Dto;
 using AqualLifeStyle.Domain.Common;
@@ -15,31 +14,26 @@ namespace AqualLifeStyle.Application.Customers
     {
         private readonly ICustomerRepository _customerRepository;
         private readonly IMembershipRepository _membershipRepository;
+        private readonly IObjectMapper _objectMapper;
 
-        public CustomerAppService(ICustomerRepository customerRepository, IMembershipRepository membershipRepository)
+        public CustomerAppService(ICustomerRepository customerRepository, IMembershipRepository membershipRepository, IObjectMapper objectMapper)
         {
             _customerRepository = customerRepository;
             _membershipRepository = membershipRepository;
+            _objectMapper = objectMapper;
         }
 
         public async Task<IReadOnlyList<CustomerDto>> GetAllAsync()
         {
             var tenantId = GetRequiredTenantId("Customer lookup failed.");
             var customers = await _customerRepository.GetAllListAsync(c => c.TenantId == tenantId);
-            return customers.Select(c => new CustomerDto
-            {
-                Id = c.Id,
-                Name = c.Name,
-                Email = c.Email?.Value,
-                MembershipId = c.MembershipId,
-                IsActive = c.IsActive
-            }).ToList();
+            return _objectMapper.Map<List<CustomerDto>>(customers);
         }
 
         public async Task<CustomerDto> GetAsync(int id)
         {
             var customer = await GetCustomerForCurrentTenantAsync(id);
-            return MapToDto(customer);
+            return _objectMapper.Map<CustomerDto>(customer);
         }
 
         public async Task<CustomerDto> UpdateAsync(CustomerDto input)
@@ -93,7 +87,7 @@ namespace AqualLifeStyle.Application.Customers
                 }
 
                 await _customerRepository.UpdateAsync(customer);
-                return MapToDto(customer);
+                return _objectMapper.Map<CustomerDto>(customer);
             }
             catch (UserFriendlyException)
             {
@@ -149,18 +143,6 @@ namespace AqualLifeStyle.Application.Customers
             {
                 throw new UserFriendlyException("Customer creation failed.", ex.Message);
             }
-        }
-
-        private static CustomerDto MapToDto(Customer customer)
-        {
-            return new CustomerDto
-            {
-                Id = customer.Id,
-                Name = customer.Name,
-                Email = customer.Email?.Value,
-                MembershipId = customer.MembershipId,
-                IsActive = customer.IsActive
-            };
         }
 
         private async Task<Customer> GetCustomerForCurrentTenantAsync(int id)

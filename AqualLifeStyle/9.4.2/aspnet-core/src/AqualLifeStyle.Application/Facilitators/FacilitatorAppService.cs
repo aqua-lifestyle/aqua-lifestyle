@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Data;
-using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
 using Abp.Domain.Uow;
+using Abp.ObjectMapping;
 using Abp.UI;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Facilitators.Dto;
@@ -22,17 +22,20 @@ namespace AqualLifeStyle.Application.Facilitators
         private readonly IAreaLeaderRepository _areaLeaderRepository;
         private readonly ICustomerRepository _customerRepository;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        private readonly IObjectMapper _objectMapper;
 
         public FacilitatorAppService(
             IFacilitatorRepository facilitatorRepository,
             IAreaLeaderRepository areaLeaderRepository,
             ICustomerRepository customerRepository,
-            IUnitOfWorkManager unitOfWorkManager)
+            IUnitOfWorkManager unitOfWorkManager,
+            IObjectMapper objectMapper)
         {
             _facilitatorRepository = facilitatorRepository;
             _areaLeaderRepository = areaLeaderRepository;
             _customerRepository = customerRepository;
             _unitOfWorkManager = unitOfWorkManager;
+            _objectMapper = objectMapper;
         }
 
         [AbpAuthorize(PermissionNames.Pages_Facilitators_Manage)]
@@ -71,7 +74,7 @@ namespace AqualLifeStyle.Application.Facilitators
 
                 await uow.CompleteAsync();
 
-                return MapToDto(facilitator);
+                return _objectMapper.Map<FacilitatorDto>(facilitator);
             }
         }
 
@@ -79,14 +82,14 @@ namespace AqualLifeStyle.Application.Facilitators
         {
             var tenantId = GetRequiredTenantId("Facilitator lookup failed.");
             var facilitators = await _facilitatorRepository.GetAllListAsync(f => f.TenantId == tenantId);
-            return facilitators.Select(MapToDto).ToList();
+            return _objectMapper.Map<List<FacilitatorDto>>(facilitators);
         }
 
         public async Task<FacilitatorDto> GetAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
             var facilitator = await GetFacilitatorForCurrentTenantAsync(id);
-            return MapToDto(facilitator);
+            return _objectMapper.Map<FacilitatorDto>(facilitator);
         }
 
         public async Task<FacilitatorDto> GetByCustomerAsync(int customerId)
@@ -99,7 +102,7 @@ namespace AqualLifeStyle.Application.Facilitators
             }
 
             var facilitator = await GetFacilitatorByCustomerForCurrentTenantAsync(customerId);
-            return facilitator == null ? null : MapToDto(facilitator);
+            return facilitator == null ? null : _objectMapper.Map<FacilitatorDto>(facilitator);
         }
 
         private async Task<Facilitator> GetFacilitatorForCurrentTenantAsync(int id)
@@ -139,19 +142,5 @@ namespace AqualLifeStyle.Application.Facilitators
             return leader;
         }
 
-        private static FacilitatorDto MapToDto(Facilitator facilitator)
-        {
-            return new FacilitatorDto
-            {
-                Id = facilitator.Id,
-                TenantId = facilitator.TenantId,
-                CustomerId = facilitator.CustomerId,
-                AreaLeaderId = facilitator.AreaLeaderId,
-                Rank = (int)facilitator.Rank,
-                DirectReferrals = facilitator.DirectReferrals,
-                IndirectReferrals = facilitator.IndirectReferrals,
-                AwardBalance = facilitator.AwardBalance
-            };
-        }
     }
 }

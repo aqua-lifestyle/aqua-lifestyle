@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Abp.ObjectMapping;
 using AqualLifeStyle.Application.Enquiries.Dto;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Validation;
@@ -13,17 +14,19 @@ namespace AqualLifeStyle.Application.Enquiries
     public class EnquiryAppService : AqualLifeStyleAppServiceBase, IEnquiryAppService
     {
         private readonly IEnquiryRepository _enquiryRepository;
+        private readonly IObjectMapper _objectMapper;
 
-        public EnquiryAppService(IEnquiryRepository enquiryRepository)
+        public EnquiryAppService(IEnquiryRepository enquiryRepository, IObjectMapper objectMapper)
         {
             _enquiryRepository = enquiryRepository;
+            _objectMapper = objectMapper;
         }
 
         public async Task<IReadOnlyList<EnquiryDto>> GetAllAsync()
         {
             var tenantId = GetRequiredTenantId("Enquiry lookup failed.");
             var enquiries = await _enquiryRepository.GetAllListAsync(e => e.TenantId == tenantId);
-            return enquiries.Select(MapToDto).ToList();
+            return _objectMapper.Map<List<EnquiryDto>>(enquiries);
         }
 
         public async Task<EnquiryDto> GetAsync(int id)
@@ -31,7 +34,7 @@ namespace AqualLifeStyle.Application.Enquiries
             AqualLifeStyleValidator.ValidId(id);
             var enquiry = await GetEnquiryForCurrentTenantAsync(id);
 
-            return MapToDto(enquiry);
+            return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
         public async Task CreateAsync(CreateEnquiryDto input)
@@ -64,7 +67,7 @@ namespace AqualLifeStyle.Application.Enquiries
             }
 
             await _enquiryRepository.UpdateAsync(enquiry);
-            return MapToDto(enquiry);
+            return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
         public async Task<EnquiryDto> CloseAsync(int id)
@@ -75,7 +78,7 @@ namespace AqualLifeStyle.Application.Enquiries
 
             enquiry.Close();
             await _enquiryRepository.UpdateAsync(enquiry);
-            return MapToDto(enquiry);
+            return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
         public async Task<EnquiryDto> ReopenAsync(int id)
@@ -94,7 +97,7 @@ namespace AqualLifeStyle.Application.Enquiries
             }
 
             await _enquiryRepository.UpdateAsync(enquiry);
-            return MapToDto(enquiry);
+            return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
         public async Task<EnquiryDto> AssignToMemberAsync(int id, AssignEnquiryDto input)
@@ -115,7 +118,7 @@ namespace AqualLifeStyle.Application.Enquiries
             }
 
             await _enquiryRepository.UpdateAsync(enquiry);
-            return MapToDto(enquiry);
+            return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
         public async Task<EnquiryDto> ConvertToCustomerAsync(int id, ConvertEnquiryToCustomerDto input)
@@ -135,7 +138,7 @@ namespace AqualLifeStyle.Application.Enquiries
 
             await _enquiryRepository.UpdateAsync(enquiry);
 
-            return MapToDto(enquiry);
+            return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
         public async Task<EnquiryDto> ClearAssignmentAsync(int id, ClearAssignmentDto input)
@@ -154,7 +157,7 @@ namespace AqualLifeStyle.Application.Enquiries
             }
 
             await _enquiryRepository.UpdateAsync(enquiry);
-            return MapToDto(enquiry);
+            return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
         /// <summary>
@@ -181,7 +184,7 @@ namespace AqualLifeStyle.Application.Enquiries
             await _enquiryRepository.UpdateAsync(enquiry);
 
             var followUp = enquiry.GetLatestFollowUp();
-            return MapFollowUpToDto(followUp);
+            return _objectMapper.Map<EnquiryFollowUpDto>(followUp);
         }
 
         /// <summary>
@@ -195,7 +198,7 @@ namespace AqualLifeStyle.Application.Enquiries
 
             return enquiry.FollowUps
                 .OrderByDescending(f => f.FollowUpDate)
-                .Select(MapFollowUpToDto)
+                .Select(followUp => _objectMapper.Map<EnquiryFollowUpDto>(followUp))
                 .ToList();
         }
 
@@ -208,7 +211,7 @@ namespace AqualLifeStyle.Application.Enquiries
             var enquiries = await _enquiryRepository.GetAllListAsync(e => e.TenantId == tenantId);
             return enquiries
                 .Where(e => e.IsSalesReady())
-                .Select(MapToDto)
+                .Select(enquiry => _objectMapper.Map<EnquiryDto>(enquiry))
                 .ToList();
         }
 
@@ -229,47 +232,5 @@ namespace AqualLifeStyle.Application.Enquiries
             return new AqualLifeStyleAuthorizationException($"{operation} A tenant context is required.");
         }
 
-        private static EnquiryDto MapToDto(Enquiry enquiry)
-        {
-            return new EnquiryDto
-            {
-                Id = enquiry.Id,
-                CustomerId = enquiry.CustomerId,
-                ProductId = enquiry.ProductId,
-                Message = enquiry.Message,
-                Response = enquiry.Response,
-                Status = (int)enquiry.Status,
-                CreatedAt = enquiry.CreatedAt.ToString("u"),
-                IsClosed = enquiry.Status == EnquiryStatus.Closed,
-                IsPending = enquiry.Status == EnquiryStatus.Pending,
-                AssignedToMemberId = enquiry.AssignedToMemberId,
-                IsConverted = enquiry.IsConverted,
-                ConvertedAt = enquiry.ConvertedAt?.ToString("u"),
-                ConversionProbability = enquiry.ConversionProbability,
-                LastFollowUpDate = enquiry.LastFollowUpDate,
-                FollowUpCount = enquiry.GetFollowUpCount(),
-                IsSalesReady = enquiry.IsSalesReady(),
-                FollowUps = enquiry.FollowUps
-                    .OrderByDescending(f => f.FollowUpDate)
-                    .Select(MapFollowUpToDto)
-                    .ToList()
-            };
-        }
-
-        private static EnquiryFollowUpDto MapFollowUpToDto(EnquiryFollowUp followUp)
-        {
-            return new EnquiryFollowUpDto
-            {
-                Id = followUp.Id,
-                EnquiryId = followUp.EnquiryId,
-                FollowUpDate = followUp.FollowUpDate,
-                FollowUpByMemberId = followUp.FollowUpByMemberId,
-                FollowUpNotes = followUp.FollowUpNotes,
-                Outcome = (int)followUp.Outcome,
-                OutcomeText = followUp.Outcome.ToString(),
-                ConversionProbability = followUp.ConversionProbability,
-                IsResolved = followUp.IsResolved
-            };
-        }
     }
 }
