@@ -142,7 +142,8 @@ namespace AqualLifeStyle.Tests
 
             var unitOfWorkManagerMock = new Mock<IUnitOfWorkManager>();
             var activeUnitOfWorkMock = new Mock<IActiveUnitOfWork>();
-            EventHandler completionHandler = null;
+            EventHandler completionHandlers = null;
+            EventHandler removedHandler = null;
             var service = new TestableEnquiryAppService(_enquiryRepositoryMock.Object, eventBusMock.Object)
             {
                 AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
@@ -150,7 +151,14 @@ namespace AqualLifeStyle.Tests
 
             activeUnitOfWorkMock
                 .SetupAdd(m => m.Completed += It.IsAny<EventHandler>())
-                .Callback((EventHandler h) => completionHandler = h);
+                .Callback((EventHandler h) => completionHandlers += h);
+            activeUnitOfWorkMock
+                .SetupRemove(m => m.Completed -= It.IsAny<EventHandler>())
+                .Callback((EventHandler h) =>
+                {
+                    removedHandler = h;
+                    completionHandlers -= h;
+                });
             unitOfWorkManagerMock
                 .Setup(m => m.Current)
                 .Returns(activeUnitOfWorkMock.Object);
@@ -164,15 +172,20 @@ namespace AqualLifeStyle.Tests
             activeUnitOfWorkMock.VerifyAdd(m => m.Completed += It.IsAny<EventHandler>(), Times.Once);
             eventBusMock.Verify(b => b.Trigger(It.IsAny<EnquiryConvertedEvent>()), Times.Never);
 
-            Assert.NotNull(completionHandler);
-            completionHandler(activeUnitOfWorkMock.Object, EventArgs.Empty);
+            Assert.NotNull(completionHandlers);
+            completionHandlers(activeUnitOfWorkMock.Object, EventArgs.Empty);
 
+            activeUnitOfWorkMock.VerifyRemove(m => m.Completed -= It.IsAny<EventHandler>(), Times.Once);
+            Assert.Null(completionHandlers);
+            Assert.NotNull(removedHandler);
             eventBusMock.Verify(b => b.Trigger(It.Is<EnquiryConvertedEvent>(evt =>
                 evt.EnquiryId == enquiry.Id &&
                 evt.CustomerId == enquiry.CustomerId &&
                 evt.ProductId == enquiry.ProductId &&
                 evt.ReferredByFacilitatorId == enquiry.ReferredByFacilitatorId &&
                 evt.TenantId == enquiry.TenantId)), Times.Once);
+
+            eventBusMock.Verify(b => b.Trigger(It.IsAny<EnquiryConvertedEvent>()), Times.Once);
         }
 
         [Fact]

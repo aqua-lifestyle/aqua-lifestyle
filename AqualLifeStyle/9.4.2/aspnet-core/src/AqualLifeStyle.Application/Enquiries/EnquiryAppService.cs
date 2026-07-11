@@ -148,7 +148,15 @@ namespace AqualLifeStyle.Application.Enquiries
                     enquiry.ConvertedAt ?? System.DateTime.UtcNow,
                     enquiry.TenantId);
 
-                CurrentUnitOfWork.Completed += (sender, args) => _eventBus.Trigger(convertedEvent);
+                var currentUow = CurrentUnitOfWork;
+                EventHandler completedHandler = null;
+                completedHandler = (sender, args) =>
+                {
+                    currentUow.Completed -= completedHandler;
+                    _eventBus.Trigger(convertedEvent);
+                };
+
+                currentUow.Completed += completedHandler;
             }
 
             return MapToDto(enquiry);

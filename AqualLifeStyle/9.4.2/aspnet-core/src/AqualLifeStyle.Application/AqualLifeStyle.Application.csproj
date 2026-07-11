@@ -13,6 +13,5 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\AqualLifeStyle.Core\AqualLifeStyle.Core.csproj" />
-    <PackageReference Include="Abp" Version="9.4.1" />
   </ItemGroup>
 </Project>
