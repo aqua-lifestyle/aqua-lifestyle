@@ -15,13 +15,11 @@ namespace AqualLifeStyle.Application.Memberships
     public class MembershipAppService : AqualLifeStyleAppServiceBase, IMembershipAppService
     {
         private readonly IMembershipRepository _membershipRepository;
-        private readonly IActiveMembershipCache _activeMembershipCache;
         private readonly IObjectMapper _objectMapper;
 
-        public MembershipAppService(IMembershipRepository membershipRepository, IActiveMembershipCache activeMembershipCache, IObjectMapper objectMapper)
+        public MembershipAppService(IMembershipRepository membershipRepository, IObjectMapper objectMapper)
         {
             _membershipRepository = membershipRepository;
-            _activeMembershipCache = activeMembershipCache;
             _objectMapper = objectMapper;
         }
 
@@ -60,7 +58,6 @@ namespace AqualLifeStyle.Application.Memberships
             membership.UpdateDescription(input.Description);
             membership.ChangeType(input.MembershipType);
             await _membershipRepository.UpdateAsync(membership);
-            InvalidateActiveMembershipCache(membership.TenantId);
 
             return _objectMapper.Map<MembershipDto>(membership);
         }
@@ -73,7 +70,6 @@ namespace AqualLifeStyle.Application.Memberships
             var tenantId = GetRequiredTenantId("Membership creation failed.");
             var membership = Membership.Create(tenantId, input.Name, input.Description, input.MembershipType);
             await _membershipRepository.InsertAsync(membership);
-            InvalidateActiveMembershipCache(tenantId);
         }
 
         public async Task<MembershipDto> SetActivationDateAsync(int id, SetMembershipActivationDto input)
@@ -95,7 +91,6 @@ namespace AqualLifeStyle.Application.Memberships
 
             membership.SetActivationDate(activationDate);
             await _membershipRepository.UpdateAsync(membership);
-            InvalidateActiveMembershipCache(membership.TenantId);
 
             return _objectMapper.Map<MembershipDto>(membership);
         }
@@ -114,7 +109,6 @@ namespace AqualLifeStyle.Application.Memberships
 
             membership.SetMonthlyObligation(input.Amount);
             await _membershipRepository.UpdateAsync(membership);
-            InvalidateActiveMembershipCache(membership.TenantId);
 
             return _objectMapper.Map<MembershipDto>(membership);
         }
@@ -138,14 +132,8 @@ namespace AqualLifeStyle.Application.Memberships
 
             membership.MarkObligationMet(asOfDate);
             await _membershipRepository.UpdateAsync(membership);
-            InvalidateActiveMembershipCache(membership.TenantId);
 
             return _objectMapper.Map<MembershipDto>(membership);
-        }
-
-        private void InvalidateActiveMembershipCache(int? tenantId)
-        {
-            _activeMembershipCache.Remove(tenantId);
         }
 
         /// <summary>

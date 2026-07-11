@@ -16,17 +16,14 @@ namespace AqualLifeStyle.Tests
     public class MembershipAppServiceTests
     {
         private readonly Mock<IMembershipRepository> _membershipRepository;
-        private readonly Mock<IActiveMembershipCache> _activeMembershipCache;
         private readonly Mock<IObjectMapper> _objectMapperMock;
         private readonly MembershipAppService _service;
 
         public MembershipAppServiceTests()
         {
             _membershipRepository = new Mock<IMembershipRepository>();
-            _activeMembershipCache = new Mock<IActiveMembershipCache>();
             _objectMapperMock = new Mock<IObjectMapper>();
-            _service = new MembershipAppService(_membershipRepository.Object, _activeMembershipCache.Object,
-                _objectMapperMock.Object);
+            _service = new MembershipAppService(_membershipRepository.Object, _objectMapperMock.Object);
         }
 
         [Fact]
@@ -57,22 +54,6 @@ namespace AqualLifeStyle.Tests
         }
 
         [Fact]
-        public async Task CreateAsync_InvalidatesActiveMembershipCache()
-        {
-            _service.AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 7);
-
-            await _service.CreateAsync(new CreateMembershipDto
-            {
-                Name = "Jasper",
-                Description = "Entry tier",
-                MembershipType = MembershipType.Jasper
-            });
-
-            _membershipRepository.Verify(x => x.InsertAsync(It.Is<Membership>(m => m.TenantId == 7)), Times.Once);
-            _activeMembershipCache.Verify(x => x.Remove(7), Times.Once);
-        }
-
-        [Fact]
         public async Task CreateAsync_ThrowsUserFriendlyException_WhenTenantContextIsMissing()
         {
             _service.AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == (int?)null);
@@ -87,7 +68,6 @@ namespace AqualLifeStyle.Tests
             Assert.Equal("Membership creation failed.", ex.Message);
             Assert.Equal("A tenant context is required.", ex.Details);
             _membershipRepository.Verify(x => x.InsertAsync(It.IsAny<Membership>()), Times.Never);
-            _activeMembershipCache.Verify(x => x.Remove(It.IsAny<int?>()), Times.Never);
         }
 
         [Fact]
@@ -108,7 +88,6 @@ namespace AqualLifeStyle.Tests
             });
 
             _membershipRepository.Verify(x => x.UpdateAsync(membership), Times.Once);
-            _activeMembershipCache.Verify(x => x.Remove(11), Times.Once);
         }
 
         [Fact]
@@ -126,7 +105,6 @@ namespace AqualLifeStyle.Tests
             });
 
             _membershipRepository.Verify(x => x.UpdateAsync(membership), Times.Once);
-            _activeMembershipCache.Verify(x => x.Remove(13), Times.Once);
         }
 
         [Fact]
@@ -144,7 +122,6 @@ namespace AqualLifeStyle.Tests
             });
 
             _membershipRepository.Verify(x => x.UpdateAsync(membership), Times.Once);
-            _activeMembershipCache.Verify(x => x.Remove(17), Times.Once);
         }
 
         [Fact]
@@ -162,7 +139,6 @@ namespace AqualLifeStyle.Tests
             });
 
             _membershipRepository.Verify(x => x.UpdateAsync(membership), Times.Once);
-            _activeMembershipCache.Verify(x => x.Remove(19), Times.Once);
         }
     }
 }
