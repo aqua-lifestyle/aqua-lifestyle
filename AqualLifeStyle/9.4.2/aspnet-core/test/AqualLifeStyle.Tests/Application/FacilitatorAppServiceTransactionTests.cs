@@ -110,5 +110,28 @@ namespace AqualLifeStyle.Tests.Application
             _areaLeaderRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<AreaLeader>()), Times.Never);
             _unitOfWorkMock.Verify(u => u.CompleteAsync(), Times.Never);
         }
+
+        [Fact]
+        public async Task RegisterAsync_ThrowsNotFound_WhenCustomerDoesNotBelongToCurrentTenant()
+        {
+            _customerRepositoryMock
+                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<Customer, bool>>>()))
+                .ReturnsAsync((Customer)null);
+
+            var ex = await Assert.ThrowsAsync<AqualLifeStyle.Application.Exceptions.AqualLifeStyleNotFoundException>(() =>
+                _service.RegisterAsync(new RegisterFacilitatorDto
+                {
+                    CustomerId = 22,
+                    AreaLeaderId = 33
+                }));
+
+            ex.Message.ShouldContain("Customer");
+
+            _facilitatorRepositoryMock.Verify(r => r.GetByCustomerIdAsync(It.IsAny<int>()), Times.Never);
+            _facilitatorRepositoryMock.Verify(r => r.InsertAndGetIdAsync(It.IsAny<Facilitator>()), Times.Never);
+            _areaLeaderRepositoryMock.Verify(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<AreaLeader, bool>>>()), Times.Never);
+            _areaLeaderRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<AreaLeader>()), Times.Never);
+            _unitOfWorkMock.Verify(u => u.CompleteAsync(), Times.Never);
+        }
     }
 }
