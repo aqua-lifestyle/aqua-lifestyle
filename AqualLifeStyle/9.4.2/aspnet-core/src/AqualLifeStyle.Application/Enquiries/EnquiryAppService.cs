@@ -212,16 +212,6 @@ namespace AqualLifeStyle.Application.Enquiries
                 .ToList();
         }
 
-        private int GetRequiredTenantId(string operation)
-        {
-            if (!AbpSession.TenantId.HasValue)
-            {
-                throw new AqualLifeStyleAuthorizationException($"{operation} A tenant context is required.");
-            }
-
-            return AbpSession.TenantId.Value;
-        }
-
         private async Task<Enquiry> GetEnquiryForCurrentTenantAsync(int id)
         {
             var tenantId = GetRequiredTenantId("Enquiry lookup failed.");
@@ -232,6 +222,11 @@ namespace AqualLifeStyle.Application.Enquiries
             }
 
             return enquiry;
+        }
+
+        protected override Exception CreateMissingTenantContextException(string operation)
+        {
+            return new AqualLifeStyleAuthorizationException($"{operation} A tenant context is required.");
         }
 
         private static EnquiryDto MapToDto(Enquiry enquiry)

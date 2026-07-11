@@ -163,16 +163,6 @@ namespace AqualLifeStyle.Application.Customers
             };
         }
 
-        private int GetRequiredTenantId(string operation)
-        {
-            if (!AbpSession.TenantId.HasValue)
-            {
-                throw new UserFriendlyException(operation, "A tenant context is required.");
-            }
-
-            return AbpSession.TenantId.Value;
-        }
-
         private async Task<Customer> GetCustomerForCurrentTenantAsync(int id)
         {
             var tenantId = GetRequiredTenantId("Customer lookup failed.");

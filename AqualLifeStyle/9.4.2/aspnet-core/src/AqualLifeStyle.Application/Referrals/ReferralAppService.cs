@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
-using Abp.UI;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Referrals.Dto;
 using AqualLifeStyle.Application.Validation;
@@ -50,16 +49,6 @@ namespace AqualLifeStyle.Application.Referrals
             referral.ConfirmAward();
             await _referralRepository.UpdateAsync(referral);
             return MapToDto(referral);
-        }
-
-        private int GetRequiredTenantId(string operation)
-        {
-            if (!AbpSession.TenantId.HasValue)
-            {
-                throw new UserFriendlyException(operation, "A tenant context is required.");
-            }
-
-            return AbpSession.TenantId.Value;
         }
 
         private static ReferralDto MapToDto(Referral referral)

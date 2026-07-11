@@ -6,7 +6,6 @@ using Abp.Application.Services;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
 using Abp.AutoMapper;
-using Abp.UI;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Memberships.Dto;
 using AqualLifeStyle.Application.Validation;
@@ -142,16 +141,6 @@ namespace AqualLifeStyle.Application.Memberships
             InvalidateActiveMembershipCache(membership.TenantId);
 
             return MapToDto(membership);
-        }
-
-        private int GetRequiredTenantId(string operation)
-        {
-            if (!AbpSession.TenantId.HasValue)
-            {
-                throw new UserFriendlyException(operation, "A tenant context is required.");
-            }
-
-            return AbpSession.TenantId.Value;
         }
 
         private void InvalidateActiveMembershipCache(int? tenantId)

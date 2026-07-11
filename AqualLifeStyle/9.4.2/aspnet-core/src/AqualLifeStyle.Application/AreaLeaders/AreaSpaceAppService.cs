@@ -33,20 +33,16 @@ namespace AqualLifeStyle.Application.AreaLeaders
             AqualLifeStyleValidator.ValidId(input.AreaLeaderId, nameof(input.AreaLeaderId));
             AqualLifeStyleValidator.NotNullOrEmpty(input.AddressLine, nameof(input.AddressLine));
             AqualLifeStyleValidator.NotNullOrEmpty(input.Capacity, nameof(input.Capacity));
+            var tenantId = GetRequiredTenantId("Area space application failed.");
             if (input.InterestedMembers < 0)
             {
                 throw new UserFriendlyException("Area space application failed.", "Interested members cannot be negative.");
             }
 
-            if (!AbpSession.TenantId.HasValue)
-            {
-                throw new UserFriendlyException("Area space application failed.", "A tenant context is required.");
-            }
-
             await GetAreaLeaderForCurrentTenantAsync(input.AreaLeaderId);
 
             var address = new Address(input.AddressLine, null, null, null);
-            var space = AreaSpace.Apply(AbpSession.TenantId.Value, input.AreaLeaderId, address, input.Capacity, input.InterestedMembers);
+            var space = AreaSpace.Apply(tenantId, input.AreaLeaderId, address, input.Capacity, input.InterestedMembers);
             await _areaSpaceRepository.InsertAndGetIdAsync(space);
             return MapToDto(space);
         }
@@ -114,16 +110,6 @@ namespace AqualLifeStyle.Application.AreaLeaders
             AqualLifeStyleValidator.ValidId(id);
             var space = await GetSpaceForCurrentTenantAsync(id);
             return MapToDto(space);
-        }
-
-        private int GetRequiredTenantId(string operation)
-        {
-            if (!AbpSession.TenantId.HasValue)
-            {
-                throw new UserFriendlyException(operation, "A tenant context is required.");
-            }
-
-            return AbpSession.TenantId.Value;
         }
 
         private async Task<AreaSpace> GetSpaceForCurrentTenantAsync(int id)

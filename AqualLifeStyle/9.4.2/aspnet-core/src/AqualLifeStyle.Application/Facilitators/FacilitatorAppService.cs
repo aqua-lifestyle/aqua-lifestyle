@@ -42,12 +42,7 @@ namespace AqualLifeStyle.Application.Facilitators
             AqualLifeStyleValidator.ValidId(input.CustomerId, nameof(input.CustomerId));
             AqualLifeStyleValidator.ValidId(input.AreaLeaderId, nameof(input.AreaLeaderId));
 
-            if (!AbpSession.TenantId.HasValue)
-            {
-                throw new UserFriendlyException("Facilitator registration failed.", "A tenant context is required.");
-            }
-
-            var tenantId = AbpSession.TenantId.Value;
+            var tenantId = GetRequiredTenantId("Facilitator registration failed.");
 
             using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
             {
@@ -105,16 +100,6 @@ namespace AqualLifeStyle.Application.Facilitators
 
             var facilitator = await GetFacilitatorByCustomerForCurrentTenantAsync(customerId);
             return facilitator == null ? null : MapToDto(facilitator);
-        }
-
-        private int GetRequiredTenantId(string operation)
-        {
-            if (!AbpSession.TenantId.HasValue)
-            {
-                throw new UserFriendlyException(operation, "A tenant context is required.");
-            }
-
-            return AbpSession.TenantId.Value;
         }
 
         private async Task<Facilitator> GetFacilitatorForCurrentTenantAsync(int id)

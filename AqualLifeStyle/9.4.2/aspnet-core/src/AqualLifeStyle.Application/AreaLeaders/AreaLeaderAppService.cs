@@ -34,18 +34,14 @@ namespace AqualLifeStyle.Application.AreaLeaders
                 throw new UserFriendlyException("Area leader application failed.", "A valid license type is required.");
             }
 
-            if (!AbpSession.TenantId.HasValue)
-            {
-                throw new UserFriendlyException("Area leader application failed.", "A tenant context is required.");
-            }
-
+            var tenantId = GetRequiredTenantId("Area leader application failed.");
             var existing = await _areaLeaderRepository.GetByCustomerIdAsync(input.CustomerId);
             if (existing != null)
             {
                 throw new UserFriendlyException("Area leader application failed.", "An area leader for this customer already exists.");
             }
 
-            var leader = AreaLeader.Apply(AbpSession.TenantId.Value, input.CustomerId, (LicenseType)input.LicenseType);
+            var leader = AreaLeader.Apply(tenantId, input.CustomerId, (LicenseType)input.LicenseType);
             await _areaLeaderRepository.InsertAndGetIdAsync(leader);
             return MapToDto(leader);
         }
@@ -82,16 +78,6 @@ namespace AqualLifeStyle.Application.AreaLeaders
             leader.PromoteToCurrentRank(new RankProgressionPolicy());
             await _areaLeaderRepository.UpdateAsync(leader);
             return MapToDto(leader);
-        }
-
-        private int GetRequiredTenantId(string operation)
-        {
-            if (!AbpSession.TenantId.HasValue)
-            {
-                throw new UserFriendlyException(operation, "A tenant context is required.");
-            }
-
-            return AbpSession.TenantId.Value;
         }
 
         private async Task<AreaLeader> GetLeaderForCurrentTenantAsync(int id)
