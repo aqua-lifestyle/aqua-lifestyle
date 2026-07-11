@@ -41,6 +41,14 @@ namespace AqualLifeStyle.Application.AreaLeaders
                 throw new UserFriendlyException("Area leader application failed.", "An area leader for this customer already exists.");
             }
 
+            var activeLeaderCount = await _areaLeaderRepository.CountActiveAsync();
+            if (activeLeaderCount >= AreaSpaceApprovalRules.MaxAreaLeaders)
+            {
+                throw new UserFriendlyException(
+                    "Area leader application failed.",
+                    $"The maximum number of active area leaders ({AreaSpaceApprovalRules.MaxAreaLeaders}) has been reached.");
+            }
+
             var leader = AreaLeader.Apply(tenantId, input.CustomerId, (LicenseType)input.LicenseType);
             await _areaLeaderRepository.InsertAndGetIdAsync(leader);
             return MapToDto(leader);
