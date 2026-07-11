@@ -157,7 +157,7 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task HandleEventAsync_WhenLeaderMissing_LogsErrorAndThrowsDependencyException()
+        public async Task HandleEventAsync_WhenLeaderMissing_LogsWarningAndCompletes()
         {
             var customerId = await CreateCustomerAsync("LeaderE");
             var leader = await _areaLeaderAppService.ApplyAsync(
@@ -181,14 +181,9 @@ namespace AqualLifeStyle.Tests.Application
             var handler = Resolve<AreaSpaceApprovedEventHandler>();
             handler.Logger = logger;
 
-            var ex = await Assert.ThrowsAsync<AqualLifeStyleDependencyException>(() =>
-                handler.HandleEventAsync(new AreaSpaceApprovedEvent(1, space.Id, leader.Id)));
+            await handler.HandleEventAsync(new AreaSpaceApprovedEvent(1, space.Id, leader.Id));
 
-            ex.Message.ShouldContain($"area space {space.Id}");
-            ex.Message.ShouldContain("tenant 1");
-            ex.Message.ShouldContain($"area leader {leader.Id}");
-
-            logger.Received(1).Error(Arg.Is<string>(message =>
+            logger.Received(1).Warn(Arg.Is<string>(message =>
                 message.Contains($"area space {space.Id}")
                 && message.Contains("tenant 1")
                 && message.Contains($"area leader {leader.Id}")));

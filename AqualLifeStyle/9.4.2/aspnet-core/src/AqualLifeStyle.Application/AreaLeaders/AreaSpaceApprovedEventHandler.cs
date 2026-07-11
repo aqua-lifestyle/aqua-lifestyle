@@ -40,10 +40,16 @@ namespace AqualLifeStyle.Application.AreaLeaders
                         l => l.Id == evt.AreaLeaderId && l.TenantId == evt.TenantId);
                     if (leader == null)
                     {
-                        Logger.Error(
-                            $"Failed to link approved area space {evt.AreaSpaceId} in tenant {evt.TenantId}: missing area leader {evt.AreaLeaderId}.");
-                        throw new AqualLifeStyleDependencyException(
-                            $"Cannot link approved area space {evt.AreaSpaceId} in tenant {evt.TenantId}: required area leader {evt.AreaLeaderId} was not found.");
+                        Logger.Warn(
+                            $"Skipping approved area space {evt.AreaSpaceId} link: missing area leader {evt.AreaLeaderId} in tenant {evt.TenantId}.");
+                        return;
+                    }
+
+                    if (leader.AreaSpaceId == evt.AreaSpaceId)
+                    {
+                        Logger.Debug(
+                            $"Area space {evt.AreaSpaceId} already linked to leader {leader.Id} in tenant {evt.TenantId}; skipping duplicate event.");
+                        return;
                     }
 
                     leader.LinkAreaSpace(evt.AreaSpaceId);
