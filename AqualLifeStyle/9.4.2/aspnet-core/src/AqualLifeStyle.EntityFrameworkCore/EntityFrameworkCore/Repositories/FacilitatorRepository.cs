@@ -17,7 +17,9 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
         }
 
         public Task<Facilitator> GetByCustomerIdAsync(int customerId, int tenantId)
-            => GetAll().FirstOrDefaultAsync(f => f.CustomerId == customerId && f.TenantId == tenantId);
+            => GetAll()
+                .Where(facilitator => facilitator.TenantId == tenantId && facilitator.CustomerId == customerId)
+                .FirstOrDefaultAsync();
 
         public async Task<Facilitator> GetWithAreaLeaderAsync(int facilitatorId)
         {
@@ -26,12 +28,18 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
             // the Include into an inner join and drop the facilitator row entirely. Loading the
             // area leader separately keeps the facilitator discoverable while still reporting a
             // null AreaLeader when it is missing or soft-deleted.
-            var facilitator = await GetAll().FirstOrDefaultAsync(f => f.Id == facilitatorId);
+            var facilitator = await GetAll()
+                .Where(f => f.Id == facilitatorId)
+                .FirstOrDefaultAsync();
             if (facilitator?.AreaLeaderId != null)
             {
                 var dbContext = _dbContextProvider.GetDbContext();
                 var areaLeader = await dbContext.AreaLeaders
-                    .FirstOrDefaultAsync(a => a.Id == facilitator.AreaLeaderId && !a.IsDeleted);
+                    .Where(areaLeader =>
+                        areaLeader.Id == facilitator.AreaLeaderId &&
+                        areaLeader.TenantId == facilitator.TenantId &&
+                        !areaLeader.IsDeleted)
+                    .FirstOrDefaultAsync();
 
                 dbContext.Entry(facilitator).Reference(f => f.AreaLeader).CurrentValue = areaLeader;
             }
@@ -40,6 +48,8 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
         }
 
         public Task<int> CountByAreaLeaderAsync(int areaLeaderId)
-            => GetAll().CountAsync(f => f.AreaLeaderId == areaLeaderId);
+            => GetAll()
+                .Where(facilitator => facilitator.AreaLeaderId == areaLeaderId)
+                .CountAsync();
     }
 }

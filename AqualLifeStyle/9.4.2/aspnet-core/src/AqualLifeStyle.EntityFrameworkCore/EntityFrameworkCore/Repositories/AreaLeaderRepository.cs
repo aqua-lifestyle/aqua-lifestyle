@@ -14,9 +14,13 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
         }
 
         public Task<AreaLeader> GetByCustomerIdAsync(int customerId)
-            => GetAll().FirstOrDefaultAsync(a => a.CustomerId == customerId);
+            => GetAll()
+                .Where(areaLeader => areaLeader.CustomerId == customerId)
+                .FirstOrDefaultAsync();
 
         public Task<int> CountActiveAsync()
-            => GetAll().CountAsync(a => !a.IsDeleted);
+            => GetAll()
+                .Where(areaLeader => !areaLeader.IsDeleted)
+                .CountAsync();
     }
 }

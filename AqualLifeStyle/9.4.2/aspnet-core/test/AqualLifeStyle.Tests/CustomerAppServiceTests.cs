@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using System.Linq.Expressions;
 using Abp.Runtime.Session;
+using Abp.UI;
 using Moq;
 using Xunit;
 using AqualLifeStyle.Application.Customers;
@@ -54,35 +55,26 @@ namespace AqualLifeStyle.Tests
         }
 
         [Fact]
-        public async Task CreateAsync_CreatesHostCustomer_WhenTenantContextIsMissing()
+        public async Task CreateAsync_Throws_WhenTenantContextIsMissing()
         {
             var customerRepo = new Mock<ICustomerRepository>();
             var membershipRepo = new Mock<IMembershipRepository>();
-            Customer insertedCustomer = null;
-
-            customerRepo.Setup(r => r.ExistsByEmailAsync("host@example.com")).ReturnsAsync(false);
-            customerRepo
-                .Setup(r => r.InsertAsync(It.IsAny<Customer>()))
-                .Callback<Customer>(customer => insertedCustomer = customer)
-                .ReturnsAsync((Customer customer) => customer);
 
             var appService = new CustomerAppService(customerRepo.Object, membershipRepo.Object)
             {
                 AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == (int?)null)
             };
 
-            await appService.CreateAsync(new CreateCustomerDto
+            var ex = await Assert.ThrowsAsync<UserFriendlyException>(() => appService.CreateAsync(new CreateCustomerDto
             {
                 Name = "Host Customer",
                 Email = "host@example.com"
-            });
+            }));
 
-            Assert.NotNull(insertedCustomer);
-            Assert.Null(insertedCustomer.TenantId);
-            Assert.Equal("Host Customer", insertedCustomer.Name);
-            Assert.Equal("host@example.com", insertedCustomer.Email.Value);
-            customerRepo.Verify(r => r.ExistsByEmailAsync("host@example.com"), Times.Once);
-            customerRepo.Verify(r => r.InsertAsync(It.IsAny<Customer>()), Times.Once);
+            Assert.Equal("Customer creation failed.", ex.Message);
+            Assert.Equal("A tenant context is required.", ex.Details);
+            customerRepo.Verify(r => r.ExistsByEmailAsync(It.IsAny<string>()), Times.Never);
+            customerRepo.Verify(r => r.InsertAsync(It.IsAny<Customer>()), Times.Never);
         }
     }
 }

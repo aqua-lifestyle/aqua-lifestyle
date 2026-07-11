@@ -1,6 +1,5 @@
-using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
+using Abp.UI;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Customers.Dto;
 using AqualLifeStyle.Domain.Common;
@@ -47,49 +46,35 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task CreateAsync_CreatesHostCustomer_WhenTenantContextIsMissing()
+        public async Task CreateAsync_Throws_WhenTenantContextIsMissing()
         {
+            UserFriendlyException ex;
+
             using (UsingTenantId(null))
             {
-                await _customerAppService.CreateAsync(new CreateCustomerDto
+                ex = await Should.ThrowAsync<UserFriendlyException>(() => _customerAppService.CreateAsync(new CreateCustomerDto
                 {
                     Name = "Host Customer",
                     Email = "host-customer@example.com"
-                });
+                }));
             }
 
-            await UsingDbContextAsync(null, async ctx =>
-            {
-                var hostCustomer = await ctx.Customers.SingleAsync(c => c.Email.Value == "host-customer@example.com");
-                hostCustomer.TenantId.ShouldBeNull();
-            });
+            ex.Message.ShouldBe("Customer creation failed.");
+            ex.Details.ShouldBe("A tenant context is required.");
         }
 
         [Fact]
-        public async Task GetAllAsync_ReturnsOnlyHostCustomers_WhenTenantContextIsMissing()
+        public async Task GetAllAsync_Throws_WhenTenantContextIsMissing()
         {
-            var hostEmail = "host-scope-customer@example.com";
-            var tenantEmail = "tenant-scope-customer@example.com";
-
-            await UsingDbContextAsync(null, async ctx =>
-            {
-                ctx.Customers.Add(Customer.Create(null, "Host Scope Customer", new EmailAddress(hostEmail)));
-                await ctx.SaveChangesAsync();
-            });
-
-            await UsingDbContextAsync(1, async ctx =>
-            {
-                ctx.Customers.Add(Customer.Create(1, "Tenant Scope Customer", new EmailAddress(tenantEmail)));
-                await ctx.SaveChangesAsync();
-            });
+            UserFriendlyException ex;
 
             using (UsingTenantId(null))
             {
-                var customers = await _customerAppService.GetAllAsync();
-
-                customers.ShouldContain(c => c.Email == hostEmail);
-                customers.ShouldNotContain(c => c.Email == tenantEmail);
+                ex = await Should.ThrowAsync<UserFriendlyException>(() => _customerAppService.GetAllAsync());
             }
+
+            ex.Message.ShouldBe("Customer lookup failed.");
+            ex.Details.ShouldBe("A tenant context is required.");
         }
     }
 }

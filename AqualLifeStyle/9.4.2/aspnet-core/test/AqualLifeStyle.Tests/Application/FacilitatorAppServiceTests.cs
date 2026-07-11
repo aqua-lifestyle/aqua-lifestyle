@@ -237,6 +237,29 @@ namespace AqualLifeStyle.Tests.Application
             found.AreaLeader.Id.ShouldBe(facilitator.AreaLeaderId);
         }
 
+        [Fact]
+        public async Task GetWithAreaLeaderAsync_DoesNotHydrateAreaLeaderFromAnotherTenant()
+        {
+            var tenantOneCustomerId = await CreateCustomerAsync("CrossTenantLinkCustomer", tenantId: 1);
+            var tenantTwoLeader = await CreateAreaLeaderAsync("CrossTenantLinkedLeader", tenantId: 2);
+            var facilitatorId = await UsingDbContextAsync(1, async ctx =>
+            {
+                var facilitator = Facilitator.Register(1, tenantOneCustomerId, tenantTwoLeader.Id);
+                ctx.Facilitators.Add(facilitator);
+                await ctx.SaveChangesAsync();
+                return facilitator.Id;
+            });
+
+            using (UsingTenantId(1))
+            {
+                var found = await _facilitatorRepository.GetWithAreaLeaderAsync(facilitatorId);
+
+                found.ShouldNotBeNull();
+                found.Id.ShouldBe(facilitatorId);
+                found.AreaLeader.ShouldBeNull();
+            }
+        }
+
         private async Task<int> CreateCustomerAsync(string name)
         {
             return await CreateCustomerAsync(name, tenantId: 1);
