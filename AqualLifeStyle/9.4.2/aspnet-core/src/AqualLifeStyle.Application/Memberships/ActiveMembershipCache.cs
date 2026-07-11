@@ -26,6 +26,7 @@ namespace AqualLifeStyle.Application.Memberships
     public class ActiveMembershipCache : IActiveMembershipCache, ITransientDependency
     {
         private const string CacheName = "ActiveMembershipLookupCache";
+        private const string CacheKeyPrefix = "ActiveMembership:";
         private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
         private readonly IMembershipRepository _membershipRepository;
@@ -59,7 +60,7 @@ namespace AqualLifeStyle.Application.Memberships
 
         private static string GetCacheKey(int? tenantId)
         {
-            return tenantId?.ToString() ?? "host";
+            return CacheKeyPrefix + (tenantId ?? 0).ToString();
         }
     }
 }
