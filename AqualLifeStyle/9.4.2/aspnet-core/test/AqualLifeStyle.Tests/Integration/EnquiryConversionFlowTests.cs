@@ -13,6 +13,7 @@ using AqualLifeStyle.Application.Facilitators.Dto;
 using AqualLifeStyle.Application.Memberships;
 using AqualLifeStyle.Application.Memberships.Dto;
 using AqualLifeStyle.Domain.AreaLeaders;
+using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
 using AqualLifeStyle.Domain.Enums;
@@ -402,14 +403,46 @@ namespace AqualLifeStyle.Tests.Integration
             });
         }
 
-        private Task<int> CreateDirectReferralAsync(int tenantId, int sourceEnquiryId)
+        private async Task<int> CreateDirectReferralAsync(int tenantId, int sourceEnquiryId)
         {
-            return UsingDbContextAsync(tenantId, async ctx =>
+            var customerId = await UsingDbContextAsync(tenantId, async ctx =>
+            {
+                var customer = Customer.Create(tenantId, $"ReferralCustomer{tenantId}", new EmailAddress($"referralcustomer{tenantId}@example.com"));
+                ctx.Customers.Add(customer);
+                await ctx.SaveChangesAsync();
+                return customer.Id;
+            });
+
+            var leaderCustomerId = await UsingDbContextAsync(tenantId, async ctx =>
+            {
+                var c = Customer.Create(tenantId, $"ReferralLeader{tenantId}", new EmailAddress($"referralleader{tenantId}@example.com"));
+                ctx.Customers.Add(c);
+                await ctx.SaveChangesAsync();
+                return c.Id;
+            });
+
+            var leader = await UsingDbContextAsync(tenantId, async ctx =>
+            {
+                var l = AreaLeader.Apply(tenantId, leaderCustomerId, LicenseType.EntreLevel);
+                ctx.AreaLeaders.Add(l);
+                await ctx.SaveChangesAsync();
+                return l;
+            });
+
+            var facilitatorId = await UsingDbContextAsync(tenantId, async ctx =>
+            {
+                var f = Facilitator.Register(tenantId, customerId, leader.Id);
+                ctx.Facilitators.Add(f);
+                await ctx.SaveChangesAsync();
+                return f.Id;
+            });
+
+            return await UsingDbContextAsync(tenantId, async ctx =>
             {
                 var referral = Referral.CreateDirect(
                     tenantId,
-                    referrerFacilitatorId: tenantId * 10,
-                    referredCustomerId: tenantId * 100,
+                    referrerFacilitatorId: facilitatorId,
+                    referredCustomerId: customerId,
                     sourceEnquiryId: sourceEnquiryId,
                     awardAmount: 100m,
                     convertedAt: System.DateTime.UtcNow);

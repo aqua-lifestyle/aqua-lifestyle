@@ -36,6 +36,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(AqualLifeStyleDbContext).Assembly);
 
             modelBuilder.Entity<Membership>(entity =>
             {
@@ -130,67 +131,6 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 entity.HasIndex(e => e.EnquiryId);
             });
 
-            modelBuilder.Entity<Facilitator>(entity =>
-            {
-                entity.ToTable("Facilitators");
-                entity.Property(e => e.TenantId).IsRequired();
-                entity.Property(e => e.CustomerId).IsRequired();
-                entity.Property(e => e.AreaLeaderId).IsRequired();
-                entity.Property(e => e.Rank).IsRequired();
-                entity.Property(e => e.DirectReferrals).IsRequired();
-                entity.Property(e => e.IndirectReferrals).IsRequired();
-                entity.Property(e => e.AwardBalance).IsRequired();
-                entity.HasOne(e => e.AreaLeader)
-                    .WithMany()
-                    .HasForeignKey(e => e.AreaLeaderId)
-                    .OnDelete(DeleteBehavior.Restrict);
-                entity.HasIndex(e => e.AreaLeaderId);
-                entity.HasIndex(e => e.CustomerId);
-            });
-
-            modelBuilder.Entity<Referral>(entity =>
-            {
-                entity.ToTable("Referrals");
-                entity.Property(e => e.TenantId).IsRequired();
-                entity.Property(e => e.ReferredCustomerId).IsRequired();
-                entity.Property(e => e.SourceEnquiryId).IsRequired();
-                entity.Property(e => e.Type).IsRequired();
-                entity.Property(e => e.AwardAmount).IsRequired();
-                entity.Property(e => e.AwardIssued).IsRequired();
-                entity.HasIndex(e => e.ReferrerFacilitatorId);
-                entity.HasIndex(e => e.ReferrerAreaLeaderId);
-                entity.HasIndex(e => e.SourceEnquiryId);
-            });
-
-            modelBuilder.Entity<AreaLeader>(entity =>
-            {
-                entity.ToTable("AreaLeaders");
-                entity.Property(e => e.TenantId).IsRequired();
-                entity.Property(e => e.CustomerId).IsRequired();
-                entity.Property(e => e.LicenseType).IsRequired();
-                entity.Property(e => e.LicenseFee).IsRequired();
-                entity.Property(e => e.Rank).IsRequired();
-                entity.Property(e => e.AreaSpaceId);
-                entity.Property(e => e.MonthlySubscription).IsRequired();
-                entity.Property(e => e.DirectReferrals).IsRequired();
-                entity.Property(e => e.IndirectReferrals).IsRequired();
-                entity.Property(e => e.OrderTarget).IsRequired();
-                entity.HasIndex(e => e.CustomerId);
-            });
-
-            modelBuilder.Entity<AreaSpace>(entity =>
-            {
-                entity.ToTable("AreaSpaces");
-                entity.Property(e => e.TenantId).IsRequired();
-                entity.Property(e => e.AreaLeaderId).IsRequired();
-                entity.Property(e => e.AddressLine).IsRequired().HasMaxLength(512);
-                entity.Property(e => e.Capacity).IsRequired().HasMaxLength(64);
-                entity.Property(e => e.InterestedMembers).IsRequired();
-                entity.Property(e => e.Status).IsRequired();
-                entity.Property(e => e.PresentationsCompleted).IsRequired();
-                entity.Property(e => e.StartupOrdersCompleted).IsRequired();
-                entity.HasIndex(e => e.AreaLeaderId);
-            });
         }
     }
 }
