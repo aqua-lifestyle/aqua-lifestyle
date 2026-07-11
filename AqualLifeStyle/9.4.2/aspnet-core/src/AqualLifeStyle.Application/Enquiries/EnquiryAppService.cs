@@ -129,7 +129,7 @@ namespace AqualLifeStyle.Application.Enquiries
 
             try
             {
-                enquiry.ConvertToCustomer(enquiry.ReferredByFacilitatorId);
+                enquiry.ConvertToCustomer();
             }
             catch (InvalidOperationException ex)
             {

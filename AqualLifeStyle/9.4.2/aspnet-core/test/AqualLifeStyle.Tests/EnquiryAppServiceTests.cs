@@ -126,6 +126,7 @@ namespace AqualLifeStyle.Tests
         {
             // Arrange
             var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
+            enquiry.Id = 1;
             SetupEnquiry(enquiry);
 
             // Act
@@ -135,6 +136,24 @@ namespace AqualLifeStyle.Tests
             Assert.True(enquiry.IsConverted);
             Assert.Equal(EnquiryStatus.Closed, enquiry.Status);
             Assert.NotNull(enquiry.ConvertedAt);
+            _enquiryRepositoryMock.Verify(r => r.UpdateAsync(enquiry), Times.Once);
+        }
+
+        [Fact]
+        public async Task ConvertToCustomerAsync_PreservesExistingReferralWhenNoNewReferralIsProvided()
+        {
+            // Arrange
+            var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
+            enquiry.Id = 1;
+            enquiry.SetReferredByFacilitator(42);
+            SetupEnquiry(enquiry);
+
+            // Act
+            await _service.ConvertToCustomerAsync(6, new ConvertEnquiryToCustomerDto());
+
+            // Assert
+            Assert.True(enquiry.IsConverted);
+            Assert.Equal(42, enquiry.ReferredByFacilitatorId);
             _enquiryRepositoryMock.Verify(r => r.UpdateAsync(enquiry), Times.Once);
         }
 
@@ -156,6 +175,27 @@ namespace AqualLifeStyle.Tests
             domainEvent.CustomerId.ShouldBe(11);
             domainEvent.ProductId.ShouldBe(5);
             domainEvent.TenantId.ShouldBe(1);
+        }
+
+        [Fact]
+        public async Task ConvertToCustomerAsync_WithoutAmbientUnitOfWork_StillQueuesDeferredConversionEvent()
+        {
+            // Arrange: this unit test does not provide an ambient ABP UoW, so conversion must rely
+            // on the aggregate's domain event rather than CurrentUnitOfWork callbacks.
+            var enquiry = Enquiry.Create(tenantId: 1, customerId: 12, productId: 6, message: "Question");
+            enquiry.Id = 8;
+            enquiry.SetReferredByFacilitator(42);
+            SetupEnquiry(enquiry);
+
+            // Act
+            await _service.ConvertToCustomerAsync(8, new ConvertEnquiryToCustomerDto());
+
+            // Assert
+            var domainEvent = enquiry.DomainEvents.OfType<EnquiryConvertedEvent>().SingleOrDefault();
+            domainEvent.ShouldNotBeNull();
+            domainEvent.ReferredByFacilitatorId.ShouldBe(42);
+            domainEvent.ConvertedAt.ShouldBe(enquiry.ConvertedAt!.Value);
+            _enquiryRepositoryMock.Verify(r => r.UpdateAsync(enquiry), Times.Once);
         }
 
         [Fact]

@@ -76,5 +76,29 @@ namespace AqualLifeStyle.Tests.Application
             ex.Message.ShouldBe("Customer lookup failed.");
             ex.Details.ShouldBe("A tenant context is required.");
         }
+
+        [Fact]
+        public async Task GetAsync_Throws_WhenTenantContextIsMissing()
+        {
+            var customerId = 0;
+
+            await UsingDbContextAsync(1, async ctx =>
+            {
+                var customer = Customer.Create(1, "Tenant Customer", new EmailAddress("tenant-customer@example.com"));
+                ctx.Customers.Add(customer);
+                await ctx.SaveChangesAsync();
+                customerId = customer.Id;
+            });
+
+            UserFriendlyException ex;
+
+            using (UsingTenantId(null))
+            {
+                ex = await Should.ThrowAsync<UserFriendlyException>(() => _customerAppService.GetAsync(customerId));
+            }
+
+            ex.Message.ShouldBe("Customer lookup failed.");
+            ex.Details.ShouldBe("A tenant context is required.");
+        }
     }
 }
