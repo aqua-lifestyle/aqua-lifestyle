@@ -67,12 +67,19 @@ namespace AqualLifeStyle.Application.Facilitators
                 var leader = await GetAreaLeaderForCurrentTenantAsync(input.AreaLeaderId);
 
                 var facilitator = Facilitator.Register(tenantId, input.CustomerId, input.AreaLeaderId);
-                await _facilitatorRepository.InsertAndGetIdAsync(facilitator);
+                try
+                {
+                    await _facilitatorRepository.InsertAndGetIdAsync(facilitator);
 
-                leader.RecordFacilitator();
-                await _areaLeaderRepository.UpdateAsync(leader);
+                    leader.RecordFacilitator();
+                    await _areaLeaderRepository.UpdateAsync(leader);
 
-                await uow.CompleteAsync();
+                    await uow.CompleteAsync();
+                }
+                catch (Exception ex)
+                {
+                    throw new UserFriendlyException("Facilitator registration failed.", "A facilitator for this customer already exists.", ex);
+                }
 
                 return _objectMapper.Map<FacilitatorDto>(facilitator);
             }
