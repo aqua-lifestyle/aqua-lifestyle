@@ -67,6 +67,10 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
                 _context.SaveChanges();
             }
 
+            // Business roles + permission grants
+
+            new BusinessRolesAndPermissionsBuilder(_context, _tenantId).Create();
+
             // Admin user
 
             var adminUser = _context.Users.IgnoreQueryFilters().FirstOrDefault(u => u.TenantId == _tenantId && u.UserName == AbpUserBase.AdminUserName);
