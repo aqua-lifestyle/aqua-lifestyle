@@ -39,6 +39,12 @@ namespace AqualLifeStyle.Application.AreaLeaders
                 throw new UserFriendlyException("Area leader application failed.", "A tenant context is required.");
             }
 
+            var existing = await _areaLeaderRepository.GetByCustomerIdAsync(input.CustomerId);
+            if (existing != null)
+            {
+                throw new UserFriendlyException("Area leader application failed.", "An area leader for this customer already exists.");
+            }
+
             var leader = AreaLeader.Apply(AbpSession.TenantId.Value, input.CustomerId, (LicenseType)input.LicenseType);
             await _areaLeaderRepository.InsertAndGetIdAsync(leader);
             return MapToDto(leader);

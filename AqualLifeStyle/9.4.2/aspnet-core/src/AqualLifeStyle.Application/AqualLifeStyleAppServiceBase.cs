@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Identity;
 using Abp.Application.Services;
 using Abp.IdentityFramework;
 using Abp.Runtime.Session;
+using Abp.UI;
+using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.MultiTenancy;
 
@@ -42,6 +44,21 @@ namespace AqualLifeStyle
         protected virtual void CheckErrors(IdentityResult identityResult)
         {
             identityResult.CheckErrors(LocalizationManager);
+        }
+
+        protected int GetRequiredTenantId(string operation)
+        {
+            if (!AbpSession.TenantId.HasValue)
+            {
+                throw CreateMissingTenantContextException(operation);
+            }
+
+            return AbpSession.TenantId.Value;
+        }
+
+        protected virtual Exception CreateMissingTenantContextException(string operation)
+        {
+            return new UserFriendlyException(operation, "A tenant context is required.");
         }
     }
 }
