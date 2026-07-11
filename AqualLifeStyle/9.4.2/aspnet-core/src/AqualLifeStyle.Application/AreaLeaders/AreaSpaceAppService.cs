@@ -16,10 +16,12 @@ namespace AqualLifeStyle.Application.AreaLeaders
     public class AreaSpaceAppService : AqualLifeStyleAppServiceBase, IAreaSpaceAppService
     {
         private readonly IAreaSpaceRepository _areaSpaceRepository;
+        private readonly IAreaLeaderRepository _areaLeaderRepository;
 
-        public AreaSpaceAppService(IAreaSpaceRepository areaSpaceRepository)
+        public AreaSpaceAppService(IAreaSpaceRepository areaSpaceRepository, IAreaLeaderRepository areaLeaderRepository)
         {
             _areaSpaceRepository = areaSpaceRepository;
+            _areaLeaderRepository = areaLeaderRepository;
         }
 
         [AbpAuthorize(PermissionNames.Pages_AreaSpaces_Manage)]
@@ -38,6 +40,8 @@ namespace AqualLifeStyle.Application.AreaLeaders
             {
                 throw new UserFriendlyException("Area space application failed.", "A tenant context is required.");
             }
+
+            await GetAreaLeaderForCurrentTenantAsync(input.AreaLeaderId);
 
             var address = new Address(input.AddressLine, null, null, null);
             var space = AreaSpace.Apply(AbpSession.TenantId.Value, input.AreaLeaderId, address, input.Capacity, input.InterestedMembers);
@@ -129,6 +133,18 @@ namespace AqualLifeStyle.Application.AreaLeaders
             }
 
             return space;
+        }
+
+        private async Task<AreaLeader> GetAreaLeaderForCurrentTenantAsync(int id)
+        {
+            var tenantId = GetRequiredTenantId("Area leader lookup failed.");
+            var leader = await _areaLeaderRepository.FirstOrDefaultAsync(l => l.Id == id && l.TenantId == tenantId);
+            if (leader == null)
+            {
+                throw new AqualLifeStyleNotFoundException("AreaLeader", id);
+            }
+
+            return leader;
         }
 
         private static AreaSpaceDto MapToDto(AreaSpace space)

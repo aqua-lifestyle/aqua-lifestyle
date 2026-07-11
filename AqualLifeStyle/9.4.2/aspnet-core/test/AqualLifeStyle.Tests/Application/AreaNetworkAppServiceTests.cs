@@ -136,6 +136,27 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task AreaSpace_ApplyAsync_ThrowsWhenAreaLeaderDoesNotExistForTenant()
+        {
+            var ex = await Assert.ThrowsAsync<AqualLifeStyleNotFoundException>(() =>
+                _areaSpaceAppService.ApplyAsync(new CreateAreaSpaceDto
+                {
+                    AreaLeaderId = 999999,
+                    AddressLine = "404 Aqua Street",
+                    Capacity = "50",
+                    InterestedMembers = 20
+                }));
+
+            ex.Message.ShouldContain("AreaLeader");
+
+            await UsingDbContextAsync(async ctx =>
+            {
+                var areaSpace = await ctx.AreaSpaces.FirstOrDefaultAsync(s => s.AddressLine == "404 Aqua Street");
+                areaSpace.ShouldBeNull();
+            });
+        }
+
+        [Fact]
         public async Task HandleEventAsync_WhenLeaderMissing_LogsErrorAndThrowsDependencyException()
         {
             var customerId = await CreateCustomerAsync("LeaderE");
