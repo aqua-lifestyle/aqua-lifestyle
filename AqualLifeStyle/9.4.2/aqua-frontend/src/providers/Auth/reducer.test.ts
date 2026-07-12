@@ -9,8 +9,10 @@ const session: AuthSession = {
   expiresAt: "2026-01-01T00:00:00Z",
   user: {
     email: "user@example.com",
-    id: "user-1",
+    id: 1,
     name: "Demo User",
+    role: "Member",
+    permissions: ["Aqua.Members.ViewSelf"],
   },
 };
 

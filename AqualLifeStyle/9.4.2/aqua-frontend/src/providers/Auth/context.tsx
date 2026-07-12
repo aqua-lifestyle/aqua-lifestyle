@@ -2,8 +2,10 @@ import { createContext } from "react";
 
 export type AuthUser = {
   email: string | null;
-  id: string;
+  id: number;
   name: string | null;
+  permissions: string[];
+  role: string;
 };
 
 export type AuthSession = {

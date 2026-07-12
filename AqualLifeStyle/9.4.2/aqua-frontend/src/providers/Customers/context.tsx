@@ -6,6 +6,8 @@ export type Customer = {
   email: string;
   membershipId: number | null;
   isActive: boolean;
+  tenantId: number | null;
+  userId: number;
 };
 
 export type CreateCustomerInput = {
