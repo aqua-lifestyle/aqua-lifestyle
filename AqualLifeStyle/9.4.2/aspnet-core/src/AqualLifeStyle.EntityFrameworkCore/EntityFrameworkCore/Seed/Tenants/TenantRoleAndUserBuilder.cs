@@ -89,7 +89,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
                 _context.SaveChanges();
             }
 
-            new DefaultCustomerUserLinker(_context).Link(_tenantId);
+            new DefaultCustomerUserLinker(_context, passwordHasher: new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()))).Link(_tenantId);
             new DefaultUserRoleAssigner(_context).AssignRoles(_tenantId);
         }
     }

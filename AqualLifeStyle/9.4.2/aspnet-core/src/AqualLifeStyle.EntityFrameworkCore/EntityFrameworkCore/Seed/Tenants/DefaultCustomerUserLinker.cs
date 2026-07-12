@@ -4,6 +4,11 @@ using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
+using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.Domain.Customers;
+using AqualLifeStyle.Domain.Enums;
 
 namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
 {
@@ -11,11 +16,13 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
     {
         private readonly AqualLifeStyleDbContext _context;
         private readonly ILogger<DefaultCustomerUserLinker> _logger;
+        private readonly PasswordHasher<User> _passwordHasher;
 
-        public DefaultCustomerUserLinker(AqualLifeStyleDbContext context, ILogger<DefaultCustomerUserLinker> logger = null)
+        public DefaultCustomerUserLinker(AqualLifeStyleDbContext context, ILogger<DefaultCustomerUserLinker> logger = null, PasswordHasher<User> passwordHasher = null)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
             _logger = logger ?? NullLogger<DefaultCustomerUserLinker>.Instance;
+            _passwordHasher = passwordHasher ?? new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()));
         }
 
         public void Link(int tenantId)
@@ -44,7 +51,12 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
                 var email = Normalize(customer.Email.Value);
                 if (!usersByEmail.TryGetValue(email, out var matches) || matches.Count == 0)
                 {
-                    _logger.LogWarning("No user match for customer {CustomerId} in tenant {TenantId}; email {Email}", customer.Id, tenantId, email);
+                    _logger.LogWarning("No user match for customer {CustomerId} in tenant {TenantId}; email {Email}; creating placeholder user", customer.Id, tenantId, email);
+                    var placeholderUser = CreatePlaceholderUser(tenantId, customer);
+                    _context.Users.Add(placeholderUser);
+                    _context.SaveChanges();
+                    customer.LinkUser(placeholderUser.Id);
+                    assignedUserIds.Add(placeholderUser.Id);
                     continue;
                 }
 
@@ -60,6 +72,30 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
             }
 
             _context.SaveChanges();
+        }
+
+        private User CreatePlaceholderUser(int tenantId, Customer customer)
+        {
+            var user = new User
+            {
+                TenantId = tenantId,
+                UserName = $"customer_{customer.Id}",
+                Name = customer.Name.Length > 64 ? customer.Name.Substring(0, 64) : customer.Name,
+                Surname = "Customer",
+                EmailAddress = customer.Email.Value,
+                IsActive = false,
+                IsEmailConfirmed = false,
+                IsLockoutEnabled = true,
+                IsPhoneNumberConfirmed = false,
+                IsTwoFactorEnabled = false,
+                AccessFailedCount = 0
+            };
+
+            user.SetNormalizedNames();
+            user.SetRole(AquaUserRole.Member);
+            user.Password = _passwordHasher.HashPassword(user, "MIGRATED_ACCOUNT_REQUIRES_PASSWORD_RESET");
+
+            return user;
         }
 
         private static string Normalize(string email) => email?.Trim().ToUpperInvariant() ?? string.Empty;
