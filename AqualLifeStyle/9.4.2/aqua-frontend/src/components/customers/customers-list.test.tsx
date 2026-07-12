@@ -8,6 +8,7 @@ import {
   useCustomersState,
   useMembershipsActions,
   useMembershipsState,
+  useAuthState,
 } from "@/src/providers";
 
 import { CustomersList } from "./customers-list";
@@ -22,6 +23,7 @@ vi.mock("@/src/providers", async () => {
     useCustomersState: vi.fn(),
     useMembershipsActions: vi.fn(),
     useMembershipsState: vi.fn(),
+    useAuthState: vi.fn(),
   };
 });
 
@@ -55,6 +57,8 @@ const customers: Customer[] = [
     email: "john@example.com",
     membershipId: 1,
     isActive: true,
+    userId: 1,
+    tenantId: 1,
   },
   {
     id: 2,
@@ -62,6 +66,8 @@ const customers: Customer[] = [
     email: "jane@example.com",
     membershipId: null,
     isActive: false,
+    userId: 2,
+    tenantId: 1,
   },
 ];
 
@@ -130,6 +136,29 @@ describe("CustomersList", () => {
       getTierBenefits: vi.fn(),
     });
     vi.mocked(useMembershipsState).mockReturnValue({ ...baseMembershipsState });
+    vi.mocked(useAuthState).mockReturnValue({
+      isAuthenticated: true,
+      isReady: true,
+      session: {
+        accessToken: "access-token",
+        expiresAt: "2026-01-01T00:00:00Z",
+        user: {
+          id: 1,
+          email: "user@example.com",
+          name: "Demo User",
+          role: "SystemAdmin",
+          permissions: [
+            "Aqua.Members.View",
+            "Aqua.Members.Create",
+            "Pages.Customers",
+            "Pages.Products",
+            "Pages.Enquiries",
+            "Pages.Memberships",
+            "Pages.Orders",
+          ],
+        },
+      },
+    });
   });
 
   it("fetches customers and memberships on mount", () => {
