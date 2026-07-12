@@ -20,7 +20,7 @@ namespace AqualLifeStyle.Tests
         public async Task CanViewProduct_AllowsStandardProductForStandardMember()
         {
             var membership = Membership.Create(1, "Jasper", "Base access", MembershipType.Jasper);
-            var customer = Customer.Create(1, "Alicia", new EmailAddress("alicia@example.com"), 1);
+            var customer = Customer.Create(1, 47, "Alicia", new EmailAddress("alicia@example.com"), 1);
             var product = Product.Create("Basic Plan", 20m, 1);
             var manager = new ProductEligibilityManager(new StubMembershipRepository(membership));
 
@@ -32,7 +32,7 @@ namespace AqualLifeStyle.Tests
         {
             var membership = Membership.Create(1, "Onyx", "Onyx access", MembershipType.Onyx);
             membership.Deactivate();
-            var customer = Customer.Create(1, "Alicia", new EmailAddress("alicia@example.com"), 1);
+            var customer = Customer.Create(1, 48, "Alicia", new EmailAddress("alicia@example.com"), 1);
             var product = Product.Create("Premium Plan", 50m, 2);
             var manager = new ProductEligibilityManager(new StubMembershipRepository(membership));
 
@@ -42,7 +42,7 @@ namespace AqualLifeStyle.Tests
         [Fact]
         public async Task CanViewProduct_DeniesMembershipRestrictedProductWithoutMembership()
         {
-            var customer = Customer.Create(1, "Alicia", new EmailAddress("alicia@example.com"), null);
+            var customer = Customer.Create(1, 49, "Alicia", new EmailAddress("alicia@example.com"), null);
             var product = Product.Create("Premium Plan", 50m, 2);
             var manager = new ProductEligibilityManager(new StubMembershipRepository(Membership.Create(1, "Jasper", "Base access", MembershipType.Jasper)));
 

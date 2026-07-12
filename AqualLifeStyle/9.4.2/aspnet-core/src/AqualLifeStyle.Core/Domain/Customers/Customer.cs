@@ -1,5 +1,6 @@
 using System;
 using Abp.Domain.Entities;
+using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Common;
 
 namespace AqualLifeStyle.Domain.Customers
@@ -7,31 +8,43 @@ namespace AqualLifeStyle.Domain.Customers
     public class Customer : Entity<int>, IMayHaveTenant
     {
         public int? TenantId { get; set; }
-        public long? UserId { get; private set; }
+        public long UserId { get; private set; }
+        public virtual User User { get; set; }
         public string Name { get; private set; }
         public EmailAddress Email { get; private set; }
-        public int? MembershipId { get; private set; }
+        public int? MembershipId { get; set; }
         public bool IsActive { get; private set; }
 
         protected Customer() { }
 
-        private Customer(int? tenantId, string name, EmailAddress email, int? membershipId = null, bool isActive = true)
+        private Customer(int? tenantId, long userId, string name, EmailAddress email, int? membershipId = null, bool isActive = true)
         {
             if (tenantId.HasValue && tenantId.Value <= 0)
             {
                 throw new ArgumentException("TenantId must be valid.", nameof(tenantId));
             }
 
+            if (userId <= 0)
+            {
+                throw new ArgumentException("UserId must be positive.", nameof(userId));
+            }
+
             TenantId = tenantId;
+            UserId = userId;
             SetName(name);
             Email = email ?? throw new ArgumentNullException(nameof(email));
             MembershipId = membershipId;
             IsActive = isActive;
         }
 
-        public static Customer Create(int? tenantId, string name, EmailAddress email, int? membershipId = null)
+        public static Customer Create(int? tenantId, long userId, string name, EmailAddress email, int? membershipId = null, User user = null)
         {
-            return new Customer(tenantId, name, email, membershipId, true);
+            var customer = new Customer(tenantId, userId, name, email, membershipId, true);
+            if (user != null)
+            {
+                customer.User = user;
+            }
+            return customer;
         }
 
         public void ChangeMembership(int? newMembershipId)
@@ -57,8 +70,8 @@ namespace AqualLifeStyle.Domain.Customers
         public void LinkUser(long userId)
         {
             if (userId <= 0) throw new ArgumentException("UserId must be positive.", nameof(userId));
-            if (UserId.HasValue && UserId.Value != userId)
-                throw new InvalidOperationException("A customer cannot be linked to a different user.");
+            if (UserId == userId) return;
+            if (UserId != default) throw new InvalidOperationException($"Customer is already linked to UserId={UserId}.");
             UserId = userId;
         }
 

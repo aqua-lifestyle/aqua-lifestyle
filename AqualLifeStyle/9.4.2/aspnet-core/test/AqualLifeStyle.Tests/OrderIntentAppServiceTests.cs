@@ -158,7 +158,7 @@ namespace AqualLifeStyle.Tests
 
         private static Customer CreateCustomer(int membershipId)
         {
-            var customer = Customer.Create(1, "Jane Doe", new EmailAddress("jane@example.com"), membershipId);
+            var customer = Customer.Create(1, 43, "Jane Doe", new EmailAddress("jane@example.com"), membershipId);
             customer.Id = 1;
             return customer;
         }

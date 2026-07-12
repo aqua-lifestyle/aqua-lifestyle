@@ -26,7 +26,7 @@ namespace AqualLifeStyle.Tests
 
             var service = new CustomerAppService(customerRepository.Object, membershipRepository.Object, objectMapperMock.Object)
             {
-                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
+                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1 && s.UserId == 1)
             };
 
             var ex = await Assert.ThrowsAsync<UserFriendlyException>(() => service.CreateAsync(new CreateCustomerDto

@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -373,6 +374,8 @@ namespace AqualLifeStyle.Tests.Integration
         {
             if (tenantId == AbpSession.TenantId)
             {
+                var userId = await CreateTestUserAsync(tenantId, $"user-{Guid.NewGuid():N}", $"user-{Guid.NewGuid():N}@example.com");
+                SetCurrentUser(userId, tenantId);
                 await _customerAppService.CreateAsync(new CreateCustomerDto
                 {
                     Name = name,
@@ -381,9 +384,10 @@ namespace AqualLifeStyle.Tests.Integration
             }
             else
             {
+                var userId = await CreateTestUserAsync(tenantId, $"user-{Guid.NewGuid():N}", $"user-{Guid.NewGuid():N}@example.com");
                 await UsingDbContextAsync(tenantId, async ctx =>
                 {
-                    ctx.Customers.Add(Customer.Create(tenantId, name, new AqualLifeStyle.Domain.Common.EmailAddress($"{name.ToLower()}@example.com")));
+                    ctx.Customers.Add(Customer.Create(tenantId, userId, name, new AqualLifeStyle.Domain.Common.EmailAddress($"{name.ToLower()}@example.com")));
                     await ctx.SaveChangesAsync();
                 });
             }
@@ -405,17 +409,19 @@ namespace AqualLifeStyle.Tests.Integration
 
         private async Task<int> CreateDirectReferralAsync(int tenantId, int sourceEnquiryId)
         {
+            var customerUserId = await CreateTestUserAsync(tenantId, $"user-{Guid.NewGuid():N}", $"user-{Guid.NewGuid():N}@example.com");
             var customerId = await UsingDbContextAsync(tenantId, async ctx =>
             {
-                var customer = Customer.Create(tenantId, $"ReferralCustomer{tenantId}", new EmailAddress($"referralcustomer{tenantId}@example.com"));
+                var customer = Customer.Create(tenantId, customerUserId, $"ReferralCustomer{tenantId}", new EmailAddress($"referralcustomer{tenantId}@example.com"));
                 ctx.Customers.Add(customer);
                 await ctx.SaveChangesAsync();
                 return customer.Id;
             });
 
+            var leaderUserId = await CreateTestUserAsync(tenantId, $"user-{Guid.NewGuid():N}", $"user-{Guid.NewGuid():N}@example.com");
             var leaderCustomerId = await UsingDbContextAsync(tenantId, async ctx =>
             {
-                var c = Customer.Create(tenantId, $"ReferralLeader{tenantId}", new EmailAddress($"referralleader{tenantId}@example.com"));
+                var c = Customer.Create(tenantId, leaderUserId, $"ReferralLeader{tenantId}", new EmailAddress($"referralleader{tenantId}@example.com"));
                 ctx.Customers.Add(c);
                 await ctx.SaveChangesAsync();
                 return c.Id;

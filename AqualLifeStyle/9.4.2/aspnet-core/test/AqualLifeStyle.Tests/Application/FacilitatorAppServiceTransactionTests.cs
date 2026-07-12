@@ -39,7 +39,7 @@ namespace AqualLifeStyle.Tests.Application
                 .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<Customer, bool>>>()))
                 .ReturnsAsync(() =>
                 {
-                    var c = Customer.Create(1, "TransactionTest", new EmailAddress("tx@example.com"));
+                     var c = Customer.Create(1, 42, "TransactionTest", new EmailAddress("tx@example.com"));
                     c.Id = 22;
                     return c;
                 });

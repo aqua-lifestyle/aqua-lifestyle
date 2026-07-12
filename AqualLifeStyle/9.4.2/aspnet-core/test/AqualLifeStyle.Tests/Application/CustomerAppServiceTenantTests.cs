@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Abp.Authorization;
 using Abp.UI;
@@ -25,15 +26,18 @@ namespace AqualLifeStyle.Tests.Application
             var tenantOneEmail = "tenant1-customer@example.com";
             var tenantTwoEmail = "tenant2-customer@example.com";
 
+            var tenantOneUserId = await CreateTestUserAsync(1, $"user-{Guid.NewGuid():N}", $"user-{Guid.NewGuid():N}@example.com");
+            var tenantTwoUserId = await CreateTestUserAsync(2, $"user-{Guid.NewGuid():N}", $"user-{Guid.NewGuid():N}@example.com");
+
             await UsingDbContextAsync(1, async ctx =>
             {
-                ctx.Customers.Add(Customer.Create(1, "Tenant One Customer", new EmailAddress(tenantOneEmail)));
+                ctx.Customers.Add(Customer.Create(1, tenantOneUserId, "Tenant One Customer", new EmailAddress(tenantOneEmail)));
                 await ctx.SaveChangesAsync();
             });
 
             await UsingDbContextAsync(2, async ctx =>
             {
-                ctx.Customers.Add(Customer.Create(2, "Tenant Two Customer", new EmailAddress(tenantTwoEmail)));
+                ctx.Customers.Add(Customer.Create(2, tenantTwoUserId, "Tenant Two Customer", new EmailAddress(tenantTwoEmail)));
                 await ctx.SaveChangesAsync();
             });
 
@@ -75,9 +79,10 @@ namespace AqualLifeStyle.Tests.Application
         {
             var customerId = 0;
 
+            var userId = await CreateTestUserAsync(1, $"user-{Guid.NewGuid():N}", $"user-{Guid.NewGuid():N}@example.com");
             await UsingDbContextAsync(1, async ctx =>
             {
-                var customer = Customer.Create(1, "Tenant Customer", new EmailAddress("tenant-customer@example.com"));
+                var customer = Customer.Create(1, userId, "Tenant Customer", new EmailAddress("tenant-customer@example.com"));
                 ctx.Customers.Add(customer);
                 await ctx.SaveChangesAsync();
                 customerId = customer.Id;

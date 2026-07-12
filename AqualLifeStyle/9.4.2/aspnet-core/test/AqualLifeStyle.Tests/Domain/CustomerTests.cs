@@ -12,13 +12,13 @@ namespace AqualLifeStyle.Tests.Domain
         public void Create_WithInvalidTenantId_Throws(int tenantId)
         {
             Should.Throw<System.ArgumentException>(() =>
-                Customer.Create(tenantId, "Jane Doe", new EmailAddress("jane@example.com")));
+                Customer.Create(tenantId, 42, "Jane Doe", new EmailAddress("jane@example.com")));
         }
 
         [Fact]
         public void Create_WithNullTenantId_AllowsCustomer()
         {
-            var customer = Customer.Create(null, "Jane Doe", new EmailAddress("jane@example.com"));
+            var customer = Customer.Create(null, 43, "Jane Doe", new EmailAddress("jane@example.com"));
 
             customer.TenantId.ShouldBeNull();
             customer.Name.ShouldBe("Jane Doe");
@@ -29,11 +29,12 @@ namespace AqualLifeStyle.Tests.Domain
         [Fact]
         public void LinkUser_WithValidUserId_CreatesImmutableLink()
         {
-            var customer = Customer.Create(1, "Jane Doe", new EmailAddress("jane@example.com"));
-            customer.LinkUser(42);
+            var customer = Customer.Create(1, 44, "Jane Doe", new EmailAddress("jane@example.com"));
+            customer.LinkUser(44);
+            customer.UserId.ShouldBe(44);
 
-            customer.UserId.ShouldBe(42);
-            Should.Throw<System.InvalidOperationException>(() => customer.LinkUser(43));
+            var anotherCustomer = Customer.Create(1, 45, "Jane Doe", new EmailAddress("jane@example.com"));
+            Should.Throw<System.InvalidOperationException>(() => anotherCustomer.LinkUser(42));
         }
 
         [Theory]
@@ -41,7 +42,7 @@ namespace AqualLifeStyle.Tests.Domain
         [InlineData(-1)]
         public void LinkUser_WithInvalidUserId_Throws(long userId)
         {
-            var customer = Customer.Create(1, "Jane Doe", new EmailAddress("jane@example.com"));
+            var customer = Customer.Create(1, 45, "Jane Doe", new EmailAddress("jane@example.com"));
             Should.Throw<System.ArgumentException>(() => customer.LinkUser(userId));
         }
     }

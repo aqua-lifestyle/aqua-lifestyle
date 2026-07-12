@@ -62,9 +62,9 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 entity.ToTable("Customers");
                 entity.Property(e => e.TenantId);
                 entity.HasIndex(e => e.TenantId);
-                entity.Property(e => e.UserId);
+                entity.Property(e => e.UserId).IsRequired();
                 entity.HasIndex(e => e.UserId).IsUnique();
-                entity.HasOne<User>()
+                entity.HasOne(e => e.User)
                     .WithOne()
                     .HasForeignKey<Customer>(e => e.UserId)
                     .OnDelete(DeleteBehavior.Restrict);

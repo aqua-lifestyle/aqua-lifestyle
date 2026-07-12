@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.UI;
@@ -269,6 +270,8 @@ namespace AqualLifeStyle.Tests.Application
         {
             if (tenantId == 1)
             {
+                var userId = await CreateTestUserAsync(tenantId, $"user-{Guid.NewGuid():N}", $"user-{Guid.NewGuid():N}@example.com");
+                SetCurrentUser(userId, tenantId);
                 await _customerAppService.CreateAsync(new CreateCustomerDto
                 {
                     Name = name,
@@ -277,9 +280,10 @@ namespace AqualLifeStyle.Tests.Application
             }
             else
             {
+                var userId = await CreateTestUserAsync(tenantId, $"user-{Guid.NewGuid():N}", $"user-{Guid.NewGuid():N}@example.com");
                 await UsingDbContextAsync(tenantId, async ctx =>
                 {
-                    var customer = Customer.Create(tenantId, name, new EmailAddress($"{name.ToLower()}@example.com"));
+                    var customer = Customer.Create(tenantId, userId, name, new EmailAddress($"{name.ToLower()}@example.com"));
                     ctx.Customers.Add(customer);
                     await ctx.SaveChangesAsync();
                 });
@@ -294,9 +298,10 @@ namespace AqualLifeStyle.Tests.Application
 
         private async Task<AreaLeader> CreateAreaLeaderAsync(string leaderName, int tenantId)
         {
+            var userId = await CreateTestUserAsync(tenantId, $"user-{Guid.NewGuid():N}", $"user-{Guid.NewGuid():N}@example.com");
             return await UsingDbContextAsync(tenantId, async ctx =>
             {
-                var customerToLeader = Customer.Create(tenantId, leaderName, new EmailAddress($"{leaderName.ToLower()}@example.com"));
+                var customerToLeader = Customer.Create(tenantId, userId, leaderName, new EmailAddress($"{leaderName.ToLower()}@example.com"));
                 ctx.Customers.Add(customerToLeader);
                 await ctx.SaveChangesAsync();
 
@@ -310,11 +315,12 @@ namespace AqualLifeStyle.Tests.Application
 
         private async Task<Facilitator> CreateFacilitatorAsync(string leaderName, string facilitatorName, int tenantId)
         {
+            var userId = await CreateTestUserAsync(tenantId, $"user-{Guid.NewGuid():N}", $"user-{Guid.NewGuid():N}@example.com");
             return await UsingDbContextAsync(tenantId, async ctx =>
             {
                 var leader = await CreateAreaLeaderAsync(leaderName, tenantId);
 
-                var facilitatorCustomer = Customer.Create(tenantId, facilitatorName, new EmailAddress($"{facilitatorName.ToLower()}@example.com"));
+                var facilitatorCustomer = Customer.Create(tenantId, userId, facilitatorName, new EmailAddress($"{facilitatorName.ToLower()}@example.com"));
                 ctx.Customers.Add(facilitatorCustomer);
                 await ctx.SaveChangesAsync();
 

@@ -157,9 +157,10 @@ namespace AqualLifeStyle.Tests.Application
 
         private async Task<int> CreateCustomerAsync(int tenantId)
         {
+            var userId = await CreateTestUserAsync(tenantId, $"user-{Guid.NewGuid():N}", $"user-{Guid.NewGuid():N}@example.com");
             return await UsingDbContextAsync(tenantId, async ctx =>
             {
-                var customer = Customer.Create(tenantId, $"ReferralTestCustomer{tenantId}", new EmailAddress($"referraltestcustomer{tenantId}@example.com"));
+                var customer = Customer.Create(tenantId, userId, $"ReferralTestCustomer{tenantId}", new EmailAddress($"referraltestcustomer{tenantId}@example.com"));
                 ctx.Customers.Add(customer);
                 await ctx.SaveChangesAsync();
                 return customer.Id;
@@ -198,9 +199,10 @@ namespace AqualLifeStyle.Tests.Application
 
         private async Task<int> CreateCustomerAsync(int tenantId, string name)
         {
+            var userId = await CreateTestUserAsync(tenantId, $"user-{Guid.NewGuid():N}", $"user-{Guid.NewGuid():N}@example.com");
             return await UsingDbContextAsync(tenantId, async ctx =>
             {
-                var customer = Customer.Create(tenantId, name, new EmailAddress($"{name.ToLower()}@example.com"));
+                var customer = Customer.Create(tenantId, userId, name, new EmailAddress($"{name.ToLower()}@example.com"));
                 ctx.Customers.Add(customer);
                 await ctx.SaveChangesAsync();
                 return customer.Id;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Abp.Authorization.Users;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Products;
@@ -75,14 +76,15 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
         {
             if (_context.Customers.Any()) return;
 
-            var customers = new List<Customer>
+            var hostAdminUser = _context.Users.First(u => u.TenantId == null && u.UserName == AbpUserBase.AdminUserName);
+            if (_context.Entry(hostAdminUser).State == Microsoft.EntityFrameworkCore.EntityState.Detached)
             {
-                Customer.Create(null, "Alice Johnson", new EmailAddress("alice@example.com"), _context.Memberships.First(m => m.MembershipType == Domain.Enums.MembershipType.Jasper).Id),
-                Customer.Create(null, "Brian Okoro", new EmailAddress("brian@example.com"), _context.Memberships.First(m => m.MembershipType == Domain.Enums.MembershipType.Onyx).Id),
-                Customer.Create(null, "Cynthia Nwosu", new EmailAddress("cynthia@example.com"), _context.Memberships.First(m => m.MembershipType == Domain.Enums.MembershipType.AQGreen).Id)
-            };
+                _context.Users.Attach(hostAdminUser);
+            }
 
-            _context.Customers.AddRange(customers);
+            var customer = Customer.Create(null, hostAdminUser.Id, "Alice Johnson", new EmailAddress("alice@example.com"), _context.Memberships.First(m => m.MembershipType == Domain.Enums.MembershipType.Jasper).Id, hostAdminUser);
+
+            _context.Customers.Add(customer);
             _context.SaveChanges();
         }
 

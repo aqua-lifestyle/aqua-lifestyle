@@ -131,6 +131,11 @@ namespace AqualLifeStyle.Application.Customers
 
             try
             {
+                if (!AbpSession.UserId.HasValue)
+                {
+                    throw new UserFriendlyException("Customer creation failed.", "A user context is required to create a customer.");
+                }
+
                 if (input.MembershipId.HasValue)
                 {
                     var membership = await _membershipRepository.GetAsync(input.MembershipId.Value);
@@ -138,7 +143,7 @@ namespace AqualLifeStyle.Application.Customers
                 }
 
                 var email = new EmailAddress(input.Email);
-                var customer = Customer.Create(tenantId, input.Name, email, input.MembershipId);
+                var customer = Customer.Create(tenantId, AbpSession.UserId.Value, input.Name, email, input.MembershipId);
                 await _customerRepository.InsertAsync(customer);
             }
             catch (UserFriendlyException)

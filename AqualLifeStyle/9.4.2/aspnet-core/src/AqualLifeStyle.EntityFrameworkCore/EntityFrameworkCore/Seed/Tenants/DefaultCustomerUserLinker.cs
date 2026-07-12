@@ -31,9 +31,9 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
             var customers = _context.Customers.IgnoreQueryFilters()
                 .Where(customer => customer.TenantId == tenantId)
                 .ToList();
-            var assignedUserIds = new HashSet<long>(customers.Where(customer => customer.UserId.HasValue).Select(customer => customer.UserId.Value));
+            var assignedUserIds = new HashSet<long>(customers.Select(customer => customer.UserId));
 
-            foreach (var customer in customers.Where(customer => !customer.UserId.HasValue))
+            foreach (var customer in customers)
             {
                 var email = Normalize(customer.Email.Value);
                 if (!usersByEmail.TryGetValue(email, out var matches) || matches.Count == 0)

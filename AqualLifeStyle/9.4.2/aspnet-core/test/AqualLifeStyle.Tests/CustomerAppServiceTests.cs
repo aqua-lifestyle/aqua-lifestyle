@@ -19,7 +19,7 @@ namespace AqualLifeStyle.Tests
         [Fact]
         public async Task UpdateAsync_ChangesNameEmailMembershipAndStatus()
         {
-            var customer = Customer.Create(1, "Old Name", new EmailAddress("old@example.com"), 1);
+            var customer = Customer.Create(1, 50, "Old Name", new EmailAddress("old@example.com"), 1);
             customer.Id = 10;
             var membership = Membership.Create(1, "Onyx", "Onyx membership", MembershipType.Onyx);
 
