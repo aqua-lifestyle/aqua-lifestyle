@@ -26,9 +26,10 @@ namespace AqualLifeStyle.Tests.Application
             var admin = await GetCurrentUserAsync();
             admin.SetRole(AquaUserRole.Guest);
 
-            await UsingDbContextAsync(async ctx =>
+            await UsingDbContextAsync(ctx =>
             {
                 new DefaultUserRoleAssigner(ctx).AssignRoles(admin.TenantId.Value);
+                return Task.CompletedTask;
             });
 
             var updated = await UsingDbContextAsync(ctx => ctx.Users.SingleAsync(u => u.Id == admin.Id));
@@ -41,9 +42,10 @@ namespace AqualLifeStyle.Tests.Application
             var newUser = await CreateUserAsync("noroles_" + System.Guid.NewGuid().ToString("N"));
             await RemoveAllUserRolesAsync(newUser.Id);
 
-            await UsingDbContextAsync(async ctx =>
+            await UsingDbContextAsync(ctx =>
             {
                 new DefaultUserRoleAssigner(ctx).AssignRoles(newUser.TenantId.Value);
+                return Task.CompletedTask;
             });
 
             var updated = await UsingDbContextAsync(ctx => ctx.Users.SingleAsync(u => u.Id == newUser.Id));
@@ -56,9 +58,10 @@ namespace AqualLifeStyle.Tests.Application
             var admin = await GetCurrentUserAsync();
             admin.SetRole(AquaUserRole.SystemAdmin);
 
-            await UsingDbContextAsync(async ctx =>
+            await UsingDbContextAsync(ctx =>
             {
                 new DefaultUserRoleAssigner(ctx).AssignRoles(admin.TenantId.Value);
+                return Task.CompletedTask;
             });
 
             var updated = await UsingDbContextAsync(ctx => ctx.Users.SingleAsync(u => u.Id == admin.Id));
