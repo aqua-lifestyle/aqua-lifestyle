@@ -8,6 +8,8 @@ namespace AqualLifeStyle.Authorization
     {
         public override void SetPermissions(IPermissionDefinitionContext context)
         {
+            RegisterAquaPermissions(context);
+
             context.CreatePermission(PermissionNames.Pages_Users, L("Users"));
             context.CreatePermission(PermissionNames.Pages_Users_Activation, L("UsersActivation"));
             context.CreatePermission(PermissionNames.Pages_Roles, L("Roles"));
@@ -42,6 +44,33 @@ namespace AqualLifeStyle.Authorization
 
             var products = context.CreatePermission(PermissionNames.Pages_Products, L("Products"));
             products.CreateChildPermission(PermissionNames.Pages_Products_Manage, L("ProductsManage"));
+        }
+
+        private static void RegisterAquaPermissions(IPermissionDefinitionContext context)
+        {
+            CreateGroup(context, AquaPermissions.Members.Default, AquaPermissions.Members.View, AquaPermissions.Members.Create, AquaPermissions.Members.Edit, AquaPermissions.Members.Delete, AquaPermissions.Members.Upgrade, AquaPermissions.Members.ViewSelf, AquaPermissions.Members.EditSelf);
+            CreateGroup(context, AquaPermissions.Facilitators.Default, AquaPermissions.Facilitators.View, AquaPermissions.Facilitators.Register, AquaPermissions.Facilitators.Refer, AquaPermissions.Facilitators.Promote, AquaPermissions.Facilitators.ViewSelf);
+            CreateGroup(context, AquaPermissions.AreaLeaders.Default, AquaPermissions.AreaLeaders.View, AquaPermissions.AreaLeaders.Apply, AquaPermissions.AreaLeaders.Approve, AquaPermissions.AreaLeaders.Manage, AquaPermissions.AreaLeaders.ViewSelf);
+            CreateGroup(context, AquaPermissions.AreaSpaces.Default, AquaPermissions.AreaSpaces.View, AquaPermissions.AreaSpaces.Apply, AquaPermissions.AreaSpaces.Approve, AquaPermissions.AreaSpaces.Manage);
+            CreateGroup(context, AquaPermissions.Orders.Default, AquaPermissions.Orders.View, AquaPermissions.Orders.Place, AquaPermissions.Orders.Process, AquaPermissions.Orders.Approve, AquaPermissions.Orders.ViewSelf);
+            CreateGroup(context, AquaPermissions.Savings.Default, AquaPermissions.Savings.View, AquaPermissions.Savings.Deposit, AquaPermissions.Savings.Withdraw, AquaPermissions.Savings.Approve, AquaPermissions.Savings.ViewSelf);
+            CreateGroup(context, AquaPermissions.Enquiries.Default, AquaPermissions.Enquiries.View, AquaPermissions.Enquiries.Create, AquaPermissions.Enquiries.Update, AquaPermissions.Enquiries.Resolve, AquaPermissions.Enquiries.ViewSelf);
+            CreateGroup(context, AquaPermissions.Referrals.Default, AquaPermissions.Referrals.View, AquaPermissions.Referrals.Create, AquaPermissions.Referrals.Confirm, AquaPermissions.Referrals.ViewSelf);
+            CreateGroup(context, AquaPermissions.Admin.Default, MultiTenancySides.Host, AquaPermissions.Admin.Dashboard, AquaPermissions.Admin.Reports, AquaPermissions.Admin.Audit, AquaPermissions.Admin.Settings, AquaPermissions.Admin.AllTenants);
+        }
+
+        private static void CreateGroup(IPermissionDefinitionContext context, string parentName, params string[] childNames)
+        {
+            CreateGroup(context, parentName, MultiTenancySides.Tenant, childNames);
+        }
+
+        private static void CreateGroup(IPermissionDefinitionContext context, string parentName, MultiTenancySides sides, params string[] childNames)
+        {
+            var parent = context.CreatePermission(parentName, L(parentName), multiTenancySides: sides);
+            foreach (var childName in childNames)
+            {
+                parent.CreateChildPermission(childName, L(childName), multiTenancySides: sides);
+            }
         }
 
         private static ILocalizableString L(string name)
