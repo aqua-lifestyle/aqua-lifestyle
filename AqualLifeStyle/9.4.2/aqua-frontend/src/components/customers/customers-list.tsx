@@ -13,6 +13,7 @@ import {
   useCustomersState,
   useMembershipsActions,
   useMembershipsState,
+  useAuthState,
 } from "@/src/providers";
 import { getMembershipNameById } from "@/src/shared/domain";
 import {
@@ -51,6 +52,17 @@ export const CustomersList = () => {
     loadErrorMessage,
   } = useCustomersState();
   const { memberships } = useMembershipsState();
+  const { session } = useAuthState();
+
+  const currentUserId = session?.user?.id ?? null;
+  const canViewAllCustomers = session?.user?.permissions?.includes("Aqua.Members.View") ?? false;
+  const canCreateCustomer = session?.user?.permissions?.includes("Aqua.Members.Create") ?? false;
+
+  const canOpenCustomer = (customer: { userId: number }) => {
+    if (canViewAllCustomers) return true;
+    if (currentUserId !== null && customer.userId === currentUserId) return true;
+    return false;
+  };
 
   useEffect(() => {
     void getCustomers();
@@ -130,9 +142,11 @@ export const CustomersList = () => {
       key: "actions",
       render: (customer: typeof tableCustomers[number]) => (
         <div className="flex items-center gap-2">
-          <LinkButton href={`/customers/${customer.id}`} size="sm" variant="outline">
-            Open
-          </LinkButton>
+          {canOpenCustomer(customer) ? (
+            <LinkButton href={`/customers/${customer.id}`} size="sm" variant="outline">
+              Open
+            </LinkButton>
+          ) : null}
           <LinkButton
             href={`/enquiries/create?customerId=${customer.id}`}
             size="sm"
@@ -159,10 +173,12 @@ export const CustomersList = () => {
               enquiries.
             </p>
           </div>
-          <LinkButton href="/customers/register" variant="primary">
-            <Plus className="size-4" />
-            Add customer
-          </LinkButton>
+          {canCreateCustomer ? (
+            <LinkButton href="/customers/register" variant="primary">
+              <Plus className="size-4" />
+              Add customer
+            </LinkButton>
+          ) : null}
         </header>
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -323,9 +339,11 @@ export const CustomersList = () => {
                         )}
                       </p>
                       <div className="mt-4 flex items-center gap-2">
-                        <LinkButton href={`/customers/${customer.id}`} size="sm" variant="outline">
-                          Open
-                        </LinkButton>
+                        {canOpenCustomer(customer) ? (
+                          <LinkButton href={`/customers/${customer.id}`} size="sm" variant="outline">
+                            Open
+                          </LinkButton>
+                        ) : null}
                         <LinkButton
                           href={`/enquiries/create?customerId=${customer.id}`}
                           size="sm"

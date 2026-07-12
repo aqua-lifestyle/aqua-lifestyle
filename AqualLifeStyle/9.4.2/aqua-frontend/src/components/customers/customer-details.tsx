@@ -15,6 +15,7 @@ import {
   useOrderIntentsState,
   useProductsActions,
   useProductsState,
+  useAuthState,
 } from "@/src/providers";
 import { getMembershipNameById } from "@/src/shared/domain";
 import {
@@ -80,6 +81,8 @@ const CustomerEditForm = ({
       membershipId:
         formState.membershipId.length > 0 ? Number(formState.membershipId) : null,
       name: formState.name.trim(),
+      tenantId: customer.tenantId,
+      userId: customer.userId,
     });
   };
 
@@ -154,6 +157,7 @@ const CustomerEditForm = ({
 
 const CustomerOverview = ({
   customer,
+  canEdit,
   isUpdatePending,
   isUpdateSuccess,
   isUpdateError,
@@ -161,6 +165,7 @@ const CustomerOverview = ({
   updateCustomer,
   updateErrorMessage,
 }: {
+  canEdit: boolean;
   customer: Customer;
   isUpdateError: boolean;
   isUpdatePending: boolean;
@@ -174,19 +179,25 @@ const CustomerOverview = ({
       <Card>
         <h2 className="text-lg font-semibold">Edit customer</h2>
         <div className="mt-4">
-          <CustomerEditForm
-            customer={customer}
-            isUpdatePending={isUpdatePending}
-            key={[
-              customer.id,
-              customer.name,
-              customer.email,
-              customer.membershipId ?? "none",
-              customer.isActive,
-            ].join(":")}
-            memberships={memberships}
-            updateCustomer={updateCustomer}
-          />
+          {canEdit ? (
+            <CustomerEditForm
+              customer={customer}
+              isUpdatePending={isUpdatePending}
+              key={[
+                customer.id,
+                customer.name,
+                customer.email,
+                customer.membershipId ?? "none",
+                customer.isActive,
+              ].join(":")}
+              memberships={memberships}
+              updateCustomer={updateCustomer}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              You do not have permission to edit this customer.
+            </p>
+          )}
         </div>
       </Card>
 
@@ -423,7 +434,17 @@ export const CustomerDetails = ({ customerId }: CustomerDetailsProps) => {
     updateErrorMessage,
   } = useCustomersState();
   const { memberships } = useMembershipsState();
+  const { session } = useAuthState();
   const [activeTab, setActiveTab] = useState("overview");
+
+  const currentUserId = session?.user?.id ?? null;
+  const canEditAllCustomers = session?.user?.permissions?.includes("Aqua.Members.Edit") ?? false;
+
+  const canEditCustomer = (customer: Customer) => {
+    if (canEditAllCustomers) return true;
+    if (currentUserId !== null && customer.userId === currentUserId) return true;
+    return false;
+  };
 
   useEffect(() => {
     if (!Number.isInteger(customerId) || customerId <= 0) {
@@ -477,6 +498,7 @@ export const CustomerDetails = ({ customerId }: CustomerDetailsProps) => {
               {
                 content: (
                   <CustomerOverview
+                    canEdit={selectedCustomer ? canEditCustomer(selectedCustomer) : false}
                     customer={selectedCustomer}
                     isUpdateError={isUpdateError}
                     isUpdatePending={isUpdatePending}

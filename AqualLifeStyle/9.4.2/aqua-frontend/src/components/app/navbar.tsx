@@ -19,25 +19,34 @@ import { useState } from "react";
 
 import { cn } from "@/src/shared/lib/utils";
 
+import { useAuthState } from "@/src/providers";
 import { TenantSwitcher } from "./tenant-switcher";
 import { UserMenu } from "./user-menu";
 
 const mainLinks = [
-  { href: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/customers", icon: Users, label: "Customers" },
-  { href: "/products", icon: Package, label: "Products" },
-  { href: "/enquiries", icon: MessageSquare, label: "Enquiries" },
+  { href: "/", icon: LayoutDashboard, label: "Dashboard", permission: null },
+  { href: "/customers", icon: Users, label: "Customers", permission: "Pages.Customers" },
+  { href: "/products", icon: Package, label: "Products", permission: "Pages.Products" },
+  { href: "/enquiries", icon: MessageSquare, label: "Enquiries", permission: "Pages.Enquiries" },
 ];
 
 const moreLinks = [
-  { href: "/memberships", icon: Building2, label: "Memberships" },
-  { href: "/order-intents", icon: Home, label: "Order intents" },
+  { href: "/memberships", icon: Building2, label: "Memberships", permission: "Pages.Memberships" },
+  { href: "/order-intents", icon: Home, label: "Order intents", permission: "Pages.Orders" },
 ];
 
 export const Navbar = () => {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const { session } = useAuthState();
+
+  const hasPermission = (permission: string | null) => {
+    if (!permission) return true;
+    return session?.user?.permissions?.includes(permission) ?? false;
+  };
+
+  const canCreateCustomer = session?.user?.permissions?.includes("Aqua.Members.Create") ?? false;
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -58,7 +67,7 @@ export const Navbar = () => {
           </Link>
 
           <nav className="hidden items-center gap-1 lg:flex">
-            {mainLinks.map((link) => (
+            {mainLinks.filter((link) => hasPermission(link.permission)).map((link) => (
               <Link
                 key={link.href}
                 className={cn(
@@ -118,13 +127,15 @@ export const Navbar = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <Link
-            className="hidden items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-dark sm:inline-flex"
-            href="/customers/register"
-          >
-            <Plus className="size-4" />
-            Add customer
-          </Link>
+          {canCreateCustomer ? (
+            <Link
+              className="hidden items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-dark sm:inline-flex"
+              href="/customers/register"
+            >
+              <Plus className="size-4" />
+              Add customer
+            </Link>
+          ) : null}
 
           <div className="hidden lg:block">
             <TenantSwitcher />
@@ -146,7 +157,7 @@ export const Navbar = () => {
       {isMobileOpen ? (
         <div className="border-t border-border bg-card px-4 py-4 lg:hidden animate-fade-in">
           <nav className="flex flex-col gap-1">
-            {[...mainLinks, ...moreLinks].map((link) => (
+            {[...mainLinks, ...moreLinks].filter((link) => hasPermission(link.permission)).map((link) => (
               <Link
                 key={link.href}
                 className={cn(
@@ -165,13 +176,15 @@ export const Navbar = () => {
           </nav>
           <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
             <TenantSwitcher />
-            <Link
-              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
-              href="/customers/register"
-            >
-              <Plus className="size-4" />
-              Add customer
-            </Link>
+            {canCreateCustomer ? (
+              <Link
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
+                href="/customers/register"
+              >
+                <Plus className="size-4" />
+                Add customer
+              </Link>
+            ) : null}
           </div>
         </div>
       ) : null}
