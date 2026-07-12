@@ -40,7 +40,7 @@ namespace AqualLifeStyle.Application.Customers
             return _objectMapper.Map<CustomerDto>(customer);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Customers_Manage)]
+        [AbpAuthorize(AquaPermissions.Members.Edit)]
         public async Task<CustomerDto> UpdateAsync(CustomerDto input)
         {
             if (input == null)
@@ -104,7 +104,7 @@ namespace AqualLifeStyle.Application.Customers
             }
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Customers_Manage)]
+        [AbpAuthorize(AquaPermissions.Members.Create)]
         public async Task CreateAsync(CreateCustomerDto input)
         {
             if (input == null)

@@ -60,7 +60,7 @@ namespace AqualLifeStyle.Application.Orders
             return _objectMapper.Map<OrderIntentDto>(orderIntent);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Orders_Manage)]
+        [AbpAuthorize(AquaPermissions.Orders.Place)]
         public async Task<OrderIntentDto> CreateFromEnquiryAsync(int enquiryId)
         {
             AqualLifeStyleValidator.ValidId(enquiryId, nameof(enquiryId));
@@ -132,7 +132,7 @@ namespace AqualLifeStyle.Application.Orders
             return _objectMapper.Map<OrderIntentDto>(orderIntent);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Orders_Manage)]
+        [AbpAuthorize(AquaPermissions.Orders.Process)]
         public async Task<OrderIntentDto> CancelAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -152,7 +152,7 @@ namespace AqualLifeStyle.Application.Orders
             return _objectMapper.Map<OrderIntentDto>(orderIntent);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Orders_Manage)]
+        [AbpAuthorize(AquaPermissions.Orders.Process)]
         public async Task<OrderIntentDto> CompleteAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);

@@ -44,7 +44,7 @@ namespace AqualLifeStyle.Application.Memberships
             return _objectMapper.Map<MembershipDto>(membership);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Memberships_Manage)]
+        [AbpAuthorize(AquaPermissions.Members.Edit)]
         public async Task<MembershipDto> UpdateAsync(MembershipDto input)
         {
             AqualLifeStyleValidator.NotNull(input, nameof(input));
@@ -65,7 +65,7 @@ namespace AqualLifeStyle.Application.Memberships
             return _objectMapper.Map<MembershipDto>(membership);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Memberships_Manage)]
+        [AbpAuthorize(AquaPermissions.Members.Create)]
         public async Task CreateAsync(CreateMembershipDto input)
         {
             AqualLifeStyleValidator.NotNull(input, nameof(input));
@@ -76,7 +76,7 @@ namespace AqualLifeStyle.Application.Memberships
             await _membershipRepository.InsertAsync(membership);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Memberships_Manage)]
+        [AbpAuthorize(AquaPermissions.Members.Edit)]
         public async Task<MembershipDto> SetActivationDateAsync(int id, SetMembershipActivationDto input)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -100,7 +100,7 @@ namespace AqualLifeStyle.Application.Memberships
             return _objectMapper.Map<MembershipDto>(membership);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Memberships_Manage)]
+        [AbpAuthorize(AquaPermissions.Members.Edit)]
         public async Task<MembershipDto> SetMonthlyObligationAsync(int id, SetMonthlyObligationDto input)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -119,7 +119,7 @@ namespace AqualLifeStyle.Application.Memberships
             return _objectMapper.Map<MembershipDto>(membership);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Memberships_Manage)]
+        [AbpAuthorize(AquaPermissions.Members.Edit)]
         public async Task<MembershipDto> MarkObligationMetAsync(int id, MarkObligationMetDto input)
         {
             AqualLifeStyleValidator.ValidId(id);

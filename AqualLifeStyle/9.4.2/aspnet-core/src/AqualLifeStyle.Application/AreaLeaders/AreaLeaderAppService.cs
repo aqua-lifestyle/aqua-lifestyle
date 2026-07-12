@@ -25,7 +25,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             _objectMapper = objectMapper;
         }
 
-        [AbpAuthorize(PermissionNames.Pages_AreaLeaders_Manage)]
+        [AbpAuthorize(AquaPermissions.AreaLeaders.Apply)]
         public async Task<AreaLeaderDto> ApplyAsync(RegisterAreaLeaderDto input)
         {
             AqualLifeStyleValidator.NotNull(input, nameof(input));
@@ -70,7 +70,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             return _objectMapper.Map<AreaLeaderDto>(leader);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_AreaLeaders_Manage)]
+        [AbpAuthorize(AquaPermissions.Orders.Process)]
         public async Task<AreaLeaderDto> RecordStartupOrderAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -80,7 +80,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             return _objectMapper.Map<AreaLeaderDto>(leader);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_AreaLeaders_Manage)]
+        [AbpAuthorize(AquaPermissions.AreaLeaders.Manage)]
         public async Task<AreaLeaderDto> PromoteAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);

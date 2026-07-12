@@ -40,7 +40,7 @@ namespace AqualLifeStyle.Application.Enquiries
             return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Enquiries_Manage)]
+        [AbpAuthorize(AquaPermissions.Enquiries.Create)]
         public async Task CreateAsync(CreateEnquiryDto input)
         {
             AqualLifeStyleValidator.NotNull(input, nameof(input));
@@ -53,7 +53,7 @@ namespace AqualLifeStyle.Application.Enquiries
             await _enquiryRepository.InsertAsync(enquiry);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Enquiries_Manage)]
+        [AbpAuthorize(AquaPermissions.Enquiries.Update)]
         public async Task<EnquiryDto> RespondAsync(int id, RespondToEnquiryDto input)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -75,7 +75,7 @@ namespace AqualLifeStyle.Application.Enquiries
             return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Enquiries_Manage)]
+        [AbpAuthorize(AquaPermissions.Enquiries.Resolve)]
         public async Task<EnquiryDto> CloseAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -87,7 +87,7 @@ namespace AqualLifeStyle.Application.Enquiries
             return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Enquiries_Manage)]
+        [AbpAuthorize(AquaPermissions.Enquiries.Update)]
         public async Task<EnquiryDto> ReopenAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -107,7 +107,7 @@ namespace AqualLifeStyle.Application.Enquiries
             return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Enquiries_Manage)]
+        [AbpAuthorize(AquaPermissions.Enquiries.Update)]
         public async Task<EnquiryDto> AssignToMemberAsync(int id, AssignEnquiryDto input)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -129,7 +129,7 @@ namespace AqualLifeStyle.Application.Enquiries
             return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Enquiries_Manage)]
+        [AbpAuthorize(AquaPermissions.Enquiries.Resolve)]
         public async Task<EnquiryDto> ConvertToCustomerAsync(int id, ConvertEnquiryToCustomerDto input)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -150,7 +150,7 @@ namespace AqualLifeStyle.Application.Enquiries
             return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Enquiries_Manage)]
+        [AbpAuthorize(AquaPermissions.Enquiries.Update)]
         public async Task<EnquiryDto> ClearAssignmentAsync(int id, ClearAssignmentDto input)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -173,7 +173,7 @@ namespace AqualLifeStyle.Application.Enquiries
         /// <summary>
         /// Record a follow-up attempt on an enquiry with outcome tracking.
         /// </summary>
-        [AbpAuthorize(PermissionNames.Pages_Enquiries_Manage)]
+        [AbpAuthorize(AquaPermissions.Enquiries.Update)]
         public async Task<EnquiryFollowUpDto> RecordFollowUpAsync(int id, CreateEnquiryFollowUpDto input)
         {
             AqualLifeStyleValidator.ValidId(id);

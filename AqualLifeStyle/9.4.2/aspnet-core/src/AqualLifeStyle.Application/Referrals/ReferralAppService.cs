@@ -37,7 +37,7 @@ namespace AqualLifeStyle.Application.Referrals
             return referral == null ? null : _objectMapper.Map<ReferralDto>(referral);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Referrals_Manage)]
+        [AbpAuthorize(AquaPermissions.Referrals.Confirm)]
         public async Task<ReferralDto> ConfirmAwardAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);

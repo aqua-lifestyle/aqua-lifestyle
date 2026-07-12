@@ -38,7 +38,7 @@ namespace AqualLifeStyle.Application.Facilitators
             _objectMapper = objectMapper;
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Facilitators_Manage)]
+        [AbpAuthorize(AquaPermissions.Facilitators.Register)]
         public async Task<FacilitatorDto> RegisterAsync(RegisterFacilitatorDto input)
         {
             AqualLifeStyleValidator.NotNull(input, nameof(input));

@@ -5,6 +5,7 @@ using Abp.MultiTenancy;
 using Abp.Runtime.Session;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Roles;
+using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -92,6 +93,12 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
             }
 
             if (roleName == "SystemAdmin" || roleName == StaticRoleNames.Tenants.Admin)
+            {
+                return true;
+            }
+
+            if (System.Enum.TryParse<AquaUserRole>(roleName, out var aquaRole) &&
+                AquaRolePermissions.GetFor(aquaRole).Contains(permissionName))
             {
                 return true;
             }
