@@ -30,6 +30,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
         {
             var roles = new[]
             {
+                new { Name = "SystemAdmin", DisplayName = "System Admin" },
                 new { Name = "AreaLeader", DisplayName = "Area Leader" },
                 new { Name = "Facilitator", DisplayName = "Facilitator" },
                 new { Name = "Member", DisplayName = "Member" },
