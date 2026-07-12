@@ -9,6 +9,7 @@ using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Validation;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.AreaLeaders;
+using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Facilitators;
 
 namespace AqualLifeStyle.Application.AreaLeaders
@@ -17,15 +18,17 @@ namespace AqualLifeStyle.Application.AreaLeaders
     public class AreaLeaderAppService : AqualLifeStyleAppServiceBase, IAreaLeaderAppService
     {
         private readonly IAreaLeaderRepository _areaLeaderRepository;
+        private readonly ICustomerRepository _customerRepository;
         private readonly IObjectMapper _objectMapper;
 
-        public AreaLeaderAppService(IAreaLeaderRepository areaLeaderRepository, IObjectMapper objectMapper)
+        public AreaLeaderAppService(IAreaLeaderRepository areaLeaderRepository, ICustomerRepository customerRepository, IObjectMapper objectMapper)
         {
             _areaLeaderRepository = areaLeaderRepository;
+            _customerRepository = customerRepository;
             _objectMapper = objectMapper;
         }
 
-        [AbpAuthorize(PermissionNames.Pages_AreaLeaders_Manage)]
+        [AbpAuthorize(AquaPermissions.AreaLeaders.Apply)]
         public async Task<AreaLeaderDto> ApplyAsync(RegisterAreaLeaderDto input)
         {
             AqualLifeStyleValidator.NotNull(input, nameof(input));
@@ -41,6 +44,12 @@ namespace AqualLifeStyle.Application.AreaLeaders
             if (existing != null)
             {
                 throw new UserFriendlyException("Area leader application failed.", "An area leader for this customer already exists.");
+            }
+
+            var customer = await _customerRepository.GetAsync(input.CustomerId);
+            if (!await CurrentUserCanAccessCustomerAsync(customer))
+            {
+                throw new UserFriendlyException("Area leader application failed.", "You do not have permission to apply for this customer.");
             }
 
             var activeLeaderCount = await _areaLeaderRepository.CountActiveAsync();
@@ -70,7 +79,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             return _objectMapper.Map<AreaLeaderDto>(leader);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_AreaLeaders_Manage)]
+        [AbpAuthorize(AquaPermissions.Orders.Process)]
         public async Task<AreaLeaderDto> RecordStartupOrderAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -80,7 +89,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             return _objectMapper.Map<AreaLeaderDto>(leader);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_AreaLeaders_Manage)]
+        [AbpAuthorize(AquaPermissions.AreaLeaders.Manage)]
         public async Task<AreaLeaderDto> PromoteAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);

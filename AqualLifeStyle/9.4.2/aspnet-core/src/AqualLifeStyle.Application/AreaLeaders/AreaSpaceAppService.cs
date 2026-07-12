@@ -33,7 +33,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             _eventBus = eventBus;
         }
 
-        [AbpAuthorize(PermissionNames.Pages_AreaSpaces_Manage)]
+        [AbpAuthorize(AquaPermissions.AreaSpaces.Apply)]
         public async Task<AreaSpaceDto> ApplyAsync(CreateAreaSpaceDto input)
         {
             AqualLifeStyleValidator.NotNull(input, nameof(input));
@@ -54,7 +54,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             return _objectMapper.Map<AreaSpaceDto>(space);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_AreaSpaces_Manage)]
+        [AbpAuthorize(AquaPermissions.AreaSpaces.Manage)]
         public async Task<AreaSpaceDto> StartReviewAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -64,7 +64,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             return _objectMapper.Map<AreaSpaceDto>(space);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_AreaSpaces_Manage)]
+        [AbpAuthorize(AquaPermissions.AreaSpaces.Manage)]
         public async Task<AreaSpaceDto> RecordPresentationAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -74,7 +74,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             return _objectMapper.Map<AreaSpaceDto>(space);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_AreaSpaces_Manage)]
+        [AbpAuthorize(AquaPermissions.Orders.Process)]
         public async Task<AreaSpaceDto> RecordStartupOrderAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -84,7 +84,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             return _objectMapper.Map<AreaSpaceDto>(space);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_AreaSpaces_Manage)]
+        [AbpAuthorize(AquaPermissions.AreaSpaces.Approve)]
         public async Task<AreaSpaceDto> ApproveAsync(int id, DateTime? atUtc = null)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -117,7 +117,7 @@ namespace AqualLifeStyle.Application.AreaLeaders
             return _objectMapper.Map<AreaSpaceDto>(space);
         }
 
-        [AbpAuthorize(PermissionNames.Pages_AreaSpaces_Manage)]
+        [AbpAuthorize(AquaPermissions.AreaSpaces.Manage)]
         public async Task<AreaSpaceDto> SuspendAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);

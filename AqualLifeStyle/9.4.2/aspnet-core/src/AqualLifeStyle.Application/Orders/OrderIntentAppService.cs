@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Abp.Authorization;
 using Abp.ObjectMapping;
+using Abp.UI;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Orders.Dto;
+using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Application.Validation;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
@@ -13,6 +16,7 @@ using AqualLifeStyle.Domain.Products;
 
 namespace AqualLifeStyle.Application.Orders
 {
+    [AbpAuthorize(PermissionNames.Pages_Orders)]
     public class OrderIntentAppService : AqualLifeStyleAppServiceBase, IOrderIntentAppService
     {
         private readonly IOrderIntentRepository _orderIntentRepository;
@@ -57,6 +61,7 @@ namespace AqualLifeStyle.Application.Orders
             return _objectMapper.Map<OrderIntentDto>(orderIntent);
         }
 
+        [AbpAuthorize(AquaPermissions.Orders.Place)]
         public async Task<OrderIntentDto> CreateFromEnquiryAsync(int enquiryId)
         {
             AqualLifeStyleValidator.ValidId(enquiryId, nameof(enquiryId));
@@ -82,6 +87,11 @@ namespace AqualLifeStyle.Application.Orders
             if (customer == null)
             {
                 throw new AqualLifeStyleDependencyException("Customer", enquiry.CustomerId.ToString());
+            }
+
+            if (!await CurrentUserCanAccessCustomerAsync(customer))
+            {
+                throw new UserFriendlyException("Order intent creation failed.", "You do not have permission to create an order for this customer.");
             }
 
             if (!customer.IsActive)
@@ -128,11 +138,17 @@ namespace AqualLifeStyle.Application.Orders
             return _objectMapper.Map<OrderIntentDto>(orderIntent);
         }
 
+        [AbpAuthorize(AquaPermissions.Orders.Process)]
         public async Task<OrderIntentDto> CancelAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
 
             var orderIntent = await GetOrderIntentOrThrowAsync(id);
+            var customer = await _customerRepository.GetAsync(orderIntent.CustomerId);
+            if (!await CurrentUserCanAccessCustomerAsync(customer))
+            {
+                throw new UserFriendlyException("Order intent cancellation failed.", "You do not have permission to cancel this order intent.");
+            }
 
             try
             {
@@ -147,11 +163,17 @@ namespace AqualLifeStyle.Application.Orders
             return _objectMapper.Map<OrderIntentDto>(orderIntent);
         }
 
+        [AbpAuthorize(AquaPermissions.Orders.Process)]
         public async Task<OrderIntentDto> CompleteAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
 
             var orderIntent = await GetOrderIntentOrThrowAsync(id);
+            var customer = await _customerRepository.GetAsync(orderIntent.CustomerId);
+            if (!await CurrentUserCanAccessCustomerAsync(customer))
+            {
+                throw new UserFriendlyException("Order intent completion failed.", "You do not have permission to complete this order intent.");
+            }
 
             try
             {

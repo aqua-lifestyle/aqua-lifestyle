@@ -19,7 +19,7 @@ namespace AqualLifeStyle.Tests
         [Fact]
         public async Task UpdateAsync_ChangesNameEmailMembershipAndStatus()
         {
-            var customer = Customer.Create(1, "Old Name", new EmailAddress("old@example.com"), 1);
+            var customer = Customer.Create(1, 50, "Old Name", new EmailAddress("old@example.com"), 1);
             customer.Id = 10;
             var membership = Membership.Create(1, "Onyx", "Onyx membership", MembershipType.Onyx);
 
@@ -46,7 +46,7 @@ namespace AqualLifeStyle.Tests
 
             var appService = new CustomerAppService(customerRepo.Object, membershipRepo.Object, objectMapperMock.Object)
             {
-                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
+                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1 && s.UserId == 50)
             };
 
             var input = new CustomerDto

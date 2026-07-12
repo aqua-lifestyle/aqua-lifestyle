@@ -38,7 +38,7 @@ namespace AqualLifeStyle.Application.Facilitators
             _objectMapper = objectMapper;
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Facilitators_Manage)]
+        [AbpAuthorize(AquaPermissions.Facilitators.Register)]
         public async Task<FacilitatorDto> RegisterAsync(RegisterFacilitatorDto input)
         {
             AqualLifeStyleValidator.NotNull(input, nameof(input));
@@ -56,6 +56,12 @@ namespace AqualLifeStyle.Application.Facilitators
                 if (!await CustomerBelongsToCurrentTenantAsync(input.CustomerId))
                 {
                     throw new AqualLifeStyleNotFoundException("Customer", input.CustomerId);
+                }
+
+                var customer = await _customerRepository.GetAsync(input.CustomerId);
+                if (!await CurrentUserCanAccessCustomerAsync(customer))
+                {
+                    throw new UserFriendlyException("Facilitator registration failed.", "You do not have permission to register a facilitator for this customer.");
                 }
 
                 var existing = await _facilitatorRepository.GetByCustomerIdAsync(input.CustomerId, tenantId);
@@ -96,6 +102,12 @@ namespace AqualLifeStyle.Application.Facilitators
         {
             AqualLifeStyleValidator.ValidId(id);
             var facilitator = await GetFacilitatorForCurrentTenantAsync(id);
+            var customer = await _customerRepository.GetAsync(facilitator.CustomerId);
+            if (!await CurrentUserCanAccessCustomerAsync(customer))
+            {
+                throw new UserFriendlyException("Facilitator lookup failed.", "You do not have permission to access this facilitator.");
+            }
+
             return _objectMapper.Map<FacilitatorDto>(facilitator);
         }
 
@@ -104,6 +116,12 @@ namespace AqualLifeStyle.Application.Facilitators
             AqualLifeStyleValidator.ValidId(customerId, nameof(customerId));
 
             if (!await CustomerBelongsToCurrentTenantAsync(customerId))
+            {
+                return null;
+            }
+
+            var customer = await _customerRepository.GetAsync(customerId);
+            if (!await CurrentUserCanAccessCustomerAsync(customer))
             {
                 return null;
             }

@@ -2,23 +2,30 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Abp.Authorization;
 using Abp.ObjectMapping;
+using Abp.UI;
 using AqualLifeStyle.Application.Enquiries.Dto;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Validation;
+using AqualLifeStyle.Authorization;
+using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
 using AqualLifeStyle.Domain.Enums;
 
 namespace AqualLifeStyle.Application.Enquiries
 {
+    [AbpAuthorize(PermissionNames.Pages_Enquiries)]
     public class EnquiryAppService : AqualLifeStyleAppServiceBase, IEnquiryAppService
     {
         private readonly IEnquiryRepository _enquiryRepository;
+        private readonly ICustomerRepository _customerRepository;
         private readonly IObjectMapper _objectMapper;
 
-        public EnquiryAppService(IEnquiryRepository enquiryRepository, IObjectMapper objectMapper)
+        public EnquiryAppService(IEnquiryRepository enquiryRepository, ICustomerRepository customerRepository, IObjectMapper objectMapper)
         {
             _enquiryRepository = enquiryRepository;
+            _customerRepository = customerRepository;
             _objectMapper = objectMapper;
         }
 
@@ -33,10 +40,16 @@ namespace AqualLifeStyle.Application.Enquiries
         {
             AqualLifeStyleValidator.ValidId(id);
             var enquiry = await GetEnquiryForCurrentTenantAsync(id);
+            var customer = await _customerRepository.GetAsync(enquiry.CustomerId);
+            if (!await CurrentUserCanAccessCustomerAsync(customer))
+            {
+                throw new UserFriendlyException("Enquiry lookup failed.", "You do not have permission to access this enquiry.");
+            }
 
             return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
+        [AbpAuthorize(AquaPermissions.Enquiries.Create)]
         public async Task CreateAsync(CreateEnquiryDto input)
         {
             AqualLifeStyleValidator.NotNull(input, nameof(input));
@@ -44,11 +57,18 @@ namespace AqualLifeStyle.Application.Enquiries
             AqualLifeStyleValidator.ValidId(input.ProductId, nameof(input.ProductId));
             AqualLifeStyleValidator.NotNullOrEmpty(input.Message, nameof(input.Message));
 
+            var customer = await _customerRepository.GetAsync(input.CustomerId);
+            if (!await CurrentUserCanAccessCustomerAsync(customer))
+            {
+                throw new UserFriendlyException("Enquiry creation failed.", "You do not have permission to create an enquiry for this customer.");
+            }
+
             var tenantId = GetRequiredTenantId("Enquiry creation failed.");
             var enquiry = Enquiry.Create(tenantId, input.CustomerId, input.ProductId, input.Message);
             await _enquiryRepository.InsertAsync(enquiry);
         }
 
+        [AbpAuthorize(AquaPermissions.Enquiries.Update)]
         public async Task<EnquiryDto> RespondAsync(int id, RespondToEnquiryDto input)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -56,6 +76,11 @@ namespace AqualLifeStyle.Application.Enquiries
             AqualLifeStyleValidator.NotNullOrEmpty(input.Response, nameof(input.Response));
 
             var enquiry = await GetEnquiryForCurrentTenantAsync(id);
+            var customer = await _customerRepository.GetAsync(enquiry.CustomerId);
+            if (!await CurrentUserCanAccessCustomerAsync(customer))
+            {
+                throw new UserFriendlyException("Enquiry response failed.", "You do not have permission to respond to this enquiry.");
+            }
 
             try
             {
@@ -70,22 +95,34 @@ namespace AqualLifeStyle.Application.Enquiries
             return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
+        [AbpAuthorize(AquaPermissions.Enquiries.Resolve)]
         public async Task<EnquiryDto> CloseAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
 
             var enquiry = await GetEnquiryForCurrentTenantAsync(id);
+            var customer = await _customerRepository.GetAsync(enquiry.CustomerId);
+            if (!await CurrentUserCanAccessCustomerAsync(customer))
+            {
+                throw new UserFriendlyException("Enquiry closure failed.", "You do not have permission to close this enquiry.");
+            }
 
             enquiry.Close();
             await _enquiryRepository.UpdateAsync(enquiry);
             return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
+        [AbpAuthorize(AquaPermissions.Enquiries.Update)]
         public async Task<EnquiryDto> ReopenAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
 
             var enquiry = await GetEnquiryForCurrentTenantAsync(id);
+            var customer = await _customerRepository.GetAsync(enquiry.CustomerId);
+            if (!await CurrentUserCanAccessCustomerAsync(customer))
+            {
+                throw new UserFriendlyException("Enquiry reopen failed.", "You do not have permission to reopen this enquiry.");
+            }
 
             try
             {
@@ -100,6 +137,7 @@ namespace AqualLifeStyle.Application.Enquiries
             return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
+        [AbpAuthorize(AquaPermissions.Enquiries.Update)]
         public async Task<EnquiryDto> AssignToMemberAsync(int id, AssignEnquiryDto input)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -121,6 +159,7 @@ namespace AqualLifeStyle.Application.Enquiries
             return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
+        [AbpAuthorize(AquaPermissions.Enquiries.Resolve)]
         public async Task<EnquiryDto> ConvertToCustomerAsync(int id, ConvertEnquiryToCustomerDto input)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -141,6 +180,7 @@ namespace AqualLifeStyle.Application.Enquiries
             return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 
+        [AbpAuthorize(AquaPermissions.Enquiries.Update)]
         public async Task<EnquiryDto> ClearAssignmentAsync(int id, ClearAssignmentDto input)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -163,6 +203,7 @@ namespace AqualLifeStyle.Application.Enquiries
         /// <summary>
         /// Record a follow-up attempt on an enquiry with outcome tracking.
         /// </summary>
+        [AbpAuthorize(AquaPermissions.Enquiries.Update)]
         public async Task<EnquiryFollowUpDto> RecordFollowUpAsync(int id, CreateEnquiryFollowUpDto input)
         {
             AqualLifeStyleValidator.ValidId(id);

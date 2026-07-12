@@ -2,6 +2,8 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
 using Abp;
 using Abp.Authorization.Users;
 using Abp.Events.Bus;
@@ -9,6 +11,7 @@ using Abp.Events.Bus.Entities;
 using Abp.MultiTenancy;
 using Abp.Runtime.Session;
 using Abp.TestBase;
+using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.EntityFrameworkCore.Seed.Host;
@@ -214,6 +217,45 @@ namespace AqualLifeStyle.Tests
         {
             var tenantId = AbpSession.GetTenantId();
             return await UsingDbContext(context => context.Tenants.SingleAsync(t => t.Id == tenantId));
+        }
+
+        protected async Task<long> CreateTestUserAsync(int? tenantId, string userName, string email)
+        {
+            return await UsingDbContextAsync(tenantId, async ctx =>
+            {
+                var user = new User
+                {
+                    TenantId = tenantId,
+                    UserName = userName,
+                    Name = userName,
+                    Surname = userName,
+                    EmailAddress = email,
+                    IsEmailConfirmed = true,
+                    IsActive = true
+                };
+                user.SetNormalizedNames();
+                user.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions())).HashPassword(user, User.DefaultPassword);
+                ctx.Users.Add(user);
+                await ctx.SaveChangesAsync();
+
+                var adminRole = ctx.Roles.IgnoreQueryFilters().FirstOrDefault(r => r.TenantId == tenantId && r.Name == StaticRoleNames.Tenants.Admin);
+                if (adminRole != null)
+                {
+                    ctx.UserRoles.Add(new Abp.Authorization.Users.UserRole(tenantId, user.Id, adminRole.Id));
+                    await ctx.SaveChangesAsync();
+                }
+
+                return user.Id;
+            });
+        }
+
+        protected void SetCurrentUser(long userId, int? tenantId = null)
+        {
+            AbpSession.UserId = userId;
+            if (tenantId.HasValue)
+            {
+                AbpSession.TenantId = tenantId.Value;
+            }
         }
     }
 }

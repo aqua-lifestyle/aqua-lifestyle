@@ -1,15 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Abp.Authorization;
 using Abp.ObjectMapping;
 using Abp.UI;
 using AqualLifeStyle.Application.Customers.Dto;
+using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Memberships;
 
 namespace AqualLifeStyle.Application.Customers
 {
+    [AbpAuthorize(PermissionNames.Pages_Customers)]
     public class CustomerAppService : AqualLifeStyleAppServiceBase, ICustomerAppService
     {
         private readonly ICustomerRepository _customerRepository;
@@ -23,6 +26,7 @@ namespace AqualLifeStyle.Application.Customers
             _objectMapper = objectMapper;
         }
 
+        [AbpAuthorize(PermissionNames.Pages_Customers)]
         public async Task<IReadOnlyList<CustomerDto>> GetAllAsync()
         {
             var tenantId = GetRequiredTenantId("Customer lookup failed.");
@@ -33,9 +37,15 @@ namespace AqualLifeStyle.Application.Customers
         public async Task<CustomerDto> GetAsync(int id)
         {
             var customer = await GetCustomerForCurrentTenantAsync(id);
+            if (!await CurrentUserCanAccessCustomerAsync(customer))
+            {
+                throw new UserFriendlyException("Customer lookup failed.", "You do not have permission to access this customer.");
+            }
+
             return _objectMapper.Map<CustomerDto>(customer);
         }
 
+        [AbpAuthorize(AquaPermissions.Members.Edit)]
         public async Task<CustomerDto> UpdateAsync(CustomerDto input)
         {
             if (input == null)
@@ -61,6 +71,10 @@ namespace AqualLifeStyle.Application.Customers
             try
             {
                 var customer = await GetCustomerForCurrentTenantAsync(input.Id);
+                if (!await CurrentUserCanAccessCustomerAsync(customer))
+                {
+                    throw new UserFriendlyException("Customer update failed.", "You do not have permission to update this customer.");
+                }
 
                 if (await _customerRepository.ExistsByEmailAsync(input.Email, input.Id))
                 {
@@ -99,6 +113,7 @@ namespace AqualLifeStyle.Application.Customers
             }
         }
 
+        [AbpAuthorize(AquaPermissions.Members.Create)]
         public async Task CreateAsync(CreateCustomerDto input)
         {
             if (input == null)
@@ -125,6 +140,11 @@ namespace AqualLifeStyle.Application.Customers
 
             try
             {
+                if (!AbpSession.UserId.HasValue)
+                {
+                    throw new UserFriendlyException("Customer creation failed.", "A user context is required to create a customer.");
+                }
+
                 if (input.MembershipId.HasValue)
                 {
                     var membership = await _membershipRepository.GetAsync(input.MembershipId.Value);
@@ -132,7 +152,7 @@ namespace AqualLifeStyle.Application.Customers
                 }
 
                 var email = new EmailAddress(input.Email);
-                var customer = Customer.Create(tenantId, input.Name, email, input.MembershipId);
+                var customer = Customer.Create(tenantId, AbpSession.UserId.Value, input.Name, email, input.MembershipId);
                 await _customerRepository.InsertAsync(customer);
             }
             catch (UserFriendlyException)
