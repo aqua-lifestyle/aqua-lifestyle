@@ -89,6 +89,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
                 _context.SaveChanges();
             }
 
+            new DefaultCustomerUserLinker(_context).Link(_tenantId);
             new DefaultUserRoleAssigner(_context).AssignRoles(_tenantId);
         }
     }
