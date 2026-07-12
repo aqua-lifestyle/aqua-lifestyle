@@ -27,15 +27,6 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
                 .Where(r => r.TenantId == tenantId)
                 .ToDictionary(r => r.Id, r => r.Name);
 
-            var rolePriority = new[]
-            {
-                AquaUserRole.SystemAdmin,
-                AquaUserRole.AreaLeader,
-                AquaUserRole.Facilitator,
-                AquaUserRole.Member,
-                AquaUserRole.Guest
-            };
-
             foreach (var user in users)
             {
                 if (user.Role != AquaUserRole.Guest)
@@ -43,53 +34,29 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
                     continue;
                 }
 
-                var userRoles = _context.UserRoles
+                var isAdmin = _context.UserRoles
                     .IgnoreQueryFilters()
                     .Where(ur => ur.UserId == user.Id && ur.TenantId == tenantId)
-                    .ToList();
+                    .AsEnumerable()
+                    .Any(ur => roleNames.TryGetValue(ur.RoleId, out var name) && (name == "Admin" || name == "SystemAdmin"));
 
-                if (!userRoles.Any())
-                {
+                if (isAdmin) { user.SetRole(AquaUserRole.SystemAdmin); continue; }
+
+                var customer = _context.Customers.IgnoreQueryFilters().SingleOrDefault(item => item.TenantId == tenantId && item.UserId == user.Id);
+                if (customer == null) { user.SetRole(AquaUserRole.Guest); continue; }
+
+                if (_context.AreaLeaders.IgnoreQueryFilters().Any(item => item.TenantId == tenantId && !item.IsDeleted && item.CustomerId == customer.Id))
+                    user.SetRole(AquaUserRole.AreaLeader);
+                else if (_context.Facilitators.IgnoreQueryFilters().Any(item => item.TenantId == tenantId && !item.IsDeleted && item.CustomerId == customer.Id))
+                    user.SetRole(AquaUserRole.Facilitator);
+                else if (customer.MembershipId.HasValue)
+                    user.SetRole(AquaUserRole.Member);
+                else
                     user.SetRole(AquaUserRole.Guest);
-                    continue;
-                }
-
-                AquaUserRole? bestRole = null;
-                foreach (var userRole in userRoles)
-                {
-                    if (!roleNames.TryGetValue(userRole.RoleId, out var roleName))
-                    {
-                        continue;
-                    }
-
-                    var mappedRole = MapRoleName(roleName);
-                    if (mappedRole.HasValue)
-                    {
-                        if (bestRole == null || Array.IndexOf(rolePriority, mappedRole.Value) < Array.IndexOf(rolePriority, bestRole.Value))
-                        {
-                            bestRole = mappedRole;
-                        }
-                    }
-                }
-
-                user.SetRole(bestRole ?? AquaUserRole.Guest);
             }
 
             _context.SaveChanges();
         }
 
-        private static AquaUserRole? MapRoleName(string roleName)
-        {
-            return roleName switch
-            {
-                "Admin" => AquaUserRole.SystemAdmin,
-                "SystemAdmin" => AquaUserRole.SystemAdmin,
-                "AreaLeader" => AquaUserRole.AreaLeader,
-                "Facilitator" => AquaUserRole.Facilitator,
-                "Member" => AquaUserRole.Member,
-                "Guest" => AquaUserRole.Guest,
-                _ => null
-            };
-        }
     }
 }
