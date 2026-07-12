@@ -5,6 +5,8 @@ import { z } from "zod";
 
 import {
   useAuthState,
+  useSystemHealthActions,
+  useSystemHealthState,
   useTenantActions,
   useTenantState,
 } from "@/src/providers";
@@ -42,8 +44,24 @@ const writeStoredTenant = (tenant: string | null) => {
   }
 };
 
+const formatCheckedAt = (checkedAtUtc: string) => {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(checkedAtUtc));
+};
+
 export const AppContextBar = () => {
   const { isAuthenticated, session } = useAuthState();
+  const { checkHealth } = useSystemHealthActions();
+  const {
+    errorMessage: healthErrorMessage,
+    health,
+    isError: isHealthError,
+    isPending: isHealthPending,
+    isSuccess: isHealthSuccess,
+  } = useSystemHealthState();
   const { clearTenant, setTenant } = useTenantActions();
   const { currentTenant, isHost } = useTenantState();
   const [tenantInput, setTenantInput] = useState(currentTenant ?? "");
@@ -51,6 +69,9 @@ export const AppContextBar = () => {
 
   const userLabel =
     session?.user?.name ?? session?.user?.email ?? session?.user?.id ?? null;
+  const checkedAtLabel = health?.checkedAtUtc
+    ? formatCheckedAt(health.checkedAtUtc)
+    : null;
 
   useEffect(() => {
     const storedTenant = readStoredTenant();
@@ -69,6 +90,10 @@ export const AppContextBar = () => {
   useEffect(() => {
     writeStoredTenant(currentTenant);
   }, [currentTenant]);
+
+  useEffect(() => {
+    void checkHealth();
+  }, [checkHealth]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -93,7 +118,53 @@ export const AppContextBar = () => {
   return (
     <aside className="border-b border-zinc-200 bg-white px-6 py-3 text-zinc-950 sm:px-8 lg:px-12">
       <div className="mx-auto grid w-full max-w-7xl gap-4 xl:grid-cols-[1fr_auto] xl:items-end">
-        <div className="grid gap-3 md:grid-cols-2 md:items-start">
+        <div className="grid gap-3 md:grid-cols-3 md:items-start">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold text-emerald-950">
+                  Backend
+                </p>
+                <Badge
+                  tone={
+                    isHealthSuccess && health?.isDatabaseReachable
+                      ? "success"
+                      : isHealthError || isHealthSuccess
+                        ? "error"
+                        : "neutral"
+                  }
+                >
+                  {isHealthPending
+                    ? "Checking"
+                    : isHealthSuccess
+                      ? health?.status ?? "Reachable"
+                      : "Unavailable"}
+                </Badge>
+              </div>
+              <Button
+                className="bg-white px-3 py-1 text-emerald-800 ring-1 ring-emerald-200 hover:bg-emerald-100 disabled:bg-white disabled:text-zinc-400"
+                disabled={isHealthPending}
+                onClick={() => {
+                  void checkHealth();
+                }}
+                type="button"
+              >
+                Refresh
+              </Button>
+            </div>
+            <p className="mt-1 text-sm leading-6 text-emerald-900">
+              {isHealthSuccess
+                ? `${health?.environment ?? "Backend"} API ${health?.version ?? "version unknown"} is reachable; database is ${health?.databaseStatus?.toLowerCase() ?? "unknown"}.`
+                : healthErrorMessage ??
+                  "Checking whether the frontend can reach ABP."}
+            </p>
+            {checkedAtLabel ? (
+              <p className="mt-1 text-xs font-medium text-emerald-800">
+                Last checked at {checkedAtLabel}
+              </p>
+            ) : null}
+          </div>
+
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold text-amber-950">

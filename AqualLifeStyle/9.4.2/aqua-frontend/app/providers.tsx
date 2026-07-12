@@ -9,6 +9,7 @@ import {
   MembershipsProvider,
   OrderIntentsProvider,
   ProductsProvider,
+  SystemHealthProvider,
   TenantProvider,
   ToastProvider,
   useTenantState,
@@ -42,7 +43,9 @@ export const AppProviders = ({ children }: AppProvidersProps) => {
     <AuthProvider>
       <TenantProvider>
         <ToastProvider>
-          <TenantAwareProviders>{children}</TenantAwareProviders>
+          <SystemHealthProvider>
+            <TenantAwareProviders>{children}</TenantAwareProviders>
+          </SystemHealthProvider>
         </ToastProvider>
       </TenantProvider>
     </AuthProvider>

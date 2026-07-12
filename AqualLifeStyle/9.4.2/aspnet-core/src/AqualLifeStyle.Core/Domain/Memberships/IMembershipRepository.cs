@@ -12,6 +12,7 @@ namespace AqualLifeStyle.Domain.Memberships
     {
         Task<bool> ExistsByNameAsync(string name);
         Task<Membership> GetByIdAsync(int id);
+        Task<Membership> GetFirstActiveAsync(int? tenantId);
         Task AddAsync(Membership membership);
     }
 }

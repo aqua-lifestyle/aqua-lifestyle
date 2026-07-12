@@ -1,5 +1,6 @@
 ﻿using System;
-using System.IO;using System.IO;using Castle.Facilities.Logging;
+using System.IO;
+using Castle.Facilities.Logging;
 using DotNetEnv;
 using Abp;
 using Abp.Castle.Logging.Log4Net;

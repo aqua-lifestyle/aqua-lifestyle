@@ -12,8 +12,9 @@ Next.js App Router frontend for the AquaLifeStyle ABP backend.
 - Order intents: create a lightweight reservation from a converted enquiry, review reserved/completed value, show member savings from tier discounts, then cancel or complete it without introducing payments prematurely.
 - Authentication context: show whether API calls are anonymous or include an access token from the auth boundary.
 - Tenant context: switch between host mode and a named tenant so subsequent API requests carry ABP's `__tenant` header.
+- Backend readiness: show whether the browser can reach ABP's `/api/health` endpoint, including refreshable version/environment and database reachability context.
 
-The root route is a live demo dashboard that guides the current end-to-end validation path and summarizes backend data.
+The root route is a live demo dashboard that guides the current end-to-end validation path, summarizes backend data, and includes backend/database readiness in the demo checklist.
 
 ## Demo Walkthrough
 
@@ -77,8 +78,9 @@ Why this order:
 - Runtime environment variables are validated with Zod in `src/shared/config`.
 - Backend access goes through the shared Axios boundary in `src/shared/api`.
 - ABP response envelopes and error envelopes are normalized centrally.
+- Demo-critical API responses, starting with backend health, are validated at runtime before entering provider state.
 - Auth and tenant readiness providers register access-token and `__tenant` resolvers with the shared Axios boundary.
-- The app context bar keeps auth mode explicit and persists the local tenant selection while host mode remains the safe default.
+- The app context bar keeps backend reachability, auth mode, and tenant mode explicit while host mode remains the safe default.
 - Feature state uses the agreed four-file provider structure:
   - `actions.tsx`
   - `context.tsx`

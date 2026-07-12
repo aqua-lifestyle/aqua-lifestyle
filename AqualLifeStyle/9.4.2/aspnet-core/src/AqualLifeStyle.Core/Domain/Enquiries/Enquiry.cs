@@ -6,8 +6,9 @@ using AqualLifeStyle.Domain.Enums;
 
 namespace AqualLifeStyle.Domain.Enquiries
 {
-    public class Enquiry : Entity<int>
+    public class Enquiry : AggregateRoot<int>, IMayHaveTenant
     {
+        public int? TenantId { get; set; }
         public int CustomerId { get; private set; }
         public int ProductId { get; private set; }
         public string Message { get; private set; }
@@ -15,6 +16,7 @@ namespace AqualLifeStyle.Domain.Enquiries
         public EnquiryStatus Status { get; private set; }
         public DateTime CreatedAt { get; private set; }
         public int? AssignedToMemberId { get; private set; }
+        public int? ReferredByFacilitatorId { get; private set; }
         public bool IsConverted { get; private set; }
         public DateTime? ConvertedAt { get; private set; }
 
@@ -27,9 +29,10 @@ namespace AqualLifeStyle.Domain.Enquiries
 
         protected Enquiry() { }
 
-        private Enquiry(int customerId, int productId, string message)
+        private Enquiry(int? tenantId, int customerId, int productId, string message)
         {
             if (string.IsNullOrWhiteSpace(message)) throw new ArgumentException("Message is required.", nameof(message));
+            TenantId = tenantId;
             CustomerId = customerId;
             ProductId = productId;
             Message = message.Trim();
@@ -40,8 +43,8 @@ namespace AqualLifeStyle.Domain.Enquiries
             ConversionProbability = 0m;
         }
 
-        public static Enquiry Create(int customerId, int productId, string message)
-            => new Enquiry(customerId, productId, message);
+        public static Enquiry Create(int? tenantId, int customerId, int productId, string message)
+            => new Enquiry(tenantId, customerId, productId, message);
 
         public void Respond(string response)
         {
@@ -76,13 +79,43 @@ namespace AqualLifeStyle.Domain.Enquiries
             AssignedToMemberId = memberId;
         }
 
-        public void ConvertToCustomer()
+        /// <summary>
+        /// Record the facilitator who sourced this lead (used for referral attribution on conversion).
+        /// </summary>
+        public void SetReferredByFacilitator(int facilitatorId)
+        {
+            if (facilitatorId <= 0) throw new ArgumentException("Facilitator ID must be valid.", nameof(facilitatorId));
+            if (IsConverted) throw new InvalidOperationException("Converted enquiries cannot be re-linked.");
+            ReferredByFacilitatorId = facilitatorId;
+        }
+
+        public void ConvertToCustomer(int? referredByFacilitatorId = null)
         {
             if (IsConverted) throw new InvalidOperationException("Enquiry has already been converted.");
+            if (referredByFacilitatorId.HasValue && referredByFacilitatorId.Value <= 0)
+            {
+                throw new ArgumentException("Facilitator ID must be valid.", nameof(referredByFacilitatorId));
+            }
+            if (Id <= 0)
+            {
+                throw new InvalidOperationException("Enquiry must be persisted before conversion can raise events.");
+            }
+
+            if (referredByFacilitatorId.HasValue)
+            {
+                ReferredByFacilitatorId = referredByFacilitatorId.Value;
+            }
             IsConverted = true;
             ConvertedAt = DateTime.UtcNow;
             Status = EnquiryStatus.Closed;
             ConversionProbability = 100m;
+            DomainEvents.Add(new EnquiryConvertedEvent(
+                Id,
+                CustomerId,
+                ProductId,
+                ReferredByFacilitatorId,
+                ConvertedAt.Value,
+                TenantId));
         }
 
         public void ClearAssignment()
@@ -111,7 +144,7 @@ namespace AqualLifeStyle.Domain.Enquiries
             // Auto-convert if follow-up indicates conversion
             if (outcome == EnquiryFollowUpOutcome.Converted)
             {
-                ConvertToCustomer();
+                ConvertToCustomer(ReferredByFacilitatorId);
             }
             // Mark as closed if lead is lost
             else if (outcome == EnquiryFollowUpOutcome.Lost && Status != EnquiryStatus.Closed)

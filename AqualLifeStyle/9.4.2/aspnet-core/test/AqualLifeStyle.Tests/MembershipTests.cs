@@ -9,7 +9,7 @@ namespace AqualLifeStyle.Tests
         [Fact]
         public void Create_DefaultsToActiveStandardMembership()
         {
-            var membership = Membership.Create("Aqua Plus", "Premium access");
+            var membership = Membership.Create(1, "Aqua Plus", "Premium access");
 
             Assert.True(membership.IsActive);
             Assert.Equal(MembershipType.Jasper, membership.MembershipType);
@@ -19,7 +19,7 @@ namespace AqualLifeStyle.Tests
         [Fact]
         public void ChangeMembershipType_UpdatesTier()
         {
-            var membership = Membership.Create("Aqua Plus", "Premium access", MembershipType.Jasper);
+            var membership = Membership.Create(1, "Aqua Plus", "Premium access", MembershipType.Jasper);
 
             membership.ChangeType(MembershipType.Onyx);
 
@@ -29,7 +29,7 @@ namespace AqualLifeStyle.Tests
         [Fact]
         public void ActivateAndDeactivate_ChangeLifecycleState()
         {
-            var membership = Membership.Create("Aqua Plus", "Premium access");
+            var membership = Membership.Create(1, "Aqua Plus", "Premium access");
 
             membership.Deactivate();
             Assert.False(membership.IsActive);
@@ -41,7 +41,7 @@ namespace AqualLifeStyle.Tests
         [Fact]
         public void EnsureCanBeAssignedToCustomer_ThrowsWhenInactive()
         {
-            var membership = Membership.Create("Aqua Plus", "Premium access");
+            var membership = Membership.Create(1, "Aqua Plus", "Premium access");
             membership.Deactivate();
 
             Assert.Throws<System.InvalidOperationException>(() => membership.EnsureCanBeAssignedToCustomer());

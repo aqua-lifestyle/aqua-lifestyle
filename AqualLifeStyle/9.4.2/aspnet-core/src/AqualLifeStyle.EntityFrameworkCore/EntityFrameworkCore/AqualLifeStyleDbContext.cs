@@ -2,8 +2,10 @@
 using Abp.Zero.EntityFrameworkCore;
 using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.Domain.AreaLeaders;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
+using AqualLifeStyle.Domain.Facilitators;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Orders;
 using AqualLifeStyle.Domain.Products;
@@ -21,6 +23,11 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<EnquiryFollowUp> EnquiryFollowUps { get; set; }
         public virtual DbSet<OrderIntent> OrderIntents { get; set; }
 
+        public virtual DbSet<Facilitator> Facilitators { get; set; }
+        public virtual DbSet<Referral> Referrals { get; set; }
+        public virtual DbSet<AreaLeader> AreaLeaders { get; set; }
+        public virtual DbSet<AreaSpace> AreaSpaces { get; set; }
+
         public AqualLifeStyleDbContext(DbContextOptions<AqualLifeStyleDbContext> options)
             : base(options)
         {
@@ -29,10 +36,13 @@ namespace AqualLifeStyle.EntityFrameworkCore
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(AqualLifeStyleDbContext).Assembly);
 
             modelBuilder.Entity<Membership>(entity =>
             {
                 entity.ToTable("Memberships");
+                entity.Property(e => e.TenantId);
+                entity.HasIndex(e => e.TenantId);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(128);
                 entity.Property(e => e.Description).HasMaxLength(512);
                 entity.Property(e => e.MembershipType).IsRequired();
@@ -50,6 +60,14 @@ namespace AqualLifeStyle.EntityFrameworkCore
             modelBuilder.Entity<Customer>(entity =>
             {
                 entity.ToTable("Customers");
+                entity.Property(e => e.TenantId);
+                entity.HasIndex(e => e.TenantId);
+                entity.Property(e => e.UserId).IsRequired();
+                entity.HasIndex(e => e.UserId).IsUnique();
+                entity.HasOne(e => e.User)
+                    .WithOne()
+                    .HasForeignKey<Customer>(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(128);
                 entity.OwnsOne(e => e.Email, email =>
                 {
@@ -82,11 +100,14 @@ namespace AqualLifeStyle.EntityFrameworkCore
             modelBuilder.Entity<Enquiry>(entity =>
             {
                 entity.ToTable("Enquiries");
+                entity.Property(e => e.TenantId);
+                entity.HasIndex(e => e.TenantId);
                 entity.Property(e => e.CustomerId).IsRequired();
                 entity.Property(e => e.ProductId).IsRequired();
                 entity.Property(e => e.Message).IsRequired().HasMaxLength(2000);
                 entity.Property(e => e.Status).IsRequired();
                 entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.ReferredByFacilitatorId);
 
                 entity.HasMany(e => e.FollowUps)
                     .WithOne()
@@ -115,6 +136,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 entity.HasIndex(e => e.CustomerId);
                 entity.HasIndex(e => e.EnquiryId);
             });
+
         }
     }
 }

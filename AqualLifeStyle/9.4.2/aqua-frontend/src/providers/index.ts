@@ -7,6 +7,13 @@ export type { TenantState } from "./Tenant";
 export { ToastProvider, useToast } from "./Toast";
 
 export {
+  SystemHealthProvider,
+  useSystemHealthActions,
+  useSystemHealthState,
+} from "./SystemHealth";
+export type { SystemHealth } from "./SystemHealth";
+
+export {
   CustomersProvider,
   useCustomersActions,
   useCustomersState,

@@ -1,4 +1,7 @@
 export const apiEndpoints = {
+  health: {
+    get: "/api/health",
+  },
   customers: {
     create: "/api/services/app/Customer/Create",
     getAll: "/api/services/app/Customer/GetAll",

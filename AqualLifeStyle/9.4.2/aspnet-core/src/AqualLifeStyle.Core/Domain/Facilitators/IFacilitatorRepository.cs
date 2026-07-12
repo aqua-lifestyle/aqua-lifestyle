@@ -1,0 +1,12 @@
+using System.Threading.Tasks;
+using Abp.Domain.Repositories;
+
+namespace AqualLifeStyle.Domain.Facilitators
+{
+    public interface IFacilitatorRepository : IRepository<Facilitator, int>
+    {
+        Task<Facilitator> GetByCustomerIdAsync(int customerId, int tenantId);
+        Task<Facilitator> GetWithAreaLeaderAsync(int facilitatorId);
+        Task<int> CountByAreaLeaderAsync(int areaLeaderId);
+    }
+}

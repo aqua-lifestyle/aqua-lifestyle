@@ -1,7 +1,11 @@
 using System;
+using System.Threading.Tasks;
+using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.Web.Host.Models;
+using Abp.EntityFrameworkCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Web.Host.Controllers
 {
@@ -12,14 +16,22 @@ namespace AqualLifeStyle.Web.Host.Controllers
     [Route("api/health")]
     public class HealthController : ControllerBase
     {
+        private const string HealthyStatus = "Healthy";
+        private const string DegradedStatus = "Degraded";
+
+        private readonly IDbContextProvider<AqualLifeStyleDbContext> _dbContextProvider;
         private readonly IWebHostEnvironment _environment;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="HealthController"/> class.
         /// </summary>
+        /// <param name="dbContextProvider">The ABP database context provider.</param>
         /// <param name="environment">The current web host environment.</param>
-        public HealthController(IWebHostEnvironment environment)
+        public HealthController(
+            IDbContextProvider<AqualLifeStyleDbContext> dbContextProvider,
+            IWebHostEnvironment environment)
         {
+            _dbContextProvider = dbContextProvider;
             _environment = environment;
         }
 
@@ -28,17 +40,34 @@ namespace AqualLifeStyle.Web.Host.Controllers
         /// </summary>
         /// <returns>A health response containing status and non-sensitive runtime metadata.</returns>
         [HttpGet]
-        public ActionResult<HealthCheckResponse> Get()
+        public async Task<ActionResult<HealthCheckResponse>> Get()
         {
+            var isDatabaseReachable = await IsDatabaseReachable();
+
             return Ok(new HealthCheckResponse
             {
-                Status = "Healthy",
+                Status = isDatabaseReachable ? HealthyStatus : DegradedStatus,
+                IsDatabaseReachable = isDatabaseReachable,
+                DatabaseStatus = isDatabaseReachable ? HealthyStatus : "Unavailable",
                 Version = AppVersionHelper.Version,
                 ReleaseDate = AppVersionHelper.ReleaseDate,
                 CheckedAtUtc = DateTime.UtcNow,
                 Environment = _environment.EnvironmentName,
                 TraceId = HttpContext.TraceIdentifier
             });
+        }
+
+        private async Task<bool> IsDatabaseReachable()
+        {
+            try
+            {
+                var dbContext = await _dbContextProvider.GetDbContextAsync();
+                return await dbContext.Database.CanConnectAsync();
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

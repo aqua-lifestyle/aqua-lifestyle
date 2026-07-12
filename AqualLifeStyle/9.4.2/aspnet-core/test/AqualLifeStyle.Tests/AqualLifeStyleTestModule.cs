@@ -48,6 +48,14 @@ namespace AqualLifeStyle.Tests
         public override void Initialize()
         {
             ServiceCollectionRegistrar.Register(IocManager);
+
+            // The default event bus resolves handlers from the global IocManager; register the
+            // network handlers explicitly against the test's LocalIocManager so conversion/approval
+            // side-effects fire within the integrated test's unit of work.
+            Abp.Events.Bus.EventBus.Default.Register<AqualLifeStyle.Domain.Enquiries.EnquiryConvertedEvent>(e =>
+                IocManager.Resolve<AqualLifeStyle.Application.Enquiries.EnquiryConvertedEventHandler>().HandleEventAsync(e).GetAwaiter().GetResult());
+            Abp.Events.Bus.EventBus.Default.Register<AqualLifeStyle.Domain.AreaLeaders.AreaSpaceApprovedEvent>(e =>
+                IocManager.Resolve<AqualLifeStyle.Application.AreaLeaders.AreaSpaceApprovedEventHandler>().HandleEventAsync(e).GetAwaiter().GetResult());
         }
 
         private void RegisterFakeService<TService>() where TService : class

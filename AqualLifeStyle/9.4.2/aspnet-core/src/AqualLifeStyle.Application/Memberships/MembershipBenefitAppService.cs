@@ -2,13 +2,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Application.Services;
+using Abp.Authorization;
 using Abp.Domain.Repositories;
 using AqualLifeStyle.Application.Memberships.Dto.Benefits;
+using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 
 namespace AqualLifeStyle.Application.Memberships
 {
+    [AbpAuthorize(PermissionNames.Pages_MembershipBenefits)]
     public class MembershipBenefitAppService : AqualLifeStyleAppServiceBase, IMembershipBenefitAppService
     {
         private readonly IMembershipBenefitRepository _benefitRepository;
@@ -46,6 +49,7 @@ namespace AqualLifeStyle.Application.Memberships
             };
         }
 
+        [AbpAuthorize(PermissionNames.Pages_MembershipBenefits_Manage)]
         public async Task<MembershipBenefitDto> CreateAsync(CreateMembershipBenefitDto input)
         {
             var benefit = MembershipBenefit.Create(
@@ -68,6 +72,7 @@ namespace AqualLifeStyle.Application.Memberships
             };
         }
 
+        [AbpAuthorize(PermissionNames.Pages_MembershipBenefits_Manage)]
         public async Task<MembershipBenefitDto> UpdateAsync(int id, MembershipBenefitDto input)
         {
             var benefit = await _benefitRepository.GetAsync(id);
@@ -85,6 +90,7 @@ namespace AqualLifeStyle.Application.Memberships
             };
         }
 
+        [AbpAuthorize(PermissionNames.Pages_MembershipBenefits_Manage)]
         public async Task DeleteAsync(int id)
         {
             await _benefitRepository.DeleteAsync(id);
