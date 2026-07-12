@@ -25,5 +25,24 @@ namespace AqualLifeStyle.Tests.Domain
             customer.Email.Value.ShouldBe("jane@example.com");
             customer.IsActive.ShouldBeTrue();
         }
+
+        [Fact]
+        public void LinkUser_WithValidUserId_CreatesImmutableLink()
+        {
+            var customer = Customer.Create(1, "Jane Doe", new EmailAddress("jane@example.com"));
+            customer.LinkUser(42);
+
+            customer.UserId.ShouldBe(42);
+            Should.Throw<System.InvalidOperationException>(() => customer.LinkUser(43));
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-1)]
+        public void LinkUser_WithInvalidUserId_Throws(long userId)
+        {
+            var customer = Customer.Create(1, "Jane Doe", new EmailAddress("jane@example.com"));
+            Should.Throw<System.ArgumentException>(() => customer.LinkUser(userId));
+        }
     }
 }

@@ -7,6 +7,7 @@ namespace AqualLifeStyle.Domain.Customers
     public class Customer : Entity<int>, IMayHaveTenant
     {
         public int? TenantId { get; set; }
+        public long? UserId { get; private set; }
         public string Name { get; private set; }
         public EmailAddress Email { get; private set; }
         public int? MembershipId { get; private set; }
@@ -51,6 +52,14 @@ namespace AqualLifeStyle.Domain.Customers
         public void ChangeEmail(EmailAddress email)
         {
             Email = email ?? throw new ArgumentNullException(nameof(email));
+        }
+
+        public void LinkUser(long userId)
+        {
+            if (userId <= 0) throw new ArgumentException("UserId must be positive.", nameof(userId));
+            if (UserId.HasValue && UserId.Value != userId)
+                throw new InvalidOperationException("A customer cannot be linked to a different user.");
+            UserId = userId;
         }
 
         public void Activate() => IsActive = true;
