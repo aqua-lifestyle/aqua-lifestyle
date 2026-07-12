@@ -38,5 +38,14 @@
 
         public const string Pages_Products = "Pages.Products";
         public const string Pages_Products_Manage = "Pages.Products.Manage";
+
+        public const string Members_ViewSelf = AquaPermissions.Members.ViewSelf;
+        public const string Members_EditSelf = AquaPermissions.Members.EditSelf;
+        public const string Facilitators_ViewSelf = AquaPermissions.Facilitators.ViewSelf;
+        public const string AreaLeaders_ViewSelf = AquaPermissions.AreaLeaders.ViewSelf;
+        public const string Orders_ViewSelf = AquaPermissions.Orders.ViewSelf;
+        public const string Savings_ViewSelf = AquaPermissions.Savings.ViewSelf;
+        public const string Enquiries_ViewSelf = AquaPermissions.Enquiries.ViewSelf;
+        public const string Referrals_ViewSelf = AquaPermissions.Referrals.ViewSelf;
     }
 }
