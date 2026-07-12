@@ -35,6 +35,12 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
 
             foreach (var customer in customers)
             {
+                if (customer.UserId > 0)
+                {
+                    _logger.LogInformation("Customer {CustomerId} is already linked to user {UserId} in tenant {TenantId}", customer.Id, customer.UserId, tenantId);
+                    continue;
+                }
+
                 var email = Normalize(customer.Email.Value);
                 if (!usersByEmail.TryGetValue(email, out var matches) || matches.Count == 0)
                 {

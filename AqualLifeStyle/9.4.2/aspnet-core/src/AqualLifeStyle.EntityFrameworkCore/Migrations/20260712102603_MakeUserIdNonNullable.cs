@@ -11,9 +11,21 @@ namespace AqualLifeStyle.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql(@"
-                UPDATE ""Customers""
-                SET ""UserId"" = COALESCE(""UserId"", 0)
-                WHERE ""UserId"" IS NULL
+                UPDATE ""Customers"" AS customer
+                SET ""UserId"" = app_user.""Id""
+                FROM ""AbpUsers"" AS app_user
+                WHERE customer.""UserId"" IS NULL
+                  AND customer.""TenantId"" IS NOT DISTINCT FROM app_user.""TenantId""
+                  AND UPPER(TRIM(customer.""Email"")) = UPPER(TRIM(app_user.""EmailAddress""))
+                  AND app_user.""IsDeleted"" = FALSE;
+
+                DO $block$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM ""Customers"" WHERE ""UserId"" IS NULL) THEN
+                        RAISE EXCEPTION 'Cannot enforce Customers.UserId: unmatched customers require manual review';
+                    END IF;
+                END
+                $block$;
             ");
 
             migrationBuilder.AlterColumn<long>(
@@ -25,20 +37,11 @@ namespace AqualLifeStyle.Migrations
                 oldType: "bigint",
                 oldNullable: true);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_Customers_UserId",
-                table: "Customers",
-                column: "UserId",
-                unique: true);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropIndex(
-                name: "IX_Customers_UserId",
-                table: "Customers");
-
             migrationBuilder.AlterColumn<long>(
                 name: "UserId",
                 table: "Customers",
