@@ -22,54 +22,54 @@ namespace AqualLifeStyle.Tests.Application
         public void AreaLeaderAppService_ShouldRequireAreaLeaderPermissions()
         {
             AssertAuthorizeAttribute(typeof(AreaLeaderAppService), PermissionNames.Pages_AreaLeaders);
-            AssertAuthorizeAttribute(typeof(AreaLeaderAppService), nameof(AreaLeaderAppService.ApplyAsync), PermissionNames.Pages_AreaLeaders_Manage);
-            AssertAuthorizeAttribute(typeof(AreaLeaderAppService), nameof(AreaLeaderAppService.RecordStartupOrderAsync), PermissionNames.Pages_AreaLeaders_Manage);
-            AssertAuthorizeAttribute(typeof(AreaLeaderAppService), nameof(AreaLeaderAppService.PromoteAsync), PermissionNames.Pages_AreaLeaders_Manage);
+            AssertAuthorizeAttribute(typeof(AreaLeaderAppService), nameof(AreaLeaderAppService.ApplyAsync), AquaPermissions.AreaLeaders.Apply);
+            AssertAuthorizeAttribute(typeof(AreaLeaderAppService), nameof(AreaLeaderAppService.RecordStartupOrderAsync), AquaPermissions.Orders.Process);
+            AssertAuthorizeAttribute(typeof(AreaLeaderAppService), nameof(AreaLeaderAppService.PromoteAsync), AquaPermissions.AreaLeaders.Manage);
         }
 
         [Fact]
         public void AreaSpaceAppService_ShouldRequireAreaSpacePermissions()
         {
             AssertAuthorizeAttribute(typeof(AreaSpaceAppService), PermissionNames.Pages_AreaSpaces);
-            AssertAuthorizeAttribute(typeof(AreaSpaceAppService), nameof(AreaSpaceAppService.ApplyAsync), PermissionNames.Pages_AreaSpaces_Manage);
-            AssertAuthorizeAttribute(typeof(AreaSpaceAppService), nameof(AreaSpaceAppService.StartReviewAsync), PermissionNames.Pages_AreaSpaces_Manage);
-            AssertAuthorizeAttribute(typeof(AreaSpaceAppService), nameof(AreaSpaceAppService.RecordPresentationAsync), PermissionNames.Pages_AreaSpaces_Manage);
-            AssertAuthorizeAttribute(typeof(AreaSpaceAppService), nameof(AreaSpaceAppService.RecordStartupOrderAsync), PermissionNames.Pages_AreaSpaces_Manage);
-            AssertAuthorizeAttribute(typeof(AreaSpaceAppService), nameof(AreaSpaceAppService.ApproveAsync), PermissionNames.Pages_AreaSpaces_Manage);
-            AssertAuthorizeAttribute(typeof(AreaSpaceAppService), nameof(AreaSpaceAppService.SuspendAsync), PermissionNames.Pages_AreaSpaces_Manage);
+            AssertAuthorizeAttribute(typeof(AreaSpaceAppService), nameof(AreaSpaceAppService.ApplyAsync), AquaPermissions.AreaSpaces.Apply);
+            AssertAuthorizeAttribute(typeof(AreaSpaceAppService), nameof(AreaSpaceAppService.StartReviewAsync), AquaPermissions.AreaSpaces.Manage);
+            AssertAuthorizeAttribute(typeof(AreaSpaceAppService), nameof(AreaSpaceAppService.RecordPresentationAsync), AquaPermissions.AreaSpaces.Manage);
+            AssertAuthorizeAttribute(typeof(AreaSpaceAppService), nameof(AreaSpaceAppService.RecordStartupOrderAsync), AquaPermissions.Orders.Process);
+            AssertAuthorizeAttribute(typeof(AreaSpaceAppService), nameof(AreaSpaceAppService.ApproveAsync), AquaPermissions.AreaSpaces.Approve);
+            AssertAuthorizeAttribute(typeof(AreaSpaceAppService), nameof(AreaSpaceAppService.SuspendAsync), AquaPermissions.AreaSpaces.Manage);
         }
 
         [Fact]
         public void FacilitatorAppService_ShouldRequireFacilitatorPermissions()
         {
             AssertAuthorizeAttribute(typeof(FacilitatorAppService), PermissionNames.Pages_Facilitators);
-            AssertAuthorizeAttribute(typeof(FacilitatorAppService), nameof(FacilitatorAppService.RegisterAsync), PermissionNames.Pages_Facilitators_Manage);
+            AssertAuthorizeAttribute(typeof(FacilitatorAppService), nameof(FacilitatorAppService.RegisterAsync), AquaPermissions.Facilitators.Register);
         }
 
         [Fact]
         public void ReferralAppService_ShouldRequireReferralPermissions()
         {
             AssertAuthorizeAttribute(typeof(ReferralAppService), PermissionNames.Pages_Referrals);
-            AssertAuthorizeAttribute(typeof(ReferralAppService), nameof(ReferralAppService.ConfirmAwardAsync), PermissionNames.Pages_Referrals_Manage);
+            AssertAuthorizeAttribute(typeof(ReferralAppService), nameof(ReferralAppService.ConfirmAwardAsync), AquaPermissions.Referrals.Confirm);
         }
 
         [Fact]
         public void CustomerAppService_ShouldRequireCustomerPermissions()
         {
             AssertAuthorizeAttribute(typeof(CustomerAppService), PermissionNames.Pages_Customers);
-            AssertAuthorizeAttribute(typeof(CustomerAppService), nameof(CustomerAppService.CreateAsync), PermissionNames.Pages_Customers_Manage);
-            AssertAuthorizeAttribute(typeof(CustomerAppService), nameof(CustomerAppService.UpdateAsync), PermissionNames.Pages_Customers_Manage);
+            AssertAuthorizeAttribute(typeof(CustomerAppService), nameof(CustomerAppService.CreateAsync), AquaPermissions.Members.Create);
+            AssertAuthorizeAttribute(typeof(CustomerAppService), nameof(CustomerAppService.UpdateAsync), AquaPermissions.Members.Edit);
         }
 
         [Fact]
         public void MembershipAppService_ShouldRequireMembershipPermissions()
         {
             AssertAuthorizeAttribute(typeof(MembershipAppService), PermissionNames.Pages_Memberships);
-            AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.CreateAsync), PermissionNames.Pages_Memberships_Manage);
-            AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.UpdateAsync), PermissionNames.Pages_Memberships_Manage);
-            AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.SetActivationDateAsync), PermissionNames.Pages_Memberships_Manage);
-            AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.SetMonthlyObligationAsync), PermissionNames.Pages_Memberships_Manage);
-            AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.MarkObligationMetAsync), PermissionNames.Pages_Memberships_Manage);
+            AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.CreateAsync), AquaPermissions.Members.Create);
+            AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.UpdateAsync), AquaPermissions.Members.Edit);
+            AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.SetActivationDateAsync), AquaPermissions.Members.Edit);
+            AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.SetMonthlyObligationAsync), AquaPermissions.Members.Edit);
+            AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.MarkObligationMetAsync), AquaPermissions.Members.Edit);
         }
 
         [Fact]
@@ -85,23 +85,23 @@ namespace AqualLifeStyle.Tests.Application
         public void EnquiryAppService_ShouldRequireEnquiryPermissions()
         {
             AssertAuthorizeAttribute(typeof(EnquiryAppService), PermissionNames.Pages_Enquiries);
-            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.CreateAsync), PermissionNames.Pages_Enquiries_Manage);
-            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.RespondAsync), PermissionNames.Pages_Enquiries_Manage);
-            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.CloseAsync), PermissionNames.Pages_Enquiries_Manage);
-            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.ReopenAsync), PermissionNames.Pages_Enquiries_Manage);
-            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.AssignToMemberAsync), PermissionNames.Pages_Enquiries_Manage);
-            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.ConvertToCustomerAsync), PermissionNames.Pages_Enquiries_Manage);
-            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.ClearAssignmentAsync), PermissionNames.Pages_Enquiries_Manage);
-            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.RecordFollowUpAsync), PermissionNames.Pages_Enquiries_Manage);
+            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.CreateAsync), AquaPermissions.Enquiries.Create);
+            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.RespondAsync), AquaPermissions.Enquiries.Update);
+            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.CloseAsync), AquaPermissions.Enquiries.Resolve);
+            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.ReopenAsync), AquaPermissions.Enquiries.Update);
+            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.AssignToMemberAsync), AquaPermissions.Enquiries.Update);
+            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.ConvertToCustomerAsync), AquaPermissions.Enquiries.Resolve);
+            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.ClearAssignmentAsync), AquaPermissions.Enquiries.Update);
+            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.RecordFollowUpAsync), AquaPermissions.Enquiries.Update);
         }
 
         [Fact]
         public void OrderIntentAppService_ShouldRequireOrderPermissions()
         {
             AssertAuthorizeAttribute(typeof(OrderIntentAppService), PermissionNames.Pages_Orders);
-            AssertAuthorizeAttribute(typeof(OrderIntentAppService), nameof(OrderIntentAppService.CreateFromEnquiryAsync), PermissionNames.Pages_Orders_Manage);
-            AssertAuthorizeAttribute(typeof(OrderIntentAppService), nameof(OrderIntentAppService.CancelAsync), PermissionNames.Pages_Orders_Manage);
-            AssertAuthorizeAttribute(typeof(OrderIntentAppService), nameof(OrderIntentAppService.CompleteAsync), PermissionNames.Pages_Orders_Manage);
+            AssertAuthorizeAttribute(typeof(OrderIntentAppService), nameof(OrderIntentAppService.CreateFromEnquiryAsync), AquaPermissions.Orders.Place);
+            AssertAuthorizeAttribute(typeof(OrderIntentAppService), nameof(OrderIntentAppService.CancelAsync), AquaPermissions.Orders.Process);
+            AssertAuthorizeAttribute(typeof(OrderIntentAppService), nameof(OrderIntentAppService.CompleteAsync), AquaPermissions.Orders.Process);
         }
 
         [Fact]
