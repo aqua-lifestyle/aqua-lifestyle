@@ -2,10 +2,12 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Abp.Authorization;
 using Abp.ObjectMapping;
+using Abp.UI;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Referrals.Dto;
 using AqualLifeStyle.Application.Validation;
 using AqualLifeStyle.Authorization;
+using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Facilitators;
 
 namespace AqualLifeStyle.Application.Referrals
@@ -14,11 +16,13 @@ namespace AqualLifeStyle.Application.Referrals
     public class ReferralAppService : AqualLifeStyleAppServiceBase, IReferralAppService
     {
         private readonly IReferralRepository _referralRepository;
+        private readonly ICustomerRepository _customerRepository;
         private readonly IObjectMapper _objectMapper;
 
-        public ReferralAppService(IReferralRepository referralRepository, IObjectMapper objectMapper)
+        public ReferralAppService(IReferralRepository referralRepository, ICustomerRepository customerRepository, IObjectMapper objectMapper)
         {
             _referralRepository = referralRepository;
+            _customerRepository = customerRepository;
             _objectMapper = objectMapper;
         }
 
@@ -46,6 +50,12 @@ namespace AqualLifeStyle.Application.Referrals
             if (referral == null)
             {
                 throw new AqualLifeStyleNotFoundException("Referral", id);
+            }
+
+            var referredCustomer = await _customerRepository.GetAsync(referral.ReferredCustomerId);
+            if (!await CurrentUserCanAccessCustomerAsync(referredCustomer))
+            {
+                throw new UserFriendlyException("Referral confirmation failed.", "You do not have permission to confirm this referral award.");
             }
 
             referral.ConfirmAward();

@@ -11,6 +11,8 @@ using Shouldly;
 using Xunit;
 using AqualLifeStyle.Application.Enquiries;
 using AqualLifeStyle.Application.Enquiries.Dto;
+using AqualLifeStyle.Domain.Common;
+using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
 using AqualLifeStyle.Domain.Enums;
 
@@ -20,17 +22,24 @@ namespace AqualLifeStyle.Tests
     {
         private readonly Mock<IEnquiryRepository> _enquiryRepositoryMock;
         private readonly Mock<IObjectMapper> _objectMapperMock;
+        private readonly Mock<ICustomerRepository> _customerRepositoryMock;
         private readonly EnquiryAppService _service;
 
         public EnquiryAppServiceTests()
         {
             _enquiryRepositoryMock = new Mock<IEnquiryRepository>();
             _objectMapperMock = new Mock<IObjectMapper>();
+            _customerRepositoryMock = new Mock<ICustomerRepository>();
             _service = new TestableEnquiryAppService(_enquiryRepositoryMock.Object,
+                _customerRepositoryMock.Object,
                 _objectMapperMock.Object)
             {
-                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
+                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1 && s.UserId == 1)
             };
+
+            _customerRepositoryMock
+                .Setup(r => r.GetAsync(It.IsAny<int>()))
+                .ReturnsAsync((int id) => { var c = Customer.Create(1, 1, "Test Customer", new EmailAddress("test@example.com")); c.Id = id; return c; });
         }
 
         private void SetupEnquiry(Enquiry enquiry)
@@ -259,8 +268,8 @@ namespace AqualLifeStyle.Tests
 
         private sealed class TestableEnquiryAppService : EnquiryAppService
         {
-            public TestableEnquiryAppService(IEnquiryRepository enquiryRepository, IObjectMapper objectMapper)
-                : base(enquiryRepository, objectMapper)
+            public TestableEnquiryAppService(IEnquiryRepository enquiryRepository, ICustomerRepository customerRepository, IObjectMapper objectMapper)
+                : base(enquiryRepository, customerRepository, objectMapper)
             {
             }
         }

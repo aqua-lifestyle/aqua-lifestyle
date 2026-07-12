@@ -6,6 +6,7 @@ using Abp.IdentityFramework;
 using Abp.Runtime.Session;
 using Abp.UI;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.MultiTenancy;
 
 namespace AqualLifeStyle
@@ -58,6 +59,35 @@ namespace AqualLifeStyle
         protected virtual Exception CreateMissingTenantContextException(string operation)
         {
             return new UserFriendlyException(operation, "A tenant context is required.");
+        }
+
+        protected async Task AssertCurrentUserOwnsCustomerAsync(Customer customer)
+        {
+            if (customer == null) throw new ArgumentNullException(nameof(customer));
+            if (!AbpSession.UserId.HasValue)
+            {
+                throw new UserFriendlyException("Authorization failed.", "A user context is required.");
+            }
+
+            if (customer.UserId != AbpSession.UserId.Value)
+            {
+                throw new UserFriendlyException("Authorization failed.", "You do not have permission to access this customer.");
+            }
+        }
+
+        protected async Task<bool> CurrentUserCanAccessCustomerAsync(Customer customer)
+        {
+            if (customer == null)
+            {
+                return false;
+            }
+
+            if (!AbpSession.UserId.HasValue)
+            {
+                return false;
+            }
+
+            return customer.UserId == AbpSession.UserId.Value;
         }
     }
 }

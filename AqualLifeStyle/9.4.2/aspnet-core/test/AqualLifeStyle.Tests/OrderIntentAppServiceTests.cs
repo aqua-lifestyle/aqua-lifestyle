@@ -12,6 +12,7 @@ using AqualLifeStyle.Domain.Orders;
 using AqualLifeStyle.Domain.Products;
 using Moq;
 using Abp.ObjectMapping;
+using Abp.Runtime.Session;
 using Xunit;
 
 namespace AqualLifeStyle.Tests
@@ -58,7 +59,10 @@ namespace AqualLifeStyle.Tests
                 _customerRepositoryMock.Object,
                 _productRepositoryMock.Object,
                 _membershipRepositoryMock.Object,
-                _objectMapperMock.Object);
+                _objectMapperMock.Object)
+            {
+                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1 && s.UserId == 43)
+            };
         }
 
         [Fact]
@@ -140,7 +144,14 @@ namespace AqualLifeStyle.Tests
         public async Task CancelAsync_WithReservedOrderIntent_CancelsSuccessfully()
         {
             var orderIntent = OrderIntent.CreateReserved(1, 2, 3, 100m, 95m, System.DateTime.UtcNow);
+            var customer = CreateCustomer(membershipId: 1);
             _orderIntentRepositoryMock.Setup(r => r.GetAsync(10)).ReturnsAsync(orderIntent);
+            _customerRepositoryMock.Setup(r => r.GetAsync(1)).ReturnsAsync(customer);
+
+            var abpSessionMock = new Mock<IAbpSession>();
+            abpSessionMock.Setup(s => s.TenantId).Returns(1);
+            abpSessionMock.Setup(s => s.UserId).Returns((long?)43);
+            _service.AbpSession = abpSessionMock.Object;
 
             var result = await _service.CancelAsync(10);
 

@@ -46,7 +46,7 @@ namespace AqualLifeStyle.Tests
 
             var appService = new CustomerAppService(customerRepo.Object, membershipRepo.Object, objectMapperMock.Object)
             {
-                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
+                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1 && s.UserId == 50)
             };
 
             var input = new CustomerDto

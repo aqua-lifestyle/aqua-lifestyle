@@ -36,10 +36,19 @@ namespace AqualLifeStyle.Tests.Application
             _unitOfWorkMock = new Mock<IUnitOfWorkCompleteHandle>();
 
             _customerRepositoryMock
-                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<Customer, bool>>>()))
-                .ReturnsAsync(() =>
+                .Setup(r => r.GetAsync(It.IsAny<int>()))
+                .ReturnsAsync((int id) =>
                 {
-                     var c = Customer.Create(1, 42, "TransactionTest", new EmailAddress("tx@example.com"));
+                    var c = Customer.Create(1, 42, "TransactionTest", new EmailAddress("tx@example.com"));
+                    c.Id = id;
+                    return c;
+                });
+
+            _customerRepositoryMock
+                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<Customer, bool>>>()))
+                .ReturnsAsync((Expression<Func<Customer, bool>> predicate) =>
+                {
+                    var c = Customer.Create(1, 42, "TransactionTest", new EmailAddress("tx@example.com"));
                     c.Id = 22;
                     return c;
                 });
@@ -69,7 +78,7 @@ namespace AqualLifeStyle.Tests.Application
                 _unitOfWorkManagerMock.Object,
                 _objectMapperMock.Object)
             {
-                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1)
+                AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1 && s.UserId == 42)
             };
         }
 

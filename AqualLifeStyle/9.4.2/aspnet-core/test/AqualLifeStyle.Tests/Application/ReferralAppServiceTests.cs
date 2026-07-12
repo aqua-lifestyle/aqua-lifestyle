@@ -37,7 +37,8 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task ConfirmAwardAsync_MarksReferralAwardIssued()
         {
-            var (referralId, _, _) = await CreateReferralAsync(AbpSession.TenantId ?? 1);
+            var (referralId, _, _, userId) = await CreateReferralAsync(AbpSession.TenantId ?? 1);
+            SetCurrentUser(userId, AbpSession.TenantId);
 
             var confirmed = await _referralAppService.ConfirmAwardAsync(referralId);
 
@@ -54,7 +55,7 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task ConfirmAwardAsync_ThrowsNotFound_WhenReferralBelongsToDifferentTenant()
         {
-            var (tenantTwoReferralId, _, _) = await CreateReferralAsync(tenantId: 2);
+            var (tenantTwoReferralId, _, _, _) = await CreateReferralAsync(tenantId: 2);
 
             using (UsingTenantId(1))
             {
@@ -81,7 +82,7 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task GetByEnquiryAsync_ReturnsMatchingReferral()
         {
-            var (_, enquiryId, _) = await CreateReferralAsync(AbpSession.TenantId ?? 1);
+            var (_, enquiryId, _, _) = await CreateReferralAsync(AbpSession.TenantId ?? 1);
 
             var found = await _referralAppService.GetByEnquiryAsync(enquiryId);
             found.ShouldNotBeNull();
@@ -91,8 +92,8 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task GetByEnquiryAsync_ReturnsCurrentTenantReferral_WhenSourceEnquiryExistsInMultipleTenants()
         {
-            var (tenantOneReferralId, tenantOneEnquiryId, _) = await CreateReferralAsync(tenantId: 1);
-            var (_, tenantTwoEnquiryId, _) = await CreateReferralAsync(tenantId: 2);
+            var (tenantOneReferralId, tenantOneEnquiryId, _, _) = await CreateReferralAsync(tenantId: 1);
+            var (_, tenantTwoEnquiryId, _, _) = await CreateReferralAsync(tenantId: 2);
 
             using (UsingTenantId(1))
             {
@@ -107,7 +108,7 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task GetAllAsync_ReturnsOnlyCurrentTenantReferrals()
         {
-            var (tenantOneReferralId, _, _) = await CreateReferralAsync(tenantId: 1);
+            var (tenantOneReferralId, _, _, _) = await CreateReferralAsync(tenantId: 1);
             await CreateReferralAsync(tenantId: 2);
 
             var referrals = await _referralAppService.GetAllAsync();
@@ -120,8 +121,8 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task RepositoryGetBySourceEnquiryAsync_UsesAmbientTenantFilter_WhenTenantIsNotPassedExplicitly()
         {
-            var (tenantOneReferralId, tenantOneEnquiryId, _) = await CreateReferralAsync(tenantId: 1);
-            var (tenantTwoReferralId, tenantTwoEnquiryId, _) = await CreateReferralAsync(tenantId: 2);
+            var (tenantOneReferralId, tenantOneEnquiryId, _, _) = await CreateReferralAsync(tenantId: 1);
+            var (tenantTwoReferralId, tenantTwoEnquiryId, _, _) = await CreateReferralAsync(tenantId: 2);
 
             using (UsingTenantId(1))
             {
@@ -134,9 +135,9 @@ namespace AqualLifeStyle.Tests.Application
             }
         }
 
-        private async Task<(int referralId, int enquiryId, int customerId)> CreateReferralAsync(int tenantId)
+        private async Task<(int referralId, int enquiryId, int customerId, long userId)> CreateReferralAsync(int tenantId)
         {
-            var customerId = await CreateCustomerAsync(tenantId);
+            var (customerId, userId) = await CreateCustomerAsync(tenantId);
             var facilitatorId = await CreateFacilitatorAsync(tenantId, customerId);
             var enquiryId = await CreateEnquiryAsync(tenantId, customerId);
 
@@ -151,11 +152,11 @@ namespace AqualLifeStyle.Tests.Application
                     convertedAt: DateTime.UtcNow);
                 ctx.Referrals.Add(referral);
                 await ctx.SaveChangesAsync();
-                return (referral.Id, enquiryId, customerId);
+                return (referral.Id, enquiryId, customerId, userId);
             });
         }
 
-        private async Task<int> CreateCustomerAsync(int tenantId)
+        private async Task<(int customerId, long userId)> CreateCustomerAsync(int tenantId)
         {
             var userId = await CreateTestUserAsync(tenantId, $"user-{Guid.NewGuid():N}", $"user-{Guid.NewGuid():N}@example.com");
             return await UsingDbContextAsync(tenantId, async ctx =>
@@ -163,7 +164,7 @@ namespace AqualLifeStyle.Tests.Application
                 var customer = Customer.Create(tenantId, userId, $"ReferralTestCustomer{tenantId}", new EmailAddress($"referraltestcustomer{tenantId}@example.com"));
                 ctx.Customers.Add(customer);
                 await ctx.SaveChangesAsync();
-                return customer.Id;
+                return (customer.Id, customer.UserId);
             });
         }
 

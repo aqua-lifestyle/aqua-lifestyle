@@ -37,6 +37,11 @@ namespace AqualLifeStyle.Application.Customers
         public async Task<CustomerDto> GetAsync(int id)
         {
             var customer = await GetCustomerForCurrentTenantAsync(id);
+            if (!await CurrentUserCanAccessCustomerAsync(customer))
+            {
+                throw new UserFriendlyException("Customer lookup failed.", "You do not have permission to access this customer.");
+            }
+
             return _objectMapper.Map<CustomerDto>(customer);
         }
 
@@ -66,6 +71,10 @@ namespace AqualLifeStyle.Application.Customers
             try
             {
                 var customer = await GetCustomerForCurrentTenantAsync(input.Id);
+                if (!await CurrentUserCanAccessCustomerAsync(customer))
+                {
+                    throw new UserFriendlyException("Customer update failed.", "You do not have permission to update this customer.");
+                }
 
                 if (await _customerRepository.ExistsByEmailAsync(input.Email, input.Id))
                 {

@@ -9,6 +9,7 @@ using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Validation;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.AreaLeaders;
+using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Facilitators;
 
 namespace AqualLifeStyle.Application.AreaLeaders
@@ -17,11 +18,13 @@ namespace AqualLifeStyle.Application.AreaLeaders
     public class AreaLeaderAppService : AqualLifeStyleAppServiceBase, IAreaLeaderAppService
     {
         private readonly IAreaLeaderRepository _areaLeaderRepository;
+        private readonly ICustomerRepository _customerRepository;
         private readonly IObjectMapper _objectMapper;
 
-        public AreaLeaderAppService(IAreaLeaderRepository areaLeaderRepository, IObjectMapper objectMapper)
+        public AreaLeaderAppService(IAreaLeaderRepository areaLeaderRepository, ICustomerRepository customerRepository, IObjectMapper objectMapper)
         {
             _areaLeaderRepository = areaLeaderRepository;
+            _customerRepository = customerRepository;
             _objectMapper = objectMapper;
         }
 
@@ -41,6 +44,12 @@ namespace AqualLifeStyle.Application.AreaLeaders
             if (existing != null)
             {
                 throw new UserFriendlyException("Area leader application failed.", "An area leader for this customer already exists.");
+            }
+
+            var customer = await _customerRepository.GetAsync(input.CustomerId);
+            if (!await CurrentUserCanAccessCustomerAsync(customer))
+            {
+                throw new UserFriendlyException("Area leader application failed.", "You do not have permission to apply for this customer.");
             }
 
             var activeLeaderCount = await _areaLeaderRepository.CountActiveAsync();
