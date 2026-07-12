@@ -12,7 +12,7 @@ namespace AqualLifeStyle.Domain.Customers
         public virtual User User { get; set; }
         public string Name { get; private set; }
         public EmailAddress Email { get; private set; }
-        public int? MembershipId { get; set; }
+        public int? MembershipId { get; private set; }
         public bool IsActive { get; private set; }
 
         protected Customer() { }

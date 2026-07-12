@@ -61,7 +61,7 @@ namespace AqualLifeStyle
             return new UserFriendlyException(operation, "A tenant context is required.");
         }
 
-        protected async Task AssertCurrentUserOwnsCustomerAsync(Customer customer)
+        protected Task AssertCurrentUserOwnsCustomerAsync(Customer customer)
         {
             if (customer == null) throw new ArgumentNullException(nameof(customer));
             if (!AbpSession.UserId.HasValue)
@@ -73,21 +73,43 @@ namespace AqualLifeStyle
             {
                 throw new UserFriendlyException("Authorization failed.", "You do not have permission to access this customer.");
             }
+
+            if (!TenantIdsMatch(customer.TenantId, AbpSession.TenantId))
+            {
+                throw new UserFriendlyException("Authorization failed.", "You do not have permission to access this customer in another tenant.");
+            }
+
+            return Task.CompletedTask;
         }
 
-        protected async Task<bool> CurrentUserCanAccessCustomerAsync(Customer customer)
+        protected Task<bool> CurrentUserCanAccessCustomerAsync(Customer customer)
         {
             if (customer == null)
             {
-                return false;
+                return Task.FromResult(false);
             }
 
             if (!AbpSession.UserId.HasValue)
             {
-                return false;
+                return Task.FromResult(false);
             }
 
-            return customer.UserId == AbpSession.UserId.Value;
+            if (customer.UserId != AbpSession.UserId.Value)
+            {
+                return Task.FromResult(false);
+            }
+
+            if (!TenantIdsMatch(customer.TenantId, AbpSession.TenantId))
+            {
+                return Task.FromResult(false);
+            }
+
+            return Task.FromResult(true);
+        }
+
+        private static bool TenantIdsMatch(int? customerTenantId, int? sessionTenantId)
+        {
+            return customerTenantId == sessionTenantId;
         }
     }
 }

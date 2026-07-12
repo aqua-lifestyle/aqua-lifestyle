@@ -39,12 +39,63 @@ namespace AqualLifeStyle.Authorization
             public const string ViewSelf = Default + ".ViewSelf";
         }
 
-        public static class AreaSpaces { public const string Default = "Aqua.AreaSpaces"; public const string View = Default + ".View"; public const string Apply = Default + ".Apply"; public const string Approve = Default + ".Approve"; public const string Manage = Default + ".Manage"; }
-        public static class Orders { public const string Default = "Aqua.Orders"; public const string View = Default + ".View"; public const string Place = Default + ".Place"; public const string Process = Default + ".Process"; public const string Approve = Default + ".Approve"; public const string ViewSelf = Default + ".ViewSelf"; }
-        public static class Savings { public const string Default = "Aqua.Savings"; public const string View = Default + ".View"; public const string Deposit = Default + ".Deposit"; public const string Withdraw = Default + ".Withdraw"; public const string Approve = Default + ".Approve"; public const string ViewSelf = Default + ".ViewSelf"; }
-        public static class Enquiries { public const string Default = "Aqua.Enquiries"; public const string View = Default + ".View"; public const string Create = Default + ".Create"; public const string Update = Default + ".Update"; public const string Resolve = Default + ".Resolve"; public const string ViewSelf = Default + ".ViewSelf"; }
-        public static class Referrals { public const string Default = "Aqua.Referrals"; public const string View = Default + ".View"; public const string Create = Default + ".Create"; public const string Confirm = Default + ".Confirm"; public const string ViewSelf = Default + ".ViewSelf"; }
-        public static class Admin { public const string Default = "Aqua.Admin"; public const string Dashboard = Default + ".Dashboard"; public const string Reports = Default + ".Reports"; public const string Audit = Default + ".Audit"; public const string Settings = Default + ".Settings"; public const string AllTenants = Default + ".AllTenants"; }
+        public static class AreaSpaces
+        {
+            public const string Default = "Aqua.AreaSpaces";
+            public const string View = Default + ".View";
+            public const string Apply = Default + ".Apply";
+            public const string Approve = Default + ".Approve";
+            public const string Manage = Default + ".Manage";
+        }
+
+        public static class Orders
+        {
+            public const string Default = "Aqua.Orders";
+            public const string View = Default + ".View";
+            public const string Place = Default + ".Place";
+            public const string Process = Default + ".Process";
+            public const string Approve = Default + ".Approve";
+            public const string ViewSelf = Default + ".ViewSelf";
+        }
+
+        public static class Savings
+        {
+            public const string Default = "Aqua.Savings";
+            public const string View = Default + ".View";
+            public const string Deposit = Default + ".Deposit";
+            public const string Withdraw = Default + ".Withdraw";
+            public const string Approve = Default + ".Approve";
+            public const string ViewSelf = Default + ".ViewSelf";
+        }
+
+        public static class Enquiries
+        {
+            public const string Default = "Aqua.Enquiries";
+            public const string View = Default + ".View";
+            public const string Create = Default + ".Create";
+            public const string Update = Default + ".Update";
+            public const string Resolve = Default + ".Resolve";
+            public const string ViewSelf = Default + ".ViewSelf";
+        }
+
+        public static class Referrals
+        {
+            public const string Default = "Aqua.Referrals";
+            public const string View = Default + ".View";
+            public const string Create = Default + ".Create";
+            public const string Confirm = Default + ".Confirm";
+            public const string ViewSelf = Default + ".ViewSelf";
+        }
+
+        public static class Admin
+        {
+            public const string Default = "Aqua.Admin";
+            public const string Dashboard = Default + ".Dashboard";
+            public const string Reports = Default + ".Reports";
+            public const string Audit = Default + ".Audit";
+            public const string Settings = Default + ".Settings";
+            public const string AllTenants = Default + ".AllTenants";
+        }
 
         private static readonly Lazy<IReadOnlyCollection<string>> AllPermissionNames =
             new Lazy<IReadOnlyCollection<string>>(() => typeof(AquaPermissions).GetNestedTypes(BindingFlags.Public)
