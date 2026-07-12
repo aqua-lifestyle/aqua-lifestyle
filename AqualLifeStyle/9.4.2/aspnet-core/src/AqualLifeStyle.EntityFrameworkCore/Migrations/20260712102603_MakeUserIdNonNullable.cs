@@ -11,7 +11,19 @@ namespace AqualLifeStyle.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql(@"
-                UPDATE ""AbpUsers"" AS user
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM pg_indexes 
+                        WHERE indexname = 'IX_Customers_UserId'
+                    ) THEN
+                        DROP INDEX ""IX_Customers_UserId"";
+                    END IF;
+                END $$;
+            ");
+
+            migrationBuilder.Sql(@"
+                UPDATE ""AbpUsers"" AS app_user
                 SET
                     ""IsDeleted"" = FALSE,
                     ""IsActive"" = FALSE,
@@ -23,15 +35,15 @@ namespace AqualLifeStyle.Migrations
                     ""IsEmailConfirmed"" = FALSE,
                     ""SecurityStamp"" = gen_random_uuid()::text,
                     ""ConcurrencyStamp"" = gen_random_uuid()::text,
-                    ""NormalizedEmailAddress"" = UPPER(TRIM(user.""EmailAddress"")),
-                    ""NormalizedUserName"" = UPPER(TRIM(user.""UserName""))
+                    ""NormalizedEmailAddress"" = UPPER(TRIM(app_user.""EmailAddress"")),
+                    ""NormalizedUserName"" = UPPER(TRIM(app_user.""UserName""))
                 WHERE ""IsDeleted"" = TRUE
                   AND EXISTS (
                       SELECT 1
                       FROM ""Customers"" AS customer
                       WHERE customer.""UserId"" IS NULL
-                        AND customer.""TenantId"" IS NOT DISTINCT FROM user.""TenantId""
-                        AND UPPER(TRIM(customer.""Email"")) = UPPER(TRIM(user.""EmailAddress""))
+                        AND customer.""TenantId"" IS NOT DISTINCT FROM app_user.""TenantId""
+                        AND UPPER(TRIM(customer.""Email"")) = UPPER(TRIM(app_user.""EmailAddress""))
                   );
 
                 INSERT INTO ""AbpUsers"" (
