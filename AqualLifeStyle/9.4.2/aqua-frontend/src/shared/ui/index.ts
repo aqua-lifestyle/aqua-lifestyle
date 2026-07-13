@@ -15,3 +15,4 @@ export { StatusMessage } from "./status-message";
 export { Tabs, type TabItem } from "./tabs";
 export { TextAreaField } from "./text-area-field";
 export { TextField } from "./text-field";
+export { AccessDenied } from "./access-denied";
