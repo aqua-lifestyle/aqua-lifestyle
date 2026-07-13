@@ -5,6 +5,7 @@ import { useState } from "react";
 import { z } from "zod";
 
 import { login, register } from "@/src/shared/api/auth-service";
+import { publicEnv } from "@/src/shared/config";
 import { useAuthActions, useTenantState, useToast } from "@/src/providers";
 import { Button, Card, LinkButton, TextField } from "@/src/shared/ui";
 
@@ -116,7 +117,7 @@ export const SignupForm = () => {
     const firstName = nameParts[0] ?? formData.name;
     const lastName = nameParts.slice(1).join(" ") || ".";
 
-    const resolvedTenant = currentTenant ?? "default";
+    const resolvedTenant = currentTenant ?? publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME;
 
     const registerResult = await register({
       email: formData.email,

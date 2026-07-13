@@ -144,11 +144,8 @@ export const register = async (input: RegisterInput): Promise<RegisterResult> =>
   try {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      __tenant: input.tenant ?? publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME,
     };
-
-    if (input.tenant) {
-      headers["__tenant"] = input.tenant;
-    }
 
     await axios.post(
       `${API_BASE}/api/services/app/Account/Register`,
