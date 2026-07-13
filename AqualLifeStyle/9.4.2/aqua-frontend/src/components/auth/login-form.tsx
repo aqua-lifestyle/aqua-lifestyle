@@ -4,6 +4,7 @@ import { Droplets, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
+import { login } from "@/src/shared/api/auth-service";
 import { useAuthActions, useTenantState, useToast } from "@/src/providers";
 import {
   Button,
@@ -51,89 +52,25 @@ export const LoginForm = () => {
     setFieldErrors({});
     setIsLoading(true);
 
-    // Demo sign-in: set a synthetic session without a real OIDC flow.
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setSession({
-      accessToken: "demo-access-token",
-      expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
-      user: {
-        id: 1,
-        email: result.data.email,
-        name: result.data.email.split("@")[0],
-        role: "SystemAdmin",
-        permissions: [
-          "Aqua.Members.View",
-          "Aqua.Members.Create",
-          "Aqua.Members.Edit",
-          "Aqua.Members.Delete",
-          "Aqua.Members.Upgrade",
-          "Aqua.Members.ViewSelf",
-          "Aqua.Members.EditSelf",
-          "Aqua.Facilitators.View",
-          "Aqua.Facilitators.Register",
-          "Aqua.Facilitators.Refer",
-          "Aqua.Facilitators.Promote",
-          "Aqua.Facilitators.ViewSelf",
-          "Aqua.AreaLeaders.View",
-          "Aqua.AreaLeaders.Apply",
-          "Aqua.AreaLeaders.Approve",
-          "Aqua.AreaLeaders.Manage",
-          "Aqua.AreaLeaders.ViewSelf",
-          "Aqua.AreaSpaces.View",
-          "Aqua.AreaSpaces.Apply",
-          "Aqua.AreaSpaces.Approve",
-          "Aqua.AreaSpaces.Manage",
-          "Aqua.Orders.View",
-          "Aqua.Orders.Place",
-          "Aqua.Orders.Process",
-          "Aqua.Orders.Approve",
-          "Aqua.Orders.ViewSelf",
-          "Aqua.Savings.View",
-          "Aqua.Savings.Deposit",
-          "Aqua.Savings.Withdraw",
-          "Aqua.Savings.Approve",
-          "Aqua.Savings.ViewSelf",
-          "Aqua.Enquiries.View",
-          "Aqua.Enquiries.Create",
-          "Aqua.Enquiries.Update",
-          "Aqua.Enquiries.Resolve",
-          "Aqua.Enquiries.ViewSelf",
-          "Aqua.Referrals.View",
-          "Aqua.Referrals.Create",
-          "Aqua.Referrals.Confirm",
-          "Aqua.Referrals.ViewSelf",
-          "Aqua.Admin.Dashboard",
-          "Aqua.Admin.Reports",
-          "Aqua.Admin.Audit",
-          "Aqua.Admin.Settings",
-          "Aqua.Admin.AllTenants",
-          "Pages.Customers",
-          "Pages.Customers.Manage",
-          "Pages.Memberships",
-          "Pages.Memberships.Manage",
-          "Pages.Enquiries",
-          "Pages.Enquiries.Manage",
-          "Pages.Orders",
-          "Pages.Orders.Manage",
-          "Pages.Products",
-          "Pages.Products.Manage",
-          "Pages.Tenants",
-          "Pages.Users",
-          "Pages.Users.Activation",
-          "Pages.Roles",
-          "Pages.AreaLeaders",
-          "Pages.AreaLeaders.Manage",
-          "Pages.AreaSpaces",
-          "Pages.AreaSpaces.Manage",
-          "Pages.Facilitators",
-          "Pages.Facilitators.Manage",
-          "Pages.Referrals",
-          "Pages.Referrals.Manage",
-          "Pages.MembershipBenefits",
-          "Pages.MembershipBenefits.Manage",
-        ],
-      },
+    // Real OIDC / OpenIddict authentication via the /connect/token endpoint.
+    const authResult = await login({
+      email: result.data.email,
+      password: result.data.password,
+      rememberMe: result.data.rememberMe,
+      tenant: currentTenant,
     });
+
+    if (!authResult.ok) {
+      toast({
+        message: authResult.message,
+        title: "Sign in failed",
+        type: "error",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    setSession(authResult.session);
 
     toast({
       message: `Signed in as ${result.data.email}`,

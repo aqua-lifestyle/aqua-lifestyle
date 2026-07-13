@@ -4,6 +4,7 @@ import { Droplets, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
+import { login, register } from "@/src/shared/api/auth-service";
 import { useAuthActions, useTenantState, useToast } from "@/src/providers";
 import { Button, Card, LinkButton, TextField } from "@/src/shared/ui";
 
@@ -25,7 +26,6 @@ const step1Schema = z
   });
 
 const step2Schema = z.object({
-  company: z.string().trim().min(2, "Company name must be at least 2 characters."),
   name: z.string().trim().min(2, "Full name must be at least 2 characters."),
 });
 
@@ -44,7 +44,6 @@ export const SignupForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [formData, setFormData] = useState({
-    company: "",
     confirmPassword: "",
     email: "",
     name: "",
@@ -68,7 +67,6 @@ export const SignupForm = () => {
       result = step1Schema.safeParse(formData);
     } else if (step === 1) {
       result = step2Schema.safeParse({
-        company: formData.company,
         name: formData.name,
       });
     } else {
@@ -111,42 +109,53 @@ export const SignupForm = () => {
     if (!validateCurrentStep()) return;
 
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
 
-    setSession({
-      accessToken: "demo-access-token",
-      expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
-      user: {
-        id: 1,
-        email: formData.email,
-        name: formData.name,
-        role: "Member",
-        permissions: [
-          "Aqua.Members.View",
-          "Aqua.Members.ViewSelf",
-          "Aqua.Members.EditSelf",
-          "Aqua.Members.Create",
-          "Aqua.Enquiries.View",
-          "Aqua.Enquiries.ViewSelf",
-          "Aqua.Enquiries.Create",
-          "Aqua.Orders.View",
-          "Aqua.Orders.ViewSelf",
-          "Aqua.Orders.Place",
-          "Aqua.Savings.View",
-          "Aqua.Savings.ViewSelf",
-          "Aqua.Referrals.View",
-          "Aqua.Referrals.ViewSelf",
-          "Aqua.Referrals.Create",
-          "Pages.Customers",
-          "Pages.Memberships",
-          "Pages.Enquiries",
-          "Pages.Orders",
-          "Pages.Products",
-          "Pages.Savings",
-          "Pages.Referrals",
-        ],
-      },
+    // Real registration via the ABP /api/account/register endpoint.
+    // Split full name into first name + surname (ABP requires both).
+    const nameParts = formData.name.trim().split(/\s+/);
+    const firstName = nameParts[0] ?? formData.name;
+    const lastName = nameParts.slice(1).join(" ") || ".";
+
+    const registerResult = await register({
+      email: formData.email,
+      password: formData.password,
+      name: firstName,
+      surname: lastName,
     });
+
+    if (!registerResult.ok) {
+      const nextErrors: Record<string, string> = {};
+
+      if (registerResult.fieldErrors) {
+        for (const [field, message] of Object.entries(registerResult.fieldErrors)) {
+          const key = field === "emailAddress" ? "email" : field === "userName" ? "email" : field;
+          nextErrors[key] = message;
+        }
+      }
+
+      setErrors(nextErrors);
+
+      toast({
+        message: registerResult.fieldErrors
+          ? Object.values(registerResult.fieldErrors).join(", ")
+          : registerResult.message,
+        title: "Registration failed",
+        type: "error",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    // Auto-login after successful registration
+    const loginResult = await login({
+      email: formData.email,
+      password: formData.password,
+      tenant: currentTenant,
+    });
+
+    if (loginResult.ok) {
+      setSession(loginResult.session);
+    }
 
     toast({
       message: "Account created successfully.",
@@ -304,15 +313,6 @@ export const SignupForm = () => {
                       required
                       value={formData.name}
                     />
-                    <TextField
-                      errorMessage={errors.company}
-                      label="Company / tenant"
-                      name="company"
-                      onChange={(e) => updateField("company", e.target.value)}
-                      placeholder="Acme Club"
-                      required
-                      value={formData.company}
-                    />
                     {currentTenant ? (
                       <p className="text-sm text-muted-foreground">
                         Tenant context: <span className="font-semibold text-foreground">{currentTenant}</span>
@@ -333,10 +333,6 @@ export const SignupForm = () => {
                         <div className="flex justify-between">
                           <dt className="text-muted-foreground">Name</dt>
                           <dd className="text-foreground">{formData.name}</dd>
-                        </div>
-                        <div className="flex justify-between">
-                          <dt className="text-muted-foreground">Company</dt>
-                          <dd className="text-foreground">{formData.company}</dd>
                         </div>
                       </dl>
                     </div>
