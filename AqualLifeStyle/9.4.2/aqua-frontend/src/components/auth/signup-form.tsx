@@ -121,6 +121,7 @@ export const SignupForm = () => {
       password: formData.password,
       name: firstName,
       surname: lastName,
+      tenant: currentTenant,
     });
 
     if (!registerResult.ok) {

@@ -59,6 +59,7 @@ export type RegisterInput = {
   password: string;
   name: string;
   surname: string;
+  tenant?: string | null;
 };
 
 export type RegisterResult =
@@ -141,6 +142,14 @@ export const login = async (input: LoginInput): Promise<LoginResult> => {
  */
 export const register = async (input: RegisterInput): Promise<RegisterResult> => {
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (input.tenant) {
+      headers["__tenant"] = input.tenant;
+    }
+
     await axios.post(
       `${API_BASE}/api/services/app/Account/Register`,
       {
@@ -151,9 +160,7 @@ export const register = async (input: RegisterInput): Promise<RegisterResult> =>
         password: input.password,
       },
       {
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
       },
     );
 
@@ -164,7 +171,6 @@ export const register = async (input: RegisterInput): Promise<RegisterResult> =>
 
       if (error.response.status === 400) {
         const fieldErrors: Record<string, string> = {};
-
         const validationErrors = (
           (data as { validationErrors?: { memberNames?: string[]; message: string }[] })
             .validationErrors ?? []
