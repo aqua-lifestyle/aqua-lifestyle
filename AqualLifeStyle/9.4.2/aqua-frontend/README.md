@@ -34,7 +34,8 @@ Use this path for the current end-to-end demo:
 - Email/SMS delivery for enquiry notifications is intentionally paused.
 - Payments, subscriptions, fulfillment, and real order settlement are not exposed as frontend workflows yet.
 - Order intents are available as the intentionally small pre-payment commerce handoff with read-only value metrics, not payment settlement.
-- Area Space, Area Leader, events, training, and therapy modules need backend/API confirmation before UI work.
+- Area Space, Area Leader, Facilitator, and Referral modules now have frontend UI flows backed by existing ABP app services.
+- Events, training, and therapy modules need backend/API confirmation before UI work.
 - OpenAPI-generated clients should replace hand-written DTOs once the Swagger contract is stable for frontend generation.
 
 ## API Contract
@@ -70,6 +71,54 @@ Why this order:
 - It extends the current proven journey naturally: membership -> product -> customer -> enquiry -> conversion -> order intent.
 - It validates buyer/operator behavior before committing to payment, fulfillment, or savings-led complexity.
 - It avoids creating frontend-only workflows for backend modules that are not yet exposed.
+
+## Role-Based UI Flows
+
+The frontend now includes role-specific pages for AreaLeader, Facilitator, Member, and Guest flows. Navigation links are permission-gated using the existing `hasPermission()` pattern.
+
+### AreaLeader
+
+Routes:
+- `/area-leader` — list all area leaders
+- `/area-leader/[areaLeaderId]` — area leader details with rank promotion
+- `/area-leader/area-spaces` — list all area spaces
+- `/area-leader/area-spaces/[areaSpaceId]` — area space details with review/approval actions
+
+Provider: `src/providers/AreaLeaders/` and `src/providers/AreaSpaces/`
+
+Permissions: `Pages.AreaLeaders`, `Pages.AreaSpaces`, `Aqua.AreaLeaders.Manage`, `Aqua.AreaSpaces.Manage`
+
+### Facilitator
+
+Routes:
+- `/facilitator` — list all facilitators
+- `/facilitator/[facilitatorId]` — facilitator details
+- `/facilitator/referrals` — list all referrals
+- `/facilitator/referrals/[referralId]` — referral details with award confirmation
+
+Provider: `src/providers/Facilitators/` and `src/providers/Referrals/`
+
+Permissions: `Pages.Facilitators`, `Pages.Referrals`, `Aqua.Referrals.Confirm`
+
+### Member
+
+Routes:
+- `/member` — member dashboard with orders, membership, and savings overview
+- `/member/orders` — member's order history
+- `/member/savings` — member's savings window status
+
+Provider: reuses existing `OrderIntents` and `Memberships` providers
+
+Permissions: `Pages.Orders`, `Aqua.Orders.ViewSelf`, `Pages.Memberships`
+
+### Guest
+
+Routes:
+- `/catalog` — public product catalog
+- `/contact` — public contact page
+- `/signup` — registration flow (existing)
+
+Permissions: none required for public pages
 
 ## Architecture Baseline
 
@@ -125,6 +174,15 @@ Open:
 - Create enquiry: [http://localhost:3000/enquiries/create](http://localhost:3000/enquiries/create)
 - Order intents: [http://localhost:3000/order-intents](http://localhost:3000/order-intents)
 - Memberships: [http://localhost:3000/memberships](http://localhost:3000/memberships)
+- Area Leaders: [http://localhost:3000/area-leader](http://localhost:3000/area-leader)
+- Area Spaces: [http://localhost:3000/area-leader/area-spaces](http://localhost:3000/area-leader/area-spaces)
+- Facilitators: [http://localhost:3000/facilitator](http://localhost:3000/facilitator)
+- Referrals: [http://localhost:3000/facilitator/referrals](http://localhost:3000/facilitator/referrals)
+- Member dashboard: [http://localhost:3000/member](http://localhost:3000/member)
+- Member orders: [http://localhost:3000/member/orders](http://localhost:3000/member/orders)
+- Member savings: [http://localhost:3000/member/savings](http://localhost:3000/member/savings)
+- Public catalog: [http://localhost:3000/catalog](http://localhost:3000/catalog)
+- Contact: [http://localhost:3000/contact](http://localhost:3000/contact)
 
 Use a normal browser such as Chrome or Edge for local HTTPS backend testing. VS Code's embedded preview can report generic network errors with local development certificates.
 
@@ -145,3 +203,4 @@ npm run build
 - Replace manual tenant entry with tenant discovery once the backend contract is confirmed.
 - Generate type-safe API clients from the verified Swagger JSON endpoint once auth/tenant contracts are stable.
 - Expand focused tests for API client behavior, provider reducers, and registration validation.
+- Add E2E tests for role-specific flows once Cypress or Playwright is configured.
