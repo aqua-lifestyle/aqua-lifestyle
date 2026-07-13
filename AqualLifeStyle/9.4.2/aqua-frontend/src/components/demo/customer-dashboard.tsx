@@ -20,6 +20,8 @@ import {
   useCustomersState,
   useMembershipsActions,
   useMembershipsState,
+  useProductsActions,
+  useProductsState,
 } from "@/src/providers";
 import { Badge, Button, Card, StatusMessage } from "@/src/shared/ui";
 
@@ -44,38 +46,67 @@ export const CustomerDashboard = () => {
   const user = session?.user;
 
   const { changeMembership, getMyCustomer } = useCustomersActions();
-  const { getActiveTiers } = useMembershipsActions();
-  const {
-    isLoadError: isCustomersError,
-    isLoadPending: isCustomersPending,
-    loadErrorMessage: customersErrorMessage,
-  } = useCustomersState();
+  const { getActiveTiers, getSavingsWindowStatuses } = useMembershipsActions();
+  const { getEligibleProductsForCustomer, getProducts } = useProductsActions();
   const {
     changeMembershipErrorMessage,
     isChangeMembershipError,
+    isLoadError: isCustomersError,
+    isLoadPending: isCustomersPending,
+    loadErrorMessage: customersErrorMessage,
+    myCustomer,
+    myCustomerErrorMessage,
+    isMyCustomerError,
+    isMyCustomerPending,
   } = useCustomersState();
   const {
     errorMessage: membershipsErrorMessage,
     isError: isMembershipsError,
     isPending: isMembershipsPending,
     memberships,
+    savingsWindowStatuses,
+    isSavingsWindowStatusesError,
+    isSavingsWindowStatusesPending,
+    savingsWindowStatusesErrorMessage,
   } = useMembershipsState();
+  const {
+    eligibleProducts,
+    isEligibleError,
+    isEligiblePending,
+    eligibleErrorMessage,
+  } = useProductsState();
 
   useEffect(() => {
     void getMyCustomer();
     void getActiveTiers();
-  }, [getMyCustomer, getActiveTiers]);
+    void getSavingsWindowStatuses();
+  }, [getMyCustomer, getActiveTiers, getSavingsWindowStatuses]);
 
-  const currentMembership = useMemo(() => {
-    if (!myCustomer?.membershipId) return null;
-    return memberships.find((m) => m.id === myCustomer.membershipId) ?? null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myCustomer?.membershipId, memberships]);
+  useEffect(() => {
+    if (myCustomer?.id) {
+      void getEligibleProductsForCustomer(myCustomer.id);
+    } else {
+      void getProducts();
+    }
+  }, [myCustomer?.id, getEligibleProductsForCustomer, getProducts]);
+
+  const currentMembership = myCustomer?.membershipId
+    ? memberships.find((m) => m.id === myCustomer.membershipId) ?? null
+    : null;
 
   const availableTiers = useMemo(() => {
     if (!memberships.length) return [];
     return memberships.filter((m) => m.isActive);
   }, [memberships]);
+
+  const currentSavingsWindow = useMemo(() => {
+    if (!currentMembership) return null;
+    return (
+      savingsWindowStatuses.find(
+        (s) => s.tier === currentMembership.membershipType,
+      ) ?? null
+    );
+  }, [currentMembership, savingsWindowStatuses]);
 
   const getInitials = () => {
     if (!user?.name) return "?";
@@ -85,13 +116,26 @@ export const CustomerDashboard = () => {
     return `${first}${last}`.toUpperCase();
   };
 
-  const isLoading = isCustomersPending || isMembershipsPending || isMyCustomerPending;
-  const hasError = isCustomersError || isMembershipsError || isMyCustomerError || isChangeMembershipError;
+  const isLoading =
+    isCustomersPending ||
+    isMembershipsPending ||
+    isMyCustomerPending ||
+    isSavingsWindowStatusesPending ||
+    isEligiblePending;
+  const hasError =
+    isCustomersError ||
+    isMembershipsError ||
+    isMyCustomerError ||
+    isChangeMembershipError ||
+    isSavingsWindowStatusesError ||
+    isEligibleError;
   const errorMessages = [
     customersErrorMessage,
     membershipsErrorMessage,
     myCustomerErrorMessage,
     changeMembershipErrorMessage,
+    savingsWindowStatusesErrorMessage,
+    eligibleErrorMessage,
   ].filter(Boolean);
 
   return (
@@ -158,9 +202,13 @@ export const CustomerDashboard = () => {
                   {currentMembership ? "Active" : "Locked"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {currentMembership
-                    ? "Join a membership to unlock savings"
-                    : "No membership selected"}
+                  {currentSavingsWindow
+                    ? currentSavingsWindow.isSavingsWindowOpen
+                      ? "Window open"
+                      : "Window closed"
+                    : currentMembership
+                      ? "Join a membership to unlock savings"
+                      : "No membership selected"}
                 </p>
               </div>
             </Card>
@@ -171,9 +219,11 @@ export const CustomerDashboard = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Products</p>
-                <p className="text-2xl font-bold">Filtered for you</p>
+                <p className="text-2xl font-bold">
+                  {eligibleProducts.length}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  Based on your tier
+                  {eligibleProducts.length === 1 ? "Item available" : "Items available"}
                 </p>
               </div>
             </Card>
@@ -301,7 +351,13 @@ export const CustomerDashboard = () => {
                 <span>Savings window</span>
                 <span className="flex items-center gap-1 font-semibold text-foreground">
                   <Clock className="size-4" />
-                  {currentMembership ? "Coming soon" : "Locked"}
+                  {currentSavingsWindow
+                    ? currentSavingsWindow.isSavingsWindowOpen
+                      ? "Open"
+                      : "Closed"
+                    : currentMembership
+                      ? "Coming soon"
+                      : "Locked"}
                 </span>
               </div>
               <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
@@ -321,18 +377,32 @@ export const CustomerDashboard = () => {
               <h2 className="text-lg font-semibold">Products for you</h2>
             </div>
             <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-              <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
-                <span>Featured products</span>
-                <span className="font-semibold text-foreground">Coming soon</span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
-                <span>Recommended for you</span>
-                <span className="font-semibold text-foreground">Coming soon</span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
-                <span>New arrivals</span>
-                <span className="font-semibold text-foreground">Coming soon</span>
-              </div>
+              {eligibleProducts.length === 0 ? (
+                <div className="rounded-lg bg-muted/50 px-4 py-3">
+                  No eligible products available yet.
+                </div>
+              ) : (
+                eligibleProducts.map((product) => (
+                  <div
+                    key={product.id}
+                    className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3"
+                  >
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        {product.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {product.membershipId
+                          ? `Tier ${product.membershipId}`
+                          : "General"}
+                      </p>
+                    </div>
+                    <span className="font-semibold text-foreground">
+                      {formatCurrency(product.price)}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </Card>
 

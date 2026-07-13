@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const publicEnvSchema = z.object({
   NEXT_PUBLIC_ABP_API_URL: z.string().url(),
-  NEXT_PUBLIC_DEFAULT_TENANT_NAME: z.string().default("Johannesburg"),
+  NEXT_PUBLIC_DEFAULT_TENANT_NAME: z.string().default("Default"),
 });
 
 export const publicEnv = publicEnvSchema.parse({
