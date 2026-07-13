@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.Web.Host.Models;
+using Abp.Dependency;
 using Abp.EntityFrameworkCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -12,9 +13,14 @@ namespace AqualLifeStyle.Web.Host.Controllers
     /// <summary>
     /// Provides a lightweight application health endpoint for frontend and operational readiness checks.
     /// </summary>
+    /// <remarks>
+    /// Implements <see cref="ITransientDependency"/> so Castle Windsor can resolve this controller.
+    /// Plain <see cref="ControllerBase"/> types are not registered by ABP conventional registration
+    /// unless they also implement an ABP dependency interface (or inherit <c>AbpController</c>).
+    /// </remarks>
     [ApiController]
     [Route("api/health")]
-    public class HealthController : ControllerBase
+    public class HealthController : ControllerBase, ITransientDependency
     {
         private const string HealthyStatus = "Healthy";
         private const string DegradedStatus = "Degraded";
