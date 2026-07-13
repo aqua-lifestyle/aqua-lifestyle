@@ -64,6 +64,15 @@ apiClient.interceptors.response.use(
       throw normalizeAbpError(error.response.status, error.response.data);
     }
 
-    throw normalizeNetworkError();
+    // No HTTP response: DNS/port down, CORS blocked, or untrusted HTTPS cert.
+    if (process.env.NODE_ENV === "development") {
+      console.error(
+        "[apiClient] Network error reaching",
+        publicEnv.NEXT_PUBLIC_ABP_API_URL,
+        error.code ?? error.message,
+      );
+    }
+
+    throw normalizeNetworkError(error);
   },
 );

@@ -37,6 +37,18 @@ describe("normalizeNetworkError", () => {
     expect(error.message).toContain("HTTPS certificate");
     expect(error.message).toContain("CORS");
   });
+
+  it("returns a TLS-specific message for certificate failures", () => {
+    const error = normalizeNetworkError(
+      new Error("self-signed certificate DEPTH_ZERO_SELF_SIGNED_CERT"),
+    );
+
+    expect(error).toBeInstanceOf(AbpHttpError);
+    expect(error.status).toBe(0);
+    expect(error.code).toBe("Aqua:Tls");
+    expect(error.message).toContain("HTTPS certificate is not trusted");
+    expect(error.message).toContain("http://localhost:21021");
+  });
 });
 
 describe("unwrapAbpResponse", () => {

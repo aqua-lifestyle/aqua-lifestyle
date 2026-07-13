@@ -32,6 +32,9 @@ export type AbpResponseEnvelope<TResponse> = {
 const NETWORK_ERROR_MESSAGE =
   "Unable to reach the backend API. Confirm the backend is running, the local HTTPS certificate is trusted, and CORS allows this frontend origin.";
 
+const CERTIFICATE_ERROR_MESSAGE =
+  "Unable to reach the backend API because the local HTTPS certificate is not trusted. Open https://localhost:44311/swagger in this browser and accept the certificate, run `dotnet dev-certs https --trust`, or set NEXT_PUBLIC_ABP_API_URL=http://localhost:21021 for local HTTP development.";
+
 export class AbpHttpError extends Error {
   readonly status: number;
   readonly code?: string;
@@ -65,7 +68,29 @@ export const normalizeAbpError = (
   });
 };
 
-export const normalizeNetworkError = (): AbpHttpError => {
+const looksLikeCertificateError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const haystack = `${error.message} ${error.name}`.toLowerCase();
+  return (
+    haystack.includes("certificate") ||
+    haystack.includes("ssl") ||
+    haystack.includes("tls") ||
+    haystack.includes("err_cert") ||
+    haystack.includes("depth_zero_self_signed")
+  );
+};
+
+export const normalizeNetworkError = (error?: unknown): AbpHttpError => {
+  if (looksLikeCertificateError(error)) {
+    return new AbpHttpError(0, {
+      code: "Aqua:Tls",
+      message: CERTIFICATE_ERROR_MESSAGE,
+    });
+  }
+
   return new AbpHttpError(0, {
     code: "Aqua:Network",
     message: NETWORK_ERROR_MESSAGE,

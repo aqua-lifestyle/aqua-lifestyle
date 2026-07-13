@@ -151,9 +151,74 @@ Default local backend settings:
 ```env
 NEXT_PUBLIC_ABP_API_URL=https://localhost:44311
 NEXTAUTH_SECRET=replace_with_a_32_character_minimum_secret
+NEXTAUTH_URL=http://localhost:3000
 ```
 
 `NEXT_PUBLIC_ABP_API_URL` is intentionally public because browser code needs the backend base URL. `NEXTAUTH_SECRET` is server-only and must not be exposed to client modules.
+
+## API Connection Setup
+
+The Next.js app talks to the ABP host over HTTPS by default.
+
+| Service | URL |
+| --- | --- |
+| Frontend | `http://localhost:3000` |
+| Backend HTTPS | `https://localhost:44311` |
+| Backend HTTP (dev fallback) | `http://localhost:21021` |
+| Health check | `/api/health` |
+| Swagger | `https://localhost:44311/swagger` |
+
+### 1. Start the backend
+
+From the monorepo `aspnet-core` folder (with `ConnectionStrings__Default` and JWT settings available via `.env` or environment):
+
+```bash
+cd AqualLifeStyle/9.4.2/aspnet-core
+dotnet run --project src/AqualLifeStyle.Web.Host
+```
+
+CORS allows `http://localhost:3000` and `https://localhost:3000` via `App:CorsOrigins` in `appsettings.json`.
+
+### 2. Trust the development HTTPS certificate
+
+```bash
+dotnet dev-certs https --trust
+```
+
+Then open [https://localhost:44311/swagger](https://localhost:44311/swagger) once in the same browser you use for the frontend and accept the certificate warning if shown.
+
+On Linux, system-wide trust is limited. If the browser still blocks API calls with a network/certificate error, use the HTTP fallback:
+
+```env
+NEXT_PUBLIC_ABP_API_URL=http://localhost:21021
+```
+
+Restart `npm run dev` after changing `.env.local`.
+
+### 3. Start the frontend
+
+```bash
+cd AqualLifeStyle/9.4.2/aqua-frontend
+npm run dev
+```
+
+### 4. Diagnose connectivity
+
+```bash
+bash AqualLifeStyle/9.4.2/scripts/diagnose-api.sh
+```
+
+The script checks process, ports, `/api/health`, TLS trust, CORS, and `.env.local`.
+
+### Common failure: "Unable to reach the backend API"
+
+| Cause | What to check |
+| --- | --- |
+| Backend not running | `pgrep -af AqualLifeStyle.Web.Host` and port `44311` |
+| Wrong port/URL | `NEXT_PUBLIC_ABP_API_URL` must be `https://localhost:44311` (not `44305`) |
+| Untrusted HTTPS cert | Accept cert in browser or use `http://localhost:21021` |
+| CORS origin missing | Backend `App:CorsOrigins` must include your frontend origin |
+| Health endpoint 500 | Backend log `App_Data/Logs/Logs.txt` — health controller must be registered with Castle Windsor |
 
 ## Development
 
