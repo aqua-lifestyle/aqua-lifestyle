@@ -55,8 +55,10 @@ const baseState = {
 beforeEach(() => {
   vi.resetAllMocks();
 
-  (useProductsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue(baseState);
-  (useProductsActions as unknown as { mockReturnValue: { getProducts: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useProductsState).mockReturnValue(baseState);
+  vi.mocked(useProductsActions).mockReturnValue({
+    getEligibleProductsForCustomer: vi.fn(),
+    getProduct: vi.fn(),
     getProducts: vi.fn(),
   });
 });
@@ -71,7 +73,7 @@ describe("PublicCatalog", () => {
   });
 
   it("shows loading state", () => {
-    (useProductsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useProductsState).mockReturnValue({
       ...baseState,
       isPending: true,
     });
@@ -82,7 +84,7 @@ describe("PublicCatalog", () => {
   });
 
   it("shows error state", () => {
-    (useProductsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useProductsState).mockReturnValue({
       ...baseState,
       isError: true,
       errorMessage: "Failed to load products",
@@ -94,7 +96,7 @@ describe("PublicCatalog", () => {
   });
 
   it("shows empty state when there are no products", () => {
-    (useProductsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useProductsState).mockReturnValue({
       ...baseState,
       products: [],
     });

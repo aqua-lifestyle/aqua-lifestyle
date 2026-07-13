@@ -33,7 +33,6 @@ export type ReferralsState = {
 
 export type ReferralsActions = {
   confirmAward: (id: number) => Promise<boolean>;
-  getReferral: (id: number) => Promise<void>;
   getReferrals: () => Promise<void>;
   getReferralsByEnquiry: (enquiryId: number) => Promise<void>;
 };

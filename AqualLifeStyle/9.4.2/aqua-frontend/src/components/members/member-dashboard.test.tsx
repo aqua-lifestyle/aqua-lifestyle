@@ -118,14 +118,19 @@ const baseOrderIntentsState = {
 beforeEach(() => {
   vi.resetAllMocks();
 
-  (useAuthState as unknown as { mockReturnValue: typeof baseAuthState }).mockReturnValue(baseAuthState);
-  (useMembershipsState as unknown as { mockReturnValue: typeof baseMembershipsState }).mockReturnValue(baseMembershipsState);
-  (useOrderIntentsState as unknown as { mockReturnValue: typeof baseOrderIntentsState }).mockReturnValue(baseOrderIntentsState);
-  (useMembershipsActions as unknown as { mockReturnValue: { getMemberships: () => Promise<void>; getSavingsWindowStatuses: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useAuthState).mockReturnValue(baseAuthState);
+  vi.mocked(useMembershipsState).mockReturnValue(baseMembershipsState);
+  vi.mocked(useOrderIntentsState).mockReturnValue(baseOrderIntentsState);
+  vi.mocked(useMembershipsActions).mockReturnValue({
+    getMembership: vi.fn(),
     getMemberships: vi.fn(),
     getSavingsWindowStatuses: vi.fn(),
+    getTierBenefits: vi.fn(),
   });
-  (useOrderIntentsActions as unknown as { mockReturnValue: { getOrderIntents: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useOrderIntentsActions).mockReturnValue({
+    cancelOrderIntent: vi.fn(),
+    completeOrderIntent: vi.fn(),
+    createFromEnquiry: vi.fn(),
     getOrderIntents: vi.fn(),
   });
 });
@@ -143,12 +148,12 @@ describe("MemberDashboard", () => {
   });
 
   it("shows loading state", () => {
-    (useMembershipsState as unknown as { mockReturnValue: typeof baseMembershipsState }).mockReturnValue({
+    vi.mocked(useMembershipsState).mockReturnValue({
       ...baseMembershipsState,
       isPending: true,
       isSuccess: false,
     });
-    (useOrderIntentsState as unknown as { mockReturnValue: typeof baseOrderIntentsState }).mockReturnValue({
+    vi.mocked(useOrderIntentsState).mockReturnValue({
       ...baseOrderIntentsState,
       isLoadSuccess: false,
       isLoadPending: true,
@@ -160,7 +165,7 @@ describe("MemberDashboard", () => {
   });
 
   it("shows error state", () => {
-    (useMembershipsState as unknown as { mockReturnValue: typeof baseMembershipsState }).mockReturnValue({
+    vi.mocked(useMembershipsState).mockReturnValue({
       ...baseMembershipsState,
       isError: true,
       errorMessage: "Failed to load memberships",

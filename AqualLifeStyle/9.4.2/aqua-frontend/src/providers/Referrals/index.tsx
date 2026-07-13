@@ -13,9 +13,6 @@ import {
   confirmAwardError,
   confirmAwardPending,
   confirmAwardSuccess,
-  getReferralError,
-  getReferralPending,
-  getReferralSuccess,
   getReferralsByEnquiryError,
   getReferralsByEnquiryPending,
   getReferralsByEnquirySuccess,
@@ -65,19 +62,6 @@ export const ReferralsProvider = ({ children }: ReferralsProviderProps) => {
     }
   }, []);
 
-  const getReferral = useCallback(async (id: number) => {
-    dispatch(getReferralPending());
-
-    try {
-      const referral = await httpClient.get<Referral>(
-        apiEndpoints.referrals.getByEnquiry(id),
-      );
-      dispatch(getReferralSuccess(referral));
-    } catch (error) {
-      dispatch(getReferralError(getErrorMessage(error)));
-    }
-  }, []);
-
   const getReferralsByEnquiry = useCallback(async (enquiryId: number) => {
     dispatch(getReferralsByEnquiryPending());
 
@@ -110,11 +94,10 @@ export const ReferralsProvider = ({ children }: ReferralsProviderProps) => {
   const actions = useMemo<ReferralsActions>(
     () => ({
       confirmAward,
-      getReferral,
       getReferrals,
       getReferralsByEnquiry,
     }),
-    [confirmAward, getReferral, getReferrals, getReferralsByEnquiry],
+    [confirmAward, getReferrals, getReferralsByEnquiry],
   );
 
   return (

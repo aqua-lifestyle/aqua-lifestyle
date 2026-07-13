@@ -66,9 +66,12 @@ const baseState = {
 beforeEach(() => {
   vi.resetAllMocks();
 
-  (useAuthState as unknown as { mockReturnValue: typeof baseAuthState }).mockReturnValue(baseAuthState);
-  (useOrderIntentsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue(baseState);
-  (useOrderIntentsActions as unknown as { mockReturnValue: { getOrderIntents: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useAuthState).mockReturnValue(baseAuthState);
+  vi.mocked(useOrderIntentsState).mockReturnValue(baseState);
+  vi.mocked(useOrderIntentsActions).mockReturnValue({
+    cancelOrderIntent: vi.fn(),
+    completeOrderIntent: vi.fn(),
+    createFromEnquiry: vi.fn(),
     getOrderIntents: vi.fn(),
   });
 });
@@ -85,7 +88,7 @@ describe("MemberOrders", () => {
   });
 
   it("shows loading state", () => {
-    (useOrderIntentsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useOrderIntentsState).mockReturnValue({
       ...baseState,
       isLoadPending: true,
     });
@@ -96,7 +99,7 @@ describe("MemberOrders", () => {
   });
 
   it("shows error state", () => {
-    (useOrderIntentsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useOrderIntentsState).mockReturnValue({
       ...baseState,
       isLoadError: true,
       loadErrorMessage: "Failed to load orders",
@@ -108,7 +111,7 @@ describe("MemberOrders", () => {
   });
 
   it("shows empty state when there are no orders", () => {
-    (useOrderIntentsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useOrderIntentsState).mockReturnValue({
       ...baseState,
       orderIntents: [],
     });

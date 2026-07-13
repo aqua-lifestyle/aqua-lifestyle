@@ -70,10 +70,6 @@ export const AreaLeaderDashboard = () => {
       </main>
     );
   }
-    return [...orderIntents]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 5);
-  }, [orderIntents]);
 
   return (
     <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">

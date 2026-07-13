@@ -41,35 +41,6 @@ export const referralsReducer = (
             : state.selectedReferral,
       };
 
-    case ReferralsActionTypes.getReferralError:
-      return {
-        ...state,
-        isSelectedError: true,
-        isSelectedPending: false,
-        isSelectedSuccess: false,
-        selectedReferral: null,
-        selectedErrorMessage: action.payload,
-      };
-
-    case ReferralsActionTypes.getReferralPending:
-      return {
-        ...state,
-        isSelectedError: false,
-        isSelectedPending: true,
-        isSelectedSuccess: false,
-        selectedErrorMessage: null,
-      };
-
-    case ReferralsActionTypes.getReferralSuccess:
-      return {
-        ...state,
-        isSelectedError: false,
-        isSelectedPending: false,
-        isSelectedSuccess: true,
-        selectedReferral: action.payload,
-        selectedErrorMessage: null,
-      };
-
     case ReferralsActionTypes.getReferralsByEnquiryError:
       return {
         ...state,

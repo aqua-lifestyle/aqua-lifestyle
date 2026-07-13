@@ -79,12 +79,6 @@ export const FacilitatorsList = () => {
       </main>
     );
   }
-    return facilitators.filter((facilitator) => {
-      const matchesRank =
-        rankFilter === "all" || facilitator.rank === Number(rankFilter);
-      return matchesRank;
-    });
-  }, [facilitators, rankFilter]);
 
   const tableColumns = [
     {

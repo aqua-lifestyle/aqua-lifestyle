@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Facilitator } from "@/src/providers/Facilitators/context";
-import { useFacilitatorsActions, useFacilitatorsState } from "@/src/providers";
+import { useFacilitatorsActions, useFacilitatorsState, useAuthState } from "@/src/providers";
 
 import { FacilitatorsList } from "./facilitators-list";
 
@@ -14,6 +14,7 @@ vi.mock("@/src/providers", async () => {
     ...actual,
     useFacilitatorsActions: vi.fn(),
     useFacilitatorsState: vi.fn(),
+    useAuthState: vi.fn(),
   };
 });
 
@@ -48,6 +49,9 @@ const baseState = {
   isRegisterError: false,
   isRegisterPending: false,
   isRegisterSuccess: false,
+  isSelectedError: false,
+  isSelectedPending: false,
+  isSelectedSuccess: false,
   loadErrorMessage: null,
   registerErrorMessage: null,
   selectedFacilitator: null,
@@ -57,9 +61,28 @@ const baseState = {
 beforeEach(() => {
   vi.resetAllMocks();
 
-  (useFacilitatorsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue(baseState);
-  (useFacilitatorsActions as unknown as { mockReturnValue: { getFacilitators: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useAuthState).mockReturnValue({
+    isAuthenticated: true,
+    isReady: true,
+    session: {
+      accessToken: "token",
+      expiresAt: null,
+      user: {
+        id: 99,
+        email: "test@example.com",
+        name: "Test User",
+        permissions: ["Pages.Facilitators"],
+        role: "admin",
+      },
+    },
+  });
+
+  vi.mocked(useFacilitatorsState).mockReturnValue(baseState);
+  vi.mocked(useFacilitatorsActions).mockReturnValue({
+    getFacilitator: vi.fn(),
     getFacilitators: vi.fn(),
+    getFacilitatorsByCustomer: vi.fn(),
+    registerFacilitator: vi.fn(),
   });
 });
 
@@ -73,7 +96,7 @@ describe("FacilitatorsList", () => {
   });
 
   it("shows loading state", () => {
-    (useFacilitatorsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useFacilitatorsState).mockReturnValue({
       ...baseState,
       isLoadPending: true,
     });
@@ -84,7 +107,7 @@ describe("FacilitatorsList", () => {
   });
 
   it("shows error state", () => {
-    (useFacilitatorsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useFacilitatorsState).mockReturnValue({
       ...baseState,
       isLoadError: true,
       loadErrorMessage: "Failed to load facilitators",
@@ -96,7 +119,7 @@ describe("FacilitatorsList", () => {
   });
 
   it("shows empty state when there are no facilitators", () => {
-    (useFacilitatorsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useFacilitatorsState).mockReturnValue({
       ...baseState,
       facilitators: [],
     });

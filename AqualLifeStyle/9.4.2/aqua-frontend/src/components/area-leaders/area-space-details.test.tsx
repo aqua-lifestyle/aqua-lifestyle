@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AreaSpace } from "@/src/providers/AreaSpaces/context";
-import { useAreaSpacesActions, useAreaSpacesState } from "@/src/providers";
+import { useAreaSpacesActions, useAreaSpacesState, useAuthState } from "@/src/providers";
 
 import { AreaSpaceDetails } from "./area-space-details";
 
@@ -14,6 +14,7 @@ vi.mock("@/src/providers", async () => {
     ...actual,
     useAreaSpacesActions: vi.fn(),
     useAreaSpacesState: vi.fn(),
+    useAuthState: vi.fn(),
   };
 });
 
@@ -59,10 +60,28 @@ const baseState = {
 beforeEach(() => {
   vi.resetAllMocks();
 
-  (useAreaSpacesState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue(baseState);
-  (useAreaSpacesActions as unknown as { mockReturnValue: { getAreaSpace: () => Promise<void>; approveAreaSpace: () => Promise<boolean>; startReview: () => Promise<boolean>; recordPresentation: () => Promise<boolean>; recordStartupOrder: () => Promise<boolean>; suspendAreaSpace: () => Promise<boolean> } }).mockReturnValue({
-    getAreaSpace: vi.fn(),
+  vi.mocked(useAuthState).mockReturnValue({
+    isAuthenticated: true,
+    isReady: true,
+    session: {
+      accessToken: "token",
+      expiresAt: null,
+      user: {
+        id: 99,
+        email: "test@example.com",
+        name: "Test User",
+        permissions: ["Pages.AreaSpaces"],
+        role: "admin",
+      },
+    },
+  });
+
+  vi.mocked(useAreaSpacesState).mockReturnValue(baseState);
+  vi.mocked(useAreaSpacesActions).mockReturnValue({
+    applyAreaSpace: vi.fn(),
     approveAreaSpace: vi.fn(),
+    getAreaSpace: vi.fn(),
+    getAreaSpaces: vi.fn(),
     startReview: vi.fn(),
     recordPresentation: vi.fn(),
     recordStartupOrder: vi.fn(),
@@ -83,7 +102,7 @@ describe("AreaSpaceDetails", () => {
   });
 
   it("shows loading state", () => {
-    (useAreaSpacesState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useAreaSpacesState).mockReturnValue({
       ...baseState,
       isSelectedPending: true,
       selectedAreaSpace: null,
@@ -95,7 +114,7 @@ describe("AreaSpaceDetails", () => {
   });
 
   it("shows error state", () => {
-    (useAreaSpacesState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useAreaSpacesState).mockReturnValue({
       ...baseState,
       isSelectedError: true,
       selectedErrorMessage: "Area space not found",

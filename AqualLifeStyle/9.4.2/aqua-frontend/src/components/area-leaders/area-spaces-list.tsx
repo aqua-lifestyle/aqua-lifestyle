@@ -72,12 +72,6 @@ export const AreaSpacesList = () => {
       </main>
     );
   }
-    return areaSpaces.filter((areaSpace) => {
-      const matchesStatus =
-        statusFilter === "all" || areaSpace.status === Number(statusFilter);
-      return matchesStatus;
-    });
-  }, [areaSpaces, statusFilter]);
 
   const tableColumns = [
     {

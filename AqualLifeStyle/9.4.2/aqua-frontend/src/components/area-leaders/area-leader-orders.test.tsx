@@ -101,6 +101,9 @@ const baseState = {
   isRecordStartupOrderError: false,
   isRecordStartupOrderPending: false,
   isRecordStartupOrderSuccess: false,
+  isSelectedError: false,
+  isSelectedPending: false,
+  isSelectedSuccess: false,
   applyErrorMessage: null,
   loadErrorMessage: null,
   promoteErrorMessage: null,
@@ -112,25 +115,36 @@ const baseState = {
 beforeEach(() => {
   vi.resetAllMocks();
 
-  (useAuthState as unknown as { mockReturnValue: typeof session }).mockReturnValue({
+  vi.mocked(useAuthState).mockReturnValue({
     isAuthenticated: true,
     isReady: true,
     session,
   });
 
-  (useAreaLeadersState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue(baseState);
-  (useAreaLeadersActions as unknown as { mockReturnValue: { getAreaLeaders: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useAreaLeadersState).mockReturnValue(baseState);
+  vi.mocked(useAreaLeadersActions).mockReturnValue({
+    applyAreaLeader: vi.fn(),
+    getAreaLeader: vi.fn(),
     getAreaLeaders: vi.fn(),
+    promoteAreaLeader: vi.fn(),
+    recordStartupOrder: vi.fn(),
   });
 
-  (useOrderIntentsState as unknown as { mockReturnValue: { orderIntents, isLoadError: false, isLoadPending: false, isLoadSuccess: true, loadErrorMessage: null } }).mockReturnValue({
-    orderIntents,
+  vi.mocked(useOrderIntentsState).mockReturnValue({
+    actionErrorMessage: null,
+    isActionError: false,
+    isActionPending: false,
+    isActionSuccess: false,
     isLoadError: false,
     isLoadPending: false,
     isLoadSuccess: true,
     loadErrorMessage: null,
+    orderIntents,
   });
-  (useOrderIntentsActions as unknown as { mockReturnValue: { getOrderIntents: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useOrderIntentsActions).mockReturnValue({
+    cancelOrderIntent: vi.fn(),
+    completeOrderIntent: vi.fn(),
+    createFromEnquiry: vi.fn(),
     getOrderIntents: vi.fn(),
   });
 });

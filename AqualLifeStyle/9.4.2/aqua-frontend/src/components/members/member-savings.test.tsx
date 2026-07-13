@@ -48,34 +48,38 @@ const baseAuthState = {
 };
 
 const baseState = {
-  isConfirmError: false,
-  isConfirmPending: false,
-  isConfirmSuccess: false,
-  isLoadError: false,
-  isLoadPending: false,
-  isLoadSuccess: true,
+  errorMessage: null,
+  isError: false,
+  isPending: false,
   isSelectedError: false,
   isSelectedPending: false,
   isSelectedSuccess: true,
-  confirmErrorMessage: null,
-  loadErrorMessage: null,
-  referrals: [],
-  selectedReferral: null,
+  isSuccess: true,
+  memberships: [],
   selectedErrorMessage: null,
+  selectedMembership: null,
+  tierBenefits: null,
+  tierBenefitsErrorMessage: null,
+  isTierBenefitsError: false,
+  isTierBenefitsPending: false,
+  isTierBenefitsSuccess: false,
+  savingsWindowStatuses,
+  savingsWindowStatusesErrorMessage: null,
   isSavingsWindowStatusesError: false,
   isSavingsWindowStatusesPending: false,
   isSavingsWindowStatusesSuccess: true,
-  savingsWindowStatuses,
-  savingsWindowStatusesErrorMessage: null,
 };
 
 beforeEach(() => {
   vi.resetAllMocks();
 
-  (useAuthState as unknown as { mockReturnValue: typeof baseAuthState }).mockReturnValue(baseAuthState);
-  (useMembershipsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue(baseState);
-  (useMembershipsActions as unknown as { mockReturnValue: { getSavingsWindowStatuses: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useAuthState).mockReturnValue(baseAuthState);
+  vi.mocked(useMembershipsState).mockReturnValue(baseState);
+  vi.mocked(useMembershipsActions).mockReturnValue({
+    getMembership: vi.fn(),
+    getMemberships: vi.fn(),
     getSavingsWindowStatuses: vi.fn(),
+    getTierBenefits: vi.fn(),
   });
 });
 
@@ -91,7 +95,7 @@ describe("MemberSavings", () => {
   });
 
   it("shows loading state", () => {
-    (useMembershipsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useMembershipsState).mockReturnValue({
       ...baseState,
       isSavingsWindowStatusesPending: true,
       savingsWindowStatuses: [],
@@ -103,7 +107,7 @@ describe("MemberSavings", () => {
   });
 
   it("shows error state", () => {
-    (useMembershipsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useMembershipsState).mockReturnValue({
       ...baseState,
       isSavingsWindowStatusesError: true,
       savingsWindowStatusesErrorMessage: "Failed to load savings",
@@ -115,7 +119,7 @@ describe("MemberSavings", () => {
   });
 
   it("shows empty state when there are no savings records", () => {
-    (useMembershipsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useMembershipsState).mockReturnValue({
       ...baseState,
       savingsWindowStatuses: [],
     });

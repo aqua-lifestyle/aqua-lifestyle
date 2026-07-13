@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AreaLeader } from "@/src/providers/AreaLeaders/context";
-import { useAreaLeadersActions, useAreaLeadersState } from "@/src/providers";
+import { useAreaLeadersActions, useAreaLeadersState, useAuthState } from "@/src/providers";
 
 import { AreaLeadersList } from "./area-leaders-list";
 
@@ -14,6 +14,7 @@ vi.mock("@/src/providers", async () => {
     ...actual,
     useAreaLeadersActions: vi.fn(),
     useAreaLeadersState: vi.fn(),
+    useAuthState: vi.fn(),
   };
 });
 
@@ -60,6 +61,9 @@ const baseState = {
   isRecordStartupOrderError: false,
   isRecordStartupOrderPending: false,
   isRecordStartupOrderSuccess: false,
+  isSelectedError: false,
+  isSelectedPending: false,
+  isSelectedSuccess: false,
   applyErrorMessage: null,
   loadErrorMessage: null,
   promoteErrorMessage: null,
@@ -71,9 +75,29 @@ const baseState = {
 beforeEach(() => {
   vi.resetAllMocks();
 
-  (useAreaLeadersState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue(baseState);
-  (useAreaLeadersActions as unknown as { mockReturnValue: { getAreaLeaders: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useAuthState).mockReturnValue({
+    isAuthenticated: true,
+    isReady: true,
+    session: {
+      accessToken: "token",
+      expiresAt: null,
+      user: {
+        id: 99,
+        email: "test@example.com",
+        name: "Test User",
+        permissions: ["Pages.AreaLeaders"],
+        role: "admin",
+      },
+    },
+  });
+
+  vi.mocked(useAreaLeadersState).mockReturnValue(baseState);
+  vi.mocked(useAreaLeadersActions).mockReturnValue({
+    applyAreaLeader: vi.fn(),
+    getAreaLeader: vi.fn(),
     getAreaLeaders: vi.fn(),
+    promoteAreaLeader: vi.fn(),
+    recordStartupOrder: vi.fn(),
   });
 });
 
@@ -87,7 +111,7 @@ describe("AreaLeadersList", () => {
   });
 
   it("shows loading state", () => {
-    (useAreaLeadersState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useAreaLeadersState).mockReturnValue({
       ...baseState,
       isLoadPending: true,
     });
@@ -98,7 +122,7 @@ describe("AreaLeadersList", () => {
   });
 
   it("shows error state", () => {
-    (useAreaLeadersState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useAreaLeadersState).mockReturnValue({
       ...baseState,
       isLoadError: true,
       loadErrorMessage: "Failed to load area leaders",
@@ -110,7 +134,7 @@ describe("AreaLeadersList", () => {
   });
 
   it("shows empty state when there are no area leaders", () => {
-    (useAreaLeadersState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useAreaLeadersState).mockReturnValue({
       ...baseState,
       areaLeaders: [],
     });

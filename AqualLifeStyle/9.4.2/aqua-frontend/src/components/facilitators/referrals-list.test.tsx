@@ -53,6 +53,9 @@ const baseState = {
   isLoadError: false,
   isLoadPending: false,
   isLoadSuccess: true,
+  isSelectedError: false,
+  isSelectedPending: false,
+  isSelectedSuccess: false,
   confirmErrorMessage: null,
   loadErrorMessage: null,
   referrals,
@@ -63,9 +66,11 @@ const baseState = {
 beforeEach(() => {
   vi.resetAllMocks();
 
-  (useReferralsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue(baseState);
-  (useReferralsActions as unknown as { mockReturnValue: { getReferrals: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useReferralsState).mockReturnValue(baseState);
+  vi.mocked(useReferralsActions).mockReturnValue({
+    confirmAward: vi.fn(),
     getReferrals: vi.fn(),
+    getReferralsByEnquiry: vi.fn(),
   });
 });
 
@@ -79,7 +84,7 @@ describe("ReferralsList", () => {
   });
 
   it("shows loading state", () => {
-    (useReferralsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useReferralsState).mockReturnValue({
       ...baseState,
       isLoadPending: true,
     });
@@ -90,7 +95,7 @@ describe("ReferralsList", () => {
   });
 
   it("shows error state", () => {
-    (useReferralsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useReferralsState).mockReturnValue({
       ...baseState,
       isLoadError: true,
       loadErrorMessage: "Failed to load referrals",
@@ -102,7 +107,7 @@ describe("ReferralsList", () => {
   });
 
   it("shows empty state when there are no referrals", () => {
-    (useReferralsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useReferralsState).mockReturnValue({
       ...baseState,
       referrals: [],
     });

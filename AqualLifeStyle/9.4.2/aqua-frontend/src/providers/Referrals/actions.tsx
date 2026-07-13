@@ -4,9 +4,6 @@ export const ReferralsActionTypes = {
   confirmAwardError: "referrals/confirmAwardError",
   confirmAwardPending: "referrals/confirmAwardPending",
   confirmAwardSuccess: "referrals/confirmAwardSuccess",
-  getReferralError: "referrals/getReferralError",
-  getReferralPending: "referrals/getReferralPending",
-  getReferralSuccess: "referrals/getReferralSuccess",
   getReferralsByEnquiryError: "referrals/getReferralsByEnquiryError",
   getReferralsByEnquiryPending: "referrals/getReferralsByEnquiryPending",
   getReferralsByEnquirySuccess: "referrals/getReferralsByEnquirySuccess",
@@ -19,9 +16,6 @@ export type ReferralsAction =
   | { type: typeof ReferralsActionTypes.confirmAwardError; payload: string }
   | { type: typeof ReferralsActionTypes.confirmAwardPending }
   | { type: typeof ReferralsActionTypes.confirmAwardSuccess; payload: Referral }
-  | { type: typeof ReferralsActionTypes.getReferralError; payload: string }
-  | { type: typeof ReferralsActionTypes.getReferralPending }
-  | { type: typeof ReferralsActionTypes.getReferralSuccess; payload: Referral }
   | { type: typeof ReferralsActionTypes.getReferralsByEnquiryError; payload: string }
   | { type: typeof ReferralsActionTypes.getReferralsByEnquiryPending }
   | { type: typeof ReferralsActionTypes.getReferralsByEnquirySuccess; payload: Referral[] }
@@ -40,20 +34,6 @@ export const confirmAwardPending = (): ReferralsAction => ({
 
 export const confirmAwardSuccess = (referral: Referral): ReferralsAction => ({
   type: ReferralsActionTypes.confirmAwardSuccess,
-  payload: referral,
-});
-
-export const getReferralError = (message: string): ReferralsAction => ({
-  type: ReferralsActionTypes.getReferralError,
-  payload: message,
-});
-
-export const getReferralPending = (): ReferralsAction => ({
-  type: ReferralsActionTypes.getReferralPending,
-});
-
-export const getReferralSuccess = (referral: Referral): ReferralsAction => ({
-  type: ReferralsActionTypes.getReferralSuccess,
   payload: referral,
 });
 

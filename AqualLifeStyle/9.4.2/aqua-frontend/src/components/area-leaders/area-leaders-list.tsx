@@ -82,12 +82,6 @@ export const AreaLeadersList = () => {
       </main>
     );
   }
-    return areaLeaders.filter((areaLeader) => {
-      const matchesLicense =
-        licenseFilter === "all" || areaLeader.licenseType === Number(licenseFilter);
-      return matchesLicense;
-    });
-  }, [areaLeaders, licenseFilter]);
 
   const tableColumns = [
     {

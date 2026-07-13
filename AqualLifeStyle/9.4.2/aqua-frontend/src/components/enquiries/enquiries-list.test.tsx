@@ -31,8 +31,8 @@ vi.mock("@/src/providers", async () => {
 });
 
 const customers: Customer[] = [
-  { id: 1, name: "John Doe", email: "john@example.com", membershipId: 1, isActive: true },
-  { id: 2, name: "Jane Smith", email: "jane@example.com", membershipId: null, isActive: false },
+  { id: 1, name: "John Doe", email: "john@example.com", membershipId: 1, isActive: true, tenantId: null, userId: 99 },
+  { id: 2, name: "Jane Smith", email: "jane@example.com", membershipId: null, isActive: false, tenantId: null, userId: 100 },
 ];
 
 const products: Product[] = [

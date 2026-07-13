@@ -126,6 +126,9 @@ const baseState = {
   isRecordStartupOrderError: false,
   isRecordStartupOrderPending: false,
   isRecordStartupOrderSuccess: false,
+  isSelectedError: false,
+  isSelectedPending: false,
+  isSelectedSuccess: false,
   applyErrorMessage: null,
   loadErrorMessage: null,
   promoteErrorMessage: null,
@@ -137,47 +140,94 @@ const baseState = {
 beforeEach(() => {
   vi.resetAllMocks();
 
-  (useAuthState as unknown as { mockReturnValue: typeof session }).mockReturnValue({
+  vi.mocked(useAuthState).mockReturnValue({
     isAuthenticated: true,
     isReady: true,
     session,
   });
 
-  (useAreaLeadersState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue(baseState);
-  (useAreaLeadersActions as unknown as { mockReturnValue: { getAreaLeaders: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useAreaLeadersState).mockReturnValue(baseState);
+  vi.mocked(useAreaLeadersActions).mockReturnValue({
+    applyAreaLeader: vi.fn(),
+    getAreaLeader: vi.fn(),
     getAreaLeaders: vi.fn(),
+    promoteAreaLeader: vi.fn(),
+    recordStartupOrder: vi.fn(),
   });
 
-  (useAreaSpacesState as unknown as { mockReturnValue: { areaSpaces, isLoadError: false, isLoadPending: false, isLoadSuccess: true, loadErrorMessage: null } }).mockReturnValue({
+  vi.mocked(useAreaSpacesState).mockReturnValue({
     areaSpaces,
+    isApplyError: false,
+    isApplyPending: false,
+    isApplySuccess: false,
+    isApproveError: false,
+    isApprovePending: false,
+    isApproveSuccess: false,
     isLoadError: false,
     isLoadPending: false,
     isLoadSuccess: true,
+    isSelectedError: false,
+    isSelectedPending: false,
+    isSelectedSuccess: false,
+    isSuspendError: false,
+    isSuspendPending: false,
+    isSuspendSuccess: false,
+    applyErrorMessage: null,
+    approveErrorMessage: null,
     loadErrorMessage: null,
+    selectedAreaSpace: null,
+    selectedErrorMessage: null,
+    suspendErrorMessage: null,
   });
-  (useAreaSpacesActions as unknown as { mockReturnValue: { getAreaSpaces: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useAreaSpacesActions).mockReturnValue({
+    applyAreaSpace: vi.fn(),
+    approveAreaSpace: vi.fn(),
+    getAreaSpace: vi.fn(),
     getAreaSpaces: vi.fn(),
+    startReview: vi.fn(),
+    recordPresentation: vi.fn(),
+    recordStartupOrder: vi.fn(),
+    suspendAreaSpace: vi.fn(),
   });
 
-  (useFacilitatorsState as unknown as { mockReturnValue: { facilitators, isLoadError: false, isLoadPending: false, isLoadSuccess: true, loadErrorMessage: null } }).mockReturnValue({
+  vi.mocked(useFacilitatorsState).mockReturnValue({
     facilitators,
     isLoadError: false,
     isLoadPending: false,
     isLoadSuccess: true,
+    isRegisterError: false,
+    isRegisterPending: false,
+    isRegisterSuccess: false,
+    isSelectedError: false,
+    isSelectedPending: false,
+    isSelectedSuccess: false,
     loadErrorMessage: null,
+    registerErrorMessage: null,
+    selectedFacilitator: null,
+    selectedErrorMessage: null,
   });
-  (useFacilitatorsActions as unknown as { mockReturnValue: { getFacilitators: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useFacilitatorsActions).mockReturnValue({
+    getFacilitator: vi.fn(),
     getFacilitators: vi.fn(),
+    getFacilitatorsByCustomer: vi.fn(),
+    registerFacilitator: vi.fn(),
   });
 
-  (useOrderIntentsState as unknown as { mockReturnValue: { orderIntents, isLoadError: false, isLoadPending: false, isLoadSuccess: true, loadErrorMessage: null } }).mockReturnValue({
-    orderIntents,
+  vi.mocked(useOrderIntentsState).mockReturnValue({
+    actionErrorMessage: null,
+    isActionError: false,
+    isActionPending: false,
+    isActionSuccess: false,
     isLoadError: false,
     isLoadPending: false,
     isLoadSuccess: true,
     loadErrorMessage: null,
+    orderIntents,
   });
-  (useOrderIntentsActions as unknown as { mockReturnValue: { getOrderIntents: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useOrderIntentsActions).mockReturnValue({
+    cancelOrderIntent: vi.fn(),
+    completeOrderIntent: vi.fn(),
+    createFromEnquiry: vi.fn(),
     getOrderIntents: vi.fn(),
   });
 });

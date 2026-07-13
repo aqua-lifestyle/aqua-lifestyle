@@ -99,15 +99,15 @@ const ReferralOverview = ({
 };
 
 export const ReferralDetails = ({ referralId }: ReferralDetailsProps) => {
-  const { getReferral, confirmAward } = useReferralsActions();
+  const { getReferrals, confirmAward } = useReferralsActions();
   const {
     isConfirmError,
     isConfirmPending,
     isConfirmSuccess,
-    isSelectedError,
-    isSelectedPending,
-    selectedReferral,
-    selectedErrorMessage,
+    isLoadError,
+    isLoadPending,
+    loadErrorMessage,
+    referrals,
     confirmErrorMessage,
   } = useReferralsState();
   const { session } = useAuthState();
@@ -120,8 +120,10 @@ export const ReferralDetails = ({ referralId }: ReferralDetailsProps) => {
       return;
     }
 
-    void getReferral(referralId);
-  }, [referralId, getReferral]);
+    void getReferrals();
+  }, [referralId, getReferrals]);
+
+  const selectedReferral = referrals.find((referral) => referral.id === referralId) ?? null;
 
   if (!hasPermission) {
     return (
@@ -162,12 +164,12 @@ export const ReferralDetails = ({ referralId }: ReferralDetailsProps) => {
         {isInvalid ? (
           <StatusMessage tone="error">This referral id is invalid.</StatusMessage>
         ) : null}
-        {isSelectedPending ? (
+        {isLoadPending ? (
           <Skeleton className="h-96" />
         ) : null}
-        {isSelectedError ? (
+        {isLoadError ? (
           <StatusMessage tone="error">
-            {selectedErrorMessage ?? "Unable to load this referral."}
+            {loadErrorMessage ?? "Unable to load this referral."}
           </StatusMessage>
         ) : null}
 

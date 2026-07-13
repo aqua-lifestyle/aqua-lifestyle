@@ -78,6 +78,9 @@ const baseState = {
   isRecordStartupOrderError: false,
   isRecordStartupOrderPending: false,
   isRecordStartupOrderSuccess: false,
+  isSelectedError: false,
+  isSelectedPending: false,
+  isSelectedSuccess: false,
   applyErrorMessage: null,
   loadErrorMessage: null,
   promoteErrorMessage: null,
@@ -89,16 +92,19 @@ const baseState = {
 beforeEach(() => {
   vi.resetAllMocks();
 
-  (useAuthState as unknown as { mockReturnValue: typeof session }).mockReturnValue({
+  vi.mocked(useAuthState).mockReturnValue({
     isAuthenticated: true,
     isReady: true,
     session,
   });
 
-  (useAreaLeadersState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue(baseState);
-  (useAreaLeadersActions as unknown as { mockReturnValue: { getAreaLeaders: () => Promise<void>, promoteAreaLeader: () => Promise<boolean> } }).mockReturnValue({
+  vi.mocked(useAreaLeadersState).mockReturnValue(baseState);
+  vi.mocked(useAreaLeadersActions).mockReturnValue({
+    applyAreaLeader: vi.fn(),
+    getAreaLeader: vi.fn(),
     getAreaLeaders: vi.fn(),
     promoteAreaLeader: vi.fn().mockResolvedValue(true),
+    recordStartupOrder: vi.fn(),
   });
 });
 

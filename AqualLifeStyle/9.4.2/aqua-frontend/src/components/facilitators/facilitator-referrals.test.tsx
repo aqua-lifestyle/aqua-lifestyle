@@ -87,34 +87,57 @@ const baseFacilitatorsState = {
   isLoadError: false,
   isLoadPending: false,
   isLoadSuccess: true,
+  isRegisterError: false,
+  isRegisterPending: false,
+  isRegisterSuccess: false,
+  isSelectedError: false,
+  isSelectedPending: false,
+  isSelectedSuccess: false,
   loadErrorMessage: null,
+  registerErrorMessage: null,
+  selectedFacilitator: null,
+  selectedErrorMessage: null,
 };
 
 const baseReferralsState = {
-  referrals,
+  isConfirmError: false,
+  isConfirmPending: false,
+  isConfirmSuccess: false,
   isLoadError: false,
   isLoadPending: false,
   isLoadSuccess: true,
+  isSelectedError: false,
+  isSelectedPending: false,
+  isSelectedSuccess: false,
+  confirmErrorMessage: null,
   loadErrorMessage: null,
+  referrals,
+  selectedReferral: null,
+  selectedErrorMessage: null,
 };
 
 beforeEach(() => {
   vi.resetAllMocks();
 
-  (useAuthState as unknown as { mockReturnValue: typeof session }).mockReturnValue({
+  vi.mocked(useAuthState).mockReturnValue({
     isAuthenticated: true,
     isReady: true,
     session,
   });
 
-  (useFacilitatorsState as unknown as { mockReturnValue: typeof baseFacilitatorsState }).mockReturnValue(baseFacilitatorsState);
-  (useFacilitatorsActions as unknown as { mockReturnValue: { getFacilitators: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useFacilitatorsState).mockReturnValue(baseFacilitatorsState);
+  vi.mocked(useFacilitatorsActions).mockReturnValue({
+    getFacilitator: vi.fn(),
     getFacilitators: vi.fn(),
+    getFacilitatorsByCustomer: vi.fn(),
+    registerFacilitator: vi.fn(),
   });
 
-  (useReferralsState as unknown as { mockReturnValue: typeof baseReferralsState }).mockReturnValue(baseReferralsState);
-  (useReferralsActions as unknown as { mockReturnValue: { getReferrals: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useReferralsState).mockReturnValue(baseReferralsState);
+  vi.mocked(useReferralsActions).mockReturnValue({
+    confirmAward: vi.fn(),
     getReferrals: vi.fn(),
+    getReferralsByEnquiry: vi.fn(),
   });
 });
 

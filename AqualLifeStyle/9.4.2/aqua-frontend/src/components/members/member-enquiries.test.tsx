@@ -75,38 +75,80 @@ const session: AuthSession = {
 };
 
 const baseCustomersState = {
+  createErrorMessage: null,
   customers,
+  isCreateError: false,
+  isCreatePending: false,
+  isCreateSuccess: false,
   isLoadError: false,
   isLoadPending: false,
   isLoadSuccess: true,
+  isSelectedError: false,
+  isSelectedPending: false,
+  isSelectedSuccess: false,
+  isUpdateError: false,
+  isUpdatePending: false,
+  isUpdateSuccess: false,
   loadErrorMessage: null,
+  selectedCustomer: null,
+  selectedErrorMessage: null,
+  updateErrorMessage: null,
 };
 
 const baseEnquiriesState = {
+  actionErrorMessage: null,
+  createErrorMessage: null,
   enquiries,
+  isActionError: false,
+  isActionPending: false,
+  isActionSuccess: false,
+  isCreateError: false,
+  isCreatePending: false,
+  isCreateSuccess: false,
   isLoadError: false,
   isLoadPending: false,
   isLoadSuccess: true,
+  isSalesReadyError: false,
+  isSalesReadyPending: false,
+  isSalesReadySuccess: false,
+  isSelectedError: false,
+  isSelectedPending: false,
+  isSelectedSuccess: false,
   loadErrorMessage: null,
+  salesReadyEnquiries: [],
+  salesReadyErrorMessage: null,
+  selectedEnquiry: null,
+  selectedErrorMessage: null,
 };
 
 beforeEach(() => {
   vi.resetAllMocks();
 
-  (useAuthState as unknown as { mockReturnValue: typeof session }).mockReturnValue({
+  vi.mocked(useAuthState).mockReturnValue({
     isAuthenticated: true,
     isReady: true,
     session,
   });
 
-  (useCustomersState as unknown as { mockReturnValue: typeof baseCustomersState }).mockReturnValue(baseCustomersState);
-  (useCustomersActions as unknown as { mockReturnValue: { getCustomers: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useCustomersState).mockReturnValue(baseCustomersState);
+  vi.mocked(useCustomersActions).mockReturnValue({
+    createCustomer: vi.fn(),
+    getCustomer: vi.fn(),
     getCustomers: vi.fn(),
+    updateCustomer: vi.fn(),
   });
 
-  (useEnquiriesState as unknown as { mockReturnValue: typeof baseEnquiriesState }).mockReturnValue(baseEnquiriesState);
-  (useEnquiriesActions as unknown as { mockReturnValue: { getEnquiries: () => Promise<void> } }).mockReturnValue({
+  vi.mocked(useEnquiriesState).mockReturnValue(baseEnquiriesState);
+  vi.mocked(useEnquiriesActions).mockReturnValue({
+    closeEnquiry: vi.fn(),
+    convertEnquiryToCustomer: vi.fn(),
+    createEnquiry: vi.fn(),
     getEnquiries: vi.fn(),
+    getEnquiry: vi.fn(),
+    getSalesReadyEnquiries: vi.fn(),
+    recordFollowUp: vi.fn(),
+    reopenEnquiry: vi.fn(),
+    respondToEnquiry: vi.fn(),
   });
 });
 

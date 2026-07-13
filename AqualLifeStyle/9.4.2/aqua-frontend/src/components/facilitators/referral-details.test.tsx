@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Referral } from "@/src/providers/Referrals/context";
-import { useReferralsActions, useReferralsState } from "@/src/providers";
+import { useReferralsActions, useReferralsState, useAuthState } from "@/src/providers";
 
 import { ReferralDetails } from "./referral-details";
 
@@ -14,6 +14,7 @@ vi.mock("@/src/providers", async () => {
     ...actual,
     useReferralsActions: vi.fn(),
     useReferralsState: vi.fn(),
+    useAuthState: vi.fn(),
   };
 });
 
@@ -43,18 +44,35 @@ const baseState = {
   isSelectedSuccess: true,
   confirmErrorMessage: null,
   loadErrorMessage: null,
-  referrals: [],
-  selectedReferral: referral,
+  referrals: [referral],
+  selectedReferral: null,
   selectedErrorMessage: null,
 };
 
 beforeEach(() => {
   vi.resetAllMocks();
 
-  (useReferralsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue(baseState);
-  (useReferralsActions as unknown as { mockReturnValue: { getReferral: () => Promise<void>; confirmAward: () => Promise<boolean> } }).mockReturnValue({
-    getReferral: vi.fn(),
+  vi.mocked(useAuthState).mockReturnValue({
+    isAuthenticated: true,
+    isReady: true,
+    session: {
+      accessToken: "token",
+      expiresAt: null,
+      user: {
+        id: 99,
+        email: "test@example.com",
+        name: "Test User",
+        permissions: ["Pages.Referrals"],
+        role: "admin",
+      },
+    },
+  });
+
+  vi.mocked(useReferralsState).mockReturnValue(baseState);
+  vi.mocked(useReferralsActions).mockReturnValue({
     confirmAward: vi.fn(),
+    getReferrals: vi.fn(),
+    getReferralsByEnquiry: vi.fn(),
   });
 });
 
@@ -71,10 +89,10 @@ describe("ReferralDetails", () => {
   });
 
   it("shows loading state", () => {
-    (useReferralsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useReferralsState).mockReturnValue({
       ...baseState,
-      isSelectedPending: true,
-      selectedReferral: null,
+      isLoadPending: true,
+      referrals: [],
     });
 
     render(<ReferralDetails referralId={1} />);
@@ -83,10 +101,10 @@ describe("ReferralDetails", () => {
   });
 
   it("shows error state", () => {
-    (useReferralsState as unknown as { mockReturnValue: typeof baseState }).mockReturnValue({
+    vi.mocked(useReferralsState).mockReturnValue({
       ...baseState,
-      isSelectedError: true,
-      selectedErrorMessage: "Referral not found",
+      isLoadError: true,
+      loadErrorMessage: "Referral not found",
     });
 
     render(<ReferralDetails referralId={1} />);
