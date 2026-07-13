@@ -98,9 +98,13 @@ const baseState = {
   isPromoteError: false,
   isPromotePending: false,
   isPromoteSuccess: false,
+  isRecordStartupOrderError: false,
+  isRecordStartupOrderPending: false,
+  isRecordStartupOrderSuccess: false,
   applyErrorMessage: null,
   loadErrorMessage: null,
   promoteErrorMessage: null,
+  recordStartupOrderErrorMessage: null,
   selectedAreaLeader: null,
   selectedErrorMessage: null,
 };

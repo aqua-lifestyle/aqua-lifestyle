@@ -16,8 +16,10 @@ const SetSession = () => {
           expiresAt: "2026-01-01T00:00:00Z",
           user: {
             email: "jane@example.com",
-            id: "user-1",
+            id: 1,
             name: "Jane Doe",
+            permissions: [],
+            role: "Member",
           },
         })
       }
