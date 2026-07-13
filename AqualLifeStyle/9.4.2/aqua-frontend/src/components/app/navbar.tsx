@@ -119,7 +119,9 @@ export const Navbar = () => {
 
               {isMoreOpen ? (
                 <div className="absolute left-0 top-full z-50 mt-2 w-44 rounded-xl border border-border bg-card p-1 shadow-lg animate-fade-in">
-                  {moreLinks.map((link) => (
+                  {moreLinks
+                    .filter((link) => hasPermission(link.permission))
+                    .map((link) => (
                     <Link
                       key={link.href}
                       className={cn(
