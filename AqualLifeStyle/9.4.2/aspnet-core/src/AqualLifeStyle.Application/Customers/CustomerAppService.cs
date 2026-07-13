@@ -45,6 +45,23 @@ namespace AqualLifeStyle.Application.Customers
             return _objectMapper.Map<CustomerDto>(customer);
         }
 
+        public async Task<CustomerDto> GetMyCustomerAsync()
+        {
+            if (!AbpSession.UserId.HasValue)
+            {
+                throw new UserFriendlyException("Customer lookup failed.", "No user context is available.");
+            }
+
+            var tenantId = GetRequiredTenantId("Customer lookup failed.");
+            var customer = await _customerRepository.FirstOrDefaultAsync(c => c.UserId == AbpSession.UserId.Value && c.TenantId == tenantId);
+            if (customer == null)
+            {
+                throw new UserFriendlyException("Customer lookup failed.", "No customer profile is linked to your account.");
+            }
+
+            return _objectMapper.Map<CustomerDto>(customer);
+        }
+
         [AbpAuthorize(AquaPermissions.Members.Edit)]
         public async Task<CustomerDto> UpdateAsync(CustomerDto input)
         {

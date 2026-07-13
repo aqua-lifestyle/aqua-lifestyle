@@ -19,6 +19,9 @@ import {
   getCustomersError,
   getCustomersPending,
   getCustomersSuccess,
+  getMyCustomerError,
+  getMyCustomerPending,
+  getMyCustomerSuccess,
   updateCustomerError,
   updateCustomerPending,
   updateCustomerSuccess,
@@ -94,6 +97,19 @@ export const CustomersProvider = ({ children }: CustomersProviderProps) => {
     }
   }, []);
 
+  const getMyCustomer = useCallback(async () => {
+    dispatch(getMyCustomerPending());
+
+    try {
+      const customer = await httpClient.get<Customer>(
+        apiEndpoints.customers.getMyCustomer,
+      );
+      dispatch(getMyCustomerSuccess(customer));
+    } catch (error) {
+      dispatch(getMyCustomerError(getErrorMessage(error)));
+    }
+  }, []);
+
   const updateCustomer = useCallback(async (input: UpdateCustomerInput) => {
     dispatch(updateCustomerPending());
 
@@ -115,9 +131,10 @@ export const CustomersProvider = ({ children }: CustomersProviderProps) => {
       createCustomer,
       getCustomer,
       getCustomers,
+      getMyCustomer,
       updateCustomer,
     }),
-    [createCustomer, getCustomer, getCustomers, updateCustomer],
+    [createCustomer, getCustomer, getCustomers, getMyCustomer, updateCustomer],
   );
 
   return (

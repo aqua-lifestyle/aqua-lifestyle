@@ -66,6 +66,7 @@ namespace AqualLifeStyle.Authorization
                     AquaPermissions.Members.EditSelf,
                     AquaPermissions.Members.Create,
                     AquaPermissions.Members.Edit,
+                    AquaPermissions.Memberships.ViewSelf,
                     AquaPermissions.Enquiries.View,
                     AquaPermissions.Enquiries.Create,
                     AquaPermissions.Enquiries.ViewSelf,

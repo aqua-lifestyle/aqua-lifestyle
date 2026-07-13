@@ -9,6 +9,7 @@ namespace AqualLifeStyle.Application.Memberships
     public interface IMembershipAppService : IApplicationService
     {
         Task<IReadOnlyList<MembershipDto>> GetAllAsync();
+        Task<IReadOnlyList<MembershipDto>> GetActiveTiersAsync();
         Task<MembershipDto> GetAsync(int id);
         Task<MembershipDto> UpdateAsync(MembershipDto input);
         Task CreateAsync(CreateMembershipDto input);

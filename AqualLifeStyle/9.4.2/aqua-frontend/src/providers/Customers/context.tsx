@@ -27,6 +27,9 @@ export type CustomersState = {
   isLoadError: boolean;
   isLoadPending: boolean;
   isLoadSuccess: boolean;
+  isMyCustomerError: boolean;
+  isMyCustomerPending: boolean;
+  isMyCustomerSuccess: boolean;
   isSelectedError: boolean;
   isSelectedPending: boolean;
   isSelectedSuccess: boolean;
@@ -34,6 +37,8 @@ export type CustomersState = {
   isUpdatePending: boolean;
   isUpdateSuccess: boolean;
   loadErrorMessage: string | null;
+  myCustomer: Customer | null;
+  myCustomerErrorMessage: string | null;
   selectedCustomer: Customer | null;
   selectedErrorMessage: string | null;
   updateErrorMessage: string | null;
@@ -43,6 +48,7 @@ export type CustomersActions = {
   createCustomer: (input: CreateCustomerInput) => Promise<boolean>;
   getCustomer: (id: number) => Promise<void>;
   getCustomers: () => Promise<void>;
+  getMyCustomer: () => Promise<void>;
   updateCustomer: (input: UpdateCustomerInput) => Promise<boolean>;
 };
 
@@ -55,6 +61,9 @@ export const initialCustomersState: CustomersState = {
   isLoadError: false,
   isLoadPending: false,
   isLoadSuccess: false,
+  isMyCustomerError: false,
+  isMyCustomerPending: false,
+  isMyCustomerSuccess: false,
   isSelectedError: false,
   isSelectedPending: false,
   isSelectedSuccess: false,
@@ -62,6 +71,8 @@ export const initialCustomersState: CustomersState = {
   isUpdatePending: false,
   isUpdateSuccess: false,
   loadErrorMessage: null,
+  myCustomer: null,
+  myCustomerErrorMessage: null,
   selectedCustomer: null,
   selectedErrorMessage: null,
   updateErrorMessage: null,

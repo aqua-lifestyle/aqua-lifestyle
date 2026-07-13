@@ -30,6 +30,7 @@ export const apiEndpoints = {
     create: "/api/services/app/Customer/Create",
     getAll: "/api/services/app/Customer/GetAll",
     getById: (id: number) => `/api/services/app/Customer/Get?id=${id}`,
+    getMyCustomer: "/api/services/app/Customer/GetMyCustomer",
     update: "/api/services/app/Customer/Update",
   },
   enquiries: {
@@ -61,6 +62,7 @@ export const apiEndpoints = {
   },
   memberships: {
     getAll: "/api/services/app/Membership/GetAll",
+    getActiveTiers: "/api/services/app/Membership/GetActiveTiers",
     getById: (id: number) => `/api/services/app/Membership/Get?id=${id}`,
     getSavingsWindowStatuses:
       "/api/services/app/Membership/GetSavingsWindowStatuses",

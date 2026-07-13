@@ -31,6 +31,13 @@ namespace AqualLifeStyle.Application.Memberships
             return _objectMapper.Map<List<MembershipDto>>(memberships);
         }
 
+        [AbpAuthorize(PermissionNames.Memberships_ViewSelf)]
+        public async Task<IReadOnlyList<MembershipDto>> GetActiveTiersAsync()
+        {
+            var memberships = await _membershipRepository.GetAllListAsync(m => m.IsActive);
+            return _objectMapper.Map<List<MembershipDto>>(memberships);
+        }
+
         public async Task<MembershipDto> GetAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -132,12 +139,7 @@ namespace AqualLifeStyle.Application.Memberships
                 throw new AqualLifeStyleNotFoundException("Membership", id);
             }
 
-            if (!DateTime.TryParse(input.AsOfDate, out var asOfDate))
-            {
-                throw new AqualLifeStyleValidationException(nameof(input.AsOfDate), "Invalid date format.");
-            }
-
-            membership.MarkObligationMet(asOfDate);
+            membership.MarkObligationMet(DateTime.Parse(input.AsOfDate));
             await _membershipRepository.UpdateAsync(membership);
 
             return _objectMapper.Map<MembershipDto>(membership);
