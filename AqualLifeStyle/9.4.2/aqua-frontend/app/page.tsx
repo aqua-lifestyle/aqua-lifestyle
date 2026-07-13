@@ -1,3 +1,5 @@
+"use client";
+
 import { CustomerDashboard } from "@/src/components/demo/customer-dashboard";
 import { DemoDashboard } from "@/src/components/demo/demo-dashboard";
 import { useAuthState } from "@/src/providers";
