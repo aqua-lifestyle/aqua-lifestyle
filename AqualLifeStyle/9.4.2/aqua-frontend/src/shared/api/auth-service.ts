@@ -81,40 +81,35 @@ const API_BASE = publicEnv.NEXT_PUBLIC_ABP_API_URL;
  */
 export const login = async (input: LoginInput): Promise<LoginResult> => {
   try {
-    const params = new URLSearchParams();
-    params.append("grant_type", "password");
-    params.append("username", input.email);
-    params.append("password", input.password);
-    params.append("client_id", "Aqua_App"); // ABP default SPA client ID
-    params.append("scope", "openid email profile roles Aqua");
-
     const headers: Record<string, string> = {
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/json",
     };
 
-    // Pass tenant header if provided
     if (input.tenant) {
       headers["__tenant"] = input.tenant;
     }
 
     const response = await axios.post<{
-      access_token: string;
-      expires_in: number;
-      token_type: string;
-      refresh_token?: string;
-      scope: string;
-    }>(`${API_BASE}/connect/token`, params.toString(), { headers });
+      result: {
+        accessToken: string;
+        expireInSeconds: number;
+        userId: number;
+      };
+    }>(`${API_BASE}/api/TokenAuth/Authenticate`, {
+      userNameOrEmailAddress: input.email,
+      password: input.password,
+      rememberClient: input.rememberMe ?? false,
+    }, { headers });
 
-    const { access_token, expires_in, refresh_token } = response.data;
+    const { accessToken, expireInSeconds } = response.data.result;
 
-    // Decode JWT payload to extract user claims
-    const claims = decodeJwtPayload(access_token);
+    const claims = decodeJwtPayload(accessToken);
     const user = claims ? claimsToUser(claims) : null;
 
     const session: AuthSession = {
-      accessToken: access_token,
-      expiresAt: new Date(Date.now() + expires_in * 1000).toISOString(),
-      refreshToken: refresh_token ?? null,
+      accessToken,
+      expiresAt: new Date(Date.now() + expireInSeconds * 1000).toISOString(),
+      refreshToken: null,
       user,
     };
 
@@ -122,9 +117,10 @@ export const login = async (input: LoginInput): Promise<LoginResult> => {
   } catch (error: unknown) {
     if (axios.isAxiosError(error) && error.response) {
       const data = error.response.data as Record<string, unknown>;
+      const errorObj = (data.error ?? data) as Record<string, unknown>;
       const message =
-        (data.error_description as string) ??
-        (data.error as string) ??
+        (errorObj.message as string) ??
+        (errorObj.details as string) ??
         (data.message as string) ??
         "Invalid email or password.";
 
