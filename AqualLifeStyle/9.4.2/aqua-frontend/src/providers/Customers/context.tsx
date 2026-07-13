@@ -19,8 +19,12 @@ export type CreateCustomerInput = {
 export type UpdateCustomerInput = Customer;
 
 export type CustomersState = {
+  changeMembershipErrorMessage: string | null;
   createErrorMessage: string | null;
   customers: Customer[];
+  isChangeMembershipError: boolean;
+  isChangeMembershipPending: boolean;
+  isChangeMembershipSuccess: boolean;
   isCreateError: boolean;
   isCreatePending: boolean;
   isCreateSuccess: boolean;
@@ -45,6 +49,7 @@ export type CustomersState = {
 };
 
 export type CustomersActions = {
+  changeMembership: (input: { membershipId?: number | null }) => Promise<Customer | null>;
   createCustomer: (input: CreateCustomerInput) => Promise<boolean>;
   getCustomer: (id: number) => Promise<void>;
   getCustomers: () => Promise<void>;
@@ -53,8 +58,12 @@ export type CustomersActions = {
 };
 
 export const initialCustomersState: CustomersState = {
+  changeMembershipErrorMessage: null,
   createErrorMessage: null,
   customers: [],
+  isChangeMembershipError: false,
+  isChangeMembershipPending: false,
+  isChangeMembershipSuccess: false,
   isCreateError: false,
   isCreatePending: false,
   isCreateSuccess: false,

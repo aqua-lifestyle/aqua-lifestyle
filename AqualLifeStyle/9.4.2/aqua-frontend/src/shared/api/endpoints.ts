@@ -31,6 +31,7 @@ export const apiEndpoints = {
     getAll: "/api/services/app/Customer/GetAll",
     getById: (id: number) => `/api/services/app/Customer/Get?id=${id}`,
     getMyCustomer: "/api/services/app/Customer/GetMyCustomer",
+    changeMembership: "/api/services/app/Customer/ChangeMembership",
     update: "/api/services/app/Customer/Update",
   },
   enquiries: {

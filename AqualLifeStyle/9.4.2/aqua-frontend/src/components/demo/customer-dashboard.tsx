@@ -43,12 +43,16 @@ export const CustomerDashboard = () => {
   const { session } = useAuthState();
   const user = session?.user;
 
-  const { getMyCustomer } = useCustomersActions();
+  const { changeMembership, getMyCustomer } = useCustomersActions();
   const { getActiveTiers } = useMembershipsActions();
   const {
     isLoadError: isCustomersError,
     isLoadPending: isCustomersPending,
     loadErrorMessage: customersErrorMessage,
+  } = useCustomersState();
+  const {
+    changeMembershipErrorMessage,
+    isChangeMembershipError,
   } = useCustomersState();
   const {
     errorMessage: membershipsErrorMessage,
@@ -82,11 +86,12 @@ export const CustomerDashboard = () => {
   };
 
   const isLoading = isCustomersPending || isMembershipsPending || isMyCustomerPending;
-  const hasError = isCustomersError || isMembershipsError || isMyCustomerError;
+  const hasError = isCustomersError || isMembershipsError || isMyCustomerError || isChangeMembershipError;
   const errorMessages = [
     customersErrorMessage,
     membershipsErrorMessage,
     myCustomerErrorMessage,
+    changeMembershipErrorMessage,
   ].filter(Boolean);
 
   return (
@@ -259,11 +264,11 @@ export const CustomerDashboard = () => {
                             <Button
                               size="sm"
                               variant="primary"
-                              onClick={() => {
+                              onClick={async () => {
                                 if (myCustomer?.id) {
-                                  alert(
-                                    "Membership upgrade/join will be available once the backend allows customer membership changes.",
-                                  );
+                                  await changeMembership({
+                                    membershipId: tier.id,
+                                  });
                                 }
                               }}
                             >

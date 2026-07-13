@@ -10,6 +10,9 @@ import {
 
 import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
 import {
+  changeMembershipError,
+  changeMembershipPending,
+  changeMembershipSuccess,
   createCustomerError,
   createCustomerPending,
   createCustomerSuccess,
@@ -126,15 +129,35 @@ export const CustomersProvider = ({ children }: CustomersProviderProps) => {
     }
   }, []);
 
+  const changeMembership = useCallback(
+    async (input: { membershipId?: number | null }): Promise<Customer | null> => {
+      dispatch(changeMembershipPending());
+
+      try {
+        const customer = await httpClient.post<Customer, { membershipId?: number | null }>(
+          apiEndpoints.customers.changeMembership,
+          input,
+        );
+        dispatch(changeMembershipSuccess(customer));
+        return customer;
+      } catch (error) {
+        dispatch(changeMembershipError(getErrorMessage(error)));
+        return null;
+      }
+    },
+    [],
+  );
+
   const actions = useMemo(
     () => ({
+      changeMembership,
       createCustomer,
       getCustomer,
       getCustomers,
       getMyCustomer,
       updateCustomer,
     }),
-    [createCustomer, getCustomer, getCustomers, getMyCustomer, updateCustomer],
+    [changeMembership, createCustomer, getCustomer, getCustomers, getMyCustomer, updateCustomer],
   );
 
   return (

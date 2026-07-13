@@ -120,6 +120,34 @@ export const customersReducer = (
         myCustomerErrorMessage: null,
       };
 
+    case CustomersActionTypes.changeMembershipError:
+      return {
+        ...state,
+        changeMembershipErrorMessage: action.payload,
+        isChangeMembershipError: true,
+        isChangeMembershipPending: false,
+        isChangeMembershipSuccess: false,
+      };
+
+    case CustomersActionTypes.changeMembershipPending:
+      return {
+        ...state,
+        changeMembershipErrorMessage: null,
+        isChangeMembershipError: false,
+        isChangeMembershipPending: true,
+        isChangeMembershipSuccess: false,
+      };
+
+    case CustomersActionTypes.changeMembershipSuccess:
+      return {
+        ...state,
+        myCustomer: action.payload,
+        changeMembershipErrorMessage: null,
+        isChangeMembershipError: false,
+        isChangeMembershipPending: false,
+        isChangeMembershipSuccess: true,
+      };
+
     case CustomersActionTypes.updateCustomerError:
       return {
         ...state,
