@@ -52,7 +52,7 @@ export const LoginForm = () => {
     setFieldErrors({});
     setIsLoading(true);
 
-    // Real OIDC / OpenIddict authentication via the /connect/token endpoint.
+    // Real authentication via the ABP TokenAuth endpoint.
     const authResult = await login({
       email: result.data.email,
       password: result.data.password,

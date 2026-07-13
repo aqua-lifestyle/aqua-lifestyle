@@ -193,9 +193,11 @@ export const register = async (input: RegisterInput): Promise<RegisterResult> =>
 };
 
 /**
- * Refresh an access token using a refresh token.
+ * Refresh an access token.
  *
- * Endpoint: POST {API_BASE}/connect/token
+ * Note: ABP TokenAuth does not issue refresh tokens. This function is
+ * preserved for compatibility but will fail if called against the current
+ * backend.
  */
 export const refreshToken = async (
   currentRefreshToken: string,
