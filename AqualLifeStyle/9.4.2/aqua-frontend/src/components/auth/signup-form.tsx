@@ -116,12 +116,14 @@ export const SignupForm = () => {
     const firstName = nameParts[0] ?? formData.name;
     const lastName = nameParts.slice(1).join(" ") || ".";
 
+    const resolvedTenant = currentTenant ?? "default";
+
     const registerResult = await register({
       email: formData.email,
       password: formData.password,
       name: firstName,
       surname: lastName,
-      tenant: currentTenant,
+      tenant: resolvedTenant,
     });
 
     if (!registerResult.ok) {
@@ -151,7 +153,7 @@ export const SignupForm = () => {
     const loginResult = await login({
       email: formData.email,
       password: formData.password,
-      tenant: currentTenant,
+      tenant: resolvedTenant,
     });
 
     if (loginResult.ok) {
