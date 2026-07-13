@@ -61,7 +61,14 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<AbpErrorEnvelope>) => {
     if (error.response) {
-      throw normalizeAbpError(error.response.status, error.response.data);
+      const { status } = error.response;
+
+      // Handle 403 Forbidden — redirect to the forbidden page
+      if (status === 403 && typeof window !== "undefined") {
+        window.location.href = "/forbidden";
+      }
+
+      throw normalizeAbpError(status, error.response.data);
     }
 
     // No HTTP response: DNS/port down, CORS blocked, or untrusted HTTPS cert.
