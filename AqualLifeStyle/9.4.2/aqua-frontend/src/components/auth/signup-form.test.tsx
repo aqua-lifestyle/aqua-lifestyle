@@ -22,6 +22,12 @@ vi.mock("@/src/providers", async () => {
   };
 });
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+  usePathname: () => "/signup",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 describe("SignupForm", () => {
   const setSession = vi.fn();
   const toast = vi.fn();

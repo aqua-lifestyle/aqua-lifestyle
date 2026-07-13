@@ -2,6 +2,7 @@
 
 import { Droplets, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { z } from "zod";
 
 import { login, register } from "@/src/shared/api/auth-service";
@@ -37,6 +38,7 @@ const steps = [
 ];
 
 export const SignupForm = () => {
+  const router = useRouter();
   const { setSession } = useAuthActions();
   const { currentTenant } = useTenantState();
   const { toast } = useToast();
@@ -159,14 +161,23 @@ export const SignupForm = () => {
 
     if (loginResult.ok) {
       setSession(loginResult.session);
+      toast({
+        message: "Account created successfully.",
+        title: "Welcome",
+        type: "success",
+      });
+      setIsLoading(false);
+      router.push("/");
+      return;
     }
 
     toast({
-      message: "Account created successfully.",
+      message: "Account created. Please sign in.",
       title: "Welcome",
       type: "success",
     });
     setIsLoading(false);
+    router.push("/login");
   };
 
   const getPasswordStrength = () => {
