@@ -13,6 +13,9 @@ export const AreaLeadersActionTypes = {
   promoteAreaLeaderError: "areaLeaders/promoteAreaLeaderError",
   promoteAreaLeaderPending: "areaLeaders/promoteAreaLeaderPending",
   promoteAreaLeaderSuccess: "areaLeaders/promoteAreaLeaderSuccess",
+  recordStartupOrderError: "areaLeaders/recordStartupOrderError",
+  recordStartupOrderPending: "areaLeaders/recordStartupOrderPending",
+  recordStartupOrderSuccess: "areaLeaders/recordStartupOrderSuccess",
 } as const;
 
 export type AreaLeadersAction =
@@ -27,7 +30,10 @@ export type AreaLeadersAction =
   | { type: typeof AreaLeadersActionTypes.getAreaLeadersSuccess; payload: AreaLeader[] }
   | { type: typeof AreaLeadersActionTypes.promoteAreaLeaderError; payload: string }
   | { type: typeof AreaLeadersActionTypes.promoteAreaLeaderPending }
-  | { type: typeof AreaLeadersActionTypes.promoteAreaLeaderSuccess; payload: AreaLeader };
+  | { type: typeof AreaLeadersActionTypes.promoteAreaLeaderSuccess; payload: AreaLeader }
+  | { type: typeof AreaLeadersActionTypes.recordStartupOrderError; payload: string }
+  | { type: typeof AreaLeadersActionTypes.recordStartupOrderPending }
+  | { type: typeof AreaLeadersActionTypes.recordStartupOrderSuccess };
 
 export const applyAreaLeaderError = (message: string): AreaLeadersAction => ({
   type: AreaLeadersActionTypes.applyAreaLeaderError,
@@ -82,4 +88,17 @@ export const promoteAreaLeaderPending = (): AreaLeadersAction => ({
 export const promoteAreaLeaderSuccess = (areaLeader: AreaLeader): AreaLeadersAction => ({
   type: AreaLeadersActionTypes.promoteAreaLeaderSuccess,
   payload: areaLeader,
+});
+
+export const recordStartupOrderError = (message: string): AreaLeadersAction => ({
+  type: AreaLeadersActionTypes.recordStartupOrderError,
+  payload: message,
+});
+
+export const recordStartupOrderPending = (): AreaLeadersAction => ({
+  type: AreaLeadersActionTypes.recordStartupOrderPending,
+});
+
+export const recordStartupOrderSuccess = (): AreaLeadersAction => ({
+  type: AreaLeadersActionTypes.recordStartupOrderSuccess,
 });

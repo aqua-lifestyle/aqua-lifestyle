@@ -125,6 +125,33 @@ export const areaLeadersReducer = (
             : state.selectedAreaLeader,
       };
 
+    case AreaLeadersActionTypes.recordStartupOrderError:
+      return {
+        ...state,
+        isRecordStartupOrderError: true,
+        isRecordStartupOrderPending: false,
+        isRecordStartupOrderSuccess: false,
+        recordStartupOrderErrorMessage: action.payload,
+      };
+
+    case AreaLeadersActionTypes.recordStartupOrderPending:
+      return {
+        ...state,
+        isRecordStartupOrderError: false,
+        isRecordStartupOrderPending: true,
+        isRecordStartupOrderSuccess: false,
+        recordStartupOrderErrorMessage: null,
+      };
+
+    case AreaLeadersActionTypes.recordStartupOrderSuccess:
+      return {
+        ...state,
+        isRecordStartupOrderError: false,
+        isRecordStartupOrderPending: false,
+        isRecordStartupOrderSuccess: true,
+        recordStartupOrderErrorMessage: null,
+      };
+
     default:
       return state;
   }

@@ -30,12 +30,16 @@ export type AreaLeadersState = {
   isPromoteError: boolean;
   isPromotePending: boolean;
   isPromoteSuccess: boolean;
+  isRecordStartupOrderError: boolean;
+  isRecordStartupOrderPending: boolean;
+  isRecordStartupOrderSuccess: boolean;
   isSelectedError: boolean;
   isSelectedPending: boolean;
   isSelectedSuccess: boolean;
   applyErrorMessage: string | null;
   loadErrorMessage: string | null;
   promoteErrorMessage: string | null;
+  recordStartupOrderErrorMessage: string | null;
   selectedAreaLeader: AreaLeader | null;
   selectedErrorMessage: string | null;
 };
@@ -45,6 +49,7 @@ export type AreaLeadersActions = {
   getAreaLeader: (id: number) => Promise<void>;
   getAreaLeaders: () => Promise<void>;
   promoteAreaLeader: (id: number) => Promise<boolean>;
+  recordStartupOrder: (id: number) => Promise<boolean>;
 };
 
 export const initialAreaLeadersState: AreaLeadersState = {
@@ -58,12 +63,16 @@ export const initialAreaLeadersState: AreaLeadersState = {
   isPromoteError: false,
   isPromotePending: false,
   isPromoteSuccess: false,
+  isRecordStartupOrderError: false,
+  isRecordStartupOrderPending: false,
+  isRecordStartupOrderSuccess: false,
   isSelectedError: false,
   isSelectedPending: false,
   isSelectedSuccess: false,
   applyErrorMessage: null,
   loadErrorMessage: null,
   promoteErrorMessage: null,
+  recordStartupOrderErrorMessage: null,
   selectedAreaLeader: null,
   selectedErrorMessage: null,
 };

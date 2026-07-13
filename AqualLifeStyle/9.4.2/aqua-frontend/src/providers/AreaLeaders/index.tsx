@@ -22,6 +22,9 @@ import {
   promoteAreaLeaderError,
   promoteAreaLeaderPending,
   promoteAreaLeaderSuccess,
+  recordStartupOrderError,
+  recordStartupOrderPending,
+  recordStartupOrderSuccess,
 } from "./actions";
 import {
   AreaLeadersActionsContext,
@@ -110,14 +113,31 @@ export const AreaLeadersProvider = ({ children }: AreaLeadersProviderProps) => {
     }
   }, []);
 
+  const recordStartupOrder = useCallback(async (id: number) => {
+    dispatch(recordStartupOrderPending());
+
+    try {
+      await httpClient.post<void, null>(
+        apiEndpoints.areaLeaders.recordStartupOrder(id),
+        null,
+      );
+      dispatch(recordStartupOrderSuccess());
+      return true;
+    } catch (error) {
+      dispatch(recordStartupOrderError(getErrorMessage(error)));
+      return false;
+    }
+  }, []);
+
   const actions = useMemo<AreaLeadersActions>(
     () => ({
       applyAreaLeader,
       getAreaLeader,
       getAreaLeaders,
       promoteAreaLeader,
+      recordStartupOrder,
     }),
-    [applyAreaLeader, getAreaLeader, getAreaLeaders, promoteAreaLeader],
+    [applyAreaLeader, getAreaLeader, getAreaLeaders, promoteAreaLeader, recordStartupOrder],
   );
 
   return (
