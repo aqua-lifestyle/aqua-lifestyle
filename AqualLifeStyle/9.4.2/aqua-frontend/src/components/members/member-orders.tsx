@@ -42,8 +42,8 @@ export const MemberOrders = () => {
   }, [getOrderIntents]);
 
   const customerOrders = useMemo(() => {
-    if (!session?.user?.id) return [];
-    const currentUserId = session.user.id;
+    const currentUserId = session?.user?.id ?? null;
+    if (currentUserId === null) return [];
     return orderIntents.filter((order) => order.customerId === currentUserId);
   }, [orderIntents, session?.user?.id]);
 

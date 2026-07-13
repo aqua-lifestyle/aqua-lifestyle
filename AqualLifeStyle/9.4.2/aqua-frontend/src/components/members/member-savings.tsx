@@ -34,8 +34,8 @@ export const MemberSavings = () => {
   }, [getSavingsWindowStatuses]);
 
   const customerSavings = useMemo(() => {
-    if (!session?.user?.id) return [];
-    const currentUserId = session.user.id;
+    const currentUserId = session?.user?.id ?? null;
+    if (currentUserId === null) return [];
     return savingsWindowStatuses.filter((s) => s.tier === currentUserId % 4);
   }, [savingsWindowStatuses, session?.user?.id]);
 
