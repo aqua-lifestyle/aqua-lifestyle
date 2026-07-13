@@ -6,6 +6,7 @@ import {
   type AreaSpace,
   useAreaSpacesActions,
   useAreaSpacesState,
+  useAuthState,
 } from "@/src/providers";
 import {
   Avatar,
@@ -287,7 +288,21 @@ export const AreaSpaceDetails = ({ areaSpaceId }: AreaSpaceDetailsProps) => {
     selectedErrorMessage,
     approveErrorMessage,
   } = useAreaSpacesState();
+  const { session } = useAuthState();
+  const hasPermission = session?.user?.permissions?.includes("Pages.AreaSpaces") ?? false;
   const [activeTab, setActiveTab] = useState("overview");
+
+  if (!hasPermission) {
+    return (
+      <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+          <StatusMessage tone="error">
+            You do not have permission to view this area space.
+          </StatusMessage>
+        </div>
+      </main>
+    );
+  }
 
   useEffect(() => {
     if (!Number.isInteger(areaSpaceId) || areaSpaceId <= 0) {

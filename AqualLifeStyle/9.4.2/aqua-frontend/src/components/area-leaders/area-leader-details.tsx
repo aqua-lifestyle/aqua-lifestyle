@@ -6,6 +6,7 @@ import {
   type AreaLeader,
   useAreaLeadersActions,
   useAreaLeadersState,
+  useAuthState,
 } from "@/src/providers";
 import {
   Avatar,
@@ -215,7 +216,21 @@ export const AreaLeaderDetails = ({ areaLeaderId }: AreaLeaderDetailsProps) => {
     selectedErrorMessage,
     promoteErrorMessage,
   } = useAreaLeadersState();
+  const { session } = useAuthState();
+  const hasPermission = session?.user?.permissions?.includes("Pages.AreaLeaders") ?? false;
   const [activeTab, setActiveTab] = useState("overview");
+
+  if (!hasPermission) {
+    return (
+      <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+          <StatusMessage tone="error">
+            You do not have permission to view this area leader.
+          </StatusMessage>
+        </div>
+      </main>
+    );
+  }
 
   useEffect(() => {
     if (!Number.isInteger(areaLeaderId) || areaLeaderId <= 0) {

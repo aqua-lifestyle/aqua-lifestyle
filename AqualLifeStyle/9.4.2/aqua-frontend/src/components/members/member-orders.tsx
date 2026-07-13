@@ -36,6 +36,19 @@ export const MemberOrders = () => {
   const { orderIntents, isLoadError, isLoadPending, loadErrorMessage } =
     useOrderIntentsState();
   const { session } = useAuthState();
+  const hasPermission = session?.user?.permissions?.includes("Pages.Orders") ?? false;
+
+  if (!hasPermission) {
+    return (
+      <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+          <StatusMessage tone="error">
+            You do not have permission to view your orders.
+          </StatusMessage>
+        </div>
+      </main>
+    );
+  }
 
   useEffect(() => {
     void getOrderIntents();
