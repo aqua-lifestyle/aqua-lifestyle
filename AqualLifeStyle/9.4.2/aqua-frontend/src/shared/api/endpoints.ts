@@ -23,6 +23,9 @@ export const apiEndpoints = {
   health: {
     get: "/api/health",
   },
+  account: {
+    register: "/api/services/app/Account/Register",
+  },
   customers: {
     create: "/api/services/app/Customer/Create",
     getAll: "/api/services/app/Customer/GetAll",

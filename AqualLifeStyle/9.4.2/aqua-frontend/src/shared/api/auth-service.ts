@@ -135,14 +135,14 @@ export const login = async (input: LoginInput): Promise<LoginResult> => {
 };
 
 /**
- * Register a new user via the ABP account registration endpoint.
+ * Register a new user via the ABP AccountAppService Web API endpoint.
  *
- * Endpoint: POST {API_BASE}/api/account/register
+ * Endpoint: POST {API_BASE}/api/services/app/Account/Register
  */
 export const register = async (input: RegisterInput): Promise<RegisterResult> => {
   try {
     await axios.post(
-      `${API_BASE}/api/account/register`,
+      `${API_BASE}/api/services/app/Account/Register`,
       {
         name: input.name,
         surname: input.surname,
@@ -162,9 +162,9 @@ export const register = async (input: RegisterInput): Promise<RegisterResult> =>
     if (axios.isAxiosError(error) && error.response) {
       const data = error.response.data as Record<string, unknown>;
 
-      // ABP validation errors
       if (error.response.status === 400) {
         const fieldErrors: Record<string, string> = {};
+
         const validationErrors = (
           (data as { validationErrors?: { memberNames?: string[]; message: string }[] })
             .validationErrors ?? []
