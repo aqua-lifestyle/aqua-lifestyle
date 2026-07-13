@@ -23,12 +23,13 @@ export type AuthState = {
 
 export type AuthActions = {
   clearSession: () => void;
+  setReady: (ready: boolean) => void;
   setSession: (session: AuthSession) => void;
 };
 
 export const initialAuthState: AuthState = {
   isAuthenticated: false,
-  isReady: true,
+  isReady: false,
   session: null,
 };
 

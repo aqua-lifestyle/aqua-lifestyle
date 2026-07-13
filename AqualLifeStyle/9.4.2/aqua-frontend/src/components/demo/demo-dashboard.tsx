@@ -26,6 +26,7 @@ import {
   useProductsState,
   useSystemHealthState,
   useTenantState,
+  useAuthState,
 } from "@/src/providers";
 import { getMembershipTypeLabel } from "@/src/shared/domain";
 import { Badge, Card, Skeleton, StatusMessage } from "@/src/shared/ui";
@@ -69,6 +70,7 @@ export const DemoDashboard = () => {
   const { getProducts } = useProductsActions();
 
   const { currentTenant, isHost } = useTenantState();
+  const { isAuthenticated, isReady } = useAuthState();
   const {
     customers,
     isLoadError: isCustomersError,
@@ -105,6 +107,10 @@ export const DemoDashboard = () => {
   } = useSystemHealthState();
 
   useEffect(() => {
+    if (!isReady || !isAuthenticated) {
+      return;
+    }
+
     void getCustomers();
     void getEnquiries();
     void getMemberships();
@@ -112,6 +118,8 @@ export const DemoDashboard = () => {
     void getProducts();
     void getSavingsWindowStatuses();
   }, [
+    isReady,
+    isAuthenticated,
     getCustomers,
     getEnquiries,
     getMemberships,

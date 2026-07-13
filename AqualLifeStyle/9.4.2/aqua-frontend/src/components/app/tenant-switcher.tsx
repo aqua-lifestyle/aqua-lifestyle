@@ -73,6 +73,7 @@ export const TenantSwitcher = () => {
   const [isSwitching, setIsSwitching] = useState(false);
   const [tenantInput, setTenantInput] = useState(currentTenant ?? "");
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
+  const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const recentTenants = useMemo(() => {
@@ -164,6 +165,11 @@ export const TenantSwitcher = () => {
     setErrorMessage(undefined);
   };
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
+
   const currentLabel = isHost ? "Host mode" : currentTenant ?? "Host mode";
 
   return (
@@ -180,7 +186,11 @@ export const TenantSwitcher = () => {
           type="button"
         >
           <Building2 className="size-4 text-accent" />
-          <span className="hidden sm:inline">{currentLabel}</span>
+          {mounted ? (
+            <span className="hidden sm:inline">{currentLabel}</span>
+          ) : (
+            <span className="hidden sm:inline">Host mode</span>
+          )}
           <ChevronDown
             className={cn(
               "size-4 text-muted-foreground transition-transform",

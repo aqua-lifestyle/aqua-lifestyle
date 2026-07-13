@@ -13,7 +13,7 @@ import {
   setRefreshTokenProvider,
 } from "@/src/shared/api";
 import { refreshToken as refreshTokenApi } from "@/src/shared/api/auth-service";
-import { clearAuthSession, setAuthSession } from "./actions";
+import { clearAuthSession, setAuthSession, setReady } from "./actions";
 import {
   AuthActionsContext,
   AuthStateContext,
@@ -48,6 +48,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
     } catch {
       localStorage.removeItem(STORAGE_KEY);
+    } finally {
+      dispatch(setReady(true));
     }
   }, []);
 
@@ -85,6 +87,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         localStorage.removeItem(STORAGE_KEY);
         dispatch(clearAuthSession());
       },
+      setReady: (ready: boolean) => dispatch(setReady(ready)),
       setSession: (session: AuthSession) => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
         dispatch(setAuthSession(session));
