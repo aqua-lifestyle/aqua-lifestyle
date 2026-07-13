@@ -52,7 +52,6 @@ export const MemberDashboard = () => {
     savingsWindowStatuses,
   } = useMembershipsState();
   const { session } = useAuthState();
-  const hasPermission = session?.user?.permissions?.includes("Pages.Orders") ?? false;
 
   // ALL hooks before early returns
   useEffect(() => {

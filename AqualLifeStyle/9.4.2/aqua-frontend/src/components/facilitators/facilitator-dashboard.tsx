@@ -13,7 +13,6 @@ import {
 import {
   Breadcrumb,
   Card,
-  EmptyState,
   LinkButton,
   Skeleton,
   StatusMessage,
@@ -21,13 +20,10 @@ import {
 
 export const FacilitatorDashboard = () => {
   const { getFacilitators } = useFacilitatorsActions();
-  const { facilitators, isLoadError: isFacilitatorsError, isLoadPending: isFacilitatorsPending, isLoadSuccess: isFacilitatorsSuccess, loadErrorMessage: facilitatorsErrorMessage } = useFacilitatorsState();
+  const { facilitators, isLoadError: isFacilitatorsError, isLoadPending: isFacilitatorsPending, loadErrorMessage: facilitatorsErrorMessage } = useFacilitatorsState();
 
   const { getReferrals } = useReferralsActions();
   const { referrals, isLoadError: isReferralsError, isLoadPending: isReferralsPending, loadErrorMessage: referralsErrorMessage } = useReferralsState();
-
-  const { session } = useAuthState();
-  const hasPermission = session?.user?.permissions?.includes("Pages.Facilitators") ?? false;
 
   // ALL hooks before early returns
   useEffect(() => {
@@ -35,6 +31,7 @@ export const FacilitatorDashboard = () => {
     void getReferrals();
   }, [getFacilitators, getReferrals]);
 
+  const { session } = useAuthState();
   const isLoading = isFacilitatorsPending || isReferralsPending;
   const hasError = isFacilitatorsError || isReferralsError;
 

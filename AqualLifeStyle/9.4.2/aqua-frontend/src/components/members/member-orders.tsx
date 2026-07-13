@@ -36,7 +36,6 @@ export const MemberOrders = () => {
   const { orderIntents, isLoadError, isLoadPending, loadErrorMessage } =
     useOrderIntentsState();
   const { session } = useAuthState();
-  const hasPermission = session?.user?.permissions?.includes("Pages.Orders") ?? false;
 
   // ALL hooks before early returns
   useEffect(() => {

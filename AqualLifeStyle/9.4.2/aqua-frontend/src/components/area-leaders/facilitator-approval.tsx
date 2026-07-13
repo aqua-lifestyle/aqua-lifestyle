@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import {
   useAreaLeadersActions,
   useAreaLeadersState,
-  useAuthState,
 } from "@/src/providers";
 import {
   Avatar,
@@ -17,9 +16,6 @@ import {
   StatusMessage,
 } from "@/src/shared/ui";
 
-type AreaLeaderFormState = {
-  monthlySubscription: string;
-};
 
 type FacilitatorApprovalProps = {
   areaLeaderId?: number;
@@ -46,10 +42,7 @@ export const FacilitatorApproval = ({ areaLeaderId }: FacilitatorApprovalProps) 
   const { getAreaLeaders, promoteAreaLeader } = useAreaLeadersActions();
   const { areaLeaders, isLoadError, isLoadPending, loadErrorMessage, isPromotePending, promoteErrorMessage, isPromoteSuccess } = useAreaLeadersState();
 
-  const { session } = useAuthState();
-  const hasPermission = session?.user?.permissions?.includes("Pages.AreaLeaders") ?? false;
   const [selectedId, setSelectedId] = useState<number | null>(areaLeaderId ?? null);
-  const [subscription, setSubscription] = useState<string>("");
   const [localError, setLocalError] = useState<string | null>(null);
 
   // ALL hooks before early returns

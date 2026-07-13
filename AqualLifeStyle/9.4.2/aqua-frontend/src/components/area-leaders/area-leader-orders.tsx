@@ -7,7 +7,6 @@ import {
   useAreaLeadersState,
   useOrderIntentsActions,
   useOrderIntentsState,
-  useAuthState,
 } from "@/src/providers";
 import {
   Avatar,
@@ -15,8 +14,6 @@ import {
   Breadcrumb,
   Card,
   DataTable,
-  EmptyState,
-  LinkButton,
   SelectField,
   Skeleton,
   StatusMessage,
@@ -42,9 +39,6 @@ export const AreaLeaderOrders = () => {
   const { orderIntents, isLoadError, isLoadPending, loadErrorMessage } = useOrderIntentsState();
   const { getAreaLeaders } = useAreaLeadersActions();
   const { areaLeaders } = useAreaLeadersState();
-
-  const { session } = useAuthState();
-  const hasPermission = session?.user?.permissions?.includes("Pages.Orders") ?? false;
 
   // ALL hooks before early returns
   useEffect(() => {

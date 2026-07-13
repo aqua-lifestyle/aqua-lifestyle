@@ -17,7 +17,6 @@ import {
   Card,
   DataTable,
   EmptyState,
-  LinkButton,
   SelectField,
   Skeleton,
   StatusMessage,
@@ -34,13 +33,11 @@ const referralTypeTone = (value: number): "neutral" | "success" | "info" => {
 
 export const FacilitatorReferrals = () => {
   const [typeFilter, setTypeFilter] = useState<ReferralTypeFilter>("all");
+  const { session } = useAuthState();
   const { getReferrals } = useReferralsActions();
   const { getFacilitators } = useFacilitatorsActions();
   const { referrals, isLoadError, isLoadPending, loadErrorMessage } = useReferralsState();
   const { facilitators } = useFacilitatorsState();
-
-  const { session } = useAuthState();
-  const hasPermission = session?.user?.permissions?.includes("Pages.Referrals") ?? false;
 
   // ALL hooks before early returns
   useEffect(() => {

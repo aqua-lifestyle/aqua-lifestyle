@@ -86,7 +86,6 @@ export const DemoDashboard = () => {
     isError: isMembershipsError,
     isPending: isMembershipsPending,
     memberships,
-    savingsWindowStatuses,
   } = useMembershipsState();
   const {
     isLoadError: isOrderIntentsError,
@@ -101,10 +100,8 @@ export const DemoDashboard = () => {
     products,
   } = useProductsState();
   const {
-    health,
     isError: isSystemHealthError,
     isPending: isSystemHealthPending,
-    isSuccess: isSystemHealthSuccess,
   } = useSystemHealthState();
 
   useEffect(() => {
@@ -121,45 +118,6 @@ export const DemoDashboard = () => {
     getOrderIntents,
     getProducts,
     getSavingsWindowStatuses,
-  ]);
-
-  const dashboardMetrics = useMemo(() => {
-    const activeCustomers = customers.filter((c) => c.isActive).length;
-    const activeMemberships = memberships.length;
-    const activeProducts = products.filter((p) => p.isActive).length;
-    const totalRevenue = orderIntents.reduce(
-      (sum, o) => sum + o.reservedPrice,
-      0,
-    );
-    const pendingEnquiries = enquiries.filter((e) => e.isPending).length;
-    const convertedEnquiries = enquiries.filter((e) => e.isConverted).length;
-    const salesReadyEnquiries = enquiries.filter((e) => e.isSalesReady).length;
-    const savingsWindowTiers = savingsWindowStatuses?.length ?? 0;
-    const reservedOrderIntents = orderIntents.filter(
-      (o) => o.status === 1,
-    ).length;
-
-    return {
-      activeCustomers,
-      activeMemberships,
-      activeProducts,
-      convertedEnquiries,
-      customers: customers.length,
-      enquiries: enquiries.length,
-      memberships: memberships.length,
-      pendingEnquiries,
-      reservedOrderIntents,
-      salesReadyEnquiries,
-      savingsWindowTiers,
-      totalRevenue,
-    };
-  }, [
-    customers,
-    enquiries,
-    memberships,
-    orderIntents,
-    products,
-    savingsWindowStatuses,
   ]);
 
   const metrics = useMemo(() => {
@@ -236,76 +194,6 @@ export const DemoDashboard = () => {
     );
   }, [customers, enquiries, orderIntents, products]);
 
-  const demoReadinessItems = [
-    {
-      action: "Check top bar",
-      href: "/",
-      isReady: isSystemHealthSuccess && health?.isDatabaseReachable === true,
-      label: "Backend and database reachable",
-      readyText: "Healthy",
-      waitingText: isSystemHealthError ? "Unavailable" : "Checking",
-    },
-    {
-      action: "Review memberships",
-      href: "/memberships",
-      isReady: dashboardMetrics.activeMemberships > 0,
-      label: "Membership tiers loaded",
-      readyText: "Ready",
-      waitingText: "Needs tiers",
-    },
-    {
-      action: "Filter catalog",
-      href: "/products",
-      isReady: dashboardMetrics.activeProducts > 0,
-      label: "Product catalog available",
-      readyText: "Ready",
-      waitingText: "Needs products",
-    },
-    {
-      action: "Review savings",
-      href: "/memberships",
-      isReady: dashboardMetrics.savingsWindowTiers > 0,
-      label: "Savings windows visible",
-      readyText: "Ready",
-      waitingText: "Needs signal",
-    },
-    {
-      action: "Register customer",
-      href: "/customers/register",
-      isReady: dashboardMetrics.activeCustomers > 0,
-      label: "Customer activation proven",
-      readyText: "Ready",
-      waitingText: "Next",
-    },
-    {
-      action: "Create enquiry",
-      href: "/enquiries/create",
-      isReady:
-        dashboardMetrics.pendingEnquiries +
-          dashboardMetrics.salesReadyEnquiries +
-          dashboardMetrics.convertedEnquiries >
-        0,
-      label: "Enquiry pipeline started",
-      readyText: "Ready",
-      waitingText: "Next",
-    },
-    {
-      action: "Open pipeline",
-      href: "/enquiries",
-      isReady: dashboardMetrics.convertedEnquiries > 0,
-      label: "Conversion handoff proven",
-      readyText: "Ready",
-      waitingText: "Next",
-    },
-    {
-      action: "Open intents",
-      href: "/order-intents",
-      isReady: dashboardMetrics.reservedOrderIntents > 0,
-      label: "Order intent handoff proven",
-      readyText: "Ready",
-      waitingText: "Next",
-    },
-  ] as const;
 
   const isLoading =
     isCustomersPending ||

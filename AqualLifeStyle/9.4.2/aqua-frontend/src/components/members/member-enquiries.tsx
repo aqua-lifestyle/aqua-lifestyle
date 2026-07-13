@@ -17,7 +17,6 @@ import {
   Card,
   DataTable,
   EmptyState,
-  LinkButton,
   SelectField,
   Skeleton,
   StatusMessage,
@@ -45,13 +44,11 @@ const statusTone = (value: number): "success" | "warning" | "info" => {
 
 export const MemberEnquiries = () => {
   const [statusFilter, setStatusFilter] = useState<EnquiryStatusFilter>("all");
+  const { session } = useAuthState();
   const { getEnquiries } = useEnquiriesActions();
   const { getCustomers } = useCustomersActions();
   const { enquiries, isLoadError, isLoadPending, loadErrorMessage } = useEnquiriesState();
   const { customers } = useCustomersState();
-
-  const { session } = useAuthState();
-  const hasPermission = session?.user?.permissions?.includes("Pages.Enquiries") ?? false;
 
   // ALL hooks before early returns
   useEffect(() => {

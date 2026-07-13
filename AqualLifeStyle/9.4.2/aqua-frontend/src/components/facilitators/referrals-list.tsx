@@ -6,7 +6,6 @@ import { DollarSign } from "lucide-react";
 import {
   useReferralsActions,
   useReferralsState,
-  useAuthState,
 } from "@/src/providers";
 import {
   Avatar,
@@ -39,9 +38,6 @@ export const ReferralsList = () => {
     loadErrorMessage,
     referrals,
   } = useReferralsState();
-  const { session } = useAuthState();
-  const hasPermission = session?.user?.permissions?.includes("Pages.Referrals") ?? false;
-
   // ALL hooks before early returns
   useEffect(() => {
     void getReferrals();

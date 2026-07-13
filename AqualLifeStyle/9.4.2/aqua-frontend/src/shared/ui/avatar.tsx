@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { cn } from "@/src/shared/lib/utils";
 
 type AvatarProps = {
@@ -58,10 +59,12 @@ export const Avatar = ({
       role="img"
     >
       {imageUrl ? (
-        <img
+        <Image
           alt={alt ?? fallback}
           className="size-full object-cover"
           src={imageUrl}
+          width={40}
+          height={40}
         />
       ) : (
         <span aria-hidden="true">{initials}</span>
