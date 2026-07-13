@@ -5,6 +5,10 @@ import { useAuthActions, useTenantState, useToast } from "@/src/providers";
 
 import { LoginForm } from "./login-form";
 
+vi.mock("@/src/shared/api/auth-service", () => ({
+  login: vi.fn(),
+}));
+
 vi.mock("@/src/providers", async () => {
   const actual = await vi.importActual<typeof import("@/src/providers")>(
     "@/src/providers",
@@ -48,7 +52,24 @@ describe("LoginForm", () => {
     ).toBeInTheDocument();
   });
 
-  it("calls setSession with a demo token after successful submit", async () => {
+  it("calls login from auth-service and sets session after successful submit", async () => {
+    const { login } = await import("@/src/shared/api/auth-service");
+    vi.mocked(login).mockResolvedValue({
+      ok: true,
+      session: {
+        accessToken: "real-access-token",
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+        refreshToken: "refresh-token",
+        user: {
+          id: 1,
+          email: "user@example.com",
+          name: "user",
+          role: "Member",
+          permissions: [],
+        },
+      },
+    });
+
     render(<LoginForm />);
 
     fireEvent.change(screen.getByLabelText("Email address"), {
@@ -65,7 +86,7 @@ describe("LoginForm", () => {
 
     expect(setSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        accessToken: "demo-access-token",
+        accessToken: "real-access-token",
         user: expect.objectContaining({
           email: "user@example.com",
           name: "user",

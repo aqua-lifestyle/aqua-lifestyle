@@ -5,6 +5,11 @@ import { useAuthActions, useTenantState, useToast } from "@/src/providers";
 
 import { SignupForm } from "./signup-form";
 
+vi.mock("@/src/shared/api/auth-service", () => ({
+  login: vi.fn(),
+  register: vi.fn(),
+}));
+
 vi.mock("@/src/providers", async () => {
   const actual = await vi.importActual<typeof import("@/src/providers")>(
     "@/src/providers",
@@ -42,6 +47,24 @@ describe("SignupForm", () => {
   });
 
   it("advances through the multi-step flow and creates an account", async () => {
+    const { register, login } = await import("@/src/shared/api/auth-service");
+    vi.mocked(register).mockResolvedValue({ ok: true });
+    vi.mocked(login).mockResolvedValue({
+      ok: true,
+      session: {
+        accessToken: "real-access-token",
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+        refreshToken: "refresh-token",
+        user: {
+          id: 1,
+          email: "jane@example.com",
+          name: "Jane",
+          role: "Member",
+          permissions: [],
+        },
+      },
+    });
+
     render(<SignupForm />);
 
     fireEvent.change(screen.getByLabelText("Email address"), {
@@ -63,9 +86,6 @@ describe("SignupForm", () => {
     fireEvent.change(screen.getByLabelText("Full name"), {
       target: { value: "Jane Doe" },
     });
-    fireEvent.change(screen.getByLabelText("Company / tenant"), {
-      target: { value: "Acme Club" },
-    });
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
@@ -84,10 +104,10 @@ describe("SignupForm", () => {
 
     expect(setSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        accessToken: "demo-access-token",
+        accessToken: "real-access-token",
         user: expect.objectContaining({
           email: "jane@example.com",
-          name: "Jane Doe",
+          name: "Jane",
         }),
       }),
     );
