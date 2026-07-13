@@ -48,6 +48,19 @@ export const AreaSpacesList = () => {
   const { session } = useAuthState();
   const hasPermission = session?.user?.permissions?.includes("Pages.AreaSpaces") ?? false;
 
+  // ALL hooks before early returns
+  useEffect(() => {
+    void getAreaSpaces();
+  }, [getAreaSpaces]);
+
+  const filteredAreaSpaces = useMemo(() => {
+    return areaSpaces.filter((areaSpace) => {
+      const matchesStatus =
+        statusFilter === "all" || areaSpace.status === Number(statusFilter);
+      return matchesStatus;
+    });
+  }, [areaSpaces, statusFilter]);
+
   if (!hasPermission) {
     return (
       <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
@@ -59,12 +72,6 @@ export const AreaSpacesList = () => {
       </main>
     );
   }
-
-  useEffect(() => {
-    void getAreaSpaces();
-  }, [getAreaSpaces]);
-
-  const filteredAreaSpaces = useMemo(() => {
     return areaSpaces.filter((areaSpace) => {
       const matchesStatus =
         statusFilter === "all" || areaSpace.status === Number(statusFilter);

@@ -292,6 +292,15 @@ export const AreaSpaceDetails = ({ areaSpaceId }: AreaSpaceDetailsProps) => {
   const hasPermission = session?.user?.permissions?.includes("Pages.AreaSpaces") ?? false;
   const [activeTab, setActiveTab] = useState("overview");
 
+  // ALL hooks before early returns
+  useEffect(() => {
+    if (!Number.isInteger(areaSpaceId) || areaSpaceId <= 0) {
+      return;
+    }
+
+    void getAreaSpace(areaSpaceId);
+  }, [areaSpaceId, getAreaSpace]);
+
   if (!hasPermission) {
     return (
       <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
@@ -303,14 +312,6 @@ export const AreaSpaceDetails = ({ areaSpaceId }: AreaSpaceDetailsProps) => {
       </main>
     );
   }
-
-  useEffect(() => {
-    if (!Number.isInteger(areaSpaceId) || areaSpaceId <= 0) {
-      return;
-    }
-
-    void getAreaSpace(areaSpaceId);
-  }, [areaSpaceId, getAreaSpace]);
 
   const isInvalid = !Number.isInteger(areaSpaceId) || areaSpaceId <= 0;
 

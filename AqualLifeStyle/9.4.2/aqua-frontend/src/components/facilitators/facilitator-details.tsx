@@ -171,6 +171,15 @@ export const FacilitatorDetails = ({ facilitatorId }: FacilitatorDetailsProps) =
   const hasPermission = session?.user?.permissions?.includes("Pages.Facilitators") ?? false;
   const [activeTab, setActiveTab] = useState("overview");
 
+  // ALL hooks before early returns
+  useEffect(() => {
+    if (!Number.isInteger(facilitatorId) || facilitatorId <= 0) {
+      return;
+    }
+
+    void getFacilitator(facilitatorId);
+  }, [facilitatorId, getFacilitator]);
+
   if (!hasPermission) {
     return (
       <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
@@ -182,14 +191,6 @@ export const FacilitatorDetails = ({ facilitatorId }: FacilitatorDetailsProps) =
       </main>
     );
   }
-
-  useEffect(() => {
-    if (!Number.isInteger(facilitatorId) || facilitatorId <= 0) {
-      return;
-    }
-
-    void getFacilitator(facilitatorId);
-  }, [facilitatorId, getFacilitator]);
 
   const isInvalid = !Number.isInteger(facilitatorId) || facilitatorId <= 0;
 

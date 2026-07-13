@@ -58,6 +58,19 @@ export const AreaLeadersList = () => {
   const { session } = useAuthState();
   const hasPermission = session?.user?.permissions?.includes("Pages.AreaLeaders") ?? false;
 
+  // ALL hooks before early returns
+  useEffect(() => {
+    void getAreaLeaders();
+  }, [getAreaLeaders]);
+
+  const filteredAreaLeaders = useMemo(() => {
+    return areaLeaders.filter((areaLeader) => {
+      const matchesLicense =
+        licenseFilter === "all" || areaLeader.licenseType === Number(licenseFilter);
+      return matchesLicense;
+    });
+  }, [areaLeaders, licenseFilter]);
+
   if (!hasPermission) {
     return (
       <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
@@ -69,12 +82,6 @@ export const AreaLeadersList = () => {
       </main>
     );
   }
-
-  useEffect(() => {
-    void getAreaLeaders();
-  }, [getAreaLeaders]);
-
-  const filteredAreaLeaders = useMemo(() => {
     return areaLeaders.filter((areaLeader) => {
       const matchesLicense =
         licenseFilter === "all" || areaLeader.licenseType === Number(licenseFilter);

@@ -42,18 +42,7 @@ export const AreaLeaderDashboard = () => {
   const { session } = useAuthState();
   const hasPermission = session?.user?.permissions?.includes("Pages.AreaLeaders") ?? false;
 
-  if (!hasPermission) {
-    return (
-      <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-          <StatusMessage tone="error">
-            You do not have permission to view the area leader dashboard.
-          </StatusMessage>
-        </div>
-      </main>
-    );
-  }
-
+  // ALL hooks before early returns
   useEffect(() => {
     void getAreaLeaders();
     void getAreaSpaces();
@@ -65,6 +54,22 @@ export const AreaLeaderDashboard = () => {
   const hasError = isAreaLeadersError || isAreaSpacesError || isFacilitatorsError || isOrdersError;
 
   const recentOrders = useMemo(() => {
+    return [...orderIntents]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5);
+  }, [orderIntents]);
+
+  if (!hasPermission) {
+    return (
+      <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+          <StatusMessage tone="error">
+            You do not have permission to view the area leader dashboard.
+          </StatusMessage>
+        </div>
+      </main>
+    );
+  }
     return [...orderIntents]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 5);

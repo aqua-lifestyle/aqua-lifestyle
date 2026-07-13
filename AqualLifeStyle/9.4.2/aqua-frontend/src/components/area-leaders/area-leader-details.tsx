@@ -220,6 +220,15 @@ export const AreaLeaderDetails = ({ areaLeaderId }: AreaLeaderDetailsProps) => {
   const hasPermission = session?.user?.permissions?.includes("Pages.AreaLeaders") ?? false;
   const [activeTab, setActiveTab] = useState("overview");
 
+  // ALL hooks before early returns
+  useEffect(() => {
+    if (!Number.isInteger(areaLeaderId) || areaLeaderId <= 0) {
+      return;
+    }
+
+    void getAreaLeader(areaLeaderId);
+  }, [areaLeaderId, getAreaLeader]);
+
   if (!hasPermission) {
     return (
       <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
@@ -231,14 +240,6 @@ export const AreaLeaderDetails = ({ areaLeaderId }: AreaLeaderDetailsProps) => {
       </main>
     );
   }
-
-  useEffect(() => {
-    if (!Number.isInteger(areaLeaderId) || areaLeaderId <= 0) {
-      return;
-    }
-
-    void getAreaLeader(areaLeaderId);
-  }, [areaLeaderId, getAreaLeader]);
 
   const isInvalid = !Number.isInteger(areaLeaderId) || areaLeaderId <= 0;
 

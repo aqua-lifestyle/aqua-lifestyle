@@ -114,6 +114,15 @@ export const ReferralDetails = ({ referralId }: ReferralDetailsProps) => {
   const hasPermission = session?.user?.permissions?.includes("Pages.Referrals") ?? false;
   const [activeTab, setActiveTab] = useState("overview");
 
+  // ALL hooks before early returns
+  useEffect(() => {
+    if (!Number.isInteger(referralId) || referralId <= 0) {
+      return;
+    }
+
+    void getReferral(referralId);
+  }, [referralId, getReferral]);
+
   if (!hasPermission) {
     return (
       <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
@@ -125,14 +134,6 @@ export const ReferralDetails = ({ referralId }: ReferralDetailsProps) => {
       </main>
     );
   }
-
-  useEffect(() => {
-    if (!Number.isInteger(referralId) || referralId <= 0) {
-      return;
-    }
-
-    void getReferral(referralId);
-  }, [referralId, getReferral]);
 
   const isInvalid = !Number.isInteger(referralId) || referralId <= 0;
 
