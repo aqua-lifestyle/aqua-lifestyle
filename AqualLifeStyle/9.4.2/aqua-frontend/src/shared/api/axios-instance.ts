@@ -91,9 +91,10 @@ apiClient.interceptors.response.use(
         }
       }
 
-      // Handle 403 Forbidden — redirect to the forbidden page
-      if (status === 403 && typeof window !== "undefined") {
-        window.location.href = "/forbidden";
+      // Handle 403 Forbidden — let the component surface the error instead
+      // of hard-redirecting to a missing /forbidden route.
+      if (status === 403) {
+        throw normalizeAbpError(status, error.response.data);
       }
 
       throw normalizeAbpError(status, error.response.data);
