@@ -18,6 +18,7 @@ type RequestContextProvider = () => string | null | Promise<string | null>;
 
 let accessTokenProvider: RequestContextProvider | null = null;
 let tenantProvider: RequestContextProvider | null = null;
+let refreshTokenProvider: (() => Promise<string | null>) | null = null;
 
 export const setAccessTokenProvider = (provider: RequestContextProvider) => {
   accessTokenProvider = provider;
@@ -25,6 +26,10 @@ export const setAccessTokenProvider = (provider: RequestContextProvider) => {
 
 export const setTenantProvider = (provider: RequestContextProvider) => {
   tenantProvider = provider;
+};
+
+export const setRefreshTokenProvider = (provider: () => Promise<string | null>) => {
+  refreshTokenProvider = provider;
 };
 
 export const apiClient: AxiosInstance = axios.create({
@@ -59,9 +64,32 @@ apiClient.interceptors.request.use(applyRequestContext);
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<AbpErrorEnvelope>) => {
+  async (error: AxiosError<AbpErrorEnvelope>) => {
     if (error.response) {
       const { status } = error.response;
+      const originalRequest = error.config as InternalAxiosRequestConfig & {
+        _retry?: boolean;
+      };
+
+      // Handle 401 Unauthorized — try token refresh before failing
+      if (status === 401 && !originalRequest._retry && refreshTokenProvider) {
+        originalRequest._retry = true;
+
+        try {
+          const newToken = await refreshTokenProvider();
+          if (newToken) {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return apiClient(originalRequest);
+          }
+        } catch {
+          // Refresh failed — will fall through to the redirect below
+        }
+
+        // Redirect to login if refresh fails
+        if (typeof window !== "undefined") {
+          window.location.href = "/login";
+        }
+      }
 
       // Handle 403 Forbidden — redirect to the forbidden page
       if (status === 403 && typeof window !== "undefined") {

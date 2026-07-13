@@ -8,7 +8,11 @@ import {
   useReducer,
 } from "react";
 
-import { setAccessTokenProvider } from "@/src/shared/api";
+import {
+  setAccessTokenProvider,
+  setRefreshTokenProvider,
+} from "@/src/shared/api";
+import { refreshToken as refreshTokenApi } from "@/src/shared/api/auth-service";
 import { clearAuthSession, setAuthSession } from "./actions";
 import {
   AuthActionsContext,
@@ -18,6 +22,8 @@ import {
 } from "./context";
 import { authReducer } from "./reducer";
 
+const STORAGE_KEY = "aqua.authSession";
+
 type AuthProviderProps = {
   children: ReactNode;
 };
@@ -25,14 +31,64 @@ type AuthProviderProps = {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [state, dispatch] = useReducer(authReducer, initialAuthState);
 
+  // Restore session from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const session = JSON.parse(stored) as AuthSession;
+        if (
+          session.expiresAt &&
+          new Date(session.expiresAt) > new Date()
+        ) {
+          dispatch(setAuthSession(session));
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      }
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, []);
+
+  // Persist session to localStorage whenever it changes
+  useEffect(() => {
+    if (state.session) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.session));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [state.session]);
+
+  // Provide the access token to the axios client
   useEffect(() => {
     setAccessTokenProvider(() => state.session?.accessToken ?? null);
   }, [state.session?.accessToken]);
 
+  // Provide token refresh capability to the axios 401 interceptor
+  useEffect(() => {
+    setRefreshTokenProvider(async () => {
+      if (!state.session?.refreshToken) return null;
+      const result = await refreshTokenApi(state.session.refreshToken);
+      if (result.ok) {
+        dispatch(setAuthSession(result.session));
+        return result.session.accessToken;
+      }
+      dispatch(clearAuthSession());
+      return null;
+    });
+  }, [state.session?.refreshToken]);
+
   const actions = useMemo(
     () => ({
-      clearSession: () => dispatch(clearAuthSession()),
-      setSession: (session: AuthSession) => dispatch(setAuthSession(session)),
+      clearSession: () => {
+        localStorage.removeItem(STORAGE_KEY);
+        dispatch(clearAuthSession());
+      },
+      setSession: (session: AuthSession) => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+        dispatch(setAuthSession(session));
+      },
     }),
     [],
   );

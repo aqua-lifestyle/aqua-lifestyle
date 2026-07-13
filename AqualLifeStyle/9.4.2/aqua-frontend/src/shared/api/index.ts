@@ -1,4 +1,9 @@
-export { apiClient, setAccessTokenProvider, setTenantProvider } from "./axios-instance";
+export {
+  apiClient,
+  setAccessTokenProvider,
+  setRefreshTokenProvider,
+  setTenantProvider,
+} from "./axios-instance";
 export { apiEndpoints } from "./endpoints";
 export { httpClient } from "./http-client";
 export {
