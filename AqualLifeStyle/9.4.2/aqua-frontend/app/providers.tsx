@@ -3,12 +3,16 @@
 import type { ReactNode } from "react";
 
 import {
+  AreaLeadersProvider,
+  AreaSpacesProvider,
   AuthProvider,
   CustomersProvider,
   EnquiriesProvider,
+  FacilitatorsProvider,
   MembershipsProvider,
   OrderIntentsProvider,
   ProductsProvider,
+  ReferralsProvider,
   SystemHealthProvider,
   TenantProvider,
   ToastProvider,
@@ -24,17 +28,25 @@ const TenantAwareProviders = ({ children }: { children: ReactNode }) => {
   const tenant = currentTenant ?? "host";
 
   return (
-    <CustomersProvider key={`customers-${tenant}`}>
-      <EnquiriesProvider key={`enquiries-${tenant}`}>
-        <MembershipsProvider key={`memberships-${tenant}`}>
-          <ProductsProvider key={`products-${tenant}`}>
-            <OrderIntentsProvider key={`order-intents-${tenant}`}>
-              {children}
-            </OrderIntentsProvider>
-          </ProductsProvider>
-        </MembershipsProvider>
-      </EnquiriesProvider>
-    </CustomersProvider>
+    <AreaLeadersProvider key={`area-leaders-${tenant}`}>
+      <AreaSpacesProvider key={`area-spaces-${tenant}`}>
+        <FacilitatorsProvider key={`facilitators-${tenant}`}>
+          <ReferralsProvider key={`referrals-${tenant}`}>
+            <CustomersProvider key={`customers-${tenant}`}>
+              <EnquiriesProvider key={`enquiries-${tenant}`}>
+                <MembershipsProvider key={`memberships-${tenant}`}>
+                  <ProductsProvider key={`products-${tenant}`}>
+                    <OrderIntentsProvider key={`order-intents-${tenant}`}>
+                      {children}
+                    </OrderIntentsProvider>
+                  </ProductsProvider>
+                </MembershipsProvider>
+              </EnquiriesProvider>
+            </CustomersProvider>
+          </ReferralsProvider>
+        </FacilitatorsProvider>
+      </AreaSpacesProvider>
+    </AreaLeadersProvider>
   );
 };
 

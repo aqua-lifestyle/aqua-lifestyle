@@ -11,7 +11,11 @@ import {
   Package,
   Plus,
   Users,
+  UserPlus,
+  DollarSign,
   X,
+  User,
+  Mail,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -33,6 +37,12 @@ const mainLinks = [
 const moreLinks = [
   { href: "/memberships", icon: Building2, label: "Memberships", permission: "Pages.Memberships" },
   { href: "/order-intents", icon: Home, label: "Order intents", permission: "Pages.Orders" },
+  { href: "/area-leader", icon: Users, label: "Area Leaders", permission: "Pages.AreaLeaders" },
+  { href: "/facilitator", icon: UserPlus, label: "Facilitators", permission: "Pages.Facilitators" },
+  { href: "/facilitator/referrals", icon: DollarSign, label: "Referrals", permission: "Pages.Referrals" },
+  { href: "/member", icon: User, label: "Member", permission: "Pages.Orders" },
+  { href: "/catalog", icon: Package, label: "Catalog", permission: null },
+  { href: "/contact", icon: Mail, label: "Contact", permission: null },
 ];
 
 export const Navbar = () => {
