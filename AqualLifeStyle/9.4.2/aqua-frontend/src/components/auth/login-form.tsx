@@ -2,6 +2,7 @@
 
 import { Droplets, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { z } from "zod";
 
 import { login } from "@/src/shared/api/auth-service";
@@ -23,6 +24,7 @@ const loginSchema = z.object({
 type FieldErrors = Partial<Record<"email" | "password", string>>;
 
 export const LoginForm = () => {
+  const router = useRouter();
   const { setSession } = useAuthActions();
   const { currentTenant, isHost } = useTenantState();
   const { toast } = useToast();
@@ -78,6 +80,7 @@ export const LoginForm = () => {
       type: "success",
     });
     setIsLoading(false);
+    router.push("/");
   };
 
   return (

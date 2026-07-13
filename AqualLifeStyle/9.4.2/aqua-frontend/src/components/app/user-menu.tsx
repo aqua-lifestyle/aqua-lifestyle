@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Settings, User } from "lucide-react";
+import { ChevronDown, LogOut, Settings, User } from "lucide-react";
 import Link from "next/link";
 
 import { useAuthActions, useAuthState } from "@/src/providers";
@@ -40,12 +40,14 @@ export const UserMenu = () => {
       </div>
       <div className="group relative">
         <button
-          className="flex items-center gap-2 rounded-full transition hover:ring-2 hover:ring-accent/30"
+          className="flex items-center gap-1.5 rounded-full transition hover:ring-2 hover:ring-accent/30"
           type="button"
+          aria-label="Open user menu"
         >
           <Avatar fallback={userLabel} size="md" />
+          <ChevronDown className="hidden size-3.5 text-muted-foreground group-hover:text-foreground sm:block" />
         </button>
-        <div className="invisible absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-xl border border-border bg-card p-1 opacity-0 shadow-lg transition-all group-hover:visible group-hover:opacity-100">
+        <div className="invisible absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-xl border border-border bg-card p-1 shadow-lg transition-all group-hover:visible group-hover:opacity-100">
           <Link
             className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
             href="/profile"

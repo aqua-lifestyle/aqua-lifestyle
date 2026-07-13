@@ -21,6 +21,12 @@ vi.mock("@/src/providers", async () => {
   };
 });
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+  usePathname: () => "/login",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 const submitForm = () => {
   const button = screen.getByRole("button", { name: "Sign in" });
   const form = button.closest("form");
