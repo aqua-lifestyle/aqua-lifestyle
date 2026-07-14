@@ -10,6 +10,9 @@ import {
 
 import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
 import {
+  getActiveTiersError,
+  getActiveTiersPending,
+  getActiveTiersSuccess,
   getMembershipError,
   getMembershipPending,
   getMembershipSuccess,
@@ -68,6 +71,19 @@ export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {
     }
   }, []);
 
+  const getActiveTiers = useCallback(async () => {
+    dispatch(getActiveTiersPending());
+
+    try {
+      const memberships = await httpClient.get<Membership[]>(
+        apiEndpoints.memberships.getActiveTiers,
+      );
+      dispatch(getActiveTiersSuccess(memberships));
+    } catch (error) {
+      dispatch(getActiveTiersError(getErrorMessage(error)));
+    }
+  }, []);
+
   const getMembership = useCallback(async (id: number) => {
     dispatch(getMembershipPending());
 
@@ -109,12 +125,13 @@ export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {
 
   const actions = useMemo(
     () => ({
+      getActiveTiers,
       getMembership,
       getMemberships,
       getSavingsWindowStatuses,
       getTierBenefits,
     }),
-    [getMembership, getMemberships, getSavingsWindowStatuses, getTierBenefits],
+    [getActiveTiers, getMembership, getMemberships, getSavingsWindowStatuses, getTierBenefits],
   );
 
   return (
