@@ -1,5 +1,5 @@
-import { AreaLeadersList } from "@/src/components/area-leaders/area-leaders-list";
+import { redirect } from "next/navigation";
 
 export default function AreaLeadersPage() {
-  return <AreaLeadersList />;
+  redirect("/area-leader/dashboard");
 }
