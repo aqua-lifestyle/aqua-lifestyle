@@ -25,6 +25,7 @@ import { cn } from "@/src/shared/lib/utils";
 
 import { useAuthState } from "@/src/providers";
 import { isSystemAdmin } from "@/src/features/admin/ui/admin-guard";
+import { isAreaLeader } from "@/src/features/area-leader/ui/area-leader-guard";
 import { TenantSwitcher } from "./tenant-switcher";
 import { UserMenu } from "./user-menu";
 
@@ -38,10 +39,6 @@ const mainLinks = [
 const moreLinks = [
   { href: "/memberships", icon: Building2, label: "Memberships", permission: "Pages.Memberships" },
   { href: "/order-intents", icon: Home, label: "Order intents", permission: "Pages.Orders" },
-  { href: "/area-leader", icon: Users, label: "Area Leaders", permission: "Pages.AreaLeaders" },
-  { href: "/area-leader/dashboard", icon: LayoutDashboard, label: "Area Leader dashboard", permission: "Pages.AreaLeaders" },
-  { href: "/area-leader/orders", icon: Package, label: "Area Leader orders", permission: "Pages.Orders" },
-  { href: "/area-leader/facilitators", icon: UserPlus, label: "Facilitator approval", permission: "Pages.Facilitators" },
   { href: "/facilitator", icon: UserPlus, label: "Facilitators", permission: "Pages.Facilitators" },
   { href: "/facilitator/dashboard", icon: LayoutDashboard, label: "Facilitator dashboard", permission: "Pages.Facilitators" },
   { href: "/facilitator/my-referrals", icon: DollarSign, label: "My referrals", permission: "Pages.Referrals" },
@@ -56,6 +53,17 @@ export const Navbar = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const { session } = useAuthState();
+  const areaLeaderLinks = isAreaLeader(session?.user?.role)
+    ? [
+        {
+          href: "/area-leader/dashboard",
+          icon: LayoutDashboard,
+          label: "Area Leader dashboard",
+          permission: "Aqua.AreaLeaders.View",
+        },
+      ]
+    : [];
+  const contextualMoreLinks = [...areaLeaderLinks, ...moreLinks];
   const primaryLinks = isSystemAdmin(session?.user?.role)
     ? [
         { href: "/admin/dashboard", icon: LayoutDashboard, label: "Admin", permission: null },
@@ -126,7 +134,7 @@ export const Navbar = () => {
 
               {isMoreOpen ? (
                 <div className="absolute left-0 top-full z-50 mt-2 w-44 rounded-xl border border-border bg-card p-1 shadow-lg animate-fade-in">
-                  {moreLinks
+                  {contextualMoreLinks
                     .filter((link) => hasPermission(link.permission))
                     .map((link) => (
                     <Link
@@ -181,7 +189,7 @@ export const Navbar = () => {
       {isMobileOpen ? (
         <div className="border-t border-border bg-card px-4 py-4 lg:hidden animate-fade-in">
           <nav className="flex flex-col gap-1">
-            {[...primaryLinks, ...moreLinks].filter((link) => hasPermission(link.permission)).map((link) => (
+            {[...primaryLinks, ...contextualMoreLinks].filter((link) => hasPermission(link.permission)).map((link) => (
               <Link
                 key={link.href}
                 className={cn(
