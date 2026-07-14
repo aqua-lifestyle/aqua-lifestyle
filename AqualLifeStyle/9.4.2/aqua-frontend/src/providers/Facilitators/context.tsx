@@ -9,6 +9,8 @@ export type Facilitator = {
   directReferrals: number;
   indirectReferrals: number;
   awardBalance: number;
+  createdAt?: string;
+  isApproved?: boolean;
 };
 
 export type FacilitatorRegisterInput = {
