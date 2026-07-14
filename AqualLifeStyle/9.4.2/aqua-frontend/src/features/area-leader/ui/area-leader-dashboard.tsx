@@ -26,7 +26,9 @@ export const AreaLeaderDashboard = () => {
   const facilitators = useFacilitatorsState(); const facilitatorActions = useFacilitatorsActions();
   const orders = useOrderIntentsState(); const orderActions = useOrderIntentsActions();
   const [actionError, setActionError] = useState<string | null>(null);
+  const [approvedDemoIds, setApprovedDemoIds] = useState<number[]>([]);
   const [isApproving, setIsApproving] = useState(false);
+  const [processedDemoIds, setProcessedDemoIds] = useState<number[]>([]);
 
   const loadDashboard = () => void Promise.all([
     leaderActions.getAreaLeaders(), spaceActions.getAreaSpaces(), customerActions.getCustomers(),
@@ -51,12 +53,37 @@ export const AreaLeaderDashboard = () => {
   }), [failed, leaders.areaLeaders, spaces.areaSpaces, customers.customers, customers.myCustomer?.id,
     enquiries.enquiries, facilitators.facilitators, orders.orderIntents]);
 
+  const visiblePendingFacilitators = dashboard.pendingFacilitators.filter(
+    (facilitator) => !approvedDemoIds.includes(facilitator.id),
+  );
+  const visibleOrders = dashboard.recentOrders.map((order) =>
+    processedDemoIds.includes(order.id)
+      ? { ...order, status: 2, statusText: "Completed" }
+      : order,
+  );
+  const visibleStats = failed
+    ? {
+        ...dashboard.stats,
+        pendingApprovals: visiblePendingFacilitators.length,
+        totalFacilitators: dashboard.stats.totalFacilitators + approvedDemoIds.length,
+      }
+    : dashboard.stats;
+
   const processOrder = async (id: number) => {
     setActionError(null);
+    if (failed) {
+      setProcessedDemoIds((current) => [...current, id]);
+      return;
+    }
     if (!(await orderActions.completeOrderIntent(id))) setActionError(orders.actionErrorMessage ?? "Unable to process the order.");
   };
   const approveFacilitator = async (id: number) => {
     setIsApproving(true); setActionError(null);
+    if (failed) {
+      setApprovedDemoIds((current) => [...current, id]);
+      setIsApproving(false);
+      return;
+    }
     try {
       await httpClient.post(`/api/services/app/Facilitator/Approve?id=${id}`, {});
       await facilitatorActions.getFacilitators();
@@ -74,8 +101,8 @@ export const AreaLeaderDashboard = () => {
         </header>
         {failed ? <StatusMessage tone="warning">Live Area Space data is unavailable. Demo data is shown so this dashboard remains presentation-ready.</StatusMessage> : null}
         {actionError ? <StatusMessage tone="error">{actionError}</StatusMessage> : null}
-        <KpiCards isLoading={loading} stats={dashboard.stats} />
-        <section className="grid gap-6 xl:grid-cols-2"><OrderManagement isProcessing={orders.isActionPending} onProcess={processOrder} orders={dashboard.recentOrders} /><FacilitatorApproval facilitators={dashboard.pendingFacilitators} isApproving={isApproving} onApprove={approveFacilitator} /></section>
+        <KpiCards isLoading={loading} stats={visibleStats} />
+        <section className="grid gap-6 xl:grid-cols-2"><OrderManagement isProcessing={orders.isActionPending} onProcess={processOrder} orders={visibleOrders} /><FacilitatorApproval facilitators={visiblePendingFacilitators} isApproving={isApproving} onApprove={approveFacilitator} /></section>
         <section className="grid gap-6 xl:grid-cols-2"><AreaSpaceManagement areaSpace={dashboard.areaSpace} /><RecentActivity activities={dashboard.activities} /></section>
         <Card><div className="flex items-center gap-2"><Users className="size-5 text-accent" /><h2 className="text-lg font-semibold">Recent members</h2></div><ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">{dashboard.recentMembers.map((member) => <li className="rounded-lg bg-muted/60 p-3 text-sm font-semibold" key={member.id}>{member.name}</li>)}</ul></Card>
       </div>
