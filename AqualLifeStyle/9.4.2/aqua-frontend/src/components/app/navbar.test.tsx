@@ -69,7 +69,7 @@ describe("Navbar", () => {
     });
 
     expect(screen.getByRole("link", { name: /Aqua Lifestyle/i })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
     expect(screen.getByRole("link", { name: "Customers" })).toHaveAttribute("href", "/customers");
     expect(screen.getByRole("link", { name: "Products" })).toHaveAttribute("href", "/products");
     expect(screen.getByRole("link", { name: "Enquiries" })).toHaveAttribute("href", "/enquiries");

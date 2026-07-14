@@ -29,7 +29,7 @@ import { TenantSwitcher } from "./tenant-switcher";
 import { UserMenu } from "./user-menu";
 
 const mainLinks = [
-  { href: "/", icon: LayoutDashboard, label: "Dashboard", permission: null },
+  { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard", permission: null },
   { href: "/customers", icon: Users, label: "Customers", permission: "Pages.Customers" },
   { href: "/products", icon: Package, label: "Products", permission: "Pages.Products" },
   { href: "/enquiries", icon: MessageSquare, label: "Enquiries", permission: "Pages.Enquiries" },
