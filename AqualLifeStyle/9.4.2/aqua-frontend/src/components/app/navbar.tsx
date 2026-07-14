@@ -24,6 +24,7 @@ import { useState } from "react";
 import { cn } from "@/src/shared/lib/utils";
 
 import { useAuthState } from "@/src/providers";
+import { isSystemAdmin } from "@/src/features/admin/ui/admin-guard";
 import { TenantSwitcher } from "./tenant-switcher";
 import { UserMenu } from "./user-menu";
 
@@ -55,6 +56,12 @@ export const Navbar = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const { session } = useAuthState();
+  const primaryLinks = isSystemAdmin(session?.user?.role)
+    ? [
+        { href: "/admin/dashboard", icon: LayoutDashboard, label: "Admin", permission: null },
+        ...mainLinks,
+      ]
+    : mainLinks;
 
   const hasPermission = (permission: string | null) => {
     if (!permission) return true;
@@ -82,7 +89,7 @@ export const Navbar = () => {
           </Link>
 
           <nav className="hidden items-center gap-1 lg:flex">
-            {mainLinks.filter((link) => hasPermission(link.permission)).map((link) => (
+            {primaryLinks.filter((link) => hasPermission(link.permission)).map((link) => (
               <Link
                 key={link.href}
                 className={cn(
@@ -174,7 +181,7 @@ export const Navbar = () => {
       {isMobileOpen ? (
         <div className="border-t border-border bg-card px-4 py-4 lg:hidden animate-fade-in">
           <nav className="flex flex-col gap-1">
-            {[...mainLinks, ...moreLinks].filter((link) => hasPermission(link.permission)).map((link) => (
+            {[...primaryLinks, ...moreLinks].filter((link) => hasPermission(link.permission)).map((link) => (
               <Link
                 key={link.href}
                 className={cn(
