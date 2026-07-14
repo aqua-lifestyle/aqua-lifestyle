@@ -1,5 +1,5 @@
-import { FacilitatorApproval } from "@/src/components/area-leaders/facilitator-approval";
+import { FacilitatorManagement } from "@/src/features/area-leader/ui/facilitator-management";
 
 export default function AreaLeaderFacilitatorApprovalPage() {
-  return <FacilitatorApproval />;
+  return <FacilitatorManagement />;
 }
