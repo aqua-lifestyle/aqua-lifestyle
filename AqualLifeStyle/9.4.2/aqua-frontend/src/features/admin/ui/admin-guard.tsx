@@ -12,7 +12,9 @@ type AdminGuardProps = {
 };
 
 export const isSystemAdmin = (role: string | null | undefined) =>
-  role?.replace(/[\s_-]/g, "").toLowerCase() === "systemadmin";
+  ["admin", "systemadmin"].includes(
+    role?.replace(/[\s_-]/g, "").toLowerCase() ?? "",
+  );
 
 export const AdminGuard = ({ children }: AdminGuardProps) => {
   const pathname = usePathname();

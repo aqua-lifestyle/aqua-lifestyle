@@ -19,22 +19,60 @@ const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
   }
 };
 
-/** Map raw JWT claims to the application's AuthUser shape. */
-const claimsToUser = (
+const claimTypes = {
+  email: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+  name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+  nameIdentifier:
+    "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier",
+  role: "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+} as const;
+
+const readStringClaim = (...values: unknown[]): string | null => {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value;
+    if (Array.isArray(value)) {
+      const item = value.find(
+        (candidate): candidate is string =>
+          typeof candidate === "string" && Boolean(candidate.trim()),
+      );
+      if (item) return item;
+    }
+  }
+  return null;
+};
+
+const normalizeRole = (role: string | null) => {
+  const normalized = role?.replace(/[\s_-]/g, "").toLowerCase();
+  return normalized === "admin" || normalized === "systemadmin"
+    ? "SystemAdmin"
+    : (role ?? "Member");
+};
+
+/** Map ABP and standard JWT claims to the application's AuthUser shape. */
+export const claimsToUser = (
   claims: Record<string, unknown>,
 ): AuthUser | null => {
-  const sub = claims.sub;
-  const id = typeof sub === "string" ? Number(sub) : (sub as number);
+  const rawId = readStringClaim(
+    claims.sub,
+    claims[claimTypes.nameIdentifier],
+  );
+  const id = Number(rawId);
 
-  if (!id) return null;
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
 
   const rawPermissions = claims.permissions ?? claims.rolePermissions ?? [];
+  const role = readStringClaim(claims.role, claims[claimTypes.role]);
 
   return {
     id,
-    email: (claims.email ?? "") as string,
-    name: (claims.name ?? claims.given_name ?? null) as string | null,
-    role: (claims.role ?? "Member") as string,
+    email: readStringClaim(claims.email, claims[claimTypes.email]),
+    name: readStringClaim(
+      claims.name,
+      claims.given_name,
+      claims.unique_name,
+      claims[claimTypes.name],
+    ),
+    role: normalizeRole(role),
     permissions: Array.isArray(rawPermissions)
       ? (rawPermissions as string[])
       : typeof rawPermissions === "string"

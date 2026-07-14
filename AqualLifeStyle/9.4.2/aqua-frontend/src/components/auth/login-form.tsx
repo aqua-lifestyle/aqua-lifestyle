@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { z } from "zod";
 
 import { login } from "@/src/shared/api/auth-service";
+import { isSystemAdmin } from "@/src/features/admin/ui/admin-guard";
 import { useAuthActions, useTenantState, useToast } from "@/src/providers";
 import {
   Button,
@@ -16,7 +17,7 @@ import {
 } from "@/src/shared/ui";
 
 const loginSchema = z.object({
-  email: z.string().trim().email("Enter a valid email address."),
+  email: z.string().trim().min(1, "Enter your username or email address."),
   password: z.string().min(1, "Password is required."),
   rememberMe: z.boolean().default(false),
 });
@@ -80,7 +81,9 @@ export const LoginForm = () => {
       type: "success",
     });
     setIsLoading(false);
-    router.push("/");
+    router.push(
+      isSystemAdmin(authResult.session.user?.role) ? "/admin/dashboard" : "/",
+    );
   };
 
   return (
@@ -130,14 +133,14 @@ export const LoginForm = () => {
                 </SelectField>
 
                 <TextField
-                  autoComplete="email"
+                  autoComplete="username"
                   errorMessage={fieldErrors.email}
-                  label="Email address"
+                  label="Username or email"
                   name="email"
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@company.com"
                   required
-                  type="email"
+                  type="text"
                   value={email}
                 />
 

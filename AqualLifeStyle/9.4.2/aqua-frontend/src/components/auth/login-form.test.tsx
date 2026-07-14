@@ -5,6 +5,8 @@ import { useAuthActions, useTenantState, useToast } from "@/src/providers";
 
 import { LoginForm } from "./login-form";
 
+const { push } = vi.hoisted(() => ({ push: vi.fn() }));
+
 vi.mock("@/src/shared/api/auth-service", () => ({
   login: vi.fn(),
 }));
@@ -22,7 +24,7 @@ vi.mock("@/src/providers", async () => {
 });
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({ push, replace: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => "/login",
   useSearchParams: () => new URLSearchParams(),
 }));
@@ -51,7 +53,7 @@ describe("LoginForm", () => {
     submitForm();
 
     expect(
-      await screen.findByText("Enter a valid email address."),
+      await screen.findByText("Enter your username or email address."),
     ).toBeInTheDocument();
     expect(
       await screen.findByText("Password is required."),
@@ -78,7 +80,7 @@ describe("LoginForm", () => {
 
     render(<LoginForm />);
 
-    fireEvent.change(screen.getByLabelText("Email address"), {
+    fireEvent.change(screen.getByLabelText("Username or email"), {
       target: { value: "user@example.com" },
     });
     fireEvent.change(screen.getByLabelText("Password"), {
@@ -104,6 +106,39 @@ describe("LoginForm", () => {
         title: "Welcome back",
         type: "success",
       }),
+    );
+  });
+
+  it("accepts the seeded admin username and opens the admin dashboard", async () => {
+    const { login } = await import("@/src/shared/api/auth-service");
+    vi.mocked(login).mockResolvedValue({
+      ok: true,
+      session: {
+        accessToken: "admin-access-token",
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+        user: {
+          id: 1,
+          email: "admin@defaulttenant.com",
+          name: "admin",
+          role: "SystemAdmin",
+          permissions: [],
+        },
+      },
+    });
+
+    render(<LoginForm />);
+
+    fireEvent.change(screen.getByLabelText("Username or email"), {
+      target: { value: "admin" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "123qwe" },
+    });
+    submitForm();
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/admin/dashboard"));
+    expect(login).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "admin", password: "123qwe" }),
     );
   });
 });
