@@ -9,8 +9,9 @@ import {
   useFacilitatorsActions, useFacilitatorsState, useOrderIntentsActions, useOrderIntentsState,
 } from "@/src/providers";
 import { httpClient } from "@/src/shared/api";
-import { Button, Card, StatusMessage } from "@/src/shared/ui";
+import { Badge, Button, Card, StatusMessage } from "@/src/shared/ui";
 import { buildAreaLeaderDashboard } from "../model/dashboard";
+import { mockAreaLeaderDashboard } from "../model/mock-data";
 import { AreaSpaceManagement } from "./area-space-management";
 import { FacilitatorApproval } from "./facilitator-approval";
 import { KpiCards } from "./kpi-cards";
@@ -43,11 +44,11 @@ export const AreaLeaderDashboard = () => {
     enquiries.isLoadError || facilitators.isLoadError || orders.isLoadError;
   const loading = leaders.isLoadPending || spaces.isLoadPending || customers.isLoadPending ||
     customers.isMyCustomerPending || enquiries.isLoadPending || facilitators.isLoadPending || orders.isLoadPending;
-  const dashboard = useMemo(() => buildAreaLeaderDashboard({
+  const dashboard = useMemo(() => failed ? mockAreaLeaderDashboard : buildAreaLeaderDashboard({
     areaLeaders: leaders.areaLeaders, areaSpaces: spaces.areaSpaces, customers: customers.customers,
     enquiries: enquiries.enquiries, facilitators: facilitators.facilitators,
     myCustomerId: customers.myCustomer?.id ?? null, orders: orders.orderIntents,
-  }), [leaders.areaLeaders, spaces.areaSpaces, customers.customers, customers.myCustomer?.id,
+  }), [failed, leaders.areaLeaders, spaces.areaSpaces, customers.customers, customers.myCustomer?.id,
     enquiries.enquiries, facilitators.facilitators, orders.orderIntents]);
 
   const processOrder = async (id: number) => {
@@ -68,10 +69,10 @@ export const AreaLeaderDashboard = () => {
     <main className="min-h-[calc(100dvh-7.5rem)] bg-muted/30 px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div><p className="text-sm font-semibold text-accent">Area operations</p><h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">Area Leader dashboard</h1><p className="mt-2 text-muted-foreground">Live performance, people, and order activity for your Area Space.</p></div>
+          <div><div className="flex items-center gap-2"><p className="text-sm font-semibold text-accent">Area operations</p><Badge tone={failed ? "warning" : "success"}>{failed ? "Demo fallback data" : "Live Area data"}</Badge></div><h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">Area Leader dashboard</h1><p className="mt-2 text-muted-foreground">Live performance, people, and order activity for your Area Space.</p></div>
           <Button disabled={loading} onClick={loadDashboard} variant="secondary"><RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />Refresh data</Button>
         </header>
-        {failed ? <StatusMessage tone="error">Unable to load live Area Space data. Check your permissions and try again.</StatusMessage> : null}
+        {failed ? <StatusMessage tone="warning">Live Area Space data is unavailable. Demo data is shown so this dashboard remains presentation-ready.</StatusMessage> : null}
         {actionError ? <StatusMessage tone="error">{actionError}</StatusMessage> : null}
         <KpiCards isLoading={loading} stats={dashboard.stats} />
         <section className="grid gap-6 xl:grid-cols-2"><OrderManagement isProcessing={orders.isActionPending} onProcess={processOrder} orders={dashboard.recentOrders} /><FacilitatorApproval facilitators={dashboard.pendingFacilitators} isApproving={isApproving} onApprove={approveFacilitator} /></section>
