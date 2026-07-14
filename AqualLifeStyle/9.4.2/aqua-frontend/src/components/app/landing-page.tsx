@@ -1,10 +1,9 @@
 "use client";
 
 import { Droplets, Users, Wallet, Package, Calendar } from "lucide-react";
-import Link from "next/link";
 
 import { useAuthState } from "@/src/providers";
-import { Button, Card } from "@/src/shared/ui";
+import { Card, LinkButton } from "@/src/shared/ui";
 
 const features = [
   {
@@ -55,22 +54,22 @@ export const LandingPage = () => {
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             {isAuthenticated ? (
-              <Button asChild size="lg" variant="primary">
-                <Link href="/member">Go to member area</Link>
-              </Button>
+              <LinkButton href="/member" size="lg" variant="primary">
+                Go to member area
+              </LinkButton>
             ) : (
               <>
-                <Button asChild size="lg" variant="primary">
-                  <Link href="/signup">Create account</Link>
-                </Button>
-                <Button
-                  asChild
+                <LinkButton href="/signup" size="lg" variant="primary">
+                  Create account
+                </LinkButton>
+                <LinkButton
+                  href="/login"
                   size="lg"
                   className="border-white/30 bg-white/10 text-white hover:bg-white/20"
                   variant="outline"
                 >
-                  <Link href="/login">Sign in</Link>
-                </Button>
+                  Sign in
+                </LinkButton>
               </>
             )}
           </div>
