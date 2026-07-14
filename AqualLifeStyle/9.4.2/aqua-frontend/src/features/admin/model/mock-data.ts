@@ -30,7 +30,7 @@ export const mockAdminDashboard: AdminDashboardData = {
       title: "Enquiry #89",
     },
   ],
-  leaders: { pendingApplications: 7, total: 18 },
+  leaders: { pendingApplications: 7, source: "fallback", total: 18 },
   members: {
     active: 210,
     byTier: [

@@ -28,6 +28,7 @@ export type AdminDashboardData = {
   activity: DashboardActivity[];
   leaders: {
     pendingApplications: number;
+    source: DashboardSource;
     total: number;
   };
   members: {
@@ -201,7 +202,11 @@ export const buildAdminDashboard = ({
     activity: [...memberActivity, ...orderActivity, ...enquiryActivity]
       .sort((a, b) => newestFirst(a.timestamp, b.timestamp))
       .slice(0, 8),
-    leaders: { pendingApplications: 0, total: areaLeaderCount },
+    leaders: {
+      pendingApplications: fallback.leaders.pendingApplications,
+      source: "fallback",
+      total: areaLeaderCount,
+    },
     members: {
       active: customers.filter((customer) => customer.isActive).length,
       byTier: [...tierCounts].map(([name, value]) => ({ name, value })),
