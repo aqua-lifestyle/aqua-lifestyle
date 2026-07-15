@@ -5,6 +5,7 @@ using Abp.Authorization;
 using AqualLifeStyle.Application.Admin.Import;
 using AqualLifeStyle.Application.Admin.Customers;
 using AqualLifeStyle.Application.Admin.Users;
+using AqualLifeStyle.Application.Admin.AreaLeaders;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Enquiries;
@@ -93,6 +94,17 @@ namespace AqualLifeStyle.Tests.Application
             AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.AssignRoleAsync), AquaPermissions.Admin.Users.AssignRole);
             AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.ResetPasswordAsync), AquaPermissions.Admin.Users.ResetPassword);
             AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.DeleteAsync), AquaPermissions.Admin.Users.Delete);
+        }
+
+        [Fact]
+        public void AdminAreaLeaderAppService_ShouldRequireGranularPermissionOnEveryMethod()
+        {
+            AssertAuthorizeAttribute(typeof(AdminAreaLeaderAppService), nameof(AdminAreaLeaderAppService.GetAllAsync), AquaPermissions.Admin.AreaLeaders.View);
+            AssertAuthorizeAttribute(typeof(AdminAreaLeaderAppService), nameof(AdminAreaLeaderAppService.GetAsync), AquaPermissions.Admin.AreaLeaders.View);
+            AssertAuthorizeAttribute(typeof(AdminAreaLeaderAppService), nameof(AdminAreaLeaderAppService.ApproveAsync), AquaPermissions.Admin.AreaLeaders.Approve);
+            AssertAuthorizeAttribute(typeof(AdminAreaLeaderAppService), nameof(AdminAreaLeaderAppService.PromoteAsync), AquaPermissions.Admin.AreaLeaders.Promote);
+            AssertAuthorizeAttribute(typeof(AdminAreaLeaderAppService), nameof(AdminAreaLeaderAppService.DemoteAsync), AquaPermissions.Admin.AreaLeaders.Demote);
+            AssertAuthorizeAttribute(typeof(AdminAreaLeaderAppService), nameof(AdminAreaLeaderAppService.RemoveAsync), AquaPermissions.Admin.AreaLeaders.Remove);
         }
 
         [Fact]
