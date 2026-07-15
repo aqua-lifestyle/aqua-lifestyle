@@ -23,11 +23,13 @@ namespace AqualLifeStyle.Application.Admin.Users
     {
         private readonly IRepository<User, long> _userRepository;
         private readonly UserManager _userManager;
+        private readonly IAdminUserRoleSynchronizer _userRoleSynchronizer;
 
-        public AdminUserAppService(IRepository<User, long> userRepository, UserManager userManager)
+        public AdminUserAppService(IRepository<User, long> userRepository, UserManager userManager, IAdminUserRoleSynchronizer userRoleSynchronizer)
         {
             _userRepository = userRepository;
             _userManager = userManager;
+            _userRoleSynchronizer = userRoleSynchronizer;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Users.View)]
@@ -119,9 +121,7 @@ namespace AqualLifeStyle.Application.Admin.Users
                 throw Failed("Role assignment", "You cannot change your own administrator role.");
             using (CurrentUnitOfWork.SetTenantId(user.TenantId.Value))
             {
-                user.SetRole(input.Role);
-                (await _userManager.UpdateAsync(user)).CheckErrors(LocalizationManager);
-                (await _userManager.SetRolesAsync(user, new[] { input.Role.ToString() })).CheckErrors(LocalizationManager);
+                await _userRoleSynchronizer.SynchronizeAsync(user, input.Role);
             }
             LogAdminMutation("User", $"assigned role {input.Role}", user.Id, user.TenantId, input.Justification);
             return Map(user);

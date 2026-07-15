@@ -22,16 +22,16 @@ namespace AqualLifeStyle.Application.Admin.AreaLeaders
     {
         private readonly IAreaLeaderRepository _areaLeaderRepository;
         private readonly ICustomerRepository _customerRepository;
-        private readonly UserManager _userManager;
+        private readonly IAdminUserRoleSynchronizer _userRoleSynchronizer;
 
         public AdminAreaLeaderAppService(
             IAreaLeaderRepository areaLeaderRepository,
             ICustomerRepository customerRepository,
-            UserManager userManager)
+            IAdminUserRoleSynchronizer userRoleSynchronizer)
         {
             _areaLeaderRepository = areaLeaderRepository;
             _customerRepository = customerRepository;
-            _userManager = userManager;
+            _userRoleSynchronizer = userRoleSynchronizer;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.AreaLeaders.View)]
@@ -83,9 +83,7 @@ namespace AqualLifeStyle.Application.Admin.AreaLeaders
             using (CurrentUnitOfWork.SetTenantId(leader.TenantId))
             {
                 leader.ApproveApplication();
-                customer.User.SetRole(AquaUserRole.AreaLeader);
-                (await _userManager.UpdateAsync(customer.User)).CheckErrors(LocalizationManager);
-                (await _userManager.SetRolesAsync(customer.User, new[] { AquaUserRole.AreaLeader.ToString() })).CheckErrors(LocalizationManager);
+                await _userRoleSynchronizer.SynchronizeAsync(customer.User, AquaUserRole.AreaLeader);
                 await _areaLeaderRepository.UpdateAsync(leader);
             }
             LogAdminMutation("Area leader", "approved", leader.Id, leader.TenantId, input.Justification);
@@ -123,9 +121,7 @@ namespace AqualLifeStyle.Application.Admin.AreaLeaders
             var replacementRole = customer.MembershipId.HasValue ? AquaUserRole.Member : AquaUserRole.Guest;
             using (CurrentUnitOfWork.SetTenantId(leader.TenantId))
             {
-                customer.User.SetRole(replacementRole);
-                (await _userManager.UpdateAsync(customer.User)).CheckErrors(LocalizationManager);
-                (await _userManager.SetRolesAsync(customer.User, new[] { replacementRole.ToString() })).CheckErrors(LocalizationManager);
+                await _userRoleSynchronizer.SynchronizeAsync(customer.User, replacementRole);
                 await _areaLeaderRepository.DeleteAsync(leader);
             }
             LogAdminMutation("Area leader", "removed", leader.Id, leader.TenantId, input.Justification);

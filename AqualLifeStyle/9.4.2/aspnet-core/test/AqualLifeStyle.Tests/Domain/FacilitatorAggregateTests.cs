@@ -115,5 +115,26 @@ namespace AqualLifeStyle.Tests.Domain
             facilitator.AwardBalance.ShouldBe(50m);
             facilitator.DomainEvents.Count.ShouldBe(1);
         }
+
+        [Fact]
+        public void ApproveApplication_RecordsApprovalOnlyOnce()
+        {
+            var facilitator = Facilitator.Register(1, 100, 50);
+            var approvedAt = new DateTime(2026, 7, 15, 12, 0, 0, DateTimeKind.Utc);
+            facilitator.ApproveApplication(approvedAt);
+            facilitator.ApproveApplication(approvedAt.AddHours(1));
+            facilitator.IsApproved.ShouldBeTrue();
+            facilitator.ApprovedAt.ShouldBe(approvedAt);
+        }
+
+        [Fact]
+        public void PromoteToEarnedRank_UsesReferralCountAndAwardTable()
+        {
+            var facilitator = Facilitator.Register(1, 100, 50);
+            Enumerable.Range(0, 20).ToList().ForEach(_ => facilitator.RecordDirectReferral());
+            facilitator.PromoteToEarnedRank(new RankProgressionPolicy(), new CommissionCalculator());
+            facilitator.Rank.ShouldBe(FacilitatorRank.Gold);
+            facilitator.AwardBalance.ShouldBe(250m);
+        }
     }
 }

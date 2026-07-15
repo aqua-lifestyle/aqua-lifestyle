@@ -31,6 +31,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
         private readonly IRepository<User, long> _userRepository;
         private readonly UserManager _userManager;
         private readonly IObjectMapper _objectMapper;
+        private readonly IAdminUserRoleSynchronizer _userRoleSynchronizer;
 
         public AdminCustomerAppService(
             IAdminCustomerAccountManager accountManager,
@@ -38,7 +39,8 @@ namespace AqualLifeStyle.Application.Admin.Customers
             IMembershipRepository membershipRepository,
             IRepository<User, long> userRepository,
             UserManager userManager,
-            IObjectMapper objectMapper)
+            IObjectMapper objectMapper,
+            IAdminUserRoleSynchronizer userRoleSynchronizer)
         {
             _accountManager = accountManager;
             _customerRepository = customerRepository;
@@ -46,6 +48,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
             _userRepository = userRepository;
             _userManager = userManager;
             _objectMapper = objectMapper;
+            _userRoleSynchronizer = userRoleSynchronizer;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Customers.View)]
@@ -125,9 +128,9 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 user.UserName = input.Email.Trim();
                 user.IsActive = input.IsActive;
                 user.SetNormalizedNames();
-                user.SetRole(input.MembershipId.HasValue ? AquaUserRole.Member : AquaUserRole.Guest);
-                CheckErrors(await _userManager.UpdateAsync(user));
-                CheckErrors(await _userManager.SetRolesAsync(user, new[] { input.MembershipId.HasValue ? "Member" : "Guest" }));
+                await _userRoleSynchronizer.SynchronizeAsync(
+                    user,
+                    input.MembershipId.HasValue ? AquaUserRole.Member : AquaUserRole.Guest);
 
                 customer.Rename($"{user.Name} {user.Surname}");
                 customer.ChangeEmail(new EmailAddress(input.Email));

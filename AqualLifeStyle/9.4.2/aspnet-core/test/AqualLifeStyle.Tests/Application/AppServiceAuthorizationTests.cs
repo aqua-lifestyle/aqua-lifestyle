@@ -6,6 +6,7 @@ using AqualLifeStyle.Application.Admin.Import;
 using AqualLifeStyle.Application.Admin.Customers;
 using AqualLifeStyle.Application.Admin.Users;
 using AqualLifeStyle.Application.Admin.AreaLeaders;
+using AqualLifeStyle.Application.Admin.Facilitators;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Enquiries;
@@ -105,6 +106,17 @@ namespace AqualLifeStyle.Tests.Application
             AssertAuthorizeAttribute(typeof(AdminAreaLeaderAppService), nameof(AdminAreaLeaderAppService.PromoteAsync), AquaPermissions.Admin.AreaLeaders.Promote);
             AssertAuthorizeAttribute(typeof(AdminAreaLeaderAppService), nameof(AdminAreaLeaderAppService.DemoteAsync), AquaPermissions.Admin.AreaLeaders.Demote);
             AssertAuthorizeAttribute(typeof(AdminAreaLeaderAppService), nameof(AdminAreaLeaderAppService.RemoveAsync), AquaPermissions.Admin.AreaLeaders.Remove);
+        }
+
+        [Fact]
+        public void AdminFacilitatorAppService_ShouldRequireGranularPermissionOnEveryMethod()
+        {
+            AssertAuthorizeAttribute(typeof(AdminFacilitatorAppService), nameof(AdminFacilitatorAppService.GetAllAsync), AquaPermissions.Admin.Facilitators.View);
+            AssertAuthorizeAttribute(typeof(AdminFacilitatorAppService), nameof(AdminFacilitatorAppService.GetAsync), AquaPermissions.Admin.Facilitators.View);
+            AssertAuthorizeAttribute(typeof(AdminFacilitatorAppService), nameof(AdminFacilitatorAppService.ApproveAsync), AquaPermissions.Admin.Facilitators.Approve);
+            AssertAuthorizeAttribute(typeof(AdminFacilitatorAppService), nameof(AdminFacilitatorAppService.PromoteAsync), AquaPermissions.Admin.Facilitators.Promote);
+            AssertAuthorizeAttribute(typeof(AdminFacilitatorAppService), nameof(AdminFacilitatorAppService.DemoteAsync), AquaPermissions.Admin.Facilitators.Demote);
+            AssertAuthorizeAttribute(typeof(AdminFacilitatorAppService), nameof(AdminFacilitatorAppService.RemoveAsync), AquaPermissions.Admin.Facilitators.Remove);
         }
 
         [Fact]
