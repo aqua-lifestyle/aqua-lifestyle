@@ -4,6 +4,7 @@ using System.Reflection;
 using Abp.Authorization;
 using AqualLifeStyle.Application.Admin.Import;
 using AqualLifeStyle.Application.Admin.Customers;
+using AqualLifeStyle.Application.Admin.Users;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Enquiries;
@@ -80,6 +81,18 @@ namespace AqualLifeStyle.Tests.Application
             AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.CreateAsync), AquaPermissions.Admin.Customers.Create);
             AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.UpdateAsync), AquaPermissions.Admin.Customers.Edit);
             AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.DeleteAsync), AquaPermissions.Admin.Customers.Delete);
+        }
+
+        [Fact]
+        public void AdminUserAppService_ShouldRequireGranularPermissionOnEveryMethod()
+        {
+            AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.GetAllAsync), AquaPermissions.Admin.Users.View);
+            AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.GetAsync), AquaPermissions.Admin.Users.View);
+            AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.CreateAsync), AquaPermissions.Admin.Users.Create);
+            AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.UpdateAsync), AquaPermissions.Admin.Users.Edit);
+            AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.AssignRoleAsync), AquaPermissions.Admin.Users.AssignRole);
+            AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.ResetPasswordAsync), AquaPermissions.Admin.Users.ResetPassword);
+            AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.DeleteAsync), AquaPermissions.Admin.Users.Delete);
         }
 
         [Fact]
