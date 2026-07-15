@@ -19,7 +19,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AqualLifeStyle.Application.Admin.Users
 {
     [Audited]
-    public class AdminUserAppService : AqualLifeStyleAppServiceBase, IAdminUserAppService
+    public class AdminUserAppService : AdminAppServiceBase, IAdminUserAppService
     {
         private readonly IRepository<User, long> _userRepository;
         private readonly UserManager _userManager;
@@ -34,8 +34,8 @@ namespace AqualLifeStyle.Application.Admin.Users
         public async Task<PagedResultDto<AdminUserDto>> GetAllAsync(AdminUserListInput input)
         {
             input ??= new AdminUserListInput();
-            ValidateRequestedTenant(input.TenantId);
-            using (AbpSession.TenantId.HasValue ? null : CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
+            ValidateRequestedTenant(input.TenantId, "User");
+            using (DisableTenantFilterForHost())
             {
                 var query = _userRepository.GetAll().Where(user => user.TenantId.HasValue);
                 if (AbpSession.TenantId.HasValue) query = query.Where(user => user.TenantId == AbpSession.TenantId.Value);
@@ -59,7 +59,7 @@ namespace AqualLifeStyle.Application.Admin.Users
         [AbpAuthorize(AquaPermissions.Admin.Users.View)]
         public async Task<AdminUserDto> GetAsync(EntityDto<long> input)
         {
-            ValidateId(input?.Id ?? 0);
+            ValidatePositiveId(input?.Id ?? 0, "User");
             return Map(await GetUserAsync(input.Id));
         }
 
@@ -68,7 +68,7 @@ namespace AqualLifeStyle.Application.Admin.Users
         {
             if (input == null) throw Failed("User creation", "The request body was empty.");
             ValidateRole(input.Role);
-            var tenantId = ResolveTargetTenant(input.TenantId);
+            var tenantId = ResolveTargetTenant(input.TenantId, "User", "creation");
             var tenant = await TenantManager.GetByIdAsync(tenantId);
             if (!tenant.IsActive) throw Failed("User creation", "The selected tenant is inactive.");
             User user;
@@ -87,7 +87,7 @@ namespace AqualLifeStyle.Application.Admin.Users
                 (await _userManager.SetRolesAsync(user, new[] { input.Role.ToString() })).CheckErrors(LocalizationManager);
                 await CurrentUnitOfWork.SaveChangesAsync();
             }
-            LogMutation("created", user, input.Justification);
+            LogAdminMutation("User", "created", user.Id, user.TenantId, input.Justification);
             return Map(user);
         }
 
@@ -95,7 +95,7 @@ namespace AqualLifeStyle.Application.Admin.Users
         public async Task<AdminUserDto> UpdateAsync(AdminUpdateUserInput input)
         {
             if (input == null) throw Failed("User update", "The request body was empty.");
-            ValidateId(input.Id);
+            ValidatePositiveId(input.Id, "User");
             var user = await GetUserAsync(input.Id);
             if (!input.IsActive && user.Id == AbpSession.GetUserId()) throw Failed("User update", "You cannot deactivate your own account.");
             using (CurrentUnitOfWork.SetTenantId(user.TenantId.Value))
@@ -105,7 +105,7 @@ namespace AqualLifeStyle.Application.Admin.Users
                 user.SetNormalizedNames();
                 (await _userManager.UpdateAsync(user)).CheckErrors(LocalizationManager);
             }
-            LogMutation("updated", user, input.Justification);
+            LogAdminMutation("User", "updated", user.Id, user.TenantId, input.Justification);
             return Map(user);
         }
 
@@ -113,7 +113,7 @@ namespace AqualLifeStyle.Application.Admin.Users
         public async Task<AdminUserDto> AssignRoleAsync(AdminAssignUserRoleInput input)
         {
             if (input == null) throw Failed("Role assignment", "The request body was empty.");
-            ValidateId(input.Id); ValidateRole(input.Role);
+            ValidatePositiveId(input.Id, "User"); ValidateRole(input.Role);
             var user = await GetUserAsync(input.Id);
             if (user.Id == AbpSession.GetUserId() && user.Role != input.Role)
                 throw Failed("Role assignment", "You cannot change your own administrator role.");
@@ -123,7 +123,7 @@ namespace AqualLifeStyle.Application.Admin.Users
                 (await _userManager.UpdateAsync(user)).CheckErrors(LocalizationManager);
                 (await _userManager.SetRolesAsync(user, new[] { input.Role.ToString() })).CheckErrors(LocalizationManager);
             }
-            LogMutation($"assigned role {input.Role}", user, input.Justification);
+            LogAdminMutation("User", $"assigned role {input.Role}", user.Id, user.TenantId, input.Justification);
             return Map(user);
         }
 
@@ -131,7 +131,7 @@ namespace AqualLifeStyle.Application.Admin.Users
         public async Task ResetPasswordAsync(AdminResetUserPasswordInput input)
         {
             if (input == null) throw Failed("Password reset", "The request body was empty.");
-            ValidateId(input.Id);
+            ValidatePositiveId(input.Id, "User");
             var user = await GetUserAsync(input.Id);
             using (CurrentUnitOfWork.SetTenantId(user.TenantId.Value))
             {
@@ -139,14 +139,14 @@ namespace AqualLifeStyle.Application.Admin.Users
                 var token = await _userManager.GeneratePasswordResetTokenAsync(user);
                 (await _userManager.ResetPasswordAsync(user, token, input.NewPassword)).CheckErrors(LocalizationManager);
             }
-            LogMutation("reset password for", user, input.Justification);
+            LogAdminMutation("User", "password reset", user.Id, user.TenantId, input.Justification);
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Users.Delete)]
         public async Task DeleteAsync(AdminDeleteUserInput input)
         {
             if (input == null) throw Failed("User removal", "The request body was empty.");
-            ValidateId(input.Id);
+            ValidatePositiveId(input.Id, "User");
             var user = await GetUserAsync(input.Id);
             if (user.Id == AbpSession.GetUserId()) throw Failed("User removal", "You cannot remove your own account.");
             using (CurrentUnitOfWork.SetTenantId(user.TenantId.Value))
@@ -155,12 +155,12 @@ namespace AqualLifeStyle.Application.Admin.Users
                 (await _userManager.UpdateAsync(user)).CheckErrors(LocalizationManager);
                 (await _userManager.DeleteAsync(user)).CheckErrors(LocalizationManager);
             }
-            LogMutation("removed", user, input.Justification);
+            LogAdminMutation("User", "removed", user.Id, user.TenantId, input.Justification);
         }
 
         private async Task<User> GetUserAsync(long id)
         {
-            using (AbpSession.TenantId.HasValue ? null : CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
+            using (DisableTenantFilterForHost())
             {
                 var query = _userRepository.GetAll().Where(user => user.Id == id && user.TenantId.HasValue);
                 if (AbpSession.TenantId.HasValue) query = query.Where(user => user.TenantId == AbpSession.TenantId.Value);
@@ -170,30 +170,10 @@ namespace AqualLifeStyle.Application.Admin.Users
             }
         }
 
-        private void ValidateRequestedTenant(int? tenantId)
-        {
-            if (tenantId.HasValue && tenantId <= 0) throw Failed("User lookup", "TenantId must be positive.");
-            if (AbpSession.TenantId.HasValue && tenantId.HasValue && tenantId != AbpSession.TenantId)
-                throw new AbpAuthorizationException("Cross-tenant user access is not allowed.");
-        }
-
-        private int ResolveTargetTenant(int tenantId)
-        {
-            if (tenantId <= 0) throw Failed("User creation", "A valid tenant is required.");
-            if (AbpSession.TenantId.HasValue && tenantId != AbpSession.TenantId.Value)
-                throw new AbpAuthorizationException("Cross-tenant user creation is not allowed.");
-            return tenantId;
-        }
-
         private static void ValidateRole(AquaUserRole role)
         {
             if (!Enum.IsDefined(typeof(AquaUserRole), role)) throw Failed("Role assignment", "The selected role is invalid.");
         }
-        private static void ValidateId(long id) { if (id <= 0) throw Failed("User operation", "A valid user Id is required."); }
-        private static UserFriendlyException Failed(string operation, string details) => new UserFriendlyException($"{operation} failed.", details);
-        private void LogMutation(string action, User user, string justification) =>
-            Logger.Info($"Admin user {action} actor={AbpSession.GetUserId()} tenant={user.TenantId} user={user.Id} justification={Sanitize(justification)}");
-        private static string Sanitize(string value) => (value ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ').Trim();
         private static AdminUserDto Map(User user) => new AdminUserDto
         {
             Id = user.Id, TenantId = user.TenantId, UserName = user.UserName, FirstName = user.Name,

@@ -23,7 +23,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AqualLifeStyle.Application.Admin.Customers
 {
     [Audited]
-    public class AdminCustomerAppService : AqualLifeStyleAppServiceBase, IAdminCustomerAppService
+    public class AdminCustomerAppService : AdminAppServiceBase, IAdminCustomerAppService
     {
         private readonly IAdminCustomerAccountManager _accountManager;
         private readonly ICustomerRepository _customerRepository;
@@ -52,9 +52,9 @@ namespace AqualLifeStyle.Application.Admin.Customers
         public async Task<PagedResultDto<AdminCustomerDto>> GetAllAsync(AdminCustomerListInput input)
         {
             input ??= new AdminCustomerListInput();
-            ValidateRequestedTenant(input.TenantId);
+            ValidateRequestedTenant(input.TenantId, "Customer");
 
-            using (AbpSession.TenantId.HasValue ? null : CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
+            using (DisableTenantFilterForHost())
             {
                 var query = _customerRepository.GetAllIncluding(customer => customer.User)
                     .Where(customer => customer.TenantId.HasValue);
@@ -84,7 +84,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
         [AbpAuthorize(AquaPermissions.Admin.Customers.View)]
         public async Task<AdminCustomerDto> GetAsync(EntityDto<int> input)
         {
-            ValidateId(input?.Id ?? 0);
+            ValidatePositiveId(input?.Id ?? 0, "Customer");
             return _objectMapper.Map<AdminCustomerDto>(await GetCustomerAsync(input.Id));
         }
 
@@ -92,7 +92,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
         public async Task<AdminCustomerDto> CreateAsync(AdminCreateCustomerInput input)
         {
             if (input == null) throw new UserFriendlyException("Customer creation failed.", "The request body was empty.");
-            var tenantId = ResolveTargetTenant(input.TenantId);
+            var tenantId = ResolveTargetTenant(input.TenantId, "Customer", "creation");
             await EnsureTenantExistsAsync(tenantId);
             var customer = await _accountManager.CreateAsync(new AdminCustomerAccountInput
             {
@@ -104,7 +104,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 IsActive = input.IsActive
             });
             await CurrentUnitOfWork.SaveChangesAsync();
-            Logger.Info($"Admin customer created actor={AbpSession.GetUserId()} tenant={tenantId} customer={customer.Id} justification={SanitizeJustification(input.Justification)}");
+            LogAdminMutation("Customer", "created", customer.Id, tenantId, input.Justification);
             return _objectMapper.Map<AdminCustomerDto>(customer);
         }
 
@@ -112,7 +112,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
         public async Task<AdminCustomerDto> UpdateAsync(AdminUpdateCustomerInput input)
         {
             if (input == null) throw new UserFriendlyException("Customer update failed.", "The request body was empty.");
-            ValidateId(input.Id);
+            ValidatePositiveId(input.Id, "Customer");
             var customer = await GetCustomerAsync(input.Id);
             var tenantId = customer.TenantId.Value;
             using (CurrentUnitOfWork.SetTenantId(tenantId))
@@ -137,7 +137,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 await CurrentUnitOfWork.SaveChangesAsync();
             }
 
-            Logger.Info($"Admin customer updated actor={AbpSession.GetUserId()} tenant={tenantId} customer={customer.Id} justification={SanitizeJustification(input.Justification)}");
+            LogAdminMutation("Customer", "updated", customer.Id, tenantId, input.Justification);
             return _objectMapper.Map<AdminCustomerDto>(customer);
         }
 
@@ -145,7 +145,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
         public async Task DeleteAsync(AdminDeleteCustomerInput input)
         {
             if (input == null) throw new UserFriendlyException("Customer removal failed.", "The request body was empty.");
-            ValidateId(input.Id);
+            ValidatePositiveId(input.Id, "Customer");
             var customer = await GetCustomerAsync(input.Id);
             var tenantId = customer.TenantId.Value;
             using (CurrentUnitOfWork.SetTenantId(tenantId))
@@ -155,12 +155,12 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 CheckErrors(await _userManager.UpdateAsync(customer.User));
                 await _customerRepository.DeleteAsync(customer);
             }
-            Logger.Info($"Admin customer removed actor={AbpSession.GetUserId()} tenant={tenantId} customer={customer.Id} justification={SanitizeJustification(input.Justification)}");
+            LogAdminMutation("Customer", "removed", customer.Id, tenantId, input.Justification);
         }
 
         private async Task<Customer> GetCustomerAsync(int id)
         {
-            using (AbpSession.TenantId.HasValue ? null : CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
+            using (DisableTenantFilterForHost())
             {
                 var query = _customerRepository.GetAllIncluding(customer => customer.User)
                     .Where(customer => customer.Id == id && customer.TenantId.HasValue);
@@ -190,33 +190,11 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 throw new UserFriendlyException("Customer update failed.", "The selected membership is missing or inactive.");
         }
 
-        private void ValidateRequestedTenant(int? tenantId)
-        {
-            if (tenantId.HasValue && tenantId <= 0) throw new UserFriendlyException("Customer lookup failed.", "TenantId must be positive.");
-            if (AbpSession.TenantId.HasValue && tenantId.HasValue && tenantId != AbpSession.TenantId)
-                throw new AbpAuthorizationException("Cross-tenant customer access is not allowed.");
-        }
-
-        private int ResolveTargetTenant(int tenantId)
-        {
-            if (tenantId <= 0) throw new UserFriendlyException("Customer creation failed.", "A valid tenant is required.");
-            if (AbpSession.TenantId.HasValue && AbpSession.TenantId.Value != tenantId)
-                throw new AbpAuthorizationException("Cross-tenant customer creation is not allowed.");
-            return tenantId;
-        }
-
         private async Task EnsureTenantExistsAsync(int tenantId)
         {
             var tenant = await TenantManager.GetByIdAsync(tenantId);
             if (!tenant.IsActive) throw new UserFriendlyException("Customer creation failed.", "The selected tenant is inactive.");
         }
 
-        private static void ValidateId(int id)
-        {
-            if (id <= 0) throw new UserFriendlyException("Customer operation failed.", "A valid customer Id is required.");
-        }
-
-        private static string SanitizeJustification(string justification) =>
-            (justification ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ').Trim();
     }
 }
