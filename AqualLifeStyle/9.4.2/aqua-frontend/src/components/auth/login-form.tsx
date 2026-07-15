@@ -1,12 +1,13 @@
 "use client";
 
 import { Droplets, Eye, EyeOff } from "lucide-react";
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 
 import { login } from "@/src/shared/api/auth-service";
 import { getLoginDestination } from "@/src/shared/auth/roles";
+import { useHydrated } from "@/src/shared/lib/use-hydrated";
 import { useAuthActions, useTenantState, useToast } from "@/src/providers";
 import {
   Button,
@@ -23,8 +24,6 @@ const loginSchema = z.object({
 });
 
 type FieldErrors = Partial<Record<"email" | "password", string>>;
-
-const subscribeToHydration = () => () => undefined;
 
 const getSafeRedirect = () => {
   const redirect = new URLSearchParams(window.location.search).get("redirect");
@@ -44,11 +43,7 @@ export const LoginForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-  const hasMounted = useSyncExternalStore(
-    subscribeToHydration,
-    () => true,
-    () => false,
-  );
+  const hasMounted = useHydrated();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
