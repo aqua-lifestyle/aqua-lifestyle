@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using Abp.Authorization;
 using AqualLifeStyle.Application.Admin.Import;
+using AqualLifeStyle.Application.Admin.Customers;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Enquiries;
@@ -69,6 +70,16 @@ namespace AqualLifeStyle.Tests.Application
             AssertAuthorizeAttribute(typeof(CustomerImportAppService), nameof(CustomerImportAppService.PreviewAsync), AquaPermissions.Admin.Customers.Import);
             AssertAuthorizeAttribute(typeof(CustomerImportAppService), nameof(CustomerImportAppService.ImportAsync), AquaPermissions.Admin.Customers.Import);
             AquaPermissions.Admin.Customers.Import.ShouldNotBe(AquaPermissions.Admin.Customers.Create);
+        }
+
+        [Fact]
+        public void AdminCustomerAppService_ShouldRequireGranularPermissionOnEveryMethod()
+        {
+            AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.GetAllAsync), AquaPermissions.Admin.Customers.View);
+            AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.GetAsync), AquaPermissions.Admin.Customers.View);
+            AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.CreateAsync), AquaPermissions.Admin.Customers.Create);
+            AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.UpdateAsync), AquaPermissions.Admin.Customers.Edit);
+            AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.DeleteAsync), AquaPermissions.Admin.Customers.Delete);
         }
 
         [Fact]

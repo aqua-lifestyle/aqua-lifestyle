@@ -8,22 +8,20 @@ using Abp.Auditing;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
-using Abp.IdentityFramework;
 using Abp.Runtime.Caching;
 using Abp.Runtime.Session;
 using Abp.UI;
 using AqualLifeStyle.Application.Admin.Import.Dto;
+using AqualLifeStyle.Application.Admin.Customers;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
-using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using Magicodes.ExporterAndImporter.Core;
 using Magicodes.ExporterAndImporter.Core.Models;
 using Magicodes.ExporterAndImporter.Csv;
 using Magicodes.ExporterAndImporter.Excel;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Application.Admin.Import
@@ -41,7 +39,7 @@ namespace AqualLifeStyle.Application.Admin.Import
         private readonly ICustomerRepository _customerRepository;
         private readonly IMembershipRepository _membershipRepository;
         private readonly IRepository<User, long> _userRepository;
-        private readonly UserManager _userManager;
+        private readonly IAdminCustomerAccountManager _accountManager;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
         private readonly ITypedCache<string, CachedCustomerImportPreview> _previewCache;
 
@@ -49,14 +47,14 @@ namespace AqualLifeStyle.Application.Admin.Import
             ICustomerRepository customerRepository,
             IMembershipRepository membershipRepository,
             IRepository<User, long> userRepository,
-            UserManager userManager,
+            IAdminCustomerAccountManager accountManager,
             IUnitOfWorkManager unitOfWorkManager,
             ICacheManager cacheManager)
         {
             _customerRepository = customerRepository;
             _membershipRepository = membershipRepository;
             _userRepository = userRepository;
-            _userManager = userManager;
+            _accountManager = accountManager;
             _unitOfWorkManager = unitOfWorkManager;
             _previewCache = cacheManager.GetCache<string, CachedCustomerImportPreview>(CacheName);
         }
@@ -163,37 +161,15 @@ namespace AqualLifeStyle.Application.Admin.Import
 
         private async Task ImportRowAsync(int tenantId, CachedCustomerImportRow row)
         {
-            var normalizedEmail = row.Email.ToUpperInvariant();
-            if (await _userRepository.GetAll().AnyAsync(user => user.NormalizedEmailAddress == normalizedEmail) ||
-                await _customerRepository.GetAll().AnyAsync(customer => customer.Email.Value.ToUpper() == normalizedEmail))
-                throw new UserFriendlyException("A customer or user with this email already exists.");
-
-            if (row.MembershipId.HasValue && await _membershipRepository.FirstOrDefaultAsync(item =>
-                    item.Id == row.MembershipId.Value && item.TenantId == tenantId && item.IsActive) == null)
-                throw new UserFriendlyException("The selected membership is missing or inactive.");
-
-            var user = new User
+            await _accountManager.CreateAsync(new AdminCustomerAccountInput
             {
                 TenantId = tenantId,
-                UserName = row.Email,
-                Name = row.FirstName,
-                Surname = row.LastName,
-                EmailAddress = row.Email,
+                FirstName = row.FirstName,
+                LastName = row.LastName,
+                Email = row.Email,
+                MembershipId = row.MembershipId,
                 IsActive = row.IsActive,
-                IsEmailConfirmed = false
-            };
-            user.SetNormalizedNames();
-            user.SetRole(row.MembershipId.HasValue ? AquaUserRole.Member : AquaUserRole.Guest);
-
-            await _userManager.InitializeOptionsAsync(tenantId);
-            CheckIdentityResult(await _userManager.CreateAsync(user, CreateTemporaryPassword()));
-            CheckIdentityResult(await _userManager.SetRolesAsync(user, new[] { row.MembershipId.HasValue ? "Member" : "Guest" }));
-            await _unitOfWorkManager.Current.SaveChangesAsync();
-
-            var customer = Customer.Create(tenantId, user.Id, $"{row.FirstName} {row.LastName}",
-                new EmailAddress(row.Email), row.MembershipId, user);
-            if (!row.IsActive) customer.Deactivate();
-            await _customerRepository.InsertAsync(customer);
+            });
         }
 
         private async Task ValidateBusinessRulesAsync(int tenantId, List<CachedCustomerImportRow> rows,
@@ -328,14 +304,12 @@ namespace AqualLifeStyle.Application.Admin.Import
                 throw new AbpAuthorizationException("Cross-tenant customer imports are not allowed.");
         }
 
-        private void CheckIdentityResult(IdentityResult result) => result.CheckErrors(LocalizationManager);
         private static string ToSafeImportError(Exception exception)
         {
             if (exception is UserFriendlyException friendly) return friendly.Details ?? friendly.Message;
             if (exception is AbpAuthorizationException) return "Authorization failed while importing this row.";
             return "The row could not be imported. Preview the file again and retry.";
         }
-        private static string CreateTemporaryPassword() => $"Aa1!{Guid.NewGuid():N}";
         private static string CacheKey(long userId, string previewId) => $"{userId}:{previewId}";
         private static CustomerImportErrorDto Error(int row, string field, string message) =>
             new CustomerImportErrorDto { RowNumber = row, Field = field, Message = message };
