@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Orders;
@@ -63,6 +64,69 @@ namespace AqualLifeStyle.Tests
             {
                 AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1 && s.UserId == 43)
             };
+        }
+
+        [Fact]
+        public async Task CreateForCurrentCustomerAsync_UsesAuthenticatedCustomerAndTierPricing()
+        {
+            var customer = CreateCustomer(membershipId: 1);
+            var product = Product.Create("Jasper Bundle", 100m, membershipId: 1);
+            product.Id = 2;
+            var membership = Membership.Create(1, "Jasper", "Entry tier", MembershipType.Jasper);
+            membership.Id = 1;
+
+            _customerRepositoryMock
+                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<System.Func<Customer, bool>>>() ))
+                .ReturnsAsync(customer);
+            _productRepositoryMock.Setup(r => r.GetAsync(2)).ReturnsAsync(product);
+            _membershipRepositoryMock.Setup(r => r.GetAsync(1)).ReturnsAsync(membership);
+            _orderIntentRepositoryMock.Setup(r => r.CountOpenForCustomerAsync(1)).ReturnsAsync(0);
+            _orderIntentRepositoryMock.Setup(r => r.InsertAndGetIdAsync(It.IsAny<OrderIntent>()))
+                .ReturnsAsync(12);
+
+            var result = await _service.CreateForCurrentCustomerAsync(2);
+
+            Assert.Equal(1, result.CustomerId);
+            Assert.Equal(2, result.ProductId);
+            Assert.Null(result.EnquiryId);
+            Assert.Equal(100m, result.UnitPrice);
+            Assert.Equal(95m, result.ReservedPrice);
+            Assert.Equal((int)OrderIntentStatus.Reserved, result.Status);
+        }
+
+        [Fact]
+        public async Task CreateForCurrentCustomerAsync_WhenNoProfileIsLinked_ThrowsWithoutCreatingOrder()
+        {
+            _customerRepositoryMock
+                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<System.Func<Customer, bool>>>() ))
+                .ReturnsAsync(default(Customer)!);
+
+            await Assert.ThrowsAsync<Abp.UI.UserFriendlyException>(() =>
+                _service.CreateForCurrentCustomerAsync(2));
+
+            _orderIntentRepositoryMock.Verify(
+                r => r.InsertAndGetIdAsync(It.IsAny<OrderIntent>()),
+                Times.Never);
+        }
+
+        [Fact]
+        public async Task CreateForCurrentCustomerAsync_WithoutMembership_ThrowsWithoutCreatingOrder()
+        {
+            var customer = CreateCustomer(membershipId: null);
+            var product = Product.Create("General Bundle", 100m, membershipId: null);
+            product.Id = 2;
+
+            _customerRepositoryMock
+                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<System.Func<Customer, bool>>>() ))
+                .ReturnsAsync(customer);
+            _productRepositoryMock.Setup(r => r.GetAsync(2)).ReturnsAsync(product);
+
+            await Assert.ThrowsAsync<AqualLifeStyleBusinessRuleException>(() =>
+                _service.CreateForCurrentCustomerAsync(2));
+
+            _orderIntentRepositoryMock.Verify(
+                r => r.InsertAndGetIdAsync(It.IsAny<OrderIntent>()),
+                Times.Never);
         }
 
         [Fact]
@@ -167,7 +231,7 @@ namespace AqualLifeStyle.Tests
             return enquiry;
         }
 
-        private static Customer CreateCustomer(int membershipId)
+        private static Customer CreateCustomer(int? membershipId)
         {
             var customer = Customer.Create(1, 43, "Jane Doe", new EmailAddress("jane@example.com"), membershipId);
             customer.Id = 1;

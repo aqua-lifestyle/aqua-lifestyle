@@ -34,7 +34,8 @@ Use this path for the current end-to-end demo:
 - Email/SMS delivery for enquiry notifications is intentionally paused.
 - Payments, subscriptions, fulfillment, and real order settlement are not exposed as frontend workflows yet.
 - Order intents are available as the intentionally small pre-payment commerce handoff with read-only value metrics, not payment settlement.
-- Area Space, Area Leader, events, training, and therapy modules need backend/API confirmation before UI work.
+- Area Space, Area Leader, Facilitator, and Referral modules now have frontend UI flows backed by existing ABP app services.
+- Events, training, and therapy modules need backend/API confirmation before UI work.
 - OpenAPI-generated clients should replace hand-written DTOs once the Swagger contract is stable for frontend generation.
 
 ## API Contract
@@ -71,6 +72,54 @@ Why this order:
 - It validates buyer/operator behavior before committing to payment, fulfillment, or savings-led complexity.
 - It avoids creating frontend-only workflows for backend modules that are not yet exposed.
 
+## Role-Based UI Flows
+
+The frontend now includes role-specific pages for AreaLeader, Facilitator, Member, and Guest flows. Navigation links are permission-gated using the existing `hasPermission()` pattern.
+
+### AreaLeader
+
+Routes:
+- `/area-leader` — list all area leaders
+- `/area-leader/[areaLeaderId]` — area leader details with rank promotion
+- `/area-leader/area-spaces` — list all area spaces
+- `/area-leader/area-spaces/[areaSpaceId]` — area space details with review/approval actions
+
+Provider: `src/providers/AreaLeaders/` and `src/providers/AreaSpaces/`
+
+Permissions: `Pages.AreaLeaders`, `Pages.AreaSpaces`, `Aqua.AreaLeaders.Manage`, `Aqua.AreaSpaces.Manage`
+
+### Facilitator
+
+Routes:
+- `/facilitator` — list all facilitators
+- `/facilitator/[facilitatorId]` — facilitator details
+- `/facilitator/referrals` — list all referrals
+- `/facilitator/referrals/[referralId]` — referral details with award confirmation
+
+Provider: `src/providers/Facilitators/` and `src/providers/Referrals/`
+
+Permissions: `Pages.Facilitators`, `Pages.Referrals`, `Aqua.Referrals.Confirm`
+
+### Member
+
+Routes:
+- `/member` — member dashboard with orders, membership, and savings overview
+- `/member/orders` — member's order history
+- `/member/savings` — member's savings window status
+
+Provider: reuses existing `OrderIntents` and `Memberships` providers
+
+Permissions: `Pages.Orders`, `Aqua.Orders.ViewSelf`, `Pages.Memberships`
+
+### Guest
+
+Routes:
+- `/catalog` — public product catalog
+- `/contact` — public contact page
+- `/signup` — registration flow (existing)
+
+Permissions: none required for public pages
+
 ## Architecture Baseline
 
 - TypeScript strict mode is required.
@@ -102,9 +151,74 @@ Default local backend settings:
 ```env
 NEXT_PUBLIC_ABP_API_URL=https://localhost:44311
 NEXTAUTH_SECRET=replace_with_a_32_character_minimum_secret
+NEXTAUTH_URL=http://localhost:3000
 ```
 
 `NEXT_PUBLIC_ABP_API_URL` is intentionally public because browser code needs the backend base URL. `NEXTAUTH_SECRET` is server-only and must not be exposed to client modules.
+
+## API Connection Setup
+
+The Next.js app talks to the ABP host over HTTPS by default.
+
+| Service | URL |
+| --- | --- |
+| Frontend | `http://localhost:3000` |
+| Backend HTTPS | `https://localhost:44311` |
+| Backend HTTP (dev fallback) | `http://localhost:21021` |
+| Health check | `/api/health` |
+| Swagger | `https://localhost:44311/swagger` |
+
+### 1. Start the backend
+
+From the monorepo `aspnet-core` folder (with `ConnectionStrings__Default` and JWT settings available via `.env` or environment):
+
+```bash
+cd AqualLifeStyle/9.4.2/aspnet-core
+dotnet run --project src/AqualLifeStyle.Web.Host
+```
+
+CORS allows `http://localhost:3000` and `https://localhost:3000` via `App:CorsOrigins` in `appsettings.json`.
+
+### 2. Trust the development HTTPS certificate
+
+```bash
+dotnet dev-certs https --trust
+```
+
+Then open [https://localhost:44311/swagger](https://localhost:44311/swagger) once in the same browser you use for the frontend and accept the certificate warning if shown.
+
+On Linux, system-wide trust is limited. If the browser still blocks API calls with a network/certificate error, use the HTTP fallback:
+
+```env
+NEXT_PUBLIC_ABP_API_URL=http://localhost:21021
+```
+
+Restart `npm run dev` after changing `.env.local`.
+
+### 3. Start the frontend
+
+```bash
+cd AqualLifeStyle/9.4.2/aqua-frontend
+npm run dev
+```
+
+### 4. Diagnose connectivity
+
+```bash
+bash AqualLifeStyle/9.4.2/scripts/diagnose-api.sh
+```
+
+The script checks process, ports, `/api/health`, TLS trust, CORS, and `.env.local`.
+
+### Common failure: "Unable to reach the backend API"
+
+| Cause | What to check |
+| --- | --- |
+| Backend not running | `pgrep -af AqualLifeStyle.Web.Host` and port `44311` |
+| Wrong port/URL | `NEXT_PUBLIC_ABP_API_URL` must be `https://localhost:44311` (not `44305`) |
+| Untrusted HTTPS cert | Accept cert in browser or use `http://localhost:21021` |
+| CORS origin missing | Backend `App:CorsOrigins` must include your frontend origin |
+| Health endpoint 500 | Backend log `App_Data/Logs/Logs.txt` — health controller must be registered with Castle Windsor |
 
 ## Development
 
@@ -125,6 +239,15 @@ Open:
 - Create enquiry: [http://localhost:3000/enquiries/create](http://localhost:3000/enquiries/create)
 - Order intents: [http://localhost:3000/order-intents](http://localhost:3000/order-intents)
 - Memberships: [http://localhost:3000/memberships](http://localhost:3000/memberships)
+- Area Leaders: [http://localhost:3000/area-leader](http://localhost:3000/area-leader)
+- Area Spaces: [http://localhost:3000/area-leader/area-spaces](http://localhost:3000/area-leader/area-spaces)
+- Facilitators: [http://localhost:3000/facilitator](http://localhost:3000/facilitator)
+- Referrals: [http://localhost:3000/facilitator/referrals](http://localhost:3000/facilitator/referrals)
+- Member dashboard: [http://localhost:3000/member](http://localhost:3000/member)
+- Member orders: [http://localhost:3000/member/orders](http://localhost:3000/member/orders)
+- Member savings: [http://localhost:3000/member/savings](http://localhost:3000/member/savings)
+- Public catalog: [http://localhost:3000/catalog](http://localhost:3000/catalog)
+- Contact: [http://localhost:3000/contact](http://localhost:3000/contact)
 
 Use a normal browser such as Chrome or Edge for local HTTPS backend testing. VS Code's embedded preview can report generic network errors with local development certificates.
 
@@ -145,3 +268,4 @@ npm run build
 - Replace manual tenant entry with tenant discovery once the backend contract is confirmed.
 - Generate type-safe API clients from the verified Swagger JSON endpoint once auth/tenant contracts are stable.
 - Expand focused tests for API client behavior, provider reducers, and registration validation.
+- Add E2E tests for role-specific flows once Cypress or Playwright is configured.

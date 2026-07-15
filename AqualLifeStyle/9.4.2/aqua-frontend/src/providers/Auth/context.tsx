@@ -2,13 +2,16 @@ import { createContext } from "react";
 
 export type AuthUser = {
   email: string | null;
-  id: string;
+  id: number;
   name: string | null;
+  permissions: string[];
+  role: string;
 };
 
 export type AuthSession = {
   accessToken: string;
   expiresAt: string | null;
+  refreshToken?: string | null;
   user: AuthUser | null;
 };
 
@@ -20,12 +23,13 @@ export type AuthState = {
 
 export type AuthActions = {
   clearSession: () => void;
+  setReady: (ready: boolean) => void;
   setSession: (session: AuthSession) => void;
 };
 
 export const initialAuthState: AuthState = {
   isAuthenticated: false,
-  isReady: true,
+  isReady: false,
   session: null,
 };
 

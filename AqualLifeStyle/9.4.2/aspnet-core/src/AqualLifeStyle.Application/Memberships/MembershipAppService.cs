@@ -10,10 +10,10 @@ using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Application.Validation;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Application.Memberships
 {
-    [AbpAuthorize(PermissionNames.Pages_Memberships)]
     public class MembershipAppService : AqualLifeStyleAppServiceBase, IMembershipAppService
     {
         private readonly IMembershipRepository _membershipRepository;
@@ -25,12 +25,23 @@ namespace AqualLifeStyle.Application.Memberships
             _objectMapper = objectMapper;
         }
 
+        [AbpAuthorize(AquaPermissions.Memberships.View)]
         public async Task<IReadOnlyList<MembershipDto>> GetAllAsync()
         {
-            var memberships = await _membershipRepository.GetAllListAsync();
+            var memberships = await _membershipRepository.GetAll().ToListAsync();
             return _objectMapper.Map<List<MembershipDto>>(memberships);
         }
 
+        [AbpAuthorize(AquaPermissions.Memberships.ViewSelf)]
+        public async Task<IReadOnlyList<MembershipDto>> GetActiveTiersAsync()
+        {
+            var memberships = await _membershipRepository.GetAll()
+                .Where(membership => membership.IsActive)
+                .ToListAsync();
+            return _objectMapper.Map<List<MembershipDto>>(memberships);
+        }
+
+        [AbpAuthorize(AquaPermissions.Memberships.ViewSelf)]
         public async Task<MembershipDto> GetAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -132,12 +143,7 @@ namespace AqualLifeStyle.Application.Memberships
                 throw new AqualLifeStyleNotFoundException("Membership", id);
             }
 
-            if (!DateTime.TryParse(input.AsOfDate, out var asOfDate))
-            {
-                throw new AqualLifeStyleValidationException(nameof(input.AsOfDate), "Invalid date format.");
-            }
-
-            membership.MarkObligationMet(asOfDate);
+            membership.MarkObligationMet(DateTime.Parse(input.AsOfDate));
             await _membershipRepository.UpdateAsync(membership);
 
             return _objectMapper.Map<MembershipDto>(membership);
@@ -146,6 +152,7 @@ namespace AqualLifeStyle.Application.Memberships
         /// <summary>
         /// Get tier-specific benefits for a membership including order windows, discounts, and commission rates.
         /// </summary>
+        [AbpAuthorize(AquaPermissions.Memberships.ViewSelf)]
         public async Task<TierBenefitsDto> GetTierBenefitsAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -163,6 +170,7 @@ namespace AqualLifeStyle.Application.Memberships
         /// <summary>
         /// Get tier benefits for a specific membership type without requiring an instance.
         /// </summary>
+        [AbpAuthorize(AquaPermissions.Memberships.ViewSelf)]
         public TierBenefitsDto GetTierBenefitsByType(MembershipType membershipType)
         {
             var benefits = TierBenefits.ForTier(membershipType);
@@ -172,6 +180,7 @@ namespace AqualLifeStyle.Application.Memberships
         /// <summary>
         /// Check if it's currently within the order window for a membership.
         /// </summary>
+        [AbpAuthorize(AquaPermissions.Memberships.ViewSelf)]
         public async Task<bool> IsOrderWindowOpenAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -188,6 +197,7 @@ namespace AqualLifeStyle.Application.Memberships
         /// <summary>
         /// Check if it's currently within the savings window for a membership.
         /// </summary>
+        [AbpAuthorize(AquaPermissions.Memberships.ViewSelf)]
         public async Task<bool> IsSavingsWindowOpenAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -204,6 +214,7 @@ namespace AqualLifeStyle.Application.Memberships
         /// <summary>
         /// Get read-only savings window status for each membership tier.
         /// </summary>
+        [AbpAuthorize(AquaPermissions.Memberships.ViewSelf)]
         public IReadOnlyList<SavingsWindowStatusDto> GetSavingsWindowStatuses(string asOfDate = null)
         {
             var date = ParseOptionalDate(asOfDate);

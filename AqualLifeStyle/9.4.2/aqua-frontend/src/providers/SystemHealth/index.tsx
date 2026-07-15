@@ -8,7 +8,7 @@ import {
   useReducer,
 } from "react";
 
-import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
+import { apiEndpoints, getRequestErrorMessage, httpClient } from "@/src/shared/api";
 import {
   checkHealthError,
   checkHealthPending,
@@ -27,19 +27,11 @@ type SystemHealthProviderProps = {
 };
 
 const getErrorMessage = (error: unknown): string => {
-  if (error instanceof AbpHttpError) {
-    return error.details ?? error.message;
-  }
-
   if (isSystemHealthContractError(error)) {
     return "Backend health response did not match the expected contract.";
   }
 
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Unable to reach the backend health endpoint.";
+  return getRequestErrorMessage(error, "Unable to reach the backend health endpoint.");
 };
 
 export const SystemHealthProvider = ({

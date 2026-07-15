@@ -1,8 +1,8 @@
-import type { InternalAxiosRequestConfig } from "axios";
+import { AxiosHeaders, type InternalAxiosRequestConfig } from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createConfig = (): InternalAxiosRequestConfig => ({
-  headers: {},
+  headers: new AxiosHeaders(),
 });
 
 const importAxiosInstance = async () => {

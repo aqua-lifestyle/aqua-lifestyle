@@ -87,6 +87,14 @@ namespace AqualLifeStyle.Authorization
             public const string ViewSelf = Default + ".ViewSelf";
         }
 
+        public static class Memberships
+        {
+            public const string Default = "Aqua.Memberships";
+            public const string View = Default + ".View";
+            public const string ViewSelf = Default + ".ViewSelf";
+            public const string Upgrade = Default + ".Upgrade";
+        }
+
         public static class Admin
         {
             public const string Default = "Aqua.Admin";
@@ -98,7 +106,7 @@ namespace AqualLifeStyle.Authorization
         }
 
         private static readonly Lazy<IReadOnlyCollection<string>> AllPermissionNames =
-            new Lazy<IReadOnlyCollection<string>>(() => typeof(AquaPermissions).GetNestedTypes(BindingFlags.Public)
+            new Lazy<IReadOnlyCollection<string>>(() => typeof(AquaPermissions).GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)
                 .SelectMany(type => type.GetFields(BindingFlags.Public | BindingFlags.Static))
                 .Where(field => field.IsLiteral && !field.IsInitOnly && field.FieldType == typeof(string))
                 .Select(field => (string)field.GetRawConstantValue())

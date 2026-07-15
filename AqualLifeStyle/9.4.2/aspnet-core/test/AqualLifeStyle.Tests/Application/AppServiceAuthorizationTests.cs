@@ -56,7 +56,8 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public void CustomerAppService_ShouldRequireCustomerPermissions()
         {
-            AssertAuthorizeAttribute(typeof(CustomerAppService), PermissionNames.Pages_Customers);
+            AssertAuthorizeAttribute(typeof(CustomerAppService), nameof(CustomerAppService.GetAllAsync), AquaPermissions.Members.View);
+            AssertAuthorizeAttribute(typeof(CustomerAppService), nameof(CustomerAppService.GetMyCustomerAsync), AquaPermissions.Members.ViewSelf);
             AssertAuthorizeAttribute(typeof(CustomerAppService), nameof(CustomerAppService.CreateAsync), AquaPermissions.Members.Create);
             AssertAuthorizeAttribute(typeof(CustomerAppService), nameof(CustomerAppService.UpdateAsync), AquaPermissions.Members.Edit);
         }
@@ -64,7 +65,8 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public void MembershipAppService_ShouldRequireMembershipPermissions()
         {
-            AssertAuthorizeAttribute(typeof(MembershipAppService), PermissionNames.Pages_Memberships);
+            AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.GetAllAsync), AquaPermissions.Memberships.View);
+            AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.GetActiveTiersAsync), AquaPermissions.Memberships.ViewSelf);
             AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.CreateAsync), AquaPermissions.Members.Create);
             AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.UpdateAsync), AquaPermissions.Members.Edit);
             AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.SetActivationDateAsync), AquaPermissions.Members.Edit);

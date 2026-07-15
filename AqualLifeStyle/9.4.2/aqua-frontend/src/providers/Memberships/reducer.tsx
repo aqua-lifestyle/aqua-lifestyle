@@ -65,6 +65,34 @@ export const membershipsReducer = (
         memberships: action.payload,
       };
 
+    case MembershipsActionTypes.getActiveTiersError:
+      return {
+        ...state,
+        errorMessage: action.payload,
+        isError: true,
+        isPending: false,
+        isSuccess: false,
+      };
+
+    case MembershipsActionTypes.getActiveTiersPending:
+      return {
+        ...state,
+        errorMessage: null,
+        isError: false,
+        isPending: true,
+        isSuccess: false,
+      };
+
+    case MembershipsActionTypes.getActiveTiersSuccess:
+      return {
+        ...state,
+        errorMessage: null,
+        isError: false,
+        isPending: false,
+        isSuccess: true,
+        memberships: action.payload,
+      };
+
     case MembershipsActionTypes.getTierBenefitsError:
       return {
         ...state,

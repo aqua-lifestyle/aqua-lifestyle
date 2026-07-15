@@ -2,10 +2,23 @@ import { describe, expect, it } from "vitest";
 
 import {
   AbpHttpError,
+  getRequestErrorMessage,
   normalizeAbpError,
   normalizeNetworkError,
   unwrapAbpResponse,
 } from "./abp-error";
+
+describe("getRequestErrorMessage", () => {
+  it("uses the public error message without exposing technical details", () => {
+    const error = new AbpHttpError(500, {
+      message: "Request failed.",
+      details: "Database connection string details",
+    });
+
+    expect(getRequestErrorMessage(error, "Fallback")).toBe("Request failed.");
+    expect(getRequestErrorMessage({ unexpected: true }, "Fallback")).toBe("Fallback");
+  });
+});
 
 describe("normalizeAbpError", () => {
   it("normalizes nested ABP error envelopes", () => {
@@ -36,6 +49,18 @@ describe("normalizeNetworkError", () => {
     expect(error.message).toContain("Unable to reach the backend API");
     expect(error.message).toContain("HTTPS certificate");
     expect(error.message).toContain("CORS");
+  });
+
+  it("returns a TLS-specific message for certificate failures", () => {
+    const error = normalizeNetworkError(
+      new Error("self-signed certificate DEPTH_ZERO_SELF_SIGNED_CERT"),
+    );
+
+    expect(error).toBeInstanceOf(AbpHttpError);
+    expect(error.status).toBe(0);
+    expect(error.code).toBe("Aqua:Tls");
+    expect(error.message).toContain("HTTPS certificate is not trusted");
+    expect(error.message).toContain("http://localhost:21021");
   });
 });
 

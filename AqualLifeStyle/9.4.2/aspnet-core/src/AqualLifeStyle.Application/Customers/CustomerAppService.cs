@@ -12,7 +12,6 @@ using AqualLifeStyle.Domain.Memberships;
 
 namespace AqualLifeStyle.Application.Customers
 {
-    [AbpAuthorize(PermissionNames.Pages_Customers)]
     public class CustomerAppService : AqualLifeStyleAppServiceBase, ICustomerAppService
     {
         private readonly ICustomerRepository _customerRepository;
@@ -26,7 +25,7 @@ namespace AqualLifeStyle.Application.Customers
             _objectMapper = objectMapper;
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Customers)]
+        [AbpAuthorize(AquaPermissions.Members.View)]
         public async Task<IReadOnlyList<CustomerDto>> GetAllAsync()
         {
             var tenantId = GetRequiredTenantId("Customer lookup failed.");
@@ -34,6 +33,7 @@ namespace AqualLifeStyle.Application.Customers
             return _objectMapper.Map<List<CustomerDto>>(customers);
         }
 
+        [AbpAuthorize]
         public async Task<CustomerDto> GetAsync(int id)
         {
             var customer = await GetCustomerForCurrentTenantAsync(id);
@@ -41,6 +41,64 @@ namespace AqualLifeStyle.Application.Customers
             {
                 throw new UserFriendlyException("Customer lookup failed.", "You do not have permission to access this customer.");
             }
+
+            return _objectMapper.Map<CustomerDto>(customer);
+        }
+
+        [AbpAuthorize(AquaPermissions.Members.ViewSelf)]
+        public async Task<CustomerDto> GetMyCustomerAsync()
+        {
+            if (!AbpSession.UserId.HasValue)
+            {
+                throw new UserFriendlyException("Customer lookup failed.", "No user context is available.");
+            }
+
+            var tenantId = GetRequiredTenantId("Customer lookup failed.");
+            var customer = await _customerRepository.FirstOrDefaultAsync(c => c.UserId == AbpSession.UserId.Value && c.TenantId == tenantId);
+            if (customer == null)
+            {
+                throw new UserFriendlyException("Customer lookup failed.", "No customer profile is linked to your account.");
+            }
+
+            return _objectMapper.Map<CustomerDto>(customer);
+        }
+
+        [AbpAuthorize(AquaPermissions.Memberships.Upgrade)]
+        public async Task<CustomerDto> ChangeMembershipAsync(ChangeMembershipDto input)
+        {
+            if (input == null)
+            {
+                throw new UserFriendlyException("Membership change failed.", "The request body was empty.");
+            }
+
+            if (!AbpSession.UserId.HasValue)
+            {
+                throw new UserFriendlyException("Membership change failed.", "No user context is available.");
+            }
+
+            var tenantId = GetRequiredTenantId("Membership change failed.");
+            var customer = await _customerRepository.FirstOrDefaultAsync(c => c.UserId == AbpSession.UserId.Value && c.TenantId == tenantId);
+            if (customer == null)
+            {
+                throw new UserFriendlyException("Membership change failed.", "No customer profile is linked to your account.");
+            }
+
+            if (!input.MembershipId.HasValue)
+            {
+                customer.ChangeMembership(null);
+                await _customerRepository.UpdateAsync(customer);
+                return _objectMapper.Map<CustomerDto>(customer);
+            }
+
+            var membership = await _membershipRepository.GetAsync(input.MembershipId.Value);
+            if (membership == null)
+            {
+                throw new UserFriendlyException("Membership change failed.", "The selected membership does not exist.");
+            }
+
+            membership.EnsureCanBeAssignedToCustomer();
+            customer.ChangeMembership(input.MembershipId.Value);
+            await _customerRepository.UpdateAsync(customer);
 
             return _objectMapper.Map<CustomerDto>(customer);
         }
@@ -175,6 +233,11 @@ namespace AqualLifeStyle.Application.Customers
             }
 
             return customer;
+        }
+
+        protected override Exception CreateMissingTenantContextException(string operation)
+        {
+            return new AbpAuthorizationException($"{operation} A tenant context is required.");
         }
     }
 }

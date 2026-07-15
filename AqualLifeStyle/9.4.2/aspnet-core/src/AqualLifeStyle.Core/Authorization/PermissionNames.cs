@@ -47,5 +47,6 @@
         public const string Savings_ViewSelf = AquaPermissions.Savings.ViewSelf;
         public const string Enquiries_ViewSelf = AquaPermissions.Enquiries.ViewSelf;
         public const string Referrals_ViewSelf = AquaPermissions.Referrals.ViewSelf;
+        public const string Memberships_ViewSelf = AquaPermissions.Memberships.ViewSelf;
     }
 }

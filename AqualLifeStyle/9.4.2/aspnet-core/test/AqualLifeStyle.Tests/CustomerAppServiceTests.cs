@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 using System.Linq.Expressions;
+using Abp.Authorization;
 using Abp.Runtime.Session;
-using Abp.UI;
 using Moq;
 using Abp.ObjectMapping;
 using Xunit;
@@ -79,14 +79,13 @@ namespace AqualLifeStyle.Tests
                 AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == (int?)null)
             };
 
-            var ex = await Assert.ThrowsAsync<UserFriendlyException>(() => appService.CreateAsync(new CreateCustomerDto
+            var ex = await Assert.ThrowsAsync<AbpAuthorizationException>(() => appService.CreateAsync(new CreateCustomerDto
             {
                 Name = "Host Customer",
                 Email = "host@example.com"
             }));
 
-            Assert.Equal("Customer creation failed.", ex.Message);
-            Assert.Equal("A tenant context is required.", ex.Details);
+            Assert.Equal("Customer creation failed. A tenant context is required.", ex.Message);
             customerRepo.Verify(r => r.ExistsByEmailAsync(It.IsAny<string>()), Times.Never);
             customerRepo.Verify(r => r.InsertAsync(It.IsAny<Customer>()), Times.Never);
         }

@@ -54,7 +54,7 @@ namespace AqualLifeStyle.Tests
             UsingDbContext(context =>
             {
                 NormalizeDbContext(context);
-                new TenantRoleAndUserBuilder(context, 1).Create();
+                new TenantRoleAndUserBuilder(context, 1, seedDemoData: true).Create();
             });
 
             LoginAsDefaultTenantAdmin();

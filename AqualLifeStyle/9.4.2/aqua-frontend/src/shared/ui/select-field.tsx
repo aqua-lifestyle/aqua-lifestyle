@@ -1,10 +1,13 @@
 import type { ReactNode, SelectHTMLAttributes } from "react";
 
+import { cn } from "@/src/shared/lib/utils";
+
 type SelectFieldProps = Omit<
   SelectHTMLAttributes<HTMLSelectElement>,
   "className"
 > & {
   children: ReactNode;
+  className?: string;
   errorMessage?: string;
   label: string;
   name: string;
@@ -12,6 +15,7 @@ type SelectFieldProps = Omit<
 
 export const SelectField = ({
   children,
+  className,
   errorMessage,
   id,
   label,
@@ -22,14 +26,21 @@ export const SelectField = ({
   const errorId = `${selectId}-error`;
 
   return (
-    <div className="flex flex-col gap-2">
-      <label className="text-sm font-medium text-zinc-800" htmlFor={selectId}>
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <label
+        className="text-sm font-medium text-foreground"
+        htmlFor={selectId}
+      >
         {label}
       </label>
       <select
         aria-describedby={errorMessage ? errorId : undefined}
         aria-invalid={Boolean(errorMessage)}
-        className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base text-zinc-950 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+        className={cn(
+          "rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition",
+          "focus:border-accent focus:ring-2 focus:ring-accent/20",
+          errorMessage && "border-error focus:border-error focus:ring-error/20",
+        )}
         id={selectId}
         name={name}
         {...props}
@@ -37,7 +48,7 @@ export const SelectField = ({
         {children}
       </select>
       {errorMessage ? (
-        <p className="text-sm text-red-700" id={errorId}>
+        <p className="text-sm text-error" id={errorId}>
           {errorMessage}
         </p>
       ) : null}

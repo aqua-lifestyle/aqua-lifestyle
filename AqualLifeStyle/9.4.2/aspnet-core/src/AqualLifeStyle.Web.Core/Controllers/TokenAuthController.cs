@@ -9,6 +9,7 @@ using Abp.Authorization;
 using Abp.Authorization.Users;
 using Abp.MultiTenancy;
 using Abp.Runtime.Security;
+using Microsoft.Extensions.Configuration;
 using AqualLifeStyle.Authentication.JwtBearer;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Users;
@@ -24,17 +25,20 @@ namespace AqualLifeStyle.Controllers
         private readonly ITenantCache _tenantCache;
         private readonly AbpLoginResultTypeHelper _abpLoginResultTypeHelper;
         private readonly TokenAuthConfiguration _configuration;
+        private readonly IConfiguration _appConfiguration;
 
         public TokenAuthController(
             LogInManager logInManager,
             ITenantCache tenantCache,
             AbpLoginResultTypeHelper abpLoginResultTypeHelper,
-            TokenAuthConfiguration configuration)
+            TokenAuthConfiguration configuration,
+            IConfiguration appConfiguration)
         {
             _logInManager = logInManager;
             _tenantCache = tenantCache;
             _abpLoginResultTypeHelper = abpLoginResultTypeHelper;
             _configuration = configuration;
+            _appConfiguration = appConfiguration;
         }
 
         [HttpPost]
@@ -59,12 +63,18 @@ namespace AqualLifeStyle.Controllers
 
         private string GetTenancyNameOrNull()
         {
-            if (!AbpSession.TenantId.HasValue)
+            if (AbpSession.TenantId.HasValue)
             {
-                return null;
+                return _tenantCache.GetOrNull(AbpSession.TenantId.Value)?.TenancyName;
             }
 
-            return _tenantCache.GetOrNull(AbpSession.TenantId.Value)?.TenancyName;
+            var defaultTenantName = _appConfiguration["App:DefaultTenantName"];
+            if (!string.IsNullOrWhiteSpace(defaultTenantName))
+            {
+                return defaultTenantName;
+            }
+
+            return null;
         }
 
         private async Task<AbpLoginResult<Tenant, User>> GetLoginResultAsync(string usernameOrEmailAddress, string password, string tenancyName)

@@ -65,6 +65,7 @@ export type MembershipsState = {
 };
 
 export type MembershipsActions = {
+  getActiveTiers: () => Promise<void>;
   getMembership: (id: number) => Promise<void>;
   getMemberships: () => Promise<void>;
   getSavingsWindowStatuses: () => Promise<void>;

@@ -8,8 +8,12 @@ import {
   useReducer,
 } from "react";
 
-import { setAccessTokenProvider } from "@/src/shared/api";
-import { clearAuthSession, setAuthSession } from "./actions";
+import {
+  setAccessTokenProvider,
+  setRefreshTokenProvider,
+} from "@/src/shared/api";
+import { refreshToken as refreshTokenApi } from "@/src/shared/api/auth-service";
+import { clearAuthSession, setAuthSession, setReady } from "./actions";
 import {
   AuthActionsContext,
   AuthStateContext,
@@ -18,6 +22,8 @@ import {
 } from "./context";
 import { authReducer } from "./reducer";
 
+const STORAGE_KEY = "aqua.authSession";
+
 type AuthProviderProps = {
   children: ReactNode;
 };
@@ -25,14 +31,74 @@ type AuthProviderProps = {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [state, dispatch] = useReducer(authReducer, initialAuthState);
 
+  // Restore session from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const session = JSON.parse(stored) as AuthSession;
+        if (
+          session.expiresAt &&
+          new Date(session.expiresAt) > new Date()
+        ) {
+          setAccessTokenProvider(() => session.accessToken);
+          dispatch(setAuthSession(session));
+        } else {
+          setAccessTokenProvider(() => null);
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      }
+    } catch {
+      setAccessTokenProvider(() => null);
+      localStorage.removeItem(STORAGE_KEY);
+    } finally {
+      dispatch(setReady(true));
+    }
+  }, []);
+
+  // Persist session to localStorage whenever it changes
+  useEffect(() => {
+    if (state.session) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.session));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [state.session]);
+
+  // Provide the access token to the axios client
   useEffect(() => {
     setAccessTokenProvider(() => state.session?.accessToken ?? null);
   }, [state.session?.accessToken]);
 
+  // Provide token refresh capability to the axios 401 interceptor
+  useEffect(() => {
+    setRefreshTokenProvider(async () => {
+      if (!state.session?.refreshToken) return null;
+      const result = await refreshTokenApi(state.session.refreshToken);
+      if (result.ok) {
+        setAccessTokenProvider(() => result.session.accessToken);
+        dispatch(setAuthSession(result.session));
+        return result.session.accessToken;
+      }
+      setAccessTokenProvider(() => null);
+      dispatch(clearAuthSession());
+      return null;
+    });
+  }, [state.session?.refreshToken]);
+
   const actions = useMemo(
     () => ({
-      clearSession: () => dispatch(clearAuthSession()),
-      setSession: (session: AuthSession) => dispatch(setAuthSession(session)),
+      clearSession: () => {
+        setAccessTokenProvider(() => null);
+        localStorage.removeItem(STORAGE_KEY);
+        dispatch(clearAuthSession());
+      },
+      setReady: (ready: boolean) => dispatch(setReady(ready)),
+      setSession: (session: AuthSession) => {
+        setAccessTokenProvider(() => session.accessToken);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+        dispatch(setAuthSession(session));
+      },
     }),
     [],
   );

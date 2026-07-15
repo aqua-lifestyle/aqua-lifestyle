@@ -78,7 +78,9 @@ namespace AqualLifeStyle.Tests.Integration
 
             await UsingDbContextAsync(async ctx =>
             {
-                var referrals = ctx.Referrals.ToList();
+                var referrals = ctx.Referrals
+                    .Where(r => r.SourceEnquiryId == enquiryId)
+                    .ToList();
                 referrals.Count.ShouldBe(2);
                 referrals.Count(r => r.Type == ReferralType.Direct).ShouldBe(1);
                 referrals.Count(r => r.Type == ReferralType.Indirect).ShouldBe(1);

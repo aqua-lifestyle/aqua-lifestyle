@@ -91,6 +91,63 @@ export const customersReducer = (
         loadErrorMessage: null,
       };
 
+    case CustomersActionTypes.getMyCustomerError:
+      return {
+        ...state,
+        isMyCustomerError: true,
+        isMyCustomerPending: false,
+        isMyCustomerSuccess: false,
+        myCustomer: null,
+        myCustomerErrorMessage: action.payload,
+      };
+
+    case CustomersActionTypes.getMyCustomerPending:
+      return {
+        ...state,
+        isMyCustomerError: false,
+        isMyCustomerPending: true,
+        isMyCustomerSuccess: false,
+        myCustomerErrorMessage: null,
+      };
+
+    case CustomersActionTypes.getMyCustomerSuccess:
+      return {
+        ...state,
+        isMyCustomerError: false,
+        isMyCustomerPending: false,
+        isMyCustomerSuccess: true,
+        myCustomer: action.payload,
+        myCustomerErrorMessage: null,
+      };
+
+    case CustomersActionTypes.changeMembershipError:
+      return {
+        ...state,
+        changeMembershipErrorMessage: action.payload,
+        isChangeMembershipError: true,
+        isChangeMembershipPending: false,
+        isChangeMembershipSuccess: false,
+      };
+
+    case CustomersActionTypes.changeMembershipPending:
+      return {
+        ...state,
+        changeMembershipErrorMessage: null,
+        isChangeMembershipError: false,
+        isChangeMembershipPending: true,
+        isChangeMembershipSuccess: false,
+      };
+
+    case CustomersActionTypes.changeMembershipSuccess:
+      return {
+        ...state,
+        myCustomer: action.payload,
+        changeMembershipErrorMessage: null,
+        isChangeMembershipError: false,
+        isChangeMembershipPending: false,
+        isChangeMembershipSuccess: true,
+      };
+
     case CustomersActionTypes.updateCustomerError:
       return {
         ...state,

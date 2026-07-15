@@ -8,8 +8,11 @@ import {
   useReducer,
 } from "react";
 
-import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
+import { apiEndpoints, getRequestErrorMessage, httpClient } from "@/src/shared/api";
 import {
+  changeMembershipError,
+  changeMembershipPending,
+  changeMembershipSuccess,
   createCustomerError,
   createCustomerPending,
   createCustomerSuccess,
@@ -19,6 +22,9 @@ import {
   getCustomersError,
   getCustomersPending,
   getCustomersSuccess,
+  getMyCustomerError,
+  getMyCustomerPending,
+  getMyCustomerSuccess,
   updateCustomerError,
   updateCustomerPending,
   updateCustomerSuccess,
@@ -38,15 +44,7 @@ type CustomersProviderProps = {
 };
 
 const getErrorMessage = (error: unknown): string => {
-  if (error instanceof AbpHttpError) {
-    return error.details ?? error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Unable to complete the customer request.";
+  return getRequestErrorMessage(error, "Unable to complete the customer request.");
 };
 
 export const CustomersProvider = ({ children }: CustomersProviderProps) => {
@@ -94,6 +92,19 @@ export const CustomersProvider = ({ children }: CustomersProviderProps) => {
     }
   }, []);
 
+  const getMyCustomer = useCallback(async () => {
+    dispatch(getMyCustomerPending());
+
+    try {
+      const customer = await httpClient.get<Customer>(
+        apiEndpoints.customers.getMyCustomer,
+      );
+      dispatch(getMyCustomerSuccess(customer));
+    } catch (error) {
+      dispatch(getMyCustomerError(getErrorMessage(error)));
+    }
+  }, []);
+
   const updateCustomer = useCallback(async (input: UpdateCustomerInput) => {
     dispatch(updateCustomerPending());
 
@@ -110,14 +121,35 @@ export const CustomersProvider = ({ children }: CustomersProviderProps) => {
     }
   }, []);
 
+  const changeMembership = useCallback(
+    async (input: { membershipId?: number | null }): Promise<Customer | null> => {
+      dispatch(changeMembershipPending());
+
+      try {
+        const customer = await httpClient.post<Customer, { membershipId?: number | null }>(
+          apiEndpoints.customers.changeMembership,
+          input,
+        );
+        dispatch(changeMembershipSuccess(customer));
+        return customer;
+      } catch (error) {
+        dispatch(changeMembershipError(getErrorMessage(error)));
+        return null;
+      }
+    },
+    [],
+  );
+
   const actions = useMemo(
     () => ({
+      changeMembership,
       createCustomer,
       getCustomer,
       getCustomers,
+      getMyCustomer,
       updateCustomer,
     }),
-    [createCustomer, getCustomer, getCustomers, updateCustomer],
+    [changeMembership, createCustomer, getCustomer, getCustomers, getMyCustomer, updateCustomer],
   );
 
   return (

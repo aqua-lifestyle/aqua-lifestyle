@@ -8,7 +8,7 @@ import {
   useReducer,
 } from "react";
 
-import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
+import { apiEndpoints, getRequestErrorMessage, httpClient } from "@/src/shared/api";
 import {
   getOrderIntentsError,
   getOrderIntentsPending,
@@ -30,15 +30,7 @@ type OrderIntentsProviderProps = {
 };
 
 const getErrorMessage = (error: unknown): string => {
-  if (error instanceof AbpHttpError) {
-    return error.details ?? error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Unable to complete the order intent request.";
+  return getRequestErrorMessage(error, "Unable to complete the order intent request.");
 };
 
 export const OrderIntentsProvider = ({
@@ -70,6 +62,22 @@ export const OrderIntentsProvider = ({
         OrderIntent,
         Record<string, never>
       >(apiEndpoints.orderIntents.createFromEnquiry(enquiryId), {});
+      dispatch(orderIntentActionSuccess(orderIntent));
+      return true;
+    } catch (error) {
+      dispatch(orderIntentActionError(getErrorMessage(error)));
+      return false;
+    }
+  }, []);
+
+  const createForCurrentCustomer = useCallback(async (productId: number) => {
+    dispatch(orderIntentActionPending());
+
+    try {
+      const orderIntent = await httpClient.post<
+        OrderIntent,
+        Record<string, never>
+      >(apiEndpoints.orderIntents.createForCurrentCustomer(productId), {});
       dispatch(orderIntentActionSuccess(orderIntent));
       return true;
     } catch (error) {
@@ -115,9 +123,10 @@ export const OrderIntentsProvider = ({
       cancelOrderIntent,
       completeOrderIntent,
       createFromEnquiry,
+      createForCurrentCustomer,
       getOrderIntents,
     }),
-    [cancelOrderIntent, completeOrderIntent, createFromEnquiry, getOrderIntents],
+    [cancelOrderIntent, completeOrderIntent, createForCurrentCustomer, createFromEnquiry, getOrderIntents],
   );
 
   return (

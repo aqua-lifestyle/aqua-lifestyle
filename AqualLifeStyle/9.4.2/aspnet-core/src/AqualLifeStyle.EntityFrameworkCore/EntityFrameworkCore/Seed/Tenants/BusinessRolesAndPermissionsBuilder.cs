@@ -45,7 +45,15 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
 
                 if (role == null)
                 {
-                    role = _context.Roles.Add(new Role(_tenantId, roleDef.Name, roleDef.DisplayName)).Entity;
+                    role = _context.Roles.Add(new Role(_tenantId, roleDef.Name, roleDef.DisplayName)
+                    {
+                        IsDefault = roleDef.Name == "Guest"
+                    }).Entity;
+                    _context.SaveChanges();
+                }
+                else if (roleDef.Name == "Guest" && !role.IsDefault)
+                {
+                    role.IsDefault = true;
                     _context.SaveChanges();
                 }
 
@@ -87,11 +95,6 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
 
         private static bool RoleShouldReceive(string roleName, string permissionName)
         {
-            if (roleName == "Guest")
-            {
-                return false;
-            }
-
             if (roleName == "SystemAdmin" || roleName == StaticRoleNames.Tenants.Admin)
             {
                 return true;
@@ -116,6 +119,11 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
             if (roleName == "Member")
             {
                 return MemberPermissions.Contains(permissionName);
+            }
+
+            if (roleName == "Guest")
+            {
+                return GuestPermissions.Contains(permissionName);
             }
 
             return false;
@@ -161,7 +169,13 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
             PermissionNames.Pages_Customers,
             PermissionNames.Pages_Memberships,
             PermissionNames.Pages_Enquiries,
-            PermissionNames.Pages_Orders
+            PermissionNames.Pages_Orders,
+            PermissionNames.Pages_Products
+        };
+
+        private static readonly string[] GuestPermissions =
+        {
+            PermissionNames.Pages_Products
         };
     }
 }

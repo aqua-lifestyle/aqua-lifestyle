@@ -11,6 +11,9 @@ export const MembershipsActionTypes = {
   getMembershipsError: "memberships/getMembershipsError",
   getMembershipsPending: "memberships/getMembershipsPending",
   getMembershipsSuccess: "memberships/getMembershipsSuccess",
+  getActiveTiersError: "memberships/getActiveTiersError",
+  getActiveTiersPending: "memberships/getActiveTiersPending",
+  getActiveTiersSuccess: "memberships/getActiveTiersSuccess",
   getTierBenefitsError: "memberships/getTierBenefitsError",
   getTierBenefitsPending: "memberships/getTierBenefitsPending",
   getTierBenefitsSuccess: "memberships/getTierBenefitsSuccess",
@@ -42,6 +45,17 @@ export type MembershipsAction =
     }
   | {
       type: typeof MembershipsActionTypes.getMembershipsSuccess;
+      payload: Membership[];
+    }
+  | {
+      type: typeof MembershipsActionTypes.getActiveTiersError;
+      payload: string;
+    }
+  | {
+      type: typeof MembershipsActionTypes.getActiveTiersPending;
+    }
+  | {
+      type: typeof MembershipsActionTypes.getActiveTiersSuccess;
       payload: Membership[];
     }
   | {
@@ -96,6 +110,22 @@ export const getMembershipsSuccess = (
   memberships: Membership[],
 ): MembershipsAction => ({
   type: MembershipsActionTypes.getMembershipsSuccess,
+  payload: memberships,
+});
+
+export const getActiveTiersError = (message: string): MembershipsAction => ({
+  type: MembershipsActionTypes.getActiveTiersError,
+  payload: message,
+});
+
+export const getActiveTiersPending = (): MembershipsAction => ({
+  type: MembershipsActionTypes.getActiveTiersPending,
+});
+
+export const getActiveTiersSuccess = (
+  memberships: Membership[],
+): MembershipsAction => ({
+  type: MembershipsActionTypes.getActiveTiersSuccess,
   payload: memberships,
 });
 

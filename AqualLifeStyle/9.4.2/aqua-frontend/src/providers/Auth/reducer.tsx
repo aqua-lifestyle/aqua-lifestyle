@@ -14,10 +14,17 @@ export const authReducer = (
         session: null,
       };
 
+    case AuthActionTypes.setReady:
+      return {
+        ...state,
+        isReady: action.payload,
+      };
+
     case AuthActionTypes.setSession:
       return {
         ...state,
         isAuthenticated: true,
+        isReady: true,
         session: action.payload,
       };
 

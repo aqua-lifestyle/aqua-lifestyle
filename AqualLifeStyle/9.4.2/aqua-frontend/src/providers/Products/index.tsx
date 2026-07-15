@@ -8,7 +8,7 @@ import {
   useReducer,
 } from "react";
 
-import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
+import { apiEndpoints, getRequestErrorMessage, httpClient } from "@/src/shared/api";
 import {
   getEligibleProductsError,
   getEligibleProductsPending,
@@ -33,15 +33,7 @@ type ProductsProviderProps = {
 };
 
 const getErrorMessage = (error: unknown): string => {
-  if (error instanceof AbpHttpError) {
-    return error.details ?? error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Unable to load products.";
+  return getRequestErrorMessage(error, "Unable to load products.");
 };
 
 export const ProductsProvider = ({ children }: ProductsProviderProps) => {

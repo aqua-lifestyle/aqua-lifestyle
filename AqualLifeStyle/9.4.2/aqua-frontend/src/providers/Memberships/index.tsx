@@ -8,8 +8,11 @@ import {
   useReducer,
 } from "react";
 
-import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
+import { apiEndpoints, getRequestErrorMessage, httpClient } from "@/src/shared/api";
 import {
+  getActiveTiersError,
+  getActiveTiersPending,
+  getActiveTiersSuccess,
   getMembershipError,
   getMembershipPending,
   getMembershipSuccess,
@@ -38,15 +41,7 @@ type MembershipsProviderProps = {
 };
 
 const getErrorMessage = (error: unknown): string => {
-  if (error instanceof AbpHttpError) {
-    return error.details ?? error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Unable to load memberships.";
+  return getRequestErrorMessage(error, "Unable to load memberships.");
 };
 
 export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {
@@ -65,6 +60,19 @@ export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {
       dispatch(getMembershipsSuccess(memberships));
     } catch (error) {
       dispatch(getMembershipsError(getErrorMessage(error)));
+    }
+  }, []);
+
+  const getActiveTiers = useCallback(async () => {
+    dispatch(getActiveTiersPending());
+
+    try {
+      const memberships = await httpClient.get<Membership[]>(
+        apiEndpoints.memberships.getActiveTiers,
+      );
+      dispatch(getActiveTiersSuccess(memberships));
+    } catch (error) {
+      dispatch(getActiveTiersError(getErrorMessage(error)));
     }
   }, []);
 
@@ -109,12 +117,13 @@ export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {
 
   const actions = useMemo(
     () => ({
+      getActiveTiers,
       getMembership,
       getMemberships,
       getSavingsWindowStatuses,
       getTierBenefits,
     }),
-    [getMembership, getMemberships, getSavingsWindowStatuses, getTierBenefits],
+    [getActiveTiers, getMembership, getMemberships, getSavingsWindowStatuses, getTierBenefits],
   );
 
   return (

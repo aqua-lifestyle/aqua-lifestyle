@@ -10,6 +10,12 @@ export const CustomersActionTypes = {
   getCustomersError: "customers/getCustomersError",
   getCustomersPending: "customers/getCustomersPending",
   getCustomersSuccess: "customers/getCustomersSuccess",
+  getMyCustomerError: "customers/getMyCustomerError",
+  getMyCustomerPending: "customers/getMyCustomerPending",
+  getMyCustomerSuccess: "customers/getMyCustomerSuccess",
+  changeMembershipError: "customers/changeMembershipError",
+  changeMembershipPending: "customers/changeMembershipPending",
+  changeMembershipSuccess: "customers/changeMembershipSuccess",
   updateCustomerError: "customers/updateCustomerError",
   updateCustomerPending: "customers/updateCustomerPending",
   updateCustomerSuccess: "customers/updateCustomerSuccess",
@@ -47,6 +53,28 @@ export type CustomersAction =
   | {
       type: typeof CustomersActionTypes.getCustomersSuccess;
       payload: Customer[];
+    }
+  | {
+      type: typeof CustomersActionTypes.getMyCustomerError;
+      payload: string;
+    }
+  | {
+      type: typeof CustomersActionTypes.getMyCustomerPending;
+    }
+  | {
+      type: typeof CustomersActionTypes.getMyCustomerSuccess;
+      payload: Customer;
+    }
+  | {
+      type: typeof CustomersActionTypes.changeMembershipError;
+      payload: string;
+    }
+  | {
+      type: typeof CustomersActionTypes.changeMembershipPending;
+    }
+  | {
+      type: typeof CustomersActionTypes.changeMembershipSuccess;
+      payload: Customer;
     }
   | {
       type: typeof CustomersActionTypes.updateCustomerError;
@@ -99,6 +127,34 @@ export const getCustomersPending = (): CustomersAction => ({
 export const getCustomersSuccess = (customers: Customer[]): CustomersAction => ({
   type: CustomersActionTypes.getCustomersSuccess,
   payload: customers,
+});
+
+export const getMyCustomerError = (message: string): CustomersAction => ({
+  type: CustomersActionTypes.getMyCustomerError,
+  payload: message,
+});
+
+export const getMyCustomerPending = (): CustomersAction => ({
+  type: CustomersActionTypes.getMyCustomerPending,
+});
+
+export const getMyCustomerSuccess = (customer: Customer): CustomersAction => ({
+  type: CustomersActionTypes.getMyCustomerSuccess,
+  payload: customer,
+});
+
+export const changeMembershipError = (message: string): CustomersAction => ({
+  type: CustomersActionTypes.changeMembershipError,
+  payload: message,
+});
+
+export const changeMembershipPending = (): CustomersAction => ({
+  type: CustomersActionTypes.changeMembershipPending,
+});
+
+export const changeMembershipSuccess = (customer: Customer): CustomersAction => ({
+  type: CustomersActionTypes.changeMembershipSuccess,
+  payload: customer,
 });
 
 export const updateCustomerError = (message: string): CustomersAction => ({
