@@ -2,7 +2,8 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthState } from "@/src/providers";
-import { AreaLeaderGuard, isAreaLeader } from "./area-leader-guard";
+import { isAreaLeader } from "@/src/shared/auth/roles";
+import { AreaLeaderGuard } from "./area-leader-guard";
 
 const replace = vi.fn();
 
@@ -43,8 +44,8 @@ describe("AreaLeaderGuard", () => {
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/dashboard"));
   });
 
-  it("renders for a permitted Area Leader", () => {
-    vi.mocked(useAuthState).mockReturnValue(authState("AreaLeader", ["Aqua.AreaLeaders.View"]));
+  it("renders for an Area Leader when the token has no client permission claims", () => {
+    vi.mocked(useAuthState).mockReturnValue(authState("AreaLeader"));
     render(<AreaLeaderGuard><p>Protected</p></AreaLeaderGuard>);
     expect(screen.getByText("Protected")).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();

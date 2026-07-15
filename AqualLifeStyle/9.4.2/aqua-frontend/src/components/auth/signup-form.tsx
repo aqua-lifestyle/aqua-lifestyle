@@ -167,7 +167,7 @@ export const SignupForm = () => {
         type: "success",
       });
       setIsLoading(false);
-      router.push("/");
+      router.push("/dashboard");
       return;
     }
 

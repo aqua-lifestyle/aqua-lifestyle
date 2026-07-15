@@ -5,16 +5,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
 import { useAuthState } from "@/src/providers";
+import { isSystemAdmin } from "@/src/shared/auth/roles";
 import { Skeleton } from "@/src/shared/ui";
 
 type AdminGuardProps = {
   children: ReactNode;
 };
-
-export const isSystemAdmin = (role: string | null | undefined) =>
-  ["admin", "systemadmin"].includes(
-    role?.replace(/[\s_-]/g, "").toLowerCase() ?? "",
-  );
 
 export const AdminGuard = ({ children }: AdminGuardProps) => {
   const pathname = usePathname();

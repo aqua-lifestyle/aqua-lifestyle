@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isSystemAdmin } from "./admin-guard";
+import { isSystemAdmin } from "@/src/shared/auth/roles";
 
 describe("isSystemAdmin", () => {
   it("accepts the ABP SystemAdmin role without case sensitivity", () => {

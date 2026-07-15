@@ -24,8 +24,7 @@ import { useState } from "react";
 import { cn } from "@/src/shared/lib/utils";
 
 import { useAuthState } from "@/src/providers";
-import { isSystemAdmin } from "@/src/features/admin/ui/admin-guard";
-import { isAreaLeader } from "@/src/features/area-leader/ui/area-leader-guard";
+import { isAreaLeader, isFacilitator, isSystemAdmin } from "@/src/shared/auth/roles";
 import { TenantSwitcher } from "./tenant-switcher";
 import { UserMenu } from "./user-menu";
 
@@ -59,11 +58,21 @@ export const Navbar = () => {
           href: "/area-leader/dashboard",
           icon: LayoutDashboard,
           label: "Area Leader dashboard",
-          permission: "Aqua.AreaLeaders.View",
+          permission: null,
         },
       ]
     : [];
-  const contextualMoreLinks = [...areaLeaderLinks, ...moreLinks];
+  const facilitatorLinks = isFacilitator(session?.user?.role)
+    ? [
+        {
+          href: "/facilitator/dashboard",
+          icon: LayoutDashboard,
+          label: "Facilitator dashboard",
+          permission: null,
+        },
+      ]
+    : [];
+  const contextualMoreLinks = [...areaLeaderLinks, ...facilitatorLinks, ...moreLinks];
   const primaryLinks = isSystemAdmin(session?.user?.role)
     ? [
         { href: "/admin/dashboard", icon: LayoutDashboard, label: "Admin", permission: null },

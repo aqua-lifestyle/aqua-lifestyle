@@ -5,18 +5,18 @@ import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect } from "react";
 
 import { useAuthState } from "@/src/providers";
-import { isAreaLeader } from "@/src/shared/auth/roles";
+import { isFacilitator } from "@/src/shared/auth/roles";
 import { Skeleton } from "@/src/shared/ui";
 
-type AreaLeaderGuardProps = {
+type FacilitatorGuardProps = {
   children: ReactNode;
 };
 
-export const AreaLeaderGuard = ({ children }: AreaLeaderGuardProps) => {
+export const FacilitatorGuard = ({ children }: FacilitatorGuardProps) => {
   const pathname = usePathname();
   const router = useRouter();
   const { isAuthenticated, isReady, session } = useAuthState();
-  const hasAccess = isAreaLeader(session?.user?.role);
+  const hasAccess = isFacilitator(session?.user?.role);
 
   useEffect(() => {
     if (!isReady) return;
@@ -33,14 +33,14 @@ export const AreaLeaderGuard = ({ children }: AreaLeaderGuardProps) => {
 
   if (!isReady || !isAuthenticated || !hasAccess) {
     return (
-      <main className="min-h-[calc(100dvh-4rem)] bg-muted/30 px-4 py-8 sm:px-6 lg:px-8">
+      <main className="min-h-dvh bg-muted/30 px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <div className="mb-6 flex items-center gap-3 text-muted-foreground">
             <ShieldCheck className="size-5" />
-            <span className="text-sm font-semibold">Verifying Area Leader access…</span>
+            <span className="text-sm font-semibold">Verifying Facilitator access…</span>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            {[0, 1, 2, 3, 4].map((item) => (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((item) => (
               <Skeleton className="h-28" key={item} />
             ))}
           </div>

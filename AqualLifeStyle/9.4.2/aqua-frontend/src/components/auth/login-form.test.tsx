@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthActions, useTenantState, useToast } from "@/src/providers";
+import { getLoginDestination } from "@/src/shared/auth/roles";
 
 import { LoginForm } from "./login-form";
 
@@ -42,9 +43,31 @@ describe("LoginForm", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useAuthActions).mockReturnValue({ setSession, clearSession: vi.fn() });
+    vi.mocked(useAuthActions).mockReturnValue({
+      clearSession: vi.fn(),
+      setReady: vi.fn(),
+      setSession,
+    });
     vi.mocked(useTenantState).mockReturnValue({ currentTenant: null, isHost: true });
     vi.mocked(useToast).mockReturnValue({ toast });
+  });
+
+  it("does not let a generic redirect override a role dashboard", () => {
+    expect(getLoginDestination("AreaLeader", "/")).toBe(
+      "/area-leader/dashboard",
+    );
+    expect(getLoginDestination("AreaLeader", "/dashboard")).toBe(
+      "/area-leader/dashboard",
+    );
+    expect(getLoginDestination("AreaLeader", "/area-leader/orders")).toBe(
+      "/area-leader/orders",
+    );
+    expect(getLoginDestination("Facilitator", "/")).toBe(
+      "/facilitator/dashboard",
+    );
+    expect(getLoginDestination("Facilitator", "/facilitator/my-referrals")).toBe(
+      "/facilitator/my-referrals",
+    );
   });
 
   it("shows validation errors for empty fields", async () => {
@@ -107,6 +130,7 @@ describe("LoginForm", () => {
         type: "success",
       }),
     );
+    expect(push).toHaveBeenCalledWith("/dashboard");
   });
 
   it("accepts the seeded admin username and opens the admin dashboard", async () => {
@@ -139,6 +163,70 @@ describe("LoginForm", () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith("/admin/dashboard"));
     expect(login).toHaveBeenCalledWith(
       expect.objectContaining({ email: "admin", password: "123qwe" }),
+    );
+  });
+
+  it("opens the Area Leader dashboard after an Area Leader signs in", async () => {
+    const { login } = await import("@/src/shared/api/auth-service");
+    vi.mocked(login).mockResolvedValue({
+      ok: true,
+      session: {
+        accessToken: "area-leader-access-token",
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+        user: {
+          id: 24,
+          email: "area.leader.demo@aqualifestyle.local",
+          name: "area.leader.demo",
+          role: "AreaLeader",
+          permissions: [],
+        },
+      },
+    });
+
+    render(<LoginForm />);
+
+    fireEvent.change(screen.getByLabelText("Username or email"), {
+      target: { value: "area.leader.demo" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "AreaLeader123!" },
+    });
+    submitForm();
+
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith("/area-leader/dashboard"),
+    );
+  });
+
+  it("opens the Facilitator dashboard after a Facilitator signs in", async () => {
+    const { login } = await import("@/src/shared/api/auth-service");
+    vi.mocked(login).mockResolvedValue({
+      ok: true,
+      session: {
+        accessToken: "facilitator-access-token",
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+        user: {
+          id: 25,
+          email: "facilitator.demo@aqualifestyle.local",
+          name: "facilitator.demo",
+          role: "Facilitator",
+          permissions: [],
+        },
+      },
+    });
+
+    render(<LoginForm />);
+
+    fireEvent.change(screen.getByLabelText("Username or email"), {
+      target: { value: "facilitator.demo" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "Facilitator123!" },
+    });
+    submitForm();
+
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith("/facilitator/dashboard"),
     );
   });
 });

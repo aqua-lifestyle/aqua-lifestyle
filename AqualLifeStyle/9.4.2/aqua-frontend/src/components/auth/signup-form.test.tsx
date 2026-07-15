@@ -34,7 +34,11 @@ describe("SignupForm", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useAuthActions).mockReturnValue({ setSession, clearSession: vi.fn() });
+    vi.mocked(useAuthActions).mockReturnValue({
+      clearSession: vi.fn(),
+      setReady: vi.fn(),
+      setSession,
+    });
     vi.mocked(useTenantState).mockReturnValue({ currentTenant: null, isHost: true });
     vi.mocked(useToast).mockReturnValue({ toast });
   });

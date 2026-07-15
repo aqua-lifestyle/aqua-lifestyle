@@ -3,6 +3,7 @@
 import { Droplets, Users, Wallet, Package, Calendar } from "lucide-react";
 
 import { useAuthState } from "@/src/providers";
+import { getRoleHome } from "@/src/shared/auth/roles";
 import { Card, LinkButton } from "@/src/shared/ui";
 
 const features = [
@@ -35,6 +36,7 @@ const features = [
 export const LandingPage = () => {
   const { session } = useAuthState();
   const isAuthenticated = Boolean(session?.user);
+  const authenticatedHome = getRoleHome(session?.user?.role);
 
   return (
     <main className="min-h-dvh bg-muted/30 text-foreground">
@@ -54,8 +56,8 @@ export const LandingPage = () => {
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             {isAuthenticated ? (
-              <LinkButton href="/member" size="lg" variant="primary">
-                Go to member area
+              <LinkButton href={authenticatedHome.href} size="lg" variant="primary">
+                {authenticatedHome.label}
               </LinkButton>
             ) : (
               <>

@@ -25,7 +25,7 @@ import {
 import { Badge, Button, Card, StatusMessage } from "@/src/shared/ui";
 import { buildAdminDashboard, formatCurrency } from "../model/dashboard";
 import { mockAdminDashboard } from "../model/mock-data";
-import { isSystemAdmin } from "./admin-guard";
+import { isSystemAdmin } from "@/src/shared/auth/roles";
 import { KpiCards } from "./kpi-cards";
 import { MemberAnalytics } from "./member-analytics";
 import { OrderAnalytics } from "./order-analytics";

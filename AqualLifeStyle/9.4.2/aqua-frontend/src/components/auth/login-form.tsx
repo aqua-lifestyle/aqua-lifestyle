@@ -1,12 +1,12 @@
 "use client";
 
 import { Droplets, Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 
 import { login } from "@/src/shared/api/auth-service";
-import { isSystemAdmin } from "@/src/features/admin/ui/admin-guard";
+import { getLoginDestination } from "@/src/shared/auth/roles";
 import { useAuthActions, useTenantState, useToast } from "@/src/providers";
 import {
   Button,
@@ -24,6 +24,15 @@ const loginSchema = z.object({
 
 type FieldErrors = Partial<Record<"email" | "password", string>>;
 
+const subscribeToHydration = () => () => undefined;
+
+const getSafeRedirect = () => {
+  const redirect = new URLSearchParams(window.location.search).get("redirect");
+  return redirect?.startsWith("/") && !redirect.startsWith("//")
+    ? redirect
+    : null;
+};
+
 export const LoginForm = () => {
   const router = useRouter();
   const { setSession } = useAuthActions();
@@ -35,6 +44,11 @@ export const LoginForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const hasMounted = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
+  );
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -81,9 +95,9 @@ export const LoginForm = () => {
       type: "success",
     });
     setIsLoading(false);
-    router.push(
-      isSystemAdmin(authResult.session.user?.role) ? "/admin/dashboard" : "/",
-    );
+    const role = authResult.session.user?.role;
+    const destination = getLoginDestination(role, getSafeRedirect());
+    router.push(destination);
   };
 
   return (
@@ -121,7 +135,7 @@ export const LoginForm = () => {
                 <SelectField
                   label="Tenant"
                   name="tenant"
-                  value={isHost ? "" : currentTenant ?? ""}
+                  value={hasMounted && !isHost ? currentTenant ?? "" : ""}
                   onChange={(e) => {
                     // Tenant selection is handled via the top-level TenantSwitcher.
                     // This select is for display purposes on the login page.
@@ -129,7 +143,9 @@ export const LoginForm = () => {
                   }}
                 >
                   <option value="">Host mode</option>
-                  <option value={currentTenant ?? ""}>{currentTenant ?? "Host mode"}</option>
+                  {hasMounted && currentTenant ? (
+                    <option value={currentTenant}>{currentTenant}</option>
+                  ) : null}
                 </SelectField>
 
                 <TextField

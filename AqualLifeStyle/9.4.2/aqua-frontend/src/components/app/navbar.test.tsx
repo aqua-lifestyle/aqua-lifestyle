@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -62,7 +62,7 @@ describe("Navbar", () => {
       </AuthProvider>,
     );
 
-    screen.getByRole("button", { name: "Set session" }).click();
+    fireEvent.click(screen.getByRole("button", { name: "Set session" }));
 
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Dashboard" })).toBeTruthy();
@@ -83,7 +83,7 @@ describe("Navbar", () => {
       </AuthProvider>,
     );
 
-    screen.getByRole("button", { name: "Set session" }).click();
+    fireEvent.click(screen.getByRole("button", { name: "Set session" }));
 
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Customers" })).toBeTruthy();
@@ -101,7 +101,7 @@ describe("Navbar", () => {
       </AuthProvider>,
     );
 
-    screen.getByRole("button", { name: "Set session" }).click();
+    fireEvent.click(screen.getByRole("button", { name: "Set session" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("tenant-switcher")).toBeInTheDocument();

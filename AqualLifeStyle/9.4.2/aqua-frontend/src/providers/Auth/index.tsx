@@ -41,12 +41,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           session.expiresAt &&
           new Date(session.expiresAt) > new Date()
         ) {
+          setAccessTokenProvider(() => session.accessToken);
           dispatch(setAuthSession(session));
         } else {
+          setAccessTokenProvider(() => null);
           localStorage.removeItem(STORAGE_KEY);
         }
       }
     } catch {
+      setAccessTokenProvider(() => null);
       localStorage.removeItem(STORAGE_KEY);
     } finally {
       dispatch(setReady(true));
@@ -73,9 +76,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (!state.session?.refreshToken) return null;
       const result = await refreshTokenApi(state.session.refreshToken);
       if (result.ok) {
+        setAccessTokenProvider(() => result.session.accessToken);
         dispatch(setAuthSession(result.session));
         return result.session.accessToken;
       }
+      setAccessTokenProvider(() => null);
       dispatch(clearAuthSession());
       return null;
     });
@@ -84,11 +89,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const actions = useMemo(
     () => ({
       clearSession: () => {
+        setAccessTokenProvider(() => null);
         localStorage.removeItem(STORAGE_KEY);
         dispatch(clearAuthSession());
       },
       setReady: (ready: boolean) => dispatch(setReady(ready)),
       setSession: (session: AuthSession) => {
+        setAccessTokenProvider(() => session.accessToken);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
         dispatch(setAuthSession(session));
       },
