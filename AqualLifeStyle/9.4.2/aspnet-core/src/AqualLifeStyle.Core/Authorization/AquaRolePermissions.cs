@@ -61,11 +61,8 @@ namespace AqualLifeStyle.Authorization
                 },
                 [AquaUserRole.Member] = new[]
                 {
-                    AquaPermissions.Members.View,
                     AquaPermissions.Members.ViewSelf,
                     AquaPermissions.Members.EditSelf,
-                    AquaPermissions.Members.Create,
-                    AquaPermissions.Members.Edit,
                     AquaPermissions.Memberships.ViewSelf,
                     AquaPermissions.Memberships.Upgrade,
                     AquaPermissions.Enquiries.View,
@@ -82,7 +79,12 @@ namespace AqualLifeStyle.Authorization
                     AquaPermissions.Savings.Withdraw,
                     AquaPermissions.Savings.ViewSelf
                 },
-                [AquaUserRole.Guest] = Array.Empty<string>()
+                [AquaUserRole.Guest] = new[]
+                {
+                    AquaPermissions.Members.ViewSelf,
+                    AquaPermissions.Memberships.ViewSelf,
+                    AquaPermissions.Memberships.Upgrade
+                }
             };
 
         public static IReadOnlyCollection<string> GetFor(AquaUserRole role)

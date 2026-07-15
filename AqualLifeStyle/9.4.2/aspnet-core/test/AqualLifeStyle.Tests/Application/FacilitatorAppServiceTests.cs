@@ -221,7 +221,6 @@ namespace AqualLifeStyle.Tests.Application
 
             using (UsingTenantId(1))
             {
-                SetCurrentUser(tenantTwoCustomerId, 1);
                 var found = await _facilitatorAppService.GetByCustomerAsync(tenantTwoCustomerId);
                 found.ShouldBeNull();
             }

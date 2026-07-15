@@ -13,7 +13,15 @@ namespace AqualLifeStyle.Tests.Authorization
         public void SystemAdmin_HasEveryPermission() => AquaRolePermissions.GetFor(AquaUserRole.SystemAdmin).ShouldBe(AquaPermissions.GetAll(), ignoreOrder: true);
 
         [Fact]
-        public void Guest_HasNoPermissions() => AquaRolePermissions.GetFor(AquaUserRole.Guest).ShouldBeEmpty();
+        public void Guest_HasOnlySelfServicePermissions()
+        {
+            AquaRolePermissions.GetFor(AquaUserRole.Guest).ShouldBe(new[]
+            {
+                AquaPermissions.Members.ViewSelf,
+                AquaPermissions.Memberships.ViewSelf,
+                AquaPermissions.Memberships.Upgrade
+            }, ignoreOrder: true);
+        }
 
         [Theory]
         [InlineData(AquaUserRole.AreaLeader, AquaPermissions.AreaSpaces.Manage)]

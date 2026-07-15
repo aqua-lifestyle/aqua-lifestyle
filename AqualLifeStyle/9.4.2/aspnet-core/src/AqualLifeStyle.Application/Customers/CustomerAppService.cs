@@ -12,7 +12,6 @@ using AqualLifeStyle.Domain.Memberships;
 
 namespace AqualLifeStyle.Application.Customers
 {
-    [AbpAuthorize(PermissionNames.Pages_Customers)]
     public class CustomerAppService : AqualLifeStyleAppServiceBase, ICustomerAppService
     {
         private readonly ICustomerRepository _customerRepository;
@@ -26,7 +25,7 @@ namespace AqualLifeStyle.Application.Customers
             _objectMapper = objectMapper;
         }
 
-        [AbpAuthorize(PermissionNames.Pages_Customers)]
+        [AbpAuthorize(AquaPermissions.Members.View)]
         public async Task<IReadOnlyList<CustomerDto>> GetAllAsync()
         {
             var tenantId = GetRequiredTenantId("Customer lookup failed.");
@@ -34,6 +33,7 @@ namespace AqualLifeStyle.Application.Customers
             return _objectMapper.Map<List<CustomerDto>>(customers);
         }
 
+        [AbpAuthorize]
         public async Task<CustomerDto> GetAsync(int id)
         {
             var customer = await GetCustomerForCurrentTenantAsync(id);
@@ -45,6 +45,7 @@ namespace AqualLifeStyle.Application.Customers
             return _objectMapper.Map<CustomerDto>(customer);
         }
 
+        [AbpAuthorize(AquaPermissions.Members.ViewSelf)]
         public async Task<CustomerDto> GetMyCustomerAsync()
         {
             if (!AbpSession.UserId.HasValue)
@@ -232,6 +233,11 @@ namespace AqualLifeStyle.Application.Customers
             }
 
             return customer;
+        }
+
+        protected override Exception CreateMissingTenantContextException(string operation)
+        {
+            return new AbpAuthorizationException($"{operation} A tenant context is required.");
         }
     }
 }

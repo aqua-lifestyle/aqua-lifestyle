@@ -3,6 +3,8 @@ using Abp.Configuration;
 using Abp.Zero.Configuration;
 using AqualLifeStyle.Authorization.Accounts.Dto;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.Domain.Common;
+using AqualLifeStyle.Domain.Customers;
 using Microsoft.Extensions.Configuration;
 
 namespace AqualLifeStyle.Authorization.Accounts
@@ -13,13 +15,16 @@ namespace AqualLifeStyle.Authorization.Accounts
 
         private readonly UserRegistrationManager _userRegistrationManager;
         private readonly IConfiguration _configuration;
+        private readonly ICustomerRepository _customerRepository;
 
         public AccountAppService(
             UserRegistrationManager userRegistrationManager,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ICustomerRepository customerRepository)
         {
             _userRegistrationManager = userRegistrationManager;
             _configuration = configuration;
+            _customerRepository = customerRepository;
         }
 
         public async Task<IsTenantAvailableOutput> IsTenantAvailable(IsTenantAvailableInput input)
@@ -61,6 +66,16 @@ namespace AqualLifeStyle.Authorization.Accounts
                 input.Password,
                 true // Assumed email address is always confirmed. Change this if you want to implement email confirmation.
             );
+
+            var customerName = $"{input.Name} {input.Surname}".Trim();
+            var customer = Customer.Create(
+                user.TenantId,
+                user.Id,
+                customerName,
+                new EmailAddress(input.EmailAddress),
+                membershipId: null,
+                user: user);
+            await _customerRepository.InsertAsync(customer);
 
             var isEmailConfirmationRequiredForLogin = await SettingManager.GetSettingValueAsync<bool>(AbpZeroSettingNames.UserManagement.IsEmailConfirmationRequiredForLogin);
 
