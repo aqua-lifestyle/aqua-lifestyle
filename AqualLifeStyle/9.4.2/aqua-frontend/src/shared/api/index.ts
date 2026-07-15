@@ -8,6 +8,7 @@ export { apiEndpoints } from "./endpoints";
 export { httpClient } from "./http-client";
 export {
   AbpHttpError,
+  getRequestErrorMessage,
   normalizeAbpError,
   normalizeNetworkError,
 } from "./abp-error";

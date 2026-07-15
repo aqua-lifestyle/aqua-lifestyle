@@ -2,10 +2,23 @@ import { describe, expect, it } from "vitest";
 
 import {
   AbpHttpError,
+  getRequestErrorMessage,
   normalizeAbpError,
   normalizeNetworkError,
   unwrapAbpResponse,
 } from "./abp-error";
+
+describe("getRequestErrorMessage", () => {
+  it("uses the public error message without exposing technical details", () => {
+    const error = new AbpHttpError(500, {
+      message: "Request failed.",
+      details: "Database connection string details",
+    });
+
+    expect(getRequestErrorMessage(error, "Fallback")).toBe("Request failed.");
+    expect(getRequestErrorMessage({ unexpected: true }, "Fallback")).toBe("Fallback");
+  });
+});
 
 describe("normalizeAbpError", () => {
   it("normalizes nested ABP error envelopes", () => {

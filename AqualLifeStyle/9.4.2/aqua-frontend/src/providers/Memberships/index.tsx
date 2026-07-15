@@ -8,7 +8,7 @@ import {
   useReducer,
 } from "react";
 
-import { AbpHttpError, apiEndpoints, httpClient } from "@/src/shared/api";
+import { apiEndpoints, getRequestErrorMessage, httpClient } from "@/src/shared/api";
 import {
   getActiveTiersError,
   getActiveTiersPending,
@@ -41,15 +41,7 @@ type MembershipsProviderProps = {
 };
 
 const getErrorMessage = (error: unknown): string => {
-  if (error instanceof AbpHttpError) {
-    return error.details ?? error.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Unable to load memberships.";
+  return getRequestErrorMessage(error, "Unable to load memberships.");
 };
 
 export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {

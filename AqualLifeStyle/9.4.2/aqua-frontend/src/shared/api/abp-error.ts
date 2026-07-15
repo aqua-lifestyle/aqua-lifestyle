@@ -53,6 +53,14 @@ export class AbpHttpError extends Error {
   }
 }
 
+export const getRequestErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return fallback;
+};
+
 export const normalizeAbpError = (
   status: number,
   data: AbpErrorEnvelope | undefined,
