@@ -11,7 +11,9 @@ import {
   type AbpErrorEnvelope,
 } from "./abp-error";
 
-const DEFAULT_TIMEOUT_MS = 15_000;
+// Local ABP authorization can take longer while the development database is
+// cold, especially when a dashboard loads several permission-protected APIs.
+const DEFAULT_TIMEOUT_MS = 30_000;
 const TENANT_HEADER = "__tenant";
 
 type RequestContextProvider = () => string | null | Promise<string | null>;
