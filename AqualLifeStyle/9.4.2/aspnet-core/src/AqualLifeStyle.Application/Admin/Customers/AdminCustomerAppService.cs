@@ -27,28 +27,22 @@ namespace AqualLifeStyle.Application.Admin.Customers
     {
         private readonly IAdminCustomerAccountManager _accountManager;
         private readonly ICustomerRepository _customerRepository;
-        private readonly IMembershipRepository _membershipRepository;
-        private readonly IRepository<User, long> _userRepository;
         private readonly UserManager _userManager;
         private readonly IObjectMapper _objectMapper;
-        private readonly IAdminUserRoleSynchronizer _userRoleSynchronizer;
+        private readonly IAdminCustomerProfileUpdater _customerProfileUpdater;
 
         public AdminCustomerAppService(
             IAdminCustomerAccountManager accountManager,
             ICustomerRepository customerRepository,
-            IMembershipRepository membershipRepository,
-            IRepository<User, long> userRepository,
             UserManager userManager,
             IObjectMapper objectMapper,
-            IAdminUserRoleSynchronizer userRoleSynchronizer)
+            IAdminCustomerProfileUpdater customerProfileUpdater)
         {
             _accountManager = accountManager;
             _customerRepository = customerRepository;
-            _membershipRepository = membershipRepository;
-            _userRepository = userRepository;
             _userManager = userManager;
             _objectMapper = objectMapper;
-            _userRoleSynchronizer = userRoleSynchronizer;
+            _customerProfileUpdater = customerProfileUpdater;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Customers.View)]
@@ -120,23 +114,11 @@ namespace AqualLifeStyle.Application.Admin.Customers
             var tenantId = customer.TenantId.Value;
             using (CurrentUnitOfWork.SetTenantId(tenantId))
             {
-                await ValidateUpdateAsync(customer, input);
-                var user = customer.User;
-                user.Name = input.FirstName.Trim();
-                user.Surname = input.LastName.Trim();
-                user.EmailAddress = input.Email.Trim();
-                user.UserName = input.Email.Trim();
-                user.IsActive = input.IsActive;
-                user.SetNormalizedNames();
-                await _userRoleSynchronizer.SynchronizeAsync(
-                    user,
-                    input.MembershipId.HasValue ? AquaUserRole.Member : AquaUserRole.Guest);
-
-                customer.Rename($"{user.Name} {user.Surname}");
-                customer.ChangeEmail(new EmailAddress(input.Email));
-                customer.ChangeMembership(input.MembershipId);
-                if (input.IsActive) customer.Activate(); else customer.Deactivate();
-                await _customerRepository.UpdateAsync(customer);
+                await _customerProfileUpdater.UpdateAsync(customer, new AdminCustomerProfileUpdate
+                {
+                    FirstName = input.FirstName, LastName = input.LastName, Email = input.Email,
+                    MembershipId = input.MembershipId, IsActive = input.IsActive
+                });
                 await CurrentUnitOfWork.SaveChangesAsync();
             }
 
@@ -173,24 +155,6 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 if (customer == null) throw new UserFriendlyException("Customer lookup failed.", "The customer was not found.");
                 return customer;
             }
-        }
-
-        private async Task ValidateUpdateAsync(Customer customer, AdminUpdateCustomerInput input)
-        {
-            if (string.IsNullOrWhiteSpace(input.FirstName) || string.IsNullOrWhiteSpace(input.LastName))
-                throw new UserFriendlyException("Customer update failed.", "First name and last name are required.");
-            var normalizedEmail = new EmailAddress(input.Email).Value.ToUpperInvariant();
-            using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
-            using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.SoftDelete))
-            {
-                if (await _customerRepository.GetAll().AnyAsync(item => item.Id != customer.Id && item.Email.Value.ToUpper() == normalizedEmail))
-                    throw new UserFriendlyException("Customer update failed.", "The email address is unavailable.");
-            }
-            if (await _userRepository.GetAll().AnyAsync(user => user.Id != customer.UserId && user.NormalizedEmailAddress == normalizedEmail))
-                throw new UserFriendlyException("Customer update failed.", "The email address is unavailable.");
-            if (input.MembershipId.HasValue && await _membershipRepository.FirstOrDefaultAsync(membership =>
-                    membership.Id == input.MembershipId.Value && membership.TenantId == customer.TenantId && membership.IsActive) == null)
-                throw new UserFriendlyException("Customer update failed.", "The selected membership is missing or inactive.");
         }
 
         private async Task EnsureTenantExistsAsync(int tenantId)

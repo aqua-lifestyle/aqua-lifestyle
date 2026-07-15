@@ -7,6 +7,7 @@ using AqualLifeStyle.Application.Admin.Customers;
 using AqualLifeStyle.Application.Admin.Users;
 using AqualLifeStyle.Application.Admin.AreaLeaders;
 using AqualLifeStyle.Application.Admin.Facilitators;
+using AqualLifeStyle.Application.Admin.Members;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Enquiries;
@@ -117,6 +118,16 @@ namespace AqualLifeStyle.Tests.Application
             AssertAuthorizeAttribute(typeof(AdminFacilitatorAppService), nameof(AdminFacilitatorAppService.PromoteAsync), AquaPermissions.Admin.Facilitators.Promote);
             AssertAuthorizeAttribute(typeof(AdminFacilitatorAppService), nameof(AdminFacilitatorAppService.DemoteAsync), AquaPermissions.Admin.Facilitators.Demote);
             AssertAuthorizeAttribute(typeof(AdminFacilitatorAppService), nameof(AdminFacilitatorAppService.RemoveAsync), AquaPermissions.Admin.Facilitators.Remove);
+        }
+
+        [Fact]
+        public void AdminMemberAppService_ShouldRequireGranularPermissionOnEveryMethod()
+        {
+            AssertAuthorizeAttribute(typeof(AdminMemberAppService), nameof(AdminMemberAppService.GetAllAsync), AquaPermissions.Admin.Members.View);
+            AssertAuthorizeAttribute(typeof(AdminMemberAppService), nameof(AdminMemberAppService.GetAsync), AquaPermissions.Admin.Members.View);
+            AssertAuthorizeAttribute(typeof(AdminMemberAppService), nameof(AdminMemberAppService.EditProfileAsync), AquaPermissions.Admin.Members.Edit);
+            AssertAuthorizeAttribute(typeof(AdminMemberAppService), nameof(AdminMemberAppService.SuspendAsync), AquaPermissions.Admin.Members.Suspend);
+            AssertAuthorizeAttribute(typeof(AdminMemberAppService), nameof(AdminMemberAppService.ChangeTierAsync), AquaPermissions.Admin.Members.ChangeTier);
         }
 
         [Fact]
