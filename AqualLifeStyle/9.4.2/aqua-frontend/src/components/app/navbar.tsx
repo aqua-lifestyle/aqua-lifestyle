@@ -76,6 +76,12 @@ export const Navbar = () => {
   const primaryLinks = isSystemAdmin(session?.user?.role)
     ? [
         { href: "/admin/dashboard", icon: LayoutDashboard, label: "Admin", permission: null },
+        {
+          href: "/admin/customers",
+          icon: Users,
+          label: "Admin customers",
+          permission: "Aqua.Admin.Customers.Import",
+        },
         ...mainLinks,
       ]
     : mainLinks;
