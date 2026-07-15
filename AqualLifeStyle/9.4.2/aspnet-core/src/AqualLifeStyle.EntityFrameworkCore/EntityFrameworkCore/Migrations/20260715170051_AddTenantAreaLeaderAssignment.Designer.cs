@@ -3,17 +3,20 @@ using System;
 using AqualLifeStyle.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace AqualLifeStyle.Migrations
+namespace AqualLifeStyle.EntityFrameworkCore.Migrations
 {
     [DbContext(typeof(AqualLifeStyleDbContext))]
-    partial class AqualLifeStyleDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260715170051_AddTenantAreaLeaderAssignment")]
+    partial class AddTenantAreaLeaderAssignment
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
