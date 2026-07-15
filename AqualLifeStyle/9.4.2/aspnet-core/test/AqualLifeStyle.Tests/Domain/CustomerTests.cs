@@ -1,3 +1,5 @@
+using Abp.Domain.Entities;
+using Abp.Domain.Entities.Auditing;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using Shouldly;
@@ -6,6 +8,13 @@ namespace AqualLifeStyle.Tests.Domain
 {
     public class CustomerTests
     {
+        [Fact]
+        public void Customer_IsAuditedAndSoftDeletable()
+        {
+            typeof(FullAuditedAggregateRoot<int>).IsAssignableFrom(typeof(Customer)).ShouldBeTrue();
+            typeof(ISoftDelete).IsAssignableFrom(typeof(Customer)).ShouldBeTrue();
+        }
+
         [Theory]
         [InlineData(0)]
         [InlineData(-1)]
