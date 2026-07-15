@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Building2,
   Calendar,
   Crown,
   Package,
   ShieldCheck,
+  ShoppingCart,
   User,
   Wallet,
   ArrowUpRight,
@@ -22,8 +24,11 @@ import {
   useMembershipsState,
   useProductsActions,
   useProductsState,
+  useOrderIntentsActions,
+  useOrderIntentsState,
 } from "@/src/providers";
-import { Badge, Button, Card, StatusMessage } from "@/src/shared/ui";
+import { Badge, Button, Card, LinkButton, StatusMessage } from "@/src/shared/ui";
+import { useHydrated } from "@/src/shared/lib/use-hydrated";
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("en-ZA", {
@@ -42,22 +47,31 @@ const formatDate = (date: string) => {
 const MEMBERSHIP_LABELS = ["Jasper", "Onyx", "AQGreen", "Business Premier"];
 
 export const CustomerDashboard = () => {
-  const { session } = useAuthState();
+  const hasMounted = useHydrated();
+  const pathname = usePathname();
+  const router = useRouter();
+  const { isAuthenticated, isReady, session } = useAuthState();
   const user = session?.user;
 
   const { changeMembership, getMyCustomer } = useCustomersActions();
   const { getActiveTiers, getSavingsWindowStatuses } = useMembershipsActions();
-  const { getEligibleProductsForCustomer, getProducts } = useProductsActions();
+  const { getEligibleProductsForCustomer } = useProductsActions();
+  const { createForCurrentCustomer } = useOrderIntentsActions();
+  const {
+    actionErrorMessage: orderErrorMessage,
+    isActionError: isOrderError,
+    isActionPending: isOrderPending,
+    isActionSuccess: isOrderSuccess,
+  } = useOrderIntentsState();
   const {
     changeMembershipErrorMessage,
     isChangeMembershipError,
-    isLoadError: isCustomersError,
-    isLoadPending: isCustomersPending,
-    loadErrorMessage: customersErrorMessage,
+    isChangeMembershipPending,
     myCustomer,
     myCustomerErrorMessage,
     isMyCustomerError,
     isMyCustomerPending,
+    isMyCustomerSuccess,
   } = useCustomersState();
   const {
     errorMessage: membershipsErrorMessage,
@@ -77,18 +91,38 @@ export const CustomerDashboard = () => {
   } = useProductsState();
 
   useEffect(() => {
+    if (isReady && !isAuthenticated) {
+      router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+    }
+  }, [isAuthenticated, isReady, pathname, router]);
+
+  useEffect(() => {
+    if (!isReady || !isAuthenticated) return;
+
     void getMyCustomer();
     void getActiveTiers();
     void getSavingsWindowStatuses();
-  }, [getMyCustomer, getActiveTiers, getSavingsWindowStatuses]);
+  }, [
+    getMyCustomer,
+    getActiveTiers,
+    getSavingsWindowStatuses,
+    isAuthenticated,
+    isReady,
+  ]);
 
   useEffect(() => {
-    if (myCustomer?.id) {
-      void getEligibleProductsForCustomer(myCustomer.id);
-    } else {
-      void getProducts();
+    if (!isReady || !isAuthenticated || !isMyCustomerSuccess || !myCustomer?.id) {
+      return;
     }
-  }, [myCustomer?.id, getEligibleProductsForCustomer, getProducts]);
+
+    void getEligibleProductsForCustomer(myCustomer.id);
+  }, [
+    myCustomer?.id,
+    getEligibleProductsForCustomer,
+    isAuthenticated,
+    isMyCustomerSuccess,
+    isReady,
+  ]);
 
   const currentMembership = myCustomer?.membershipId
     ? memberships.find((m) => m.id === myCustomer.membershipId) ?? null
@@ -117,26 +151,37 @@ export const CustomerDashboard = () => {
   };
 
   const isLoading =
-    isCustomersPending ||
     isMembershipsPending ||
     isMyCustomerPending ||
     isSavingsWindowStatusesPending ||
     isEligiblePending;
   const hasError =
-    isCustomersError ||
     isMembershipsError ||
     isMyCustomerError ||
     isChangeMembershipError ||
     isSavingsWindowStatusesError ||
     isEligibleError;
-  const errorMessages = [
-    customersErrorMessage,
-    membershipsErrorMessage,
-    myCustomerErrorMessage,
-    changeMembershipErrorMessage,
-    savingsWindowStatusesErrorMessage,
-    eligibleErrorMessage,
-  ].filter(Boolean);
+  const errorMessages = Array.from(
+    new Set(
+      [
+        membershipsErrorMessage,
+        myCustomerErrorMessage,
+        changeMembershipErrorMessage,
+        savingsWindowStatusesErrorMessage,
+        eligibleErrorMessage,
+      ].filter((message): message is string => Boolean(message)),
+    ),
+  );
+
+  if (!isReady || !isAuthenticated) {
+    return (
+      <main className="min-h-dvh bg-muted/30 px-4 py-10 text-muted-foreground">
+        <div className="mx-auto max-w-7xl text-sm font-semibold">
+          Verifying customer access…
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
@@ -158,9 +203,9 @@ export const CustomerDashboard = () => {
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="size-4" />
-            <span>{formatDate(new Date().toISOString())}</span>
+            <span>{hasMounted ? formatDate(new Date().toISOString()) : "Current date"}</span>
             <Badge tone="accent" className="ml-2">
-              Member
+              {currentMembership ? "Member" : "Customer"}
             </Badge>
           </div>
         </header>
@@ -207,7 +252,7 @@ export const CustomerDashboard = () => {
                       ? "Window open"
                       : "Window closed"
                     : currentMembership
-                      ? "Join a membership to unlock savings"
+                      ? "Savings status unavailable"
                       : "No membership selected"}
                 </p>
               </div>
@@ -249,6 +294,20 @@ export const CustomerDashboard = () => {
           </StatusMessage>
         ) : null}
 
+        {isOrderError ? (
+          <StatusMessage tone="error">
+            {orderErrorMessage ?? "Unable to reserve this product."}
+          </StatusMessage>
+        ) : null}
+        {isOrderSuccess ? (
+          <StatusMessage tone="success">
+            <span>Product reserved successfully. Your new order is now visible to the Area Leader.</span>
+            <LinkButton className="ml-3" href="/member/orders" size="sm" variant="outline">
+              View my orders
+            </LinkButton>
+          </StatusMessage>
+        ) : null}
+
         <section className="grid gap-6 lg:grid-cols-2">
           <Card>
             <div className="flex items-center gap-3 border-b border-border pb-4">
@@ -267,7 +326,7 @@ export const CustomerDashboard = () => {
                   <div className="mt-2 flex items-center justify-between">
                     <span className="text-muted-foreground">Monthly obligation</span>
                     <span className="font-semibold text-foreground">
-                      {currentMembership.monthlyObligationAmount
+                      {currentMembership.monthlyObligationAmount !== null
                         ? formatCurrency(currentMembership.monthlyObligationAmount)
                         : "Not set"}
                     </span>
@@ -312,6 +371,8 @@ export const CustomerDashboard = () => {
                             <Badge tone="success">Current</Badge>
                           ) : (
                             <Button
+                              disabled={!myCustomer?.id || isChangeMembershipPending}
+                              isLoading={isChangeMembershipPending}
                               size="sm"
                               variant="primary"
                               onClick={async () => {
@@ -330,6 +391,11 @@ export const CustomerDashboard = () => {
                       </div>
                     );
                   })}
+                  {availableTiers.length === 0 ? (
+                    <div className="rounded-lg bg-muted/50 px-4 py-3 text-muted-foreground">
+                      No membership tiers are available right now.
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -393,13 +459,26 @@ export const CustomerDashboard = () => {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {product.membershipId
-                          ? `Tier ${product.membershipId}`
-                          : "General"}
+                          ? memberships.find(
+                              (membership) => membership.id === product.membershipId,
+                            )?.name ?? "Member product"
+                          : "Available to all customers"}
                       </p>
                     </div>
-                    <span className="font-semibold text-foreground">
-                      {formatCurrency(product.price)}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="font-semibold text-foreground">
+                        {formatCurrency(product.price)}
+                      </span>
+                      <Button
+                        disabled={!currentMembership || isOrderPending}
+                        isLoading={isOrderPending}
+                        onClick={() => void createForCurrentCustomer(product.id)}
+                        size="sm"
+                      >
+                        <ShoppingCart className="size-4" />
+                        Reserve
+                      </Button>
+                    </div>
                   </div>
                 ))
               )}

@@ -1,17 +1,22 @@
 "use client";
 
-import { DollarSign, TrendingUp, UserPlus, Users } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { Copy, DollarSign, TrendingUp, UserPlus, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   useFacilitatorsActions,
   useFacilitatorsState,
+  useCustomersActions,
+  useCustomersState,
   useReferralsActions,
   useReferralsState,
   useAuthState,
+  useToast,
 } from "@/src/providers";
 import {
+  Badge,
   Breadcrumb,
+  Button,
   Card,
   LinkButton,
   Skeleton,
@@ -19,27 +24,31 @@ import {
 } from "@/src/shared/ui";
 
 export const FacilitatorDashboard = () => {
+  const [isCopied, setIsCopied] = useState(false);
+  const { toast } = useToast();
   const { getFacilitators } = useFacilitatorsActions();
   const { facilitators, isLoadError: isFacilitatorsError, isLoadPending: isFacilitatorsPending, loadErrorMessage: facilitatorsErrorMessage } = useFacilitatorsState();
 
   const { getReferrals } = useReferralsActions();
   const { referrals, isLoadError: isReferralsError, isLoadPending: isReferralsPending, loadErrorMessage: referralsErrorMessage } = useReferralsState();
+  const { getMyCustomer } = useCustomersActions();
+  const { myCustomer, isMyCustomerError, isMyCustomerPending, myCustomerErrorMessage } = useCustomersState();
 
   // ALL hooks before early returns
   useEffect(() => {
     void getFacilitators();
     void getReferrals();
-  }, [getFacilitators, getReferrals]);
+    void getMyCustomer();
+  }, [getFacilitators, getMyCustomer, getReferrals]);
 
   const { session } = useAuthState();
-  const isLoading = isFacilitatorsPending || isReferralsPending;
-  const hasError = isFacilitatorsError || isReferralsError;
+  const isLoading = isFacilitatorsPending || isReferralsPending || isMyCustomerPending;
+  const hasError = isFacilitatorsError || isReferralsError || isMyCustomerError;
 
   const facilitator = useMemo(() => {
-    const currentUserId = session?.user?.id ?? null;
-    if (!currentUserId) return null;
-    return facilitators.find((f) => f.customerId === currentUserId) ?? null;
-  }, [facilitators, session?.user?.id]);
+    if (!session?.user?.id || !myCustomer) return null;
+    return facilitators.find((f) => f.customerId === myCustomer.id) ?? null;
+  }, [facilitators, myCustomer, session?.user?.id]);
 
   const myReferrals = useMemo(() => {
     if (!facilitator) return [];
@@ -48,6 +57,55 @@ export const FacilitatorDashboard = () => {
 
   const totalAwards = useMemo(() => myReferrals.reduce((sum, r) => sum + r.awardAmount, 0), [myReferrals]);
   const confirmedCount = useMemo(() => myReferrals.filter((r) => r.confirmedAt !== null).length, [myReferrals]);
+  const recentReferrals = useMemo(
+    () => [...myReferrals].sort((left, right) =>
+      (right.convertedAt ?? "").localeCompare(left.convertedAt ?? ""),
+    ).slice(0, 5),
+    [myReferrals],
+  );
+  const referralCode = facilitator ? `FAC-${facilitator.id}` : null;
+  const referralPath = facilitator ? `/signup?ref=${facilitator.id}` : null;
+
+  const copyReferralLink = async () => {
+    if (!facilitator) return;
+
+    const referralLink = new URL("/signup", window.location.origin);
+    referralLink.searchParams.set("ref", String(facilitator.id));
+    let copied = false;
+    try {
+      await navigator.clipboard?.writeText(referralLink.toString());
+      copied = Boolean(navigator.clipboard);
+    } catch {
+      // Fall back for browsers that deny Clipboard API permission.
+    }
+
+    if (!copied) {
+      const textArea = document.createElement("textarea");
+      textArea.value = referralLink.toString();
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      document.body.appendChild(textArea);
+      textArea.select();
+      copied = document.execCommand("copy");
+      textArea.remove();
+    }
+
+    if (!copied) {
+      toast({
+        message: "Copy was blocked. Select the referral link and copy it manually.",
+        title: "Unable to copy link",
+        type: "error",
+      });
+      return;
+    }
+
+    setIsCopied(true);
+    toast({
+      message: "Referral signup link copied to your clipboard.",
+      title: "Link copied",
+      type: "success",
+    });
+  };
 
   return (
     <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
@@ -74,7 +132,7 @@ export const FacilitatorDashboard = () => {
           </div>
         ) : hasError ? (
           <StatusMessage tone="error">
-            {facilitatorsErrorMessage ?? referralsErrorMessage ?? "Unable to load dashboard data."}
+            {facilitatorsErrorMessage ?? referralsErrorMessage ?? myCustomerErrorMessage ?? "Unable to load dashboard data."}
           </StatusMessage>
         ) : (
           <>
@@ -121,15 +179,61 @@ export const FacilitatorDashboard = () => {
               <Card>
                 <h2 className="text-lg font-semibold">Quick actions</h2>
                 <div className="mt-4 flex flex-col gap-3">
-                  <LinkButton href="/facilitator/referrals" variant="outline">
-                    View referrals
+                  <LinkButton href="/facilitator/my-referrals" variant="outline">
+                    View my referrals
                   </LinkButton>
-                  <LinkButton href="/facilitator" variant="outline">
+                  <LinkButton href={facilitator ? `/facilitator/${facilitator.id}` : "/facilitator"} variant="outline">
                     View facilitator details
                   </LinkButton>
                 </div>
               </Card>
+              <Card>
+                <h2 className="text-lg font-semibold">Share your referral link</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Send this signup link to a prospective member. Their customer journey can be attributed to your Facilitator profile.
+                </p>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <code className="flex-1 rounded-lg bg-muted px-3 py-2 text-sm font-semibold">
+                    {referralCode && referralPath
+                      ? `${referralCode} · ${referralPath}`
+                      : "Referral profile unavailable"}
+                  </code>
+                  <Button disabled={!facilitator} onClick={() => void copyReferralLink()} variant="secondary">
+                    <Copy className="size-4" />
+                    {isCopied ? "Copied" : "Copy link"}
+                  </Button>
+                </div>
+              </Card>
             </section>
+            <Card>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold">Recent referral activity</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Your latest attributed customer conversions.</p>
+                </div>
+                <LinkButton href="/facilitator/my-referrals" size="sm" variant="ghost">View all</LinkButton>
+              </div>
+              {recentReferrals.length === 0 ? (
+                <p className="mt-4 rounded-lg bg-muted/60 p-4 text-sm text-muted-foreground">No referral activity yet.</p>
+              ) : (
+                <ul className="mt-4 divide-y divide-border">
+                  {recentReferrals.map((referral) => (
+                    <li className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0" key={referral.id}>
+                      <div>
+                        <p className="font-semibold">Customer #{referral.referredCustomerId}</p>
+                        <p className="text-xs text-muted-foreground">Enquiry #{referral.sourceEnquiryId}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-semibold">R {referral.awardAmount.toFixed(2)}</span>
+                        <Badge tone={referral.awardIssued ? "success" : "neutral"}>
+                          {referral.awardIssued ? "Awarded" : "Pending"}
+                        </Badge>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
           </>
         )}
       </div>

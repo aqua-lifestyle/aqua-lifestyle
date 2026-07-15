@@ -83,20 +83,29 @@ describe("EnquiryCreateForm", () => {
     createEnquiry.mockResolvedValue(true);
 
     vi.mocked(useCustomersActions).mockReturnValue({
+      changeMembership: vi.fn(),
       createCustomer: vi.fn(),
       getCustomer: vi.fn(),
       getCustomers,
+      getMyCustomer: vi.fn(),
       updateCustomer: vi.fn(),
     });
     vi.mocked(useCustomersState).mockReturnValue({
+      changeMembershipErrorMessage: null,
       createErrorMessage: null,
       customers: [...customers],
       isCreateError: false,
       isCreatePending: false,
       isCreateSuccess: false,
+      isChangeMembershipError: false,
+      isChangeMembershipPending: false,
+      isChangeMembershipSuccess: false,
       isLoadError: false,
       isLoadPending: false,
       isLoadSuccess: true,
+      isMyCustomerError: false,
+      isMyCustomerPending: false,
+      isMyCustomerSuccess: false,
       isSelectedError: false,
       isSelectedPending: false,
       isSelectedSuccess: false,
@@ -104,6 +113,8 @@ describe("EnquiryCreateForm", () => {
       isUpdatePending: false,
       isUpdateSuccess: false,
       loadErrorMessage: null,
+      myCustomer: null,
+      myCustomerErrorMessage: null,
       selectedCustomer: null,
       selectedErrorMessage: null,
       updateErrorMessage: null,

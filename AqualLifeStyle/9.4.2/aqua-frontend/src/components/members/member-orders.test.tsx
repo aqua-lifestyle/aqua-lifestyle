@@ -2,7 +2,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { OrderIntent } from "@/src/providers/OrderIntents/context";
-import { useAuthState, useOrderIntentsActions, useOrderIntentsState } from "@/src/providers";
+import {
+  useCustomersActions,
+  useCustomersState,
+  useOrderIntentsActions,
+  useOrderIntentsState,
+} from "@/src/providers";
 
 import { MemberOrders } from "./member-orders";
 
@@ -12,7 +17,8 @@ vi.mock("@/src/providers", async () => {
   );
   return {
     ...actual,
-    useAuthState: vi.fn(),
+    useCustomersActions: vi.fn(),
+    useCustomersState: vi.fn(),
     useOrderIntentsActions: vi.fn(),
     useOrderIntentsState: vi.fn(),
   };
@@ -35,22 +41,6 @@ const orderIntents: OrderIntent[] = [
   },
 ];
 
-const baseAuthState = {
-  isAuthenticated: true,
-  isReady: true,
-  session: {
-    accessToken: "demo-token",
-    expiresAt: "2099-01-01",
-    user: {
-      email: "member@example.com",
-      id: 1,
-      name: "Member User",
-      permissions: [],
-      role: "Member",
-    },
-  },
-};
-
 const baseState = {
   actionErrorMessage: null,
   isActionError: false,
@@ -66,11 +56,56 @@ const baseState = {
 beforeEach(() => {
   vi.resetAllMocks();
 
-  vi.mocked(useAuthState).mockReturnValue(baseAuthState);
+  vi.mocked(useCustomersActions).mockReturnValue({
+    changeMembership: vi.fn(),
+    createCustomer: vi.fn(),
+    getCustomer: vi.fn(),
+    getCustomers: vi.fn(),
+    getMyCustomer: vi.fn(),
+    updateCustomer: vi.fn(),
+  });
+  vi.mocked(useCustomersState).mockReturnValue({
+    changeMembershipErrorMessage: null,
+    createErrorMessage: null,
+    customers: [],
+    isChangeMembershipError: false,
+    isChangeMembershipPending: false,
+    isChangeMembershipSuccess: false,
+    isCreateError: false,
+    isCreatePending: false,
+    isCreateSuccess: false,
+    isLoadError: false,
+    isLoadPending: false,
+    isLoadSuccess: false,
+    isMyCustomerError: false,
+    isMyCustomerPending: false,
+    isMyCustomerSuccess: true,
+    isSelectedError: false,
+    isSelectedPending: false,
+    isSelectedSuccess: false,
+    isUpdateError: false,
+    isUpdatePending: false,
+    isUpdateSuccess: false,
+    loadErrorMessage: null,
+    myCustomer: {
+      email: "member@example.com",
+      id: 1,
+      isActive: true,
+      membershipId: 1,
+      name: "Member User",
+      tenantId: 1,
+      userId: 42,
+    },
+    myCustomerErrorMessage: null,
+    selectedCustomer: null,
+    selectedErrorMessage: null,
+    updateErrorMessage: null,
+  });
   vi.mocked(useOrderIntentsState).mockReturnValue(baseState);
   vi.mocked(useOrderIntentsActions).mockReturnValue({
     cancelOrderIntent: vi.fn(),
     completeOrderIntent: vi.fn(),
+    createForCurrentCustomer: vi.fn(),
     createFromEnquiry: vi.fn(),
     getOrderIntents: vi.fn(),
   });

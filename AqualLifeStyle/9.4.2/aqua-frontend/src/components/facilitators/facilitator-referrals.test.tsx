@@ -6,6 +6,8 @@ import type { Referral } from "@/src/providers/Referrals/context";
 import type { AuthSession } from "@/src/providers/Auth/context";
 import {
   useAuthState,
+  useCustomersActions,
+  useCustomersState,
   useFacilitatorsActions,
   useFacilitatorsState,
   useReferralsActions,
@@ -21,6 +23,8 @@ vi.mock("@/src/providers", async () => {
   return {
     ...actual,
     useAuthState: vi.fn(),
+    useCustomersActions: vi.fn(),
+    useCustomersState: vi.fn(),
     useFacilitatorsActions: vi.fn(),
     useFacilitatorsState: vi.fn(),
     useReferralsActions: vi.fn(),
@@ -74,7 +78,7 @@ const session: AuthSession = {
   accessToken: "token",
   expiresAt: null,
   user: {
-    id: 99,
+    id: 25,
     email: "test@example.com",
     name: "Test User",
     permissions: ["Pages.Referrals"],
@@ -123,6 +127,43 @@ beforeEach(() => {
     isAuthenticated: true,
     isReady: true,
     session,
+  });
+  vi.mocked(useCustomersState).mockReturnValue({
+    changeMembershipErrorMessage: null,
+    createErrorMessage: null,
+    customers: [],
+    isChangeMembershipError: false,
+    isChangeMembershipPending: false,
+    isChangeMembershipSuccess: false,
+    isCreateError: false,
+    isCreatePending: false,
+    isCreateSuccess: false,
+    isLoadError: false,
+    isLoadPending: false,
+    isLoadSuccess: false,
+    isMyCustomerError: false,
+    isMyCustomerPending: false,
+    isMyCustomerSuccess: true,
+    isSelectedError: false,
+    isSelectedPending: false,
+    isSelectedSuccess: false,
+    isUpdateError: false,
+    isUpdatePending: false,
+    isUpdateSuccess: false,
+    loadErrorMessage: null,
+    myCustomer: { id: 99, email: "test@example.com", isActive: true, membershipId: null, name: "Test User", tenantId: 1, userId: 25 },
+    myCustomerErrorMessage: null,
+    selectedCustomer: null,
+    selectedErrorMessage: null,
+    updateErrorMessage: null,
+  });
+  vi.mocked(useCustomersActions).mockReturnValue({
+    changeMembership: vi.fn(),
+    createCustomer: vi.fn(),
+    getCustomer: vi.fn(),
+    getCustomers: vi.fn(),
+    getMyCustomer: vi.fn(),
+    updateCustomer: vi.fn(),
   });
 
   vi.mocked(useFacilitatorsState).mockReturnValue(baseFacilitatorsState);

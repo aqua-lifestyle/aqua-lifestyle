@@ -75,6 +75,8 @@ export const apiEndpoints = {
     complete: (id: number) => `/api/services/app/OrderIntent/Complete?id=${id}`,
     createFromEnquiry: (enquiryId: number) =>
       `/api/services/app/OrderIntent/CreateFromEnquiry?enquiryId=${enquiryId}`,
+    createForCurrentCustomer: (productId: number) =>
+      `/api/services/app/OrderIntent/CreateForCurrentCustomer?productId=${productId}`,
     getAll: "/api/services/app/OrderIntent/GetAll",
     getById: (id: number) => `/api/services/app/OrderIntent/Get?id=${id}`,
   },

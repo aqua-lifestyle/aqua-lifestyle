@@ -76,6 +76,7 @@ beforeEach(() => {
   vi.mocked(useAuthState).mockReturnValue(baseAuthState);
   vi.mocked(useMembershipsState).mockReturnValue(baseState);
   vi.mocked(useMembershipsActions).mockReturnValue({
+    getActiveTiers: vi.fn(),
     getMembership: vi.fn(),
     getMemberships: vi.fn(),
     getSavingsWindowStatuses: vi.fn(),

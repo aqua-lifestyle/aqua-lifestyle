@@ -51,14 +51,21 @@ const selectedCustomer: Customer = {
 };
 
 const baseCustomersState = {
+  changeMembershipErrorMessage: null,
   createErrorMessage: null,
   customers: [],
   isCreateError: false,
   isCreatePending: false,
   isCreateSuccess: false,
+  isChangeMembershipError: false,
+  isChangeMembershipPending: false,
+  isChangeMembershipSuccess: false,
   isLoadError: false,
   isLoadPending: false,
   isLoadSuccess: false,
+  isMyCustomerError: false,
+  isMyCustomerPending: false,
+  isMyCustomerSuccess: false,
   isSelectedError: false,
   isSelectedPending: false,
   isSelectedSuccess: true,
@@ -66,6 +73,8 @@ const baseCustomersState = {
   isUpdatePending: false,
   isUpdateSuccess: false,
   loadErrorMessage: null,
+  myCustomer: null,
+  myCustomerErrorMessage: null,
   selectedCustomer,
   selectedErrorMessage: null,
   updateErrorMessage: null,
@@ -104,13 +113,16 @@ describe("CustomerDetails", () => {
     updateCustomer.mockResolvedValue(true);
 
     vi.mocked(useCustomersActions).mockReturnValue({
+      changeMembership: vi.fn(),
       createCustomer: vi.fn(),
       getCustomer,
       getCustomers: vi.fn(),
+      getMyCustomer: vi.fn(),
       updateCustomer,
     });
     vi.mocked(useCustomersState).mockReturnValue({ ...baseCustomersState });
     vi.mocked(useMembershipsActions).mockReturnValue({
+      getActiveTiers: vi.fn(),
       getMembership: vi.fn(),
       getMemberships,
       getSavingsWindowStatuses: vi.fn(),

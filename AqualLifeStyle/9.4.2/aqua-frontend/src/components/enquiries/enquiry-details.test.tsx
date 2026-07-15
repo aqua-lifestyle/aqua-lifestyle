@@ -133,20 +133,29 @@ describe("EnquiryDetails", () => {
     });
     vi.mocked(useEnquiriesState).mockReturnValue({ ...baseEnquiriesState });
     vi.mocked(useCustomersActions).mockReturnValue({
+      changeMembership: vi.fn(),
       createCustomer: vi.fn(),
       getCustomer: vi.fn(),
       getCustomers,
+      getMyCustomer: vi.fn(),
       updateCustomer: vi.fn(),
     });
     vi.mocked(useCustomersState).mockReturnValue({
+      changeMembershipErrorMessage: null,
       createErrorMessage: null,
       customers: [...customers],
       isCreateError: false,
       isCreatePending: false,
       isCreateSuccess: false,
+      isChangeMembershipError: false,
+      isChangeMembershipPending: false,
+      isChangeMembershipSuccess: false,
       isLoadError: false,
       isLoadPending: false,
       isLoadSuccess: true,
+      isMyCustomerError: false,
+      isMyCustomerPending: false,
+      isMyCustomerSuccess: false,
       isSelectedError: false,
       isSelectedPending: false,
       isSelectedSuccess: false,
@@ -154,6 +163,8 @@ describe("EnquiryDetails", () => {
       isUpdatePending: false,
       isUpdateSuccess: false,
       loadErrorMessage: null,
+      myCustomer: null,
+      myCustomerErrorMessage: null,
       selectedCustomer: null,
       selectedErrorMessage: null,
       updateErrorMessage: null,
@@ -181,6 +192,7 @@ describe("EnquiryDetails", () => {
       selectedProduct: null,
     });
     vi.mocked(useMembershipsActions).mockReturnValue({
+      getActiveTiers: vi.fn(),
       getMembership: vi.fn(),
       getMemberships,
       getSavingsWindowStatuses: vi.fn(),

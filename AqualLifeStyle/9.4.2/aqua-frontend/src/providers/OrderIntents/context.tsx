@@ -33,6 +33,7 @@ export type OrderIntentsActions = {
   cancelOrderIntent: (id: number) => Promise<boolean>;
   completeOrderIntent: (id: number) => Promise<boolean>;
   createFromEnquiry: (enquiryId: number) => Promise<boolean>;
+  createForCurrentCustomer: (productId: number) => Promise<boolean>;
   getOrderIntents: () => Promise<void>;
 };
 

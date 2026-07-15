@@ -66,20 +66,29 @@ describe("CustomerRegistrationForm", () => {
     createCustomer.mockResolvedValue(true);
 
     vi.mocked(useCustomersActions).mockReturnValue({
+      changeMembership: vi.fn(),
       createCustomer,
       getCustomer: vi.fn(),
       getCustomers: vi.fn(),
+      getMyCustomer: vi.fn(),
       updateCustomer: vi.fn(),
     });
     vi.mocked(useCustomersState).mockReturnValue({
+      changeMembershipErrorMessage: null,
       createErrorMessage: null,
       customers: [],
       isCreateError: false,
       isCreatePending: false,
       isCreateSuccess: false,
+      isChangeMembershipError: false,
+      isChangeMembershipPending: false,
+      isChangeMembershipSuccess: false,
       isLoadError: false,
       isLoadPending: false,
       isLoadSuccess: false,
+      isMyCustomerError: false,
+      isMyCustomerPending: false,
+      isMyCustomerSuccess: false,
       isSelectedError: false,
       isSelectedPending: false,
       isSelectedSuccess: false,
@@ -87,11 +96,14 @@ describe("CustomerRegistrationForm", () => {
       isUpdatePending: false,
       isUpdateSuccess: false,
       loadErrorMessage: null,
+      myCustomer: null,
+      myCustomerErrorMessage: null,
       selectedCustomer: null,
       selectedErrorMessage: null,
       updateErrorMessage: null,
     });
     vi.mocked(useMembershipsActions).mockReturnValue({
+      getActiveTiers: vi.fn(),
       getMembership: vi.fn(),
       getMemberships,
       getSavingsWindowStatuses: vi.fn(),

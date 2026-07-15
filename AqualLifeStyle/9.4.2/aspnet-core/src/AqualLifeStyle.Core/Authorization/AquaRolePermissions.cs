@@ -83,7 +83,8 @@ namespace AqualLifeStyle.Authorization
                 {
                     AquaPermissions.Members.ViewSelf,
                     AquaPermissions.Memberships.ViewSelf,
-                    AquaPermissions.Memberships.Upgrade
+                    AquaPermissions.Memberships.Upgrade,
+                    AquaPermissions.Orders.Place
                 }
             };
 

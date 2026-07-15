@@ -75,14 +75,21 @@ const session: AuthSession = {
 };
 
 const baseCustomersState = {
+  changeMembershipErrorMessage: null,
   createErrorMessage: null,
   customers,
   isCreateError: false,
   isCreatePending: false,
   isCreateSuccess: false,
+  isChangeMembershipError: false,
+  isChangeMembershipPending: false,
+  isChangeMembershipSuccess: false,
   isLoadError: false,
   isLoadPending: false,
   isLoadSuccess: true,
+  isMyCustomerError: false,
+  isMyCustomerPending: false,
+  isMyCustomerSuccess: false,
   isSelectedError: false,
   isSelectedPending: false,
   isSelectedSuccess: false,
@@ -90,6 +97,8 @@ const baseCustomersState = {
   isUpdatePending: false,
   isUpdateSuccess: false,
   loadErrorMessage: null,
+  myCustomer: null,
+  myCustomerErrorMessage: null,
   selectedCustomer: null,
   selectedErrorMessage: null,
   updateErrorMessage: null,
@@ -132,9 +141,11 @@ beforeEach(() => {
 
   vi.mocked(useCustomersState).mockReturnValue(baseCustomersState);
   vi.mocked(useCustomersActions).mockReturnValue({
+    changeMembership: vi.fn(),
     createCustomer: vi.fn(),
     getCustomer: vi.fn(),
     getCustomers: vi.fn(),
+    getMyCustomer: vi.fn(),
     updateCustomer: vi.fn(),
   });
 

@@ -62,6 +62,62 @@ namespace AqualLifeStyle.Application.Orders
         }
 
         [AbpAuthorize(AquaPermissions.Orders.Place)]
+        public async Task<OrderIntentDto> CreateForCurrentCustomerAsync(int productId)
+        {
+            AqualLifeStyleValidator.ValidId(productId, nameof(productId));
+            if (!AbpSession.UserId.HasValue)
+            {
+                throw new AqualLifeStyleAuthorizationException("Order placement requires an authenticated customer.");
+            }
+
+            var tenantId = GetRequiredTenantId("Order placement failed.");
+            var customer = await _customerRepository.FirstOrDefaultAsync(
+                item => item.TenantId == tenantId && item.UserId == AbpSession.UserId.Value);
+            if (customer == null)
+            {
+                throw new UserFriendlyException("Order placement failed.", "No customer profile is linked to this account.");
+            }
+
+            if (!customer.IsActive)
+            {
+                throw new AqualLifeStyleBusinessRuleException("Inactive customers cannot create order intents.");
+            }
+
+            var product = await _productRepository.GetAsync(productId);
+            if (product == null || !product.IsActive)
+            {
+                throw new AqualLifeStyleBusinessRuleException("The selected product is not available.");
+            }
+
+            if (!customer.MembershipId.HasValue)
+            {
+                throw new AqualLifeStyleBusinessRuleException("An active membership is required before placing an order.");
+            }
+
+            var membership = await _membershipRepository.GetAsync(customer.MembershipId.Value);
+            EnsureMembershipAllowsReservation(customer, product, membership);
+
+            var openOrderIntentCount = await _orderIntentRepository.CountOpenForCustomerAsync(customer.Id);
+            var maxConcurrentOrders = membership.GetMaxConcurrentOrders();
+            if (openOrderIntentCount >= maxConcurrentOrders)
+            {
+                throw new AqualLifeStyleBusinessRuleException("Customer has reached the maximum number of open order intents for their tier.");
+            }
+
+            var now = DateTime.UtcNow;
+            var reservedPrice = membership.ApplyTierDiscount(product.Price);
+            var orderIntent = OrderIntent.CreateReserved(
+                customer.Id,
+                product.Id,
+                null,
+                product.Price,
+                reservedPrice,
+                now);
+            orderIntent.Id = await _orderIntentRepository.InsertAndGetIdAsync(orderIntent);
+            return _objectMapper.Map<OrderIntentDto>(orderIntent);
+        }
+
+        [AbpAuthorize(AquaPermissions.Orders.Place)]
         public async Task<OrderIntentDto> CreateFromEnquiryAsync(int enquiryId)
         {
             AqualLifeStyleValidator.ValidId(enquiryId, nameof(enquiryId));

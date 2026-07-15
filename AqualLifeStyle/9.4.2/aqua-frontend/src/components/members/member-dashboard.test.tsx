@@ -122,6 +122,7 @@ beforeEach(() => {
   vi.mocked(useMembershipsState).mockReturnValue(baseMembershipsState);
   vi.mocked(useOrderIntentsState).mockReturnValue(baseOrderIntentsState);
   vi.mocked(useMembershipsActions).mockReturnValue({
+    getActiveTiers: vi.fn(),
     getMembership: vi.fn(),
     getMemberships: vi.fn(),
     getSavingsWindowStatuses: vi.fn(),
@@ -130,6 +131,7 @@ beforeEach(() => {
   vi.mocked(useOrderIntentsActions).mockReturnValue({
     cancelOrderIntent: vi.fn(),
     completeOrderIntent: vi.fn(),
+    createForCurrentCustomer: vi.fn(),
     createFromEnquiry: vi.fn(),
     getOrderIntents: vi.fn(),
   });

@@ -7,9 +7,12 @@ import type { AuthSession } from "@/src/providers/Auth/context";
 import {
   useFacilitatorsActions,
   useFacilitatorsState,
+  useCustomersActions,
+  useCustomersState,
   useReferralsActions,
   useReferralsState,
   useAuthState,
+  useToast,
 } from "@/src/providers";
 
 import { FacilitatorDashboard } from "./facilitator-dashboard";
@@ -22,9 +25,12 @@ vi.mock("@/src/providers", async () => {
     ...actual,
     useFacilitatorsActions: vi.fn(),
     useFacilitatorsState: vi.fn(),
+    useCustomersActions: vi.fn(),
+    useCustomersState: vi.fn(),
     useReferralsActions: vi.fn(),
     useReferralsState: vi.fn(),
     useAuthState: vi.fn(),
+    useToast: vi.fn(),
   };
 });
 
@@ -61,7 +67,7 @@ const session: AuthSession = {
   accessToken: "token",
   expiresAt: null,
   user: {
-    id: 99,
+    id: 25,
     email: "test@example.com",
     name: "Test User",
     permissions: ["Pages.Facilitators"],
@@ -111,6 +117,7 @@ beforeEach(() => {
     isReady: true,
     session,
   });
+  vi.mocked(useToast).mockReturnValue({ toast: vi.fn() });
 
   vi.mocked(useFacilitatorsState).mockReturnValue(baseFacilitatorsState);
   vi.mocked(useFacilitatorsActions).mockReturnValue({
@@ -118,6 +125,44 @@ beforeEach(() => {
     getFacilitators: vi.fn(),
     getFacilitatorsByCustomer: vi.fn(),
     registerFacilitator: vi.fn(),
+  });
+
+  vi.mocked(useCustomersState).mockReturnValue({
+    changeMembershipErrorMessage: null,
+    createErrorMessage: null,
+    customers: [],
+    isChangeMembershipError: false,
+    isChangeMembershipPending: false,
+    isChangeMembershipSuccess: false,
+    isCreateError: false,
+    isCreatePending: false,
+    isCreateSuccess: false,
+    isLoadError: false,
+    isLoadPending: false,
+    isLoadSuccess: false,
+    isMyCustomerError: false,
+    isMyCustomerPending: false,
+    isMyCustomerSuccess: true,
+    isSelectedError: false,
+    isSelectedPending: false,
+    isSelectedSuccess: false,
+    isUpdateError: false,
+    isUpdatePending: false,
+    isUpdateSuccess: false,
+    loadErrorMessage: null,
+    myCustomer: { id: 99, email: "test@example.com", isActive: true, membershipId: null, name: "Test User", tenantId: 1, userId: 25 },
+    myCustomerErrorMessage: null,
+    selectedCustomer: null,
+    selectedErrorMessage: null,
+    updateErrorMessage: null,
+  });
+  vi.mocked(useCustomersActions).mockReturnValue({
+    changeMembership: vi.fn(),
+    createCustomer: vi.fn(),
+    getCustomer: vi.fn(),
+    getCustomers: vi.fn(),
+    getMyCustomer: vi.fn(),
+    updateCustomer: vi.fn(),
   });
 
   vi.mocked(useReferralsState).mockReturnValue(baseReferralsState);
@@ -138,5 +183,16 @@ describe("FacilitatorDashboard", () => {
     expect(screen.getByText("Confirmed")).toBeDefined();
     expect(screen.getByText("Rank")).toBeDefined();
     expect(screen.getByText("Quick actions")).toBeDefined();
+    expect(screen.getByText("Share your referral link")).toBeDefined();
+    expect(screen.getByText(/FAC-1/)).toBeDefined();
+    expect(screen.getByRole("link", { name: "View my referrals" })).toHaveAttribute(
+      "href",
+      "/facilitator/my-referrals",
+    );
+    expect(screen.getByRole("link", { name: "View facilitator details" })).toHaveAttribute(
+      "href",
+      "/facilitator/1",
+    );
+    expect(screen.getByText("Recent referral activity")).toBeDefined();
   });
 });

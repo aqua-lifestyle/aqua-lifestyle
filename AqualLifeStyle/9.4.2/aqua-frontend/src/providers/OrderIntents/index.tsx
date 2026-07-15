@@ -78,6 +78,22 @@ export const OrderIntentsProvider = ({
     }
   }, []);
 
+  const createForCurrentCustomer = useCallback(async (productId: number) => {
+    dispatch(orderIntentActionPending());
+
+    try {
+      const orderIntent = await httpClient.post<
+        OrderIntent,
+        Record<string, never>
+      >(apiEndpoints.orderIntents.createForCurrentCustomer(productId), {});
+      dispatch(orderIntentActionSuccess(orderIntent));
+      return true;
+    } catch (error) {
+      dispatch(orderIntentActionError(getErrorMessage(error)));
+      return false;
+    }
+  }, []);
+
   const cancelOrderIntent = useCallback(async (id: number) => {
     dispatch(orderIntentActionPending());
 
@@ -115,9 +131,10 @@ export const OrderIntentsProvider = ({
       cancelOrderIntent,
       completeOrderIntent,
       createFromEnquiry,
+      createForCurrentCustomer,
       getOrderIntents,
     }),
-    [cancelOrderIntent, completeOrderIntent, createFromEnquiry, getOrderIntents],
+    [cancelOrderIntent, completeOrderIntent, createForCurrentCustomer, createFromEnquiry, getOrderIntents],
   );
 
   return (

@@ -101,6 +101,7 @@ describe("ProductDetails", () => {
     });
     vi.mocked(useProductsState).mockReturnValue({ ...baseProductsState });
     vi.mocked(useMembershipsActions).mockReturnValue({
+      getActiveTiers: vi.fn(),
       getMembership: vi.fn(),
       getMemberships: loadMemberships,
       getSavingsWindowStatuses: vi.fn(),

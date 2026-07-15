@@ -227,6 +227,7 @@ beforeEach(() => {
   vi.mocked(useOrderIntentsActions).mockReturnValue({
     cancelOrderIntent: vi.fn(),
     completeOrderIntent: vi.fn(),
+    createForCurrentCustomer: vi.fn(),
     createFromEnquiry: vi.fn(),
     getOrderIntents: vi.fn(),
   });

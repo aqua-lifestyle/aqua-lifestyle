@@ -4,7 +4,8 @@ import { Package } from "lucide-react";
 import { useEffect, useMemo } from "react";
 
 import {
-  useAuthState,
+  useCustomersActions,
+  useCustomersState,
   useOrderIntentsActions,
   useOrderIntentsState,
 } from "@/src/providers";
@@ -18,35 +19,30 @@ import {
   Skeleton,
   StatusMessage,
 } from "@/src/shared/ui";
-
-const orderStatusLabel = (value: number) => {
-  const labels = ["Pending", "Reserved", "Completed", "Cancelled"];
-  return labels[value] ?? `Status ${value}`;
-};
-
-const orderStatusTone = (value: number): "neutral" | "info" | "success" | "error" => {
-  if (value === 2) return "success";
-  if (value === 3) return "error";
-  if (value === 1) return "info";
-  return "neutral";
-};
+import { getOrderStatusLabel, getOrderStatusTone } from "@/src/shared/lib/order-status";
 
 export const MemberOrders = () => {
   const { getOrderIntents } = useOrderIntentsActions();
+  const { getMyCustomer } = useCustomersActions();
   const { orderIntents, isLoadError, isLoadPending, loadErrorMessage } =
     useOrderIntentsState();
-  const { session } = useAuthState();
+  const {
+    isMyCustomerError,
+    isMyCustomerPending,
+    myCustomer,
+    myCustomerErrorMessage,
+  } = useCustomersState();
 
   // ALL hooks before early returns
   useEffect(() => {
     void getOrderIntents();
-  }, [getOrderIntents]);
+    void getMyCustomer();
+  }, [getMyCustomer, getOrderIntents]);
 
   const customerOrders = useMemo(() => {
-    const currentUserId = session?.user?.id ?? null;
-    if (currentUserId === null) return [];
-    return orderIntents.filter((order) => order.customerId === currentUserId);
-  }, [orderIntents, session?.user?.id]);
+    if (!myCustomer?.id) return [];
+    return orderIntents.filter((order) => order.customerId === myCustomer.id);
+  }, [myCustomer, orderIntents]);
 
   const tableColumns = [
     {
@@ -69,8 +65,8 @@ export const MemberOrders = () => {
       header: "Status",
       key: "status",
       render: (order: typeof customerOrders[number]) => (
-        <Badge tone={orderStatusTone(order.status)}>
-          {orderStatusLabel(order.status)}
+        <Badge tone={getOrderStatusTone(order.status)}>
+          {getOrderStatusLabel(order.status)}
         </Badge>
       ),
       sortable: true,
@@ -122,11 +118,11 @@ export const MemberOrders = () => {
           </div>
         </header>
 
-        {isLoadPending ? (
+        {isLoadPending || isMyCustomerPending ? (
           <Skeleton className="h-96" />
-        ) : isLoadError ? (
+        ) : isLoadError || isMyCustomerError ? (
           <StatusMessage tone="error">
-            {loadErrorMessage ?? "Unable to load orders."}
+            {loadErrorMessage ?? myCustomerErrorMessage ?? "Unable to load orders."}
           </StatusMessage>
         ) : customerOrders.length === 0 ? (
           <EmptyState

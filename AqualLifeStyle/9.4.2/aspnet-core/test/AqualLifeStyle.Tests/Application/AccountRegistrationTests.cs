@@ -74,6 +74,7 @@ namespace AqualLifeStyle.Tests.Application
                 guestPermissions.ShouldContain(PermissionNames.Pages_Products);
                 guestPermissions.ShouldContain(AquaPermissions.Members.ViewSelf);
                 guestPermissions.ShouldContain(AquaPermissions.Memberships.ViewSelf);
+                guestPermissions.ShouldContain(AquaPermissions.Orders.Place);
                 guestPermissions.ShouldNotContain(PermissionNames.Pages_Customers);
                 guestPermissions.ShouldNotContain(PermissionNames.Pages_Memberships);
 

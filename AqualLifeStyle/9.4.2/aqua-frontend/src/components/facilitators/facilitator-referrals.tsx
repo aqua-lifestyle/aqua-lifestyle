@@ -5,6 +5,8 @@ import { DollarSign } from "lucide-react";
 
 import {
   useAuthState,
+  useCustomersActions,
+  useCustomersState,
   useFacilitatorsActions,
   useFacilitatorsState,
   useReferralsActions,
@@ -36,20 +38,22 @@ export const FacilitatorReferrals = () => {
   const { session } = useAuthState();
   const { getReferrals } = useReferralsActions();
   const { getFacilitators } = useFacilitatorsActions();
+  const { getMyCustomer } = useCustomersActions();
   const { referrals, isLoadError, isLoadPending, loadErrorMessage } = useReferralsState();
   const { facilitators } = useFacilitatorsState();
+  const { myCustomer, isMyCustomerPending } = useCustomersState();
 
   // ALL hooks before early returns
   useEffect(() => {
     void getReferrals();
     void getFacilitators();
-  }, [getReferrals, getFacilitators]);
+    void getMyCustomer();
+  }, [getFacilitators, getMyCustomer, getReferrals]);
 
   const facilitator = useMemo(() => {
-    const currentUserId = session?.user?.id ?? null;
-    if (!currentUserId) return null;
-    return facilitators.find((f) => f.customerId === currentUserId) ?? null;
-  }, [facilitators, session?.user?.id]);
+    if (!session?.user?.id || !myCustomer) return null;
+    return facilitators.find((f) => f.customerId === myCustomer.id) ?? null;
+  }, [facilitators, myCustomer, session?.user?.id]);
 
   const myReferrals = useMemo(() => {
     if (!facilitator) return [];
@@ -131,7 +135,7 @@ export const FacilitatorReferrals = () => {
           </div>
         </header>
 
-        {isLoadPending ? (
+        {isLoadPending || isMyCustomerPending ? (
           <Skeleton className="h-96" />
         ) : isLoadError ? (
           <StatusMessage tone="error">
