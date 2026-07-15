@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using Abp.Authorization;
+using AqualLifeStyle.Application.Admin.Import;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Enquiries;
@@ -60,6 +61,14 @@ namespace AqualLifeStyle.Tests.Application
             AssertAuthorizeAttribute(typeof(CustomerAppService), nameof(CustomerAppService.GetMyCustomerAsync), AquaPermissions.Members.ViewSelf);
             AssertAuthorizeAttribute(typeof(CustomerAppService), nameof(CustomerAppService.CreateAsync), AquaPermissions.Members.Create);
             AssertAuthorizeAttribute(typeof(CustomerAppService), nameof(CustomerAppService.UpdateAsync), AquaPermissions.Members.Edit);
+        }
+
+        [Fact]
+        public void CustomerImportAppService_ShouldRequireSeparateImportPermissionOnEveryMethod()
+        {
+            AssertAuthorizeAttribute(typeof(CustomerImportAppService), nameof(CustomerImportAppService.PreviewAsync), AquaPermissions.Admin.Customers.Import);
+            AssertAuthorizeAttribute(typeof(CustomerImportAppService), nameof(CustomerImportAppService.ImportAsync), AquaPermissions.Admin.Customers.Import);
+            AquaPermissions.Admin.Customers.Import.ShouldNotBe(AquaPermissions.Admin.Customers.Create);
         }
 
         [Fact]
