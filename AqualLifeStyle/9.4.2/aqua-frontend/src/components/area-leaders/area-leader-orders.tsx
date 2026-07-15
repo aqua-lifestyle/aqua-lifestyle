@@ -18,20 +18,9 @@ import {
   Skeleton,
   StatusMessage,
 } from "@/src/shared/ui";
+import { getOrderStatusLabel, getOrderStatusTone } from "@/src/shared/lib/order-status";
 
 type OrderStatusFilter = "all" | "0" | "1" | "2" | "3";
-
-const orderStatusLabel = (value: number) => {
-  const labels = ["Pending", "Reserved", "Completed", "Cancelled"];
-  return labels[value] ?? `Status ${value}`;
-};
-
-const orderStatusTone = (value: number): "neutral" | "info" | "success" | "error" => {
-  if (value === 2) return "success";
-  if (value === 3) return "error";
-  if (value === 1) return "info";
-  return "neutral";
-};
 
 export const AreaLeaderOrders = () => {
   const [statusFilter, setStatusFilter] = useState<OrderStatusFilter>("all");
@@ -77,8 +66,8 @@ export const AreaLeaderOrders = () => {
       header: "Status",
       key: "status",
       render: (order: typeof filteredOrders[number]) => (
-        <Badge tone={orderStatusTone(order.status)}>
-          {orderStatusLabel(order.status)}
+        <Badge tone={getOrderStatusTone(order.status)}>
+          {getOrderStatusLabel(order.status)}
         </Badge>
       ),
       sortable: true,

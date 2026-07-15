@@ -20,18 +20,7 @@ import {
   Skeleton,
   StatusMessage,
 } from "@/src/shared/ui";
-
-const orderStatusLabel = (value: number) => {
-  const labels = ["Pending", "Reserved", "Completed", "Cancelled"];
-  return labels[value] ?? `Status ${value}`;
-};
-
-const orderStatusTone = (value: number): "neutral" | "info" | "success" | "error" => {
-  if (value === 2) return "success";
-  if (value === 3) return "error";
-  if (value === 1) return "info";
-  return "neutral";
-};
+import { getOrderStatusLabel, getOrderStatusTone } from "@/src/shared/lib/order-status";
 
 export const MemberDashboard = () => {
   const { getOrderIntents } = useOrderIntentsActions();
@@ -185,8 +174,8 @@ export const MemberDashboard = () => {
                                 </p>
                               </div>
                             </div>
-                            <Badge tone={orderStatusTone(order.status)}>
-                              {orderStatusLabel(order.status)}
+                            <Badge tone={getOrderStatusTone(order.status)}>
+                              {getOrderStatusLabel(order.status)}
                             </Badge>
                           </div>
                         </LinkButton>
