@@ -25,6 +25,7 @@ const claimTypes = {
   nameIdentifier:
     "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier",
   role: "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+  tenantId: "http://www.aspnetboilerplate.com/identity/claims/tenantId",
 } as const;
 
 const readStringClaim = (...values: unknown[]): string | null => {
@@ -62,6 +63,8 @@ export const claimsToUser = (
 
   const rawPermissions = claims.permissions ?? claims.rolePermissions ?? [];
   const role = readStringClaim(claims.role, claims[claimTypes.role]);
+  const rawTenantId = readStringClaim(claims.tenantId, claims[claimTypes.tenantId]);
+  const tenantId = Number(rawTenantId);
 
   return {
     id,
@@ -78,6 +81,7 @@ export const claimsToUser = (
       : typeof rawPermissions === "string"
         ? rawPermissions.split(",")
         : [],
+    ...(Number.isSafeInteger(tenantId) && tenantId > 0 ? { tenantId } : {}),
   };
 };
 

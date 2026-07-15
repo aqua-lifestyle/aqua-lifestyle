@@ -20,7 +20,7 @@ describe("claimsToUser", () => {
   });
 
   it("continues to map standard JWT claims", () => {
-    expect(claimsToUser({ email: "member@example.com", name: "Member", role: "Member", sub: "42" }))
-      .toMatchObject({ email: "member@example.com", id: 42, role: "Member" });
+    expect(claimsToUser({ email: "member@example.com", name: "Member", role: "Member", sub: "42", tenantId: "7" }))
+      .toMatchObject({ email: "member@example.com", id: 42, role: "Member", tenantId: 7 });
   });
 });

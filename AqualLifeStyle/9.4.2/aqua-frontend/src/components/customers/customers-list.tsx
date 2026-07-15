@@ -30,6 +30,7 @@ import {
 } from "@/src/shared/ui";
 import { cn } from "@/src/shared/lib/utils";
 import { ImportCustomersDialog } from "@/src/components/admin/ImportCustomersDialog";
+import { CustomerDialog } from "@/src/components/admin/CustomerDialog";
 
 type CustomerStatusFilter = "all" | "active" | "inactive";
 
@@ -180,7 +181,7 @@ export const CustomersList = ({ showAdminImport = false }: CustomersListProps) =
           </div>
           <div className="flex flex-wrap gap-3">
             {showAdminImport ? <ImportCustomersDialog onImported={getCustomers} /> : null}
-            {canCreateCustomer ? (
+            {showAdminImport ? <CustomerDialog onCreated={getCustomers} /> : canCreateCustomer ? (
               <LinkButton href="/customers/register" variant="primary">
                 <Plus className="size-4" />
                 Add customer

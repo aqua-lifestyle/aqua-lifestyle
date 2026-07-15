@@ -6,6 +6,7 @@ export type AuthUser = {
   name: string | null;
   permissions: string[];
   role: string;
+  tenantId?: number | null;
 };
 
 export type AuthSession = {
