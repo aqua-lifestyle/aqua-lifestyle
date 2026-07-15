@@ -38,7 +38,7 @@ const SetSession = () => {
               "Aqua.Members.Create",
               "Aqua.Members.Edit",
               "Aqua.Members.Delete",
-              "Aqua.Admin.Customers.Import",
+              "Aqua.Admin.Customers.View",
               "Pages.Customers",
               "Pages.Products",
               "Pages.Enquiries",

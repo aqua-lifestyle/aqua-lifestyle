@@ -80,7 +80,7 @@ export const Navbar = () => {
           href: "/admin/customers",
           icon: Users,
           label: "Admin customers",
-          permission: "Aqua.Admin.Customers.Import",
+          permission: "Aqua.Admin.Customers.View",
         },
         ...mainLinks,
       ]
