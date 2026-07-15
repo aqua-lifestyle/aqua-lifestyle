@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { reportApplicationError } from "@/src/shared/observability/telemetry";
 import { Button } from "@/src/shared/ui";
 
 export default function Error({
@@ -11,7 +12,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("Application error:", error);
+    reportApplicationError(error, "app-error-boundary");
   }, [error]);
 
   return (
