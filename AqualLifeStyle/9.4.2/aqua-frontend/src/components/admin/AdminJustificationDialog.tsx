@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { z } from "zod";
 
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import { Button, Dialog, StatusMessage, TextAreaField } from "@/src/shared/ui";
-
-const justificationSchema = z.string().trim().min(3, "Explain why this action is required.").max(500);
+import { adminAuditJustificationSchema } from "./admin-action-validation";
 
 type AdminJustificationDialogProps = {
   confirmLabel: string;
@@ -30,7 +28,7 @@ export const AdminJustificationDialog = ({
     setOpen(false); setJustification(""); setValidationError(undefined); setRequestError(undefined);
   };
   const confirm = async () => {
-    const parsed = justificationSchema.safeParse(justification);
+    const parsed = adminAuditJustificationSchema.safeParse(justification);
     if (!parsed.success) { setValidationError(parsed.error.issues[0]?.message); return; }
     setValidationError(undefined); setRequestError(undefined); setSubmitting(true);
     try { await onConfirm(parsed.data); close(); }
