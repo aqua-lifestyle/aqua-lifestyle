@@ -161,7 +161,7 @@ namespace AqualLifeStyle.Application.Admin.Import
 
         private async Task ImportRowAsync(int tenantId, CachedCustomerImportRow row)
         {
-            await _accountManager.CreateAsync(new AdminCustomerAccountInput
+            _ = await _accountManager.CreateOrRestoreAsync(new AdminCustomerAccountInput
             {
                 TenantId = tenantId,
                 FirstName = row.FirstName,

@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using Abp.Application.Services.Dto;
+using Abp.Auditing;
 using Abp.Authorization.Users;
 
 namespace AqualLifeStyle.Application.Admin.Customers.Dto
@@ -31,6 +32,7 @@ namespace AqualLifeStyle.Application.Admin.Customers.Dto
         public bool IsActive { get; set; }
         public DateTime CreationTime { get; set; }
         public DateTime? LastModificationTime { get; set; }
+        public bool WasRestored { get; set; }
     }
 
     public class AdminCreateCustomerInput
@@ -46,6 +48,9 @@ namespace AqualLifeStyle.Application.Admin.Customers.Dto
 
         [Required, EmailAddress, StringLength(AbpUserBase.MaxEmailAddressLength)]
         public string Email { get; set; }
+
+        [Required, StringLength(AbpUserBase.MaxPlainPasswordLength, MinimumLength = 8), DisableAuditing]
+        public string Password { get; set; }
 
         [Range(1, int.MaxValue)]
         public int? MembershipId { get; set; }

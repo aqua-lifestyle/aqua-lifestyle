@@ -1,6 +1,11 @@
 import axios from "axios";
 
 import { type AuthSession, type AuthUser } from "@/src/providers/Auth/context";
+import {
+  getRequestErrorMessage,
+  normalizeAbpError,
+  type AbpErrorEnvelope,
+} from "@/src/shared/api/abp-error";
 import { publicEnv } from "@/src/shared/config";
 
 /**
@@ -110,6 +115,23 @@ export type RegisterResult =
 
 const API_BASE = publicEnv.NEXT_PUBLIC_ABP_API_URL;
 
+export const getAuthenticationErrorMessage = (
+  status: number,
+  data: AbpErrorEnvelope,
+): string => {
+  const message = getRequestErrorMessage(
+    normalizeAbpError(status, data),
+    "The username, password, or Area workspace is incorrect.",
+  );
+  const missingAreaMatch = message.match(/There is no tenant defined with name\s+(.+)/i);
+
+  if (missingAreaMatch?.[1]) {
+    return `The selected Area “${missingAreaMatch[1].trim()}” does not exist. Choose the correct Area workspace and try again.`;
+  }
+
+  return message.replace(/\btenant\b/gi, "Area");
+};
+
 /**
  * Authenticate against the ABP / OpenIddict token endpoint using the Resource
  * Owner Password Credentials grant.
@@ -156,15 +178,13 @@ export const login = async (input: LoginInput): Promise<LoginResult> => {
     return { ok: true, session };
   } catch (error: unknown) {
     if (axios.isAxiosError(error) && error.response) {
-      const data = error.response.data as Record<string, unknown>;
-      const errorObj = (data.error ?? data) as Record<string, unknown>;
-      const message =
-        (errorObj.message as string) ??
-        (errorObj.details as string) ??
-        (data.message as string) ??
-        "Invalid email or password.";
-
-      return { ok: false, message };
+      return {
+        ok: false,
+        message: getAuthenticationErrorMessage(
+          error.response.status,
+          error.response.data as AbpErrorEnvelope,
+        ),
+      };
     }
 
     return { ok: false, message: "Unable to reach the authentication server. Check your connection and try again." };

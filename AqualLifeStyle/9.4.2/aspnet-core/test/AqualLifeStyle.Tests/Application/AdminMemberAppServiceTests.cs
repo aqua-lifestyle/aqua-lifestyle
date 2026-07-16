@@ -42,6 +42,7 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Original",
                 LastName = "Member",
                 Email = originalEmail,
+                Password = "Temporary123!",
                 MembershipId = membershipIds[0],
                 IsActive = true,
                 Justification = "Approved member onboarding"

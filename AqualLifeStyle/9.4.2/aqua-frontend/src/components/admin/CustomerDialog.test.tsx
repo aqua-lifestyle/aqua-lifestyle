@@ -8,7 +8,7 @@ import {
   useToast,
 } from "@/src/providers";
 import { httpClient } from "@/src/shared/api";
-import { CustomerDialog } from "./CustomerDialog";
+import { CustomerDialog, getCustomerOnboardingConfirmation } from "./CustomerDialog";
 
 vi.mock("@/src/providers", () => ({
   useAuthState: vi.fn(),
@@ -31,6 +31,13 @@ const authState = (permissions: string[]) => ({
 describe("CustomerDialog", () => {
   const getMemberships = vi.fn();
   const toast = vi.fn();
+
+  it("describes restoration as reconnecting existing history", () => {
+    expect(getCustomerOnboardingConfirmation(true)).toEqual({
+      message: "The customer was reconnected to their existing account and history.",
+      title: "Customer access restored",
+    });
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -85,6 +92,7 @@ describe("CustomerDialog", () => {
     fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Ada" } });
     fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Lovelace" } });
     fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "ada@example.com" } });
+    fireEvent.change(screen.getByLabelText("Temporary password"), { target: { value: "Temporary123!" } });
     fireEvent.change(screen.getByLabelText("Reason for creating this account"), { target: { value: "Approved onboarding" } });
     fireEvent.click(screen.getByRole("button", { name: /create customer/i }));
 
@@ -95,6 +103,7 @@ describe("CustomerDialog", () => {
         firstName: "Ada",
         justification: "Approved onboarding",
         lastName: "Lovelace",
+        password: "Temporary123!",
         tenantId: 1,
       }),
     ));

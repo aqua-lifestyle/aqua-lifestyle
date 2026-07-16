@@ -111,18 +111,22 @@ namespace AqualLifeStyle.Application.Admin.Customers
             if (input == null) throw new UserFriendlyException("Customer creation failed.", "The request body was empty.");
             var tenantId = ResolveTargetTenant(input.TenantId, "Customer", "creation");
             await EnsureTenantExistsAsync(tenantId);
-            var customer = await _accountManager.CreateAsync(new AdminCustomerAccountInput
+            var accountResult = await _accountManager.CreateOrRestoreAsync(new AdminCustomerAccountInput
             {
                 TenantId = tenantId,
                 FirstName = input.FirstName,
                 LastName = input.LastName,
                 Email = input.Email,
+                Password = input.Password,
                 MembershipId = input.MembershipId,
                 IsActive = input.IsActive
             });
             await CurrentUnitOfWork.SaveChangesAsync();
-            LogAdminMutation("Customer", "created", customer.Id, tenantId, input.Justification);
-            return await MapCustomerAsync(customer);
+            var customer = accountResult.Customer;
+            LogAdminMutation("Customer", accountResult.WasRestored ? "restored" : "created", customer.Id, tenantId, input.Justification);
+            var customerDto = await MapCustomerAsync(customer);
+            customerDto.WasRestored = accountResult.WasRestored;
+            return customerDto;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Customers.Edit)]

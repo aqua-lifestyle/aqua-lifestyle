@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { claimsToUser } from "./auth-service";
+import { claimsToUser, getAuthenticationErrorMessage } from "./auth-service";
 
 describe("claimsToUser", () => {
   it("maps ABP claim URIs and treats the built-in Admin role as SystemAdmin", () => {
@@ -27,5 +27,22 @@ describe("claimsToUser", () => {
   it("maps the granted permission list included in an administrator token", () => {
     expect(claimsToUser({ permissions: "Aqua.Admin.Users.View,Aqua.Admin.Tenants.View", role: "Admin", sub: "1" })?.permissions)
       .toEqual(["Aqua.Admin.Users.View", "Aqua.Admin.Tenants.View"]);
+  });
+});
+
+describe("getAuthenticationErrorMessage", () => {
+  it("shows the Area problem without exposing the correlation identifier", () => {
+    const message = getAuthenticationErrorMessage(500, {
+      error: {
+        message: "Login failed!",
+        details: "CorrelationId: request-17\nThere is no tenant defined with name customer",
+      },
+    });
+
+    expect(message).toBe(
+      "The selected Area “customer” does not exist. Choose the correct Area workspace and try again.",
+    );
+    expect(message).not.toContain("CorrelationId");
+    expect(message).not.toContain("tenant");
   });
 });

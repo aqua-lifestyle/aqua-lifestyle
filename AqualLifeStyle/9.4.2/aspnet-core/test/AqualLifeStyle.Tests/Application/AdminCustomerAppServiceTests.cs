@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Abp.Authorization;
 using AqualLifeStyle.Application.Admin.Customers;
 using AqualLifeStyle.Application.Admin.Customers.Dto;
+using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +23,7 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task CustomerLifecycle_CreatesLinkedAccount_UpdatesAndSoftDeletes()
+        public async Task CustomerLifecycle_CreatesUpdatesRemovesAndRestoresLinkedAccount()
         {
             var email = $"admin-created-{Guid.NewGuid():N}@example.com";
             var created = await _service.CreateAsync(new AdminCreateCustomerInput
@@ -31,12 +32,19 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Ada",
                 LastName = "Lovelace",
                 Email = email,
+                Password = "Temporary123!",
                 IsActive = true,
                 Justification = "Approved customer onboarding"
             });
 
             created.TenantId.ShouldBe(1);
             created.Name.ShouldBe("Ada Lovelace");
+            created.WasRestored.ShouldBeFalse();
+            var originalCreationTime = created.CreationTime;
+            var originalUserId = created.UserId;
+            var createdUser = await Resolve<UserManager>().FindByEmailAsync(email);
+            createdUser.ShouldNotBeNull();
+            (await Resolve<UserManager>().CheckPasswordAsync(createdUser, "Temporary123!")).ShouldBeTrue();
             await UsingDbContextAsync(async context =>
             {
                 var customer = await context.Customers.Include(item => item.User).SingleAsync(item => item.Id == created.Id);
@@ -72,6 +80,35 @@ namespace AqualLifeStyle.Tests.Application
                 customer.IsDeleted.ShouldBeTrue();
                 user.IsActive.ShouldBeFalse();
             });
+
+            var restored = await _service.CreateAsync(new AdminCreateCustomerInput
+            {
+                TenantId = 1,
+                FirstName = "Dora",
+                LastName = "Shongwe",
+                Email = email,
+                Password = "Replacement123!",
+                IsActive = true,
+                Justification = "Returning customer requested account restoration"
+            });
+            restored.Id.ShouldBe(created.Id);
+            restored.UserId.ShouldBe(originalUserId);
+            restored.CreationTime.ShouldBe(originalCreationTime);
+            restored.WasRestored.ShouldBeTrue();
+            restored.Name.ShouldBe("Dora Shongwe");
+            restored.IsActive.ShouldBeTrue();
+            var restoredUser = await Resolve<UserManager>().FindByEmailAsync(email);
+            restoredUser.ShouldNotBeNull();
+            restoredUser.IsActive.ShouldBeTrue();
+            (await Resolve<UserManager>().CheckPasswordAsync(restoredUser, "Replacement123!")).ShouldBeTrue();
+            await UsingDbContextAsync(async context =>
+            {
+                var restoredCustomers = await context.Customers.IgnoreQueryFilters()
+                    .Where(item => item.Email.Value == email)
+                    .ToListAsync();
+                restoredCustomers.Count.ShouldBe(1);
+                restoredCustomers[0].IsDeleted.ShouldBeFalse();
+            });
         }
 
         [Fact]
@@ -83,6 +120,7 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Cross",
                 LastName = "Tenant",
                 Email = $"cross-{Guid.NewGuid():N}@example.com",
+                Password = "Temporary123!",
                 IsActive = true,
                 Justification = "Invalid cross tenant attempt"
             }));
@@ -113,6 +151,7 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Platform",
                 LastName = "Member",
                 Email = email,
+                Password = "Temporary123!",
                 IsActive = true,
                 Justification = "Approved customer onboarding"
             });

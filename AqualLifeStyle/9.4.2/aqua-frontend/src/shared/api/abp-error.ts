@@ -57,6 +57,7 @@ const GENERIC_SERVER_MESSAGES = new Set([
   "The request failed.",
   "An internal error occurred during your request!",
   "Internal server error.",
+  "Login failed!",
 ]);
 
 const getStatusMessage = (status: number, fallback: string): string => {
@@ -80,7 +81,11 @@ const getStatusMessage = (status: number, fallback: string): string => {
 };
 
 const getSafePublicDetails = (details?: string): string | null => {
-  const value = details?.trim();
+  const value = details
+    ?.split(/\r?\n/)
+    .filter((line) => !line.trim().startsWith("CorrelationId:"))
+    .join("\n")
+    .trim();
   if (!value || value.length > 500) return null;
 
   const normalizedValue = value.toLowerCase();

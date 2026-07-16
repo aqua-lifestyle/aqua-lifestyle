@@ -29,15 +29,26 @@ const schema = z.object({
   lastName: z.string().trim().min(1, "Last name is required.").max(64),
   membershipId: z.union([z.literal(""), z.coerce.number().int().positive()])
     .transform((value) => value === "" ? null : value),
+  password: z.string().min(8, "Use at least 8 characters.").max(128),
   tenantId: z.coerce.number().int().positive("Select a valid area."),
 });
 
-type Fields = "email" | "firstName" | "justification" | "lastName" | "membershipId" | "tenantId";
+type Fields = "email" | "firstName" | "justification" | "lastName" | "membershipId" | "password" | "tenantId";
 type FieldErrors = Partial<Record<Fields, string>>;
 
 type CustomerDialogProps = {
   onCreated?: () => void | Promise<void>;
 };
+
+export const getCustomerOnboardingConfirmation = (wasRestored: boolean) => wasRestored
+  ? {
+      message: "The customer was reconnected to their existing account and history.",
+      title: "Customer access restored",
+    }
+  : {
+      message: "Customer account created successfully.",
+      title: "Customer created",
+    };
 
 export const CustomerDialog = ({ onCreated }: CustomerDialogProps) => {
   const { session } = useAuthState();
@@ -77,6 +88,7 @@ export const CustomerDialog = ({ onCreated }: CustomerDialogProps) => {
       justification: data.get("justification"),
       lastName: data.get("lastName"),
       membershipId: data.get("membershipId"),
+      password: data.get("password"),
       tenantId: data.get("tenantId"),
     });
     if (!parsed.success) {
@@ -93,9 +105,17 @@ export const CustomerDialog = ({ onCreated }: CustomerDialogProps) => {
     setError(null);
     setIsSubmitting(true);
     try {
-      await httpClient.post("/api/services/app/AdminCustomer/Create", parsed.data);
+      const createdCustomer = await httpClient.post<{ wasRestored: boolean }, typeof parsed.data>(
+        "/api/services/app/AdminCustomer/Create",
+        parsed.data,
+      );
       await onCreated?.();
-      toast({ message: "Customer account created successfully.", title: "Success", type: "success" });
+      const confirmation = getCustomerOnboardingConfirmation(createdCustomer.wasRestored);
+      toast({
+        message: confirmation.message,
+        title: confirmation.title,
+        type: "success",
+      });
       form.reset();
       close();
     } catch (requestError) {
@@ -129,6 +149,7 @@ export const CustomerDialog = ({ onCreated }: CustomerDialogProps) => {
           <TextField autoComplete="given-name" errorMessage={fieldErrors.firstName} label="First name" name="firstName" required />
           <TextField autoComplete="family-name" errorMessage={fieldErrors.lastName} label="Last name" name="lastName" required />
           <TextField autoComplete="email" className="sm:col-span-2" errorMessage={fieldErrors.email} label="Email address" name="email" required type="email" />
+          <TextField autoComplete="new-password" className="sm:col-span-2" errorMessage={fieldErrors.password} label="Temporary password" minLength={8} name="password" required type="password" />
           <TextAreaField className="sm:col-span-2" errorMessage={fieldErrors.justification} label="Reason for creating this account" maxLength={500} name="justification" required rows={3} />
           <label className="flex items-center gap-2 text-sm font-medium">
             <input defaultChecked name="isActive" type="checkbox" /> Active account

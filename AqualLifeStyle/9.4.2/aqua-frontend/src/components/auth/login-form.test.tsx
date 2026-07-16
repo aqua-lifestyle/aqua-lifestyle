@@ -168,6 +168,31 @@ describe("LoginForm", () => {
     );
   });
 
+  it("does not treat a legacy customer account type as an Area name", async () => {
+    const { login } = await import("@/src/shared/api/auth-service");
+    vi.mocked(useTenantState).mockReturnValue({ currentTenant: "customer", isHost: false });
+    vi.mocked(login).mockResolvedValue({
+      ok: false,
+      message: "The username, password, or Area workspace is incorrect.",
+    });
+
+    render(<LoginForm />);
+    fireEvent.change(screen.getByLabelText("Username or email"), {
+      target: { value: "new.customer@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "Temporary123!" },
+    });
+    submitForm();
+
+    await waitFor(() => expect(login).toHaveBeenCalledWith(
+      expect.objectContaining({ tenant: "Default" }),
+    ));
+    expect(
+      await screen.findByText("The username, password, or Area workspace is incorrect."),
+    ).toBeInTheDocument();
+  });
+
   it("opens the Area Leader dashboard after an Area Leader signs in", async () => {
     const { login } = await import("@/src/shared/api/auth-service");
     vi.mocked(login).mockResolvedValue({

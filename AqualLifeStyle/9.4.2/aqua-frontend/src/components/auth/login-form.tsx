@@ -15,6 +15,7 @@ import {
   Card,
   LinkButton,
   SelectField,
+  StatusMessage,
   TextField,
 } from "@/src/shared/ui";
 
@@ -25,6 +26,17 @@ const loginSchema = z.object({
 });
 
 type FieldErrors = Partial<Record<"email" | "password", string>>;
+
+const ACCOUNT_TYPE_WORKSPACE_NAMES = new Set([
+  "admin", "arealeader", "customer", "facilitator", "guest", "member", "systemadmin",
+]);
+
+export const getLoginAreaName = (currentArea: string | null, defaultArea: string) => {
+  const normalizedCurrentArea = currentArea?.replace(/[\s_-]/g, "").toLowerCase();
+  return currentArea && !ACCOUNT_TYPE_WORKSPACE_NAMES.has(normalizedCurrentArea ?? "")
+    ? currentArea
+    : defaultArea;
+};
 
 const getSafeRedirect = () => {
   const redirect = new URLSearchParams(window.location.search).get("redirect");
@@ -41,14 +53,19 @@ export const LoginForm = () => {
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [requestError, setRequestError] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState(
-    currentTenant ?? publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME,
+    getLoginAreaName(currentTenant, publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME),
   );
   const hasMounted = useHydrated();
+  const currentAreaName = getLoginAreaName(
+    currentTenant,
+    publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME,
+  );
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -67,6 +84,7 @@ export const LoginForm = () => {
     }
 
     setFieldErrors({});
+    setRequestError(undefined);
     setIsLoading(true);
 
     // Real authentication via the ABP TokenAuth endpoint.
@@ -78,6 +96,7 @@ export const LoginForm = () => {
     });
 
     if (!authResult.ok) {
+      setRequestError(authResult.message);
       toast({
         message: authResult.message,
         title: "Sign in failed",
@@ -140,7 +159,7 @@ export const LoginForm = () => {
                   onChange={(event) => setSelectedWorkspace(event.target.value)}
                 >
                   <option value={publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME}>Area workspace</option>
-                  {hasMounted && currentTenant && currentTenant !== publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME ? <option value={currentTenant}>{currentTenant}</option> : null}
+                  {hasMounted && currentAreaName !== publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME ? <option value={currentAreaName}>{currentAreaName}</option> : null}
                   <option value="">Platform administration</option>
                 </SelectField>
                 <p className="-mt-2 text-xs text-muted-foreground">Choose Platform administration only when signing in with the platform administrator account.</p>
@@ -192,6 +211,7 @@ export const LoginForm = () => {
                 <Button className="w-full" disabled={isLoading} isLoading={isLoading} type="submit">
                   Sign in
                 </Button>
+                {requestError ? <StatusMessage tone="error">{requestError}</StatusMessage> : null}
               </form>
             </Card>
 
