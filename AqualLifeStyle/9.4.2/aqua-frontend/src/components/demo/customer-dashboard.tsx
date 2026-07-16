@@ -194,7 +194,7 @@ export const CustomerDashboard = () => {
             <div>
               <p className="text-sm font-semibold text-accent">Welcome back</p>
               <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                {user?.name ?? "Member"}
+                {user?.name ?? "Club member"}
               </h1>
               <p className="mt-1 text-base text-muted-foreground">
                 {user?.email}
@@ -205,7 +205,7 @@ export const CustomerDashboard = () => {
             <Calendar className="size-4" />
             <span>{hasMounted ? formatDate(new Date().toISOString()) : "Current date"}</span>
             <Badge tone="accent" className="ml-2">
-              {currentMembership ? "Member" : "Customer"}
+              {currentMembership ? "Club member" : "Customer"}
             </Badge>
           </div>
         </header>

@@ -2,6 +2,7 @@
 
 import {
   Building2,
+  KeyRound,
   LayoutDashboard,
   Network,
   ShieldCheck,
@@ -17,12 +18,13 @@ import { cn } from "@/src/shared/lib/utils";
 
 const adminLinks = [
   { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard", permission: null },
-  { href: "/admin/customers", icon: Users, label: "Customers", permission: "Aqua.Admin.Customers.View" },
-  { href: "/admin/users", icon: ShieldCheck, label: "Users", permission: "Aqua.Admin.Users.View" },
-  { href: "/admin/tenants", icon: Building2, label: "Tenants", permission: "Aqua.Admin.Tenants.View" },
+  { href: "/admin/customers", icon: Users, label: "Customer accounts", permission: "Aqua.Admin.Customers.View" },
+  { href: "/admin/users", icon: ShieldCheck, label: "User accounts & access", permission: "Aqua.Admin.Users.View" },
+  { href: "/admin/access-levels", icon: KeyRound, label: "Access levels", permission: "Pages.Roles" },
+  { href: "/admin/tenants", icon: Building2, label: "Areas", permission: "Aqua.Admin.Tenants.View" },
   { href: "/admin/area-leaders", icon: Network, label: "Area leaders", permission: "Aqua.Admin.AreaLeaders.View" },
   { href: "/admin/facilitators", icon: UserCheck, label: "Facilitators", permission: "Aqua.Admin.Facilitators.View" },
-  { href: "/admin/members", icon: UsersRound, label: "Members", permission: "Aqua.Admin.Members.View" },
+  { href: "/admin/members", icon: UsersRound, label: "Club members", permission: "Aqua.Admin.Members.View" },
 ] as const;
 
 export const AdminSidebar = () => {
@@ -43,7 +45,7 @@ export const AdminSidebar = () => {
             Administration
           </p>
         </div>
-        <nav aria-label="Admin navigation" className="flex gap-1 overflow-x-auto p-2 lg:flex-col lg:overflow-visible lg:p-0">
+        <nav aria-label="Administration navigation" className="flex gap-1 overflow-x-auto p-2 lg:flex-col lg:overflow-visible lg:p-0">
           {visibleLinks.map((link) => {
             const active = isActive(link.href);
 

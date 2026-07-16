@@ -61,7 +61,7 @@ describe("AdminMembers", () => {
     expect(httpClient.get).toHaveBeenCalledWith("/api/services/app/AdminMember/GetAll?MaxResultCount=100");
     expect(screen.getByText("Onyx")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit profile" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Change tier" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Change plan" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Suspend" })).not.toBeInTheDocument();
   });
 });

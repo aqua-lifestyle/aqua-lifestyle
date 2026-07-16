@@ -16,7 +16,7 @@ vi.mock("@/src/providers", () => ({
   useMembershipsState: vi.fn(),
   useToast: vi.fn(),
 }));
-vi.mock("@/src/shared/api", () => ({ httpClient: { post: vi.fn() } }));
+vi.mock("@/src/shared/api", () => ({ httpClient: { get: vi.fn(), post: vi.fn() } }));
 
 const authState = (permissions: string[]) => ({
   isAuthenticated: true,
@@ -34,6 +34,7 @@ describe("CustomerDialog", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(httpClient.get).mockResolvedValue([]);
     HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) { this.setAttribute("open", ""); });
     HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) { this.removeAttribute("open"); });
     vi.mocked(useMembershipsActions).mockReturnValue({
@@ -84,7 +85,7 @@ describe("CustomerDialog", () => {
     fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Ada" } });
     fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Lovelace" } });
     fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "ada@example.com" } });
-    fireEvent.change(screen.getByLabelText("Audit justification"), { target: { value: "Approved onboarding" } });
+    fireEvent.change(screen.getByLabelText("Reason for creating this account"), { target: { value: "Approved onboarding" } });
     fireEvent.click(screen.getByRole("button", { name: /create customer/i }));
 
     await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(

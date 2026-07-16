@@ -101,7 +101,7 @@ export const AreaSpacesList = () => {
       sortable: true,
     },
     {
-      header: "Interested Members",
+      header: "Interested club members",
       key: "interestedMembers",
       render: (areaSpace: typeof filteredAreaSpaces[number]) => (
         <span className="text-sm">{areaSpace.interestedMembers}</span>

@@ -30,19 +30,22 @@ namespace AqualLifeStyle.Application.Admin.Customers
         private readonly UserManager _userManager;
         private readonly IObjectMapper _objectMapper;
         private readonly IAdminCustomerProfileUpdater _customerProfileUpdater;
+        private readonly IMembershipRepository _membershipRepository;
 
         public AdminCustomerAppService(
             IAdminCustomerAccountManager accountManager,
             ICustomerRepository customerRepository,
             UserManager userManager,
             IObjectMapper objectMapper,
-            IAdminCustomerProfileUpdater customerProfileUpdater)
+            IAdminCustomerProfileUpdater customerProfileUpdater,
+            IMembershipRepository membershipRepository)
         {
             _accountManager = accountManager;
             _customerRepository = customerRepository;
             _userManager = userManager;
             _objectMapper = objectMapper;
             _customerProfileUpdater = customerProfileUpdater;
+            _membershipRepository = membershipRepository;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Customers.View)]
@@ -74,7 +77,24 @@ namespace AqualLifeStyle.Application.Admin.Customers
                     .Skip(input.SkipCount)
                     .Take(input.MaxResultCount)
                     .ToListAsync();
-                return new PagedResultDto<AdminCustomerDto>(total, _objectMapper.Map<List<AdminCustomerDto>>(customers));
+                var customerDtos = _objectMapper.Map<List<AdminCustomerDto>>(customers);
+                await PopulateMembershipNamesAsync(customerDtos);
+                return new PagedResultDto<AdminCustomerDto>(total, customerDtos);
+            }
+        }
+
+        [AbpAuthorize(AquaPermissions.Admin.Customers.View)]
+        public async Task<List<AdminMembershipOptionDto>> GetMembershipOptionsAsync(AdminCustomerMembershipOptionsInput input)
+        {
+            if (input == null) throw Failed("Membership plan lookup", "The request body was empty.");
+            var tenantId = ResolveTargetTenant(input.TenantId, "Membership plan", "lookup");
+            using (DisableTenantFilterForHost())
+            {
+                return await _membershipRepository.GetAll()
+                    .Where(plan => plan.IsActive && (!plan.TenantId.HasValue || plan.TenantId == tenantId))
+                    .OrderBy(plan => plan.MembershipType).ThenBy(plan => plan.Name)
+                    .Select(plan => new AdminMembershipOptionDto { Id = plan.Id, Name = plan.Name, MembershipType = (int)plan.MembershipType })
+                    .ToListAsync();
             }
         }
 
@@ -82,7 +102,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
         public async Task<AdminCustomerDto> GetAsync(EntityDto<int> input)
         {
             ValidatePositiveId(input?.Id ?? 0, "Customer");
-            return _objectMapper.Map<AdminCustomerDto>(await GetCustomerAsync(input.Id));
+            return await MapCustomerAsync(await GetCustomerAsync(input.Id));
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Customers.Create)]
@@ -102,7 +122,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
             });
             await CurrentUnitOfWork.SaveChangesAsync();
             LogAdminMutation("Customer", "created", customer.Id, tenantId, input.Justification);
-            return _objectMapper.Map<AdminCustomerDto>(customer);
+            return await MapCustomerAsync(customer);
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Customers.Edit)]
@@ -123,7 +143,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
             }
 
             LogAdminMutation("Customer", "updated", customer.Id, tenantId, input.Justification);
-            return _objectMapper.Map<AdminCustomerDto>(customer);
+            return await MapCustomerAsync(customer);
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Customers.Delete)]
@@ -161,6 +181,35 @@ namespace AqualLifeStyle.Application.Admin.Customers
         {
             var tenant = await TenantManager.GetByIdAsync(tenantId);
             if (!tenant.IsActive) throw new UserFriendlyException("Customer creation failed.", "The selected tenant is inactive.");
+        }
+
+        private async Task<AdminCustomerDto> MapCustomerAsync(Customer customer)
+        {
+            var customerDto = _objectMapper.Map<AdminCustomerDto>(customer);
+            await PopulateMembershipNamesAsync(new[] { customerDto });
+            return customerDto;
+        }
+
+        private async Task PopulateMembershipNamesAsync(IEnumerable<AdminCustomerDto> customerDtos)
+        {
+            var customers = customerDtos.ToList();
+            var membershipIds = customers.Where(customer => customer.MembershipId.HasValue)
+                .Select(customer => customer.MembershipId.Value)
+                .Distinct()
+                .ToList();
+            if (membershipIds.Count == 0) return;
+
+            using (DisableTenantFilterForHost())
+            {
+                var membershipNames = await _membershipRepository.GetAll()
+                    .Where(membership => membershipIds.Contains(membership.Id))
+                    .ToDictionaryAsync(membership => membership.Id, membership => membership.Name);
+                foreach (var customer in customers)
+                {
+                    if (customer.MembershipId.HasValue && membershipNames.TryGetValue(customer.MembershipId.Value, out var membershipName))
+                        customer.MembershipName = membershipName;
+                }
+            }
         }
 
     }

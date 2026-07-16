@@ -94,7 +94,7 @@ const AreaSpaceEditForm = ({
         value={formState.capacity}
       />
       <TextField
-        label="Interested Members"
+        label="Interested club members"
         name="interestedMembers"
         onChange={(event) =>
           setFormState((current) => ({
@@ -183,7 +183,7 @@ const AreaSpaceOverview = ({
               <dd className="font-medium">{areaSpace.capacity}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">Interested Members</dt>
+              <dt className="text-muted-foreground">Interested club members</dt>
               <dd className="font-medium">{areaSpace.interestedMembers}</dd>
             </div>
             <div className="flex justify-between gap-4">

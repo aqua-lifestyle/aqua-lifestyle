@@ -27,6 +27,7 @@ describe("AdminSidebar", () => {
     vi.mocked(useAuthState).mockReturnValue(authState([
       "Aqua.Admin.Customers.View",
       "Aqua.Admin.Users.View",
+      "Pages.Roles",
     ]));
   });
 
@@ -34,15 +35,16 @@ describe("AdminSidebar", () => {
     render(<AdminSidebar />);
 
     expect(screen.getByRole("link", { name: "Dashboard" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Customers" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Users" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Tenants" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Members" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Customer accounts" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "User accounts & access" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Access levels" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Areas" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Club members" })).not.toBeInTheDocument();
   });
 
   it("marks the current section as active", () => {
     render(<AdminSidebar />);
 
-    expect(screen.getByRole("link", { name: "Customers" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Customer accounts" })).toHaveAttribute("aria-current", "page");
   });
 });

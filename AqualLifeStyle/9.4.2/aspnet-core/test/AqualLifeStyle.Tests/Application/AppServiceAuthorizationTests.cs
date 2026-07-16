@@ -81,6 +81,7 @@ namespace AqualLifeStyle.Tests.Application
         public void AdminCustomerAppService_ShouldRequireGranularPermissionOnEveryMethod()
         {
             AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.GetAllAsync), AquaPermissions.Admin.Customers.View);
+            AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.GetMembershipOptionsAsync), AquaPermissions.Admin.Customers.View);
             AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.GetAsync), AquaPermissions.Admin.Customers.View);
             AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.CreateAsync), AquaPermissions.Admin.Customers.Create);
             AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.UpdateAsync), AquaPermissions.Admin.Customers.Edit);
@@ -126,6 +127,7 @@ namespace AqualLifeStyle.Tests.Application
         {
             AssertAuthorizeAttribute(typeof(AdminMemberAppService), nameof(AdminMemberAppService.GetAllAsync), AquaPermissions.Admin.Members.View);
             AssertAuthorizeAttribute(typeof(AdminMemberAppService), nameof(AdminMemberAppService.GetAsync), AquaPermissions.Admin.Members.View);
+            AssertAuthorizeAttribute(typeof(AdminMemberAppService), nameof(AdminMemberAppService.GetMembershipOptionsAsync), AquaPermissions.Admin.Members.ChangeTier);
             AssertAuthorizeAttribute(typeof(AdminMemberAppService), nameof(AdminMemberAppService.EditProfileAsync), AquaPermissions.Admin.Members.Edit);
             AssertAuthorizeAttribute(typeof(AdminMemberAppService), nameof(AdminMemberAppService.SuspendAsync), AquaPermissions.Admin.Members.Suspend);
             AssertAuthorizeAttribute(typeof(AdminMemberAppService), nameof(AdminMemberAppService.ChangeTierAsync), AquaPermissions.Admin.Members.ChangeTier);

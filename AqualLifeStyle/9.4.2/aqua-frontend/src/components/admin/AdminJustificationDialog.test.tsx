@@ -16,7 +16,7 @@ describe("AdminJustificationDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Approve" }));
     fireEvent.click(screen.getAllByRole("button", { name: "Approve" })[1]);
     expect(await screen.findByText("Explain why this action is required.")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Audit justification"), { target: { value: "  Checks completed  " } });
+    fireEvent.change(screen.getByLabelText("Reason for action"), { target: { value: "  Checks completed  " } });
     fireEvent.click(screen.getAllByRole("button", { name: "Approve" })[1]);
 
     await waitFor(() => expect(onConfirm).toHaveBeenCalledWith("Checks completed"));

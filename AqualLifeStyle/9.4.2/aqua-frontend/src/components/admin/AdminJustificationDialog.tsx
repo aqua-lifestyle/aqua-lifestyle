@@ -32,7 +32,7 @@ export const AdminJustificationDialog = ({
     if (!parsed.success) { setValidationError(parsed.error.issues[0]?.message); return; }
     setValidationError(undefined); setRequestError(undefined); setSubmitting(true);
     try { await onConfirm(parsed.data); close(); }
-    catch (error) { setRequestError(getRequestErrorMessage(error, "The admin action could not be completed.")); }
+    catch (error) { setRequestError(getRequestErrorMessage(error, "This action could not be completed.")); }
     finally { setSubmitting(false); }
   };
 
@@ -40,7 +40,7 @@ export const AdminJustificationDialog = ({
     <Button onClick={() => setOpen(true)} size="sm" variant={variant}>{triggerLabel}</Button>
     <Dialog onClose={close} open={open} title={title}>
       <p className="text-sm text-muted-foreground">{description}</p>
-      <TextAreaField errorMessage={validationError} label="Audit justification" maxLength={500} name="justification" onChange={(event) => setJustification(event.target.value)} required rows={3} value={justification} />
+      <TextAreaField errorMessage={validationError} label="Reason for action" maxLength={500} name="justification" onChange={(event) => setJustification(event.target.value)} required rows={3} value={justification} />
       {requestError ? <StatusMessage tone="error">{requestError}</StatusMessage> : null}
       <div className="flex justify-end gap-3"><Button onClick={close} variant="ghost">Cancel</Button><Button isLoading={submitting} onClick={confirm} variant={variant === "danger" ? "danger" : "primary"}>{confirmLabel}</Button></div>
     </Dialog>

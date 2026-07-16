@@ -6,8 +6,6 @@ import { z } from "zod";
 
 import {
   useAuthState,
-  useMembershipsActions,
-  useMembershipsState,
   useToast,
 } from "@/src/providers";
 import { httpClient } from "@/src/shared/api";
@@ -20,6 +18,7 @@ import {
   TextAreaField,
   TextField,
 } from "@/src/shared/ui";
+import { AdminAreaSelectionField } from "./AdminAreaSelectionField";
 
 const CREATE_PERMISSION = "Aqua.Admin.Customers.Create";
 const schema = z.object({
@@ -30,7 +29,7 @@ const schema = z.object({
   lastName: z.string().trim().min(1, "Last name is required.").max(64),
   membershipId: z.union([z.literal(""), z.coerce.number().int().positive()])
     .transform((value) => value === "" ? null : value),
-  tenantId: z.coerce.number().int().positive("Enter a valid tenant ID."),
+  tenantId: z.coerce.number().int().positive("Select a valid area."),
 });
 
 type Fields = "email" | "firstName" | "justification" | "lastName" | "membershipId" | "tenantId";
@@ -42,19 +41,23 @@ type CustomerDialogProps = {
 
 export const CustomerDialog = ({ onCreated }: CustomerDialogProps) => {
   const { session } = useAuthState();
-  const { getMemberships } = useMembershipsActions();
-  const { memberships } = useMembershipsState();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [membershipOptions, setMembershipOptions] = useState<{ id: number; name: string }[]>([]);
+  const [selectedTenantId, setSelectedTenantId] = useState(String(session?.user?.tenantId ?? ""));
   const canCreate = session?.user?.permissions?.includes(CREATE_PERMISSION) ?? false;
   const tenantId = session?.user?.tenantId;
 
   useEffect(() => {
-    if (open) void getMemberships();
-  }, [getMemberships, open]);
+    const parsedTenantId = Number(selectedTenantId);
+    if (!open || !Number.isInteger(parsedTenantId) || parsedTenantId <= 0) return;
+    void httpClient.get<{ id: number; name: string }[]>(`/api/services/app/AdminCustomer/GetMembershipOptions?TenantId=${parsedTenantId}`)
+      .then(setMembershipOptions)
+      .catch((requestError) => setError(getRequestErrorMessage(requestError, "Membership plans could not be loaded for this area.")));
+  }, [open, selectedTenantId]);
 
   const close = () => {
     setOpen(false);
@@ -111,27 +114,22 @@ export const CustomerDialog = ({ onCreated }: CustomerDialogProps) => {
       </Button>
       <Dialog onClose={close} open={open} size="lg" title="Add customer">
         <form className="grid gap-4 sm:grid-cols-2" noValidate onSubmit={submit}>
-          <TextField
-            defaultValue={tenantId ?? ""}
-            disabled={Boolean(tenantId)}
+          <AdminAreaSelectionField
             errorMessage={fieldErrors.tenantId}
-            label="Tenant ID"
-            min={1}
-            name="tenantId"
-            required
-            type="number"
+            fixedAreaId={tenantId ?? undefined}
+            value={selectedTenantId}
+            onChange={(areaId) => { setSelectedTenantId(areaId); if (!areaId) setMembershipOptions([]); }}
           />
-          {tenantId ? <input name="tenantId" type="hidden" value={tenantId} /> : null}
-          <SelectField label="Membership" name="membershipId" errorMessage={fieldErrors.membershipId}>
-            <option value="">No membership assigned</option>
-            {memberships.map((membership) => (
+          <SelectField label="Membership plan" name="membershipId" errorMessage={fieldErrors.membershipId}>
+            <option value="">Not yet enrolled</option>
+            {membershipOptions.map((membership) => (
               <option key={membership.id} value={membership.id}>{membership.name}</option>
             ))}
           </SelectField>
           <TextField autoComplete="given-name" errorMessage={fieldErrors.firstName} label="First name" name="firstName" required />
           <TextField autoComplete="family-name" errorMessage={fieldErrors.lastName} label="Last name" name="lastName" required />
           <TextField autoComplete="email" className="sm:col-span-2" errorMessage={fieldErrors.email} label="Email address" name="email" required type="email" />
-          <TextAreaField className="sm:col-span-2" errorMessage={fieldErrors.justification} label="Audit justification" maxLength={500} name="justification" required rows={3} />
+          <TextAreaField className="sm:col-span-2" errorMessage={fieldErrors.justification} label="Reason for creating this account" maxLength={500} name="justification" required rows={3} />
           <label className="flex items-center gap-2 text-sm font-medium">
             <input defaultChecked name="isActive" type="checkbox" /> Active account
           </label>

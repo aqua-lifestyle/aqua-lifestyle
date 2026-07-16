@@ -60,7 +60,7 @@ export const EditMemberProfileDialog = ({ member, onUpdated }: EditMemberProfile
       await onUpdated();
       close();
     } catch (error) {
-      setRequestError(getRequestErrorMessage(error, "The member profile could not be updated."));
+      setRequestError(getRequestErrorMessage(error, "The club member profile could not be updated."));
     } finally {
       setSubmitting(false);
     }
@@ -68,12 +68,12 @@ export const EditMemberProfileDialog = ({ member, onUpdated }: EditMemberProfile
 
   return <>
     <Button onClick={() => setOpen(true)} size="sm" variant="outline">Edit profile</Button>
-    <Dialog onClose={close} open={open} size="lg" title="Edit member profile">
+    <Dialog onClose={close} open={open} size="lg" title="Edit club member profile">
       <form className="grid gap-4 sm:grid-cols-2" noValidate onSubmit={submit}>
         <TextField defaultValue={member.firstName} errorMessage={fieldErrors.firstName} label="First name" name="firstName" required />
         <TextField defaultValue={member.lastName} errorMessage={fieldErrors.lastName} label="Last name" name="lastName" required />
         <TextField className="sm:col-span-2" defaultValue={member.email} errorMessage={fieldErrors.email} label="Email address" name="email" required type="email" />
-        <TextAreaField className="sm:col-span-2" errorMessage={fieldErrors.justification} label="Audit justification" maxLength={500} name="justification" required rows={3} />
+        <TextAreaField className="sm:col-span-2" errorMessage={fieldErrors.justification} label="Reason for change" maxLength={500} name="justification" required rows={3} />
         {requestError ? <StatusMessage className="sm:col-span-2" tone="error">{requestError}</StatusMessage> : null}
         <div className="flex justify-end gap-3 sm:col-span-2">
           <Button onClick={close} variant="ghost">Cancel</Button>

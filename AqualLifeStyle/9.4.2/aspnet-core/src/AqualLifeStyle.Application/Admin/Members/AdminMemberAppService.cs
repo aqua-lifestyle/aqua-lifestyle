@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Abp.Application.Services.Dto;
 using Abp.Auditing;
 using Abp.Authorization;
@@ -56,6 +57,21 @@ namespace AqualLifeStyle.Application.Admin.Members
                 return new PagedResultDto<AdminMemberDto>(total, members
                     .Where(member => membershipById.ContainsKey(member.MembershipId.Value))
                     .Select(member => Map(member, membershipById[member.MembershipId.Value])).ToList());
+            }
+        }
+
+        [AbpAuthorize(AquaPermissions.Admin.Members.ChangeTier)]
+        public async Task<List<AdminMembershipOptionDto>> GetMembershipOptionsAsync(EntityDto<int> input)
+        {
+            ValidatePositiveId(input?.Id ?? 0, "Member");
+            var member = await GetMemberAsync(input.Id);
+            using (DisableTenantFilterForHost())
+            {
+                return await _membershipRepository.GetAll()
+                    .Where(plan => plan.IsActive && (!plan.TenantId.HasValue || plan.TenantId == member.TenantId.Value))
+                    .OrderBy(plan => plan.MembershipType).ThenBy(plan => plan.Name)
+                    .Select(plan => new AdminMembershipOptionDto { Id = plan.Id, Name = plan.Name, MembershipType = (int)plan.MembershipType })
+                    .ToListAsync();
             }
         }
 

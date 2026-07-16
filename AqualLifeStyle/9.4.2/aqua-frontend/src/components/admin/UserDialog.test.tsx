@@ -6,7 +6,7 @@ import { httpClient } from "@/src/shared/api";
 import { UserDialog } from "./UserDialog";
 
 vi.mock("@/src/providers", () => ({ useAuthState: vi.fn(), useToast: vi.fn() }));
-vi.mock("@/src/shared/api", () => ({ httpClient: { post: vi.fn() } }));
+vi.mock("@/src/shared/api", () => ({ httpClient: { get: vi.fn(), post: vi.fn() } }));
 
 const authState = (permissions: string[]) => ({
   isAuthenticated: true, isReady: true,
@@ -38,8 +38,8 @@ describe("UserDialog", () => {
     fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Hopper" } });
     fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "grace@example.com" } });
     fireEvent.change(screen.getByLabelText("Temporary password"), { target: { value: "SafePassword123!" } });
-    fireEvent.change(screen.getByLabelText("Role"), { target: { value: "1" } });
-    fireEvent.change(screen.getByLabelText("Audit justification"), { target: { value: "Approved account" } });
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("Reason for creating this account"), { target: { value: "Approved account" } });
     fireEvent.click(screen.getByRole("button", { name: /create user/i }));
     await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
       "/api/services/app/AdminUser/Create",

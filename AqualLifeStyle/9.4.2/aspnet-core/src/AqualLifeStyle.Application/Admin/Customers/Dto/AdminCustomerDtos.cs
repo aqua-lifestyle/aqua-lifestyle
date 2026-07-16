@@ -13,6 +13,11 @@ namespace AqualLifeStyle.Application.Admin.Customers.Dto
         public bool? IsActive { get; set; }
     }
 
+    public class AdminCustomerMembershipOptionsInput
+    {
+        [Range(1, int.MaxValue)] public int TenantId { get; set; }
+    }
+
     public class AdminCustomerDto : EntityDto<int>
     {
         public int TenantId { get; set; }
@@ -22,6 +27,7 @@ namespace AqualLifeStyle.Application.Admin.Customers.Dto
         public string Name { get; set; }
         public string Email { get; set; }
         public int? MembershipId { get; set; }
+        public string MembershipName { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreationTime { get; set; }
         public DateTime? LastModificationTime { get; set; }

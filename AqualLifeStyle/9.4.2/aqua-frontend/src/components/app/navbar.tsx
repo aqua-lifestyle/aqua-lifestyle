@@ -41,7 +41,7 @@ const moreLinks = [
   { href: "/facilitator", icon: UserPlus, label: "Facilitators", permission: "Pages.Facilitators" },
   { href: "/facilitator/dashboard", icon: LayoutDashboard, label: "Facilitator dashboard", permission: "Pages.Facilitators" },
   { href: "/facilitator/my-referrals", icon: DollarSign, label: "My referrals", permission: "Pages.Referrals" },
-  { href: "/member", icon: User, label: "Member", permission: "Pages.Orders" },
+  { href: "/member", icon: User, label: "Club member", permission: "Pages.Orders" },
   { href: "/member/enquiries", icon: MessageSquare, label: "My enquiries", permission: "Pages.Enquiries" },
   { href: "/catalog", icon: Package, label: "Catalog", permission: null },
   { href: "/contact", icon: Mail, label: "Contact", permission: null },
