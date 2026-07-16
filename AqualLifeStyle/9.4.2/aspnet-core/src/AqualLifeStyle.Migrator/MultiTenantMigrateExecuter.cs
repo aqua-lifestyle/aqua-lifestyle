@@ -81,7 +81,7 @@ namespace AqualLifeStyle.Migrator
                 _log.Write("Name              : " + tenant.Name);
                 _log.Write("TenancyName       : " + tenant.TenancyName);
                 _log.Write("Tenant Id         : " + tenant.Id);
-                _log.Write("Connection string : " + SimpleStringCipher.Instance.Decrypt(tenant.ConnectionString));
+                _log.Write("Connection string : " + CensorConnectionString(SimpleStringCipher.Instance.Decrypt(tenant.ConnectionString)));
 
                 if (!migratedDatabases.Contains(tenant.ConnectionString))
                 {

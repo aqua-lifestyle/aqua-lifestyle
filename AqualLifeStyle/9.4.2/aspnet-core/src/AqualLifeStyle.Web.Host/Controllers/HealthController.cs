@@ -7,6 +7,8 @@ using Abp.EntityFrameworkCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Abp.Runtime.Caching.Redis;
 
 namespace AqualLifeStyle.Web.Host.Controllers
 {
@@ -27,18 +29,26 @@ namespace AqualLifeStyle.Web.Host.Controllers
 
         private readonly IDbContextProvider<AqualLifeStyleDbContext> _dbContextProvider;
         private readonly IWebHostEnvironment _environment;
+        private readonly IConfiguration _configuration;
+        private readonly IAbpRedisCacheDatabaseProvider _redisDatabaseProvider;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="HealthController"/> class.
         /// </summary>
         /// <param name="dbContextProvider">The ABP database context provider.</param>
         /// <param name="environment">The current web host environment.</param>
+        /// <param name="configuration">The application configuration.</param>
+        /// <param name="redisDatabaseProvider">The ABP Redis database provider.</param>
         public HealthController(
             IDbContextProvider<AqualLifeStyleDbContext> dbContextProvider,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            IConfiguration configuration,
+            IAbpRedisCacheDatabaseProvider redisDatabaseProvider)
         {
             _dbContextProvider = dbContextProvider;
             _environment = environment;
+            _configuration = configuration;
+            _redisDatabaseProvider = redisDatabaseProvider;
         }
 
         /// <summary>
@@ -49,18 +59,40 @@ namespace AqualLifeStyle.Web.Host.Controllers
         public async Task<ActionResult<HealthCheckResponse>> Get()
         {
             var isDatabaseReachable = await IsDatabaseReachable();
+            var isRedisConfigured = !string.IsNullOrWhiteSpace(_configuration["Redis:Configuration"]);
+            var isRedisReachable = !isRedisConfigured || await IsRedisReachable();
+            var isHealthy = isDatabaseReachable && isRedisReachable;
 
-            return Ok(new HealthCheckResponse
+            var response = new HealthCheckResponse
             {
-                Status = isDatabaseReachable ? HealthyStatus : DegradedStatus,
+                Status = isHealthy ? HealthyStatus : DegradedStatus,
                 IsDatabaseReachable = isDatabaseReachable,
                 DatabaseStatus = isDatabaseReachable ? HealthyStatus : "Unavailable",
+                IsRedisReachable = isRedisReachable,
+                RedisStatus = !isRedisConfigured ? "NotConfigured" : isRedisReachable ? HealthyStatus : "Unavailable",
                 Version = AppVersionHelper.Version,
                 ReleaseDate = AppVersionHelper.ReleaseDate,
                 CheckedAtUtc = DateTime.UtcNow,
                 Environment = _environment.EnvironmentName,
                 TraceId = HttpContext.TraceIdentifier
-            });
+            };
+            return isHealthy
+                ? Ok(response)
+                : StatusCode(503, response);
+        }
+
+        private async Task<bool> IsRedisReachable()
+        {
+            try
+            {
+                var database = _redisDatabaseProvider.GetDatabase();
+                await database.PingAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private async Task<bool> IsDatabaseReachable()

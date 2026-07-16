@@ -1,7 +1,5 @@
-using System;
 using Castle.Core.Logging;
 using Abp.Dependency;
-using Abp.Timing;
 
 namespace AqualLifeStyle.Migrator
 {
@@ -16,7 +14,6 @@ namespace AqualLifeStyle.Migrator
 
         public void Write(string text)
         {
-            Console.WriteLine(Clock.Now.ToString("yyyy-MM-dd HH:mm:ss") + " | " + text);
             Logger.Info(text);
         }
     }
