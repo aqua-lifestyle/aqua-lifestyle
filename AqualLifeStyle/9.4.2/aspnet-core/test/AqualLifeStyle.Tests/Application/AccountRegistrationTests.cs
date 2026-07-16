@@ -8,8 +8,6 @@ using AqualLifeStyle.Application.Memberships;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Accounts;
 using AqualLifeStyle.Authorization.Accounts.Dto;
-using Castle.MicroKernel.Registration;
-using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
@@ -24,11 +22,6 @@ namespace AqualLifeStyle.Tests.Application
 
         public AccountRegistrationTests()
         {
-            var configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection()
-                .Build();
-            LocalIocManager.IocContainer.Register(
-                Component.For<IConfiguration>().Instance(configuration));
             _accountAppService = Resolve<IAccountAppService>();
             _customerAppService = Resolve<ICustomerAppService>();
             _membershipAppService = Resolve<IMembershipAppService>();
