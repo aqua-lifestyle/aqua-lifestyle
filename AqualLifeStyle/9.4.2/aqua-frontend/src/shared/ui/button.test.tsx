@@ -27,4 +27,13 @@ describe("Button", () => {
     const { container } = render(<Button variant="danger">Delete</Button>);
     expect(container.firstChild).toHaveClass("bg-error/10");
   });
+
+  it("uses theme-contrasting text for secondary actions", () => {
+    render(<Button variant="secondary">Refresh data</Button>);
+
+    expect(screen.getByRole("button", { name: "Refresh data" })).toHaveClass(
+      "bg-primary",
+      "text-background",
+    );
+  });
 });
