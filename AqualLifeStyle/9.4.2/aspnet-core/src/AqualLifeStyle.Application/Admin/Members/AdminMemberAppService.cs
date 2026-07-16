@@ -52,7 +52,13 @@ namespace AqualLifeStyle.Application.Admin.Members
                 var members = await query.OrderByDescending(customer => customer.CreationTime)
                     .Skip(input.SkipCount).Take(input.MaxResultCount).ToListAsync();
                 var membershipIds = members.Select(member => member.MembershipId.Value).Distinct().ToArray();
-                var memberships = await _membershipRepository.GetAll().Where(tier => membershipIds.Contains(tier.Id)).ToListAsync();
+                List<Membership> memberships;
+                using (DisableTenantDataFilter())
+                {
+                    memberships = await _membershipRepository.GetAll()
+                        .Where(plan => membershipIds.Contains(plan.Id))
+                        .ToListAsync();
+                }
                 var membershipById = memberships.ToDictionary(tier => tier.Id);
                 return new PagedResultDto<AdminMemberDto>(total, members
                     .Where(member => membershipById.ContainsKey(member.MembershipId.Value))
@@ -65,7 +71,7 @@ namespace AqualLifeStyle.Application.Admin.Members
         {
             ValidatePositiveId(input?.Id ?? 0, "Member");
             var member = await GetMemberAsync(input.Id);
-            using (DisableTenantFilterForHost())
+            using (DisableTenantDataFilter())
             {
                 return await _membershipRepository.GetAll()
                     .Where(plan => plan.IsActive && (!plan.TenantId.HasValue || plan.TenantId == member.TenantId.Value))
@@ -139,10 +145,13 @@ namespace AqualLifeStyle.Application.Admin.Members
 
         private async Task<Membership> GetMembershipAsync(int membershipId, int tenantId)
         {
-            var membership = await _membershipRepository.FirstOrDefaultAsync(tier => tier.Id == membershipId &&
-                (!tier.TenantId.HasValue || tier.TenantId == tenantId));
-            if (membership == null) throw Failed("Member lookup", "The membership tier was not found.");
-            return membership;
+            using (DisableTenantDataFilter())
+            {
+                var membership = await _membershipRepository.FirstOrDefaultAsync(plan => plan.Id == membershipId &&
+                    (!plan.TenantId.HasValue || plan.TenantId == tenantId));
+                if (membership == null) throw Failed("Member lookup", "The membership plan was not found.");
+                return membership;
+            }
         }
 
         private static AdminMemberDto Map(Customer member, Membership membership) => new AdminMemberDto

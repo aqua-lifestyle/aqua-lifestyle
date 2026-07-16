@@ -43,7 +43,9 @@ export const AdminFacilitators = () => {
   }, [loadFacilitators]);
 
   const mutateFacilitator = async (operation: FacilitatorMutation, facilitator: AdminFacilitator, justification: string) => {
-    await httpClient.post(`/api/services/app/AdminFacilitator/${operation}`, { id: facilitator.id, justification });
+    const endpoint = `/api/services/app/AdminFacilitator/${operation}`;
+    if (operation === "Remove") await httpClient.delete(endpoint, { id: facilitator.id, justification });
+    else await httpClient.post(endpoint, { id: facilitator.id, justification });
     toast({ message: `${facilitator.customerName}'s facilitator record was updated.`, title: "Facilitator updated", type: "success" });
     await loadFacilitators();
   };

@@ -8,7 +8,6 @@ using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
-using AqualLifeStyle.Domain.Memberships;
 using Microsoft.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Application.Admin.Customers
@@ -30,20 +29,20 @@ namespace AqualLifeStyle.Application.Admin.Customers
     public class AdminCustomerProfileUpdater : IAdminCustomerProfileUpdater, ITransientDependency
     {
         private readonly ICustomerRepository _customerRepository;
-        private readonly IMembershipRepository _membershipRepository;
+        private readonly ICustomerMembershipPlanAssignmentValidator _membershipPlanAssignmentValidator;
         private readonly IRepository<User, long> _userRepository;
         private readonly IAdminUserRoleSynchronizer _userRoleSynchronizer;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public AdminCustomerProfileUpdater(
             ICustomerRepository customerRepository,
-            IMembershipRepository membershipRepository,
+            ICustomerMembershipPlanAssignmentValidator membershipPlanAssignmentValidator,
             IRepository<User, long> userRepository,
             IAdminUserRoleSynchronizer userRoleSynchronizer,
             IUnitOfWorkManager unitOfWorkManager)
         {
             _customerRepository = customerRepository;
-            _membershipRepository = membershipRepository;
+            _membershipPlanAssignmentValidator = membershipPlanAssignmentValidator;
             _userRepository = userRepository;
             _userRoleSynchronizer = userRoleSynchronizer;
             _unitOfWorkManager = unitOfWorkManager;
@@ -64,10 +63,9 @@ namespace AqualLifeStyle.Application.Admin.Customers
             }
             if (await _userRepository.GetAll().AnyAsync(user => user.Id != customer.UserId && user.NormalizedEmailAddress == normalizedEmail))
                 throw new UserFriendlyException("Customer update failed.", "The email address is unavailable.");
-            if (update.MembershipId.HasValue && await _membershipRepository.FirstOrDefaultAsync(membership =>
-                    membership.Id == update.MembershipId.Value &&
-                    (!membership.TenantId.HasValue || membership.TenantId == customer.TenantId) && membership.IsActive) == null)
-                throw new UserFriendlyException("Customer update failed.", "The selected membership is missing or inactive.");
+            if (update.MembershipId.HasValue)
+                await _membershipPlanAssignmentValidator.EnsureAvailableForAreaAsync(
+                    update.MembershipId.Value, customer.TenantId.Value, "Customer update");
 
             var user = customer.User;
             user.Name = update.FirstName.Trim(); user.Surname = update.LastName.Trim();

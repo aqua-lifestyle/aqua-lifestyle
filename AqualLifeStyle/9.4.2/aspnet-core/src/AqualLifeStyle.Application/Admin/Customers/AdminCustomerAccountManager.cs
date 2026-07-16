@@ -10,7 +10,6 @@ using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
-using AqualLifeStyle.Domain.Memberships;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,20 +33,20 @@ namespace AqualLifeStyle.Application.Admin.Customers
     public class AdminCustomerAccountManager : IAdminCustomerAccountManager, ITransientDependency
     {
         private readonly ICustomerRepository _customerRepository;
-        private readonly IMembershipRepository _membershipRepository;
+        private readonly ICustomerMembershipPlanAssignmentValidator _membershipPlanAssignmentValidator;
         private readonly IRepository<User, long> _userRepository;
         private readonly UserManager _userManager;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public AdminCustomerAccountManager(
             ICustomerRepository customerRepository,
-            IMembershipRepository membershipRepository,
+            ICustomerMembershipPlanAssignmentValidator membershipPlanAssignmentValidator,
             IRepository<User, long> userRepository,
             UserManager userManager,
             IUnitOfWorkManager unitOfWorkManager)
         {
             _customerRepository = customerRepository;
-            _membershipRepository = membershipRepository;
+            _membershipPlanAssignmentValidator = membershipPlanAssignmentValidator;
             _userRepository = userRepository;
             _userManager = userManager;
             _unitOfWorkManager = unitOfWorkManager;
@@ -71,11 +70,9 @@ namespace AqualLifeStyle.Application.Admin.Customers
                         throw new UserFriendlyException("Customer creation failed.", "The email address is unavailable.");
                 }
 
-                if (input.MembershipId.HasValue && await _membershipRepository.FirstOrDefaultAsync(membership =>
-                        membership.Id == input.MembershipId.Value &&
-                        membership.TenantId == input.TenantId &&
-                        membership.IsActive) == null)
-                    throw new UserFriendlyException("Customer creation failed.", "The selected membership is missing or inactive.");
+                if (input.MembershipId.HasValue)
+                    await _membershipPlanAssignmentValidator.EnsureAvailableForAreaAsync(
+                        input.MembershipId.Value, input.TenantId, "Customer creation");
 
                 var user = new User
                 {

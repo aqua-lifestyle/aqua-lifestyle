@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthState, useToast } from "@/src/providers";
 import { httpClient } from "@/src/shared/api";
@@ -6,7 +6,7 @@ import { AdminCustomers } from "./AdminCustomers";
 import { AdminUsers } from "./AdminUsers";
 
 vi.mock("@/src/providers", () => ({ useAuthState: vi.fn(), useMembershipsActions: vi.fn(), useMembershipsState: vi.fn(), useToast: vi.fn() }));
-vi.mock("@/src/shared/api", () => ({ httpClient: { get: vi.fn(), post: vi.fn() } }));
+vi.mock("@/src/shared/api", () => ({ httpClient: { delete: vi.fn(), get: vi.fn(), post: vi.fn(), put: vi.fn() } }));
 const state = (permissions: string[]) => ({ isAuthenticated: true, isReady: true, session: { accessToken: "token", expiresAt: null, user: { email: "admin@example.com", id: 1, name: "Admin", permissions, role: "SystemAdmin" } } });
 
 describe("administrator account management", () => {
@@ -23,6 +23,43 @@ describe("administrator account management", () => {
     render(<AdminCustomers />);
     await waitFor(() => expect(screen.getByText("Aqua Customer")).toBeInTheDocument());
     expect(httpClient.get).toHaveBeenCalledWith("/api/services/app/AdminCustomer/GetAll?MaxResultCount=100");
+  });
+
+  it("updates a customer with PUT and membership-plan selection", async () => {
+    vi.mocked(useAuthState).mockReturnValue(state(["Aqua.Admin.Customers.View", "Aqua.Admin.Customers.Edit"]));
+    vi.mocked(httpClient.get).mockImplementation(async (url: string) => url.includes("GetMembershipOptions")
+      ? [{ id: 8, name: "AQGreen" }]
+      : { items: [{ creationTime: "2026-01-01", email: "customer@example.com", firstName: "Aqua", id: 2, isActive: true, lastName: "Customer", membershipId: null, membershipName: null, name: "Aqua Customer", tenantId: 1, userId: 3 }], totalCount: 1 });
+    vi.mocked(httpClient.put).mockResolvedValue({ id: 2 });
+    render(<AdminCustomers />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit account" }));
+    await screen.findByRole("option", { name: "AQGreen" });
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Updated" } });
+    fireEvent.change(screen.getByLabelText("Membership plan"), { target: { value: "8" } });
+    fireEvent.change(screen.getByLabelText("Reason for change"), { target: { value: "Customer requested the correction" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(httpClient.put).toHaveBeenCalledWith(
+      "/api/services/app/AdminCustomer/Update",
+      expect.objectContaining({ firstName: "Updated", id: 2, membershipId: 8 }),
+    ));
+  });
+
+  it("removes a customer with DELETE and an audited reason", async () => {
+    vi.mocked(useAuthState).mockReturnValue(state(["Aqua.Admin.Customers.View", "Aqua.Admin.Customers.Delete"]));
+    vi.mocked(httpClient.get).mockResolvedValue({ items: [{ creationTime: "2026-01-01", email: "customer@example.com", firstName: "Aqua", id: 2, isActive: true, lastName: "Customer", membershipId: null, membershipName: null, name: "Aqua Customer", tenantId: 1, userId: 3 }], totalCount: 1 });
+    vi.mocked(httpClient.delete).mockResolvedValue(undefined);
+    render(<AdminCustomers />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+    fireEvent.change(screen.getByLabelText("Reason for action"), { target: { value: "Duplicate customer account" } });
+    fireEvent.click(screen.getByRole("button", { name: "Remove account" }));
+
+    await waitFor(() => expect(httpClient.delete).toHaveBeenCalledWith(
+      "/api/services/app/AdminCustomer/Delete",
+      { id: 2, justification: "Duplicate customer account" },
+    ));
   });
 
   it("shows every granted user-account action", async () => {

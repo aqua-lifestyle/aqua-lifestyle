@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using Abp.Authorization;
 using AqualLifeStyle.Application.Admin.Customers;
 using AqualLifeStyle.Application.Admin.Customers.Dto;
+using AqualLifeStyle.Domain.Enums;
+using AqualLifeStyle.Domain.Memberships;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
@@ -84,6 +86,60 @@ namespace AqualLifeStyle.Tests.Application
                 IsActive = true,
                 Justification = "Invalid cross tenant attempt"
             }));
+        }
+
+        [Fact]
+        public async Task MembershipPlans_IncludePlatformAndCurrentAreaPlans_AndAllowPlatformAssignment()
+        {
+            var planIds = await UsingDbContextAsync((int?)null, async context =>
+            {
+                var platformPlan = Membership.Create(null, $"Platform-{Guid.NewGuid():N}", "Available in every Area", MembershipType.Jasper);
+                var currentAreaPlan = Membership.Create(1, $"Area-1-{Guid.NewGuid():N}", "Available in the current Area", MembershipType.Onyx);
+                var otherAreaPlan = Membership.Create(2, $"Area-2-{Guid.NewGuid():N}", "Available in another Area", MembershipType.AQGreen);
+                context.Memberships.AddRange(platformPlan, currentAreaPlan, otherAreaPlan);
+                await context.SaveChangesAsync();
+                return new[] { platformPlan.Id, currentAreaPlan.Id, otherAreaPlan.Id };
+            });
+
+            var options = await _service.GetMembershipOptionsAsync(new AdminCustomerMembershipOptionsInput { TenantId = 1 });
+            options.Select(option => option.Id).ShouldContain(planIds[0]);
+            options.Select(option => option.Id).ShouldContain(planIds[1]);
+            options.Select(option => option.Id).ShouldNotContain(planIds[2]);
+
+            var email = $"platform-member-{Guid.NewGuid():N}@example.com";
+            var customer = await _service.CreateAsync(new AdminCreateCustomerInput
+            {
+                TenantId = 1,
+                FirstName = "Platform",
+                LastName = "Member",
+                Email = email,
+                IsActive = true,
+                Justification = "Approved customer onboarding"
+            });
+            var updated = await _service.UpdateAsync(new AdminUpdateCustomerInput
+            {
+                Id = customer.Id,
+                FirstName = "Platform",
+                LastName = "Club Member",
+                Email = email,
+                MembershipId = planIds[0],
+                IsActive = true,
+                Justification = "Customer selected a platform membership plan"
+            });
+
+            updated.MembershipId.ShouldBe(planIds[0]);
+            updated.MembershipName.ShouldNotBeNullOrWhiteSpace();
+            await UsingDbContextAsync(async context =>
+            {
+                var persistedCustomer = await context.Customers.SingleAsync(item => item.Id == customer.Id);
+                persistedCustomer.MembershipId.ShouldBe(planIds[0]);
+                var roleNames = await (from assignment in context.UserRoles
+                    join role in context.Roles on assignment.RoleId equals role.Id
+                    where assignment.UserId == persistedCustomer.UserId
+                    select role.Name).ToListAsync();
+                roleNames.ShouldContain("Member");
+                roleNames.ShouldNotContain("Guest");
+            });
         }
     }
 }

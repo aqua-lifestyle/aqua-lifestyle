@@ -18,6 +18,47 @@ describe("getRequestErrorMessage", () => {
     expect(getRequestErrorMessage(error, "Fallback")).toBe("Request failed.");
     expect(getRequestErrorMessage({ unexpected: true }, "Fallback")).toBe("Fallback");
   });
+
+  it("turns generic HTTP failures into actionable messages", () => {
+    expect(getRequestErrorMessage(new AbpHttpError(405, {}), "Customer update failed."))
+      .toContain("not supported by the current server version");
+    expect(getRequestErrorMessage(new AbpHttpError(403, {}), "Customer update failed."))
+      .toContain("does not have permission");
+    expect(getRequestErrorMessage(new AbpHttpError(409, {}), "Customer update failed."))
+      .toContain("conflicts with an existing record");
+  });
+
+  it("prioritizes field validation messages from the server", () => {
+    const error = new AbpHttpError(400, {
+      validationErrors: [
+        { members: ["email"], message: "Enter a valid email address." },
+        { members: ["membershipId"], message: "Select an available membership plan." },
+      ],
+    });
+
+    expect(getRequestErrorMessage(error, "Customer update failed."))
+      .toBe("Enter a valid email address. Select an available membership plan.");
+  });
+
+  it("shows the business reason supplied with a user-friendly server error", () => {
+    const error = new AbpHttpError(500, {
+      message: "Customer creation failed.",
+      details: "The selected membership plan is unavailable or inactive.",
+    });
+
+    expect(getRequestErrorMessage(error, "The customer could not be created."))
+      .toBe("The selected membership plan is unavailable or inactive.");
+  });
+
+  it("does not expose technical diagnostics as error details", () => {
+    const error = new AbpHttpError(500, {
+      message: "An internal error occurred during your request!",
+      details: "Stack trace:\n   at Application.Service in /src/Application/Service.cs",
+    });
+
+    expect(getRequestErrorMessage(error, "The customer could not be created."))
+      .toBe("The customer could not be created.");
+  });
 });
 
 describe("normalizeAbpError", () => {

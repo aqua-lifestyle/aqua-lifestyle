@@ -88,7 +88,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
         {
             if (input == null) throw Failed("Membership plan lookup", "The request body was empty.");
             var tenantId = ResolveTargetTenant(input.TenantId, "Membership plan", "lookup");
-            using (DisableTenantFilterForHost())
+            using (DisableTenantDataFilter())
             {
                 return await _membershipRepository.GetAll()
                     .Where(plan => plan.IsActive && (!plan.TenantId.HasValue || plan.TenantId == tenantId))
@@ -199,7 +199,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 .ToList();
             if (membershipIds.Count == 0) return;
 
-            using (DisableTenantFilterForHost())
+            using (DisableTenantDataFilter())
             {
                 var membershipNames = await _membershipRepository.GetAll()
                     .Where(membership => membershipIds.Contains(membership.Id))

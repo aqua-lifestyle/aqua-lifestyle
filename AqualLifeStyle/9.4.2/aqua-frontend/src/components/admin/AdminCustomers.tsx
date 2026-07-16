@@ -21,7 +21,7 @@ export const AdminCustomers = () => {
   const load = useCallback(async () => { if (!canView) return; setLoading(true); try { setCustomers((await httpClient.get<PagedCustomers>("/api/services/app/AdminCustomer/GetAll?MaxResultCount=100")).items); setError(undefined); } catch (requestError) { setError(getRequestErrorMessage(requestError, "Customer accounts could not be loaded.")); } finally { setLoading(false); } }, [canView]);
   useEffect(() => { const task = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(task); }, [load]);
   const refreshed = async (message: string) => { toast({ message, title: "Customer account updated", type: "success" }); await load(); };
-  const remove = async (customer: AdminCustomer, justification: string) => { await httpClient.post("/api/services/app/AdminCustomer/Delete", { id: customer.id, justification }); await refreshed(`${customer.name}'s account was removed.`); };
+  const remove = async (customer: AdminCustomer, justification: string) => { await httpClient.delete("/api/services/app/AdminCustomer/Delete", { id: customer.id, justification }); await refreshed(`${customer.name}'s account was removed.`); };
   if (!canView) return <main className="p-6"><StatusMessage tone="error">Your account does not have access to customer management.</StatusMessage></main>;
   const columns = [
     { header: "Customer", key: "name", sortable: true, render: (customer: AdminCustomer) => <div className="flex items-center gap-3"><Avatar fallback={customer.name} size="sm" /><div><p className="font-semibold">{customer.name}</p><p className="text-xs text-muted-foreground">{customer.email}</p></div></div> },

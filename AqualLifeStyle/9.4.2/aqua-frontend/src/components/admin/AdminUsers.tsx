@@ -37,7 +37,7 @@ export const AdminUsers = () => {
     return () => window.clearTimeout(task);
   }, [load]);
   const updated = async (message: string) => { toast({ message, title: "User account updated", type: "success" }); await load(); };
-  const remove = async (user: AdminUser, justification: string) => { await httpClient.post("/api/services/app/AdminUser/Delete", { id: user.id, justification }); await updated(`${user.firstName} ${user.lastName}'s account was removed.`); };
+  const remove = async (user: AdminUser, justification: string) => { await httpClient.delete("/api/services/app/AdminUser/Delete", { id: user.id, justification }); await updated(`${user.firstName} ${user.lastName}'s account was removed.`); };
 
   if (!canView) return <main className="p-6"><StatusMessage tone="error">You do not have permission to view users.</StatusMessage></main>;
   const columns = [

@@ -12,7 +12,10 @@ namespace AqualLifeStyle.Application.Admin
         protected IDisposable DisableTenantFilterForHost() =>
             AbpSession.TenantId.HasValue
                 ? NoopDisposable.Instance
-                : CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant);
+                : DisableTenantDataFilter();
+
+        protected IDisposable DisableTenantDataFilter() =>
+            CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant);
 
         protected void ValidateRequestedTenant(int? tenantId, string resource)
         {

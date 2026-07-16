@@ -42,7 +42,9 @@ export const AdminAreaLeaders = () => {
   }, [loadAreaLeaders]);
 
   const mutateAreaLeader = async (operation: AreaLeaderMutation, areaLeader: AdminAreaLeader, justification: string) => {
-    await httpClient.post(`/api/services/app/AdminAreaLeader/${operation}`, { id: areaLeader.id, justification });
+    const endpoint = `/api/services/app/AdminAreaLeader/${operation}`;
+    if (operation === "Remove") await httpClient.delete(endpoint, { id: areaLeader.id, justification });
+    else await httpClient.post(endpoint, { id: areaLeader.id, justification });
     toast({ message: `${areaLeader.customerName}'s area leader record was updated.`, title: "Area leader updated", type: "success" });
     await loadAreaLeaders();
   };
