@@ -1,0 +1,60 @@
+services:
+  - type: web
+    name: aqualifestyle-api
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    dockerContext: .
+    dockerfilePath: ./docker/api/Dockerfile
+    preDeployCommand: dotnet migrator/AqualLifeStyle.Migrator.dll -q
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_HTTP_PORTS
+        value: "10000"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aqualifestyle-postgres
+          property: connectionString
+      - key: Redis__Configuration
+        fromService:
+          type: keyvalue
+          name: aqualifestyle-redis
+          property: connectionString
+      - key: Redis__DatabaseId
+        value: "0"
+      - key: Authentication__JwtBearer__IsEnabled
+        value: "true"
+      - key: Authentication__JwtBearer__SecurityKey
+        generateValue: true
+      - key: Authentication__JwtBearer__Issuer
+        value: AqualLifeStyle
+      - key: Authentication__JwtBearer__Audience
+        value: AqualLifeStyle
+      - key: App__DefaultTenantName
+        value: Default
+      - key: App__ServerRootAddress
+        sync: false
+      - key: App__ClientRootAddress
+        sync: false
+      - key: App__CorsOrigins
+        sync: false
+      - key: Logging__MinimumLevel
+        value: Information
+
+  - type: keyvalue
+    name: aqualifestyle-redis
+    region: frankfurt
+    plan: free
+    ipAllowList: []
+    maxmemoryPolicy: allkeys-lru
+
+databases:
+  - name: aqualifestyle-postgres
+    region: frankfurt
+    plan: free
+    databaseName: aqualifestyle
+    user: aqualifestyle
+    ipAllowList: []
