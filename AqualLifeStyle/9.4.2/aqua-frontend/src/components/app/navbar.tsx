@@ -95,6 +95,25 @@ export const Navbar = () => {
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
+  if (pathname.startsWith("/admin")) {
+    return (
+      <header className="sticky top-0 z-40 w-full border-b border-border bg-card/95 backdrop-blur">
+        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Link className="flex items-center gap-3 text-foreground transition hover:opacity-80" href="/admin/dashboard">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-dark text-white shadow-md">
+              <Droplets className="size-5" />
+            </div>
+            <div>
+              <p className="font-bold leading-tight">Aqua Lifestyle</p>
+              <p className="text-xs text-muted-foreground">Administration</p>
+            </div>
+          </Link>
+          <UserMenu />
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header className="sticky top-0 z-40 w-full glass">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
