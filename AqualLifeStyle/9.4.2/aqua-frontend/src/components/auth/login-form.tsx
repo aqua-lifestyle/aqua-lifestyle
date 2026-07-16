@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import { z } from "zod";
 
 import { login } from "@/src/shared/api/auth-service";
+import { publicEnv } from "@/src/shared/config";
 import { getLoginDestination } from "@/src/shared/auth/roles";
 import { useHydrated } from "@/src/shared/lib/use-hydrated";
-import { useAuthActions, useTenantState, useToast } from "@/src/providers";
+import { useAuthActions, useTenantActions, useTenantState, useToast } from "@/src/providers";
 import {
   Button,
   Card,
@@ -35,7 +36,8 @@ const getSafeRedirect = () => {
 export const LoginForm = () => {
   const router = useRouter();
   const { setSession } = useAuthActions();
-  const { currentTenant, isHost } = useTenantState();
+  const { currentTenant } = useTenantState();
+  const { clearTenant, setTenant } = useTenantActions();
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -43,6 +45,9 @@ export const LoginForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [selectedWorkspace, setSelectedWorkspace] = useState(
+    currentTenant ?? publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME,
+  );
   const hasMounted = useHydrated();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -69,7 +74,7 @@ export const LoginForm = () => {
       email: result.data.email,
       password: result.data.password,
       rememberMe: result.data.rememberMe,
-      tenant: currentTenant,
+      tenant: selectedWorkspace || null,
     });
 
     if (!authResult.ok) {
@@ -83,6 +88,7 @@ export const LoginForm = () => {
     }
 
     setSession(authResult.session);
+    if (selectedWorkspace) setTenant(selectedWorkspace); else clearTenant();
 
     toast({
       message: `Signed in as ${result.data.email}`,
@@ -106,7 +112,7 @@ export const LoginForm = () => {
             </div>
             <h2 className="mt-6 text-3xl font-bold">Aqua Lifestyle Club</h2>
             <p className="mt-2 text-white/80">
-              Enterprise-grade club management, designed for modern teams.
+              Manage memberships and the aQua network from one secure place.
             </p>
           </div>
         </div>
@@ -128,20 +134,16 @@ export const LoginForm = () => {
             <Card className="mt-6">
               <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
                 <SelectField
-                  label="Tenant"
+                  label="Workspace"
                   name="tenant"
-                  value={hasMounted && !isHost ? currentTenant ?? "" : ""}
-                  onChange={(e) => {
-                    // Tenant selection is handled via the top-level TenantSwitcher.
-                    // This select is for display purposes on the login page.
-                    e.preventDefault();
-                  }}
+                  value={hasMounted ? selectedWorkspace : publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME}
+                  onChange={(event) => setSelectedWorkspace(event.target.value)}
                 >
-                  <option value="">Host mode</option>
-                  {hasMounted && currentTenant ? (
-                    <option value={currentTenant}>{currentTenant}</option>
-                  ) : null}
+                  <option value={publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME}>Area workspace</option>
+                  {hasMounted && currentTenant && currentTenant !== publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME ? <option value={currentTenant}>{currentTenant}</option> : null}
+                  <option value="">Platform administration</option>
                 </SelectField>
+                <p className="-mt-2 text-xs text-muted-foreground">Choose Platform administration only when signing in with the platform administrator account.</p>
 
                 <TextField
                   autoComplete="username"

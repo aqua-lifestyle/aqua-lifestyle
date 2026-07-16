@@ -127,9 +127,7 @@ export const login = async (input: LoginInput): Promise<LoginResult> => {
       "Content-Type": "application/json",
     };
 
-    if (input.tenant) {
-      headers["__tenant"] = input.tenant;
-    }
+    headers["__tenant"] = input.tenant ?? "";
 
     const response = await axios.post<{
       result: {

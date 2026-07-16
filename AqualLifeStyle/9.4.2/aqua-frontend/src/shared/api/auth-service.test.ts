@@ -23,4 +23,9 @@ describe("claimsToUser", () => {
     expect(claimsToUser({ email: "member@example.com", name: "Member", role: "Member", sub: "42", tenantId: "7" }))
       .toMatchObject({ email: "member@example.com", id: 42, role: "Member", tenantId: 7 });
   });
+
+  it("maps the granted permission list included in an administrator token", () => {
+    expect(claimsToUser({ permissions: "Aqua.Admin.Users.View,Aqua.Admin.Tenants.View", role: "Admin", sub: "1" })?.permissions)
+      .toEqual(["Aqua.Admin.Users.View", "Aqua.Admin.Tenants.View"]);
+  });
 });

@@ -15,6 +15,7 @@ using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Models.TokenAuth;
 using AqualLifeStyle.MultiTenancy;
+using Abp.Domain.Uow;
 
 namespace AqualLifeStyle.Controllers
 {
@@ -26,19 +27,25 @@ namespace AqualLifeStyle.Controllers
         private readonly AbpLoginResultTypeHelper _abpLoginResultTypeHelper;
         private readonly TokenAuthConfiguration _configuration;
         private readonly IConfiguration _appConfiguration;
+        private readonly UserManager _userManager;
+        private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public TokenAuthController(
             LogInManager logInManager,
             ITenantCache tenantCache,
             AbpLoginResultTypeHelper abpLoginResultTypeHelper,
             TokenAuthConfiguration configuration,
-            IConfiguration appConfiguration)
+            IConfiguration appConfiguration,
+            UserManager userManager,
+            IUnitOfWorkManager unitOfWorkManager)
         {
             _logInManager = logInManager;
             _tenantCache = tenantCache;
             _abpLoginResultTypeHelper = abpLoginResultTypeHelper;
             _configuration = configuration;
             _appConfiguration = appConfiguration;
+            _userManager = userManager;
+            _unitOfWorkManager = unitOfWorkManager;
         }
 
         [HttpPost]
@@ -50,7 +57,14 @@ namespace AqualLifeStyle.Controllers
                 GetTenancyNameOrNull()
             );
 
-            var accessToken = CreateAccessToken(CreateJwtClaims(loginResult.Identity));
+            var claims = CreateJwtClaims(loginResult.Identity);
+            IReadOnlyList<Permission> grantedPermissions;
+            using (_unitOfWorkManager.Current.SetTenantId(loginResult.User.TenantId))
+            {
+                grantedPermissions = (await _userManager.GetGrantedPermissionsAsync(loginResult.User)).ToList();
+            }
+            claims.Add(new Claim("permissions", string.Join(",", grantedPermissions.Select(permission => permission.Name))));
+            var accessToken = CreateAccessToken(claims);
 
             return new AuthenticateResultModel
             {
@@ -63,6 +77,12 @@ namespace AqualLifeStyle.Controllers
 
         private string GetTenancyNameOrNull()
         {
+            if (Request.Headers.ContainsKey("__tenant"))
+            {
+                var requestedTenant = Request.Headers["__tenant"].FirstOrDefault();
+                return string.IsNullOrWhiteSpace(requestedTenant) ? null : requestedTenant;
+            }
+
             if (AbpSession.TenantId.HasValue)
             {
                 return _tenantCache.GetOrNull(AbpSession.TenantId.Value)?.TenancyName;

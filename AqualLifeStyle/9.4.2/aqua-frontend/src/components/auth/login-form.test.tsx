@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useAuthActions, useTenantState, useToast } from "@/src/providers";
+import { useAuthActions, useTenantActions, useTenantState, useToast } from "@/src/providers";
 import { getLoginDestination } from "@/src/shared/auth/roles";
 
 import { LoginForm } from "./login-form";
@@ -19,6 +19,7 @@ vi.mock("@/src/providers", async () => {
   return {
     ...actual,
     useAuthActions: vi.fn(),
+    useTenantActions: vi.fn(),
     useTenantState: vi.fn(),
     useToast: vi.fn(),
   };
@@ -49,6 +50,7 @@ describe("LoginForm", () => {
       setSession,
     });
     vi.mocked(useTenantState).mockReturnValue({ currentTenant: null, isHost: true });
+    vi.mocked(useTenantActions).mockReturnValue({ clearTenant: vi.fn(), setTenant: vi.fn() });
     vi.mocked(useToast).mockReturnValue({ toast });
   });
 
