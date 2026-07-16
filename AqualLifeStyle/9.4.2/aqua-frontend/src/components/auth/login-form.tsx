@@ -6,14 +6,16 @@ import { useRouter } from "next/navigation";
 import { z } from "zod";
 
 import { login } from "@/src/shared/api/auth-service";
+import { publicEnv } from "@/src/shared/config";
 import { getLoginDestination } from "@/src/shared/auth/roles";
 import { useHydrated } from "@/src/shared/lib/use-hydrated";
-import { useAuthActions, useTenantState, useToast } from "@/src/providers";
+import { useAuthActions, useTenantActions, useTenantState, useToast } from "@/src/providers";
 import {
   Button,
   Card,
   LinkButton,
   SelectField,
+  StatusMessage,
   TextField,
 } from "@/src/shared/ui";
 
@@ -25,6 +27,17 @@ const loginSchema = z.object({
 
 type FieldErrors = Partial<Record<"email" | "password", string>>;
 
+const ACCOUNT_TYPE_WORKSPACE_NAMES = new Set([
+  "admin", "arealeader", "customer", "facilitator", "guest", "member", "systemadmin",
+]);
+
+export const getLoginAreaName = (currentArea: string | null, defaultArea: string) => {
+  const normalizedCurrentArea = currentArea?.replace(/[\s_-]/g, "").toLowerCase();
+  return currentArea && !ACCOUNT_TYPE_WORKSPACE_NAMES.has(normalizedCurrentArea ?? "")
+    ? currentArea
+    : defaultArea;
+};
+
 const getSafeRedirect = () => {
   const redirect = new URLSearchParams(window.location.search).get("redirect");
   return redirect?.startsWith("/") && !redirect.startsWith("//")
@@ -35,15 +48,24 @@ const getSafeRedirect = () => {
 export const LoginForm = () => {
   const router = useRouter();
   const { setSession } = useAuthActions();
-  const { currentTenant, isHost } = useTenantState();
+  const { currentTenant } = useTenantState();
+  const { clearTenant, setTenant } = useTenantActions();
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [requestError, setRequestError] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [selectedWorkspace, setSelectedWorkspace] = useState(
+    getLoginAreaName(currentTenant, publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME),
+  );
   const hasMounted = useHydrated();
+  const currentAreaName = getLoginAreaName(
+    currentTenant,
+    publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME,
+  );
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -62,6 +84,7 @@ export const LoginForm = () => {
     }
 
     setFieldErrors({});
+    setRequestError(undefined);
     setIsLoading(true);
 
     // Real authentication via the ABP TokenAuth endpoint.
@@ -69,10 +92,11 @@ export const LoginForm = () => {
       email: result.data.email,
       password: result.data.password,
       rememberMe: result.data.rememberMe,
-      tenant: currentTenant,
+      tenant: selectedWorkspace || null,
     });
 
     if (!authResult.ok) {
+      setRequestError(authResult.message);
       toast({
         message: authResult.message,
         title: "Sign in failed",
@@ -83,6 +107,7 @@ export const LoginForm = () => {
     }
 
     setSession(authResult.session);
+    if (selectedWorkspace) setTenant(selectedWorkspace); else clearTenant();
 
     toast({
       message: `Signed in as ${result.data.email}`,
@@ -106,7 +131,7 @@ export const LoginForm = () => {
             </div>
             <h2 className="mt-6 text-3xl font-bold">Aqua Lifestyle Club</h2>
             <p className="mt-2 text-white/80">
-              Enterprise-grade club management, designed for modern teams.
+              Manage memberships and the aQua network from one secure place.
             </p>
           </div>
         </div>
@@ -128,20 +153,16 @@ export const LoginForm = () => {
             <Card className="mt-6">
               <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
                 <SelectField
-                  label="Tenant"
+                  label="Workspace"
                   name="tenant"
-                  value={hasMounted && !isHost ? currentTenant ?? "" : ""}
-                  onChange={(e) => {
-                    // Tenant selection is handled via the top-level TenantSwitcher.
-                    // This select is for display purposes on the login page.
-                    e.preventDefault();
-                  }}
+                  value={hasMounted ? selectedWorkspace : publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME}
+                  onChange={(event) => setSelectedWorkspace(event.target.value)}
                 >
-                  <option value="">Host mode</option>
-                  {hasMounted && currentTenant ? (
-                    <option value={currentTenant}>{currentTenant}</option>
-                  ) : null}
+                  <option value={publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME}>Area workspace</option>
+                  {hasMounted && currentAreaName !== publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME ? <option value={currentAreaName}>{currentAreaName}</option> : null}
+                  <option value="">Platform administration</option>
                 </SelectField>
+                <p className="-mt-2 text-xs text-muted-foreground">Choose Platform administration only when signing in with the platform administrator account.</p>
 
                 <TextField
                   autoComplete="username"
@@ -190,6 +211,7 @@ export const LoginForm = () => {
                 <Button className="w-full" disabled={isLoading} isLoading={isLoading} type="submit">
                   Sign in
                 </Button>
+                {requestError ? <StatusMessage tone="error">{requestError}</StatusMessage> : null}
               </form>
             </Card>
 

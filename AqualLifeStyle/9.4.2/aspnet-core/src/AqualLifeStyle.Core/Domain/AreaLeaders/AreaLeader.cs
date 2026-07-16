@@ -18,6 +18,8 @@ namespace AqualLifeStyle.Domain.AreaLeaders
         public LicenseType LicenseType { get; private set; }
         public decimal LicenseFee { get; private set; }
         public AreaLeaderRank Rank { get; private set; }
+        public bool IsApproved { get; private set; }
+        public DateTime? ApprovedAt { get; private set; }
         public int? AreaSpaceId { get; private set; }
         public decimal MonthlySubscription { get; private set; }
         public int DirectReferrals { get; private set; }
@@ -38,6 +40,7 @@ namespace AqualLifeStyle.Domain.AreaLeaders
             LicenseType = licenseType;
             LicenseFee = LicenseFeeFor(licenseType);
             Rank = AreaLeaderRank.Ruby;
+            IsApproved = false;
             DirectReferrals = 0;
             IndirectReferrals = 0;
             OrderTarget = 0;
@@ -78,7 +81,23 @@ namespace AqualLifeStyle.Domain.AreaLeaders
         public void PromoteToCurrentRank(RankProgressionPolicy policy)
         {
             if (policy == null) throw new ArgumentNullException(nameof(policy));
-            Rank = policy.EvaluateAreaLeaderRank(OrderTarget);
+            var attainedRank = policy.EvaluateAreaLeaderRank(OrderTarget);
+            if (attainedRank > Rank) Rank = attainedRank;
+        }
+
+        public void ApproveApplication(DateTime? approvedAtUtc = null)
+        {
+            if (IsDeleted) throw new InvalidOperationException("Cannot approve a deleted area leader.");
+            if (IsApproved) return;
+            IsApproved = true;
+            ApprovedAt = approvedAtUtc ?? DateTime.UtcNow;
+        }
+
+        public void DemoteOneRank()
+        {
+            if (IsDeleted) throw new InvalidOperationException("Cannot demote a deleted area leader.");
+            if (Rank == AreaLeaderRank.Ruby) return;
+            Rank = (AreaLeaderRank)((int)Rank - 1);
         }
 
         private static decimal LicenseFeeFor(LicenseType licenseType) => licenseType switch

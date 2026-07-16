@@ -18,7 +18,7 @@ const variantClassNames: Record<LinkButtonVariant, string> = {
     "border border-border bg-card text-foreground hover:bg-muted hover:border-border/80",
   primary:
     "bg-accent text-white hover:bg-accent-dark shadow-sm shadow-accent/20",
-  secondary: "bg-primary text-white hover:bg-primary-light",
+  secondary: "bg-primary text-background hover:bg-primary-light",
 };
 
 const sizeClassNames: Record<LinkButtonSize, string> = {

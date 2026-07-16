@@ -57,7 +57,102 @@ namespace AqualLifeStyle.Authorization
             CreateGroup(context, AquaPermissions.Enquiries.Default, AquaPermissions.Enquiries.View, AquaPermissions.Enquiries.Create, AquaPermissions.Enquiries.Update, AquaPermissions.Enquiries.Resolve, AquaPermissions.Enquiries.ViewSelf);
             CreateGroup(context, AquaPermissions.Referrals.Default, AquaPermissions.Referrals.View, AquaPermissions.Referrals.Create, AquaPermissions.Referrals.Confirm, AquaPermissions.Referrals.ViewSelf);
             CreateGroup(context, AquaPermissions.Memberships.Default, AquaPermissions.Memberships.View, AquaPermissions.Memberships.ViewSelf, AquaPermissions.Memberships.Upgrade);
-            CreateGroup(context, AquaPermissions.Admin.Default, MultiTenancySides.Host, AquaPermissions.Admin.Dashboard, AquaPermissions.Admin.Reports, AquaPermissions.Admin.Audit, AquaPermissions.Admin.Settings, AquaPermissions.Admin.AllTenants);
+            RegisterAdminPermissions(context);
+        }
+
+        private static void RegisterAdminPermissions(IPermissionDefinitionContext context)
+        {
+            var sides = MultiTenancySides.Host | MultiTenancySides.Tenant;
+            var admin = context.CreatePermission(
+                AquaPermissions.Admin.Default,
+                L(AquaPermissions.Admin.Default),
+                multiTenancySides: sides);
+            CreateChildren(
+                admin,
+                sides,
+                AquaPermissions.Admin.Dashboard,
+                AquaPermissions.Admin.Reports,
+                AquaPermissions.Admin.Audit,
+                AquaPermissions.Admin.Settings);
+
+            var users = admin.CreateChildPermission(
+                AquaPermissions.Admin.Users.Default,
+                L(AquaPermissions.Admin.Users.Default),
+                multiTenancySides: sides);
+            CreateChildren(users, sides,
+                AquaPermissions.Admin.Users.View,
+                AquaPermissions.Admin.Users.Create,
+                AquaPermissions.Admin.Users.Edit,
+                AquaPermissions.Admin.Users.Delete,
+                AquaPermissions.Admin.Users.AssignRole,
+                AquaPermissions.Admin.Users.ResetPassword);
+
+            var customers = admin.CreateChildPermission(
+                AquaPermissions.Admin.Customers.Default,
+                L(AquaPermissions.Admin.Customers.Default),
+                multiTenancySides: sides);
+            CreateChildren(customers, sides,
+                AquaPermissions.Admin.Customers.View,
+                AquaPermissions.Admin.Customers.Create,
+                AquaPermissions.Admin.Customers.Edit,
+                AquaPermissions.Admin.Customers.Delete,
+                AquaPermissions.Admin.Customers.Import);
+
+            var areaLeaders = admin.CreateChildPermission(
+                AquaPermissions.Admin.AreaLeaders.Default,
+                L(AquaPermissions.Admin.AreaLeaders.Default),
+                multiTenancySides: sides);
+            CreateChildren(areaLeaders, sides,
+                AquaPermissions.Admin.AreaLeaders.View,
+                AquaPermissions.Admin.AreaLeaders.Approve,
+                AquaPermissions.Admin.AreaLeaders.Promote,
+                AquaPermissions.Admin.AreaLeaders.Demote,
+                AquaPermissions.Admin.AreaLeaders.Remove);
+
+            var facilitators = admin.CreateChildPermission(
+                AquaPermissions.Admin.Facilitators.Default,
+                L(AquaPermissions.Admin.Facilitators.Default),
+                multiTenancySides: sides);
+            CreateChildren(facilitators, sides,
+                AquaPermissions.Admin.Facilitators.View,
+                AquaPermissions.Admin.Facilitators.Approve,
+                AquaPermissions.Admin.Facilitators.Promote,
+                AquaPermissions.Admin.Facilitators.Demote,
+                AquaPermissions.Admin.Facilitators.Remove);
+
+            var members = admin.CreateChildPermission(
+                AquaPermissions.Admin.Members.Default,
+                L(AquaPermissions.Admin.Members.Default),
+                multiTenancySides: sides);
+            CreateChildren(members, sides,
+                AquaPermissions.Admin.Members.View,
+                AquaPermissions.Admin.Members.Edit,
+                AquaPermissions.Admin.Members.Suspend,
+                AquaPermissions.Admin.Members.ChangeTier);
+
+            var host = MultiTenancySides.Host;
+            CreateChildren(admin, host, AquaPermissions.Admin.AllTenants);
+            var tenants = admin.CreateChildPermission(
+                AquaPermissions.Admin.Tenants.Default,
+                L(AquaPermissions.Admin.Tenants.Default),
+                multiTenancySides: host);
+            CreateChildren(tenants, host,
+                AquaPermissions.Admin.Tenants.View,
+                AquaPermissions.Admin.Tenants.Create,
+                AquaPermissions.Admin.Tenants.Edit,
+                AquaPermissions.Admin.Tenants.Activate,
+                AquaPermissions.Admin.Tenants.AssignLeader);
+        }
+
+        private static void CreateChildren(
+            Permission parent,
+            MultiTenancySides sides,
+            params string[] childNames)
+        {
+            foreach (var childName in childNames)
+            {
+                parent.CreateChildPermission(childName, L(childName), multiTenancySides: sides);
+            }
         }
 
         private static void CreateGroup(IPermissionDefinitionContext context, string parentName, params string[] childNames)

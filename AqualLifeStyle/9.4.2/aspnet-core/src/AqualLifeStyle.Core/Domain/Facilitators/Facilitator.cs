@@ -17,6 +17,8 @@ namespace AqualLifeStyle.Domain.Facilitators
         public int AreaLeaderId { get; private set; }
         public AreaLeader AreaLeader { get; private set; }
         public FacilitatorRank Rank { get; private set; }
+        public bool IsApproved { get; private set; }
+        public DateTime? ApprovedAt { get; private set; }
         public int DirectReferrals { get; private set; }
         public int IndirectReferrals { get; private set; }
         public decimal AwardBalance { get; private set; }
@@ -35,6 +37,7 @@ namespace AqualLifeStyle.Domain.Facilitators
             CustomerId = customerId;
             AreaLeaderId = areaLeaderId;
             Rank = FacilitatorRank.Bronze;
+            IsApproved = false;
             DirectReferrals = 0;
             IndirectReferrals = 0;
             AwardBalance = 0m;
@@ -89,6 +92,30 @@ namespace AqualLifeStyle.Domain.Facilitators
             Rank = rank;
             AwardBalance += awardAmount;
             DomainEvents.Add(new FacilitatorRankAchievedEvent(Id, CustomerId, rank, awardAmount));
+        }
+
+        public void ApproveApplication(DateTime? approvedAtUtc = null)
+        {
+            if (IsDeleted) throw new InvalidOperationException("Cannot approve a deleted facilitator.");
+            if (IsApproved) return;
+            IsApproved = true;
+            ApprovedAt = approvedAtUtc ?? DateTime.UtcNow;
+        }
+
+        public void PromoteToEarnedRank(RankProgressionPolicy progressionPolicy, CommissionCalculator commissionCalculator)
+        {
+            if (progressionPolicy == null) throw new ArgumentNullException(nameof(progressionPolicy));
+            if (commissionCalculator == null) throw new ArgumentNullException(nameof(commissionCalculator));
+            var earnedRank = progressionPolicy.EvaluateFacilitatorRank(DirectReferrals);
+            if (earnedRank <= Rank) return;
+            AwardRank(earnedRank, commissionCalculator.ComputeFacilitatorAward(earnedRank).Amount);
+        }
+
+        public void DemoteOneRank()
+        {
+            if (IsDeleted) throw new InvalidOperationException("Cannot demote a deleted facilitator.");
+            if (Rank == FacilitatorRank.Bronze) return;
+            Rank = (FacilitatorRank)((int)Rank - 1);
         }
     }
 }

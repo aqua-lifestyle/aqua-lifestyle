@@ -1,11 +1,14 @@
 using System.Threading.Tasks;
 using Abp.Configuration;
+using Abp.Auditing;
+using Abp.UI;
 using Abp.Zero.Configuration;
 using AqualLifeStyle.Authorization.Accounts.Dto;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using Microsoft.Extensions.Configuration;
+using Microsoft.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Authorization.Accounts
 {
@@ -83,6 +86,38 @@ namespace AqualLifeStyle.Authorization.Accounts
             {
                 CanLogin = user.IsActive && (user.IsEmailConfirmed || !isEmailConfirmationRequiredForLogin)
             };
+        }
+
+        [DisableAuditing]
+        public async Task<bool> CompletePasswordSetup(CompletePasswordSetupInput input)
+        {
+            if (input == null)
+                throw new UserFriendlyException("Password setup failed.", "The request was empty.");
+            var tenant = await TenantManager.FindByTenancyNameAsync(input.AreaName);
+            if (tenant == null || !tenant.IsActive)
+                throw new UserFriendlyException("Password setup failed.", "This password setup link is invalid or has expired.");
+
+            using (CurrentUnitOfWork.SetTenantId(tenant.Id))
+            {
+                await UserManager.InitializeOptionsAsync(tenant.Id);
+                var user = await UserManager.FindByIdAsync(input.UserId.ToString());
+                var customer = user == null
+                    ? null
+                    : await _customerRepository.GetAll().SingleOrDefaultAsync(item => item.UserId == user.Id);
+                if (user == null || user.TenantId != tenant.Id || customer == null)
+                    throw new UserFriendlyException("Password setup failed.", "This password setup link is invalid or has expired.");
+
+                var resetResult = await UserManager.ResetPasswordAsync(user, input.ResetToken, input.NewPassword);
+                if (!resetResult.Succeeded)
+                    throw new UserFriendlyException("Password setup failed.", "This password setup link is invalid or has expired. Ask an administrator for a new link.");
+
+                user.CompleteRequiredPasswordReset();
+                user.IsActive = customer.IsActive;
+                CheckErrors(await UserManager.UpdateAsync(user));
+                await CurrentUnitOfWork.SaveChangesAsync();
+                Logger.Info($"Customer password setup completed tenant={tenant.Id} user={user.Id} customer={customer.Id}");
+                return true;
+            }
         }
     }
 }

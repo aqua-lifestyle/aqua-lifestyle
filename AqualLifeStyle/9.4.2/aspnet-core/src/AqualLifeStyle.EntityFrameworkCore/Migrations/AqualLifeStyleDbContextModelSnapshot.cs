@@ -1591,6 +1591,9 @@ namespace AqualLifeStyle.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int?>("AreaSpaceId")
                         .HasColumnType("integer");
 
@@ -1614,6 +1617,9 @@ namespace AqualLifeStyle.Migrations
 
                     b.Property<int>("IndirectReferrals")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("IsApproved")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -1737,8 +1743,29 @@ namespace AqualLifeStyle.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
 
                     b.Property<int?>("MembershipId")
                         .HasColumnType("integer");
@@ -1866,6 +1893,9 @@ namespace AqualLifeStyle.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("AreaLeaderId")
                         .HasColumnType("integer");
 
@@ -1892,6 +1922,9 @@ namespace AqualLifeStyle.Migrations
 
                     b.Property<int>("IndirectReferrals")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("IsApproved")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -2157,6 +2190,9 @@ namespace AqualLifeStyle.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AreaLeaderId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("ConnectionString")
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
@@ -2199,6 +2235,8 @@ namespace AqualLifeStyle.Migrations
                         .HasColumnType("character varying(64)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AreaLeaderId");
 
                     b.HasIndex("CreatorUserId");
 
@@ -2456,7 +2494,7 @@ namespace AqualLifeStyle.Migrations
 
             modelBuilder.Entity("AqualLifeStyle.Domain.Customers.Customer", b =>
                 {
-                    b.HasOne("AqualLifeStyle.Authorization.Users.User", null)
+                    b.HasOne("AqualLifeStyle.Authorization.Users.User", "User")
                         .WithOne()
                         .HasForeignKey("AqualLifeStyle.Domain.Customers.Customer", "UserId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2485,6 +2523,8 @@ namespace AqualLifeStyle.Migrations
                         });
 
                     b.Navigation("Email");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("AqualLifeStyle.Domain.Enquiries.EnquiryFollowUp", b =>
@@ -2540,6 +2580,11 @@ namespace AqualLifeStyle.Migrations
 
             modelBuilder.Entity("AqualLifeStyle.MultiTenancy.Tenant", b =>
                 {
+                    b.HasOne("AqualLifeStyle.Domain.AreaLeaders.AreaLeader", null)
+                        .WithMany()
+                        .HasForeignKey("AreaLeaderId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("AqualLifeStyle.Authorization.Users.User", "CreatorUser")
                         .WithMany()
                         .HasForeignKey("CreatorUserId");

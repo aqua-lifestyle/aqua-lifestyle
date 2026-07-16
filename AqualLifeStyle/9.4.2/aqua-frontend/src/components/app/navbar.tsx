@@ -41,7 +41,7 @@ const moreLinks = [
   { href: "/facilitator", icon: UserPlus, label: "Facilitators", permission: "Pages.Facilitators" },
   { href: "/facilitator/dashboard", icon: LayoutDashboard, label: "Facilitator dashboard", permission: "Pages.Facilitators" },
   { href: "/facilitator/my-referrals", icon: DollarSign, label: "My referrals", permission: "Pages.Referrals" },
-  { href: "/member", icon: User, label: "Member", permission: "Pages.Orders" },
+  { href: "/member", icon: User, label: "Club member", permission: "Pages.Orders" },
   { href: "/member/enquiries", icon: MessageSquare, label: "My enquiries", permission: "Pages.Enquiries" },
   { href: "/catalog", icon: Package, label: "Catalog", permission: null },
   { href: "/contact", icon: Mail, label: "Contact", permission: null },
@@ -76,6 +76,12 @@ export const Navbar = () => {
   const primaryLinks = isSystemAdmin(session?.user?.role)
     ? [
         { href: "/admin/dashboard", icon: LayoutDashboard, label: "Admin", permission: null },
+        {
+          href: "/admin/customers",
+          icon: Users,
+          label: "Admin customers",
+          permission: "Aqua.Admin.Customers.View",
+        },
         ...mainLinks,
       ]
     : mainLinks;
@@ -88,6 +94,25 @@ export const Navbar = () => {
   const canCreateCustomer = session?.user?.permissions?.includes("Aqua.Members.Create") ?? false;
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+
+  if (pathname.startsWith("/admin")) {
+    return (
+      <header className="sticky top-0 z-40 w-full border-b border-border bg-card/95 backdrop-blur">
+        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Link className="flex items-center gap-3 text-foreground transition hover:opacity-80" href="/admin/dashboard">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-dark text-white shadow-md">
+              <Droplets className="size-5" />
+            </div>
+            <div>
+              <p className="font-bold leading-tight">Aqua Lifestyle</p>
+              <p className="text-xs text-muted-foreground">Administration</p>
+            </div>
+          </Link>
+          <UserMenu />
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="sticky top-0 z-40 w-full glass">

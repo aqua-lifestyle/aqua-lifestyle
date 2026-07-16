@@ -103,6 +103,66 @@ namespace AqualLifeStyle.Authorization
             public const string Audit = Default + ".Audit";
             public const string Settings = Default + ".Settings";
             public const string AllTenants = Default + ".AllTenants";
+
+            public static class Users
+            {
+                public const string Default = Admin.Default + ".Users";
+                public const string View = Default + ".View";
+                public const string Create = Default + ".Create";
+                public const string Edit = Default + ".Edit";
+                public const string Delete = Default + ".Delete";
+                public const string AssignRole = Default + ".AssignRole";
+                public const string ResetPassword = Default + ".ResetPassword";
+            }
+
+            public static class Tenants
+            {
+                public const string Default = Admin.Default + ".Tenants";
+                public const string View = Default + ".View";
+                public const string Create = Default + ".Create";
+                public const string Edit = Default + ".Edit";
+                public const string Activate = Default + ".Activate";
+                public const string AssignLeader = Default + ".AssignLeader";
+            }
+
+            public static class Customers
+            {
+                public const string Default = Admin.Default + ".Customers";
+                public const string View = Default + ".View";
+                public const string Create = Default + ".Create";
+                public const string Edit = Default + ".Edit";
+                public const string Delete = Default + ".Delete";
+                public const string Import = Default + ".Import";
+            }
+
+            public static class AreaLeaders
+            {
+                public const string Default = Admin.Default + ".AreaLeaders";
+                public const string View = Default + ".View";
+                public const string Approve = Default + ".Approve";
+                public const string Promote = Default + ".Promote";
+                public const string Demote = Default + ".Demote";
+                public const string Remove = Default + ".Remove";
+            }
+
+            public static class Facilitators
+            {
+                public const string Default = Admin.Default + ".Facilitators";
+                public const string View = Default + ".View";
+                public const string Approve = Default + ".Approve";
+                public const string Promote = Default + ".Promote";
+                public const string Demote = Default + ".Demote";
+                public const string Remove = Default + ".Remove";
+            }
+
+            public static class Members
+            {
+                public const string Default = Admin.Default + ".Members";
+                public const string View = Default + ".View";
+                public const string Edit = Default + ".Edit";
+                public const string Suspend = Default + ".Suspend";
+                public const string ChangeTier = Default + ".ChangeTier";
+            }
         }
 
         private static readonly Lazy<IReadOnlyCollection<string>> AllPermissionNames =

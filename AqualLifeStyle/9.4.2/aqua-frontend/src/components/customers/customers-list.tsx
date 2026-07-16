@@ -29,6 +29,8 @@ import {
   StatusMessage,
 } from "@/src/shared/ui";
 import { cn } from "@/src/shared/lib/utils";
+import { ImportCustomersDialog } from "@/src/components/admin/ImportCustomersDialog";
+import { CustomerDialog } from "@/src/components/admin/CustomerDialog";
 
 type CustomerStatusFilter = "all" | "active" | "inactive";
 
@@ -39,7 +41,11 @@ const searchFn = (customer: { email: string; name: string }, query: string) => {
   );
 };
 
-export const CustomersList = () => {
+type CustomersListProps = {
+  showAdminImport?: boolean;
+};
+
+export const CustomersList = ({ showAdminImport = false }: CustomersListProps) => {
   const [membershipFilter, setMembershipFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<CustomerStatusFilter>("all");
   const [view, setView] = useState<"table" | "cards">("table");
@@ -173,12 +179,15 @@ export const CustomersList = () => {
               enquiries.
             </p>
           </div>
-          {canCreateCustomer ? (
-            <LinkButton href="/customers/register" variant="primary">
-              <Plus className="size-4" />
-              Add customer
-            </LinkButton>
-          ) : null}
+          <div className="flex flex-wrap gap-3">
+            {showAdminImport ? <ImportCustomersDialog onImported={getCustomers} /> : null}
+            {showAdminImport ? <CustomerDialog onCreated={getCustomers} /> : canCreateCustomer ? (
+              <LinkButton href="/customers/register" variant="primary">
+                <Plus className="size-4" />
+                Add customer
+              </LinkButton>
+            ) : null}
+          </div>
         </header>
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useAuthActions, useTenantState, useToast } from "@/src/providers";
+import { useAuthActions, useTenantActions, useTenantState, useToast } from "@/src/providers";
 import { getLoginDestination } from "@/src/shared/auth/roles";
 
 import { LoginForm } from "./login-form";
@@ -19,6 +19,7 @@ vi.mock("@/src/providers", async () => {
   return {
     ...actual,
     useAuthActions: vi.fn(),
+    useTenantActions: vi.fn(),
     useTenantState: vi.fn(),
     useToast: vi.fn(),
   };
@@ -49,6 +50,7 @@ describe("LoginForm", () => {
       setSession,
     });
     vi.mocked(useTenantState).mockReturnValue({ currentTenant: null, isHost: true });
+    vi.mocked(useTenantActions).mockReturnValue({ clearTenant: vi.fn(), setTenant: vi.fn() });
     vi.mocked(useToast).mockReturnValue({ toast });
   });
 
@@ -164,6 +166,31 @@ describe("LoginForm", () => {
     expect(login).toHaveBeenCalledWith(
       expect.objectContaining({ email: "admin", password: "123qwe" }),
     );
+  });
+
+  it("does not treat a legacy customer account type as an Area name", async () => {
+    const { login } = await import("@/src/shared/api/auth-service");
+    vi.mocked(useTenantState).mockReturnValue({ currentTenant: "customer", isHost: false });
+    vi.mocked(login).mockResolvedValue({
+      ok: false,
+      message: "The username, password, or Area workspace is incorrect.",
+    });
+
+    render(<LoginForm />);
+    fireEvent.change(screen.getByLabelText("Username or email"), {
+      target: { value: "new.customer@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "Temporary123!" },
+    });
+    submitForm();
+
+    await waitFor(() => expect(login).toHaveBeenCalledWith(
+      expect.objectContaining({ tenant: "Default" }),
+    ));
+    expect(
+      await screen.findByText("The username, password, or Area workspace is incorrect."),
+    ).toBeInTheDocument();
   });
 
   it("opens the Area Leader dashboard after an Area Leader signs in", async () => {

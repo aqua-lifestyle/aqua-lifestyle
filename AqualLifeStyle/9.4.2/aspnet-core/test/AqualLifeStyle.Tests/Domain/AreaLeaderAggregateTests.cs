@@ -126,5 +126,30 @@ namespace AqualLifeStyle.Tests.Domain
 
             leader.Rank.ShouldBe(AreaLeaderRank.Diamond);
         }
+
+        [Fact]
+        public void ApproveApplication_RecordsApprovalOnlyOnce()
+        {
+            var leader = AreaLeader.Apply(1, 10, LicenseType.EntreLevel);
+            var approvedAt = new DateTime(2026, 7, 15, 12, 0, 0, DateTimeKind.Utc);
+
+            leader.ApproveApplication(approvedAt);
+            leader.ApproveApplication(approvedAt.AddHours(1));
+
+            leader.IsApproved.ShouldBeTrue();
+            leader.ApprovedAt.ShouldBe(approvedAt);
+        }
+
+        [Fact]
+        public void DemoteOneRank_MovesDownOneTier()
+        {
+            var leader = AreaLeader.Apply(1, 10, LicenseType.EntreLevel);
+            Enumerable.Range(0, 100).ToList().ForEach(_ => leader.RecordStartupOrder());
+            leader.PromoteToCurrentRank(_policy);
+
+            leader.DemoteOneRank();
+
+            leader.Rank.ShouldBe(AreaLeaderRank.Emerald);
+        }
     }
 }

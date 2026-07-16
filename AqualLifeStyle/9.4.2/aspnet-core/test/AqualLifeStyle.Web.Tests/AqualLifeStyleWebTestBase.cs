@@ -77,20 +77,12 @@ namespace AqualLifeStyle.Web.Tests
         /// <param name="tenancyName"></param>
         /// <param name="input"></param>
         /// <returns></returns>
-        protected async Task AuthenticateAsync(string tenancyName, AuthenticateModel input)
+        protected async Task<AuthenticateResultModel> AuthenticateAsync(string tenancyName, AuthenticateModel input)
         {
-            if (tenancyName.IsNullOrWhiteSpace())
-            {
-                var tenant = UsingDbContext(context => context.Tenants.FirstOrDefault(t => t.TenancyName == tenancyName));
-                if (tenant != null)
-                {
-                    AbpSession.TenantId = tenant.Id;
-                    Client.DefaultRequestHeaders.Add("Abp.TenantId", tenant.Id.ToString());  //Set TenantId
-                }
-            }
-
-            var response = await Client.PostAsync("/api/TokenAuth/Authenticate",
-                new StringContent(input.ToJsonString(), Encoding.UTF8, "application/json"));
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/TokenAuth/Authenticate");
+            request.Headers.Add("__tenant", tenancyName ?? string.Empty);
+            request.Content = new StringContent(input.ToJsonString(), Encoding.UTF8, "application/json");
+            var response = await Client.SendAsync(request);
             response.StatusCode.ShouldBe(HttpStatusCode.OK);
             var result = JsonSerializer.Deserialize<AjaxResponse<AuthenticateResultModel>>(await response.Content.ReadAsStringAsync(), new JsonSerializerOptions()
             {
@@ -99,6 +91,7 @@ namespace AqualLifeStyle.Web.Tests
             Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", result.Result.AccessToken);
 
             AbpSession.UserId = result.Result.UserId;
+            return result.Result;
         }
 
         #endregion

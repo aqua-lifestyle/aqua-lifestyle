@@ -228,9 +228,9 @@ export const SignupForm = () => {
               <h1 className="mt-4 text-2xl font-bold">Aqua Lifestyle Club</h1>
             </div>
 
-            <h1 className="text-2xl font-bold tracking-tight">Create your account</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Create your customer account</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              {steps[step].description}
+              Join as a customer. Administrator access is issued securely by an existing administrator.
             </p>
 
             <div className="mt-6 flex items-center justify-between gap-2">

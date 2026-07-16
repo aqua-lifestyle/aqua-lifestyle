@@ -17,8 +17,12 @@ export const httpClient = {
     return unwrapAbpResponse(response.data);
   },
 
-  delete: async <TResponse>(url: string) => {
-    const response = await apiClient.delete<TResponse | AbpResponseEnvelope<TResponse>>(url);
+  delete: async <TResponse, TBody = undefined>(url: string, body?: TBody) => {
+    const response = await apiClient.delete<TResponse | AbpResponseEnvelope<TResponse>>(url, {
+      // ABP's conventional DELETE actions bind complex input DTOs from the
+      // query string. A JSON request body reaches the route but is ignored.
+      params: body,
+    });
     return unwrapAbpResponse(response.data);
   },
 };

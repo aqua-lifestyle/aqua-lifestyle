@@ -25,6 +25,7 @@ namespace AqualLifeStyle.Application.Orders
         private readonly IProductRepository _productRepository;
         private readonly IMembershipRepository _membershipRepository;
         private readonly IObjectMapper _objectMapper;
+        protected virtual DateTime UtcNow => DateTime.UtcNow;
 
         public OrderIntentAppService(
             IOrderIntentRepository orderIntentRepository,
@@ -104,7 +105,7 @@ namespace AqualLifeStyle.Application.Orders
                 throw new AqualLifeStyleBusinessRuleException("Customer has reached the maximum number of open order intents for their tier.");
             }
 
-            var now = DateTime.UtcNow;
+            var now = UtcNow;
             var reservedPrice = membership.ApplyTierDiscount(product.Price);
             var orderIntent = OrderIntent.CreateReserved(
                 customer.Id,
@@ -179,7 +180,7 @@ namespace AqualLifeStyle.Application.Orders
                 throw new AqualLifeStyleBusinessRuleException("Customer has reached the maximum number of open order intents for their tier.");
             }
 
-            var now = DateTime.UtcNow;
+            var now = UtcNow;
             var reservedPrice = membership?.ApplyTierDiscount(product.Price) ?? product.Price;
             var orderIntent = OrderIntent.CreateReserved(
                 enquiry.CustomerId,
@@ -208,7 +209,7 @@ namespace AqualLifeStyle.Application.Orders
 
             try
             {
-                orderIntent.Cancel(DateTime.UtcNow);
+                orderIntent.Cancel(UtcNow);
             }
             catch (InvalidOperationException ex)
             {
@@ -233,7 +234,7 @@ namespace AqualLifeStyle.Application.Orders
 
             try
             {
-                orderIntent.Complete(DateTime.UtcNow);
+                orderIntent.Complete(UtcNow);
             }
             catch (InvalidOperationException ex)
             {
@@ -264,7 +265,7 @@ namespace AqualLifeStyle.Application.Orders
                 throw new AqualLifeStyleBusinessRuleException("Customer membership does not allow this product reservation.");
             }
 
-            if (membership != null && !membership.IsOrderWindowOpen())
+            if (membership != null && !membership.IsOrderWindowOpen(UtcNow))
             {
                 throw new AqualLifeStylePreconditionException("Customer membership order window is currently closed.", "ORDER_WINDOW_CLOSED");
             }

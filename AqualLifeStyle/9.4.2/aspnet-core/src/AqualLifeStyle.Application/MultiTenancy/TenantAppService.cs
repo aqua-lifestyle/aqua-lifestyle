@@ -22,71 +22,27 @@ namespace AqualLifeStyle.MultiTenancy
     public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, PagedTenantResultRequestDto, CreateTenantDto, TenantDto>, ITenantAppService
     {
         private readonly TenantManager _tenantManager;
-        private readonly EditionManager _editionManager;
-        private readonly UserManager _userManager;
-        private readonly RoleManager _roleManager;
-        private readonly IAbpZeroDbMigrator _abpZeroDbMigrator;
+        private readonly ITenantAccountProvisioner _tenantAccountProvisioner;
 
         public TenantAppService(
             IRepository<Tenant, int> repository,
             TenantManager tenantManager,
-            EditionManager editionManager,
-            UserManager userManager,
-            RoleManager roleManager,
-            IAbpZeroDbMigrator abpZeroDbMigrator)
+            ITenantAccountProvisioner tenantAccountProvisioner)
             : base(repository)
         {
             _tenantManager = tenantManager;
-            _editionManager = editionManager;
-            _userManager = userManager;
-            _roleManager = roleManager;
-            _abpZeroDbMigrator = abpZeroDbMigrator;
+            _tenantAccountProvisioner = tenantAccountProvisioner;
         }
 
         public override async Task<TenantDto> CreateAsync(CreateTenantDto input)
         {
             CheckCreatePermission();
 
-            // Create tenant
-            var tenant = ObjectMapper.Map<Tenant>(input);
-            tenant.ConnectionString = input.ConnectionString.IsNullOrEmpty()
-                ? null
-                : SimpleStringCipher.Instance.Encrypt(input.ConnectionString);
-
-            var defaultEdition = await _editionManager.FindByNameAsync(EditionManager.DefaultEditionName);
-            if (defaultEdition != null)
+            var tenant = await _tenantAccountProvisioner.ProvisionAsync(new TenantProvisioningRequest
             {
-                tenant.EditionId = defaultEdition.Id;
-            }
-
-            await _tenantManager.CreateAsync(tenant);
-            await CurrentUnitOfWork.SaveChangesAsync(); // To get new tenant's id.
-
-            // Create tenant database
-            _abpZeroDbMigrator.CreateOrMigrateForTenant(tenant);
-
-            // We are working entities of new tenant, so changing tenant filter
-            using (CurrentUnitOfWork.SetTenantId(tenant.Id))
-            {
-                // Create static roles for new tenant
-                CheckErrors(await _roleManager.CreateStaticRoles(tenant.Id));
-
-                await CurrentUnitOfWork.SaveChangesAsync(); // To get static role ids
-
-                // Grant all permissions to admin role
-                var adminRole = _roleManager.Roles.Single(r => r.Name == StaticRoleNames.Tenants.Admin);
-                await _roleManager.GrantAllPermissionsAsync(adminRole);
-
-                // Create admin user for the tenant
-                var adminUser = User.CreateTenantAdminUser(tenant.Id, input.AdminEmailAddress);
-                await _userManager.InitializeOptionsAsync(tenant.Id);
-                CheckErrors(await _userManager.CreateAsync(adminUser, User.DefaultPassword));
-                await CurrentUnitOfWork.SaveChangesAsync(); // To get admin user's id
-
-                // Assign admin user to role!
-                CheckErrors(await _userManager.AddToRoleAsync(adminUser, adminRole.Name));
-                await CurrentUnitOfWork.SaveChangesAsync();
-            }
+                TenancyName = input.TenancyName, Name = input.Name, AdminEmailAddress = input.AdminEmailAddress,
+                ConnectionString = input.ConnectionString, IsActive = input.IsActive
+            });
 
             return MapToEntityDto(tenant);
         }
@@ -120,4 +76,3 @@ namespace AqualLifeStyle.MultiTenancy
         }
     }
 }
-

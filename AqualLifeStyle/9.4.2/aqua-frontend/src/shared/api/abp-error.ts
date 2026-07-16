@@ -53,9 +53,74 @@ export class AbpHttpError extends Error {
   }
 }
 
+const GENERIC_SERVER_MESSAGES = new Set([
+  "The request failed.",
+  "An internal error occurred during your request!",
+  "Internal server error.",
+  "Login failed!",
+]);
+
+const getStatusMessage = (status: number, fallback: string): string => {
+  switch (status) {
+    case 400:
+    case 422:
+      return `Some information is missing or invalid. Review the form and try again. ${fallback}`;
+    case 401:
+      return "Your session has expired. Sign in again, then retry this action.";
+    case 403:
+      return "Your account does not have permission to complete this action. Ask a platform administrator to review your access level.";
+    case 404:
+      return "This record or service is no longer available. Refresh the page and try again.";
+    case 405:
+      return "This action is not supported by the current server version. Refresh the application and try again.";
+    case 409:
+      return "This change conflicts with an existing record or a more recent update. Refresh the page and review the latest information.";
+    default:
+      return fallback;
+  }
+};
+
+const getSafePublicDetails = (details?: string): string | null => {
+  const value = details
+    ?.split(/\r?\n/)
+    .filter((line) => !line.trim().startsWith("CorrelationId:"))
+    .join("\n")
+    .trim();
+  if (!value || value.length > 500) return null;
+
+  const normalizedValue = value.toLowerCase();
+  const looksLikeTechnicalDiagnostics =
+    value.includes("\n   at ") ||
+    normalizedValue.includes("stack trace:") ||
+    normalizedValue.includes("connection string") ||
+    value.includes("/src/") ||
+    value.includes("\\src\\");
+
+  return looksLikeTechnicalDiagnostics ? null : value;
+};
+
 export const getRequestErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof AbpHttpError) {
+    const validationMessage = error.validationErrors
+      .map((validationError) => validationError.message.trim())
+      .filter(Boolean)
+      .join(" ");
+    if (validationMessage) return validationMessage;
+
+    const publicDetails = getSafePublicDetails(error.details);
+    if (publicDetails) return publicDetails;
+
+    if (error.message && !GENERIC_SERVER_MESSAGES.has(error.message)) {
+      return error.message;
+    }
+
+    return getStatusMessage(error.status, fallback);
+  }
+
   if (error instanceof Error) {
-    return error.message;
+    return error.message && !GENERIC_SERVER_MESSAGES.has(error.message)
+      ? error.message
+      : fallback;
   }
 
   return fallback;

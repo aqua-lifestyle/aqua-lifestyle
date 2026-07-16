@@ -38,6 +38,14 @@ namespace AqualLifeStyle.EntityFrameworkCore
             base.OnModelCreating(modelBuilder);
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AqualLifeStyleDbContext).Assembly);
 
+            modelBuilder.Entity<Tenant>(entity =>
+            {
+                entity.HasOne<AreaLeader>()
+                    .WithMany()
+                    .HasForeignKey(tenant => tenant.AreaLeaderId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
             modelBuilder.Entity<Membership>(entity =>
             {
                 entity.ToTable("Memberships");

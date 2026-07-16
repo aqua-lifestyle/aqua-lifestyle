@@ -23,7 +23,7 @@ const variantClassNames: Record<ButtonVariant, string> = {
   primary:
     "bg-accent text-white hover:bg-accent-dark shadow-sm shadow-accent/20 focus:ring-accent/30",
   secondary:
-    "bg-primary text-white hover:bg-primary-light",
+    "bg-primary text-background hover:bg-primary-light",
 };
 
 const sizeClassNames: Record<ButtonSize, string> = {

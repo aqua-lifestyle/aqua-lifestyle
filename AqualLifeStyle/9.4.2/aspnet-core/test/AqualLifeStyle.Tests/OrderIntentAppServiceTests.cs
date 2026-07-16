@@ -54,7 +54,7 @@ namespace AqualLifeStyle.Tests
                     CompletedAt = oi.CompletedAt
                 });
 
-            _service = new OrderIntentAppService(
+            _service = new DeterministicOrderIntentAppService(
                 _orderIntentRepositoryMock.Object,
                 _enquiryRepositoryMock.Object,
                 _customerRepositoryMock.Object,
@@ -236,6 +236,22 @@ namespace AqualLifeStyle.Tests
             var customer = Customer.Create(1, 43, "Jane Doe", new EmailAddress("jane@example.com"), membershipId);
             customer.Id = 1;
             return customer;
+        }
+
+        private sealed class DeterministicOrderIntentAppService : OrderIntentAppService
+        {
+            public DeterministicOrderIntentAppService(
+                IOrderIntentRepository orderIntentRepository,
+                IEnquiryRepository enquiryRepository,
+                ICustomerRepository customerRepository,
+                IProductRepository productRepository,
+                IMembershipRepository membershipRepository,
+                IObjectMapper objectMapper)
+                : base(orderIntentRepository, enquiryRepository, customerRepository, productRepository, membershipRepository, objectMapper)
+            {
+            }
+
+            protected override System.DateTime UtcNow => new System.DateTime(2026, 7, 10, 12, 0, 0, System.DateTimeKind.Utc);
         }
     }
 }

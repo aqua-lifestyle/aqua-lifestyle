@@ -10,7 +10,14 @@ type DialogProps = {
   className?: string;
   onClose: () => void;
   open: boolean;
+  size?: "md" | "lg" | "xl";
   title: string;
+};
+
+const sizeClassNames = {
+  lg: "w-[min(96vw,48rem)] max-w-3xl",
+  md: "max-w-lg",
+  xl: "w-[min(96vw,64rem)] max-w-5xl",
 };
 
 export const Dialog = ({
@@ -18,6 +25,7 @@ export const Dialog = ({
   className,
   onClose,
   open,
+  size = "md",
   title,
 }: DialogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -51,7 +59,8 @@ export const Dialog = ({
     <dialog
       ref={dialogRef}
       className={cn(
-        "m-auto max-w-lg rounded-2xl bg-card p-0 text-card-foreground shadow-lg backdrop:bg-primary/20 backdrop:backdrop-blur-sm",
+        "m-auto rounded-2xl bg-card p-0 text-card-foreground shadow-lg backdrop:bg-primary/20 backdrop:backdrop-blur-sm",
+        sizeClassNames[size],
         className,
       )}
       onClick={(event) => {

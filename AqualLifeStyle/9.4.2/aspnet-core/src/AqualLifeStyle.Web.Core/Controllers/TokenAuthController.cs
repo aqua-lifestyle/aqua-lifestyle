@@ -15,6 +15,8 @@ using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Models.TokenAuth;
 using AqualLifeStyle.MultiTenancy;
+using Abp.Domain.Uow;
+using Abp.UI;
 
 namespace AqualLifeStyle.Controllers
 {
@@ -26,19 +28,25 @@ namespace AqualLifeStyle.Controllers
         private readonly AbpLoginResultTypeHelper _abpLoginResultTypeHelper;
         private readonly TokenAuthConfiguration _configuration;
         private readonly IConfiguration _appConfiguration;
+        private readonly UserManager _userManager;
+        private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public TokenAuthController(
             LogInManager logInManager,
             ITenantCache tenantCache,
             AbpLoginResultTypeHelper abpLoginResultTypeHelper,
             TokenAuthConfiguration configuration,
-            IConfiguration appConfiguration)
+            IConfiguration appConfiguration,
+            UserManager userManager,
+            IUnitOfWorkManager unitOfWorkManager)
         {
             _logInManager = logInManager;
             _tenantCache = tenantCache;
             _abpLoginResultTypeHelper = abpLoginResultTypeHelper;
             _configuration = configuration;
             _appConfiguration = appConfiguration;
+            _userManager = userManager;
+            _unitOfWorkManager = unitOfWorkManager;
         }
 
         [HttpPost]
@@ -50,7 +58,14 @@ namespace AqualLifeStyle.Controllers
                 GetTenancyNameOrNull()
             );
 
-            var accessToken = CreateAccessToken(CreateJwtClaims(loginResult.Identity));
+            var claims = CreateJwtClaims(loginResult.Identity, loginResult.User);
+            IReadOnlyList<Permission> grantedPermissions;
+            using (_unitOfWorkManager.Current.SetTenantId(loginResult.User.TenantId))
+            {
+                grantedPermissions = (await _userManager.GetGrantedPermissionsAsync(loginResult.User)).ToList();
+            }
+            claims.Add(new Claim("permissions", string.Join(",", grantedPermissions.Select(permission => permission.Name))));
+            var accessToken = CreateAccessToken(claims);
 
             return new AuthenticateResultModel
             {
@@ -63,6 +78,12 @@ namespace AqualLifeStyle.Controllers
 
         private string GetTenancyNameOrNull()
         {
+            if (Request.Headers.ContainsKey("__tenant"))
+            {
+                var requestedTenant = Request.Headers["__tenant"].FirstOrDefault();
+                return string.IsNullOrWhiteSpace(requestedTenant) ? null : requestedTenant;
+            }
+
             if (AbpSession.TenantId.HasValue)
             {
                 return _tenantCache.GetOrNull(AbpSession.TenantId.Value)?.TenancyName;
@@ -84,6 +105,12 @@ namespace AqualLifeStyle.Controllers
             switch (loginResult.Result)
             {
                 case AbpLoginResultType.Success:
+                    if (loginResult.User.RequiresPasswordReset())
+                    {
+                        throw new UserFriendlyException(
+                            "Password reset required.",
+                            "Your customer account was restored. Use the secure password setup link provided to you before signing in.");
+                    }
                     return loginResult;
                 default:
                     throw _abpLoginResultTypeHelper.CreateExceptionForFailedLoginAttempt(loginResult.Result, usernameOrEmailAddress, tenancyName);
@@ -106,7 +133,7 @@ namespace AqualLifeStyle.Controllers
             return new JwtSecurityTokenHandler().WriteToken(jwtSecurityToken);
         }
 
-        private static List<Claim> CreateJwtClaims(ClaimsIdentity identity)
+        private static List<Claim> CreateJwtClaims(ClaimsIdentity identity, User user)
         {
             var claims = identity.Claims.ToList();
             var nameIdClaim = claims.First(c => c.Type == ClaimTypes.NameIdentifier);
@@ -116,7 +143,8 @@ namespace AqualLifeStyle.Controllers
             {
                 new Claim(JwtRegisteredClaimNames.Sub, nameIdClaim.Value),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.Now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
+                new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.Now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+                new Claim(JwtSessionSecurityStampValidator.SecurityStampClaimType, user.SecurityStamp)
             });
 
             return claims;

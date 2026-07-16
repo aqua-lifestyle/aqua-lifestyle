@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Abp.Runtime.Security;
+using AqualLifeStyle.Authentication.JwtBearer;
 
 namespace AqualLifeStyle.Web.Host.Startup
 {
@@ -46,7 +47,8 @@ namespace AqualLifeStyle.Web.Host.Startup
 
                     options.Events = new JwtBearerEvents
                     {
-                        OnMessageReceived = QueryStringTokenResolver
+                        OnMessageReceived = QueryStringTokenResolver,
+                        OnTokenValidated = JwtSessionSecurityStampValidator.ValidateAsync
                     };
                 });
             }

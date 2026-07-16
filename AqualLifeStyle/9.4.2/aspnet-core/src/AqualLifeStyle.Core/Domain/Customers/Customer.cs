@@ -1,11 +1,12 @@
 using System;
 using Abp.Domain.Entities;
+using Abp.Domain.Entities.Auditing;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Common;
 
 namespace AqualLifeStyle.Domain.Customers
 {
-    public class Customer : Entity<int>, IMayHaveTenant
+    public class Customer : FullAuditedAggregateRoot<int>, IMayHaveTenant
     {
         public int? TenantId { get; set; }
         public long UserId { get; private set; }

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   AuthProvider,
@@ -7,8 +7,10 @@ import {
 } from "@/src/providers";
 import { Navbar } from "./navbar";
 
+const mockPathname = vi.fn(() => "/customers");
+
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/customers",
+  usePathname: () => mockPathname(),
 }));
 
 vi.mock("./tenant-switcher", () => ({
@@ -38,6 +40,7 @@ const SetSession = () => {
               "Aqua.Members.Create",
               "Aqua.Members.Edit",
               "Aqua.Members.Delete",
+              "Aqua.Admin.Customers.View",
               "Pages.Customers",
               "Pages.Products",
               "Pages.Enquiries",
@@ -54,6 +57,8 @@ const SetSession = () => {
 };
 
 describe("Navbar", () => {
+  beforeEach(() => mockPathname.mockReturnValue("/customers"));
+
   it("renders the brand and main navigation links", async () => {
     render(
       <AuthProvider>
@@ -71,6 +76,7 @@ describe("Navbar", () => {
     expect(screen.getByRole("link", { name: /Aqua Lifestyle/i })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
     expect(screen.getByRole("link", { name: "Customers" })).toHaveAttribute("href", "/customers");
+    expect(screen.getByRole("link", { name: "Admin customers" })).toHaveAttribute("href", "/admin/customers");
     expect(screen.getByRole("link", { name: "Products" })).toHaveAttribute("href", "/products");
     expect(screen.getByRole("link", { name: "Enquiries" })).toHaveAttribute("href", "/enquiries");
   });
@@ -108,5 +114,20 @@ describe("Navbar", () => {
     });
 
     expect(screen.getByTestId("user-menu")).toBeInTheDocument();
+  });
+
+  it("uses a utility header instead of duplicate navigation in administration", () => {
+    mockPathname.mockReturnValue("/admin/customers");
+
+    render(
+      <AuthProvider>
+        <Navbar />
+      </AuthProvider>,
+    );
+
+    expect(screen.getByRole("link", { name: /Aqua Lifestyle Administration/i })).toHaveAttribute("href", "/admin/dashboard");
+    expect(screen.getByTestId("user-menu")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Customers" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tenant-switcher")).not.toBeInTheDocument();
   });
 });
