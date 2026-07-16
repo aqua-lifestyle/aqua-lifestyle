@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using AqualLifeStyle.Authentication.JwtBearer;
 
 namespace AqualLifeStyle.Web.Startup
 {
@@ -15,6 +18,10 @@ namespace AqualLifeStyle.Web.Startup
             services.ConfigureApplicationCookie(options =>
             {
                 options.AccessDeniedPath = "/Account/Forbidden";
+            });
+            services.Configure<SecurityStampValidatorOptions>(options =>
+            {
+                options.ValidationInterval = TimeSpan.Zero;
             });
             
             if (bool.Parse(configuration["Authentication:JwtBearer:IsEnabled"]))
@@ -43,6 +50,10 @@ namespace AqualLifeStyle.Web.Startup
 
                             // If you want to allow a certain amount of clock drift, set that here
                             ClockSkew = TimeSpan.Zero
+                        };
+                        options.Events = new JwtBearerEvents
+                        {
+                            OnTokenValidated = JwtSessionSecurityStampValidator.ValidateAsync
                         };
                     });
                 

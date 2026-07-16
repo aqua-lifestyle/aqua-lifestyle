@@ -58,7 +58,7 @@ namespace AqualLifeStyle.Controllers
                 GetTenancyNameOrNull()
             );
 
-            var claims = CreateJwtClaims(loginResult.Identity);
+            var claims = CreateJwtClaims(loginResult.Identity, loginResult.User);
             IReadOnlyList<Permission> grantedPermissions;
             using (_unitOfWorkManager.Current.SetTenantId(loginResult.User.TenantId))
             {
@@ -133,7 +133,7 @@ namespace AqualLifeStyle.Controllers
             return new JwtSecurityTokenHandler().WriteToken(jwtSecurityToken);
         }
 
-        private static List<Claim> CreateJwtClaims(ClaimsIdentity identity)
+        private static List<Claim> CreateJwtClaims(ClaimsIdentity identity, User user)
         {
             var claims = identity.Claims.ToList();
             var nameIdClaim = claims.First(c => c.Type == ClaimTypes.NameIdentifier);
@@ -143,7 +143,8 @@ namespace AqualLifeStyle.Controllers
             {
                 new Claim(JwtRegisteredClaimNames.Sub, nameIdClaim.Value),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.Now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
+                new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.Now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+                new Claim(JwtSessionSecurityStampValidator.SecurityStampClaimType, user.SecurityStamp)
             });
 
             return claims;

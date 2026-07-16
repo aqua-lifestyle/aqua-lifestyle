@@ -1,5 +1,6 @@
 ﻿using System.Threading.Tasks;
 using System.Net.Http;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using AqualLifeStyle.Models.TokenAuth;
@@ -11,6 +12,7 @@ using System.Linq;
 using AqualLifeStyle.Authorization;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Abp.Authorization.Users;
+using AqualLifeStyle.Authentication.JwtBearer;
 
 namespace AqualLifeStyle.Web.Tests.Controllers
 {
@@ -48,6 +50,28 @@ namespace AqualLifeStyle.Web.Tests.Controllers
             permissions.ShouldContain(AquaPermissions.Admin.Tenants.View);
             permissions.ShouldContain(AquaPermissions.Admin.Customers.View);
             permissions.ShouldContain(PermissionNames.Pages_Roles);
+            claims.ShouldContain(claim => claim.Type == JwtSessionSecurityStampValidator.SecurityStampClaimType);
+        }
+
+        [Fact]
+        public async Task RotatingSecurityStamp_ImmediatelyInvalidatesExistingJwt()
+        {
+            await AuthenticateAsync(null, new AuthenticateModel
+            {
+                UserNameOrEmailAddress = "admin",
+                Password = "123qwe"
+            });
+            UsingDbContext(context =>
+            {
+                var user = context.Users.Single(item => item.TenantId == null && item.UserName == AbpUserBase.AdminUserName);
+                user.SecurityStamp = System.Guid.NewGuid().ToString();
+                context.SaveChanges();
+            });
+            AbpSession.UserId = null;
+            AbpSession.TenantId = null;
+
+            var response = await Client.GetAsync("/api/services/app/AdminCustomer/GetAll?SkipCount=0&MaxResultCount=10");
+            response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         }
 
         [Fact]

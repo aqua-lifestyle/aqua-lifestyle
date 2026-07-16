@@ -208,7 +208,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
             {
                 customer.Deactivate();
                 customer.User.IsActive = false;
-                CheckErrors(await _userManager.UpdateAsync(customer.User));
+                CheckErrors(await _userManager.UpdateSecurityStampAsync(customer.User));
                 await _customerRepository.DeleteAsync(customer);
             }
             LogAdminMutation("Customer", "removed", customer.Id, tenantId, input.Justification);

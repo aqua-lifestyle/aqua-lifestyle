@@ -162,7 +162,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 });
                 await _userManager.InitializeOptionsAsync(input.TenantId);
                 customer.User.RequirePasswordReset();
-                EnsureSuccess(await _userManager.UpdateAsync(customer.User));
+                EnsureSuccess(await _userManager.UpdateSecurityStampAsync(customer.User));
                 return customer;
             }
         }

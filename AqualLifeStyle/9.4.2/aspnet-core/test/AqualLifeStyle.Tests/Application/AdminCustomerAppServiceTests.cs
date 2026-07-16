@@ -50,6 +50,7 @@ namespace AqualLifeStyle.Tests.Application
             var createdUser = await Resolve<UserManager>().FindByEmailAsync(email);
             createdUser.ShouldNotBeNull();
             var originalPasswordHash = createdUser.Password;
+            var originalSecurityStamp = createdUser.SecurityStamp;
             (await Resolve<UserManager>().CheckPasswordAsync(createdUser, "Temporary123!")).ShouldBeTrue();
             await UsingDbContextAsync(async context =>
             {
@@ -79,12 +80,15 @@ namespace AqualLifeStyle.Tests.Application
                 Id = created.Id,
                 Justification = "Duplicate registration confirmed"
             });
+            string removedSecurityStamp = null;
             await UsingDbContextAsync(async context =>
             {
                 var customer = await context.Customers.IgnoreQueryFilters().SingleAsync(item => item.Id == created.Id);
                 var user = await context.Users.IgnoreQueryFilters().SingleAsync(item => item.Id == customer.UserId);
                 customer.IsDeleted.ShouldBeTrue();
                 user.IsActive.ShouldBeFalse();
+                removedSecurityStamp = user.SecurityStamp;
+                removedSecurityStamp.ShouldNotBe(originalSecurityStamp);
             });
 
             var restorationCandidate = await _service.CreateAsync(new AdminCreateCustomerInput
@@ -124,6 +128,7 @@ namespace AqualLifeStyle.Tests.Application
             restoredUser.ShouldNotBeNull();
             restoredUser.IsActive.ShouldBeTrue();
             restoredUser.Password.ShouldBe(originalPasswordHash);
+            restoredUser.SecurityStamp.ShouldNotBe(removedSecurityStamp);
             restoredUser.RequiresPasswordReset().ShouldBeTrue();
             (await Resolve<UserManager>().CheckPasswordAsync(restoredUser, "Temporary123!")).ShouldBeTrue();
             await UsingDbContextAsync(async context =>
