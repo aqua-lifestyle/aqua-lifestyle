@@ -11,6 +11,7 @@ using Abp.Zero.Configuration;
 using Abp.Zero.EntityFrameworkCore;
 using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.Tests.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 
 namespace AqualLifeStyle.Tests
 {
@@ -29,6 +30,16 @@ namespace AqualLifeStyle.Tests
 
         public override void PreInitialize()
         {
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new[]
+                {
+                    new System.Collections.Generic.KeyValuePair<string, string>(
+                        "App:ClientRootAddress",
+                        "https://customers.example.test")
+                })
+                .Build();
+            IocManager.IocContainer.Register(Component.For<IConfiguration>().Instance(configuration));
+
             Configuration.UnitOfWork.Timeout = TimeSpan.FromMinutes(30);
             Configuration.UnitOfWork.IsTransactional = false;
 

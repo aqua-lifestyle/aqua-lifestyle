@@ -84,6 +84,7 @@ namespace AqualLifeStyle.Tests.Application
             AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.GetMembershipOptionsAsync), AquaPermissions.Admin.Customers.View);
             AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.GetAsync), AquaPermissions.Admin.Customers.View);
             AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.CreateAsync), AquaPermissions.Admin.Customers.Create);
+            AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.RestoreAsync), AquaPermissions.Admin.Customers.Create);
             AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.UpdateAsync), AquaPermissions.Admin.Customers.Edit);
             AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.DeleteAsync), AquaPermissions.Admin.Customers.Delete);
         }

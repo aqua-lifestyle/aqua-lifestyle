@@ -31,6 +31,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
         private readonly IObjectMapper _objectMapper;
         private readonly IAdminCustomerProfileUpdater _customerProfileUpdater;
         private readonly IMembershipRepository _membershipRepository;
+        private readonly IUserPasswordSetupLinkGenerator _passwordSetupLinkGenerator;
 
         public AdminCustomerAppService(
             IAdminCustomerAccountManager accountManager,
@@ -38,7 +39,8 @@ namespace AqualLifeStyle.Application.Admin.Customers
             UserManager userManager,
             IObjectMapper objectMapper,
             IAdminCustomerProfileUpdater customerProfileUpdater,
-            IMembershipRepository membershipRepository)
+            IMembershipRepository membershipRepository,
+            IUserPasswordSetupLinkGenerator passwordSetupLinkGenerator)
         {
             _accountManager = accountManager;
             _customerRepository = customerRepository;
@@ -46,6 +48,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
             _objectMapper = objectMapper;
             _customerProfileUpdater = customerProfileUpdater;
             _membershipRepository = membershipRepository;
+            _passwordSetupLinkGenerator = passwordSetupLinkGenerator;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Customers.View)]
@@ -106,12 +109,12 @@ namespace AqualLifeStyle.Application.Admin.Customers
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Customers.Create)]
-        public async Task<AdminCustomerDto> CreateAsync(AdminCreateCustomerInput input)
+        public async Task<AdminCustomerOnboardingResultDto> CreateAsync(AdminCreateCustomerInput input)
         {
             if (input == null) throw new UserFriendlyException("Customer creation failed.", "The request body was empty.");
             var tenantId = ResolveTargetTenant(input.TenantId, "Customer", "creation");
             await EnsureTenantExistsAsync(tenantId);
-            var accountResult = await _accountManager.CreateOrRestoreAsync(new AdminCustomerAccountInput
+            var accountResult = await _accountManager.CreateOrFindRemovedAsync(new AdminCustomerAccountInput
             {
                 TenantId = tenantId,
                 FirstName = input.FirstName,
@@ -121,12 +124,56 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 MembershipId = input.MembershipId,
                 IsActive = input.IsActive
             });
+            if (accountResult.RemovedCustomer != null)
+            {
+                return new AdminCustomerOnboardingResultDto
+                {
+                    RequiresRestoreConfirmation = true,
+                    RemovedCustomer = new AdminRemovedCustomerCandidateDto
+                    {
+                        CustomerId = accountResult.RemovedCustomer.Id,
+                        Name = accountResult.RemovedCustomer.Name,
+                        Email = accountResult.RemovedCustomer.Email.Value,
+                        RemovalTime = accountResult.RemovedCustomer.DeletionTime
+                    }
+                };
+            }
+
             await CurrentUnitOfWork.SaveChangesAsync();
             var customer = accountResult.Customer;
-            LogAdminMutation("Customer", accountResult.WasRestored ? "restored" : "created", customer.Id, tenantId, input.Justification);
-            var customerDto = await MapCustomerAsync(customer);
-            customerDto.WasRestored = accountResult.WasRestored;
-            return customerDto;
+            LogAdminMutation("Customer", "created", customer.Id, tenantId, input.Justification);
+            return new AdminCustomerOnboardingResultDto
+            {
+                Customer = await MapCustomerAsync(customer)
+            };
+        }
+
+        [DisableAuditing]
+        [AbpAuthorize(AquaPermissions.Admin.Customers.Create)]
+        public async Task<AdminCustomerOnboardingResultDto> RestoreAsync(AdminRestoreCustomerInput input)
+        {
+            if (input == null) throw new UserFriendlyException("Customer restoration failed.", "The request body was empty.");
+            ValidatePositiveId(input.CustomerId, "Customer");
+            var removedCustomer = await GetRemovedCustomerAsync(input.CustomerId);
+            var tenantId = removedCustomer.TenantId.Value;
+            var customer = await _accountManager.RestoreAsync(input.CustomerId, new AdminCustomerAccountInput
+            {
+                TenantId = tenantId,
+                FirstName = input.FirstName,
+                LastName = input.LastName,
+                Email = input.Email,
+                MembershipId = input.MembershipId,
+                IsActive = input.IsActive
+            });
+            await CurrentUnitOfWork.SaveChangesAsync();
+            var tenant = await TenantManager.GetByIdAsync(tenantId);
+            var passwordSetupUrl = await _passwordSetupLinkGenerator.GenerateAsync(customer.User, tenant.TenancyName);
+            LogAdminMutation("Customer", "restored with password setup required", customer.Id, tenantId, input.Justification);
+            return new AdminCustomerOnboardingResultDto
+            {
+                Customer = await MapCustomerAsync(customer),
+                PasswordSetupUrl = passwordSetupUrl
+            };
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Customers.Edit)]
@@ -177,6 +224,22 @@ namespace AqualLifeStyle.Application.Admin.Customers
                     query = query.Where(customer => customer.TenantId == AbpSession.TenantId.Value);
                 var customer = await query.SingleOrDefaultAsync();
                 if (customer == null) throw new UserFriendlyException("Customer lookup failed.", "The customer was not found.");
+                return customer;
+            }
+        }
+
+        private async Task<Customer> GetRemovedCustomerAsync(int id)
+        {
+            using (DisableTenantDataFilter())
+            using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.SoftDelete))
+            {
+                var query = _customerRepository.GetAllIncluding(customer => customer.User)
+                    .Where(customer => customer.Id == id && customer.IsDeleted && customer.TenantId.HasValue);
+                if (AbpSession.TenantId.HasValue)
+                    query = query.Where(customer => customer.TenantId == AbpSession.TenantId.Value);
+                var customer = await query.SingleOrDefaultAsync();
+                if (customer == null)
+                    throw new UserFriendlyException("Customer restoration failed.", "The removed customer account was not found.");
                 return customer;
             }
         }

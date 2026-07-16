@@ -122,9 +122,20 @@ namespace AqualLifeStyle.Web.Controllers
             switch (loginResult.Result)
             {
                 case AbpLoginResultType.Success:
+                    EnsurePasswordResetIsComplete(loginResult.User);
                     return loginResult;
                 default:
                     throw _abpLoginResultTypeHelper.CreateExceptionForFailedLoginAttempt(loginResult.Result, usernameOrEmailAddress, tenancyName);
+            }
+        }
+
+        private static void EnsurePasswordResetIsComplete(User user)
+        {
+            if (user.RequiresPasswordReset())
+            {
+                throw new UserFriendlyException(
+                    "Password reset required.",
+                    "Your customer account was restored. Use the secure password setup link provided to you before signing in.");
             }
         }
 
@@ -313,6 +324,7 @@ namespace AqualLifeStyle.Web.Controllers
             switch (loginResult.Result)
             {
                 case AbpLoginResultType.Success:
+                    EnsurePasswordResetIsComplete(loginResult.User);
                     await _signInManager.SignInAsync(loginResult.Identity, false);
                     return Redirect(returnUrl);
                 case AbpLoginResultType.UnknownExternalLogin:

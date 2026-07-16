@@ -16,6 +16,7 @@ using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Models.TokenAuth;
 using AqualLifeStyle.MultiTenancy;
 using Abp.Domain.Uow;
+using Abp.UI;
 
 namespace AqualLifeStyle.Controllers
 {
@@ -104,6 +105,12 @@ namespace AqualLifeStyle.Controllers
             switch (loginResult.Result)
             {
                 case AbpLoginResultType.Success:
+                    if (loginResult.User.RequiresPasswordReset())
+                    {
+                        throw new UserFriendlyException(
+                            "Password reset required.",
+                            "Your customer account was restored. Use the secure password setup link provided to you before signing in.");
+                    }
                     return loginResult;
                 default:
                     throw _abpLoginResultTypeHelper.CreateExceptionForFailedLoginAttempt(loginResult.Result, usernameOrEmailAddress, tenancyName);

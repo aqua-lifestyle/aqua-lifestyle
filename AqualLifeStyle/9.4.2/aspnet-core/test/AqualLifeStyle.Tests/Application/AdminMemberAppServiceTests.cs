@@ -36,7 +36,7 @@ namespace AqualLifeStyle.Tests.Application
                 return new[] { entryTier.Id, upgradedTier.Id };
             });
             var originalEmail = $"member-{Guid.NewGuid():N}@example.com";
-            var member = await _customerAdministration.CreateAsync(new AdminCreateCustomerInput
+            var member = (await _customerAdministration.CreateAsync(new AdminCreateCustomerInput
             {
                 TenantId = 1,
                 FirstName = "Original",
@@ -46,7 +46,7 @@ namespace AqualLifeStyle.Tests.Application
                 MembershipId = membershipIds[0],
                 IsActive = true,
                 Justification = "Approved member onboarding"
-            });
+            })).Customer;
 
             var updatedEmail = $"updated-member-{Guid.NewGuid():N}@example.com";
             var edited = await _memberAdministration.EditProfileAsync(new EditMemberProfileInput

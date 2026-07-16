@@ -22,19 +22,21 @@ namespace AqualLifeStyle.Application.Admin.Customers
         public string LastName { get; set; }
         public string Email { get; set; }
         public string Password { get; set; }
+        public bool AllowSystemGeneratedPassword { get; set; }
         public int? MembershipId { get; set; }
         public bool IsActive { get; set; }
     }
 
     public interface IAdminCustomerAccountManager
     {
-        Task<AdminCustomerAccountResult> CreateOrRestoreAsync(AdminCustomerAccountInput input);
+        Task<AdminCustomerAccountResult> CreateOrFindRemovedAsync(AdminCustomerAccountInput input);
+        Task<Customer> RestoreAsync(int customerId, AdminCustomerAccountInput input);
     }
 
     public class AdminCustomerAccountResult
     {
         public Customer Customer { get; set; }
-        public bool WasRestored { get; set; }
+        public Customer RemovedCustomer { get; set; }
     }
 
     public class AdminCustomerAccountManager : IAdminCustomerAccountManager, ITransientDependency
@@ -62,7 +64,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
             _unitOfWorkManager = unitOfWorkManager;
         }
 
-        public async Task<AdminCustomerAccountResult> CreateOrRestoreAsync(AdminCustomerAccountInput input)
+        public async Task<AdminCustomerAccountResult> CreateOrFindRemovedAsync(AdminCustomerAccountInput input)
         {
             Validate(input);
             var email = input.Email.Trim();
@@ -82,33 +84,17 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 {
                     if (!existingCustomer.IsDeleted || existingCustomer.TenantId != input.TenantId)
                         throw new UserFriendlyException("Customer creation failed.", "The email address belongs to an existing account.");
-
-                    existingCustomer.IsDeleted = false;
-                    existingCustomer.DeleterUserId = null;
-                    existingCustomer.DeletionTime = null;
-                    await _customerProfileUpdater.UpdateAsync(existingCustomer, new AdminCustomerProfileUpdate
-                    {
-                        FirstName = input.FirstName,
-                        LastName = input.LastName,
-                        Email = input.Email,
-                        MembershipId = input.MembershipId,
-                        IsActive = input.IsActive
-                    });
-                    await _userManager.InitializeOptionsAsync(input.TenantId);
-                    var passwordResetToken = await _userManager.GeneratePasswordResetTokenAsync(existingCustomer.User);
-                    EnsureSuccess(await _userManager.ResetPasswordAsync(
-                        existingCustomer.User,
-                        passwordResetToken,
-                        input.Password ?? CreateTemporaryPassword()));
                     return new AdminCustomerAccountResult
                     {
-                        Customer = existingCustomer,
-                        WasRestored = true
+                        RemovedCustomer = existingCustomer
                     };
                 }
 
                 if (await _userRepository.GetAll().AnyAsync(user => user.NormalizedEmailAddress == normalizedEmail))
                     throw new UserFriendlyException("Customer creation failed.", "The email address belongs to an existing sign-in account.");
+
+                if (string.IsNullOrWhiteSpace(input.Password) && !input.AllowSystemGeneratedPassword)
+                    throw new UserFriendlyException("Customer creation requires confirmation.", "Enter a temporary password for the new customer account.");
 
                 if (input.MembershipId.HasValue)
                     await _membershipPlanAssignmentValidator.EnsureAvailableForAreaAsync(
@@ -128,7 +114,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 user.SetRole(input.MembershipId.HasValue ? AquaUserRole.Member : AquaUserRole.Guest);
 
                 await _userManager.InitializeOptionsAsync(input.TenantId);
-                EnsureSuccess(await _userManager.CreateAsync(user, input.Password ?? CreateTemporaryPassword()));
+                EnsureSuccess(await _userManager.CreateAsync(user, input.Password ?? CreateSystemGeneratedPassword()));
                 EnsureSuccess(await _userManager.SetRolesAsync(user, new[]
                 {
                     input.MembershipId.HasValue ? "Member" : "Guest"
@@ -146,9 +132,38 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 await _customerRepository.InsertAsync(customer);
                 return new AdminCustomerAccountResult
                 {
-                    Customer = customer,
-                    WasRestored = false
+                    Customer = customer
                 };
+            }
+        }
+
+        public async Task<Customer> RestoreAsync(int customerId, AdminCustomerAccountInput input)
+        {
+            Validate(input);
+            using (_unitOfWorkManager.Current.SetTenantId(input.TenantId))
+            using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
+            using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.SoftDelete))
+            {
+                var customer = await _customerRepository.GetAllIncluding(item => item.User)
+                    .SingleOrDefaultAsync(item => item.Id == customerId && item.TenantId == input.TenantId);
+                if (customer == null || !customer.IsDeleted)
+                    throw new UserFriendlyException("Customer restoration failed.", "The removed customer account is no longer available to restore.");
+
+                customer.IsDeleted = false;
+                customer.DeleterUserId = null;
+                customer.DeletionTime = null;
+                await _customerProfileUpdater.UpdateAsync(customer, new AdminCustomerProfileUpdate
+                {
+                    FirstName = input.FirstName,
+                    LastName = input.LastName,
+                    Email = input.Email,
+                    MembershipId = input.MembershipId,
+                    IsActive = input.IsActive
+                });
+                await _userManager.InitializeOptionsAsync(input.TenantId);
+                customer.User.RequirePasswordReset();
+                EnsureSuccess(await _userManager.UpdateAsync(customer.User));
+                return customer;
             }
         }
 
@@ -176,6 +191,6 @@ namespace AqualLifeStyle.Application.Admin.Customers
             throw new UserFriendlyException("Customer creation failed.", message);
         }
 
-        private static string CreateTemporaryPassword() => $"Aa1!{Guid.NewGuid():N}";
+        private static string CreateSystemGeneratedPassword() => $"Aa1!{Guid.NewGuid():N}";
     }
 }

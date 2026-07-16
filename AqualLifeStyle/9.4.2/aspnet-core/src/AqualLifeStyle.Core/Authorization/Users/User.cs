@@ -50,6 +50,18 @@ namespace AqualLifeStyle.Authorization.Users
 
         public bool IsGuest() => Role == AquaUserRole.Guest;
 
+        public bool RequiresPasswordReset() => !PasswordResetCode.IsNullOrWhiteSpace();
+
+        public void RequirePasswordReset()
+        {
+            PasswordResetCode = Guid.NewGuid().ToString("N");
+        }
+
+        public void CompleteRequiredPasswordReset()
+        {
+            PasswordResetCode = null;
+        }
+
         public void SetRole(AquaUserRole role)
         {
             if (!Enum.IsDefined(typeof(AquaUserRole), role))

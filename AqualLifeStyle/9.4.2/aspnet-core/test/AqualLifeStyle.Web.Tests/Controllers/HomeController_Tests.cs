@@ -1,4 +1,7 @@
 ﻿using System.Threading.Tasks;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
 using AqualLifeStyle.Models.TokenAuth;
 using AqualLifeStyle.Web.Controllers;
 using Shouldly;
@@ -7,6 +10,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using AqualLifeStyle.Authorization;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
+using Abp.Authorization.Users;
 
 namespace AqualLifeStyle.Web.Tests.Controllers
 {
@@ -63,9 +67,47 @@ namespace AqualLifeStyle.Web.Tests.Controllers
             permissions.ShouldNotContain(AquaPermissions.Admin.Tenants.View);
         }
 
+        [Fact]
+        public async Task Authentication_RequiresRestoredCustomerToCompletePasswordReset()
+        {
+            UsingDbContext(context =>
+            {
+                var user = context.Users.Single(item => item.TenantId == 1 && item.UserName == AbpUserBase.AdminUserName);
+                user.RequirePasswordReset();
+                context.SaveChanges();
+            });
+
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Post, "/api/TokenAuth/Authenticate");
+                request.Headers.Add("__tenant", "Default");
+                request.Content = new StringContent(JsonSerializer.Serialize(new AuthenticateModel
+                {
+                    UserNameOrEmailAddress = "admin",
+                    Password = "123qwe"
+                }), Encoding.UTF8, "application/json");
+
+                var response = await Client.SendAsync(request);
+                var responseBody = await response.Content.ReadAsStringAsync();
+                responseBody.ShouldContain("Password reset required.");
+                responseBody.ShouldNotContain("accessToken");
+            }
+            finally
+            {
+                UsingDbContext(context =>
+                {
+                    var user = context.Users.Single(item => item.TenantId == 1 && item.UserName == AbpUserBase.AdminUserName);
+                    user.CompleteRequiredPasswordReset();
+                    context.SaveChanges();
+                });
+            }
+        }
+
         [Theory]
         [InlineData("api/services/app/AdminCustomer/Update", "PUT")]
         [InlineData("api/services/app/AdminCustomer/Delete", "DELETE")]
+        [InlineData("api/services/app/AdminCustomer/Restore", "POST")]
+        [InlineData("api/services/app/Account/CompletePasswordSetup", "POST")]
         [InlineData("api/services/app/AdminUser/Update", "PUT")]
         [InlineData("api/services/app/AdminUser/Delete", "DELETE")]
         [InlineData("api/services/app/AdminAreaLeader/Remove", "DELETE")]

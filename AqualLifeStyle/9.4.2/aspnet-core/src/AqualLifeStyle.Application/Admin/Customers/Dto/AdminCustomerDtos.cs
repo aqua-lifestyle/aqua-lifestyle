@@ -32,14 +32,10 @@ namespace AqualLifeStyle.Application.Admin.Customers.Dto
         public bool IsActive { get; set; }
         public DateTime CreationTime { get; set; }
         public DateTime? LastModificationTime { get; set; }
-        public bool WasRestored { get; set; }
     }
 
-    public class AdminCreateCustomerInput
+    public abstract class AdminCustomerOnboardingDetailsInput
     {
-        [Range(1, int.MaxValue)]
-        public int TenantId { get; set; }
-
         [Required, StringLength(AbpUserBase.MaxNameLength, MinimumLength = 1)]
         public string FirstName { get; set; }
 
@@ -49,9 +45,6 @@ namespace AqualLifeStyle.Application.Admin.Customers.Dto
         [Required, EmailAddress, StringLength(AbpUserBase.MaxEmailAddressLength)]
         public string Email { get; set; }
 
-        [Required, StringLength(AbpUserBase.MaxPlainPasswordLength, MinimumLength = 8), DisableAuditing]
-        public string Password { get; set; }
-
         [Range(1, int.MaxValue)]
         public int? MembershipId { get; set; }
 
@@ -59,6 +52,39 @@ namespace AqualLifeStyle.Application.Admin.Customers.Dto
 
         [Required, StringLength(500, MinimumLength = 3)]
         public string Justification { get; set; }
+    }
+
+    public class AdminCreateCustomerInput : AdminCustomerOnboardingDetailsInput
+    {
+        [Range(1, int.MaxValue)]
+        public int TenantId { get; set; }
+
+        [StringLength(AbpUserBase.MaxPlainPasswordLength, MinimumLength = 8), DisableAuditing]
+        public string Password { get; set; }
+    }
+
+    public class AdminRestoreCustomerInput : AdminCustomerOnboardingDetailsInput
+    {
+        [Range(1, int.MaxValue)]
+        public int CustomerId { get; set; }
+    }
+
+    public class AdminRemovedCustomerCandidateDto
+    {
+        public int CustomerId { get; set; }
+        public string Name { get; set; }
+        public string Email { get; set; }
+        public DateTime? RemovalTime { get; set; }
+    }
+
+    public class AdminCustomerOnboardingResultDto
+    {
+        public bool RequiresRestoreConfirmation { get; set; }
+        public AdminRemovedCustomerCandidateDto RemovedCustomer { get; set; }
+        public AdminCustomerDto Customer { get; set; }
+
+        [DisableAuditing]
+        public string PasswordSetupUrl { get; set; }
     }
 
     public class AdminUpdateCustomerInput : EntityDto<int>

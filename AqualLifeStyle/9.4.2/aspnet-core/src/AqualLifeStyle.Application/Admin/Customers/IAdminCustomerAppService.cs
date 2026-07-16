@@ -11,7 +11,8 @@ namespace AqualLifeStyle.Application.Admin.Customers
         Task<PagedResultDto<AdminCustomerDto>> GetAllAsync(AdminCustomerListInput input);
         Task<List<AdminMembershipOptionDto>> GetMembershipOptionsAsync(AdminCustomerMembershipOptionsInput input);
         Task<AdminCustomerDto> GetAsync(EntityDto<int> input);
-        Task<AdminCustomerDto> CreateAsync(AdminCreateCustomerInput input);
+        Task<AdminCustomerOnboardingResultDto> CreateAsync(AdminCreateCustomerInput input);
+        Task<AdminCustomerOnboardingResultDto> RestoreAsync(AdminRestoreCustomerInput input);
         Task<AdminCustomerDto> UpdateAsync(AdminUpdateCustomerInput input);
         Task DeleteAsync(AdminDeleteCustomerInput input);
     }

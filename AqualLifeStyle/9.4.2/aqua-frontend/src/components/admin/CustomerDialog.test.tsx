@@ -8,7 +8,7 @@ import {
   useToast,
 } from "@/src/providers";
 import { httpClient } from "@/src/shared/api";
-import { CustomerDialog, getCustomerOnboardingConfirmation } from "./CustomerDialog";
+import { CustomerDialog } from "./CustomerDialog";
 
 vi.mock("@/src/providers", () => ({
   useAuthState: vi.fn(),
@@ -31,13 +31,6 @@ const authState = (permissions: string[]) => ({
 describe("CustomerDialog", () => {
   const getMemberships = vi.fn();
   const toast = vi.fn();
-
-  it("describes restoration as reconnecting existing history", () => {
-    expect(getCustomerOnboardingConfirmation(true)).toEqual({
-      message: "The customer was reconnected to their existing account and history.",
-      title: "Customer access restored",
-    });
-  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -85,14 +78,19 @@ describe("CustomerDialog", () => {
   it("validates and creates a tenant-linked customer with justification", async () => {
     const onCreated = vi.fn();
     vi.mocked(useAuthState).mockReturnValue(authState(["Aqua.Admin.Customers.Create"]));
-    vi.mocked(httpClient.post).mockResolvedValue({ id: 10 });
+    vi.mocked(httpClient.post).mockResolvedValue({
+      customer: { id: 10, name: "Ada Lovelace" },
+      passwordSetupUrl: null,
+      removedCustomer: null,
+      requiresRestoreConfirmation: false,
+    });
     render(<CustomerDialog onCreated={onCreated} />);
 
     fireEvent.click(screen.getByRole("button", { name: /add customer/i }));
     fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Ada" } });
     fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Lovelace" } });
     fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "ada@example.com" } });
-    fireEvent.change(screen.getByLabelText("Temporary password"), { target: { value: "Temporary123!" } });
+    fireEvent.change(screen.getByLabelText("Temporary password for a new customer"), { target: { value: "Temporary123!" } });
     fireEvent.change(screen.getByLabelText("Reason for creating this account"), { target: { value: "Approved onboarding" } });
     fireEvent.click(screen.getByRole("button", { name: /create customer/i }));
 
@@ -109,5 +107,47 @@ describe("CustomerDialog", () => {
     ));
     expect(onCreated).toHaveBeenCalled();
     expect(toast).toHaveBeenCalled();
+  });
+
+  it("requires explicit confirmation before restoring a removed customer", async () => {
+    const onCreated = vi.fn();
+    vi.mocked(useAuthState).mockReturnValue(authState(["Aqua.Admin.Customers.Create"]));
+    vi.mocked(httpClient.post)
+      .mockResolvedValueOnce({
+        customer: null,
+        passwordSetupUrl: null,
+        removedCustomer: { customerId: 17, email: "dora@example.com", name: "Dora Shongwe", removalTime: "2026-07-16" },
+        requiresRestoreConfirmation: true,
+      })
+      .mockResolvedValueOnce({
+        customer: { id: 17, name: "Dora Shongwe" },
+        passwordSetupUrl: "https://customers.example/reset-password?token=one-time",
+        removedCustomer: null,
+        requiresRestoreConfirmation: false,
+      });
+    render(<CustomerDialog onCreated={onCreated} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /add customer/i }));
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Dora" } });
+    fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Shongwe" } });
+    fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "dora@example.com" } });
+    fireEvent.change(screen.getByLabelText("Reason for creating this account"), { target: { value: "Returning customer approved" } });
+    fireEvent.click(screen.getByRole("button", { name: /create customer/i }));
+
+    expect(await screen.findByText("An existing removed customer was found. No account has been changed yet.")).toBeInTheDocument();
+    expect(onCreated).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Restore customer" }));
+
+    await waitFor(() => expect(httpClient.post).toHaveBeenLastCalledWith(
+      "/api/services/app/AdminCustomer/Restore",
+      expect.objectContaining({ customerId: 17, email: "dora@example.com" }),
+    ));
+    const restoreInput = vi.mocked(httpClient.post).mock.calls.at(-1)?.[1] as Record<string, unknown>;
+    expect(restoreInput).not.toHaveProperty("password");
+    expect(restoreInput).not.toHaveProperty("tenantId");
+    expect(await screen.findByLabelText("Password setup link")).toHaveValue(
+      "https://customers.example/reset-password?token=one-time",
+    );
+    expect(onCreated).toHaveBeenCalledOnce();
   });
 });

@@ -2,12 +2,16 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
+using Abp.UI;
 using AqualLifeStyle.Application.Admin.Customers;
 using AqualLifeStyle.Application.Admin.Customers.Dto;
+using AqualLifeStyle.Authorization.Accounts;
+using AqualLifeStyle.Authorization.Accounts.Dto;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.WebUtilities;
 using Shouldly;
 using Xunit;
 
@@ -26,7 +30,7 @@ namespace AqualLifeStyle.Tests.Application
         public async Task CustomerLifecycle_CreatesUpdatesRemovesAndRestoresLinkedAccount()
         {
             var email = $"admin-created-{Guid.NewGuid():N}@example.com";
-            var created = await _service.CreateAsync(new AdminCreateCustomerInput
+            var creationResult = await _service.CreateAsync(new AdminCreateCustomerInput
             {
                 TenantId = 1,
                 FirstName = "Ada",
@@ -36,14 +40,16 @@ namespace AqualLifeStyle.Tests.Application
                 IsActive = true,
                 Justification = "Approved customer onboarding"
             });
+            var created = creationResult.Customer;
 
+            creationResult.RequiresRestoreConfirmation.ShouldBeFalse();
             created.TenantId.ShouldBe(1);
             created.Name.ShouldBe("Ada Lovelace");
-            created.WasRestored.ShouldBeFalse();
             var originalCreationTime = created.CreationTime;
             var originalUserId = created.UserId;
             var createdUser = await Resolve<UserManager>().FindByEmailAsync(email);
             createdUser.ShouldNotBeNull();
+            var originalPasswordHash = createdUser.Password;
             (await Resolve<UserManager>().CheckPasswordAsync(createdUser, "Temporary123!")).ShouldBeTrue();
             await UsingDbContextAsync(async context =>
             {
@@ -81,26 +87,45 @@ namespace AqualLifeStyle.Tests.Application
                 user.IsActive.ShouldBeFalse();
             });
 
-            var restored = await _service.CreateAsync(new AdminCreateCustomerInput
+            var restorationCandidate = await _service.CreateAsync(new AdminCreateCustomerInput
             {
                 TenantId = 1,
                 FirstName = "Dora",
                 LastName = "Shongwe",
                 Email = email,
-                Password = "Replacement123!",
                 IsActive = true,
                 Justification = "Returning customer requested account restoration"
             });
+            restorationCandidate.RequiresRestoreConfirmation.ShouldBeTrue();
+            restorationCandidate.RemovedCustomer.CustomerId.ShouldBe(created.Id);
+            await UsingDbContextAsync(async context =>
+            {
+                var untouchedCustomer = await context.Customers.IgnoreQueryFilters().SingleAsync(item => item.Id == created.Id);
+                untouchedCustomer.IsDeleted.ShouldBeTrue();
+                untouchedCustomer.Name.ShouldBe("Augusta Ada Lovelace");
+            });
+
+            var restorationResult = await _service.RestoreAsync(new AdminRestoreCustomerInput
+            {
+                CustomerId = restorationCandidate.RemovedCustomer.CustomerId,
+                FirstName = "Dora",
+                LastName = "Shongwe",
+                Email = email,
+                IsActive = true,
+                Justification = "Returning customer explicitly approved for restoration"
+            });
+            var restored = restorationResult.Customer;
             restored.Id.ShouldBe(created.Id);
             restored.UserId.ShouldBe(originalUserId);
             restored.CreationTime.ShouldBe(originalCreationTime);
-            restored.WasRestored.ShouldBeTrue();
             restored.Name.ShouldBe("Dora Shongwe");
             restored.IsActive.ShouldBeTrue();
             var restoredUser = await Resolve<UserManager>().FindByEmailAsync(email);
             restoredUser.ShouldNotBeNull();
             restoredUser.IsActive.ShouldBeTrue();
-            (await Resolve<UserManager>().CheckPasswordAsync(restoredUser, "Replacement123!")).ShouldBeTrue();
+            restoredUser.Password.ShouldBe(originalPasswordHash);
+            restoredUser.RequiresPasswordReset().ShouldBeTrue();
+            (await Resolve<UserManager>().CheckPasswordAsync(restoredUser, "Temporary123!")).ShouldBeTrue();
             await UsingDbContextAsync(async context =>
             {
                 var restoredCustomers = await context.Customers.IgnoreQueryFilters()
@@ -109,6 +134,29 @@ namespace AqualLifeStyle.Tests.Application
                 restoredCustomers.Count.ShouldBe(1);
                 restoredCustomers[0].IsDeleted.ShouldBeFalse();
             });
+
+            var passwordSetupUri = new Uri(restorationResult.PasswordSetupUrl);
+            var passwordSetupQuery = QueryHelpers.ParseQuery(passwordSetupUri.Query);
+            var passwordSetupCompleted = await Resolve<IAccountAppService>().CompletePasswordSetup(new CompletePasswordSetupInput
+            {
+                AreaName = passwordSetupQuery["area"],
+                UserId = long.Parse(passwordSetupQuery["userId"]),
+                ResetToken = passwordSetupQuery["token"],
+                NewPassword = "CustomerChosen123!"
+            });
+            passwordSetupCompleted.ShouldBeTrue();
+            restoredUser = await Resolve<UserManager>().FindByEmailAsync(email);
+            restoredUser.IsActive.ShouldBeTrue();
+            restoredUser.RequiresPasswordReset().ShouldBeFalse();
+            (await Resolve<UserManager>().CheckPasswordAsync(restoredUser, "CustomerChosen123!")).ShouldBeTrue();
+            await Should.ThrowAsync<UserFriendlyException>(() =>
+                Resolve<IAccountAppService>().CompletePasswordSetup(new CompletePasswordSetupInput
+                {
+                    AreaName = passwordSetupQuery["area"],
+                    UserId = long.Parse(passwordSetupQuery["userId"]),
+                    ResetToken = passwordSetupQuery["token"],
+                    NewPassword = "AnotherPassword123!"
+                }));
         }
 
         [Fact]
@@ -145,7 +193,7 @@ namespace AqualLifeStyle.Tests.Application
             options.Select(option => option.Id).ShouldNotContain(planIds[2]);
 
             var email = $"platform-member-{Guid.NewGuid():N}@example.com";
-            var customer = await _service.CreateAsync(new AdminCreateCustomerInput
+            var customer = (await _service.CreateAsync(new AdminCreateCustomerInput
             {
                 TenantId = 1,
                 FirstName = "Platform",
@@ -154,7 +202,7 @@ namespace AqualLifeStyle.Tests.Application
                 Password = "Temporary123!",
                 IsActive = true,
                 Justification = "Approved customer onboarding"
-            });
+            })).Customer;
             var updated = await _service.UpdateAsync(new AdminUpdateCustomerInput
             {
                 Id = customer.Id,

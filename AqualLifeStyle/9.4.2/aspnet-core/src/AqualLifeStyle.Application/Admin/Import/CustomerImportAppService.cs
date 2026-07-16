@@ -161,7 +161,7 @@ namespace AqualLifeStyle.Application.Admin.Import
 
         private async Task ImportRowAsync(int tenantId, CachedCustomerImportRow row)
         {
-            _ = await _accountManager.CreateOrRestoreAsync(new AdminCustomerAccountInput
+            var accountResult = await _accountManager.CreateOrFindRemovedAsync(new AdminCustomerAccountInput
             {
                 TenantId = tenantId,
                 FirstName = row.FirstName,
@@ -169,7 +169,10 @@ namespace AqualLifeStyle.Application.Admin.Import
                 Email = row.Email,
                 MembershipId = row.MembershipId,
                 IsActive = row.IsActive,
+                AllowSystemGeneratedPassword = true,
             });
+            if (accountResult.RemovedCustomer != null)
+                throw new UserFriendlyException("Customer import requires review.", "This email belongs to a removed customer and must be restored explicitly.");
         }
 
         private async Task ValidateBusinessRulesAsync(int tenantId, List<CachedCustomerImportRow> rows,
