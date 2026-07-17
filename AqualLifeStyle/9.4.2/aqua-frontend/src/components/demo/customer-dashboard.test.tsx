@@ -267,7 +267,7 @@ describe("CustomerDashboard", () => {
     expect(screen.getAllByText("Jasper").length).toBeGreaterThan(0);
     expect(screen.getByText("Water filter")).toBeInTheDocument();
     expect(screen.getByText("Monthly obligation").parentElement).toHaveTextContent(
-      "R 0.00",
+      /R\s*0[,.]00/,
     );
   });
 

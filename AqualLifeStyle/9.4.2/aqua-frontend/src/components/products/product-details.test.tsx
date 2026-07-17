@@ -133,7 +133,7 @@ describe("ProductDetails", () => {
   it("renders product overview and price", () => {
     render(<ProductDetails productId={3} />);
     expect(screen.getByText("Paddle")).toBeInTheDocument();
-    expect(screen.getByText(/R\s*300\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/R\s*300[,.]00/)).toBeInTheDocument();
     expect(screen.getAllByText("Open to all").length).toBeGreaterThanOrEqual(2);
   });
 

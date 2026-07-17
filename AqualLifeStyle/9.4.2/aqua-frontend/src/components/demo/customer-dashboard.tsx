@@ -410,7 +410,7 @@ export const CustomerDashboard = () => {
               <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
                 <span>Current balance</span>
                 <span className="font-semibold text-foreground">
-                  {currentMembership ? "R 0.00" : "Locked"}
+                  {currentMembership ? formatCurrency(0) : "Locked"}
                 </span>
               </div>
               <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
