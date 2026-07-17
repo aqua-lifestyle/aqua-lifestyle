@@ -13,6 +13,13 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\AqualLifeStyle.Application\AqualLifeStyle.Application.csproj" />
     <ProjectReference Include="..\..\src\AqualLifeStyle.EntityFrameworkCore\AqualLifeStyle.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\src\AqualLifeStyle.Migrator\AqualLifeStyle.Migrator.csproj" />
+    <ProjectReference Include="..\..\src\AqualLifeStyle.Web.Host\AqualLifeStyle.Web.Host.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Required to use ASP.NET Core types (IWebHostEnvironment, ControllerBase, etc.) when
+         referencing AqualLifeStyle.Web.Host from this non-Web test project. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
