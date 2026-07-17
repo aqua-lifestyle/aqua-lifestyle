@@ -23,6 +23,16 @@ namespace AqualLifeStyle.Web.Host.Models
         public string DatabaseStatus { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether the configured Redis cache is reachable.
+        /// </summary>
+        public bool IsRedisReachable { get; set; }
+
+        /// <summary>
+        /// Gets or sets the Redis dependency status.
+        /// </summary>
+        public string RedisStatus { get; set; }
+
+        /// <summary>
         /// Gets or sets the application version.
         /// </summary>
         public string Version { get; set; }
