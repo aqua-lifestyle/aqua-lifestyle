@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-alpine AS dependencies
+FROM node:24-alpine AS dependencies
 WORKDIR /app
 COPY AqualLifeStyle/9.4.2/aqua-frontend/package.json AqualLifeStyle/9.4.2/aqua-frontend/package-lock.json ./
 RUN npm ci
 
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_PUBLIC_ABP_API_URL
@@ -18,7 +18,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY AqualLifeStyle/9.4.2/aqua-frontend/ ./
 RUN npm run build
 
-FROM node:22-alpine AS runtime
+FROM node:24-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
