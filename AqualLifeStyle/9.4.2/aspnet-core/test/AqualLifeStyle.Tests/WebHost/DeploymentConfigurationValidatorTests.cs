@@ -69,6 +69,17 @@ namespace AqualLifeStyle.Tests.WebHost
         }
 
         [Fact]
+        public void Validate_InProduction_WithRenderDatabaseUrl_DoesNotThrow()
+        {
+            var settings = CompleteProductionSettings();
+            settings.Remove("ConnectionStrings:Default");
+            settings["DATABASE_URL"] = "postgresql://user:password@postgres:5432/aqualifestyle";
+            var services = BuildServiceProvider("Production", settings);
+
+            Should.NotThrow(() => DeploymentConfigurationValidator.Validate(services));
+        }
+
+        [Fact]
         public void Validate_InProduction_WithMissingConnectionString_ThrowsWithDescriptiveMessage()
         {
             var settings = CompleteProductionSettings();
