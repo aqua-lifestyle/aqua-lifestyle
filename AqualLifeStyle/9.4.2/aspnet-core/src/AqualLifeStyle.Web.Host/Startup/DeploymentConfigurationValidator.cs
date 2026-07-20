@@ -20,7 +20,6 @@ namespace AqualLifeStyle.Web.Host.Startup
             var configuration = services.GetRequiredService<IConfiguration>();
             var requiredSettings = new Dictionary<string, string>
             {
-                ["ConnectionStrings:Default"] = "ConnectionStrings__Default or DATABASE_URL",
                 ["App:ServerRootAddress"] = "App__ServerRootAddress",
                 ["App:ClientRootAddress"] = "App__ClientRootAddress",
                 ["App:CorsOrigins"] = "App__CorsOrigins",
@@ -28,10 +27,15 @@ namespace AqualLifeStyle.Web.Host.Startup
                 ["Redis:Configuration"] = "Redis__Configuration"
             };
             var missing = new List<string>();
+            if (!IsConfigured(configuration["ConnectionStrings:Default"]) &&
+                !IsConfigured(configuration["DATABASE_URL"]))
+            {
+                missing.Add("ConnectionStrings__Default or DATABASE_URL");
+            }
+
             foreach (var setting in requiredSettings)
             {
-                var value = configuration[setting.Key];
-                if (string.IsNullOrWhiteSpace(value) || value.StartsWith("<set-via-", StringComparison.Ordinal))
+                if (!IsConfigured(configuration[setting.Key]))
                 {
                     missing.Add(setting.Value);
                 }
@@ -42,6 +46,12 @@ namespace AqualLifeStyle.Web.Host.Startup
                 throw new InvalidOperationException(
                     "Production configuration is incomplete. Set: " + string.Join(", ", missing));
             }
+        }
+
+        private static bool IsConfigured(string value)
+        {
+            return !string.IsNullOrWhiteSpace(value) &&
+                   !value.StartsWith("<set-via-", StringComparison.Ordinal);
         }
     }
 }
