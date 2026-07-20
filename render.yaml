@@ -36,11 +36,11 @@ services:
       - key: App__DefaultTenantName
         value: Default
       - key: App__ServerRootAddress
-        sync: false
+        value: https://aqualifestyle-api.onrender.com/
       - key: App__ClientRootAddress
-        sync: false
+        value: https://aqua-lifestyle.vercel.app/
       - key: App__CorsOrigins
-        sync: false
+        value: https://aqua-lifestyle.vercel.app
       - key: Logging__MinimumLevel
         value: Information
 
