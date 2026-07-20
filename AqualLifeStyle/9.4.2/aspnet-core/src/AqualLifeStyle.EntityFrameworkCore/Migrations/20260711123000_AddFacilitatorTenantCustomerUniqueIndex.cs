@@ -1,9 +1,13 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+﻿using AqualLifeStyle.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace AqualLifeStyle.Migrations
 {
+    [DbContext(typeof(AqualLifeStyleDbContext))]
+    [Migration("20260711123000_AddFacilitatorTenantCustomerUniqueIndex")]
     /// <inheritdoc />
     public partial class AddFacilitatorTenantCustomerUniqueIndex : Migration
     {
