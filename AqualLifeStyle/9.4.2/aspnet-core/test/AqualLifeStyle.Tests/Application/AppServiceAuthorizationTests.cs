@@ -14,6 +14,7 @@ using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Enquiries;
 using AqualLifeStyle.Application.Facilitators;
 using AqualLifeStyle.Application.Memberships;
+using AqualLifeStyle.Application.MyAccount;
 using AqualLifeStyle.Application.Orders;
 using AqualLifeStyle.Application.Products;
 using AqualLifeStyle.Application.Referrals;
@@ -25,6 +26,12 @@ namespace AqualLifeStyle.Tests.Application
 {
     public class AppServiceAuthorizationTests
     {
+        [Fact]
+        public void MyAccountAppService_ShouldRequireAnAuthenticatedUser()
+        {
+            AssertAuthorizeAttribute(typeof(MyAccountAppService));
+        }
+
         [Fact]
         public void AreaLeaderAppService_ShouldRequireAreaLeaderPermissions()
         {
@@ -201,6 +208,12 @@ namespace AqualLifeStyle.Tests.Application
             var attribute = serviceType.GetCustomAttribute<AbpAuthorizeAttribute>(inherit: true);
             attribute.ShouldNotBeNull($"{serviceType.Name} should declare AbpAuthorize.");
             attribute.Permissions.ShouldContain(permissionName);
+        }
+
+        private static void AssertAuthorizeAttribute(Type serviceType)
+        {
+            var attribute = serviceType.GetCustomAttribute<AbpAuthorizeAttribute>(inherit: true);
+            attribute.ShouldNotBeNull($"{serviceType.Name} should require an authenticated user.");
         }
 
         private static void AssertAuthorizeAttribute(Type serviceType, string methodName, string permissionName)
