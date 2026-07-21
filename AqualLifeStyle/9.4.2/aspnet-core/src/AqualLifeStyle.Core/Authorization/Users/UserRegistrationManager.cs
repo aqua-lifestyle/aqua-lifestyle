@@ -8,6 +8,7 @@ using Abp.Authorization.Users;
 using Abp.Domain.Services;
 using Abp.IdentityFramework;
 using Abp.Runtime.Session;
+using Abp.Configuration;
 using Abp.UI;
 using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.MultiTenancy;
@@ -20,27 +21,37 @@ namespace AqualLifeStyle.Authorization.Users
 
         public int? DefaultTenantId { get; set; }
 
-        private readonly TenantManager _tenantManager;
+                private readonly TenantManager _tenantManager;
         private readonly UserManager _userManager;
         private readonly RoleManager _roleManager;
         private readonly IPasswordHasher<User> _passwordHasher;
+        private readonly ISettingManager _settingManager;
 
         public UserRegistrationManager(
             TenantManager tenantManager,
             UserManager userManager,
             RoleManager roleManager,
-            IPasswordHasher<User> passwordHasher)
+            IPasswordHasher<User> passwordHasher,
+            ISettingManager settingManager)
         {
             _tenantManager = tenantManager;
             _userManager = userManager;
             _roleManager = roleManager;
             _passwordHasher = passwordHasher;
+            _settingManager = settingManager;
 
             AbpSession = NullAbpSession.Instance;
         }
 
         public async Task<User> RegisterAsync(string name, string surname, string emailAddress, string userName, string plainPassword, bool isEmailConfirmed)
         {
+            // Enforce setting to disable public self-registration (defense in depth)
+            var isSelfRegistrationEnabled = await _settingManager.GetSettingValueAsync<bool>("Abp.Account.IsSelfRegistrationEnabled");
+            if (!isSelfRegistrationEnabled)
+            {
+                throw new UserFriendlyException("Registration is disabled.", "Public self-registration is disabled.");
+            }
+
             CheckForTenant();
 
             var tenant = await GetActiveTenantAsync();
