@@ -75,18 +75,25 @@ namespace AqualLifeStyle.Web.Controllers
 
         #region Login / Logout
 
-        public ActionResult Login(string userNameOrEmailAddress = "", string returnUrl = "", string successMessage = "")
+        public async Task<ActionResult> Login(string userNameOrEmailAddress = "", string returnUrl = "", string successMessage = "")
         {
             if (string.IsNullOrWhiteSpace(returnUrl))
             {
                 returnUrl = GetAppHomeUrl();
             }
 
+            // Determine whether self-registration is allowed for the current tenant
+            var isSelfRegistrationAllowed = false;
+            if (AbpSession.TenantId.HasValue)
+            {
+                isSelfRegistrationAllowed = await SettingManager.GetSettingValueAsync<bool>("Abp.Account.IsSelfRegistrationEnabled");
+            }
+
             return View(new LoginFormViewModel
             {
                 ReturnUrl = returnUrl,
                 IsMultiTenancyEnabled = _multiTenancyConfig.IsEnabled,
-                IsSelfRegistrationAllowed = IsSelfRegistrationEnabled(),
+                IsSelfRegistrationAllowed = isSelfRegistrationAllowed,
                 MultiTenancySide = AbpSession.MultiTenancySide
             });
         }
