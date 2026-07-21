@@ -11,7 +11,6 @@ namespace AqualLifeStyle.Application.MyAccount
     [Audited]
     public class MyAccountAppService : AqualLifeStyleAppServiceBase, IMyAccountAppService
     {
-        [DisableAuditing]
         public async Task ChangePasswordAsync(ChangeMyPasswordInput input)
         {
             if (input == null)
@@ -30,6 +29,15 @@ namespace AqualLifeStyle.Application.MyAccount
             var user = await GetCurrentUserAsync();
             if (!await UserManager.CheckPasswordAsync(user, input.CurrentPassword))
             {
+                // Record failed attempt so lockout policies are applied
+                await UserManager.AccessFailedAsync(user);
+
+                // Check whether the user is now locked out
+                var isLockedOut = await UserManager.IsLockedOutAsync(user);
+
+                // Log the failure with tenant/user context (do not log passwords)
+                Logger.Warn($"Failed password change attempt tenant={user.TenantId?.ToString() ?? "host"} user={user.Id} lockedOut={isLockedOut}");
+
                 throw new UserFriendlyException(
                     "Password change failed.",
                     "Your current password is incorrect. No changes were made.");
