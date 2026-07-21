@@ -81,7 +81,10 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
                     IsActive = true
                 };
 
-                user.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions())).HashPassword(user, "123qwe");
+                // Use a randomly generated password and require a password setup to avoid shipping default credentials
+                var initialPassword = User.CreateRandomPassword();
+                user.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions())).HashPassword(user, initialPassword);
+                user.RequirePasswordReset();
                 user.SetNormalizedNames();
 
                 adminUserForHost = _context.Users.Add(user).Entity;

@@ -83,7 +83,10 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
             if (adminUser == null)
             {
                 adminUser = User.CreateTenantAdminUser(_tenantId, "admin@defaulttenant.com");
-                adminUser.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions())).HashPassword(adminUser, "123qwe");
+                // Use a randomly generated password and require a password setup to avoid shipping default credentials
+                var initialPassword = User.CreateRandomPassword();
+                adminUser.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions())).HashPassword(adminUser, initialPassword);
+                adminUser.RequirePasswordReset();
                 adminUser.IsEmailConfirmed = true;
                 adminUser.IsActive = true;
 
