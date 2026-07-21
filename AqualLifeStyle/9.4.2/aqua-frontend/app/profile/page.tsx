@@ -3,6 +3,7 @@
 import { User } from "lucide-react";
 import { useState } from "react";
 
+import { AuthenticatedPage } from "@/src/components/auth/authenticated-page";
 import { useAuthActions, useAuthState } from "@/src/providers";
 import {
   Avatar,
@@ -14,6 +15,14 @@ import {
 } from "@/src/shared/ui";
 
 export default function ProfilePage() {
+  return (
+    <AuthenticatedPage>
+      <ProfileContent />
+    </AuthenticatedPage>
+  );
+}
+
+function ProfileContent() {
   const { session } = useAuthState();
   const { setSession } = useAuthActions();
   const [isEditing, setIsEditing] = useState(false);
@@ -24,18 +33,10 @@ export default function ProfilePage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   if (!session) {
-    return (
-      <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-          <StatusMessage tone="error">
-            You must be signed in to view your profile.
-          </StatusMessage>
-        </div>
-      </main>
-    );
+    return null;
   }
 
-const handleSave = () => {
+  const handleSave = () => {
     setIsSaving(true);
     setSaveError(null);
     setSaveSuccess(false);
