@@ -2,10 +2,19 @@
 
 import { useState } from "react";
 
+import { AuthenticatedPage } from "@/src/components/auth/authenticated-page";
 import { useAuthState, useTenantActions, useTenantState } from "@/src/providers";
 import { Breadcrumb, Button, Card, StatusMessage } from "@/src/shared/ui";
 
 export default function SettingsPage() {
+  return (
+    <AuthenticatedPage>
+      <SettingsContent />
+    </AuthenticatedPage>
+  );
+}
+
+function SettingsContent() {
   const { session } = useAuthState();
   const { currentTenant } = useTenantState();
   const { clearTenant, setTenant } = useTenantActions();
@@ -13,15 +22,7 @@ export default function SettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   if (!session) {
-    return (
-      <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-          <StatusMessage tone="error">
-            You must be signed in to view settings.
-          </StatusMessage>
-        </div>
-      </main>
-    );
+    return null;
   }
 
   const handleSaveNotifications = () => {

@@ -1,9 +1,15 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuthActions } from "@/src/providers";
 
 import { UserMenu } from "./user-menu";
+
+const replace = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace }),
+}));
 
 const SetSession = () => {
   const { setSession } = useAuthActions();
@@ -30,6 +36,8 @@ const SetSession = () => {
 };
 
 describe("UserMenu", () => {
+  beforeEach(() => vi.resetAllMocks());
+
   it("renders sign-in and sign-up links when unauthenticated", () => {
     render(
       <AuthProvider>
@@ -68,5 +76,6 @@ describe("UserMenu", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
     expect(screen.getByRole("link", { name: "Sign in" })).toBeInTheDocument();
+    expect(replace).toHaveBeenCalledWith("/login");
   });
 });

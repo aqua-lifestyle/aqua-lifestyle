@@ -2,13 +2,20 @@
 
 import { ChevronDown, LogOut, Settings, User } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { useAuthActions, useAuthState } from "@/src/providers";
 import { Avatar } from "@/src/shared/ui";
 
 export const UserMenu = () => {
+  const router = useRouter();
   const { isAuthenticated, session } = useAuthState();
   const { clearSession } = useAuthActions();
+
+  const handleSignOut = () => {
+    clearSession();
+    router.replace("/login");
+  };
 
   const userLabel =
     session?.user?.name ?? session?.user?.email ?? "Demo user";
@@ -64,7 +71,7 @@ export const UserMenu = () => {
           </Link>
           <button
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-error transition hover:bg-error/10"
-            onClick={clearSession}
+            onClick={handleSignOut}
             type="button"
           >
             <LogOut className="size-4" />
