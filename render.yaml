@@ -38,9 +38,9 @@ services:
       - key: App__ServerRootAddress
         value: https://aqualifestyle-api.onrender.com/
       - key: App__ClientRootAddress
-        value: https://aqua-lifestyle.vercel.app/
+        value: https://www.aqualifestyleclub.co.za/
       - key: App__CorsOrigins
-        value: https://aqua-lifestyle.vercel.app
+        value: https://www.aqualifestyleclub.co.za,https://aqualifestyleclub.co.za,https://aqua-lifestyle.vercel.app
       - key: Logging__MinimumLevel
         value: Information
 
