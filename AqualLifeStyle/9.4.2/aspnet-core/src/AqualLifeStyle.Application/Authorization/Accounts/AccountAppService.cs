@@ -48,6 +48,13 @@ namespace AqualLifeStyle.Authorization.Accounts
 
         public async Task<RegisterOutput> Register(RegisterInput input)
         {
+            // Prevent public self-registration if disabled via settings
+            var isSelfRegistrationEnabled = await SettingManager.GetSettingValueAsync<bool>("Abp.Account.IsSelfRegistrationEnabled");
+            if (!isSelfRegistrationEnabled)
+            {
+                throw new UserFriendlyException("Registration is disabled.", "Public self-registration is disabled.");
+            }
+
             if (!AbpSession.TenantId.HasValue)
             {
                 var defaultTenantName = _configuration["App:DefaultTenantName"];
