@@ -40,7 +40,7 @@ describe("ChangePasswordForm", () => {
     await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith("/api/services/app/MyAccount/ChangePassword", {
       currentPassword: "123qwe", newPassword: "PrivateAdminPassword123!",
     }));
-    expect(clearSession).toHaveBeenCalled();
+    await waitFor(() => expect(clearSession).toHaveBeenCalled());
     expect(replace).toHaveBeenCalledWith("/login");
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Password updated" }));
   });
