@@ -19,7 +19,7 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task DefaultArea_AllowsCustomerSelfRegistration()
+        public async Task ActiveArea_AllowsCustomerSelfRegistrationByDefault()
         {
             var result = await _accountAppService.GetTenantSelfRegistrationAvailability(
                 new GetTenantSelfRegistrationAvailabilityInput { TenancyName = "Default" });

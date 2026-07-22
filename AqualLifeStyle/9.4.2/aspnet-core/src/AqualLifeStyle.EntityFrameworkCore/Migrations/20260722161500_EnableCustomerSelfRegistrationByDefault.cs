@@ -7,8 +7,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace AqualLifeStyle.Migrations
 {
     [DbContext(typeof(AqualLifeStyleDbContext))]
-    [Migration("20260722161500_EnableDefaultAreaCustomerRegistration")]
-    public partial class EnableDefaultAreaCustomerRegistration : Migration
+    [Migration("20260722161500_EnableCustomerSelfRegistrationByDefault")]
+    public partial class EnableCustomerSelfRegistrationByDefault : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -16,11 +16,10 @@ namespace AqualLifeStyle.Migrations
 UPDATE ""AbpSettings""
 SET ""Value"" = 'true',
     ""LastModificationTime"" = NOW()
-WHERE ""TenantId"" = (
+WHERE ""TenantId"" IN (
         SELECT ""Id""
         FROM ""AbpTenants""
-        WHERE ""TenancyName"" = 'Default'
-        LIMIT 1)
+        WHERE ""IsActive"" = TRUE)
   AND ""UserId"" IS NULL
   AND ""Name"" = 'Abp.Account.IsSelfRegistrationEnabled';
 
@@ -37,7 +36,7 @@ SELECT
     'true',
     NOW()
 FROM ""AbpTenants"" AS tenant
-WHERE tenant.""TenancyName"" = 'Default'
+WHERE tenant.""IsActive"" = TRUE
   AND NOT EXISTS (
       SELECT 1
       FROM ""AbpSettings"" AS setting
@@ -53,11 +52,10 @@ WHERE tenant.""TenancyName"" = 'Default'
 UPDATE ""AbpSettings""
 SET ""Value"" = 'false',
     ""LastModificationTime"" = NOW()
-WHERE ""TenantId"" = (
+WHERE ""TenantId"" IN (
         SELECT ""Id""
         FROM ""AbpTenants""
-        WHERE ""TenancyName"" = 'Default'
-        LIMIT 1)
+        WHERE ""IsActive"" = TRUE)
   AND ""UserId"" IS NULL
   AND ""Name"" = 'Abp.Account.IsSelfRegistrationEnabled';
 ");
