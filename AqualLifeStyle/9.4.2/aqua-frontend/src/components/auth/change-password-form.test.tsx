@@ -30,6 +30,17 @@ describe("ChangePasswordForm", () => {
     expect(httpClient.post).not.toHaveBeenCalled();
   });
 
+  it("rejects special characters that the server does not support", async () => {
+    render(<ChangePasswordForm />);
+    fireEvent.change(screen.getByLabelText("Current password"), { target: { value: "123qwe" } });
+    fireEvent.change(screen.getByLabelText("New password"), { target: { value: "PrivatePassword123?" } });
+    fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "PrivatePassword123?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+
+    expect(await screen.findByText("Add one of these special characters: !@#$%^&*().")).toBeInTheDocument();
+    expect(httpClient.post).not.toHaveBeenCalled();
+  });
+
   it("changes the password and requires a fresh sign-in", async () => {
     vi.mocked(httpClient.post).mockResolvedValue({
       message: "Your password was changed. Sign in again with your new password.",

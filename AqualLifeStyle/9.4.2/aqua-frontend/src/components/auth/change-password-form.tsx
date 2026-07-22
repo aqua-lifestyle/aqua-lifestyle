@@ -7,19 +7,14 @@ import { z } from "zod";
 import { useAuthActions, useToast } from "@/src/providers";
 import { httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
+import { passwordPolicyDescription, securePasswordSchema } from "@/src/shared/auth/password-policy";
 import { Button, StatusMessage, TextField } from "@/src/shared/ui";
 
 const changePasswordSchema = z
   .object({
     confirmPassword: z.string().min(1, "Confirm your new password."),
     currentPassword: z.string().min(1, "Enter your current password."),
-    newPassword: z
-      .string()
-      .min(8, "Use at least 8 characters.")
-      .regex(/[A-Z]/, "Add an uppercase letter.")
-      .regex(/[a-z]/, "Add a lowercase letter.")
-      .regex(/[0-9]/, "Add a number.")
-      .regex(/[^A-Za-z0-9]/, "Add a special character."),
+    newPassword: securePasswordSchema,
   })
   .refine((value) => value.newPassword === value.confirmPassword, {
     message: "The new passwords do not match.",
@@ -101,7 +96,7 @@ export const ChangePasswordForm = () => {
       <TextField autoComplete="new-password" errorMessage={fieldErrors.newPassword} label="New password" minLength={8} name="newPassword" required type="password" />
       <TextField autoComplete="new-password" errorMessage={fieldErrors.confirmPassword} label="Confirm new password" minLength={8} name="confirmPassword" required type="password" />
       <p className="text-sm text-muted-foreground">
-        Use at least 8 characters with uppercase, lowercase, number, and special characters.
+        {passwordPolicyDescription}
         You will be asked to sign in again on every device.
       </p>
       {requestError ? <StatusMessage tone="error">{requestError}</StatusMessage> : null}

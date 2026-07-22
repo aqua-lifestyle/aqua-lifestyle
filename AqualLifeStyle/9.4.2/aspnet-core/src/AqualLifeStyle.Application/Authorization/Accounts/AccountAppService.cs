@@ -15,7 +15,7 @@ namespace AqualLifeStyle.Authorization.Accounts
 {
     public class AccountAppService : AqualLifeStyleAppServiceBase, IAccountAppService
     {
-        public const string PasswordRegex = "(?=^.{8,}$)(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?!.*\\s)[0-9a-zA-Z!@#$%^&*()]*$";
+        public const string PasswordRegex = "(?=^.{8,}$)(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*()])(?!.*\\s)[0-9a-zA-Z!@#$%^&*()]*$";
 
         private readonly UserRegistrationManager _userRegistrationManager;
         private readonly IConfiguration _configuration;

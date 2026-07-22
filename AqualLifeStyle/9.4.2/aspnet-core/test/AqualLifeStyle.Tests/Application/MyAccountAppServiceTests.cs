@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Abp.Runtime.Session;
+using Abp.Runtime.Validation;
 using Abp.UI;
 using AqualLifeStyle.Application.MyAccount;
 using AqualLifeStyle.Application.MyAccount.Dto;
@@ -80,6 +81,19 @@ namespace AqualLifeStyle.Tests.Application
                     .ShouldNotBe(PasswordVerificationResult.Failed);
                 user.AccessFailedCount.ShouldBeGreaterThan(0);
             });
+        }
+
+        [Fact]
+        public async Task ChangePassword_WithoutSpecialCharacter_IsRejectedByServerValidation()
+        {
+            await CreateAndLoginTestUserAsync();
+
+            await Should.ThrowAsync<AbpValidationException>(() =>
+                _service.ChangePasswordAsync(new ChangeMyPasswordInput
+                {
+                    CurrentPassword = User.DefaultPassword,
+                    NewPassword = "NoSpecialCharacter123"
+                }));
         }
     }
 }

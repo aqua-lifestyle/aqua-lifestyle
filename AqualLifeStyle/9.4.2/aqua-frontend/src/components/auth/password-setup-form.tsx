@@ -5,16 +5,12 @@ import { z } from "zod";
 
 import { httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
+import { passwordPolicyDescription, securePasswordSchema } from "@/src/shared/auth/password-policy";
 import { Button, Card, LinkButton, StatusMessage, TextField } from "@/src/shared/ui";
 
 const passwordSchema = z.object({
   confirmPassword: z.string(),
-  password: z.string()
-    .min(8, "Use at least 8 characters.")
-    .regex(/[A-Z]/, "Include an uppercase letter.")
-    .regex(/[a-z]/, "Include a lowercase letter.")
-    .regex(/\d/, "Include a number.")
-    .regex(/^[0-9a-zA-Z!@#$%^&*()]*$/, "Use letters, numbers, or !@#$%^&*()."),
+  password: securePasswordSchema,
 }).refine((value) => value.password === value.confirmPassword, {
   message: "The passwords do not match.",
   path: ["confirmPassword"],
@@ -79,6 +75,7 @@ export const PasswordSetupForm = ({ areaName, resetToken, userId }: PasswordSetu
           <form className="mt-5 flex flex-col gap-4" noValidate onSubmit={submit}>
             <TextField autoComplete="new-password" errorMessage={fieldErrors.password} label="New password" name="password" required type="password" />
             <TextField autoComplete="new-password" errorMessage={fieldErrors.confirmPassword} label="Confirm new password" name="confirmPassword" required type="password" />
+            <p className="text-sm text-muted-foreground">{passwordPolicyDescription}</p>
             {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
             <Button isLoading={isSubmitting} type="submit">Set password</Button>
           </form>

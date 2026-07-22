@@ -52,7 +52,7 @@ describe("SignupForm", () => {
       await screen.findByText("Enter a valid email address."),
     ).toBeInTheDocument();
     expect(
-      await screen.findByText("Password must be at least 8 characters."),
+      await screen.findByText("Use at least 8 characters."),
     ).toBeInTheDocument();
   });
 
