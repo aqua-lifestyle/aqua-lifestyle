@@ -6,6 +6,7 @@ import {
   normalizeAbpError,
   type AbpErrorEnvelope,
 } from "@/src/shared/api/abp-error";
+import { apiEndpoints } from "@/src/shared/api/endpoints";
 import { publicEnv } from "@/src/shared/config";
 
 /**
@@ -113,7 +114,30 @@ export type RegisterResult =
   | { ok: true }
   | { ok: false; message: string; fieldErrors?: Record<string, string> };
 
+export type TenantSelfRegistrationAvailabilityResult =
+  | { ok: true; isSelfRegistrationEnabled: boolean }
+  | { ok: false };
+
 const API_BASE = publicEnv.NEXT_PUBLIC_ABP_API_URL;
+
+export const getTenantSelfRegistrationAvailability = async (
+  tenancyName: string,
+): Promise<TenantSelfRegistrationAvailabilityResult> => {
+  try {
+    const response = await axios.get<{
+      result: { isSelfRegistrationEnabled: boolean };
+    }>(`${API_BASE}${apiEndpoints.account.getTenantSelfRegistrationAvailability}`, {
+      params: { tenancyName },
+    });
+
+    return {
+      isSelfRegistrationEnabled: response.data.result.isSelfRegistrationEnabled,
+      ok: true,
+    };
+  } catch {
+    return { ok: false };
+  }
+};
 
 export const getAuthenticationErrorMessage = (
   status: number,

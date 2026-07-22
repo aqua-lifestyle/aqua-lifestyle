@@ -8,6 +8,9 @@ namespace AqualLifeStyle.Authorization.Accounts
     {
         Task<IsTenantAvailableOutput> IsTenantAvailable(IsTenantAvailableInput input);
 
+        Task<GetTenantSelfRegistrationAvailabilityOutput> GetTenantSelfRegistrationAvailability(
+            GetTenantSelfRegistrationAvailabilityInput input);
+
         Task<RegisterOutput> Register(RegisterInput input);
 
         Task<bool> CompletePasswordSetup(CompletePasswordSetupInput input);

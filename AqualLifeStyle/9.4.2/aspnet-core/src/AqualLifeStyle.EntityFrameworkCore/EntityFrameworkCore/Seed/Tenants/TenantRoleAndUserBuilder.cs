@@ -10,6 +10,7 @@ using Abp.MultiTenancy;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.EntityFrameworkCore.Seed;
 
 namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
 {
@@ -83,7 +84,9 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
             if (adminUser == null)
             {
                 adminUser = User.CreateTenantAdminUser(_tenantId, "admin@defaulttenant.com");
-                adminUser.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions())).HashPassword(adminUser, "123qwe");
+                var initialPassword = AdministratorBootstrapPasswordProvider.GetAreaAdministratorPassword(_tenantId);
+                adminUser.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()))
+                    .HashPassword(adminUser, initialPassword);
                 adminUser.IsEmailConfirmed = true;
                 adminUser.IsActive = true;
 

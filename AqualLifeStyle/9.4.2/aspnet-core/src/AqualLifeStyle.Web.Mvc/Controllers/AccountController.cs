@@ -24,6 +24,7 @@ using Abp.Web.Models;
 using Abp.Zero.Configuration;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.Configuration;
 using AqualLifeStyle.Controllers;
 using AqualLifeStyle.Identity;
 using AqualLifeStyle.MultiTenancy;
@@ -75,18 +76,25 @@ namespace AqualLifeStyle.Web.Controllers
 
         #region Login / Logout
 
-        public ActionResult Login(string userNameOrEmailAddress = "", string returnUrl = "", string successMessage = "")
+        public async Task<ActionResult> Login(string userNameOrEmailAddress = "", string returnUrl = "", string successMessage = "")
         {
             if (string.IsNullOrWhiteSpace(returnUrl))
             {
                 returnUrl = GetAppHomeUrl();
             }
 
+            // Determine whether self-registration is allowed for the current tenant
+            var isSelfRegistrationAllowed = false;
+            if (AbpSession.TenantId.HasValue)
+            {
+                isSelfRegistrationAllowed = await SettingManager.GetSettingValueAsync<bool>(AppSettingNames.IsSelfRegistrationEnabled);
+            }
+
             return View(new LoginFormViewModel
             {
                 ReturnUrl = returnUrl,
                 IsMultiTenancyEnabled = _multiTenancyConfig.IsEnabled,
-                IsSelfRegistrationAllowed = IsSelfRegistrationEnabled(),
+                IsSelfRegistrationAllowed = isSelfRegistrationAllowed,
                 MultiTenancySide = AbpSession.MultiTenancySide
             });
         }
@@ -143,8 +151,13 @@ namespace AqualLifeStyle.Web.Controllers
 
         #region Register
 
-        public ActionResult Register()
+        public async Task<ActionResult> Register()
         {
+            if (!await IsSelfRegistrationEnabledForCurrentTenantAsync())
+            {
+                return RedirectToAction(nameof(Login));
+            }
+
             return RegisterView(new RegisterViewModel());
         }
 
@@ -155,20 +168,15 @@ namespace AqualLifeStyle.Web.Controllers
             return View("Register", model);
         }
 
-        private bool IsSelfRegistrationEnabled()
-        {
-            if (!AbpSession.TenantId.HasValue)
-            {
-                return false; // No registration enabled for host users!
-            }
-
-            return true;
-        }
-
         [HttpPost]
         [UnitOfWork]
         public async Task<ActionResult> Register(RegisterViewModel model)
         {
+            if (!await IsSelfRegistrationEnabledForCurrentTenantAsync())
+            {
+                return RedirectToAction(nameof(Login));
+            }
+
             try
             {
                 ExternalLoginInfo externalLoginInfo = null;
@@ -268,6 +276,12 @@ namespace AqualLifeStyle.Web.Controllers
 
                 return View("Register", model);
             }
+        }
+
+        private async Task<bool> IsSelfRegistrationEnabledForCurrentTenantAsync()
+        {
+            return AbpSession.TenantId.HasValue &&
+                   await SettingManager.GetSettingValueAsync<bool>(AppSettingNames.IsSelfRegistrationEnabled);
         }
 
         #endregion

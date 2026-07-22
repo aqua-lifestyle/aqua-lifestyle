@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { AuthenticatedPage } from "@/src/components/auth/authenticated-page";
+import { ChangePasswordForm } from "@/src/components/auth/change-password-form";
 import { useAuthState, useTenantActions, useTenantState } from "@/src/providers";
 import { Breadcrumb, Button, Card, StatusMessage } from "@/src/shared/ui";
 
@@ -80,23 +81,31 @@ function SettingsContent() {
         </Card>
 
         <Card>
-          <h2 className="text-lg font-semibold">Tenant</h2>
+          <h2 className="text-lg font-semibold">Account security</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Current tenant: {currentTenant ?? "Host"}
+            Change your password if it is temporary, shared, or no longer private.
+          </p>
+          <ChangePasswordForm />
+        </Card>
+
+        <Card>
+          <h2 className="text-lg font-semibold">Area</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Current area: {currentTenant ?? "Platform administration"}
           </p>
           <div className="mt-4 flex gap-2">
             <Button
               onClick={() => setTenant("default")}
               variant="outline"
             >
-              Switch to default tenant
+              Use Default area
             </Button>
             {currentTenant ? (
               <Button
                 onClick={clearTenant}
                 variant="outline"
               >
-                Switch to host mode
+                Use platform administration
               </Button>
             ) : null}
           </div>

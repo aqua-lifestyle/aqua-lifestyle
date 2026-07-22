@@ -12,15 +12,31 @@ using System.Linq;
 using AqualLifeStyle.Authorization;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Abp.Authorization.Users;
+using AqualLifeStyle.Authorization.Users;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
 using AqualLifeStyle.Authentication.JwtBearer;
 
 namespace AqualLifeStyle.Web.Tests.Controllers
 {
     public class HomeController_Tests: AqualLifeStyleWebTestBase
     {
+        private void EnsureAdminPassword(int? tenantId, string password)
+        {
+            var passwordHasher = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()));
+
+            UsingDbContext(context =>
+            {
+                var user = context.Users.Single(u => u.TenantId == tenantId && u.UserName == AbpUserBase.AdminUserName);
+                user.Password = passwordHasher.HashPassword(user, password);
+                user.CompleteRequiredPasswordReset();
+            });
+        }
+
         [Fact]
         public async Task Index_Test()
         {
+            EnsureAdminPassword(null, User.DefaultPassword);
             await AuthenticateAsync(null, new AuthenticateModel
             {
                 UserNameOrEmailAddress = "admin",
@@ -39,6 +55,7 @@ namespace AqualLifeStyle.Web.Tests.Controllers
         [Fact]
         public async Task HostAdministratorToken_IncludesGrantedAdministrationPermissions()
         {
+            EnsureAdminPassword(null, User.DefaultPassword);
             var authentication = await AuthenticateAsync(null, new AuthenticateModel
             {
                 UserNameOrEmailAddress = "admin",
@@ -56,6 +73,7 @@ namespace AqualLifeStyle.Web.Tests.Controllers
         [Fact]
         public async Task RotatingSecurityStamp_ImmediatelyInvalidatesExistingJwt()
         {
+            EnsureAdminPassword(null, User.DefaultPassword);
             await AuthenticateAsync(null, new AuthenticateModel
             {
                 UserNameOrEmailAddress = "admin",
@@ -77,6 +95,7 @@ namespace AqualLifeStyle.Web.Tests.Controllers
         [Fact]
         public async Task DivisionAdministratorToken_IncludesDivisionManagementPermissionsOnly()
         {
+            EnsureAdminPassword(1, User.DefaultPassword);
             var authentication = await AuthenticateAsync("Default", new AuthenticateModel
             {
                 UserNameOrEmailAddress = "admin",
@@ -94,6 +113,8 @@ namespace AqualLifeStyle.Web.Tests.Controllers
         [Fact]
         public async Task Authentication_RequiresRestoredCustomerToCompletePasswordReset()
         {
+            EnsureAdminPassword(1, User.DefaultPassword);
+
             UsingDbContext(context =>
             {
                 var user = context.Users.Single(item => item.TenantId == 1 && item.UserName == AbpUserBase.AdminUserName);

@@ -5,6 +5,7 @@ using Abp.UI;
 using Abp.Zero.Configuration;
 using AqualLifeStyle.Authorization.Accounts.Dto;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.Configuration;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using Microsoft.Extensions.Configuration;
@@ -14,7 +15,7 @@ namespace AqualLifeStyle.Authorization.Accounts
 {
     public class AccountAppService : AqualLifeStyleAppServiceBase, IAccountAppService
     {
-        public const string PasswordRegex = "(?=^.{8,}$)(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?!.*\\s)[0-9a-zA-Z!@#$%^&*()]*$";
+        public const string PasswordRegex = "(?=^.{8,}$)(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*()])(?!.*\\s)[0-9a-zA-Z!@#$%^&*()]*$";
 
         private readonly UserRegistrationManager _userRegistrationManager;
         private readonly IConfiguration _configuration;
@@ -46,9 +47,32 @@ namespace AqualLifeStyle.Authorization.Accounts
             return new IsTenantAvailableOutput(TenantAvailabilityState.Available, tenant.Id);
         }
 
+        public async Task<GetTenantSelfRegistrationAvailabilityOutput> GetTenantSelfRegistrationAvailability(
+            GetTenantSelfRegistrationAvailabilityInput input)
+        {
+            var tenant = await TenantManager.FindByTenancyNameAsync(input.TenancyName.Trim());
+            if (tenant == null || !tenant.IsActive)
+            {
+                return new GetTenantSelfRegistrationAvailabilityOutput
+                {
+                    IsSelfRegistrationEnabled = false
+                };
+            }
+
+            var isSelfRegistrationEnabled = await SettingManager.GetSettingValueForTenantAsync<bool>(
+                AppSettingNames.IsSelfRegistrationEnabled,
+                tenant.Id);
+
+            return new GetTenantSelfRegistrationAvailabilityOutput
+            {
+                IsSelfRegistrationEnabled = isSelfRegistrationEnabled
+            };
+        }
+
         public async Task<RegisterOutput> Register(RegisterInput input)
         {
-            if (!AbpSession.TenantId.HasValue)
+            int? targetTenantId = AbpSession.TenantId;
+            if (!targetTenantId.HasValue)
             {
                 var defaultTenantName = _configuration["App:DefaultTenantName"];
                 if (!string.IsNullOrWhiteSpace(defaultTenantName))
@@ -57,8 +81,17 @@ namespace AqualLifeStyle.Authorization.Accounts
                     if (tenant != null && tenant.IsActive)
                     {
                         _userRegistrationManager.DefaultTenantId = tenant.Id;
+                        targetTenantId = tenant.Id;
                     }
                 }
+            }
+
+            var isSelfRegistrationEnabled = targetTenantId.HasValue
+                ? await SettingManager.GetSettingValueForTenantAsync<bool>(AppSettingNames.IsSelfRegistrationEnabled, targetTenantId.Value)
+                : await SettingManager.GetSettingValueAsync<bool>(AppSettingNames.IsSelfRegistrationEnabled);
+            if (!isSelfRegistrationEnabled)
+            {
+                throw new UserFriendlyException("Registration is disabled.", "Public self-registration is disabled.");
             }
 
             var user = await _userRegistrationManager.RegisterAsync(

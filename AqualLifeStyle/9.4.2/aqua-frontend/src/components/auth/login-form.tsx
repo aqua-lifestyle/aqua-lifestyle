@@ -8,6 +8,7 @@ import { z } from "zod";
 import { login } from "@/src/shared/api/auth-service";
 import { publicEnv } from "@/src/shared/config";
 import { getLoginDestination } from "@/src/shared/auth/roles";
+import { useTenantSelfRegistrationAvailability } from "@/src/shared/auth/use-tenant-self-registration-availability";
 import { useHydrated } from "@/src/shared/lib/use-hydrated";
 import { useAuthActions, useTenantActions, useTenantState, useToast } from "@/src/providers";
 import {
@@ -66,6 +67,8 @@ export const LoginForm = () => {
     currentTenant,
     publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME,
   );
+  const selfRegistrationAvailability =
+    useTenantSelfRegistrationAvailability(selectedWorkspace);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -241,12 +244,17 @@ export const LoginForm = () => {
               </div>
             </div>
 
-            <p className="mt-6 text-center text-sm text-muted-foreground">
-              Don’t have an account?{" "}
-              <LinkButton href="/signup" variant="ghost">
-                Sign up
-              </LinkButton>
-            </p>
+            {selfRegistrationAvailability === "enabled" ? (
+              <p className="mt-6 text-center text-sm text-muted-foreground">
+                Don’t have an account?{" "}
+                <LinkButton
+                  href={`/signup?area=${encodeURIComponent(selectedWorkspace)}`}
+                  variant="ghost"
+                >
+                  Sign up
+                </LinkButton>
+              </p>
+            ) : null}
           </div>
         </div>
       </div>

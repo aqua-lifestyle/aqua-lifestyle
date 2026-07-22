@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
 using Abp.Authorization.Roles;
+using Abp.Configuration;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Memberships;
 using AqualLifeStyle.Authorization;
@@ -34,53 +35,59 @@ namespace AqualLifeStyle.Tests.Application
             var email = $"customer_{suffix}@test.com";
             var userName = $"customer_{suffix}";
 
-            var result = await _accountAppService.Register(new RegisterInput
+            using (UsingTenantId(1))
             {
-                EmailAddress = email,
-                Name = "New",
-                Password = "Customer!101",
-                Surname = "Customer",
-                UserName = userName
-            });
+                var settingManager = Resolve<ISettingManager>();
+                await settingManager.ChangeSettingForTenantAsync(1, "Abp.Account.IsSelfRegistrationEnabled", "true");
 
-            result.CanLogin.ShouldBeTrue();
+                var result = await _accountAppService.Register(new RegisterInput
+                {
+                    EmailAddress = email,
+                    Name = "New",
+                    Password = "Customer!101",
+                    Surname = "Customer",
+                    UserName = userName
+                });
 
-            await UsingDbContextAsync(async context =>
-            {
-                var user = await context.Users.SingleAsync(item => item.UserName == userName);
-                var customer = await context.Customers.SingleAsync(item => item.UserId == user.Id);
-                var roleNames = await (
-                    from userRole in context.UserRoles
-                    join role in context.Roles on userRole.RoleId equals role.Id
-                    where userRole.UserId == user.Id
-                    select role.Name).ToListAsync();
-                var guestRole = await context.Roles.SingleAsync(role => role.TenantId == 1 && role.Name == "Guest");
-                var guestPermissions = await context.Permissions
-                    .OfType<RolePermissionSetting>()
-                    .Where(permission => permission.TenantId == 1 && permission.RoleId == guestRole.Id && permission.IsGranted)
-                    .Select(permission => permission.Name)
-                    .ToListAsync();
+                result.CanLogin.ShouldBeTrue();
 
-                customer.Email.Value.ShouldBe(email);
-                customer.MembershipId.ShouldBeNull();
-                roleNames.ShouldContain("Guest");
-                guestPermissions.ShouldContain(PermissionNames.Pages_Products);
-                guestPermissions.ShouldContain(AquaPermissions.Members.ViewSelf);
-                guestPermissions.ShouldContain(AquaPermissions.Memberships.ViewSelf);
-                guestPermissions.ShouldContain(AquaPermissions.Orders.Place);
-                guestPermissions.ShouldNotContain(PermissionNames.Pages_Customers);
-                guestPermissions.ShouldNotContain(PermissionNames.Pages_Memberships);
+                await UsingDbContextAsync(async context =>
+                {
+                    var user = await context.Users.SingleAsync(item => item.UserName == userName);
+                    var customer = await context.Customers.SingleAsync(item => item.UserId == user.Id);
+                    var roleNames = await (
+                        from userRole in context.UserRoles
+                        join role in context.Roles on userRole.RoleId equals role.Id
+                        where userRole.UserId == user.Id
+                        select role.Name).ToListAsync();
+                    var guestRole = await context.Roles.SingleAsync(role => role.TenantId == 1 && role.Name == "Guest");
+                    var guestPermissions = await context.Permissions
+                        .OfType<RolePermissionSetting>()
+                        .Where(permission => permission.TenantId == 1 && permission.RoleId == guestRole.Id && permission.IsGranted)
+                        .Select(permission => permission.Name)
+                        .ToListAsync();
 
-                SetCurrentUser(user.Id, user.TenantId);
-            });
+                    customer.Email.Value.ShouldBe(email);
+                    customer.MembershipId.ShouldBeNull();
+                    roleNames.ShouldContain("Guest");
+                    guestPermissions.ShouldContain(PermissionNames.Pages_Products);
+                    guestPermissions.ShouldContain(AquaPermissions.Members.ViewSelf);
+                    guestPermissions.ShouldContain(AquaPermissions.Memberships.ViewSelf);
+                    guestPermissions.ShouldContain(AquaPermissions.Orders.Place);
+                    guestPermissions.ShouldNotContain(PermissionNames.Pages_Customers);
+                    guestPermissions.ShouldNotContain(PermissionNames.Pages_Memberships);
 
-            var currentCustomer = await _customerAppService.GetMyCustomerAsync();
-            currentCustomer.Email.ShouldBe(email);
-            (await _membershipAppService.GetActiveTiersAsync()).ShouldNotBeEmpty();
-            await Should.ThrowAsync<AbpAuthorizationException>(() =>
-                _customerAppService.GetAllAsync());
-            await Should.ThrowAsync<AbpAuthorizationException>(() =>
-                _membershipAppService.GetAllAsync());
+                    SetCurrentUser(user.Id, user.TenantId);
+                });
+
+                var currentCustomer = await _customerAppService.GetMyCustomerAsync();
+                currentCustomer.Email.ShouldBe(email);
+                (await _membershipAppService.GetActiveTiersAsync()).ShouldNotBeEmpty();
+                await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                    _customerAppService.GetAllAsync());
+                await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                    _membershipAppService.GetAllAsync());
+            }
         }
     }
 }
