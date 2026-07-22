@@ -43,5 +43,33 @@ namespace AqualLifeStyle.Tests.Application
                 await Should.ThrowAsync<UserFriendlyException>(() => _accountAppService.Register(input));
             }
         }
+
+        [Fact]
+        public async Task GetTenantSelfRegistrationAvailability_ReturnsTheCurrentTenantSetting()
+        {
+            var settingManager = Resolve<ISettingManager>();
+            await settingManager.ChangeSettingForTenantAsync(1, "Abp.Account.IsSelfRegistrationEnabled", "true");
+
+            var enabledResult = await _accountAppService.GetTenantSelfRegistrationAvailability(
+                new GetTenantSelfRegistrationAvailabilityInput { TenancyName = "Default" });
+
+            enabledResult.IsSelfRegistrationEnabled.ShouldBeTrue();
+
+            await settingManager.ChangeSettingForTenantAsync(1, "Abp.Account.IsSelfRegistrationEnabled", "false");
+
+            var disabledResult = await _accountAppService.GetTenantSelfRegistrationAvailability(
+                new GetTenantSelfRegistrationAvailabilityInput { TenancyName = "Default" });
+
+            disabledResult.IsSelfRegistrationEnabled.ShouldBeFalse();
+        }
+
+        [Fact]
+        public async Task GetTenantSelfRegistrationAvailability_ReturnsDisabledForAnUnknownTenant()
+        {
+            var result = await _accountAppService.GetTenantSelfRegistrationAvailability(
+                new GetTenantSelfRegistrationAvailabilityInput { TenancyName = "missing-area" });
+
+            result.IsSelfRegistrationEnabled.ShouldBeFalse();
+        }
     }
 }

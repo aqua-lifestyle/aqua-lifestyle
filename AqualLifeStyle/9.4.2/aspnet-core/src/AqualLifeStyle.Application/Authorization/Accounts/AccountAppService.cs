@@ -47,6 +47,28 @@ namespace AqualLifeStyle.Authorization.Accounts
             return new IsTenantAvailableOutput(TenantAvailabilityState.Available, tenant.Id);
         }
 
+        public async Task<GetTenantSelfRegistrationAvailabilityOutput> GetTenantSelfRegistrationAvailability(
+            GetTenantSelfRegistrationAvailabilityInput input)
+        {
+            var tenant = await TenantManager.FindByTenancyNameAsync(input.TenancyName.Trim());
+            if (tenant == null || !tenant.IsActive)
+            {
+                return new GetTenantSelfRegistrationAvailabilityOutput
+                {
+                    IsSelfRegistrationEnabled = false
+                };
+            }
+
+            var isSelfRegistrationEnabled = await SettingManager.GetSettingValueForTenantAsync<bool>(
+                AppSettingNames.IsSelfRegistrationEnabled,
+                tenant.Id);
+
+            return new GetTenantSelfRegistrationAvailabilityOutput
+            {
+                IsSelfRegistrationEnabled = isSelfRegistrationEnabled
+            };
+        }
+
         public async Task<RegisterOutput> Register(RegisterInput input)
         {
             int? targetTenantId = AbpSession.TenantId;

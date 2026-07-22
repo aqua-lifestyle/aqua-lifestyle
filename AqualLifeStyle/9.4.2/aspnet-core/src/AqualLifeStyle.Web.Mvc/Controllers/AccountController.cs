@@ -153,8 +153,7 @@ namespace AqualLifeStyle.Web.Controllers
 
         public async Task<ActionResult> Register()
         {
-            if (!AbpSession.TenantId.HasValue ||
-                !await SettingManager.GetSettingValueAsync<bool>(AppSettingNames.IsSelfRegistrationEnabled))
+            if (!await IsSelfRegistrationEnabledForCurrentTenantAsync())
             {
                 return RedirectToAction(nameof(Login));
             }
@@ -173,6 +172,11 @@ namespace AqualLifeStyle.Web.Controllers
         [UnitOfWork]
         public async Task<ActionResult> Register(RegisterViewModel model)
         {
+            if (!await IsSelfRegistrationEnabledForCurrentTenantAsync())
+            {
+                return RedirectToAction(nameof(Login));
+            }
+
             try
             {
                 ExternalLoginInfo externalLoginInfo = null;
@@ -272,6 +276,12 @@ namespace AqualLifeStyle.Web.Controllers
 
                 return View("Register", model);
             }
+        }
+
+        private async Task<bool> IsSelfRegistrationEnabledForCurrentTenantAsync()
+        {
+            return AbpSession.TenantId.HasValue &&
+                   await SettingManager.GetSettingValueAsync<bool>(AppSettingNames.IsSelfRegistrationEnabled);
         }
 
         #endregion
