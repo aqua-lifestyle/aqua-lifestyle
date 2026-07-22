@@ -45,16 +45,14 @@ namespace AqualLifeStyle.Authorization.Users
 
         public async Task<User> RegisterAsync(string name, string surname, string emailAddress, string userName, string plainPassword, bool isEmailConfirmed)
         {
-            // Enforce setting to disable public self-registration (defense in depth)
-            var isSelfRegistrationEnabled = await _settingManager.GetSettingValueAsync<bool>("Abp.Account.IsSelfRegistrationEnabled");
+            CheckForTenant();
+
+            var tenant = await GetActiveTenantAsync();
+            var isSelfRegistrationEnabled = await _settingManager.GetSettingValueForTenantAsync<bool>("Abp.Account.IsSelfRegistrationEnabled", tenant.Id);
             if (!isSelfRegistrationEnabled)
             {
                 throw new UserFriendlyException("Registration is disabled.", "Public self-registration is disabled.");
             }
-
-            CheckForTenant();
-
-            var tenant = await GetActiveTenantAsync();
 
             var user = new User
             {

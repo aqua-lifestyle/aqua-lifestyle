@@ -22,10 +22,11 @@ namespace AqualLifeStyle.Tests.Application
         public async Task Register_WhenSelfRegistrationDisabled_ShouldThrowUserFriendlyException()
         {
             // Arrange: ensure we're operating in the default tenant
+            var settingManager = Resolve<ISettingManager>();
+            await settingManager.ChangeSettingForApplicationAsync("Abp.Account.IsSelfRegistrationEnabled", "true");
+
             using (UsingTenantId(1))
             {
-                var settingManager = Resolve<ISettingManager>();
-
                 // Disable self registration for tenant 1
                 await settingManager.ChangeSettingForTenantAsync(1, "Abp.Account.IsSelfRegistrationEnabled", "false");
 

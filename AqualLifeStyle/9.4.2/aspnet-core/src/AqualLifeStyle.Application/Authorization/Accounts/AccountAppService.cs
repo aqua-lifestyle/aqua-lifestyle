@@ -48,14 +48,8 @@ namespace AqualLifeStyle.Authorization.Accounts
 
         public async Task<RegisterOutput> Register(RegisterInput input)
         {
-            // Prevent public self-registration if disabled via settings
-            var isSelfRegistrationEnabled = await SettingManager.GetSettingValueAsync<bool>("Abp.Account.IsSelfRegistrationEnabled");
-            if (!isSelfRegistrationEnabled)
-            {
-                throw new UserFriendlyException("Registration is disabled.", "Public self-registration is disabled.");
-            }
-
-            if (!AbpSession.TenantId.HasValue)
+            int? targetTenantId = AbpSession.TenantId;
+            if (!targetTenantId.HasValue)
             {
                 var defaultTenantName = _configuration["App:DefaultTenantName"];
                 if (!string.IsNullOrWhiteSpace(defaultTenantName))
@@ -64,8 +58,17 @@ namespace AqualLifeStyle.Authorization.Accounts
                     if (tenant != null && tenant.IsActive)
                     {
                         _userRegistrationManager.DefaultTenantId = tenant.Id;
+                        targetTenantId = tenant.Id;
                     }
                 }
+            }
+
+            var isSelfRegistrationEnabled = targetTenantId.HasValue
+                ? await SettingManager.GetSettingValueForTenantAsync<bool>("Abp.Account.IsSelfRegistrationEnabled", targetTenantId.Value)
+                : await SettingManager.GetSettingValueAsync<bool>("Abp.Account.IsSelfRegistrationEnabled");
+            if (!isSelfRegistrationEnabled)
+            {
+                throw new UserFriendlyException("Registration is disabled.", "Public self-registration is disabled.");
             }
 
             var user = await _userRegistrationManager.RegisterAsync(
