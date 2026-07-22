@@ -47,9 +47,9 @@ Import the repository and set the project Root Directory to `AqualLifeStyle/9.4.
 
 `NEXT_PUBLIC_*` values are embedded during `next build`; changing them requires a new Vercel deployment. Do not put secrets in public variables.
 
-Do not add a frontend registration flag. Registration availability comes from the live Area-scoped ABP setting `Abp.Account.IsSelfRegistrationEnabled`. The Default Area is seeded as enabled when it has no explicit setting; other Areas default to disabled. Changing an Area setting changes the sign-in and sign-up experience without rebuilding the frontend, while server-side checks continue to enforce the same value.
+Do not add a frontend registration flag. Registration availability comes from the live Area-scoped ABP setting `Abp.Account.IsSelfRegistrationEnabled`, which defaults to enabled for active Areas. An Area can explicitly disable customer self-registration when it requires managed registration. Changing an Area setting changes the sign-in and sign-up experience without rebuilding the frontend, while server-side checks continue to enforce the same value.
 
-Migration `20260722161500_EnableDefaultAreaCustomerRegistration` changes the existing production Default Area setting to `true` once. It does not affect other Areas or continually overwrite later administrator changes.
+Migration `20260722161500_EnableCustomerSelfRegistrationByDefault` changes existing active Area settings to `true` once. It does not continually overwrite later administrator changes.
 
 ## GitHub Actions
 
