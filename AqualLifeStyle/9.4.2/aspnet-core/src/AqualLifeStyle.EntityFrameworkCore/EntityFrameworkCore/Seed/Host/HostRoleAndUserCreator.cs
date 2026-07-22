@@ -82,13 +82,11 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
                     IsActive = true
                 };
 
-                // Use the deployment-controlled password if supplied.
-                // If not supplied, generate a one-time credential and deliver it through the deployment channel instead of discarding it.
+                // Require a deployment-controlled password for seeded host admin credentials.
                 var initialPassword = Environment.GetEnvironmentVariable("AQUA_INITIAL_ADMIN_PASSWORD");
                 if (string.IsNullOrWhiteSpace(initialPassword))
                 {
-                    initialPassword = User.CreateRandomPassword();
-                    Console.WriteLine($"Generated one-time host admin password: {initialPassword}");
+                    throw new InvalidOperationException("AQUA_INITIAL_ADMIN_PASSWORD must be set for host administrator bootstrap.");
                 }
 
                 user.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions())).HashPassword(user, initialPassword);
