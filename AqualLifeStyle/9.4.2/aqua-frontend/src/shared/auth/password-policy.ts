@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const passwordPolicyDescription =
-  "Use at least 8 characters with uppercase, lowercase, number, and one of !@#$%^&*().";
+  "Use at least 8 characters with uppercase, lowercase, number, and one of !@#$%^&*(). Other symbols are not allowed.";
 
 export const securePasswordSchema = z
   .string()
