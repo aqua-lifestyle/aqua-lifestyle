@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Abp.Runtime.Session;
 using Abp.UI;
@@ -19,9 +20,19 @@ namespace AqualLifeStyle.Tests.Application
             _service = Resolve<IMyAccountAppService>();
         }
 
+        private async Task<long> CreateAndLoginTestUserAsync()
+        {
+            var suffix = Guid.NewGuid().ToString("N").Substring(0, 8);
+            var userId = await CreateTestUserAsync(AbpSession.TenantId, $"testuser{suffix}", $"testuser{suffix}@defaulttenant.com");
+            SetCurrentUser(userId, AbpSession.TenantId);
+            return userId;
+        }
+
         [Fact]
         public async Task ChangePassword_ReplacesPasswordAndInvalidatesExistingSessions()
         {
+            await CreateAndLoginTestUserAsync();
+
             string originalSecurityStamp = null;
             await UsingDbContextAsync(async context =>
             {
@@ -31,7 +42,7 @@ namespace AqualLifeStyle.Tests.Application
 
             await _service.ChangePasswordAsync(new ChangeMyPasswordInput
             {
-                CurrentPassword = "123qwe",
+                CurrentPassword = User.DefaultPassword,
                 NewPassword = "PrivateAdminPassword123!"
             });
 
@@ -39,7 +50,7 @@ namespace AqualLifeStyle.Tests.Application
             {
                 var user = await context.Users.FindAsync(AbpSession.GetUserId());
                 var hasher = Resolve<IPasswordHasher<User>>();
-                hasher.VerifyHashedPassword(user, user.Password, "123qwe")
+                hasher.VerifyHashedPassword(user, user.Password, User.DefaultPassword)
                     .ShouldBe(PasswordVerificationResult.Failed);
                 hasher.VerifyHashedPassword(user, user.Password, "PrivateAdminPassword123!")
                     .ShouldNotBe(PasswordVerificationResult.Failed);
@@ -50,6 +61,8 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task ChangePassword_WithIncorrectCurrentPassword_DoesNotChangePassword()
         {
+            await CreateAndLoginTestUserAsync();
+
             await Should.ThrowAsync<UserFriendlyException>(() =>
                 _service.ChangePasswordAsync(new ChangeMyPasswordInput
                 {
@@ -61,8 +74,9 @@ namespace AqualLifeStyle.Tests.Application
             {
                 var user = await context.Users.FindAsync(AbpSession.GetUserId());
                 var hasher = Resolve<IPasswordHasher<User>>();
-                hasher.VerifyHashedPassword(user, user.Password, "123qwe")
+                hasher.VerifyHashedPassword(user, user.Password, User.DefaultPassword)
                     .ShouldNotBe(PasswordVerificationResult.Failed);
+                user.AccessFailedCount.ShouldBeGreaterThan(0);
             });
         }
     }
