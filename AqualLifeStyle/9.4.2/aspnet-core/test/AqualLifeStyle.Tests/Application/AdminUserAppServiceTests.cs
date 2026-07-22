@@ -124,5 +124,38 @@ namespace AqualLifeStyle.Tests.Application
                 Justification = "Should be denied"
             }));
         }
+
+        [Fact]
+        public async Task Admin_CanCreateAdminUser()
+        {
+            // Ensure we're acting as the default tenant admin
+            LoginAsDefaultTenantAdmin();
+
+            var email = $"admin-created-{Guid.NewGuid():N}@example.com";
+
+            var created = await _service.CreateAsync(new AdminCreateUserInput
+            {
+                TenantId = 1,
+                FirstName = "Creator",
+                LastName = "Admin",
+                Email = email,
+                Password = "SafePassword123!",
+                Role = AquaUserRole.Member,
+                IsActive = true,
+                Justification = "Test admin creation"
+            });
+
+            created.ShouldNotBeNull();
+            created.TenantId.ShouldBe(1);
+            created.Email.ShouldBe(email);
+            created.Role.ShouldBe(AquaUserRole.Member);
+
+            await UsingDbContextAsync(async context =>
+            {
+                var user = await context.Users.SingleOrDefaultAsync(u => u.Id == created.Id && u.TenantId == 1);
+                user.ShouldNotBeNull();
+                user.IsActive.ShouldBeTrue();
+            });
+        }
     }
 }
