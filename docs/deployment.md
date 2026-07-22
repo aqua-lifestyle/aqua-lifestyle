@@ -30,6 +30,8 @@ Create a Blueprint from the repository-root `render.yaml`. Before the first depl
 
 The Blueprint provisions the Docker API, PostgreSQL, and Redis. It runs the migration executable as a pre-deploy command, waits on `/api/health`, and deploys only after GitHub checks pass. The free data plans are suitable for evaluation; upgrade them before relying on production availability or retention guarantees.
 
+For a fresh production database, set the secret `AQUA_INITIAL_ADMIN_PASSWORD` before the first migration. It must contain at least 16 characters with uppercase, lowercase, number, and special characters. It is used only to create missing initial administrators and does not rotate existing accounts. Follow [administrator access security](administrator-access-security.md) to replace the bootstrap credential immediately and verify session invalidation.
+
 The API runtime uses the slim Debian ASP.NET image and its built-in non-root `app` user. A shell-less chiseled image is intentionally not used because Render's pre-deploy migration command needs a shell inside the runtime image.
 
 Render supplies `DATABASE_URL`; the application converts it to the Npgsql keyword format without logging credentials. Redis is supplied through `Redis__Configuration` and becomes ABP's distributed cache backing implementation.
@@ -41,6 +43,7 @@ Import the repository and set the project Root Directory to `AqualLifeStyle/9.4.
 - `NEXT_PUBLIC_ABP_API_URL`: the matching Render API origin, without a trailing slash.
 - `NEXT_PUBLIC_DEFAULT_TENANT_NAME`: normally `Default`.
 - `NEXT_PUBLIC_MONITORING_ENDPOINT`: optional browser telemetry collector.
+- `NEXT_PUBLIC_SELF_REGISTRATION_ENABLED`: keep `false` for administrator-managed account creation.
 - `NEXTAUTH_SECRET`: a server-only random value of at least 32 characters.
 
 `NEXT_PUBLIC_*` values are embedded during `next build`; changing them requires a new Vercel deployment. Do not put secrets in public variables.
