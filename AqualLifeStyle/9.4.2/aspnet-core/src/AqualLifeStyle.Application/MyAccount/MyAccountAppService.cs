@@ -33,9 +33,9 @@ namespace AqualLifeStyle.Application.MyAccount
                 Logger.Warn($"Failed password change attempt tenant={user.TenantId?.ToString() ?? "host"} user={user.Id} lockedOut={isLockedOut}");
                 throw new UserFriendlyException(
                     "Password change failed.",
-                    "Your current password is incorrect. No changes were made.");
+                    "Your account is temporarily locked. Please try again later or contact support.");
             }
- 
+
             if (!await UserManager.CheckPasswordAsync(user, input.CurrentPassword))
             {
                 // Record failed attempt so lockout policies are applied

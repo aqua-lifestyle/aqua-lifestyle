@@ -154,6 +154,7 @@ namespace AqualLifeStyle.Tests.Application
             {
                 var user = await context.Users.SingleOrDefaultAsync(u => u.Id == created.Id && u.TenantId == 1);
                 user.ShouldNotBeNull();
+                user.EmailAddress.ShouldBe(email);
                 user.IsActive.ShouldBeTrue();
                 user.Role.ShouldBe(AquaUserRole.SystemAdmin);
             });

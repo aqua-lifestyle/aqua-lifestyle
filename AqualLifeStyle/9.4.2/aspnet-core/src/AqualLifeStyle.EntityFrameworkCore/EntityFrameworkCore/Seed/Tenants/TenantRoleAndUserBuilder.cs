@@ -83,12 +83,15 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
             if (adminUser == null)
             {
                 adminUser = User.CreateTenantAdminUser(_tenantId, "admin@defaulttenant.com");
-                // Use a deployment-controlled password if supplied; otherwise generate a random one and preserve rotation enforcement.
-                var initialPassword = Environment.GetEnvironmentVariable($"AQUA_INITIAL_TENANT_{_tenantId}_ADMIN_PASSWORD")
-                                      ?? Environment.GetEnvironmentVariable("AQUA_INITIAL_ADMIN_PASSWORD");
+                // Use the tenant-specific deployment-controlled password if supplied; otherwise fall back to the host-level deployment secret.
+                var tenantAdminPassword = Environment.GetEnvironmentVariable($"AQUA_INITIAL_TENANT_{_tenantId}_ADMIN_PASSWORD");
+                var initialPassword = string.IsNullOrWhiteSpace(tenantAdminPassword)
+                    ? Environment.GetEnvironmentVariable("AQUA_INITIAL_ADMIN_PASSWORD")
+                    : tenantAdminPassword;
                 if (string.IsNullOrWhiteSpace(initialPassword))
                 {
                     initialPassword = User.CreateRandomPassword();
+                    Console.WriteLine($"Generated one-time tenant admin password for tenant {_tenantId}: {initialPassword}");
                 }
                 adminUser.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions())).HashPassword(adminUser, initialPassword);
                 adminUser.RequirePasswordReset();
