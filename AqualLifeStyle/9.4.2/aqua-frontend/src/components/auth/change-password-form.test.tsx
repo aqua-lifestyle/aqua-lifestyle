@@ -31,7 +31,10 @@ describe("ChangePasswordForm", () => {
   });
 
   it("changes the password and requires a fresh sign-in", async () => {
-    vi.mocked(httpClient.post).mockResolvedValue(undefined);
+    vi.mocked(httpClient.post).mockResolvedValue({
+      message: "Your password was changed. Sign in again with your new password.",
+      succeeded: true,
+    });
     render(<ChangePasswordForm />);
     fireEvent.change(screen.getByLabelText("Current password"), { target: { value: "123qwe" } });
     fireEvent.change(screen.getByLabelText("New password"), { target: { value: "PrivateAdminPassword123!" } });
@@ -53,6 +56,22 @@ describe("ChangePasswordForm", () => {
     fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "PrivateAdminPassword123!" } });
     fireEvent.click(screen.getByRole("button", { name: "Change password" }));
     expect(await screen.findByText("Incorrect password")).toBeInTheDocument();
+    expect(clearSession).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("shows an incorrect-password result without ending the session", async () => {
+    vi.mocked(httpClient.post).mockResolvedValue({
+      message: "Your current password is incorrect. No changes were made.",
+      succeeded: false,
+    });
+    render(<ChangePasswordForm />);
+    fireEvent.change(screen.getByLabelText("Current password"), { target: { value: "wrong-password" } });
+    fireEvent.change(screen.getByLabelText("New password"), { target: { value: "PrivateAdminPassword123!" } });
+    fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "PrivateAdminPassword123!" } });
+    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+
+    expect(await screen.findByText("Your current password is incorrect. No changes were made.")).toBeInTheDocument();
     expect(clearSession).not.toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalled();
   });

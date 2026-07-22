@@ -6,6 +6,6 @@ namespace AqualLifeStyle.Application.MyAccount
 {
     public interface IMyAccountAppService : IApplicationService
     {
-        Task ChangePasswordAsync(ChangeMyPasswordInput input);
+        Task<ChangeMyPasswordResult> ChangePasswordAsync(ChangeMyPasswordInput input);
     }
 }

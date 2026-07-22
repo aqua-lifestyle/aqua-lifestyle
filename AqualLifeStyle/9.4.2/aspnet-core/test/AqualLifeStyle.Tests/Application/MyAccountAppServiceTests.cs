@@ -63,12 +63,14 @@ namespace AqualLifeStyle.Tests.Application
         {
             await CreateAndLoginTestUserAsync();
 
-            await Should.ThrowAsync<UserFriendlyException>(() =>
-                _service.ChangePasswordAsync(new ChangeMyPasswordInput
-                {
-                    CurrentPassword = "not-the-current-password",
-                    NewPassword = "PrivateAdminPassword123!"
-                }));
+            var result = await _service.ChangePasswordAsync(new ChangeMyPasswordInput
+            {
+                CurrentPassword = "not-the-current-password",
+                NewPassword = "PrivateAdminPassword123!"
+            });
+
+            result.Succeeded.ShouldBeFalse();
+            result.Message.ShouldBe("Your current password is incorrect. No changes were made.");
 
             await UsingDbContextAsync(async context =>
             {

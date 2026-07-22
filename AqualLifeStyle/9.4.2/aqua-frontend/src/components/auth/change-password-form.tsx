@@ -32,6 +32,7 @@ const changePasswordSchema = z
 
 type PasswordField = "confirmPassword" | "currentPassword" | "newPassword";
 type PasswordFieldErrors = Partial<Record<PasswordField, string>>;
+type ChangePasswordResult = { message: string; succeeded: boolean };
 
 export const ChangePasswordForm = () => {
   const router = useRouter();
@@ -66,15 +67,19 @@ export const ChangePasswordForm = () => {
     setRequestError(undefined);
     setIsSubmitting(true);
     try {
-      await httpClient.post<void, { currentPassword: string; newPassword: string }>(
+      const result = await httpClient.post<ChangePasswordResult, { currentPassword: string; newPassword: string }>(
         "/api/services/app/MyAccount/ChangePassword",
         {
           currentPassword: parsed.data.currentPassword,
           newPassword: parsed.data.newPassword,
         },
       );
+      if (!result.succeeded) {
+        setRequestError(result.message);
+        return;
+      }
       toast({
-        message: "Your password was changed. Sign in again with your new password.",
+        message: result.message,
         title: "Password updated",
         type: "success",
       });
