@@ -32,7 +32,11 @@ const steps = [
   { description: "Get started", title: "Review & terms" },
 ];
 
-export const SignupForm = () => {
+type SignupFormProps = {
+  tenancyName?: string;
+};
+
+export const SignupForm = ({ tenancyName }: SignupFormProps) => {
   const router = useRouter();
   const { setSession } = useAuthActions();
   const { currentTenant } = useTenantState();
@@ -114,7 +118,9 @@ export const SignupForm = () => {
     const firstName = nameParts[0] ?? formData.name;
     const lastName = nameParts.slice(1).join(" ") || ".";
 
-    const resolvedTenant = currentTenant ?? publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME;
+    const resolvedTenant = tenancyName ??
+      currentTenant ??
+      publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME;
 
     const registerResult = await register({
       email: formData.email,

@@ -43,10 +43,11 @@ Import the repository and set the project Root Directory to `AqualLifeStyle/9.4.
 - `NEXT_PUBLIC_ABP_API_URL`: the matching Render API origin, without a trailing slash.
 - `NEXT_PUBLIC_DEFAULT_TENANT_NAME`: normally `Default`.
 - `NEXT_PUBLIC_MONITORING_ENDPOINT`: optional browser telemetry collector.
-- `NEXT_PUBLIC_SELF_REGISTRATION_ENABLED`: keep `false` for administrator-managed account creation.
 - `NEXTAUTH_SECRET`: a server-only random value of at least 32 characters.
 
 `NEXT_PUBLIC_*` values are embedded during `next build`; changing them requires a new Vercel deployment. Do not put secrets in public variables.
+
+Do not add a frontend registration flag. Registration availability comes from the live Area-scoped ABP setting `Abp.Account.IsSelfRegistrationEnabled`; its default is `false`. Changing that backend setting changes the sign-in and sign-up experience without rebuilding the frontend, while server-side checks continue to enforce the same value.
 
 ## GitHub Actions
 

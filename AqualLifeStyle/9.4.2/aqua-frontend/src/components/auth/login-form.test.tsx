@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthActions, useTenantActions, useTenantState, useToast } from "@/src/providers";
+import { getTenantSelfRegistrationAvailability } from "@/src/shared/api/auth-service";
 import { getLoginDestination } from "@/src/shared/auth/roles";
 
 import { LoginForm } from "./login-form";
@@ -9,6 +10,7 @@ import { LoginForm } from "./login-form";
 const { push } = vi.hoisted(() => ({ push: vi.fn() }));
 
 vi.mock("@/src/shared/api/auth-service", () => ({
+  getTenantSelfRegistrationAvailability: vi.fn(),
   login: vi.fn(),
 }));
 
@@ -44,6 +46,10 @@ describe("LoginForm", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getTenantSelfRegistrationAvailability).mockResolvedValue({
+      isSelfRegistrationEnabled: false,
+      ok: true,
+    });
     vi.mocked(useAuthActions).mockReturnValue({
       clearSession: vi.fn(),
       setReady: vi.fn(),
@@ -85,10 +91,27 @@ describe("LoginForm", () => {
     ).toBeInTheDocument();
   });
 
-  it("does not advertise public registration when it is disabled", () => {
+  it("does not advertise public registration when the Area has disabled it", async () => {
     render(<LoginForm />);
 
+    await waitFor(() =>
+      expect(getTenantSelfRegistrationAvailability).toHaveBeenCalledWith("Default"),
+    );
     expect(screen.queryByRole("link", { name: "Sign up" })).not.toBeInTheDocument();
+  });
+
+  it("advertises public registration when the selected Area enables it", async () => {
+    vi.mocked(getTenantSelfRegistrationAvailability).mockResolvedValue({
+      isSelfRegistrationEnabled: true,
+      ok: true,
+    });
+
+    render(<LoginForm />);
+
+    expect(await screen.findByRole("link", { name: "Sign up" })).toHaveAttribute(
+      "href",
+      "/signup?area=Default",
+    );
   });
 
   it("calls login from auth-service and sets session after successful submit", async () => {

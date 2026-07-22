@@ -1,6 +1,11 @@
-import { describe, expect, it } from "vitest";
+import axios from "axios";
+import { describe, expect, it, vi } from "vitest";
 
-import { claimsToUser, getAuthenticationErrorMessage } from "./auth-service";
+import {
+  claimsToUser,
+  getAuthenticationErrorMessage,
+  getTenantSelfRegistrationAvailability,
+} from "./auth-service";
 
 describe("claimsToUser", () => {
   it("maps ABP claim URIs and treats the built-in Admin role as SystemAdmin", () => {
@@ -44,5 +49,34 @@ describe("getAuthenticationErrorMessage", () => {
     );
     expect(message).not.toContain("CorrelationId");
     expect(message).not.toContain("tenant");
+  });
+});
+
+describe("getTenantSelfRegistrationAvailability", () => {
+  it("requests and returns the live setting for the selected Area", async () => {
+    const get = vi.spyOn(axios, "get").mockResolvedValueOnce({
+      data: { result: { isSelfRegistrationEnabled: true } },
+    });
+
+    await expect(getTenantSelfRegistrationAvailability("CapeTown")).resolves.toEqual({
+      isSelfRegistrationEnabled: true,
+      ok: true,
+    });
+    expect(get).toHaveBeenCalledWith(
+      expect.stringContaining("/Account/GetTenantSelfRegistrationAvailability"),
+      { params: { tenancyName: "CapeTown" } },
+    );
+
+    get.mockRestore();
+  });
+
+  it("fails closed when availability cannot be loaded", async () => {
+    const get = vi.spyOn(axios, "get").mockRejectedValueOnce(new Error("offline"));
+
+    await expect(getTenantSelfRegistrationAvailability("CapeTown")).resolves.toEqual({
+      ok: false,
+    });
+
+    get.mockRestore();
   });
 });

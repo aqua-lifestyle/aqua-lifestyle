@@ -24,6 +24,8 @@ export const apiEndpoints = {
     get: "/api/health",
   },
   account: {
+    getTenantSelfRegistrationAvailability:
+      "/api/services/app/Account/GetTenantSelfRegistrationAvailability",
     register: "/api/services/app/Account/Register",
   },
   customers: {

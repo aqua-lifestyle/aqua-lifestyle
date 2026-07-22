@@ -1,24 +1,17 @@
 import { SignupForm } from "@/src/components/auth/signup-form";
-import { publicEnv } from "@/src/shared/config";
-import { Card, LinkButton } from "@/src/shared/ui";
+import { TenantSelfRegistrationGate } from "@/src/components/auth/tenant-self-registration-gate";
 
-export default function SignupPage() {
-  if (!publicEnv.NEXT_PUBLIC_SELF_REGISTRATION_ENABLED) {
-    return (
-      <main className="min-h-dvh bg-muted/30 px-4 py-12 text-foreground sm:px-6">
-        <Card className="mx-auto max-w-lg">
-          <h1 className="text-2xl font-bold tracking-tight">Account registration</h1>
-          <p className="mt-3 text-muted-foreground">
-            New Club Member accounts are created by an authorised Aqua Lifestyle Club administrator.
-            Contact the club team if you need access or return to sign in if your account already exists.
-          </p>
-          <div className="mt-6">
-            <LinkButton href="/login" variant="primary">Return to sign in</LinkButton>
-          </div>
-        </Card>
-      </main>
-    );
-  }
+type SignupPageProps = {
+  searchParams: Promise<{ area?: string | string[] }>;
+};
 
-  return <SignupForm />;
+export default async function SignupPage({ searchParams }: SignupPageProps) {
+  const area = (await searchParams).area;
+  const requestedTenancyName = typeof area === "string" ? area : undefined;
+
+  return (
+    <TenantSelfRegistrationGate requestedTenancyName={requestedTenancyName}>
+      {(tenancyName) => <SignupForm tenancyName={tenancyName} />}
+    </TenantSelfRegistrationGate>
+  );
 }

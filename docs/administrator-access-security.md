@@ -17,13 +17,14 @@ This document is the operational and technical reference for administrator acces
 
 The boundary is enforced in several places:
 
-1. The Next.js sign-in page hides the **Sign up** action when `NEXT_PUBLIC_SELF_REGISTRATION_ENABLED` is not `true`.
-2. A direct visit to `/signup` explains that account creation is managed by the club team.
-3. The ABP account application service checks the target Area setting before registration.
-4. The registration domain manager repeats the Area-specific check as defence in depth.
-5. The legacy MVC registration page redirects to sign-in when registration is disabled, and its POST path is still protected by the domain manager.
+1. The Next.js application asks the backend for the selected Area's current registration availability.
+2. The sign-in page shows **Sign up** only when that Area currently permits self-registration.
+3. A direct visit to `/signup` checks the same runtime availability and fails closed if it is disabled or cannot be confirmed.
+4. The ABP account application service checks the target Area setting again before registration.
+5. The registration domain manager repeats the Area-specific check as defence in depth.
+6. Both GET and POST requests to the legacy MVC registration action redirect to sign-in when registration is disabled.
 
-The frontend switch controls presentation only. The backend setting is authoritative. Never enable the frontend switch unless the matching backend Area setting is also intentionally enabled.
+There is no frontend registration feature flag. `Abp.Account.IsSelfRegistrationEnabled` is the single authority and can vary by Area at runtime. Frontend availability checks improve the experience, while the backend registration checks remain the security boundary.
 
 ## Administrator account creation
 
@@ -98,14 +99,14 @@ Important behavior:
 Use this sequence for the current Render and Vercel deployment:
 
 1. Merge and deploy the reviewed branch.
-2. In Vercel, set `NEXT_PUBLIC_SELF_REGISTRATION_ENABLED=false` for Production and redeploy. This is a build-time public value.
+2. Confirm `Abp.Account.IsSelfRegistrationEnabled` remains `false` for each invitation-only Area.
 3. Confirm the Render API is healthy at `https://aqualifestyle-api.onrender.com/api/health`.
 4. Sign in to the Default Area as its administrator.
 5. Open **Settings → Account security** and replace `123qwe` with a unique password stored in a password manager.
 6. Confirm the browser returns to sign-in and the old password no longer works.
 7. Sign in to **Platform administration** with the host administrator and rotate that password separately if the account is in use.
 8. Confirm a previously issued token receives an unauthorised response after its security stamp changes.
-9. Confirm `/signup` shows the managed-registration message and a direct registration API request returns **Registration is disabled**.
+9. Confirm `/signup` shows the managed-registration message and both direct registration POST paths redirect or return **Registration is disabled**.
 10. Review Render logs for successful startup and the expected password-change audit event without credential values.
 
 An existing database does not need the bootstrap secret to redeploy because both administrator records already exist. Set the secret before a fresh database or disaster-recovery bootstrap.
