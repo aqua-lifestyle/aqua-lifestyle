@@ -49,6 +49,8 @@ Import the repository and set the project Root Directory to `AqualLifeStyle/9.4.
 
 Do not add a frontend registration flag. Registration availability comes from the live Area-scoped ABP setting `Abp.Account.IsSelfRegistrationEnabled`. The Default Area is seeded as enabled when it has no explicit setting; other Areas default to disabled. Changing an Area setting changes the sign-in and sign-up experience without rebuilding the frontend, while server-side checks continue to enforce the same value.
 
+Migration `20260722161500_EnableDefaultAreaCustomerRegistration` changes the existing production Default Area setting to `true` once. It does not affect other Areas or continually overwrite later administrator changes.
+
 ## GitHub Actions
 
 `ci.yml` is the required pull-request check. It builds and tests .NET, runs frontend lint/type/tests/build, and builds both Docker images without publishing them. Configure branch protection on `main` to require all three jobs.
