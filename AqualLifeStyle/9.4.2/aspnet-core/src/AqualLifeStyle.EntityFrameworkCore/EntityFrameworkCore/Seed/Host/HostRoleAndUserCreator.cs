@@ -93,8 +93,16 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
                 // Assign Admin role to admin user
                 _context.UserRoles.Add(new UserRole(null, adminUserForHost.Id, adminRoleForHost.Id));
                 _context.SaveChanges();
-
                 _context.SaveChanges();
+            }
+            else
+            {
+                var hasher = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()));
+                if (!adminUserForHost.RequiresPasswordReset() && hasher.VerifyHashedPassword(adminUserForHost, adminUserForHost.Password, User.DefaultPassword) == PasswordVerificationResult.Success)
+                {
+                    adminUserForHost.RequirePasswordReset();
+                    _context.SaveChanges();
+                }
             }
 
             if (!adminUserForHost.IsSystemAdmin())

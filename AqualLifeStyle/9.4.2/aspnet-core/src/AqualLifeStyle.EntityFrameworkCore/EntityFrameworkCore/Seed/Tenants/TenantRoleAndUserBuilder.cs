@@ -97,7 +97,16 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
                 _context.UserRoles.Add(new UserRole(_tenantId, adminUser.Id, adminRole.Id));
                 _context.SaveChanges();
             }
-
+            else
+            {
+                var hasher = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()));
+                if (!adminUser.RequiresPasswordReset() && hasher.VerifyHashedPassword(adminUser, adminUser.Password, User.DefaultPassword) == PasswordVerificationResult.Success)
+                {
+                    adminUser.RequirePasswordReset();
+                    _context.SaveChanges();
+                }
+            }
+ 
             new DefaultCustomerUserLinker(_context, passwordHasher: new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()))).Link(_tenantId);
             new DefaultCustomerAccountProvisioner(_context).Provision(_tenantId);
             if (_seedDemoData)
