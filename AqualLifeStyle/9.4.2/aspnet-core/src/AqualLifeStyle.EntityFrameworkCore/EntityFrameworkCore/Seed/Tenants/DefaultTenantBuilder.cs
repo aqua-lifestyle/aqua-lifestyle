@@ -1,8 +1,6 @@
 ﻿using System.Linq;
 using Microsoft.EntityFrameworkCore;
-using Abp.Configuration;
 using Abp.MultiTenancy;
-using AqualLifeStyle.Configuration;
 using AqualLifeStyle.Editions;
 using AqualLifeStyle.MultiTenancy;
 
@@ -40,29 +38,6 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
                 _context.Tenants.Add(defaultTenant);
                 _context.SaveChanges();
             }
-
-            EnableCustomerSelfRegistrationWhenNotConfigured(defaultTenant.Id);
-        }
-
-        private void EnableCustomerSelfRegistrationWhenNotConfigured(int tenantId)
-        {
-            var registrationSettingExists = _context.Settings
-                .IgnoreQueryFilters()
-                .Any(setting =>
-                    setting.Name == AppSettingNames.IsSelfRegistrationEnabled &&
-                    setting.TenantId == tenantId &&
-                    setting.UserId == null);
-            if (registrationSettingExists)
-            {
-                return;
-            }
-
-            _context.Settings.Add(new Setting(
-                tenantId,
-                null,
-                AppSettingNames.IsSelfRegistrationEnabled,
-                "true"));
-            _context.SaveChanges();
         }
     }
 }

@@ -5,7 +5,7 @@ This document is the operational and technical reference for administrator acces
 ## Security decisions
 
 - The sign-in page remains public. Authentication endpoints must be reachable by legitimate users; hiding the page is not an access control.
-- Customer self-registration is enabled for the Default Area. Other Areas remain closed unless an authorised administrator enables their Area setting.
+- Customer self-registration is enabled by default for active Areas. An authorised administrator can disable it for an Area that requires managed registration.
 - Public registration creates only a Club Member customer account with Guest access. Staff and administrator accounts are created through authorised administrator workflows.
 - Browser input never selects an administrator role. Role assignment is performed only through authorised administrator services.
 - The platform administrator role is not a default role and must never be assigned automatically.
@@ -14,7 +14,7 @@ This document is the operational and technical reference for administrator acces
 
 ## Registration boundary
 
-`Abp.Account.IsSelfRegistrationEnabled` is defined at application and Area scope with a default value of `false`. The Default Area seed adds an Area-specific value of `true` when no explicit value exists. An explicit administrator choice to disable it is preserved.
+`Abp.Account.IsSelfRegistrationEnabled` is defined at application and Area scope with a default value of `true`. An explicit Area value can disable customer signup without changing other Areas.
 
 The boundary is enforced in several places:
 
@@ -100,14 +100,14 @@ Important behavior:
 Use this sequence for the current Render and Vercel deployment:
 
 1. Merge and deploy the reviewed branch.
-2. Confirm `Abp.Account.IsSelfRegistrationEnabled` is `true` for the Default Area and remains `false` for each invitation-only Area.
+2. Confirm `Abp.Account.IsSelfRegistrationEnabled` is `true` for Areas that accept customer signup and explicitly `false` only for managed-registration Areas.
 3. Confirm the Render API is healthy at `https://aqualifestyle-api.onrender.com/api/health`.
 4. Sign in to the Default Area as its administrator.
 5. Open **Settings → Account security** and replace `123qwe` with a unique password stored in a password manager.
 6. Confirm the browser returns to sign-in and the old password no longer works.
 7. Sign in to **Platform administration** with the host administrator and rotate that password separately if the account is in use.
 8. Confirm a previously issued token receives an unauthorised response after its security stamp changes.
-9. Confirm `/signup?area=Default` creates only a customer with Guest access, while disabled Areas show the managed-registration message and reject direct registration requests.
+9. Confirm `/signup` creates only a customer with Guest access in an enabled Area, while disabled Areas show the managed-registration message and reject direct registration requests.
 10. Review Render logs for successful startup and the expected password-change audit event without credential values.
 
 An existing database does not need the bootstrap secret to redeploy because both administrator records already exist. Set the secret before a fresh database or disaster-recovery bootstrap.
@@ -146,7 +146,7 @@ npm run build
 
 Manual checks:
 
-- Default Area customer sign-up is advertised and creates only Guest access.
+- Enabled Areas advertise customer sign-up and create only Guest access.
 - Sign-up is not advertised when an Area has disabled registration.
 - Direct registration is blocked by both frontend and backend paths.
 - Club Member registration cannot submit a role.
