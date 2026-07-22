@@ -30,6 +30,8 @@ namespace AqualLifeStyle.Tests
 
         public override void PreInitialize()
         {
+            AdministratorBootstrapTestEnvironment.Configure();
+
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new[]
                 {

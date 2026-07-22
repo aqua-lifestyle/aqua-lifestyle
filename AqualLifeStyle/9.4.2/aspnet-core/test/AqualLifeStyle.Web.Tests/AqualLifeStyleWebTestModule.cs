@@ -3,6 +3,7 @@ using Abp.AspNetCore.TestBase;
 using Abp.Modules;
 using Abp.Reflection.Extensions;
 using AqualLifeStyle.EntityFrameworkCore;
+using AqualLifeStyle.Tests;
 using AqualLifeStyle.Web.Startup;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 
@@ -21,6 +22,7 @@ namespace AqualLifeStyle.Web.Tests
         
         public override void PreInitialize()
         {
+            AdministratorBootstrapTestEnvironment.Configure();
             Configuration.UnitOfWork.IsTransactional = false; //EF Core InMemory DB does not support transactions.
         }
 
