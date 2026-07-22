@@ -76,7 +76,7 @@ Restoration reconnects the original account to its history. It does not recreate
 
 Fresh production databases require `AQUA_INITIAL_ADMIN_PASSWORD`. The Render Blueprint declares it with `sync: false`, so the value must be entered in Render and is never committed to Git.
 
-Production validation requires at least 16 characters containing uppercase, lowercase, number, and special characters. Missing or weak values stop bootstrap before an insecure administrator is created. Development and automated tests continue to use the conventional local-only password unless a local override is supplied.
+Every environment except the explicitly named `Development` environment requires at least 16 characters containing uppercase, lowercase, number, and special characters. Production, staging, QA, unset, and unrecognised environment names fail closed when the secret is missing or weak. Local development continues to use the conventional local-only password unless an override is supplied.
 
 The shared secret bootstraps the host administrator and is the fallback for the initial administrator in each Area. A specific Area can override it with:
 

@@ -33,7 +33,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed
             string configuredPassword,
             string environmentVariableName)
         {
-            if (!string.Equals(environmentName, "Production", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase))
             {
                 return string.IsNullOrWhiteSpace(configuredPassword)
                     ? User.DefaultPassword

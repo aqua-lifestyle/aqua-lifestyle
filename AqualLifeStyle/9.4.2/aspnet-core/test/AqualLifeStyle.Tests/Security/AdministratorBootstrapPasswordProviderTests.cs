@@ -21,6 +21,24 @@ namespace AqualLifeStyle.Tests.Security
         [Theory]
         [InlineData(null)]
         [InlineData("")]
+        [InlineData("Production")]
+        [InlineData("Staging")]
+        [InlineData("QA")]
+        [InlineData("Test")]
+        [InlineData("Developmnt")]
+        public void EnvironmentNotExplicitlyAllowedForDevelopmentWithoutSecret_FailsClosed(
+            string environmentName)
+        {
+            Should.Throw<InvalidOperationException>(() =>
+                AdministratorBootstrapPasswordProvider.ResolvePassword(
+                    environmentName,
+                    null,
+                    AdministratorBootstrapPasswordProvider.SharedAdministratorPasswordVariable));
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
         [InlineData("123qwe")]
         [InlineData("MissingSpecial123")]
         [InlineData("missing-uppercase-123!")]
@@ -46,6 +64,22 @@ namespace AqualLifeStyle.Tests.Security
 
             AdministratorBootstrapPasswordProvider.ResolvePassword(
                     "Production",
+                    configuredPassword,
+                    AdministratorBootstrapPasswordProvider.SharedAdministratorPasswordVariable)
+                .ShouldBe(configuredPassword);
+        }
+
+        [Theory]
+        [InlineData("Staging")]
+        [InlineData("QA")]
+        [InlineData("Developmnt")]
+        public void NonDevelopmentEnvironmentWithStrongSecret_UsesConfiguredPassword(
+            string environmentName)
+        {
+            const string configuredPassword = "OneTimeBootstrap123!";
+
+            AdministratorBootstrapPasswordProvider.ResolvePassword(
+                    environmentName,
                     configuredPassword,
                     AdministratorBootstrapPasswordProvider.SharedAdministratorPasswordVariable)
                 .ShouldBe(configuredPassword);
