@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Abp.Auditing;
 using Abp.Authorization.Users;
+using AqualLifeStyle.Authorization.Accounts;
 
 namespace AqualLifeStyle.Application.MyAccount.Dto
 {
@@ -13,6 +14,7 @@ namespace AqualLifeStyle.Application.MyAccount.Dto
 
         [Required]
         [StringLength(AbpUserBase.MaxPlainPasswordLength, MinimumLength = 8)]
+        [RegularExpression(AccountAppService.PasswordRegex)]
         [DisableAuditing]
         public string NewPassword { get; set; }
     }
