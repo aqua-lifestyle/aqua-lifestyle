@@ -119,7 +119,7 @@ namespace AqualLifeStyle.Tests.Application
                 LastName = "Fail",
                 Email = $"attempt-{Guid.NewGuid():N}@example.com",
                 Password = "SafePassword123!",
-                Role = AquaUserRole.Guest,
+                Role = AquaUserRole.SystemAdmin,
                 IsActive = true,
                 Justification = "Should be denied"
             }));
