@@ -241,12 +241,14 @@ export const LoginForm = () => {
               </div>
             </div>
 
-            <p className="mt-6 text-center text-sm text-muted-foreground">
-              Don’t have an account?{" "}
-              <LinkButton href="/signup" variant="ghost">
-                Sign up
-              </LinkButton>
-            </p>
+            {publicEnv.NEXT_PUBLIC_SELF_REGISTRATION_ENABLED ? (
+              <p className="mt-6 text-center text-sm text-muted-foreground">
+                Don’t have an account?{" "}
+                <LinkButton href="/signup" variant="ghost">
+                  Sign up
+                </LinkButton>
+              </p>
+            ) : null}
           </div>
         </div>
       </div>

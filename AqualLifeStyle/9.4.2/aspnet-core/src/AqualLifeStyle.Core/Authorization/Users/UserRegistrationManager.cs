@@ -11,6 +11,7 @@ using Abp.Runtime.Session;
 using Abp.Configuration;
 using Abp.UI;
 using AqualLifeStyle.Authorization.Roles;
+using AqualLifeStyle.Configuration;
 using AqualLifeStyle.MultiTenancy;
 
 namespace AqualLifeStyle.Authorization.Users
@@ -21,7 +22,7 @@ namespace AqualLifeStyle.Authorization.Users
 
         public int? DefaultTenantId { get; set; }
 
-                private readonly TenantManager _tenantManager;
+        private readonly TenantManager _tenantManager;
         private readonly UserManager _userManager;
         private readonly RoleManager _roleManager;
         private readonly IPasswordHasher<User> _passwordHasher;
@@ -48,7 +49,7 @@ namespace AqualLifeStyle.Authorization.Users
             CheckForTenant();
 
             var tenant = await GetActiveTenantAsync();
-            var isSelfRegistrationEnabled = await _settingManager.GetSettingValueForTenantAsync<bool>("Abp.Account.IsSelfRegistrationEnabled", tenant.Id);
+            var isSelfRegistrationEnabled = await _settingManager.GetSettingValueForTenantAsync<bool>(AppSettingNames.IsSelfRegistrationEnabled, tenant.Id);
             if (!isSelfRegistrationEnabled)
             {
                 throw new UserFriendlyException("Registration is disabled.", "Public self-registration is disabled.");

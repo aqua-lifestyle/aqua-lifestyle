@@ -24,6 +24,7 @@ using Abp.Web.Models;
 using Abp.Zero.Configuration;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.Configuration;
 using AqualLifeStyle.Controllers;
 using AqualLifeStyle.Identity;
 using AqualLifeStyle.MultiTenancy;
@@ -86,7 +87,7 @@ namespace AqualLifeStyle.Web.Controllers
             var isSelfRegistrationAllowed = false;
             if (AbpSession.TenantId.HasValue)
             {
-                isSelfRegistrationAllowed = await SettingManager.GetSettingValueAsync<bool>("Abp.Account.IsSelfRegistrationEnabled");
+                isSelfRegistrationAllowed = await SettingManager.GetSettingValueAsync<bool>(AppSettingNames.IsSelfRegistrationEnabled);
             }
 
             return View(new LoginFormViewModel
@@ -150,8 +151,14 @@ namespace AqualLifeStyle.Web.Controllers
 
         #region Register
 
-        public ActionResult Register()
+        public async Task<ActionResult> Register()
         {
+            if (!AbpSession.TenantId.HasValue ||
+                !await SettingManager.GetSettingValueAsync<bool>(AppSettingNames.IsSelfRegistrationEnabled))
+            {
+                return RedirectToAction(nameof(Login));
+            }
+
             return RegisterView(new RegisterViewModel());
         }
 
@@ -160,16 +167,6 @@ namespace AqualLifeStyle.Web.Controllers
             ViewBag.IsMultiTenancyEnabled = _multiTenancyConfig.IsEnabled;
 
             return View("Register", model);
-        }
-
-        private bool IsSelfRegistrationEnabled()
-        {
-            if (!AbpSession.TenantId.HasValue)
-            {
-                return false; // No registration enabled for host users!
-            }
-
-            return true;
         }
 
         [HttpPost]

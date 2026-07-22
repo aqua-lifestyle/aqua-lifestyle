@@ -5,6 +5,7 @@ using Abp.UI;
 using Abp.Zero.Configuration;
 using AqualLifeStyle.Authorization.Accounts.Dto;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.Configuration;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using Microsoft.Extensions.Configuration;
@@ -64,8 +65,8 @@ namespace AqualLifeStyle.Authorization.Accounts
             }
 
             var isSelfRegistrationEnabled = targetTenantId.HasValue
-                ? await SettingManager.GetSettingValueForTenantAsync<bool>("Abp.Account.IsSelfRegistrationEnabled", targetTenantId.Value)
-                : await SettingManager.GetSettingValueAsync<bool>("Abp.Account.IsSelfRegistrationEnabled");
+                ? await SettingManager.GetSettingValueForTenantAsync<bool>(AppSettingNames.IsSelfRegistrationEnabled, targetTenantId.Value)
+                : await SettingManager.GetSettingValueAsync<bool>(AppSettingNames.IsSelfRegistrationEnabled);
             if (!isSelfRegistrationEnabled)
             {
                 throw new UserFriendlyException("Registration is disabled.", "Public self-registration is disabled.");

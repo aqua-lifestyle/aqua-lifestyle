@@ -85,6 +85,12 @@ describe("LoginForm", () => {
     ).toBeInTheDocument();
   });
 
+  it("does not advertise public registration when it is disabled", () => {
+    render(<LoginForm />);
+
+    expect(screen.queryByRole("link", { name: "Sign up" })).not.toBeInTheDocument();
+  });
+
   it("calls login from auth-service and sets session after successful submit", async () => {
     const { login } = await import("@/src/shared/api/auth-service");
     vi.mocked(login).mockResolvedValue({

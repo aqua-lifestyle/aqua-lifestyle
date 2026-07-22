@@ -30,5 +30,20 @@ namespace AqualLifeStyle.Web.Tests.Controllers
 
             registerLink.ShouldBeNull();
         }
+
+        [Fact]
+        public async Task RegisterPage_WhenSelfRegistrationDisabled_RedirectsToLogin()
+        {
+            var settingManager = IocManager.Resolve<ISettingManager>();
+            await settingManager.ChangeSettingForTenantAsync(1, "Abp.Account.IsSelfRegistrationEnabled", "false");
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/Account/Register");
+            request.Headers.Add("__tenant", "Default");
+
+            var response = await Client.SendAsync(request);
+
+            response.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+            response.Headers.Location?.OriginalString.ShouldContain("/Account/Login");
+        }
     }
 }
