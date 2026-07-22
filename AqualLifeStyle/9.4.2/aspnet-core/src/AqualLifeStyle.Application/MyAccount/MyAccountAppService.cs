@@ -45,6 +45,7 @@ namespace AqualLifeStyle.Application.MyAccount
 
             CheckErrors(await UserManager.ChangePasswordAsync(user, input.NewPassword));
             CheckErrors(await UserManager.UpdateSecurityStampAsync(user));
+            CheckErrors(await UserManager.ResetAccessFailedCountAsync(user));
             await CurrentUnitOfWork.SaveChangesAsync();
 
             Logger.Info($"Account password changed tenant={user.TenantId?.ToString() ?? "host"} user={user.Id}");
