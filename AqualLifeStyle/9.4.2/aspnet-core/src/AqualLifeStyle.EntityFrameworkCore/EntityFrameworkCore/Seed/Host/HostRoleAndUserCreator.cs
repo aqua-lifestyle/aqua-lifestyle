@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Abp.Authorization;
@@ -81,8 +82,12 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
                     IsActive = true
                 };
 
-                // Use a randomly generated password and require a password setup to avoid shipping default credentials
-                var initialPassword = User.CreateRandomPassword();
+                // Use a deployment-controlled password if supplied; otherwise generate a random one and preserve rotation enforcement.
+                var initialPassword = Environment.GetEnvironmentVariable("AQUA_INITIAL_ADMIN_PASSWORD");
+                if (string.IsNullOrWhiteSpace(initialPassword))
+                {
+                    initialPassword = User.CreateRandomPassword();
+                }
                 user.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions())).HashPassword(user, initialPassword);
                 user.RequirePasswordReset();
                 user.SetNormalizedNames();
@@ -98,7 +103,8 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
             else
             {
                 var hasher = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()));
-                if (!adminUserForHost.RequiresPasswordReset() && hasher.VerifyHashedPassword(adminUserForHost, adminUserForHost.Password, User.DefaultPassword) == PasswordVerificationResult.Success)
+                var verificationResult = hasher.VerifyHashedPassword(adminUserForHost, adminUserForHost.Password, User.DefaultPassword);
+                if (!adminUserForHost.RequiresPasswordReset() && verificationResult != PasswordVerificationResult.Failed)
                 {
                     adminUserForHost.RequirePasswordReset();
                     _context.SaveChanges();
