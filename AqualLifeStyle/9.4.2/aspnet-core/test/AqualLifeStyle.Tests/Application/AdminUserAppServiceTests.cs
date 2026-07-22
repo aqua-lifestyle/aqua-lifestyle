@@ -140,7 +140,7 @@ namespace AqualLifeStyle.Tests.Application
                 LastName = "Admin",
                 Email = email,
                 Password = "SafePassword123!",
-                Role = AquaUserRole.Member,
+                Role = AquaUserRole.SystemAdmin,
                 IsActive = true,
                 Justification = "Test admin creation"
             });
@@ -148,13 +148,14 @@ namespace AqualLifeStyle.Tests.Application
             created.ShouldNotBeNull();
             created.TenantId.ShouldBe(1);
             created.Email.ShouldBe(email);
-            created.Role.ShouldBe(AquaUserRole.Member);
+            created.Role.ShouldBe(AquaUserRole.SystemAdmin);
 
             await UsingDbContextAsync(async context =>
             {
                 var user = await context.Users.SingleOrDefaultAsync(u => u.Id == created.Id && u.TenantId == 1);
                 user.ShouldNotBeNull();
                 user.IsActive.ShouldBeTrue();
+                user.Role.ShouldBe(AquaUserRole.SystemAdmin);
             });
         }
     }
