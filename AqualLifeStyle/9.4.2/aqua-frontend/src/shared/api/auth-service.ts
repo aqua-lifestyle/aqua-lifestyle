@@ -127,7 +127,7 @@ export const getTenantSelfRegistrationAvailability = async (
     const response = await axios.get<{
       result: { isSelfRegistrationEnabled: boolean };
     }>(`${API_BASE}${apiEndpoints.account.getTenantSelfRegistrationAvailability}`, {
-      params: { tenancyName },
+      params: { TenancyName: tenancyName },
     });
 
     return {

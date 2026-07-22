@@ -5,7 +5,8 @@ This document is the operational and technical reference for administrator acces
 ## Security decisions
 
 - The sign-in page remains public. Authentication endpoints must be reachable by legitimate users; hiding the page is not an access control.
-- Public self-registration is disabled by default. New Club Member and staff accounts are created by an authorised administrator.
+- Customer self-registration is enabled for the Default Area. Other Areas remain closed unless an authorised administrator enables their Area setting.
+- Public registration creates only a Club Member customer account with Guest access. Staff and administrator accounts are created through authorised administrator workflows.
 - Browser input never selects an administrator role. Role assignment is performed only through authorised administrator services.
 - The platform administrator role is not a default role and must never be assigned automatically.
 - Administrator services enforce server-side ABP permissions. Frontend route guards improve navigation but are not the security boundary.
@@ -13,7 +14,7 @@ This document is the operational and technical reference for administrator acces
 
 ## Registration boundary
 
-`Abp.Account.IsSelfRegistrationEnabled` is defined at application and Area scope with a default value of `false`.
+`Abp.Account.IsSelfRegistrationEnabled` is defined at application and Area scope with a default value of `false`. The Default Area seed adds an Area-specific value of `true` when no explicit value exists. An explicit administrator choice to disable it is preserved.
 
 The boundary is enforced in several places:
 
@@ -99,14 +100,14 @@ Important behavior:
 Use this sequence for the current Render and Vercel deployment:
 
 1. Merge and deploy the reviewed branch.
-2. Confirm `Abp.Account.IsSelfRegistrationEnabled` remains `false` for each invitation-only Area.
+2. Confirm `Abp.Account.IsSelfRegistrationEnabled` is `true` for the Default Area and remains `false` for each invitation-only Area.
 3. Confirm the Render API is healthy at `https://aqualifestyle-api.onrender.com/api/health`.
 4. Sign in to the Default Area as its administrator.
 5. Open **Settings → Account security** and replace `123qwe` with a unique password stored in a password manager.
 6. Confirm the browser returns to sign-in and the old password no longer works.
 7. Sign in to **Platform administration** with the host administrator and rotate that password separately if the account is in use.
 8. Confirm a previously issued token receives an unauthorised response after its security stamp changes.
-9. Confirm `/signup` shows the managed-registration message and both direct registration POST paths redirect or return **Registration is disabled**.
+9. Confirm `/signup?area=Default` creates only a customer with Guest access, while disabled Areas show the managed-registration message and reject direct registration requests.
 10. Review Render logs for successful startup and the expected password-change audit event without credential values.
 
 An existing database does not need the bootstrap secret to redeploy because both administrator records already exist. Set the secret before a fresh database or disaster-recovery bootstrap.
@@ -145,7 +146,8 @@ npm run build
 
 Manual checks:
 
-- Sign-up is not advertised when registration is disabled.
+- Default Area customer sign-up is advertised and creates only Guest access.
+- Sign-up is not advertised when an Area has disabled registration.
 - Direct registration is blocked by both frontend and backend paths.
 - Club Member registration cannot submit a role.
 - Non-administrators receive an authorisation failure from administrator APIs.
@@ -173,10 +175,10 @@ These controls are not completed by the current change and should be planned exp
 - email delivery for one-time invitations and password recovery;
 - explicit refresh-token storage and revocation if refresh tokens are introduced;
 - rate limiting at Render/reverse-proxy and application levels;
-- verified email addresses instead of automatic confirmation for public registration, if it is ever enabled;
-- CAPTCHA or bot protection for any future public registration path;
+- verified email addresses instead of automatic confirmation for public registration;
+- CAPTCHA or bot protection for public registration;
 - security alerts for administrator creation, role changes, password changes, and repeated lockouts;
 - periodic access reviews and removal of unused administrator accounts; and
 - recovery codes and a documented two-person administrator recovery process.
 
-Do not re-enable public registration as a shortcut for creating administrators. Administrator onboarding should become invitation-based, permission-gated, time-limited, and fully audited.
+Do not extend public customer registration to staff or administrator roles. Administrator onboarding should become invitation-based, permission-gated, time-limited, and fully audited.

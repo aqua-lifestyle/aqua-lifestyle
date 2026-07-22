@@ -1,19 +1,16 @@
 "use client";
 
-import type { ReactNode } from "react";
-
+import { SignupForm } from "@/src/components/auth/signup-form";
 import { useTenantState } from "@/src/providers";
 import { useTenantSelfRegistrationAvailability } from "@/src/shared/auth/use-tenant-self-registration-availability";
 import { publicEnv } from "@/src/shared/config";
 import { Card, LinkButton } from "@/src/shared/ui";
 
 type TenantSelfRegistrationGateProps = {
-  children: (tenancyName: string) => ReactNode;
   requestedTenancyName?: string;
 };
 
 export const TenantSelfRegistrationGate = ({
-  children,
   requestedTenancyName,
 }: TenantSelfRegistrationGateProps) => {
   const { currentTenant } = useTenantState();
@@ -23,7 +20,7 @@ export const TenantSelfRegistrationGate = ({
   const availability = useTenantSelfRegistrationAvailability(tenancyName);
 
   if (availability === "enabled") {
-    return children(tenancyName);
+    return <SignupForm tenancyName={tenancyName} />;
   }
 
   const isLoading = availability === "loading";

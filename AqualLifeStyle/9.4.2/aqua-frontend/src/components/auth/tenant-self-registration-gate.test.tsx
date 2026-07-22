@@ -6,6 +6,12 @@ import { getTenantSelfRegistrationAvailability } from "@/src/shared/api/auth-ser
 
 import { TenantSelfRegistrationGate } from "./tenant-self-registration-gate";
 
+vi.mock("@/src/components/auth/signup-form", () => ({
+  SignupForm: ({ tenancyName }: { tenancyName: string }) => (
+    <p>Create your {tenancyName} account</p>
+  ),
+}));
+
 vi.mock("@/src/shared/api/auth-service", () => ({
   getTenantSelfRegistrationAvailability: vi.fn(),
 }));
@@ -30,11 +36,7 @@ describe("TenantSelfRegistrationGate", () => {
       ok: true,
     });
 
-    render(
-      <TenantSelfRegistrationGate>
-        {(tenancyName) => <p>Create your {tenancyName} account</p>}
-      </TenantSelfRegistrationGate>,
-    );
+    render(<TenantSelfRegistrationGate />);
 
     expect(await screen.findByText("Create your CapeTown account")).toBeInTheDocument();
     expect(getTenantSelfRegistrationAvailability).toHaveBeenCalledWith("CapeTown");
@@ -46,11 +48,7 @@ describe("TenantSelfRegistrationGate", () => {
       ok: true,
     });
 
-    render(
-      <TenantSelfRegistrationGate>
-        {() => <p>Create your account</p>}
-      </TenantSelfRegistrationGate>,
-    );
+    render(<TenantSelfRegistrationGate />);
 
     expect(await screen.findByText(/created by an authorised/i)).toBeInTheDocument();
     expect(screen.queryByText("Create your account")).not.toBeInTheDocument();
@@ -63,11 +61,7 @@ describe("TenantSelfRegistrationGate", () => {
   it("does not expose registration when availability cannot be confirmed", async () => {
     vi.mocked(getTenantSelfRegistrationAvailability).mockResolvedValue({ ok: false });
 
-    render(
-      <TenantSelfRegistrationGate>
-        {() => <p>Create your account</p>}
-      </TenantSelfRegistrationGate>,
-    );
+    render(<TenantSelfRegistrationGate />);
 
     expect(await screen.findByText(/could not be confirmed/i)).toBeInTheDocument();
     expect(screen.queryByText("Create your account")).not.toBeInTheDocument();

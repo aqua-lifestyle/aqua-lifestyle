@@ -64,7 +64,7 @@ describe("getTenantSelfRegistrationAvailability", () => {
     });
     expect(get).toHaveBeenCalledWith(
       expect.stringContaining("/Account/GetTenantSelfRegistrationAvailability"),
-      { params: { tenancyName: "CapeTown" } },
+      { params: { TenancyName: "CapeTown" } },
     );
 
     get.mockRestore();
