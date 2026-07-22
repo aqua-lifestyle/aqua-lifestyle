@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Abp.Authorization;
@@ -8,6 +7,7 @@ using Abp.MultiTenancy;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.EntityFrameworkCore.Seed;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 
@@ -34,7 +34,12 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
             var adminRoleForHost = _context.Roles.IgnoreQueryFilters().FirstOrDefault(r => r.TenantId == null && r.Name == StaticRoleNames.Host.Admin);
             if (adminRoleForHost == null)
             {
-                adminRoleForHost = _context.Roles.Add(new Role(null, StaticRoleNames.Host.Admin, StaticRoleNames.Host.Admin) { IsStatic = true, IsDefault = true }).Entity;
+                adminRoleForHost = _context.Roles.Add(new Role(null, StaticRoleNames.Host.Admin, StaticRoleNames.Host.Admin) { IsStatic = true, IsDefault = false }).Entity;
+                _context.SaveChanges();
+            }
+            else if (adminRoleForHost.IsDefault)
+            {
+                adminRoleForHost.IsDefault = false;
                 _context.SaveChanges();
             }
 
@@ -82,15 +87,9 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
                     IsActive = true
                 };
 
-                // Require a deployment-controlled password for seeded host admin credentials.
-                var initialPassword = Environment.GetEnvironmentVariable("AQUA_INITIAL_ADMIN_PASSWORD");
-                if (string.IsNullOrWhiteSpace(initialPassword))
-                {
-                    throw new InvalidOperationException("AQUA_INITIAL_ADMIN_PASSWORD must be set for host administrator bootstrap.");
-                }
-
-                user.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions())).HashPassword(user, initialPassword);
-                user.RequirePasswordReset();
+                var initialPassword = AdministratorBootstrapPasswordProvider.GetHostAdministratorPassword();
+                user.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()))
+                    .HashPassword(user, initialPassword);
                 user.SetNormalizedNames();
 
                 adminUserForHost = _context.Users.Add(user).Entity;
@@ -101,17 +100,6 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
                 _context.SaveChanges();
                 _context.SaveChanges();
             }
-            else
-            {
-                var hasher = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()));
-                var verificationResult = hasher.VerifyHashedPassword(adminUserForHost, adminUserForHost.Password, User.DefaultPassword);
-                if (!adminUserForHost.RequiresPasswordReset() && verificationResult != PasswordVerificationResult.Failed)
-                {
-                    adminUserForHost.RequirePasswordReset();
-                    _context.SaveChanges();
-                }
-            }
-
             if (!adminUserForHost.IsSystemAdmin())
             {
                 adminUserForHost.SetRole(AqualLifeStyle.Domain.Enums.AquaUserRole.SystemAdmin);

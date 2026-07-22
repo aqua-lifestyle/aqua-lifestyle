@@ -10,6 +10,7 @@ using Abp.MultiTenancy;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.EntityFrameworkCore.Seed;
 
 namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
 {
@@ -83,17 +84,9 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
             if (adminUser == null)
             {
                 adminUser = User.CreateTenantAdminUser(_tenantId, "admin@defaulttenant.com");
-                // Require a deployment-controlled password for seeded tenant admin credentials.
-                var tenantAdminPassword = Environment.GetEnvironmentVariable($"AQUA_INITIAL_TENANT_{_tenantId}_ADMIN_PASSWORD");
-                var initialPassword = string.IsNullOrWhiteSpace(tenantAdminPassword)
-                    ? Environment.GetEnvironmentVariable("AQUA_INITIAL_ADMIN_PASSWORD")
-                    : tenantAdminPassword;
-                if (string.IsNullOrWhiteSpace(initialPassword))
-                {
-                    throw new InvalidOperationException($"AQUA_INITIAL_TENANT_{_tenantId}_ADMIN_PASSWORD or AQUA_INITIAL_ADMIN_PASSWORD must be set for tenant {_tenantId} administrator bootstrap.");
-                }
-                adminUser.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions())).HashPassword(adminUser, initialPassword);
-                adminUser.RequirePasswordReset();
+                var initialPassword = AdministratorBootstrapPasswordProvider.GetAreaAdministratorPassword(_tenantId);
+                adminUser.Password = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()))
+                    .HashPassword(adminUser, initialPassword);
                 adminUser.IsEmailConfirmed = true;
                 adminUser.IsActive = true;
 
@@ -104,17 +97,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
                 _context.UserRoles.Add(new UserRole(_tenantId, adminUser.Id, adminRole.Id));
                 _context.SaveChanges();
             }
-            else
-            {
-                var hasher = new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()));
-                var verificationResult = hasher.VerifyHashedPassword(adminUser, adminUser.Password, User.DefaultPassword);
-                if (!adminUser.RequiresPasswordReset() && verificationResult != PasswordVerificationResult.Failed)
-                {
-                    adminUser.RequirePasswordReset();
-                    _context.SaveChanges();
-                }
-            }
- 
+
             new DefaultCustomerUserLinker(_context, passwordHasher: new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()))).Link(_tenantId);
             new DefaultCustomerAccountProvisioner(_context).Provision(_tenantId);
             if (_seedDemoData)
