@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
 using Abp.Authorization.Roles;
+using Abp.Configuration;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Memberships;
 using AqualLifeStyle.Authorization;
@@ -30,6 +31,12 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task Register_ProvisionsCustomerWithGuestAccess()
         {
+            using (UsingTenantId(1))
+            {
+                var settingManager = Resolve<ISettingManager>();
+                await settingManager.ChangeSettingForTenantAsync(1, "Abp.Account.IsSelfRegistrationEnabled", "true");
+            }
+
             var suffix = Guid.NewGuid().ToString("N");
             var email = $"customer_{suffix}@test.com";
             var userName = $"customer_{suffix}";
