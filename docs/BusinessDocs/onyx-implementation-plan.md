@@ -203,10 +203,15 @@ The provider-neutral Onyx loan lifecycle foundation is complete:
 - payment application is idempotent and prevents overpayment;
 - missed weekly requirements and an outstanding balance after the three-month
   deadline expose a payout-hold decision without changing network placement;
+- the Entry commission calculator applies that decision only to the borrowing
+  member's own payout, and an already-earned payout can be placed on hold without
+  rewriting its calculated components;
+- after compliance is restored, the held payout uses the existing explicit,
+  idempotent release transition;
 - the agreement, requirements, repayment allocations, payment references, and
   audit fields are persisted by the PostgreSQL model.
 
 Secured member acceptance, administrator approval, provider callback,
-reconciliation, and payout orchestration remain application-workflow work. A
+reconciliation, and automated payout orchestration remain application-workflow work. A
 loan agreement does not yet create an Onyx participation because the placement
 of a graduating member in the Onyx network has not been confirmed.

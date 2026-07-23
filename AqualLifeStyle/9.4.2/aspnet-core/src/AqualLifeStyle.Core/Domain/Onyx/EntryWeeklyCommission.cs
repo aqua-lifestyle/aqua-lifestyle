@@ -46,7 +46,7 @@ namespace AqualLifeStyle.Domain.Onyx
             EntryCommissionPeriod period,
             EntryCommissionTerms terms,
             int highestCompletedLevel,
-            bool isOwnPayoutEligible)
+            string holdReason)
         {
             if (participation == null)
             {
@@ -109,14 +109,14 @@ namespace AqualLifeStyle.Domain.Onyx
             {
                 PayoutStatus = EntryCommissionPayoutStatus.NotEarned;
             }
-            else if (isOwnPayoutEligible)
+            else if (string.IsNullOrWhiteSpace(holdReason))
             {
                 PayoutStatus = EntryCommissionPayoutStatus.Earned;
             }
             else
             {
                 PayoutStatus = EntryCommissionPayoutStatus.Held;
-                HoldReason = "Entry monthly commitment is overdue.";
+                HoldReason = NormalizeHoldReason(holdReason);
             }
         }
 
@@ -125,14 +125,38 @@ namespace AqualLifeStyle.Domain.Onyx
             EntryCommissionPeriod period,
             EntryCommissionTerms terms,
             int highestCompletedLevel,
-            bool isOwnPayoutEligible)
+            string holdReason)
         {
             return new EntryWeeklyCommission(
                 participation,
                 period,
                 terms,
                 highestCompletedLevel,
-                isOwnPayoutEligible);
+                holdReason);
+        }
+
+        public void HoldPayout(string reason)
+        {
+            var normalizedReason = NormalizeHoldReason(reason);
+            if (PayoutStatus == EntryCommissionPayoutStatus.Held)
+            {
+                if (!string.Equals(HoldReason, normalizedReason, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        "This commission was already held using a different reason.");
+                }
+
+                return;
+            }
+
+            if (PayoutStatus != EntryCommissionPayoutStatus.Earned)
+            {
+                throw new InvalidOperationException(
+                    "Only an earned commission can be placed on hold.");
+            }
+
+            HoldReason = normalizedReason;
+            PayoutStatus = EntryCommissionPayoutStatus.Held;
         }
 
         public void ReleaseEligiblePayout(DateTime releasedAt)
@@ -251,6 +275,24 @@ namespace AqualLifeStyle.Domain.Onyx
                 throw new InvalidOperationException(
                     "This commission was already released using different release facts.");
             }
+        }
+
+        private static string NormalizeHoldReason(string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                throw new ArgumentException("A hold reason is required.", nameof(reason));
+            }
+
+            var normalizedReason = reason.Trim();
+            if (normalizedReason.Length > 500)
+            {
+                throw new ArgumentException(
+                    "The hold reason cannot exceed 500 characters.",
+                    nameof(reason));
+            }
+
+            return normalizedReason;
         }
     }
 
