@@ -11,6 +11,7 @@ using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Orders;
 using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.Domain.Products;
+using AqualLifeStyle.Domain.Savings;
 using AqualLifeStyle.MultiTenancy;
 
 namespace AqualLifeStyle.EntityFrameworkCore
@@ -44,6 +45,8 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<OnyxLoanAgreement> OnyxLoanAgreements { get; set; }
         public virtual DbSet<OnyxLoanWeeklyRequirement> OnyxLoanWeeklyRequirements { get; set; }
         public virtual DbSet<OnyxLoanRepaymentAllocation> OnyxLoanRepaymentAllocations { get; set; }
+        public virtual DbSet<SavingsAccount> SavingsAccounts { get; set; }
+        public virtual DbSet<SavingsContribution> SavingsContributions { get; set; }
 
         public AqualLifeStyleDbContext(DbContextOptions<AqualLifeStyleDbContext> options)
             : base(options)

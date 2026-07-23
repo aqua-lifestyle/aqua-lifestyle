@@ -28,14 +28,14 @@ Status legend: ✅ Implemented in codebase · ⚠️ Partially implemented / ass
 
 | ID | Requirement | Priority | Status |
 |----|-------------|----------|--------|
-| FR-09 | Club accounts: Standard (reg R560, min saving R310/R510 p.m.), Club Millionaire (reg R1200, min R500–600 p.m.), Business Premier (reg R790, min R1500 p.m.), Investment Projects (activation R2500, min security R5000) | Critical | ❌ Missing |
-| FR-10 | Savings deposits accepted 1st–15th of each month | Critical | ❌ Missing |
+| FR-09 | Club Member savings account: minimum R100 per contribution, larger voluntary contributions allowed | Critical | 🔧 Domain and persistence foundation |
+| FR-10 | Savings contributions accepted 1st–15th of each month | Critical | 🔧 Domain foundation |
 | FR-11 | Savings locked 17th–24th (administration verification period) | Critical | ❌ Missing |
-| FR-12 | 20% interest/share pool over 12 months (17% annual for Business Premier) | High | ❌ Missing |
+| FR-12 | Every contribution receives the full 20% interest when the account matures 12 months after opening | High | 🔧 Domain and persistence foundation |
 | FR-13 | Refund rule: below minimum threshold within 3 months → refund minus admin & branding costs | High | ❌ Missing |
-| FR-14 | First-year payments locked for first 12 months | High | ❌ Missing |
+| FR-14 | Withdrawals blocked until account maturity 12 months after opening | High | 🔧 Domain foundation |
 | FR-15 | Registration payment must complete within 14 business days with proof submitted | High | ❌ Missing |
-| FR-16 | Track `SavingsAccount` balances per member | Critical | ⚠️ Partial (domain object exists; no persistence or app service) |
+| FR-16 | Track savings principal, per-contribution interest, and maturity amount per Club Member | Critical | 🔧 Persistence foundation; application service pending |
 
 ### 2.3 Product Catalog & Orders
 
@@ -118,9 +118,9 @@ Status legend: ✅ Implemented in codebase · ⚠️ Partially implemented / ass
 | ID | Rule | Source |
 |----|------|--------|
 | BR-01 | Savings deposits only between the 1st and 15th; no deposits 17th–24th | National Club / Membership docs |
-| BR-02 | Standard account: savings below R1,500 within 3 months → refund minus admin & branding | National Club doc |
-| BR-03 | Club Millionaire: savings below R2,500 within 3 months → refund minus admin & branding | National Club doc |
-| BR-04 | Business Premier: savings below R4,500 within 3 months → refund minus admin & branding | National Club doc |
+| BR-02 | Legacy Standard R1,500 three-month refund threshold remains a policy input until its relationship to the current universal Club Member account is confirmed | National Club doc / current clarification |
+| BR-03 | Legacy Club Millionaire R2,500 three-month refund threshold remains a policy input until account types are confirmed | National Club doc / current clarification |
+| BR-04 | Legacy Business Premier R4,500 three-month refund threshold must not be assigned to current Onyx savings without an explicit migration decision | National Club doc / current clarification |
 | BR-05 | A member month must not pass without buying a product | National Club doc |
 | BR-06 | Onyx members may only pay subscription for the level they qualify for | Membership doc |
 | BR-07 | Area Leaders can only receive and redirect collections; extra orders for themselves only, unless license-qualified to sell | Area Leader doc |
@@ -128,7 +128,8 @@ Status legend: ✅ Implemented in codebase · ⚠️ Partially implemented / ass
 | BR-09 | Orders are paid directly to the company account, not to Area Leaders | Area Leader doc |
 | BR-10 | Funeral cover has a 6-month waiting period | National Club doc |
 | BR-11 | Borrowing requires 6 months of saving without skipping | National Club doc |
-| BR-12 | First-year payments locked 12 months; first-6-month withdrawals forfeit the 20% interest | National Club doc |
+| BR-12 | Withdrawals are blocked until 12 months after account opening; every accepted contribution receives the full 20% interest at maturity | Current confirmed rule |
+| BR-13 | Pooled savings may finance Entry customer loans, but Club Member savings and borrower loan ledgers remain separate | Current confirmed rule |
 
 ## 5. Assumptions
 

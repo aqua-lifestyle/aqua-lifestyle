@@ -258,23 +258,35 @@ The confirmed Level 3 travel-entitlement foundation is complete:
 Trip selection, pricing, booking, fulfilment, and payment are intentionally not
 implemented.
 
-#### Savings audit boundary
+#### Savings account status
 
-Savings remains unchanged pending reconciliation of conflicting rules. The
-existing domain-only `SavingsAccount` currently:
+The Club Member savings domain and persistence foundation is complete:
 
-- accepts only positive deposits dated from the 1st through the 15th;
-- maintains an in-memory deposit list, total, and count;
-- exposes a caller-supplied three-month refund-threshold check;
-- calculates simple interest from a caller-supplied annual rate and month count;
-- records a nominal one-year unlock date.
+- an account belongs to an Area and Customer and matures exactly 12 months after
+  opening;
+- contributions use confirmed `SavingsContribution` payment records and are
+  accepted only from the 1st through the 15th;
+- every contribution must be at least R100 and may be larger;
+- every contribution records the full 20% maturity interest independently,
+  including contributions made later in the 12-month term;
+- the same confirmed payment cannot be added twice to an account or across
+  accounts;
+- principal, projected interest, and the projected maturity amount remain
+  separate, explainable values;
+- withdrawals are unavailable before maturity;
+- maturity snapshots principal, interest, and the amount due to the Club Member
+  without rewriting contribution history;
+- the existing caller-supplied three-month refund-threshold policy boundary is
+  preserved until account-specific refund thresholds are confirmed.
 
-It does not yet enforce the confirmed R100 minimum, persist an auditable
-transaction ledger, identify an Area or Customer aggregate, or prevent duplicate
-confirmed payments. More importantly, it currently treats the first-year lock
-as blocking deposits and requires `ActivateSavingsAccount` to unlock the account
-before saving, while the business rule describes locked withdrawals/funds rather
-than blocked contributions. Older account-specific monthly minimums and interest
-rates also conflict with the current R100 minimum unless they represent a
-different threshold. Those meanings must be confirmed before persistence so the
-existing incorrect semantics are not cemented into a migration.
+The Club may use pooled savings to support loans for customers entering Entry,
+but no individual Club Member contribution is assigned to or netted against a
+specific borrower. Savings ownership, loan receivables, loan repayments, and
+maturity liabilities remain separate ledgers.
+
+Secured Club Member contribution workflows, verified provider callbacks,
+maturity payout processing, pooled-fund accounting, and reconciliation remain
+application-layer work. The promised 20% return and use of member savings for
+lending require appropriate South African financial-services and consumer-credit
+review before production launch; the domain model records the confirmed business
+terms but does not establish regulatory compliance.

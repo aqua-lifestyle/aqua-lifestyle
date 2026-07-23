@@ -16,11 +16,13 @@
 - ✅ Next.js admin frontend (customers, products, memberships, enquiries, order-intents)
 
 ## Phase 2: Savings & Order Cycle (Next Priority)
-- [ ] Persist `SavingsAccount` (repository + app service) and add `SavingsDeposit`
+- [x] Persist Club Member `SavingsAccount` and payment-linked contribution ledger
+- [ ] Add secured Club Member and administrator savings application services
 - [ ] Club account types with registration fees and tier minimums (FR-09)
-- [ ] Savings window enforcement: deposits 1st–15th, locked 17th–24th (BR-01)
+- [x] Savings contribution window enforcement from the 1st–15th
 - [ ] Refund-rule flagging (3-month threshold per tier) (BR-02–04)
-- [ ] Interest/share-pool accrual (20% / 17%) with 12-month first-year lock (BR-12)
+- [x] Full 20% interest per contribution with 12-month maturity and early-withdrawal lock
+- [ ] Maturity payout processing and pooled-fund/Entry-loan accounting
 - [ ] Order calendar enforcement (opening/cut-off/delivery cycles) on `OrderIntent`
 - [ ] Product combos with member vs Jasper pricing (FR-19)
 - [ ] Monthly buying obligation tied to actual orders (BR-05)
