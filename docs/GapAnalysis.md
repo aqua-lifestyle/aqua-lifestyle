@@ -38,7 +38,7 @@ Frontend (`aqua-frontend`, Next.js): pages exist for customers, enquiries, membe
 |--------------------------------|--------|-------|
 | Membership plan catalogue | ✅ Implemented | Reuse `Membership`; do not create a duplicate catalogue aggregate |
 | BusinessPremier replacement by Onyx | ⚠️ Migration required | Enum value `3`, seed data, products, tests, and historical database rows may still reference it; deprecate before an explicit data migration and remove only after production verification |
-| Member-specific activation & monthly obligation tracking | ❌ Missing | Existing dates are stored on a shared `Membership`; add separate participation and obligation records |
+| Member-specific activation & monthly obligation tracking | 🔧 Foundation implemented | Entry participation and monthly obligations are separate persisted records with versioned amounts, due/grace/overdue/paid states, preserved debt, and payment linkage; obligation scheduling and member/admin workflows remain |
 | Entry feeder participation | 🔧 Domain foundation | Supports independent joining or an optional verified Entry recruiter, two confirmed R600 activation payments, terms version, and permanent history; persistence remains |
 | Direct Onyx participation | ❌ Missing | Requires a confirmed R6,120 payment and explicit activation; must not create an Entry record |
 | Entry-to-Onyx graduation | ❌ Missing | Creates a separate Onyx participation while preserving Entry history |

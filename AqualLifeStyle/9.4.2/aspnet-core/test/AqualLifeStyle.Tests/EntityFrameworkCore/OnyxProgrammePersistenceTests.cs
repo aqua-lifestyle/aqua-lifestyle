@@ -104,13 +104,29 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     $"onyx-direct-{suffix}");
                 onyxParticipation.ApplyConfirmedDirectEntryPayment(onyxPayment);
 
+                var monthlyObligation = EntryMonthlyObligation.Create(
+                    participantEntry,
+                    2026,
+                    8,
+                    EffectiveFrom.AddMonths(1));
+                monthlyObligation.AssessStatus(EffectiveFrom.AddMonths(1).AddDays(8));
+                var monthlyPayment = CreateConfirmedPayment(
+                    participantCustomer.Id,
+                    MemberPaymentPurpose.EntryMonthlyCommitment,
+                    600m,
+                    $"entry-monthly-{suffix}",
+                    EffectiveFrom.AddMonths(1).AddDays(9));
+                monthlyObligation.ApplyConfirmedPayment(monthlyPayment);
+
                 context.MemberPayments.AddRange(
                     recruiterPayments.Registration,
                     recruiterPayments.Activation,
                     participantPayments.Registration,
                     participantPayments.Activation,
-                    onyxPayment);
+                    onyxPayment,
+                    monthlyPayment);
                 context.EntryParticipations.AddRange(recruiterEntry, participantEntry);
+                context.EntryMonthlyObligations.Add(monthlyObligation);
                 context.OnyxParticipations.Add(onyxParticipation);
                 await context.SaveChangesAsync();
 
@@ -118,6 +134,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 {
                     ParticipantCustomerId = participantCustomer.Id,
                     ParticipantEntryId = participantEntry.Id,
+                    MonthlyObligationId = monthlyObligation.Id,
                     OnyxParticipationId = onyxParticipation.Id,
                     OnyxPaymentReference = onyxPayment.ExternalReference
                 };
@@ -130,6 +147,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     .SingleAsync(participation => participation.Id == persisted.ParticipantEntryId);
                 var onyx = await context.OnyxParticipations
                     .SingleAsync(participation => participation.Id == persisted.OnyxParticipationId);
+                var monthlyObligation = await context.EntryMonthlyObligations
+                    .SingleAsync(obligation => obligation.Id == persisted.MonthlyObligationId);
                 var payments = await context.MemberPayments
                     .Where(payment => payment.CustomerId == persisted.ParticipantCustomerId)
                     .ToListAsync();
@@ -142,7 +161,11 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
 
                 Assert.True(onyx.JoinedIndependently);
                 Assert.Equal(OnyxParticipationStatus.Active, onyx.Status);
-                Assert.Equal(3, payments.Count);
+                Assert.Equal(EntryMonthlyObligationStatus.Paid, monthlyObligation.Status);
+                Assert.Equal(0m, monthlyObligation.OutstandingAmount);
+                Assert.NotNull(monthlyObligation.MarkedOverdueAt);
+                Assert.True(monthlyObligation.IsOwnPayoutEligible);
+                Assert.Equal(4, payments.Count);
                 Assert.All(payments, payment => Assert.Equal("YOCO", payment.Provider));
             });
 
@@ -187,7 +210,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             int customerId,
             MemberPaymentPurpose purpose,
             decimal amount,
-            string externalReference)
+            string externalReference,
+            DateTime? confirmedAt = null)
         {
             var payment = MemberPayment.CreatePending(
                 1,
@@ -197,7 +221,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 "Yoco",
                 externalReference,
                 EffectiveFrom);
-            payment.Confirm(EffectiveFrom.AddMinutes(1));
+            payment.Confirm(confirmedAt ?? EffectiveFrom.AddMinutes(1));
             return payment;
         }
     }

@@ -143,3 +143,20 @@ The persistence and provider-neutral confirmation foundation is complete:
   mark a payment successful.
 - Provider-specific callback verification remains intentionally unimplemented
   until Yoco credentials, signing rules, and webhook specifications are supplied.
+
+### Phase 3 obligation status
+
+The Entry monthly-obligation foundation is complete:
+
+- each obligation records its Entry participation, customer, year/month identity,
+  applicable terms version, amount, due time, and seven-day grace boundary;
+- the lifecycle distinguishes due, grace period, overdue, and paid;
+- overdue debt and the permanent Entry network position are preserved;
+- overdue status blocks only the customer's own payout eligibility;
+- confirmed late payment settles the debt and restores that eligibility without
+  deleting the fact that the obligation became overdue;
+- no upline contribution effect is inferred from the obligation state because
+  that business rule remains unresolved.
+
+Automatic obligation scheduling and payment allocation are deferred to the
+secured application workflow phase.

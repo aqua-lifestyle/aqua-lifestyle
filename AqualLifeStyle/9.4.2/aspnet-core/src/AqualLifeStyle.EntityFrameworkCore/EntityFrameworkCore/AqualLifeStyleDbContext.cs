@@ -32,6 +32,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<MemberPayment> MemberPayments { get; set; }
         public virtual DbSet<EntryParticipation> EntryParticipations { get; set; }
         public virtual DbSet<EntryRecruiterCorrection> EntryRecruiterCorrections { get; set; }
+        public virtual DbSet<EntryMonthlyObligation> EntryMonthlyObligations { get; set; }
         public virtual DbSet<OnyxParticipation> OnyxParticipations { get; set; }
 
         public AqualLifeStyleDbContext(DbContextOptions<AqualLifeStyleDbContext> options)
