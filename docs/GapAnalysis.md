@@ -44,7 +44,7 @@ Frontend (`aqua-frontend`, Next.js): pages exist for customers, enquiries, membe
 | Entry-to-Onyx graduation | ❌ Missing | Creates a separate Onyx participation while preserving Entry history |
 | Entry/Onyx five-person networks | 🔧 Domain foundation | Independent customers form network roots; optional recruiters must actively participate in the same programme; separate from sales referrals and cross-Area placement is permitted |
 | Weekly member commission ledger | ❌ Missing | Requires complete-level components, unique periods, and earned/held/released/paid states |
-| Member payment and Yoco reconciliation ledger | ❌ Missing | No provider boundary, external-reference idempotency, or confirmed-payment record exists |
+| Member payment and Yoco reconciliation ledger | 🔧 Foundation implemented | Payments and participation are persisted; provider/reference uniqueness and idempotent confirmed-payment processing are enforced. A verified Yoco webhook adapter remains pending until its signing specification and credentials are supplied |
 | VIP funding agreement and repayments | ❌ Missing | Requires acceptance, admin approval, four weekly minimums, three-month deadline, and payout holds |
 | Product catalog + member eligibility | ✅ Implemented | `ProductEligibilityManager` |
 | Product combos (Combo 2/3/4/5) with member vs Jasper pricing | ❌ Missing | Products exist, but no combo/bundle concept or dual pricing |

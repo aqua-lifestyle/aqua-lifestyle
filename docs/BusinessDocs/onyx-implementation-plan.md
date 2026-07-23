@@ -128,3 +128,18 @@ No historical record is silently reinterpreted in the current phase.
    provider callbacks, reconciliation views, and business-language workflows.
 
 Every phase must build and pass its focused tests before the next phase begins.
+
+### Phase 2 implementation status
+
+The persistence and provider-neutral confirmation foundation is complete:
+
+- Entry participation, Onyx participation, recruiter-correction history, and
+  member payments have explicit EF Core mappings and a PostgreSQL migration.
+- A provider/reference pair is unique across the payment ledger.
+- A verified confirmation is reconciled idempotently and invokes the domain
+  transition for Entry registration, Entry activation, or direct Onyx entry.
+- The confirmation processor is an internal application component, not a remote
+  application service. Customers and administrators cannot call it as an API to
+  mark a payment successful.
+- Provider-specific callback verification remains intentionally unimplemented
+  until Yoco credentials, signing rules, and webhook specifications are supplied.
