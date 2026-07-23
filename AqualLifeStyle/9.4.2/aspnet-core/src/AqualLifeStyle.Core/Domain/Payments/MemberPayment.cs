@@ -58,7 +58,7 @@ namespace AqualLifeStyle.Domain.Payments
             Purpose = purpose;
             Amount = amount;
             Currency = NormalizeCurrency(currency);
-            Provider = RequireText(provider, nameof(provider), 64);
+            Provider = RequireText(provider, nameof(provider), 64).ToUpperInvariant();
             ExternalReference = RequireText(externalReference, nameof(externalReference), 128);
             InitiatedAt = initiatedAt;
             Status = MemberPaymentStatus.Pending;

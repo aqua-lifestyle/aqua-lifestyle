@@ -7,7 +7,9 @@ using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
 using AqualLifeStyle.Domain.Facilitators;
 using AqualLifeStyle.Domain.Memberships;
+using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Orders;
+using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.Domain.Products;
 using AqualLifeStyle.MultiTenancy;
 
@@ -27,6 +29,10 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<Referral> Referrals { get; set; }
         public virtual DbSet<AreaLeader> AreaLeaders { get; set; }
         public virtual DbSet<AreaSpace> AreaSpaces { get; set; }
+        public virtual DbSet<MemberPayment> MemberPayments { get; set; }
+        public virtual DbSet<EntryParticipation> EntryParticipations { get; set; }
+        public virtual DbSet<EntryRecruiterCorrection> EntryRecruiterCorrections { get; set; }
+        public virtual DbSet<OnyxParticipation> OnyxParticipations { get; set; }
 
         public AqualLifeStyleDbContext(DbContextOptions<AqualLifeStyleDbContext> options)
             : base(options)
