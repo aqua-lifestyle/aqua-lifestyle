@@ -30,7 +30,7 @@ namespace AqualLifeStyle.Domain.Onyx
         public DateTime? ActivatedAt { get; private set; }
         public Guid? DirectEntryPaymentId { get; private set; }
         public Guid? EntryParticipationId { get; private set; }
-        public Guid? FundingAgreementId { get; private set; }
+        public Guid? LoanAgreementId { get; private set; }
         public string TermsVersion { get; private set; }
         public DateTime TermsEffectiveFrom { get; private set; }
         public decimal DirectEntryAmount { get; private set; }

@@ -10,7 +10,7 @@ namespace AqualLifeStyle.Domain.Payments
         EntryActivation = 1,
         OnyxDirectEntry = 2,
         EntryMonthlyCommitment = 3,
-        OnyxFundingRepayment = 4,
+        OnyxLoanRepayment = 4,
         OnyxRental = 5,
         SavingsContribution = 6
     }

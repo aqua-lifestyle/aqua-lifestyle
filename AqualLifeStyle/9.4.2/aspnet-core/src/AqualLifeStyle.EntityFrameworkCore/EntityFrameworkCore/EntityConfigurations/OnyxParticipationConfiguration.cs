@@ -54,6 +54,11 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
                 .WithMany()
                 .HasForeignKey(participation => participation.EntryParticipationId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasOne<OnyxLoanAgreement>()
+                .WithMany()
+                .HasForeignKey(participation => participation.LoanAgreementId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

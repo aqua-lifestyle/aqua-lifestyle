@@ -40,6 +40,16 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 250m,
                 1250m);
 
+        private static readonly OnyxLoanTerms LoanTerms =
+            OnyxLoanTerms.Create(
+                "2026-07",
+                EffectiveFrom,
+                6120m,
+                30m,
+                3,
+                4,
+                200m);
+
         [Fact]
         public async Task ProgrammeParticipationAndPaymentHistory_RoundTripsAndRejectsDuplicateProviderReference()
         {
@@ -235,6 +245,131 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             duplicateContext.MemberPayments.Add(duplicatePayment);
 
             await Assert.ThrowsAsync<DbUpdateException>(() => duplicateContext.SaveChangesAsync());
+        }
+
+        [Fact]
+        public async Task LoanAgreement_RequirementsAndRepayment_RoundTrip()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var memberUserId = await CreateTestUserAsync(
+                1,
+                $"funded-member-{suffix}",
+                $"funded-member-{suffix}@example.com");
+
+            var loanAgreementId = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    memberUserId,
+                    "Funded Entry Member",
+                    new EmailAddress($"funded-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+
+                var entryParticipation = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    EntryTerms,
+                    EffectiveFrom);
+                var activationPayments = CreateAndApplyEntryPayments(
+                    entryParticipation,
+                    $"loan-entry-registration-{suffix}",
+                    $"loan-entry-activation-{suffix}");
+
+                var network = BuildLevelTwoNetwork(entryParticipation, suffix);
+                var agreement = OnyxLoanAgreement.OfferToEligibleEntryParticipant(
+                    entryParticipation,
+                    network,
+                    new EntryNetworkQualificationEvaluator(),
+                    LoanTerms,
+                    EffectiveFrom.AddDays(1));
+                agreement.AcceptByMember(
+                    memberUserId,
+                    "I accept the Onyx loan terms.",
+                    EffectiveFrom.AddDays(2));
+                agreement.ApproveByAdministrator(1, EffectiveFrom.AddDays(3));
+
+                var repayment = CreateConfirmedPayment(
+                    customer.Id,
+                    MemberPaymentPurpose.OnyxLoanRepayment,
+                    200m,
+                    $"loan-repayment-{suffix}",
+                    EffectiveFrom.AddDays(4));
+                agreement.ApplyConfirmedRepayment(repayment, weeklyRequirementNumber: 1);
+
+                context.MemberPayments.AddRange(
+                    activationPayments.Registration,
+                    activationPayments.Activation,
+                    repayment);
+                context.EntryParticipations.Add(entryParticipation);
+                context.OnyxLoanAgreements.Add(agreement);
+                await context.SaveChangesAsync();
+
+                return agreement.Id;
+            });
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var agreement = await context.OnyxLoanAgreements
+                    .Include(item => item.WeeklyRequirements)
+                    .Include(item => item.Repayments)
+                    .SingleAsync(item => item.Id == loanAgreementId);
+
+                Assert.Equal(OnyxLoanAgreementStatus.Active, agreement.Status);
+                Assert.Equal(7756m, agreement.OutstandingAmount);
+                Assert.Equal(4, agreement.WeeklyRequirements.Count);
+                Assert.Equal(
+                    OnyxLoanWeeklyRequirementStatus.Satisfied,
+                    agreement.WeeklyRequirements.Single(
+                        requirement => requirement.RequirementNumber == 1).Status);
+                var repayment = Assert.Single(agreement.Repayments);
+                Assert.Equal(1, repayment.WeeklyRequirementNumber);
+            });
+        }
+
+        private static List<EntryParticipation> BuildLevelTwoNetwork(
+            EntryParticipation root,
+            string referenceSuffix)
+        {
+            var network = new List<EntryParticipation> { root };
+            var firstLevel = new List<EntryParticipation>();
+            var nextCustomerId = 20000;
+
+            for (var index = 0; index < EntryNetworkQualificationEvaluator.BranchSize; index++)
+            {
+                var recruit = EntryParticipation.StartUnderRecruiter(
+                    1,
+                    nextCustomerId++,
+                    root,
+                    EntryTerms,
+                    EffectiveFrom);
+                CreateAndApplyEntryPayments(
+                    recruit,
+                    $"loan-network-l1-registration-{index}-{referenceSuffix}",
+                    $"loan-network-l1-activation-{index}-{referenceSuffix}");
+                network.Add(recruit);
+                firstLevel.Add(recruit);
+            }
+
+            foreach (var recruiter in firstLevel)
+            {
+                for (var index = 0; index < EntryNetworkQualificationEvaluator.BranchSize; index++)
+                {
+                    var recruit = EntryParticipation.StartUnderRecruiter(
+                        1,
+                        nextCustomerId++,
+                        recruiter,
+                        EntryTerms,
+                        EffectiveFrom);
+                    CreateAndApplyEntryPayments(
+                        recruit,
+                        $"loan-network-l2-registration-{nextCustomerId}-{referenceSuffix}",
+                        $"loan-network-l2-activation-{nextCustomerId}-{referenceSuffix}");
+                    network.Add(recruit);
+                }
+            }
+
+            return network;
         }
 
         private static (MemberPayment Registration, MemberPayment Activation)

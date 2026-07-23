@@ -37,6 +37,9 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<EntryWeeklyCommission> EntryWeeklyCommissions { get; set; }
         public virtual DbSet<EntryCommissionComponent> EntryCommissionComponents { get; set; }
         public virtual DbSet<OnyxParticipation> OnyxParticipations { get; set; }
+        public virtual DbSet<OnyxLoanAgreement> OnyxLoanAgreements { get; set; }
+        public virtual DbSet<OnyxLoanWeeklyRequirement> OnyxLoanWeeklyRequirements { get; set; }
+        public virtual DbSet<OnyxLoanRepaymentAllocation> OnyxLoanRepaymentAllocations { get; set; }
 
         public AqualLifeStyleDbContext(DbContextOptions<AqualLifeStyleDbContext> options)
             : base(options)

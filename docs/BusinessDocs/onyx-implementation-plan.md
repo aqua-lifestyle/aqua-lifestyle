@@ -14,8 +14,10 @@ rules below.
   payment.
 - Entry entrants create a separate Entry participation and qualify only after two
   confirmed R600 payments.
-- Entry Level 2 makes the funding agreement available. Member acceptance followed
-  by administrator approval can create a separate Onyx participation.
+- Entry Level 2 makes the loan agreement available. Member acceptance followed
+  by administrator approval makes the agreement effective. Creation of the
+  separate Onyx participation remains deferred until the recruiter-placement rule
+  for a graduating member is confirmed.
 - Graduation never converts, deletes, or overwrites Entry participation, network
   placement, payments, or commissions.
 - Neither lifecycle is represented by replacing `Customer.MembershipId`.
@@ -49,6 +51,12 @@ The current Entry terms are:
 The current direct Onyx entry amount is R6,120. Every participation, obligation,
 commission period, and agreement records the terms/rule version and the monetary
 amounts used so later changes do not rewrite history.
+
+The repayable R6,120 principal plus 30% charge is described as an Onyx loan rather
+than generic funding so members are not led to believe it is a grant. The 30%
+term and complete agreement workflow require South African credit-law review
+before production launch; the domain model records the approved business proposal
+but does not itself establish regulatory compliance.
 
 ## Complete-level network rules
 
@@ -117,7 +125,7 @@ No historical record is silently reinterpreted in the current phase.
    unique external references, and controlled confirmed-payment processing.
 3. **Obligations and Entry commissions:** monthly debt/grace records, configurable
    weeks, immutable components, and earned/held/released/paid transitions.
-4. **Funding agreement:** member acceptance, admin approval/effective date, four
+4. **Loan agreement:** member acceptance, admin approval/effective date, four
    weekly R200 requirements, additional repayments, deadline, and compliance
    restoration.
 5. **Onyx network and earnings:** implement Level 1 first; add Levels 2–5 only
@@ -177,3 +185,28 @@ The Entry weekly commission-ledger foundation is also complete:
 
 The secured administrator-triggered calculation, discrepancy reporting, and
 automatic scheduling remain application-layer work.
+
+### Phase 4 loan-agreement status
+
+The provider-neutral Onyx loan lifecycle foundation is complete:
+
+- only an active Entry participant who has completed Level 2 may be offered the
+  current versioned loan terms;
+- the current R6,120 principal and 30% interest produce an explicit R7,956 total;
+- member acceptance is recorded before administrator approval, and the
+  administrator approval time is the effective date that starts the three-month
+  repayment period;
+- the first four R200 weekly requirements are separate records with separate due
+  dates, so one late R800 payment cannot silently satisfy all four requirements;
+- confirmed payments require explicit weekly allocation when used as catch-up,
+  while additional unallocated repayments reduce the overall balance;
+- payment application is idempotent and prevents overpayment;
+- missed weekly requirements and an outstanding balance after the three-month
+  deadline expose a payout-hold decision without changing network placement;
+- the agreement, requirements, repayment allocations, payment references, and
+  audit fields are persisted by the PostgreSQL model.
+
+Secured member acceptance, administrator approval, provider callback,
+reconciliation, and payout orchestration remain application-workflow work. A
+loan agreement does not yet create an Onyx participation because the placement
+of a graduating member in the Onyx network has not been confirmed.

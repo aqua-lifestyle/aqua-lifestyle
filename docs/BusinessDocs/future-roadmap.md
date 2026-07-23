@@ -26,10 +26,10 @@
 - [ ] Monthly buying obligation tied to actual orders (BR-05)
 
 ## Phase 3: Entry and Onyx Participation
-- [ ] Confirmed-payment records with idempotent external references
-- [ ] Separate Entry and Onyx participation records; never convert one into the other
-- [ ] Direct Onyx activation after a confirmed R6,120 payment
-- [ ] Entry activation after two confirmed R600 payments, with independent joining or an optional verified Entry recruiter
+- [x] Confirmed-payment records with idempotent external references
+- [x] Separate Entry and Onyx participation records; never convert one into the other
+- [x] Direct Onyx activation after a confirmed R6,120 payment
+- [x] Entry activation after two confirmed R600 payments, with independent joining or an optional verified Entry recruiter
 - [ ] Entry-to-Onyx graduation that preserves Entry history
 - [ ] Registration channels (online/office/presentation) with required documents (ID, bank letter)
 - [ ] SMS/WhatsApp notifications (payment confirmation, welcome, collection dates)
@@ -45,9 +45,9 @@
 - [ ] Referral awards and incentive issuance
 - [ ] Order collection routing through Area Spaces/outlets
 
-## Phase 5: Onyx Funding and Legacy Business Premier Migration
-- [ ] Member-accepted and administrator-approved Onyx funding agreement
-- [ ] Four weekly minimum repayments and three-month settlement deadline
+## Phase 5: Onyx Loan and Legacy Business Premier Migration
+- [x] Member-accepted and administrator-approved Onyx loan agreement domain and persistence foundation
+- [x] Four explicit weekly minimum repayments and three-month settlement deadline foundation
 - [ ] Held and idempotently released commission payouts
 - [ ] Inventory and explicitly migrate legacy `BusinessPremier` membership data
 - [ ] Investment project catalog and participation (60/40 profit share, bi-quarterly distribution)
