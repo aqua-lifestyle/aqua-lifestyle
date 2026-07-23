@@ -1,9 +1,14 @@
 # Future Roadmap: aQua Lifestyle Club Platform
 
+> The active Onyx delivery sequence is maintained in
+> [`onyx-implementation-plan.md`](onyx-implementation-plan.md). Its confirmed
+> decisions supersede the older membership assumptions below wherever they
+> conflict.
+
 ## Phase 1: Foundation (Current — Implemented)
 - ✅ ABP-based backend with multi-tenancy, users, roles, JWT auth
-- ✅ Membership tiers (Jasper, Onyx, AQGreen, Business Premier) with `TierBenefits`
-- ✅ Membership activation dates and monthly obligation tracking
+- ✅ Membership plan catalogue with the legacy Jasper, Onyx, AQGreen, and Business Premier values
+- ⚠️ Shared-plan activation dates and obligation dates exist but are not valid member-specific participation records
 - ✅ Product catalog with membership-based eligibility (`ProductEligibilityManager`)
 - ✅ Order intents (Draft → Reserved → Completed/Cancelled)
 - ✅ Enquiry lifecycle with follow-ups, conversion probability, and enquiry→customer conversion
@@ -20,11 +25,15 @@
 - [ ] Product combos with member vs Jasper pricing (FR-19)
 - [ ] Monthly buying obligation tied to actual orders (BR-05)
 
-## Phase 3: Registration & Subscription Levels
-- [ ] Payment-verified registration pipeline (proof-of-payment upload, admin confirmation)
+## Phase 3: Entry and Onyx Participation
+- [ ] Confirmed-payment records with idempotent external references
+- [ ] Separate Entry and Onyx participation records; never convert one into the other
+- [ ] Direct Onyx activation after a confirmed R6,120 payment
+- [ ] Entry activation after two confirmed R600 payments and required recruiter placement
+- [ ] Entry-to-Onyx graduation that preserves Entry history
 - [ ] Registration channels (online/office/presentation) with required documents (ID, bank letter)
 - [ ] SMS/WhatsApp notifications (payment confirmation, welcome, collection dates)
-- [ ] Onyx IBA subscription levels 0–5 with level fees, order sets, and payment/collection dates
+- [ ] Complete-level Entry and Onyx network qualification with immutable weekly commissions
 - [ ] Jasper activation plans (Standard R950 / Premium R1200) with combo allocation
 - [ ] Virtual membership cards with QR codes
 
@@ -36,9 +45,11 @@
 - [ ] Referral awards and incentive issuance
 - [ ] Order collection routing through Area Spaces/outlets
 
-## Phase 5: Business Premier & Investments
-- [ ] Clubbing plans A–D with waiting/circle periods and pooled equipment purchases
-- [ ] Borrowing workflow (6-month eligibility, 30% charge, 6–8 month repayment)
+## Phase 5: Onyx Funding and Legacy Business Premier Migration
+- [ ] Member-accepted and administrator-approved Onyx funding agreement
+- [ ] Four weekly minimum repayments and three-month settlement deadline
+- [ ] Held and idempotently released commission payouts
+- [ ] Inventory and explicitly migrate legacy `BusinessPremier` membership data
 - [ ] Investment project catalog and participation (60/40 profit share, bi-quarterly distribution)
 - [ ] Funeral plan auto-link for Club Millionaire (R30,000, 6-month waiting)
 

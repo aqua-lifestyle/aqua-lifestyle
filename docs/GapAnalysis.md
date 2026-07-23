@@ -4,6 +4,10 @@ This report compares the business model described in the provided business docum
 (*National Club Aqgreen*, *Area Space / Area Leader*, *Membership*) against the current
 codebase (`AqualLifeStyle/9.4.2` — ASP.NET Boilerplate backend + Next.js frontend).
 
+> **Current authority (2026-07-23):** The confirmed Onyx decisions recorded in
+> [`BusinessDocs/onyx-implementation-plan.md`](BusinessDocs/onyx-implementation-plan.md)
+> supersede the older membership assumptions in this report wherever they conflict.
+
 ## 1. Business Sources Analyzed
 
 | Source | Content |
@@ -21,14 +25,27 @@ Backend (`aspnet-core`), verified in code:
 - **App services**: Products, Customers, Enquiries, Memberships, Orders (+ ABP built-ins: Users, Roles, Tenants, Sessions)
 - **Cross-cutting**: centralized exception hierarchy, `AqualLifeStyleValidator`, `ProductEligibilityManager` (async)
 
+`Membership` is a shared plan-catalogue record. Its current `ActivationDate` and
+`LastObligationMetDate` fields are consequently not safe for member-specific Onyx
+activation or payment compliance. `Customer.MembershipId` is also a single plan link
+and must not be used to convert an Entry participation into an Onyx participation.
+
 Frontend (`aqua-frontend`, Next.js): pages exist for customers, enquiries, memberships, order-intents, products.
 
 ## 3. Capability Gap Matrix
 
 | Business Capability (from docs) | Status | Notes |
 |--------------------------------|--------|-------|
-| Membership tiers Jasper/Onyx/AQGreen/BusinessPremier | ✅ Implemented | `MembershipType` + `TierBenefits` |
-| Membership activation & monthly obligation tracking | ✅ Implemented | `MembershipAppService` |
+| Membership plan catalogue | ✅ Implemented | Reuse `Membership`; do not create a duplicate catalogue aggregate |
+| BusinessPremier replacement by Onyx | ⚠️ Migration required | Enum value `3`, seed data, products, tests, and historical database rows may still reference it; deprecate before an explicit data migration and remove only after production verification |
+| Member-specific activation & monthly obligation tracking | ❌ Missing | Existing dates are stored on a shared `Membership`; add separate participation and obligation records |
+| Entry feeder participation | ❌ Missing | Must retain recruiter, two confirmed R600 activation payments, terms version, and permanent history |
+| Direct Onyx participation | ❌ Missing | Requires a confirmed R6,120 payment and explicit activation; must not create an Entry record |
+| Entry-to-Onyx graduation | ❌ Missing | Creates a separate Onyx participation while preserving Entry history |
+| Entry/Onyx five-person networks | ❌ Missing | Separate from Facilitator/Area Leader sales referrals; cross-Area placement is currently permitted |
+| Weekly member commission ledger | ❌ Missing | Requires complete-level components, unique periods, and earned/held/released/paid states |
+| Member payment and Yoco reconciliation ledger | ❌ Missing | No provider boundary, external-reference idempotency, or confirmed-payment record exists |
+| VIP funding agreement and repayments | ❌ Missing | Requires acceptance, admin approval, four weekly minimums, three-month deadline, and payout holds |
 | Product catalog + member eligibility | ✅ Implemented | `ProductEligibilityManager` |
 | Product combos (Combo 2/3/4/5) with member vs Jasper pricing | ❌ Missing | Products exist, but no combo/bundle concept or dual pricing |
 | Order intents (draft/reserve/cancel/complete) | ✅ Implemented | `OrderIntent` |
@@ -38,7 +55,7 @@ Frontend (`aqua-frontend`, Next.js): pages exist for customers, enquiries, membe
 | 20% (17% Business Premier) interest / profit-share pool (60/40 split) | ❌ Missing | No interest accrual or distribution logic |
 | Refund rule (savings below threshold within 3 months → refund minus admin/branding) | ❌ Missing | |
 | Registration workflows (WhatsApp/online/office/presentation channels, proof of payment, SMS confirmation) | ❌ Missing | Enquiry→Customer conversion exists but no payment-verified registration pipeline |
-| IBA subscription levels 1–5 with level fees and product incentives | ❌ Missing | |
+| Onyx levels 1–5 with rental and product incentives | ❌ Missing | Level 1 weekly R250 is confirmed; cumulative commission totals for Levels 2–5 are not confirmed by repository source material |
 | Area Leader licensing, application (20+ interested members, 42h review, 4 presentations) | ❌ Missing | No Area Leader/Area Space domain at all |
 | Area Leader ranks (Ruby → Ambassador) with order targets & income tables | ❌ Missing | |
 | Area Space approval & lifecycle | ❌ Missing | |
@@ -55,7 +72,7 @@ Frontend (`aqua-frontend`, Next.js): pages exist for customers, enquiries, membe
 | Area Leader ranks (Ruby → Ambassador) with order targets | 🔧 In progress | **Phase 3** — `RankProgressionPolicy` over `AreaLeaderRankConfiguration` |
 | Area Space approval & lifecycle | 🔧 In progress | **Phase 3** — `AreaSpace` workflow (Applied→UnderReview→Approved/Suspended) |
 | Facilitator registration, ranking (Bronze → Premier T/60), referral awards | 🔧 In progress | **Phase 2** — `Facilitator` + `Referral` aggregates; `RankProgressionPolicy` over `FacilitatorRankConfiguration` |
-| Referral / commission tracking | 🔧 In progress | **Phase 2/4** — `Referral` aggregate + `CommissionCalculator` (seeded amounts, flagged V-03) |
+| Sales referral / award tracking | 🔧 In progress | Existing `Referral` and `CommissionCalculator` apply to Facilitator/Area Leader enquiry attribution, not the Entry/Onyx member network |
 | Real Admin (JWT auth + RBAC on business services) | ❌ Missing → planned | **Phase 5** — `TokenAuth` login + `[AbpAuthorize]` + Admin role grants |
 | Admin network dashboard | ❌ Missing → planned | **Phase 6** — `GetNetworkOverviewAsync` read model |
 | Enquiry lifecycle (respond/close/reopen, follow-ups, conversion) | ✅ Implemented | base lifecycle; conversion semantics fixed in Phase 4 |
@@ -77,15 +94,16 @@ Frontend (`aqua-frontend`, Next.js): pages exist for customers, enquiries, membe
 
 ## 5. Priority Recommendations
 
-Implementation is sequenced by the Mission Plan (`docs/MissionPlan.md`):
+Existing platform work remains documented in the Mission Plan. The current Onyx
+feature is sequenced separately in
+[`BusinessDocs/onyx-implementation-plan.md`](BusinessDocs/onyx-implementation-plan.md):
 
-1. **Area Leader / Area Space / Facilitator / Referral contexts (IN PROGRESS, Phase 2–4)** — new `FullAuditedAggregateRoot` aggregates with ranks, referral attribution, and commission calculation; fixes the broken Enquiry→Customer conversion.
-2. **Real Admin — auth + RBAC (Phase 5, PAUSED for approval)** — wire `TokenAuth` login on the frontend, `[AbpAuthorize]` on business services, seed Admin grants. **Sequencing trap:** authorizing services instantly locks down currently-unauthenticated endpoints, so login + seed must land in the same batch.
-3. **Admin network dashboard (Phase 6)** — `GetNetworkOverviewAsync` read model + frontend widget.
-4. **Savings domain (DEFERRED)** — wire `SavingsAccount` to persistence + app service; enforce deposit windows, minimums per tier, refund rule, interest accrual.
-5. **Order cycle enforcement (DEFERRED)** — apply opening/cut-off/delivery date rules and monthly-buying obligation to `OrderIntent`.
-6. **Combos & dual pricing (DEFERRED)** — model product combos with member/Jasper/retail price tiers.
-7. **Registration pipeline (DEFERRED)** — payment-verified registration with proof-of-payment upload and confirmation notifications.
-8. **Investment projects & profit share (LOW/LATER)** — depends on savings + membership maturity.
+1. Establish separate Entry and Onyx participation aggregates with versioned terms.
+2. Persist confirmed payments and member obligations with idempotent external references.
+3. Calculate complete network levels and immutable weekly Entry commissions.
+4. Add agreement approval, repayment compliance, and held-payout release.
+5. Add the independently calculated Onyx network after its Levels 2–5 totals are confirmed.
+6. Add rental, product-combo, travel, and savings workflows.
+7. Expose secured member/admin use cases and professional frontend workflows.
 
 See `docs/BusinessDocs/future-roadmap.md` for the phased plan and `docs/Assumptions.md` for assumptions needing business validation. ADRs for the new work live in `docs/adr/`.
