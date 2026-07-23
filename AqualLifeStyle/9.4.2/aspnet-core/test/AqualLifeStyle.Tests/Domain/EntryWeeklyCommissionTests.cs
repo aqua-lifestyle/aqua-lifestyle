@@ -48,7 +48,7 @@ namespace AqualLifeStyle.Tests.Domain
             Assert.Equal(0, commission.HighestCompletedLevel);
             Assert.Empty(commission.Components);
             Assert.Equal(0m, commission.TotalAmount);
-            Assert.Equal(EntryCommissionPayoutStatus.NotEarned, commission.PayoutStatus);
+            Assert.Equal(WeeklyCommissionPayoutStatus.NotEarned, commission.PayoutStatus);
         }
 
         [Fact]
@@ -76,7 +76,7 @@ namespace AqualLifeStyle.Tests.Domain
                     Assert.Equal(1250m, levelThree.Amount);
                 });
             Assert.Equal(1650m, commission.TotalAmount);
-            Assert.Equal(EntryCommissionPayoutStatus.Earned, commission.PayoutStatus);
+            Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
         }
 
         [Fact]
@@ -95,7 +95,7 @@ namespace AqualLifeStyle.Tests.Domain
 
             Assert.Equal(1, commission.HighestCompletedLevel);
             Assert.Equal(150m, commission.TotalAmount);
-            Assert.Equal(EntryCommissionPayoutStatus.Held, commission.PayoutStatus);
+            Assert.Equal(WeeklyCommissionPayoutStatus.Held, commission.PayoutStatus);
             Assert.Equal("Entry monthly commitment is overdue.", commission.HoldReason);
             Assert.True(root.IsQualifiedForNetwork);
         }
@@ -123,7 +123,7 @@ namespace AqualLifeStyle.Tests.Domain
             commission.MarkPaid(releasedAt.AddHours(1), "payout-2026-07-1");
             commission.MarkPaid(releasedAt.AddHours(1), "payout-2026-07-1");
 
-            Assert.Equal(EntryCommissionPayoutStatus.Paid, commission.PayoutStatus);
+            Assert.Equal(WeeklyCommissionPayoutStatus.Paid, commission.PayoutStatus);
             Assert.Equal(releasedAt, commission.ReleasedAt);
             Assert.Equal("The outstanding monthly commitment was paid.", commission.ReleaseReason);
             Assert.Equal("payout-2026-07-1", commission.PaymentReference);
@@ -145,7 +145,7 @@ namespace AqualLifeStyle.Tests.Domain
 
             Assert.Equal(2, commission.HighestCompletedLevel);
             Assert.Equal(400m, commission.TotalAmount);
-            Assert.Equal(EntryCommissionPayoutStatus.Held, commission.PayoutStatus);
+            Assert.Equal(WeeklyCommissionPayoutStatus.Held, commission.PayoutStatus);
             Assert.Equal("Onyx loan repayment is overdue.", commission.HoldReason);
             Assert.True(root.IsQualifiedForNetwork);
         }
@@ -182,7 +182,7 @@ namespace AqualLifeStyle.Tests.Domain
                 releasedAt,
                 "The overdue Onyx loan instalment was paid.");
 
-            Assert.Equal(EntryCommissionPayoutStatus.Released, commission.PayoutStatus);
+            Assert.Equal(WeeklyCommissionPayoutStatus.Released, commission.PayoutStatus);
             Assert.Equal(400m, commission.TotalAmount);
             Assert.Equal(2, commission.Components.Count);
         }

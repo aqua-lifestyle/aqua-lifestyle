@@ -215,3 +215,26 @@ Secured member acceptance, administrator approval, provider callback,
 reconciliation, and automated payout orchestration remain application-workflow work. A
 loan agreement does not yet create an Onyx participation because the placement
 of a graduating member in the Onyx network has not been confirmed.
+
+### Phase 5 Onyx network and earnings status
+
+The independently calculated Onyx Level 1 foundation is complete:
+
+- only active Onyx participation contributes to the Onyx network; Entry
+  participation and sales referrals cannot contribute to this calculation;
+- an active Onyx participant with exactly five active direct Onyx recruits
+  completes Level 1;
+- incomplete Level 1 records no partial commission;
+- the approved Level 1 weekly commission is one immutable R250 component;
+- deeper network structure does not create Levels 2–5 earnings because those
+  amounts remain unapproved;
+- every closed Onyx period records its exact boundaries, time zone, calculation
+  time, and rules version;
+- each Onyx participation has at most one commission record per period in a
+  ledger separate from Entry;
+- earned commission is released and marked paid through explicit, idempotent
+  transitions.
+
+Secured calculation, review, release, and payment workflows remain
+application-layer work. No Onyx hold rule has been inferred from Entry
+obligations or the unresolved effect of overdue members on their uplines.

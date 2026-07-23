@@ -43,7 +43,7 @@ Frontend (`aqua-frontend`, Next.js): pages exist for customers, enquiries, membe
 | Direct Onyx participation | 🔧 Foundation implemented | A confirmed R6,120 payment explicitly activates a separate persisted Onyx participation and does not create an Entry record; secured joining workflow remains |
 | Entry-to-Onyx graduation | ❌ Missing | Creates a separate Onyx participation while preserving Entry history |
 | Entry/Onyx five-person networks | 🔧 Domain foundation | Independent customers form network roots; optional recruiters must actively participate in the same programme; separate from sales referrals and cross-Area placement is permitted |
-| Weekly member commission ledger | 🔧 Foundation implemented | Entry periods, immutable complete-level components, member/period uniqueness, and not-earned/earned/held/released/paid states are persisted; overdue Entry commitments and Onyx loans hold only the member's own payout, with explicit idempotent release after compliance; secured administrator-triggered calculation and payout workflows remain |
+| Weekly member commission ledger | 🔧 Foundation implemented | Entry and Onyx use separate persisted periods and ledgers. Entry retains its complete Levels 1–3 components and member-only compliance holds. Onyx implements only the approved Level 1 R250 component for five active direct Onyx recruits; deeper earnings remain disabled. Secured administrator-triggered calculation and payout workflows remain |
 | Member payment and Yoco reconciliation ledger | 🔧 Foundation implemented | Payments and participation are persisted; provider/reference uniqueness and idempotent confirmed-payment processing are enforced. A verified Yoco webhook adapter remains pending until its signing specification and credentials are supplied |
 | Onyx loan agreement and repayments | 🔧 Foundation implemented | Level 2 eligibility, versioned R6,120 + 30% terms, member acceptance, admin approval/effective date, four explicit weekly minimums, additional repayments, three-month deadline, idempotent payment allocation, persistence, and member-only commission holds are implemented; secured workflows and automated orchestration remain |
 | Product catalog + member eligibility | ✅ Implemented | `ProductEligibilityManager` |
@@ -55,7 +55,7 @@ Frontend (`aqua-frontend`, Next.js): pages exist for customers, enquiries, membe
 | 20% (17% Business Premier) interest / profit-share pool (60/40 split) | ❌ Missing | No interest accrual or distribution logic |
 | Refund rule (savings below threshold within 3 months → refund minus admin/branding) | ❌ Missing | |
 | Registration workflows (WhatsApp/online/office/presentation channels, proof of payment, SMS confirmation) | ❌ Missing | Enquiry→Customer conversion exists but no payment-verified registration pipeline |
-| Onyx levels 1–5 with rental and product incentives | ❌ Missing | Level 1 weekly R250 is confirmed; cumulative commission totals for Levels 2–5 are not confirmed by repository source material |
+| Onyx levels 1–5 with rental and product incentives | 🔧 Level 1 foundation | Level 1 qualification and its weekly R250 ledger are implemented independently from Entry. Cumulative commission totals for Levels 2–5, rental rules, and product incentives are not confirmed by repository source material |
 | Area Leader licensing, application (20+ interested members, 42h review, 4 presentations) | ❌ Missing | No Area Leader/Area Space domain at all |
 | Area Leader ranks (Ruby → Ambassador) with order targets & income tables | ❌ Missing | |
 | Area Space approval & lifecycle | ❌ Missing | |
@@ -102,7 +102,8 @@ feature is sequenced separately in
 2. Persist confirmed payments and member obligations with idempotent external references.
 3. Calculate complete network levels and immutable weekly Entry commissions.
 4. Add agreement approval, repayment compliance, and held-payout release.
-5. Add the independently calculated Onyx network after its Levels 2–5 totals are confirmed.
+5. Extend the independent Onyx network beyond implemented Level 1 only after
+   Levels 2–5 totals are confirmed.
 6. Add rental, product-combo, travel, and savings workflows.
 7. Expose secured member/admin use cases and professional frontend workflows.
 

@@ -33,7 +33,9 @@
 - [ ] Entry-to-Onyx graduation that preserves Entry history
 - [ ] Registration channels (online/office/presentation) with required documents (ID, bank letter)
 - [ ] SMS/WhatsApp notifications (payment confirmation, welcome, collection dates)
-- [ ] Complete-level Entry and Onyx network qualification with immutable weekly commissions
+- [x] Domain and persistence foundations for complete-level Entry commissions and the approved Onyx Level 1 R250 commission
+- [ ] Secured administrator calculation, review, release, and payment workflows
+- [ ] Onyx Levels 2–5 commission rules after their cumulative totals are approved
 - [ ] Jasper activation plans (Standard R950 / Premium R1200) with combo allocation
 - [ ] Virtual membership cards with QR codes
 

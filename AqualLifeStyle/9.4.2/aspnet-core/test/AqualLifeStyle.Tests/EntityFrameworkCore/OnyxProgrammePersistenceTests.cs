@@ -50,6 +50,12 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 4,
                 200m);
 
+        private static readonly OnyxCommissionTerms ApprovedOnyxCommissionTerms =
+            OnyxCommissionTerms.Create(
+                "onyx-commission-2026-07",
+                EffectiveFrom,
+                250m);
+
         [Fact]
         public async Task ProgrammeParticipationAndPaymentHistory_RoundTripsAndRejectsDuplicateProviderReference()
         {
@@ -224,7 +230,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 Assert.Equal(0m, monthlyObligation.OutstandingAmount);
                 Assert.NotNull(monthlyObligation.MarkedOverdueAt);
                 Assert.True(monthlyObligation.IsOwnPayoutEligible);
-                Assert.Equal(EntryCommissionPayoutStatus.Earned, weeklyCommission.PayoutStatus);
+                Assert.Equal(WeeklyCommissionPayoutStatus.Earned, weeklyCommission.PayoutStatus);
                 Assert.Equal(150m, weeklyCommission.TotalAmount);
                 var component = Assert.Single(weeklyCommission.Components);
                 Assert.Equal(1, component.Level);
@@ -324,6 +330,108 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                         requirement => requirement.RequirementNumber == 1).Status);
                 var repayment = Assert.Single(agreement.Repayments);
                 Assert.Equal(1, repayment.WeeklyRequirementNumber);
+            });
+        }
+
+        [Fact]
+        public async Task OnyxLevelOneCommission_RoundTripsInItsOwnLedger()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userIds = new List<long>();
+            for (var index = 0; index <= OnyxNetworkQualificationEvaluator.LevelOneBranchSize; index++)
+            {
+                userIds.Add(await CreateTestUserAsync(
+                    1,
+                    $"onyx-network-{index}-{suffix}",
+                    $"onyx-network-{index}-{suffix}@example.com"));
+            }
+
+            var commissionId = await UsingDbContextAsync(1, async context =>
+            {
+                var customers = userIds
+                    .Select((userId, index) => Customer.Create(
+                        1,
+                        userId,
+                        $"Onyx Member {index}",
+                        new EmailAddress($"onyx-member-{index}-{suffix}@example.com")))
+                    .ToList();
+                var membership = Membership.Create(
+                    1,
+                    $"Onyx-Network-{suffix}",
+                    "Onyx network persistence test",
+                    MembershipType.Onyx);
+                context.Customers.AddRange(customers);
+                context.Memberships.Add(membership);
+                await context.SaveChangesAsync();
+
+                var root = OnyxParticipation.StartDirectIndependently(
+                    1,
+                    customers[0].Id,
+                    membership.Id,
+                    OnyxTerms,
+                    EffectiveFrom);
+                var rootPayment = CreateConfirmedPayment(
+                    root.CustomerId,
+                    MemberPaymentPurpose.OnyxDirectEntry,
+                    6120m,
+                    $"onyx-network-root-{suffix}");
+                root.ApplyConfirmedDirectEntryPayment(rootPayment);
+
+                var network = new List<OnyxParticipation> { root };
+                var payments = new List<MemberPayment> { rootPayment };
+                for (var index = 1; index < customers.Count; index++)
+                {
+                    var recruit = OnyxParticipation.StartDirectUnderRecruiter(
+                        1,
+                        customers[index].Id,
+                        root,
+                        membership.Id,
+                        OnyxTerms,
+                        EffectiveFrom);
+                    var payment = CreateConfirmedPayment(
+                        recruit.CustomerId,
+                        MemberPaymentPurpose.OnyxDirectEntry,
+                        6120m,
+                        $"onyx-network-recruit-{index}-{suffix}");
+                    recruit.ApplyConfirmedDirectEntryPayment(payment);
+                    network.Add(recruit);
+                    payments.Add(payment);
+                }
+
+                var periodStart = EffectiveFrom.AddDays(5);
+                var periodEnd = periodStart.AddDays(7).AddTicks(-1);
+                var period = OnyxCommissionPeriod.CreateClosedPeriod(
+                    1,
+                    periodStart,
+                    periodEnd,
+                    "Africa/Johannesburg",
+                    periodEnd.AddMinutes(1),
+                    ApprovedOnyxCommissionTerms);
+                var commission = new OnyxWeeklyCommissionCalculator(
+                        new OnyxNetworkQualificationEvaluator())
+                    .Calculate(root, period, ApprovedOnyxCommissionTerms, network);
+
+                context.MemberPayments.AddRange(payments);
+                context.OnyxParticipations.AddRange(network);
+                context.OnyxCommissionPeriods.Add(period);
+                context.OnyxWeeklyCommissions.Add(commission);
+                await context.SaveChangesAsync();
+
+                return commission.Id;
+            });
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var commission = await context.OnyxWeeklyCommissions
+                    .Include(item => item.Components)
+                    .SingleAsync(item => item.Id == commissionId);
+
+                Assert.Equal(1, commission.HighestCompletedLevel);
+                Assert.Equal(250m, commission.TotalAmount);
+                Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
+                var component = Assert.Single(commission.Components);
+                Assert.Equal(1, component.Level);
+                Assert.Equal(250m, component.Amount);
             });
         }
 

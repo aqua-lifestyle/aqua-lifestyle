@@ -6,15 +6,6 @@ using Abp.Domain.Entities.Auditing;
 
 namespace AqualLifeStyle.Domain.Onyx
 {
-    public enum EntryCommissionPayoutStatus
-    {
-        NotEarned = 0,
-        Earned = 1,
-        Held = 2,
-        Released = 3,
-        Paid = 4
-    }
-
     public class EntryWeeklyCommission : FullAuditedAggregateRoot<Guid>, IMustHaveTenant
     {
         private readonly List<EntryCommissionComponent> _components = new();
@@ -28,7 +19,7 @@ namespace AqualLifeStyle.Domain.Onyx
         public string Currency { get; private set; }
         public string RulesVersion { get; private set; }
         public DateTime CalculatedAt { get; private set; }
-        public EntryCommissionPayoutStatus PayoutStatus { get; private set; }
+        public WeeklyCommissionPayoutStatus PayoutStatus { get; private set; }
         public string HoldReason { get; private set; }
         public DateTime? ReleasedAt { get; private set; }
         public string ReleaseReason { get; private set; }
@@ -107,15 +98,15 @@ namespace AqualLifeStyle.Domain.Onyx
             TotalAmount = _components.Sum(component => component.Amount);
             if (highestCompletedLevel == 0)
             {
-                PayoutStatus = EntryCommissionPayoutStatus.NotEarned;
+                PayoutStatus = WeeklyCommissionPayoutStatus.NotEarned;
             }
             else if (string.IsNullOrWhiteSpace(holdReason))
             {
-                PayoutStatus = EntryCommissionPayoutStatus.Earned;
+                PayoutStatus = WeeklyCommissionPayoutStatus.Earned;
             }
             else
             {
-                PayoutStatus = EntryCommissionPayoutStatus.Held;
+                PayoutStatus = WeeklyCommissionPayoutStatus.Held;
                 HoldReason = NormalizeHoldReason(holdReason);
             }
         }
@@ -138,7 +129,7 @@ namespace AqualLifeStyle.Domain.Onyx
         public void HoldPayout(string reason)
         {
             var normalizedReason = NormalizeHoldReason(reason);
-            if (PayoutStatus == EntryCommissionPayoutStatus.Held)
+            if (PayoutStatus == WeeklyCommissionPayoutStatus.Held)
             {
                 if (!string.Equals(HoldReason, normalizedReason, StringComparison.Ordinal))
                 {
@@ -149,26 +140,26 @@ namespace AqualLifeStyle.Domain.Onyx
                 return;
             }
 
-            if (PayoutStatus != EntryCommissionPayoutStatus.Earned)
+            if (PayoutStatus != WeeklyCommissionPayoutStatus.Earned)
             {
                 throw new InvalidOperationException(
                     "Only an earned commission can be placed on hold.");
             }
 
             HoldReason = normalizedReason;
-            PayoutStatus = EntryCommissionPayoutStatus.Held;
+            PayoutStatus = WeeklyCommissionPayoutStatus.Held;
         }
 
         public void ReleaseEligiblePayout(DateTime releasedAt)
         {
-            if (PayoutStatus == EntryCommissionPayoutStatus.Released ||
-                PayoutStatus == EntryCommissionPayoutStatus.Paid)
+            if (PayoutStatus == WeeklyCommissionPayoutStatus.Released ||
+                PayoutStatus == WeeklyCommissionPayoutStatus.Paid)
             {
                 EnsureMatchingRelease(releasedAt, ReleaseReason);
                 return;
             }
 
-            if (PayoutStatus != EntryCommissionPayoutStatus.Earned)
+            if (PayoutStatus != WeeklyCommissionPayoutStatus.Earned)
             {
                 throw new InvalidOperationException(
                     "Only an earned eligible commission can be released normally.");
@@ -187,14 +178,14 @@ namespace AqualLifeStyle.Domain.Onyx
             }
 
             var normalizedReason = reason.Trim();
-            if (PayoutStatus == EntryCommissionPayoutStatus.Released ||
-                PayoutStatus == EntryCommissionPayoutStatus.Paid)
+            if (PayoutStatus == WeeklyCommissionPayoutStatus.Released ||
+                PayoutStatus == WeeklyCommissionPayoutStatus.Paid)
             {
                 EnsureMatchingRelease(releasedAt, normalizedReason);
                 return;
             }
 
-            if (PayoutStatus != EntryCommissionPayoutStatus.Held)
+            if (PayoutStatus != WeeklyCommissionPayoutStatus.Held)
             {
                 throw new InvalidOperationException(
                     "Only a held commission can be released after compliance is restored.");
@@ -220,7 +211,7 @@ namespace AqualLifeStyle.Domain.Onyx
             }
 
             var normalizedReference = paymentReference.Trim();
-            if (PayoutStatus == EntryCommissionPayoutStatus.Paid)
+            if (PayoutStatus == WeeklyCommissionPayoutStatus.Paid)
             {
                 if (PaidAt != paidAt ||
                     !string.Equals(
@@ -235,7 +226,7 @@ namespace AqualLifeStyle.Domain.Onyx
                 return;
             }
 
-            if (PayoutStatus != EntryCommissionPayoutStatus.Released)
+            if (PayoutStatus != WeeklyCommissionPayoutStatus.Released)
             {
                 throw new InvalidOperationException(
                     "A commission must be released before it can be marked paid.");
@@ -250,7 +241,7 @@ namespace AqualLifeStyle.Domain.Onyx
 
             PaidAt = paidAt;
             PaymentReference = normalizedReference;
-            PayoutStatus = EntryCommissionPayoutStatus.Paid;
+            PayoutStatus = WeeklyCommissionPayoutStatus.Paid;
         }
 
         private void RecordRelease(DateTime releasedAt, string reason)
@@ -264,7 +255,7 @@ namespace AqualLifeStyle.Domain.Onyx
 
             ReleasedAt = releasedAt;
             ReleaseReason = reason;
-            PayoutStatus = EntryCommissionPayoutStatus.Released;
+            PayoutStatus = WeeklyCommissionPayoutStatus.Released;
         }
 
         private void EnsureMatchingRelease(DateTime releasedAt, string reason)
