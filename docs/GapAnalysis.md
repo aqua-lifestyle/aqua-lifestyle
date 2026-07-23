@@ -39,10 +39,10 @@ Frontend (`aqua-frontend`, Next.js): pages exist for customers, enquiries, membe
 | Membership plan catalogue | ✅ Implemented | Reuse `Membership`; do not create a duplicate catalogue aggregate |
 | BusinessPremier replacement by Onyx | ⚠️ Migration required | Enum value `3`, seed data, products, tests, and historical database rows may still reference it; deprecate before an explicit data migration and remove only after production verification |
 | Member-specific activation & monthly obligation tracking | ❌ Missing | Existing dates are stored on a shared `Membership`; add separate participation and obligation records |
-| Entry feeder participation | ❌ Missing | Must retain recruiter, two confirmed R600 activation payments, terms version, and permanent history |
+| Entry feeder participation | 🔧 Domain foundation | Supports independent joining or an optional verified Entry recruiter, two confirmed R600 activation payments, terms version, and permanent history; persistence remains |
 | Direct Onyx participation | ❌ Missing | Requires a confirmed R6,120 payment and explicit activation; must not create an Entry record |
 | Entry-to-Onyx graduation | ❌ Missing | Creates a separate Onyx participation while preserving Entry history |
-| Entry/Onyx five-person networks | ❌ Missing | Separate from Facilitator/Area Leader sales referrals; cross-Area placement is currently permitted |
+| Entry/Onyx five-person networks | 🔧 Domain foundation | Independent customers form network roots; optional recruiters must actively participate in the same programme; separate from sales referrals and cross-Area placement is permitted |
 | Weekly member commission ledger | ❌ Missing | Requires complete-level components, unique periods, and earned/held/released/paid states |
 | Member payment and Yoco reconciliation ledger | ❌ Missing | No provider boundary, external-reference idempotency, or confirmed-payment record exists |
 | VIP funding agreement and repayments | ❌ Missing | Requires acceptance, admin approval, four weekly minimums, three-month deadline, and payout holds |

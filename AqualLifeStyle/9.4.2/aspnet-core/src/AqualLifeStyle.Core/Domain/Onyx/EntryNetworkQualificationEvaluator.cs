@@ -34,7 +34,8 @@ namespace AqualLifeStyle.Domain.Onyx
             }
 
             var byRecruiter = qualified
-                .GroupBy(participation => participation.RecruiterCustomerId)
+                .Where(participation => participation.RecruiterCustomerId.HasValue)
+                .GroupBy(participation => participation.RecruiterCustomerId.Value)
                 .ToDictionary(group => group.Key, group => group.ToList());
 
             if (!IsCompleteBranch(customerId, 1, byRecruiter))

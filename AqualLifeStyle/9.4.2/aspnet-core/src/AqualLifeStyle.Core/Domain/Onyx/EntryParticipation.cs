@@ -19,7 +19,8 @@ namespace AqualLifeStyle.Domain.Onyx
 
         public int TenantId { get; set; }
         public int CustomerId { get; private set; }
-        public int RecruiterCustomerId { get; private set; }
+        public int? RecruiterCustomerId { get; private set; }
+        public bool JoinedIndependently => !RecruiterCustomerId.HasValue;
         public EntryParticipationStatus Status { get; private set; }
         public DateTime StartedAt { get; private set; }
         public DateTime? ActivatedAt { get; private set; }
@@ -42,7 +43,7 @@ namespace AqualLifeStyle.Domain.Onyx
         private EntryParticipation(
             int tenantId,
             int customerId,
-            int recruiterCustomerId,
+            int? recruiterCustomerId,
             EntryProgrammeTerms terms,
             DateTime startedAt)
         {
@@ -70,14 +71,32 @@ namespace AqualLifeStyle.Domain.Onyx
             Status = EntryParticipationStatus.AwaitingRegistrationPayment;
         }
 
-        public static EntryParticipation Start(
+        public static EntryParticipation StartIndependently(
             int tenantId,
             int customerId,
-            int recruiterCustomerId,
             EntryProgrammeTerms terms,
             DateTime startedAt)
         {
-            return new EntryParticipation(tenantId, customerId, recruiterCustomerId, terms, startedAt)
+            return new EntryParticipation(tenantId, customerId, null, terms, startedAt)
+            {
+                Id = Guid.NewGuid()
+            };
+        }
+
+        public static EntryParticipation StartUnderRecruiter(
+            int tenantId,
+            int customerId,
+            EntryParticipation recruiterParticipation,
+            EntryProgrammeTerms terms,
+            DateTime startedAt)
+        {
+            EnsureEligibleRecruiter(customerId, recruiterParticipation);
+            return new EntryParticipation(
+                tenantId,
+                customerId,
+                recruiterParticipation.CustomerId,
+                terms,
+                startedAt)
             {
                 Id = Guid.NewGuid()
             };
@@ -101,7 +120,29 @@ namespace AqualLifeStyle.Domain.Onyx
         }
 
         public void CorrectRecruiter(
-            int newRecruiterCustomerId,
+            EntryParticipation newRecruiterParticipation,
+            long administratorUserId,
+            string reason,
+            DateTime correctedAt)
+        {
+            EnsureEligibleRecruiter(CustomerId, newRecruiterParticipation);
+            RecordRecruiterCorrection(
+                newRecruiterParticipation.CustomerId,
+                administratorUserId,
+                reason,
+                correctedAt);
+        }
+
+        public void CorrectToIndependent(
+            long administratorUserId,
+            string reason,
+            DateTime correctedAt)
+        {
+            RecordRecruiterCorrection(null, administratorUserId, reason, correctedAt);
+        }
+
+        private void RecordRecruiterCorrection(
+            int? newRecruiterCustomerId,
             long administratorUserId,
             string reason,
             DateTime correctedAt)
@@ -199,9 +240,31 @@ namespace AqualLifeStyle.Domain.Onyx
             }
         }
 
-        private static void EnsureValidRecruiter(int customerId, int recruiterCustomerId)
+        private static void EnsureEligibleRecruiter(
+            int customerId,
+            EntryParticipation recruiterParticipation)
         {
-            if (recruiterCustomerId <= 0) throw new ArgumentOutOfRangeException(nameof(recruiterCustomerId));
+            if (recruiterParticipation == null)
+            {
+                throw new ArgumentNullException(nameof(recruiterParticipation));
+            }
+
+            if (!recruiterParticipation.IsQualifiedForNetwork)
+            {
+                throw new InvalidOperationException(
+                    "The recruiting customer must have active Entry participation.");
+            }
+
+            EnsureValidRecruiter(customerId, recruiterParticipation.CustomerId);
+        }
+
+        private static void EnsureValidRecruiter(int customerId, int? recruiterCustomerId)
+        {
+            if (recruiterCustomerId.HasValue && recruiterCustomerId.Value <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(recruiterCustomerId));
+            }
+
             if (customerId == recruiterCustomerId)
             {
                 throw new InvalidOperationException("A customer cannot recruit themselves.");
@@ -211,8 +274,8 @@ namespace AqualLifeStyle.Domain.Onyx
 
     public class EntryRecruiterCorrection : Entity<Guid>
     {
-        public int PreviousRecruiterCustomerId { get; private set; }
-        public int NewRecruiterCustomerId { get; private set; }
+        public int? PreviousRecruiterCustomerId { get; private set; }
+        public int? NewRecruiterCustomerId { get; private set; }
         public long AdministratorUserId { get; private set; }
         public string Reason { get; private set; }
         public DateTime CorrectedAt { get; private set; }
@@ -222,8 +285,8 @@ namespace AqualLifeStyle.Domain.Onyx
         }
 
         private EntryRecruiterCorrection(
-            int previousRecruiterCustomerId,
-            int newRecruiterCustomerId,
+            int? previousRecruiterCustomerId,
+            int? newRecruiterCustomerId,
             long administratorUserId,
             string reason,
             DateTime correctedAt)
@@ -237,8 +300,8 @@ namespace AqualLifeStyle.Domain.Onyx
         }
 
         internal static EntryRecruiterCorrection Record(
-            int previousRecruiterCustomerId,
-            int newRecruiterCustomerId,
+            int? previousRecruiterCustomerId,
+            int? newRecruiterCustomerId,
             long administratorUserId,
             string reason,
             DateTime correctedAt)

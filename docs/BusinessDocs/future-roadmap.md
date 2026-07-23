@@ -29,7 +29,7 @@
 - [ ] Confirmed-payment records with idempotent external references
 - [ ] Separate Entry and Onyx participation records; never convert one into the other
 - [ ] Direct Onyx activation after a confirmed R6,120 payment
-- [ ] Entry activation after two confirmed R600 payments and required recruiter placement
+- [ ] Entry activation after two confirmed R600 payments, with independent joining or an optional verified Entry recruiter
 - [ ] Entry-to-Onyx graduation that preserves Entry history
 - [ ] Registration channels (online/office/presentation) with required documents (ID, bank letter)
 - [ ] SMS/WhatsApp notifications (payment confirmation, welcome, collection dates)

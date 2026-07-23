@@ -16,7 +16,7 @@ namespace AqualLifeStyle.Tests.Domain
         [Fact]
         public void StartingDirectOnyxParticipation_DoesNotActivateSelectedMembership()
         {
-            var participation = OnyxParticipation.StartDirect(
+            var participation = OnyxParticipation.StartDirectIndependently(
                 tenantId: 1,
                 customerId: 10,
                 onyxMembershipId: 7,
@@ -27,12 +27,13 @@ namespace AqualLifeStyle.Tests.Domain
             Assert.Equal(OnyxParticipationStatus.AwaitingDirectEntryPayment, participation.Status);
             Assert.Null(participation.ActivatedAt);
             Assert.Null(participation.EntryParticipationId);
+            Assert.True(participation.JoinedIndependently);
         }
 
         [Fact]
         public void DirectOnyxParticipation_RequiresAConfirmedSixThousandOneHundredTwentyRandPayment()
         {
-            var participation = OnyxParticipation.StartDirect(
+            var participation = OnyxParticipation.StartDirectIndependently(
                 tenantId: 1,
                 customerId: 10,
                 onyxMembershipId: 7,
@@ -62,7 +63,7 @@ namespace AqualLifeStyle.Tests.Domain
         [Fact]
         public void DirectOnyxActivation_RejectsAnIncorrectPaymentAmount()
         {
-            var participation = OnyxParticipation.StartDirect(
+            var participation = OnyxParticipation.StartDirectIndependently(
                 tenantId: 1,
                 customerId: 10,
                 onyxMembershipId: 7,
@@ -81,6 +82,52 @@ namespace AqualLifeStyle.Tests.Domain
             Assert.Throws<InvalidOperationException>(() =>
                 participation.ApplyConfirmedDirectEntryPayment(payment));
             Assert.Equal(OnyxParticipationStatus.AwaitingDirectEntryPayment, participation.Status);
+        }
+
+        [Fact]
+        public void RecordedRecruiter_MustHaveActiveOnyxParticipation()
+        {
+            var recruiter = OnyxParticipation.StartDirectIndependently(
+                tenantId: 2,
+                customerId: 20,
+                onyxMembershipId: 7,
+                Terms,
+                EffectiveFrom);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                OnyxParticipation.StartDirectUnderRecruiter(
+                    tenantId: 1,
+                    customerId: 10,
+                    recruiter,
+                    onyxMembershipId: 7,
+                    Terms,
+                    EffectiveFrom));
+
+            Activate(recruiter, "onyx-recruiter-20");
+            var participation = OnyxParticipation.StartDirectUnderRecruiter(
+                tenantId: 1,
+                customerId: 10,
+                recruiter,
+                onyxMembershipId: 7,
+                Terms,
+                EffectiveFrom);
+
+            Assert.False(participation.JoinedIndependently);
+            Assert.Equal(20, participation.RecruiterCustomerId);
+        }
+
+        private static void Activate(OnyxParticipation participation, string externalReference)
+        {
+            var payment = MemberPayment.CreatePending(
+                participation.TenantId,
+                participation.CustomerId,
+                MemberPaymentPurpose.OnyxDirectEntry,
+                6120m,
+                "Yoco",
+                externalReference,
+                EffectiveFrom);
+            payment.Confirm(EffectiveFrom.AddMinutes(1));
+            participation.ApplyConfirmedDirectEntryPayment(payment);
         }
     }
 }

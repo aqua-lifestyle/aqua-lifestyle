@@ -12,8 +12,8 @@ rules below.
   `MembershipType`.
 - Direct entrants create an Onyx participation only after a confirmed R6,120
   payment.
-- Entry entrants create an Entry participation with a required recruiter. They
-  qualify only after two confirmed R600 payments.
+- Entry entrants create a separate Entry participation and qualify only after two
+  confirmed R600 payments.
 - Entry Level 2 makes the funding agreement available. Member acceptance followed
   by administrator approval can create a separate Onyx participation.
 - Graduation never converts, deletes, or overwrites Entry participation, network
@@ -22,10 +22,17 @@ rules below.
 - Entry and Onyx calculations remain independent so Entry commissions can continue
   after graduation.
 
-Recruiting may cross Area boundaries. Entry placement is independent of the
-Facilitator/Area Leader sales-referral model. Placement becomes permanent when the
-recruit qualifies, except for an explicit, justified, audited administrator
-correction.
+Customers may join Entry or Onyx independently without a recruiter. When a
+recruiter exists, the recruiter is another customer with active participation in
+the same programme. A recorded recruiter is therefore optional but verified:
+active Entry participation is required to recruit into Entry, and active Onyx
+participation is required to recruit into Onyx. Missing recruiter information is
+valid and identifies the customer as the starting point of their own network.
+
+Recruiting may cross Area boundaries. Programme placement is independent of the
+Facilitator/Area Leader sales-referral model. A recorded placement becomes
+permanent when the recruit qualifies, except for an explicit, justified, audited
+administrator correction.
 
 ## Versioned financial terms
 
@@ -103,8 +110,9 @@ No historical record is silently reinterpreted in the current phase.
 ## Delivery phases
 
 1. **Domain foundations:** versioned terms, separate Entry and Onyx participation,
-   confirmed-payment activation transitions, permanent recruiter placement, and
-   complete 5/25/125 Entry qualification.
+   confirmed-payment activation transitions, optional verified recruiter
+   placement, independent network roots, and complete 5/25/125 Entry
+   qualification.
 2. **Persistence and payments:** EF mappings/migration, payment-provider boundary,
    unique external references, and controlled confirmed-payment processing.
 3. **Obligations and Entry commissions:** monthly debt/grace records, configurable

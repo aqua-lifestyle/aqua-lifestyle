@@ -17,12 +17,45 @@ namespace AqualLifeStyle.Tests.Domain
             gracePeriodDays: 7);
 
         [Fact]
-        public void Start_RequiresARecruiter()
+        public void Customer_CanStartEntryIndependently()
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() =>
-                EntryParticipation.Start(1, customerId: 10, recruiterCustomerId: 0, Terms, EffectiveFrom));
+            var participation = EntryParticipation.StartIndependently(
+                tenantId: 1,
+                customerId: 10,
+                Terms,
+                EffectiveFrom);
+
+            Assert.True(participation.JoinedIndependently);
+            Assert.Null(participation.RecruiterCustomerId);
+        }
+
+        [Fact]
+        public void RecordedRecruiter_MustHaveActiveEntryParticipation()
+        {
+            var inactiveRecruiter = EntryParticipation.StartIndependently(
+                tenantId: 2,
+                customerId: 20,
+                Terms,
+                EffectiveFrom);
+
             Assert.Throws<InvalidOperationException>(() =>
-                EntryParticipation.Start(1, customerId: 10, recruiterCustomerId: 10, Terms, EffectiveFrom));
+                EntryParticipation.StartUnderRecruiter(
+                    tenantId: 1,
+                    customerId: 10,
+                    inactiveRecruiter,
+                    Terms,
+                    EffectiveFrom));
+
+            ApplyBothActivationPayments(inactiveRecruiter);
+            var participation = EntryParticipation.StartUnderRecruiter(
+                tenantId: 1,
+                customerId: 10,
+                inactiveRecruiter,
+                Terms,
+                EffectiveFrom);
+
+            Assert.False(participation.JoinedIndependently);
+            Assert.Equal(20, participation.RecruiterCustomerId);
         }
 
         [Fact]
@@ -30,6 +63,8 @@ namespace AqualLifeStyle.Tests.Domain
         {
             var participation = StartParticipation();
             var registrationPayment = CreatePayment(
+                participation.TenantId,
+                participation.CustomerId,
                 MemberPaymentPurpose.EntryRegistration,
                 "entry-registration-10");
             registrationPayment.Confirm(EffectiveFrom.AddMinutes(1));
@@ -61,6 +96,8 @@ namespace AqualLifeStyle.Tests.Domain
         {
             var participation = StartParticipation();
             var activationPayment = CreatePayment(
+                participation.TenantId,
+                participation.CustomerId,
                 MemberPaymentPurpose.EntryActivation,
                 "entry-activation-10");
 
@@ -78,6 +115,8 @@ namespace AqualLifeStyle.Tests.Domain
         {
             var participation = StartParticipation();
             var payment = CreatePayment(
+                participation.TenantId,
+                participation.CustomerId,
                 MemberPaymentPurpose.EntryRegistration,
                 "entry-registration-idempotent");
             payment.Confirm(EffectiveFrom.AddMinutes(1));
@@ -95,14 +134,21 @@ namespace AqualLifeStyle.Tests.Domain
             var participation = StartParticipation();
             ApplyBothActivationPayments(participation);
 
+            var recruiter = EntryParticipation.StartIndependently(
+                tenantId: 2,
+                customerId: 30,
+                Terms,
+                EffectiveFrom);
+            ApplyBothActivationPayments(recruiter);
+
             participation.CorrectRecruiter(
-                newRecruiterCustomerId: 30,
+                recruiter,
                 administratorUserId: 99,
                 reason: "Corrected a registration capture error.",
                 correctedAt: EffectiveFrom.AddDays(1));
 
             var correction = Assert.Single(participation.RecruiterCorrections);
-            Assert.Equal(20, correction.PreviousRecruiterCustomerId);
+            Assert.Null(correction.PreviousRecruiterCustomerId);
             Assert.Equal(30, correction.NewRecruiterCustomerId);
             Assert.Equal(99, correction.AdministratorUserId);
             Assert.Equal("Corrected a registration capture error.", correction.Reason);
@@ -112,10 +158,9 @@ namespace AqualLifeStyle.Tests.Domain
 
         private static EntryParticipation StartParticipation()
         {
-            return EntryParticipation.Start(
+            return EntryParticipation.StartIndependently(
                 tenantId: 1,
                 customerId: 10,
-                recruiterCustomerId: 20,
                 Terms,
                 EffectiveFrom);
         }
@@ -123,12 +168,16 @@ namespace AqualLifeStyle.Tests.Domain
         private static void ApplyBothActivationPayments(EntryParticipation participation)
         {
             var registrationPayment = CreatePayment(
+                participation.TenantId,
+                participation.CustomerId,
                 MemberPaymentPurpose.EntryRegistration,
                 $"registration-{participation.CustomerId}");
             registrationPayment.Confirm(EffectiveFrom.AddMinutes(1));
             participation.ApplyConfirmedActivationPayment(registrationPayment);
 
             var activationPayment = CreatePayment(
+                participation.TenantId,
+                participation.CustomerId,
                 MemberPaymentPurpose.EntryActivation,
                 $"activation-{participation.CustomerId}");
             activationPayment.Confirm(EffectiveFrom.AddMinutes(2));
@@ -136,12 +185,14 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         private static MemberPayment CreatePayment(
+            int tenantId,
+            int customerId,
             MemberPaymentPurpose purpose,
             string externalReference)
         {
             return MemberPayment.CreatePending(
-                tenantId: 1,
-                customerId: 10,
+                tenantId,
+                customerId,
                 purpose,
                 amount: 600m,
                 provider: "Yoco",

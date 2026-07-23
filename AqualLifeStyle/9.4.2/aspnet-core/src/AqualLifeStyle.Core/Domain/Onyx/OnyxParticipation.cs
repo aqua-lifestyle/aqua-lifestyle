@@ -21,6 +21,8 @@ namespace AqualLifeStyle.Domain.Onyx
     {
         public int TenantId { get; set; }
         public int CustomerId { get; private set; }
+        public int? RecruiterCustomerId { get; private set; }
+        public bool JoinedIndependently => !RecruiterCustomerId.HasValue;
         public int OnyxMembershipId { get; private set; }
         public OnyxAdmissionRoute AdmissionRoute { get; private set; }
         public OnyxParticipationStatus Status { get; private set; }
@@ -41,12 +43,14 @@ namespace AqualLifeStyle.Domain.Onyx
         private OnyxParticipation(
             int tenantId,
             int customerId,
+            int? recruiterCustomerId,
             int onyxMembershipId,
             OnyxPlanTerms terms,
             DateTime startedAt)
         {
             if (tenantId <= 0) throw new ArgumentOutOfRangeException(nameof(tenantId));
             if (customerId <= 0) throw new ArgumentOutOfRangeException(nameof(customerId));
+            EnsureValidRecruiter(customerId, recruiterCustomerId);
             if (onyxMembershipId <= 0) throw new ArgumentOutOfRangeException(nameof(onyxMembershipId));
             if (terms == null) throw new ArgumentNullException(nameof(terms));
             if (startedAt == default) throw new ArgumentException("A start time is required.", nameof(startedAt));
@@ -57,6 +61,7 @@ namespace AqualLifeStyle.Domain.Onyx
 
             TenantId = tenantId;
             CustomerId = customerId;
+            RecruiterCustomerId = recruiterCustomerId;
             OnyxMembershipId = onyxMembershipId;
             AdmissionRoute = OnyxAdmissionRoute.DirectPayment;
             Status = OnyxParticipationStatus.AwaitingDirectEntryPayment;
@@ -67,14 +72,46 @@ namespace AqualLifeStyle.Domain.Onyx
             Currency = terms.Currency;
         }
 
-        public static OnyxParticipation StartDirect(
+        public static OnyxParticipation StartDirectIndependently(
             int tenantId,
             int customerId,
             int onyxMembershipId,
             OnyxPlanTerms terms,
             DateTime startedAt)
         {
-            return new OnyxParticipation(tenantId, customerId, onyxMembershipId, terms, startedAt)
+            return new OnyxParticipation(tenantId, customerId, null, onyxMembershipId, terms, startedAt)
+            {
+                Id = Guid.NewGuid()
+            };
+        }
+
+        public static OnyxParticipation StartDirectUnderRecruiter(
+            int tenantId,
+            int customerId,
+            OnyxParticipation recruiterParticipation,
+            int onyxMembershipId,
+            OnyxPlanTerms terms,
+            DateTime startedAt)
+        {
+            if (recruiterParticipation == null)
+            {
+                throw new ArgumentNullException(nameof(recruiterParticipation));
+            }
+
+            if (recruiterParticipation.Status != OnyxParticipationStatus.Active)
+            {
+                throw new InvalidOperationException(
+                    "The recruiting customer must have active Onyx participation.");
+            }
+
+            EnsureValidRecruiter(customerId, recruiterParticipation.CustomerId);
+            return new OnyxParticipation(
+                tenantId,
+                customerId,
+                recruiterParticipation.CustomerId,
+                onyxMembershipId,
+                terms,
+                startedAt)
             {
                 Id = Guid.NewGuid()
             };
@@ -117,6 +154,19 @@ namespace AqualLifeStyle.Domain.Onyx
             DirectEntryPaymentId = payment.Id;
             ActivatedAt = payment.ConfirmedAt;
             Status = OnyxParticipationStatus.Active;
+        }
+
+        private static void EnsureValidRecruiter(int customerId, int? recruiterCustomerId)
+        {
+            if (recruiterCustomerId.HasValue && recruiterCustomerId.Value <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(recruiterCustomerId));
+            }
+
+            if (customerId == recruiterCustomerId)
+            {
+                throw new InvalidOperationException("A customer cannot recruit themselves.");
+            }
         }
     }
 }
