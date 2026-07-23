@@ -7,13 +7,17 @@ namespace AqualLifeStyle.Domain.Onyx
     public enum OnyxNetworkLevel
     {
         None = 0,
-        Level1 = 1
+        Level1 = 1,
+        Level2 = 2,
+        Level3 = 3,
+        Level4 = 4,
+        Level5 = 5
     }
 
     public sealed class OnyxNetworkQualificationEvaluator
     {
-        public const int LevelOneBranchSize = 5;
-        public const int HighestConfirmedLevel = 1;
+        public const int BranchSize = 5;
+        public const int HighestConfirmedStructuralLevel = 5;
 
         public OnyxNetworkLevel Evaluate(
             OnyxParticipation participation,
@@ -44,12 +48,51 @@ namespace AqualLifeStyle.Domain.Onyx
                 return OnyxNetworkLevel.None;
             }
 
-            var activeDirectRecruits = activeParticipations.Count(candidate =>
-                candidate.RecruiterCustomerId == participation.CustomerId);
+            var activeParticipationsByRecruiter = activeParticipations
+                .Where(candidate => candidate.RecruiterCustomerId.HasValue)
+                .GroupBy(candidate => candidate.RecruiterCustomerId.Value)
+                .ToDictionary(group => group.Key, group => group.ToList());
 
-            return activeDirectRecruits == LevelOneBranchSize
-                ? OnyxNetworkLevel.Level1
-                : OnyxNetworkLevel.None;
+            var highestCompletedLevel = OnyxNetworkLevel.None;
+            for (var level = 1; level <= HighestConfirmedStructuralLevel; level++)
+            {
+                if (!IsCompleteBranch(
+                        participation.CustomerId,
+                        level,
+                        activeParticipationsByRecruiter))
+                {
+                    break;
+                }
+
+                highestCompletedLevel = (OnyxNetworkLevel)level;
+            }
+
+            return highestCompletedLevel;
+        }
+
+        private static bool IsCompleteBranch(
+            int customerId,
+            int remainingDepth,
+            IReadOnlyDictionary<int, List<OnyxParticipation>> activeParticipationsByRecruiter)
+        {
+            if (remainingDepth == 0)
+            {
+                return true;
+            }
+
+            if (!activeParticipationsByRecruiter.TryGetValue(
+                    customerId,
+                    out var directRecruits) ||
+                directRecruits.Count != BranchSize)
+            {
+                return false;
+            }
+
+            return directRecruits.All(recruit =>
+                IsCompleteBranch(
+                    recruit.CustomerId,
+                    remainingDepth - 1,
+                    activeParticipationsByRecruiter));
         }
 
         private static void EnsureCustomerParticipationIsUnique(

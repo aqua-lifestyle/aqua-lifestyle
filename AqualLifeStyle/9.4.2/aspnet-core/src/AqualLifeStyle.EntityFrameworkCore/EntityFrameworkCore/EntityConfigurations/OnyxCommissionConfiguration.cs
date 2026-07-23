@@ -41,7 +41,8 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
             builder.Property(commission => commission.OnyxParticipationId).IsRequired();
             builder.Property(commission => commission.CustomerId).IsRequired();
             builder.Property(commission => commission.CommissionPeriodId).IsRequired();
-            builder.Property(commission => commission.HighestCompletedLevel).IsRequired();
+            builder.Property(commission => commission.HighestQualifiedNetworkLevel).IsRequired();
+            builder.Property(commission => commission.HighestCommissionedLevel).IsRequired();
             builder.Property(commission => commission.TotalAmount).HasPrecision(18, 2).IsRequired();
             builder.Property(commission => commission.Currency).HasMaxLength(3).IsRequired();
             builder.Property(commission => commission.RulesVersion).HasMaxLength(32).IsRequired();

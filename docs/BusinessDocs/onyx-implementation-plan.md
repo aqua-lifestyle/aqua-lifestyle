@@ -218,16 +218,17 @@ of a graduating member in the Onyx network has not been confirmed.
 
 ### Phase 5 Onyx network and earnings status
 
-The independently calculated Onyx Level 1 foundation is complete:
+The independently calculated Onyx network foundation is complete:
 
 - only active Onyx participation contributes to the Onyx network; Entry
   participation and sales referrals cannot contribute to this calculation;
-- an active Onyx participant with exactly five active direct Onyx recruits
-  completes Level 1;
+- structural qualification evaluates the confirmed five-person branches through
+  Levels 1–5;
 - incomplete Level 1 records no partial commission;
 - the approved Level 1 weekly commission is one immutable R250 component;
-- deeper network structure does not create Levels 2–5 earnings because those
-  amounts remain unapproved;
+- commission records preserve both the highest structurally qualified level and
+  the highest commissioned level, so deeper structure does not accidentally
+  create Levels 2–5 earnings while those amounts remain unapproved;
 - every closed Onyx period records its exact boundaries, time zone, calculation
   time, and rules version;
 - each Onyx participation has at most one commission record per period in a
@@ -238,3 +239,42 @@ The independently calculated Onyx Level 1 foundation is complete:
 Secured calculation, review, release, and payment workflows remain
 application-layer work. No Onyx hold rule has been inferred from Entry
 obligations or the unresolved effect of overdue members on their uplines.
+
+### Phase 6 benefits and separate accounts status
+
+The confirmed Level 3 travel-entitlement foundation is complete:
+
+- a Club Member must have active Onyx participation and a complete Level 3
+  structure before an entitlement can be granted;
+- eligibility and activation are separate states;
+- the entitlement records the qualification level, eligibility time,
+  three-month waiting-period end, activation time, terms version, and the
+  Club Member's confirmed 10% trip contribution;
+- activation before the waiting period ends is rejected and repeated activation
+  with the same facts is idempotent;
+- the entitlement is persisted separately from participation, commissions,
+  loans, payments, and future travel bookings.
+
+Trip selection, pricing, booking, fulfilment, and payment are intentionally not
+implemented.
+
+#### Savings audit boundary
+
+Savings remains unchanged pending reconciliation of conflicting rules. The
+existing domain-only `SavingsAccount` currently:
+
+- accepts only positive deposits dated from the 1st through the 15th;
+- maintains an in-memory deposit list, total, and count;
+- exposes a caller-supplied three-month refund-threshold check;
+- calculates simple interest from a caller-supplied annual rate and month count;
+- records a nominal one-year unlock date.
+
+It does not yet enforce the confirmed R100 minimum, persist an auditable
+transaction ledger, identify an Area or Customer aggregate, or prevent duplicate
+confirmed payments. More importantly, it currently treats the first-year lock
+as blocking deposits and requires `ActivateSavingsAccount` to unlock the account
+before saving, while the business rule describes locked withdrawals/funds rather
+than blocked contributions. Older account-specific monthly minimums and interest
+rates also conflict with the current R100 minimum unless they represent a
+different threshold. Those meanings must be confirmed before persistence so the
+existing incorrect semantics are not cemented into a migration.

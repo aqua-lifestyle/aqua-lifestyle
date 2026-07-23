@@ -13,7 +13,8 @@ namespace AqualLifeStyle.Domain.Onyx
         public Guid OnyxParticipationId { get; private set; }
         public int CustomerId { get; private set; }
         public Guid CommissionPeriodId { get; private set; }
-        public int HighestCompletedLevel { get; private set; }
+        public int HighestQualifiedNetworkLevel { get; private set; }
+        public int HighestCommissionedLevel { get; private set; }
         public decimal TotalAmount { get; private set; }
         public string Currency { get; private set; }
         public string RulesVersion { get; private set; }
@@ -34,7 +35,8 @@ namespace AqualLifeStyle.Domain.Onyx
             OnyxParticipation participation,
             OnyxCommissionPeriod period,
             OnyxCommissionTerms terms,
-            OnyxNetworkLevel highestCompletedLevel)
+            OnyxNetworkLevel highestQualifiedNetworkLevel,
+            OnyxNetworkLevel highestCommissionedLevel)
         {
             if (participation == null) throw new ArgumentNullException(nameof(participation));
             if (period == null) throw new ArgumentNullException(nameof(period));
@@ -57,10 +59,17 @@ namespace AqualLifeStyle.Domain.Onyx
                     "The Onyx commission terms do not match the period rules version.");
             }
 
-            if (highestCompletedLevel < OnyxNetworkLevel.None ||
-                highestCompletedLevel > OnyxNetworkLevel.Level1)
+            if (highestQualifiedNetworkLevel < OnyxNetworkLevel.None ||
+                highestQualifiedNetworkLevel > OnyxNetworkLevel.Level5)
             {
-                throw new ArgumentOutOfRangeException(nameof(highestCompletedLevel));
+                throw new ArgumentOutOfRangeException(nameof(highestQualifiedNetworkLevel));
+            }
+
+            if (highestCommissionedLevel < OnyxNetworkLevel.None ||
+                highestCommissionedLevel > OnyxNetworkLevel.Level1 ||
+                highestCommissionedLevel > highestQualifiedNetworkLevel)
+            {
+                throw new ArgumentOutOfRangeException(nameof(highestCommissionedLevel));
             }
 
             Id = Guid.NewGuid();
@@ -68,12 +77,13 @@ namespace AqualLifeStyle.Domain.Onyx
             OnyxParticipationId = participation.Id;
             CustomerId = participation.CustomerId;
             CommissionPeriodId = period.Id;
-            HighestCompletedLevel = (int)highestCompletedLevel;
+            HighestQualifiedNetworkLevel = (int)highestQualifiedNetworkLevel;
+            HighestCommissionedLevel = (int)highestCommissionedLevel;
             Currency = terms.Currency;
             RulesVersion = terms.Version;
             CalculatedAt = period.CalculatedAt;
 
-            if (highestCompletedLevel == OnyxNetworkLevel.Level1)
+            if (highestCommissionedLevel == OnyxNetworkLevel.Level1)
             {
                 var amount = terms.GetCommissionAmount(OnyxNetworkLevel.Level1);
                 _components.Add(OnyxCommissionComponent.Create(
@@ -93,13 +103,15 @@ namespace AqualLifeStyle.Domain.Onyx
             OnyxParticipation participation,
             OnyxCommissionPeriod period,
             OnyxCommissionTerms terms,
-            OnyxNetworkLevel highestCompletedLevel)
+            OnyxNetworkLevel highestQualifiedNetworkLevel,
+            OnyxNetworkLevel highestCommissionedLevel)
         {
             return new OnyxWeeklyCommission(
                 participation,
                 period,
                 terms,
-                highestCompletedLevel);
+                highestQualifiedNetworkLevel,
+                highestCommissionedLevel);
         }
 
         public void ReleaseEligiblePayout(DateTime releasedAt)

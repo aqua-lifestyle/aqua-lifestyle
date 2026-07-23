@@ -56,6 +56,14 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 EffectiveFrom,
                 250m);
 
+        private static readonly OnyxTravelBenefitTerms TravelBenefitTerms =
+            OnyxTravelBenefitTerms.Create(
+                "onyx-travel-2026-07",
+                EffectiveFrom,
+                OnyxNetworkLevel.Level3,
+                3,
+                10m);
+
         [Fact]
         public async Task ProgrammeParticipationAndPaymentHistory_RoundTripsAndRejectsDuplicateProviderReference()
         {
@@ -338,7 +346,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             var suffix = Guid.NewGuid().ToString("N");
             var userIds = new List<long>();
-            for (var index = 0; index <= OnyxNetworkQualificationEvaluator.LevelOneBranchSize; index++)
+            for (var index = 0; index <= OnyxNetworkQualificationEvaluator.BranchSize; index++)
             {
                 userIds.Add(await CreateTestUserAsync(
                     1,
@@ -426,13 +434,131 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     .Include(item => item.Components)
                     .SingleAsync(item => item.Id == commissionId);
 
-                Assert.Equal(1, commission.HighestCompletedLevel);
+                Assert.Equal(1, commission.HighestQualifiedNetworkLevel);
+                Assert.Equal(1, commission.HighestCommissionedLevel);
                 Assert.Equal(250m, commission.TotalAmount);
                 Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
                 var component = Assert.Single(commission.Components);
                 Assert.Equal(1, component.Level);
                 Assert.Equal(250m, component.Amount);
             });
+        }
+
+        [Fact]
+        public async Task OnyxTravelBenefitEntitlement_RoundTripsAfterWaitingPeriod()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"onyx-traveller-{suffix}",
+                $"onyx-traveller-{suffix}@example.com");
+
+            var entitlementId = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "Onyx Traveller",
+                    new EmailAddress($"onyx-traveller-customer-{suffix}@example.com"));
+                var membership = Membership.Create(
+                    1,
+                    $"Onyx-Travel-{suffix}",
+                    "Onyx travel benefit persistence test",
+                    MembershipType.Onyx);
+                context.Customers.Add(customer);
+                context.Memberships.Add(membership);
+                await context.SaveChangesAsync();
+
+                var root = OnyxParticipation.StartDirectIndependently(
+                    1,
+                    customer.Id,
+                    membership.Id,
+                    OnyxTerms,
+                    EffectiveFrom);
+                var rootPayment = CreateConfirmedPayment(
+                    customer.Id,
+                    MemberPaymentPurpose.OnyxDirectEntry,
+                    6120m,
+                    $"onyx-travel-root-{suffix}");
+                root.ApplyConfirmedDirectEntryPayment(rootPayment);
+                var network = BuildTransientCompleteOnyxNetwork(
+                    root,
+                    membership.Id,
+                    maximumDepth: 3,
+                    referenceSuffix: suffix);
+                var entitlement =
+                    OnyxTravelBenefitEntitlement.GrantForQualifiedParticipant(
+                        root,
+                        network,
+                        new OnyxNetworkQualificationEvaluator(),
+                        TravelBenefitTerms,
+                        EffectiveFrom.AddDays(10));
+                entitlement.ActivateAfterWaitingPeriod(
+                    entitlement.WaitingPeriodEndsAt);
+
+                context.MemberPayments.Add(rootPayment);
+                context.OnyxParticipations.Add(root);
+                context.OnyxTravelBenefitEntitlements.Add(entitlement);
+                await context.SaveChangesAsync();
+
+                return entitlement.Id;
+            });
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var entitlement = await context.OnyxTravelBenefitEntitlements
+                    .SingleAsync(item => item.Id == entitlementId);
+
+                Assert.Equal(OnyxNetworkLevel.Level3, entitlement.QualifiedNetworkLevel);
+                Assert.Equal(OnyxTravelBenefitStatus.Active, entitlement.Status);
+                Assert.Equal(10m, entitlement.MemberTripContributionPercent);
+                Assert.Equal(
+                    entitlement.WaitingPeriodEndsAt,
+                    entitlement.ActivatedAt);
+            });
+        }
+
+        private static List<OnyxParticipation> BuildTransientCompleteOnyxNetwork(
+            OnyxParticipation root,
+            int membershipId,
+            int maximumDepth,
+            string referenceSuffix)
+        {
+            var network = new List<OnyxParticipation> { root };
+            var currentLevel = new List<OnyxParticipation> { root };
+            var nextCustomerId = 30000;
+
+            for (var depth = 1; depth <= maximumDepth; depth++)
+            {
+                var nextLevel = new List<OnyxParticipation>();
+                foreach (var recruiter in currentLevel)
+                {
+                    for (var index = 0;
+                         index < OnyxNetworkQualificationEvaluator.BranchSize;
+                         index++)
+                    {
+                        var recruit = OnyxParticipation.StartDirectUnderRecruiter(
+                            1,
+                            nextCustomerId++,
+                            recruiter,
+                            membershipId,
+                            OnyxTerms,
+                            EffectiveFrom);
+                        var payment = CreateConfirmedPayment(
+                            recruit.CustomerId,
+                            MemberPaymentPurpose.OnyxDirectEntry,
+                            6120m,
+                            $"onyx-travel-network-{recruit.CustomerId}-{referenceSuffix}");
+                        recruit.ApplyConfirmedDirectEntryPayment(payment);
+                        network.Add(recruit);
+                        nextLevel.Add(recruit);
+                    }
+                }
+
+                currentLevel = nextLevel;
+            }
+
+            return network;
         }
 
         private static List<EntryParticipation> BuildLevelTwoNetwork(

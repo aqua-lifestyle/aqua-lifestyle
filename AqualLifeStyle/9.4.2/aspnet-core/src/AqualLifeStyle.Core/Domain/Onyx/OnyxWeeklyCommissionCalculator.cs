@@ -26,15 +26,20 @@ namespace AqualLifeStyle.Domain.Onyx
                 throw new ArgumentNullException(nameof(networkParticipations));
             }
 
-            var highestCompletedLevel = _networkQualificationEvaluator.Evaluate(
+            var highestQualifiedNetworkLevel = _networkQualificationEvaluator.Evaluate(
                 participation,
                 networkParticipations);
+            var highestCommissionedLevel =
+                highestQualifiedNetworkLevel >= OnyxNetworkLevel.Level1
+                    ? OnyxNetworkLevel.Level1
+                    : OnyxNetworkLevel.None;
 
             return OnyxWeeklyCommission.RecordCalculation(
                 participation,
                 period,
                 terms,
-                highestCompletedLevel);
+                highestQualifiedNetworkLevel,
+                highestCommissionedLevel);
         }
     }
 }

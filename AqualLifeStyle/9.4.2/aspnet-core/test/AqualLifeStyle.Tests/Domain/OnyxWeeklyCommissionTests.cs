@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using AqualLifeStyle.Domain.Onyx;
-using AqualLifeStyle.Domain.Payments;
 using Xunit;
 
 namespace AqualLifeStyle.Tests.Domain
@@ -25,11 +24,15 @@ namespace AqualLifeStyle.Tests.Domain
         [Fact]
         public void FourActiveDirectRecruits_RecordNoPartialCommission()
         {
-            var network = BuildActiveLevelOneNetwork(directRecruitCount: 4);
+            var network = OnyxNetworkTestBuilder.BuildLevelOneNetwork(
+                directRecruitCount: 4,
+                PlanTerms,
+                EffectiveFrom);
 
             var commission = Calculate(network);
 
-            Assert.Equal(0, commission.HighestCompletedLevel);
+            Assert.Equal(0, commission.HighestQualifiedNetworkLevel);
+            Assert.Equal(0, commission.HighestCommissionedLevel);
             Assert.Equal(0m, commission.TotalAmount);
             Assert.Empty(commission.Components);
             Assert.Equal(WeeklyCommissionPayoutStatus.NotEarned, commission.PayoutStatus);
@@ -38,12 +41,15 @@ namespace AqualLifeStyle.Tests.Domain
         [Fact]
         public void FiveActiveDirectRecruits_RecordOneTwoHundredFiftyRandCommission()
         {
-            var network = BuildActiveLevelOneNetwork(
-                OnyxNetworkQualificationEvaluator.LevelOneBranchSize);
+            var network = OnyxNetworkTestBuilder.BuildLevelOneNetwork(
+                OnyxNetworkQualificationEvaluator.BranchSize,
+                PlanTerms,
+                EffectiveFrom);
 
             var commission = Calculate(network);
 
-            Assert.Equal(1, commission.HighestCompletedLevel);
+            Assert.Equal(1, commission.HighestQualifiedNetworkLevel);
+            Assert.Equal(1, commission.HighestCommissionedLevel);
             Assert.Equal(250m, commission.TotalAmount);
             Assert.Equal("ZAR", commission.Currency);
             Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
@@ -55,7 +61,10 @@ namespace AqualLifeStyle.Tests.Domain
         [Fact]
         public void InactiveDirectRecruit_DoesNotCompleteLevelOne()
         {
-            var network = BuildActiveLevelOneNetwork(directRecruitCount: 4);
+            var network = OnyxNetworkTestBuilder.BuildLevelOneNetwork(
+                directRecruitCount: 4,
+                PlanTerms,
+                EffectiveFrom);
             var root = network[0];
             network.Add(OnyxParticipation.StartDirectUnderRecruiter(
                 1,
@@ -74,15 +83,21 @@ namespace AqualLifeStyle.Tests.Domain
         [Fact]
         public void ActiveCrossAreaDirectRecruit_ContributesToLevelOne()
         {
-            var network = BuildActiveLevelOneNetwork(directRecruitCount: 4);
-            network.Add(CreateActiveUnderRecruiter(
+            var network = OnyxNetworkTestBuilder.BuildLevelOneNetwork(
+                directRecruitCount: 4,
+                PlanTerms,
+                EffectiveFrom);
+            network.Add(OnyxNetworkTestBuilder.CreateActiveUnderRecruiter(
                 customerId: 20,
                 network[0],
+                PlanTerms,
+                EffectiveFrom,
                 tenantId: 2));
 
             var commission = Calculate(network);
 
-            Assert.Equal(1, commission.HighestCompletedLevel);
+            Assert.Equal(1, commission.HighestQualifiedNetworkLevel);
+            Assert.Equal(1, commission.HighestCommissionedLevel);
             Assert.Equal(250m, commission.TotalAmount);
             Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
         }
@@ -90,17 +105,40 @@ namespace AqualLifeStyle.Tests.Domain
         [Fact]
         public void DeeperNetwork_DoesNotCreateUnapprovedOnyxEarnings()
         {
-            var network = BuildActiveLevelOneNetwork(
-                OnyxNetworkQualificationEvaluator.LevelOneBranchSize);
+            var network = OnyxNetworkTestBuilder.BuildLevelOneNetwork(
+                OnyxNetworkQualificationEvaluator.BranchSize,
+                PlanTerms,
+                EffectiveFrom);
             var directRecruit = network[1];
             for (var index = 0; index < 5; index++)
             {
-                network.Add(CreateActiveUnderRecruiter(100 + index, directRecruit));
+                network.Add(OnyxNetworkTestBuilder.CreateActiveUnderRecruiter(
+                    100 + index,
+                    directRecruit,
+                    PlanTerms,
+                    EffectiveFrom));
             }
 
             var commission = Calculate(network);
 
-            Assert.Equal(1, commission.HighestCompletedLevel);
+            Assert.Equal(1, commission.HighestQualifiedNetworkLevel);
+            Assert.Equal(1, commission.HighestCommissionedLevel);
+            Assert.Equal(250m, commission.TotalAmount);
+            Assert.Single(commission.Components);
+        }
+
+        [Fact]
+        public void CompleteLevelTwo_RecordsQualificationButNoUnapprovedCommission()
+        {
+            var network = OnyxNetworkTestBuilder.BuildCompleteNetwork(
+                maximumDepth: 2,
+                PlanTerms,
+                EffectiveFrom);
+
+            var commission = Calculate(network);
+
+            Assert.Equal(2, commission.HighestQualifiedNetworkLevel);
+            Assert.Equal(1, commission.HighestCommissionedLevel);
             Assert.Equal(250m, commission.TotalAmount);
             Assert.Single(commission.Components);
         }
@@ -108,8 +146,10 @@ namespace AqualLifeStyle.Tests.Domain
         [Fact]
         public void EarnedCommission_IsReleasedAndPaidThroughIdempotentTransitions()
         {
-            var network = BuildActiveLevelOneNetwork(
-                OnyxNetworkQualificationEvaluator.LevelOneBranchSize);
+            var network = OnyxNetworkTestBuilder.BuildLevelOneNetwork(
+                OnyxNetworkQualificationEvaluator.BranchSize,
+                PlanTerms,
+                EffectiveFrom);
             var commission = Calculate(network);
             var releasedAt = EffectiveFrom.AddDays(13);
             var paidAt = releasedAt.AddHours(1);
@@ -155,54 +195,5 @@ namespace AqualLifeStyle.Tests.Domain
                 network);
         }
 
-        private static List<OnyxParticipation> BuildActiveLevelOneNetwork(
-            int directRecruitCount)
-        {
-            var root = OnyxParticipation.StartDirectIndependently(
-                1,
-                1,
-                7,
-                PlanTerms,
-                EffectiveFrom);
-            Activate(root);
-            var network = new List<OnyxParticipation> { root };
-
-            for (var index = 0; index < directRecruitCount; index++)
-            {
-                network.Add(CreateActiveUnderRecruiter(index + 2, root));
-            }
-
-            return network;
-        }
-
-        private static OnyxParticipation CreateActiveUnderRecruiter(
-            int customerId,
-            OnyxParticipation recruiter,
-            int tenantId = 1)
-        {
-            var participation = OnyxParticipation.StartDirectUnderRecruiter(
-                tenantId,
-                customerId,
-                recruiter,
-                7,
-                PlanTerms,
-                EffectiveFrom);
-            Activate(participation);
-            return participation;
-        }
-
-        private static void Activate(OnyxParticipation participation)
-        {
-            var payment = MemberPayment.CreatePending(
-                participation.TenantId,
-                participation.CustomerId,
-                MemberPaymentPurpose.OnyxDirectEntry,
-                6120m,
-                "Yoco",
-                $"onyx-direct-{participation.CustomerId}",
-                EffectiveFrom);
-            payment.Confirm(EffectiveFrom.AddMinutes(1));
-            participation.ApplyConfirmedDirectEntryPayment(payment);
-        }
     }
 }
