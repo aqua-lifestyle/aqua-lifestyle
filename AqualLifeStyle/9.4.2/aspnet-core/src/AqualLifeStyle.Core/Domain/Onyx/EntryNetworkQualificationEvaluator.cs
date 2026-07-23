@@ -15,6 +15,7 @@ namespace AqualLifeStyle.Domain.Onyx
     public sealed class EntryNetworkQualificationEvaluator
     {
         public const int BranchSize = 5;
+        public const int MaximumLevel = 3;
 
         public EntryNetworkLevel Evaluate(
             int customerId,

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AqualLifeStyle.Domain.Common;
@@ -30,6 +31,14 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             version: "2026-07",
             effectiveFrom: EffectiveFrom,
             directEntryAmount: 6120m);
+
+        private static readonly EntryCommissionTerms CommissionTerms =
+            EntryCommissionTerms.Create(
+                "2026-07",
+                EffectiveFrom,
+                150m,
+                250m,
+                1250m);
 
         [Fact]
         public async Task ProgrammeParticipationAndPaymentHistory_RoundTripsAndRejectsDuplicateProviderReference()
@@ -118,6 +127,40 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     EffectiveFrom.AddMonths(1).AddDays(9));
                 monthlyObligation.ApplyConfirmedPayment(monthlyPayment);
 
+                var commissionPeriodStart = EffectiveFrom.AddDays(5);
+                var commissionPeriodEnd = commissionPeriodStart.AddDays(7).AddTicks(-1);
+                var commissionPeriod = EntryCommissionPeriod.CreateClosedPeriod(
+                    1,
+                    commissionPeriodStart,
+                    commissionPeriodEnd,
+                    "Africa/Johannesburg",
+                    commissionPeriodEnd.AddMinutes(1),
+                    CommissionTerms);
+                var network = new List<EntryParticipation> { participantEntry };
+                for (var index = 0; index < EntryNetworkQualificationEvaluator.BranchSize; index++)
+                {
+                    var recruit = EntryParticipation.StartUnderRecruiter(
+                        1,
+                        10000 + index,
+                        participantEntry,
+                        EntryTerms,
+                        EffectiveFrom);
+                    var recruitPayments = CreateAndApplyEntryPayments(
+                        recruit,
+                        $"transient-registration-{index}-{suffix}",
+                        $"transient-activation-{index}-{suffix}");
+                    network.Add(recruit);
+                }
+
+                var weeklyCommission = new EntryWeeklyCommissionCalculator(
+                    new EntryNetworkQualificationEvaluator())
+                    .Calculate(
+                        participantEntry,
+                        commissionPeriod,
+                        CommissionTerms,
+                        network,
+                        new[] { monthlyObligation });
+
                 context.MemberPayments.AddRange(
                     recruiterPayments.Registration,
                     recruiterPayments.Activation,
@@ -127,6 +170,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     monthlyPayment);
                 context.EntryParticipations.AddRange(recruiterEntry, participantEntry);
                 context.EntryMonthlyObligations.Add(monthlyObligation);
+                context.EntryCommissionPeriods.Add(commissionPeriod);
+                context.EntryWeeklyCommissions.Add(weeklyCommission);
                 context.OnyxParticipations.Add(onyxParticipation);
                 await context.SaveChangesAsync();
 
@@ -135,6 +180,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     ParticipantCustomerId = participantCustomer.Id,
                     ParticipantEntryId = participantEntry.Id,
                     MonthlyObligationId = monthlyObligation.Id,
+                    WeeklyCommissionId = weeklyCommission.Id,
                     OnyxParticipationId = onyxParticipation.Id,
                     OnyxPaymentReference = onyxPayment.ExternalReference
                 };
@@ -149,6 +195,9 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     .SingleAsync(participation => participation.Id == persisted.OnyxParticipationId);
                 var monthlyObligation = await context.EntryMonthlyObligations
                     .SingleAsync(obligation => obligation.Id == persisted.MonthlyObligationId);
+                var weeklyCommission = await context.EntryWeeklyCommissions
+                    .Include(commission => commission.Components)
+                    .SingleAsync(commission => commission.Id == persisted.WeeklyCommissionId);
                 var payments = await context.MemberPayments
                     .Where(payment => payment.CustomerId == persisted.ParticipantCustomerId)
                     .ToListAsync();
@@ -165,6 +214,11 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 Assert.Equal(0m, monthlyObligation.OutstandingAmount);
                 Assert.NotNull(monthlyObligation.MarkedOverdueAt);
                 Assert.True(monthlyObligation.IsOwnPayoutEligible);
+                Assert.Equal(EntryCommissionPayoutStatus.Earned, weeklyCommission.PayoutStatus);
+                Assert.Equal(150m, weeklyCommission.TotalAmount);
+                var component = Assert.Single(weeklyCommission.Components);
+                Assert.Equal(1, component.Level);
+                Assert.Equal(150m, component.Amount);
                 Assert.Equal(4, payments.Count);
                 Assert.All(payments, payment => Assert.Equal("YOCO", payment.Provider));
             });

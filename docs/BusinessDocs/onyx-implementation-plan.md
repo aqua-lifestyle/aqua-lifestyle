@@ -160,3 +160,20 @@ The Entry monthly-obligation foundation is complete:
 
 Automatic obligation scheduling and payment allocation are deferred to the
 secured application workflow phase.
+
+The Entry weekly commission-ledger foundation is also complete:
+
+- every closed period records its exact start, end, time zone, calculation time,
+  and rules version;
+- incomplete network levels record no partial component;
+- completed levels retain separate R150, R250, and R1,250 components, producing
+  the explainable cumulative total;
+- each Entry participation can have only one ledger record per commission period;
+- payout state distinguishes not earned, earned, held, released, and paid;
+- releasing held funds and recording payment use explicit, idempotent domain
+  transitions without rewriting the calculated components;
+- an overdue customer's own record is held, while structural network
+  qualification remains unchanged and no unconfirmed upline effect is applied.
+
+The secured administrator-triggered calculation, discrepancy reporting, and
+automatic scheduling remain application-layer work.
