@@ -208,7 +208,9 @@ export const MembershipDetails = ({ membershipId }: MembershipDetailsProps) => {
                     <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm text-zinc-600">Savings window</p>
+                          <p className="text-sm text-zinc-600">
+                            Savings contribution window
+                          </p>
                           <p className="mt-2 text-xl font-semibold">
                             Day {tierBenefits.savingsWindowOpenDay}-
                             {tierBenefits.savingsWindowCloseDay}
@@ -258,9 +260,13 @@ export const MembershipDetails = ({ membershipId }: MembershipDetailsProps) => {
                           </dd>
                         </div>
                         <div>
-                          <dt className="text-zinc-600">Interest rate</dt>
+                          <dt className="text-zinc-600">
+                            12-month savings interest
+                          </dt>
                           <dd className="mt-1 font-medium text-zinc-950">
-                            {formatPercent(tierBenefits.interestRate)}
+                            {formatPercent(
+                              tierBenefits.savingsMaturityInterestRate,
+                            )}
                           </dd>
                         </div>
                         <div>

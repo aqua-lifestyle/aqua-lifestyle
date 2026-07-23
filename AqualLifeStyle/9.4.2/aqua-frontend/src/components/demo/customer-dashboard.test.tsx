@@ -123,7 +123,7 @@ const membershipsState: MembershipsState = {
       asOfDate: "2026-07-14",
       currentDay: 14,
       isSavingsWindowOpen: true,
-      savingsWindowCloseDay: 20,
+      savingsWindowCloseDay: 15,
       savingsWindowOpenDay: 1,
       statusLabel: "Open",
       tier: 0,

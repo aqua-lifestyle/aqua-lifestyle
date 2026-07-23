@@ -22,7 +22,7 @@ export type TierBenefits = {
   savingsWindowOpenDay: number;
   savingsWindowCloseDay: number;
   productPricingDiscount: number;
-  interestRate: number;
+  savingsMaturityInterestRate: number;
   maxConcurrentOrders: number;
   referralCommissionRate: number;
   profitSharePercentage: number;

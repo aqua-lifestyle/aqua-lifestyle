@@ -10,7 +10,7 @@ namespace AqualLifeStyle.Application.Memberships.Dto
         public int SavingsWindowOpenDay { get; set; }
         public int SavingsWindowCloseDay { get; set; }
         public decimal ProductPricingDiscount { get; set; }
-        public decimal InterestRate { get; set; }
+        public decimal SavingsMaturityInterestRate { get; set; }
         public int MaxConcurrentOrders { get; set; }
         public decimal ReferralCommissionRate { get; set; }
         public decimal ProfitSharePercentage { get; set; }

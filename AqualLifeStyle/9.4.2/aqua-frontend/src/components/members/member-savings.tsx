@@ -68,7 +68,7 @@ export const MemberSavings = () => {
       sortable: true,
     },
     {
-      header: "Window",
+      header: "Contribution window",
       key: "savingsWindowOpenDay",
       render: (savings: typeof customerSavings[number]) => (
         <span className="text-sm">
