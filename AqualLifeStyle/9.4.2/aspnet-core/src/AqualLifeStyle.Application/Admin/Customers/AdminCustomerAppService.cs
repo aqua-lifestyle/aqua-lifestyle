@@ -94,7 +94,10 @@ namespace AqualLifeStyle.Application.Admin.Customers
             using (DisableTenantDataFilter())
             {
                 return await _membershipRepository.GetAll()
-                    .Where(plan => plan.IsActive && (!plan.TenantId.HasValue || plan.TenantId == tenantId))
+                    .Where(plan =>
+                        plan.IsActive &&
+                        plan.MembershipType != MembershipType.Onyx &&
+                        (!plan.TenantId.HasValue || plan.TenantId == tenantId))
                     .OrderBy(plan => plan.MembershipType).ThenBy(plan => plan.Name)
                     .Select(plan => new AdminMembershipOptionDto { Id = plan.Id, Name = plan.Name, MembershipType = (int)plan.MembershipType })
                     .ToListAsync();

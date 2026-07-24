@@ -135,6 +135,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         {
             input ??= new StartDirectOnyxParticipationInput();
             var customer = await GetCurrentActiveCustomerAsync();
+            await ClearLegacyOnyxMembershipAssignmentAsync(customer);
             var existing = await _onyxParticipationRepository.FirstOrDefaultAsync(
                 participation => participation.CustomerId == customer.Id);
             if (existing != null)
@@ -174,6 +175,30 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             Logger.Info(
                 $"Direct Onyx participation started tenant={customer.TenantId} customer={customer.Id} independent={participation.JoinedIndependently}");
             return Map(participation);
+        }
+
+        private async Task ClearLegacyOnyxMembershipAssignmentAsync(Customer customer)
+        {
+            if (!customer.MembershipId.HasValue)
+            {
+                return;
+            }
+
+            Membership assignedMembership;
+            using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
+            {
+                assignedMembership = await _membershipRepository.FirstOrDefaultAsync(
+                    customer.MembershipId.Value);
+            }
+            if (assignedMembership?.MembershipType != MembershipType.Onyx)
+            {
+                return;
+            }
+
+            customer.ChangeMembership(null);
+            await _customerRepository.UpdateAsync(customer);
+            Logger.Warn(
+                $"Cleared legacy direct Onyx membership assignment tenant={customer.TenantId} customer={customer.Id}");
         }
 
         private async Task<Customer> GetCurrentActiveCustomerAsync()

@@ -30,7 +30,7 @@ namespace AqualLifeStyle.Tests.Application
             var membershipIds = await UsingDbContextAsync(async context =>
             {
                 var entryTier = Membership.Create(1, $"Entry-{Guid.NewGuid():N}", "Entry membership", MembershipType.Jasper);
-                var upgradedTier = Membership.Create(1, $"Upgrade-{Guid.NewGuid():N}", "Upgraded membership", MembershipType.Onyx);
+                var upgradedTier = Membership.Create(1, $"Upgrade-{Guid.NewGuid():N}", "Upgraded membership", MembershipType.AQGreen);
                 context.Memberships.AddRange(entryTier, upgradedTier);
                 await context.SaveChangesAsync();
                 return new[] { entryTier.Id, upgradedTier.Id };

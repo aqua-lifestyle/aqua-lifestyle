@@ -8,6 +8,7 @@ using AqualLifeStyle.Application.Admin.Customers;
 using AqualLifeStyle.Application.Admin.Members.Dto;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Customers;
+using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using Microsoft.EntityFrameworkCore;
 
@@ -74,7 +75,10 @@ namespace AqualLifeStyle.Application.Admin.Members
             using (DisableTenantDataFilter())
             {
                 return await _membershipRepository.GetAll()
-                    .Where(plan => plan.IsActive && (!plan.TenantId.HasValue || plan.TenantId == member.TenantId.Value))
+                    .Where(plan =>
+                        plan.IsActive &&
+                        plan.MembershipType != MembershipType.Onyx &&
+                        (!plan.TenantId.HasValue || plan.TenantId == member.TenantId.Value))
                     .OrderBy(plan => plan.MembershipType).ThenBy(plan => plan.Name)
                     .Select(plan => new AdminMembershipOptionDto { Id = plan.Id, Name = plan.Name, MembershipType = (int)plan.MembershipType })
                     .ToListAsync();

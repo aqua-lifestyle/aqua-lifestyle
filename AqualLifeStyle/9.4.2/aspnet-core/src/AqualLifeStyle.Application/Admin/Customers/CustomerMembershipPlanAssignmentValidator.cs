@@ -31,10 +31,18 @@ namespace AqualLifeStyle.Application.Admin.Customers
             {
                 var membershipPlan = await _membershipRepository.FirstOrDefaultAsync(plan =>
                     plan.Id == membershipPlanId &&
-                    (!plan.TenantId.HasValue || plan.TenantId == areaId) &&
-                    plan.IsActive);
+                    (!plan.TenantId.HasValue || plan.TenantId == areaId));
                 if (membershipPlan == null)
                     throw new UserFriendlyException($"{operation} failed.", "The selected membership plan is unavailable or inactive.");
+
+                try
+                {
+                    membershipPlan.EnsureCanBeAssignedToCustomer();
+                }
+                catch (System.InvalidOperationException exception)
+                {
+                    throw new UserFriendlyException($"{operation} failed.", exception.Message);
+                }
             }
         }
     }
