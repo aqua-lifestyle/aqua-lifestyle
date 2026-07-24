@@ -54,6 +54,7 @@ namespace AqualLifeStyle.Authorization
             CreateGroup(context, AquaPermissions.AreaSpaces.Default, AquaPermissions.AreaSpaces.View, AquaPermissions.AreaSpaces.Apply, AquaPermissions.AreaSpaces.Approve, AquaPermissions.AreaSpaces.Manage);
             CreateGroup(context, AquaPermissions.Orders.Default, AquaPermissions.Orders.View, AquaPermissions.Orders.Place, AquaPermissions.Orders.Process, AquaPermissions.Orders.Approve, AquaPermissions.Orders.ViewSelf);
             CreateGroup(context, AquaPermissions.Savings.Default, AquaPermissions.Savings.View, AquaPermissions.Savings.Deposit, AquaPermissions.Savings.Withdraw, AquaPermissions.Savings.Approve, AquaPermissions.Savings.ViewSelf);
+            CreateGroup(context, AquaPermissions.Loans.Default, AquaPermissions.Loans.ViewSelf);
             CreateGroup(context, AquaPermissions.Enquiries.Default, AquaPermissions.Enquiries.View, AquaPermissions.Enquiries.Create, AquaPermissions.Enquiries.Update, AquaPermissions.Enquiries.Resolve, AquaPermissions.Enquiries.ViewSelf);
             CreateGroup(context, AquaPermissions.Referrals.Default, AquaPermissions.Referrals.View, AquaPermissions.Referrals.Create, AquaPermissions.Referrals.Confirm, AquaPermissions.Referrals.ViewSelf);
             CreateGroup(context, AquaPermissions.Memberships.Default, AquaPermissions.Memberships.View, AquaPermissions.Memberships.ViewSelf, AquaPermissions.Memberships.Upgrade);
@@ -164,6 +165,15 @@ namespace AqualLifeStyle.Authorization
                 savings,
                 sides,
                 AquaPermissions.Admin.Savings.View);
+
+            var loans = admin.CreateChildPermission(
+                AquaPermissions.Admin.Loans.Default,
+                L(AquaPermissions.Admin.Loans.Default),
+                multiTenancySides: sides);
+            CreateChildren(
+                loans,
+                sides,
+                AquaPermissions.Admin.Loans.View);
 
             CreateChildren(admin, host, AquaPermissions.Admin.AllTenants);
             var tenants = admin.CreateChildPermission(

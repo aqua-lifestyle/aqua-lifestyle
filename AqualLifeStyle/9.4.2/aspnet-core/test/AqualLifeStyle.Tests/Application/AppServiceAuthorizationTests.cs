@@ -11,6 +11,7 @@ using AqualLifeStyle.Application.Admin.Members;
 using AqualLifeStyle.Application.Admin.Tenants;
 using AqualLifeStyle.Application.Admin.Commissions;
 using AqualLifeStyle.Application.Admin.Savings;
+using AqualLifeStyle.Application.Admin.Loans;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Enquiries;
@@ -21,6 +22,7 @@ using AqualLifeStyle.Application.Orders;
 using AqualLifeStyle.Application.Products;
 using AqualLifeStyle.Application.Referrals;
 using AqualLifeStyle.Application.Savings;
+using AqualLifeStyle.Application.Loans;
 using AqualLifeStyle.Authorization;
 using Shouldly;
 using Xunit;
@@ -193,6 +195,19 @@ namespace AqualLifeStyle.Tests.Application
                 typeof(AdminSavingsAppService),
                 nameof(AdminSavingsAppService.GetAllAsync),
                 AquaPermissions.Admin.Savings.View);
+        }
+
+        [Fact]
+        public void LoanServices_ShouldSeparateSelfAndAdministratorViews()
+        {
+            AssertAuthorizeAttribute(
+                typeof(ClubMemberOnyxLoanAppService),
+                nameof(ClubMemberOnyxLoanAppService.GetMyAgreementsAsync),
+                AquaPermissions.Loans.ViewSelf);
+            AssertAuthorizeAttribute(
+                typeof(AdminOnyxLoanAppService),
+                nameof(AdminOnyxLoanAppService.GetAllAsync),
+                AquaPermissions.Admin.Loans.View);
         }
 
         [Fact]

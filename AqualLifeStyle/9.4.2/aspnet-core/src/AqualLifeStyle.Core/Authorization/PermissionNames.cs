@@ -45,6 +45,7 @@
         public const string AreaLeaders_ViewSelf = AquaPermissions.AreaLeaders.ViewSelf;
         public const string Orders_ViewSelf = AquaPermissions.Orders.ViewSelf;
         public const string Savings_ViewSelf = AquaPermissions.Savings.ViewSelf;
+        public const string Loans_ViewSelf = AquaPermissions.Loans.ViewSelf;
         public const string Enquiries_ViewSelf = AquaPermissions.Enquiries.ViewSelf;
         public const string Referrals_ViewSelf = AquaPermissions.Referrals.ViewSelf;
         public const string Memberships_ViewSelf = AquaPermissions.Memberships.ViewSelf;

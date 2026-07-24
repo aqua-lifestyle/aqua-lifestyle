@@ -54,6 +54,17 @@ namespace AqualLifeStyle.Tests.Authorization
         }
 
         [Fact]
+        public void NestedAdminLoanPermissions_AreIncludedForSystemAdmin()
+        {
+            AquaPermissions.GetAll().ShouldContain(
+                AquaPermissions.Admin.Loans.Default);
+            AquaPermissions.GetAll().ShouldContain(
+                AquaPermissions.Admin.Loans.View);
+            AquaRolePermissions.GetFor(AquaUserRole.SystemAdmin).ShouldContain(
+                AquaPermissions.Admin.Loans.View);
+        }
+
+        [Fact]
         public void Guest_HasOnlySelfServicePermissions()
         {
             AquaRolePermissions.GetFor(AquaUserRole.Guest).ShouldBe(new[]
@@ -78,6 +89,7 @@ namespace AqualLifeStyle.Tests.Authorization
         [InlineData(AquaUserRole.Member, AquaPermissions.Orders.Place)]
         [InlineData(AquaUserRole.Member, AquaPermissions.Savings.Deposit)]
         [InlineData(AquaUserRole.Member, AquaPermissions.Savings.Withdraw)]
+        [InlineData(AquaUserRole.Member, AquaPermissions.Loans.ViewSelf)]
         public void Role_HasExpectedPermission(AquaUserRole role, string permission) => AquaRolePermissions.GetFor(role).ShouldContain(permission);
 
         [Theory]
@@ -111,6 +123,8 @@ namespace AqualLifeStyle.Tests.Authorization
         [InlineData(AquaPermissions.Admin.Commissions.Release, AquaPermissions.Admin.Commissions.Default)]
         [InlineData(AquaPermissions.Admin.Commissions.RecordPayment, AquaPermissions.Admin.Commissions.Default)]
         [InlineData(AquaPermissions.Admin.Savings.View, AquaPermissions.Admin.Savings.Default)]
+        [InlineData(AquaPermissions.Loans.ViewSelf, AquaPermissions.Loans.Default)]
+        [InlineData(AquaPermissions.Admin.Loans.View, AquaPermissions.Admin.Loans.Default)]
         public void Provider_RegistersExpectedParent(string childName, string parentName)
         {
             var permissions = PermissionFinder.GetAllPermissions(new AqualLifeStyleAuthorizationProvider());
