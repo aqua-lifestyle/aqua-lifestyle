@@ -17,7 +17,8 @@
 
 ## Phase 2: Savings & Order Cycle (Next Priority)
 - [x] Persist Club Member `SavingsAccount` and payment-linked contribution ledger
-- [ ] Add secured Club Member and administrator savings application services
+- [x] Add secured Club Member savings history and administrator reconciliation views
+- [ ] Add account-opening authority and provider-confirmed contribution workflows
 - [ ] Club account types with registration fees and tier minimums
 - [x] Savings contribution window enforcement from the 1st–15th
 - [ ] Refund-rule flagging (3-month threshold per tier) (BR-02–04)

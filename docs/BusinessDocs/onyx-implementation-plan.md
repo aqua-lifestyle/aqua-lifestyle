@@ -314,8 +314,15 @@ but no individual Club Member contribution is assigned to or netted against a
 specific borrower. Savings ownership, loan receivables, loan repayments, and
 maturity liabilities remain separate ledgers.
 
-Secured Club Member contribution workflows, verified provider callbacks,
-maturity payout processing, pooled-fund accounting, and reconciliation remain
+Club Members can now review their persisted account, confirmed contribution
+history, projected interest, and maturity date. Separately authorised
+administrators can reconcile the same ledgers within their Area scope, while
+host-wide review requires all-Areas permission. An account whose maturity date
+has passed is labelled as requiring maturity processing rather than falsely
+claiming that a payout occurred.
+
+Account-opening authority, secured contribution workflows, verified provider
+callbacks, maturity payout processing, and pooled-fund accounting remain
 application-layer work. The promised 20% return and use of member savings for
 lending require appropriate South African financial-services and consumer-credit
 review before production launch; the domain model records the confirmed business

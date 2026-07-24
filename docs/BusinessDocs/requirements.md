@@ -35,7 +35,7 @@ Status legend: ✅ Implemented in codebase · 🔧 Domain/persistence foundation
 | FR-13 | Refund rule: below minimum threshold within 3 months → refund minus admin & branding costs | High | ❌ Missing |
 | FR-14 | Withdrawals blocked until account maturity 12 months after opening | High | 🔧 Domain foundation |
 | FR-15 | Registration payment must complete within 14 business days with proof submitted | High | ❌ Missing |
-| FR-16 | Track savings principal, per-contribution interest, and maturity amount per Club Member | Critical | 🔧 Persistence foundation; application service pending |
+| FR-16 | Track savings principal, per-contribution interest, and maturity amount per Club Member | Critical | ⚠️ Persisted ledger and secured read/reconciliation services implemented; contribution processing pending |
 
 ### 2.3 Product Catalog & Orders
 
