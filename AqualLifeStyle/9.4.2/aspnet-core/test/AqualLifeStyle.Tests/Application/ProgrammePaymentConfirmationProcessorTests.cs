@@ -113,9 +113,20 @@ namespace AqualLifeStyle.Tests.Application
                 var payments = await context.MemberPayments
                     .Where(payment => payment.CustomerId == persisted.CustomerId)
                     .ToListAsync();
+                var user = await context.Users.SingleAsync(candidate => candidate.Id == userId);
 
                 Assert.Equal(EntryParticipationStatus.Active, entry.Status);
                 Assert.Equal(OnyxParticipationStatus.Active, onyxParticipation.Status);
+                Assert.Equal(AquaUserRole.Member, user.Role);
+                Assert.Contains(
+                    await context.Roles
+                        .Where(role => context.UserRoles
+                            .Where(userRole => userRole.UserId == userId)
+                            .Select(userRole => userRole.RoleId)
+                            .Contains(role.Id))
+                        .Select(role => role.Name)
+                        .ToListAsync(),
+                    roleName => roleName == AquaUserRole.Member.ToString());
                 Assert.Equal(3, payments.Count);
                 Assert.All(payments, payment => Assert.Equal(MemberPaymentStatus.Confirmed, payment.Status));
                 Assert.All(payments, payment => Assert.NotEqual(default, payment.CreationTime));
@@ -131,6 +142,57 @@ namespace AqualLifeStyle.Tests.Application
                 registrationReference);
             await Assert.ThrowsAsync<InvalidOperationException>(
                 () => processor.ProcessAsync(mismatchedReuse));
+        }
+
+        [Fact]
+        public async Task ActiveParticipation_DoesNotDemoteAnExistingBusinessRole()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"facilitator-{suffix}",
+                $"facilitator-{suffix}@example.com");
+
+            var customerId = await UsingDbContextAsync(1, async context =>
+            {
+                var user = await context.Users.SingleAsync(candidate => candidate.Id == userId);
+                user.SetRole(AquaUserRole.Facilitator);
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "Existing Facilitator",
+                    new EmailAddress($"facilitator-customer-{suffix}@example.com"));
+                var membership = Membership.Create(
+                    1,
+                    $"Onyx-{suffix}",
+                    "Onyx direct-entry plan",
+                    MembershipType.Onyx);
+                context.Customers.Add(customer);
+                context.Memberships.Add(membership);
+                await context.SaveChangesAsync();
+                context.OnyxParticipations.Add(
+                    OnyxParticipation.StartDirectIndependently(
+                        1,
+                        customer.Id,
+                        membership.Id,
+                        OnyxPlanTerms.Create("2026-07", EffectiveFrom, 6120m),
+                        EffectiveFrom));
+                await context.SaveChangesAsync();
+                return customer.Id;
+            });
+
+            await LocalIocManager.Resolve<ProgrammePaymentConfirmationProcessor>()
+                .ProcessAsync(CreateConfirmation(
+                    customerId,
+                    MemberPaymentPurpose.OnyxDirectEntry,
+                    6120m,
+                    $"onyx-facilitator-{suffix}"));
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var user = await context.Users.SingleAsync(candidate => candidate.Id == userId);
+                Assert.Equal(AquaUserRole.Facilitator, user.Role);
+            });
         }
 
         private static ConfirmedProgrammePayment CreateConfirmation(

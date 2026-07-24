@@ -49,17 +49,20 @@ namespace AqualLifeStyle.Payments
         private readonly IRepository<MemberPayment, Guid> _paymentRepository;
         private readonly IRepository<EntryParticipation, Guid> _entryParticipationRepository;
         private readonly IRepository<OnyxParticipation, Guid> _onyxParticipationRepository;
+        private readonly ActiveProgrammeParticipantRoleSynchronizer _participantRoleSynchronizer;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public ProgrammePaymentConfirmationProcessor(
             IRepository<MemberPayment, Guid> paymentRepository,
             IRepository<EntryParticipation, Guid> entryParticipationRepository,
             IRepository<OnyxParticipation, Guid> onyxParticipationRepository,
+            ActiveProgrammeParticipantRoleSynchronizer participantRoleSynchronizer,
             IUnitOfWorkManager unitOfWorkManager)
         {
             _paymentRepository = paymentRepository;
             _entryParticipationRepository = entryParticipationRepository;
             _onyxParticipationRepository = onyxParticipationRepository;
+            _participantRoleSynchronizer = participantRoleSynchronizer;
             _unitOfWorkManager = unitOfWorkManager;
         }
 
@@ -105,6 +108,11 @@ namespace AqualLifeStyle.Payments
                 }
 
                 var participation = await ApplyToParticipationAsync(payment);
+                if (participation.IsActive)
+                {
+                    await _participantRoleSynchronizer.PromoteGuestToMemberAsync(
+                        payment.CustomerId);
+                }
                 await _unitOfWorkManager.Current.SaveChangesAsync();
 
                 return new ProgrammePaymentConfirmationResult(
@@ -115,7 +123,7 @@ namespace AqualLifeStyle.Payments
             }
         }
 
-        private async Task<(Guid Id, ProgrammeParticipationKind Kind)> ApplyToParticipationAsync(
+        private async Task<(Guid Id, ProgrammeParticipationKind Kind, bool IsActive)> ApplyToParticipationAsync(
             MemberPayment payment)
         {
             if (payment.Purpose == MemberPaymentPurpose.OnyxDirectEntry)
@@ -131,7 +139,10 @@ namespace AqualLifeStyle.Payments
                 }
 
                 onyxParticipation.ApplyConfirmedDirectEntryPayment(payment);
-                return (onyxParticipation.Id, ProgrammeParticipationKind.Onyx);
+                return (
+                    onyxParticipation.Id,
+                    ProgrammeParticipationKind.Onyx,
+                    onyxParticipation.Status == OnyxParticipationStatus.Active);
             }
 
             var entryParticipation = await _entryParticipationRepository.FirstOrDefaultAsync(
@@ -145,7 +156,10 @@ namespace AqualLifeStyle.Payments
             }
 
             entryParticipation.ApplyConfirmedActivationPayment(payment);
-            return (entryParticipation.Id, ProgrammeParticipationKind.Entry);
+            return (
+                entryParticipation.Id,
+                ProgrammeParticipationKind.Entry,
+                entryParticipation.Status == EntryParticipationStatus.Active);
         }
 
         private static void EnsureSupportedPurpose(MemberPaymentPurpose purpose)
