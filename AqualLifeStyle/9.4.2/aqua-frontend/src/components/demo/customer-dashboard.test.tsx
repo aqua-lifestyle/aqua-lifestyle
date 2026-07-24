@@ -271,14 +271,34 @@ describe("CustomerDashboard", () => {
     );
   });
 
-  it("changes to another membership tier", async () => {
+  it("routes Onyx joining through the programme participation workflow", async () => {
     render(<CustomerDashboard />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Upgrade/ }));
+    expect(
+      screen.getByRole("link", { name: "View programmes" }),
+    ).toHaveAttribute("href", "/member/programmes");
+    expect(screen.queryByText("Premium membership")).not.toBeInTheDocument();
+    expect(changeMembership).not.toHaveBeenCalled();
+  });
 
-    await waitFor(() => {
-      expect(changeMembership).toHaveBeenCalledWith({ membershipId: 2 });
+  it("gives customers with a legacy Onyx selection a completion path", async () => {
+    vi.mocked(useCustomersState).mockReturnValue({
+      ...customersState,
+      myCustomer: {
+        ...customersState.myCustomer!,
+        membershipId: 2,
+      },
     });
+
+    render(<CustomerDashboard />);
+
+    expect(
+      screen.getByText(/previous Onyx selection still needs to be completed/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Complete Onyx joining" }),
+    ).toHaveAttribute("href", "/member/programmes");
+    expect(screen.queryByText("Current plan")).not.toBeInTheDocument();
   });
 
   it("reserves an eligible product", async () => {

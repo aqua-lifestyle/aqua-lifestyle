@@ -180,22 +180,24 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task MembershipPlans_IncludePlatformAndCurrentAreaPlans_AndAllowPlatformAssignment()
+        public async Task MembershipPlans_ExcludeOnyxAndOtherAreaPlans_AndAllowPlatformAssignment()
         {
             var planIds = await UsingDbContextAsync((int?)null, async context =>
             {
                 var platformPlan = Membership.Create(null, $"Platform-{Guid.NewGuid():N}", "Available in every Area", MembershipType.Jasper);
-                var currentAreaPlan = Membership.Create(1, $"Area-1-{Guid.NewGuid():N}", "Available in the current Area", MembershipType.Onyx);
-                var otherAreaPlan = Membership.Create(2, $"Area-2-{Guid.NewGuid():N}", "Available in another Area", MembershipType.AQGreen);
-                context.Memberships.AddRange(platformPlan, currentAreaPlan, otherAreaPlan);
+                var currentAreaPlan = Membership.Create(1, $"Area-1-{Guid.NewGuid():N}", "Available in the current Area", MembershipType.AQGreen);
+                var onyxProgramme = Membership.Create(1, $"Onyx-{Guid.NewGuid():N}", "Joined through programme participation", MembershipType.Onyx);
+                var otherAreaPlan = Membership.Create(2, $"Area-2-{Guid.NewGuid():N}", "Available in another Area", MembershipType.BusinessPremier);
+                context.Memberships.AddRange(platformPlan, currentAreaPlan, onyxProgramme, otherAreaPlan);
                 await context.SaveChangesAsync();
-                return new[] { platformPlan.Id, currentAreaPlan.Id, otherAreaPlan.Id };
+                return new[] { platformPlan.Id, currentAreaPlan.Id, onyxProgramme.Id, otherAreaPlan.Id };
             });
 
             var options = await _service.GetMembershipOptionsAsync(new AdminCustomerMembershipOptionsInput { TenantId = 1 });
             options.Select(option => option.Id).ShouldContain(planIds[0]);
             options.Select(option => option.Id).ShouldContain(planIds[1]);
             options.Select(option => option.Id).ShouldNotContain(planIds[2]);
+            options.Select(option => option.Id).ShouldNotContain(planIds[3]);
 
             var email = $"platform-member-{Guid.NewGuid():N}@example.com";
             var customer = (await _service.CreateAsync(new AdminCreateCustomerInput

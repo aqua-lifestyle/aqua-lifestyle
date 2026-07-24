@@ -110,6 +110,12 @@ namespace AqualLifeStyle.Domain.Memberships
 
         public void EnsureCanBeAssignedToCustomer()
         {
+            if (MembershipType == MembershipType.Onyx)
+            {
+                throw new InvalidOperationException(
+                    "Onyx must be joined through programme participation and cannot be assigned as a membership plan.");
+            }
+
             if (!IsActive)
             {
                 throw new InvalidOperationException("Inactive memberships cannot be assigned to new customers.");

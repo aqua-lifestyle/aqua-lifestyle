@@ -36,7 +36,9 @@ namespace AqualLifeStyle.Application.Memberships
         public async Task<IReadOnlyList<MembershipDto>> GetActiveTiersAsync()
         {
             var memberships = await _membershipRepository.GetAll()
-                .Where(membership => membership.IsActive)
+                .Where(membership =>
+                    membership.IsActive &&
+                    membership.MembershipType != MembershipType.Onyx)
                 .ToListAsync();
             return _objectMapper.Map<List<MembershipDto>>(memberships);
         }

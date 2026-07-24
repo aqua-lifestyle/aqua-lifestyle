@@ -73,6 +73,33 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task StartingOnyxParticipation_ClearsLegacyDirectMembershipAssignment()
+        {
+            var customerId = await RegisterAndSignInCustomerAsync();
+            var onyxMembershipId = await UsingDbContextAsync(1, async context =>
+            {
+                return await context.Memberships
+                    .Where(membership => membership.MembershipType == MembershipType.Onyx)
+                    .Select(membership => membership.Id)
+                    .FirstAsync();
+            });
+            var customerRepository = Resolve<ICustomerRepository>();
+            var customer = await customerRepository.GetAsync(customerId);
+            customer.ChangeMembership(onyxMembershipId);
+            await customerRepository.UpdateAsync(customer);
+
+            var participation = await _participationService.StartDirectOnyxAsync(
+                new StartDirectOnyxParticipationInput());
+
+            participation.Status.ShouldBe("Awaiting full payment");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var customer = await context.Customers.SingleAsync(item => item.Id == customerId);
+                customer.MembershipId.ShouldBeNull();
+            });
+        }
+
+        [Fact]
         public async Task JoiningUnderRecruiter_RequiresActiveParticipationInSameProgramme()
         {
             var customerId = await RegisterAndSignInCustomerAsync();

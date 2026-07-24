@@ -96,7 +96,14 @@ namespace AqualLifeStyle.Application.Customers
                 throw new UserFriendlyException("Membership change failed.", "The selected membership does not exist.");
             }
 
-            membership.EnsureCanBeAssignedToCustomer();
+            try
+            {
+                membership.EnsureCanBeAssignedToCustomer();
+            }
+            catch (InvalidOperationException exception)
+            {
+                throw new UserFriendlyException("Membership change failed.", exception.Message);
+            }
             customer.ChangeMembership(input.MembershipId.Value);
             await _customerRepository.UpdateAsync(customer);
 

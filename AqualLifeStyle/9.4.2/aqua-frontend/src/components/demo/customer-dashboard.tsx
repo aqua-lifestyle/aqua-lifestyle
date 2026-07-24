@@ -45,6 +45,7 @@ const formatDate = (date: string) => {
 };
 
 const MEMBERSHIP_LABELS = ["Jasper", "Onyx", "AQGreen", "Business Premier"];
+const ONYX_PROGRAMME_CONFIGURATION_TYPE = 1;
 
 export const CustomerDashboard = () => {
   const hasMounted = useHydrated();
@@ -124,13 +125,20 @@ export const CustomerDashboard = () => {
     isReady,
   ]);
 
-  const currentMembership = myCustomer?.membershipId
+  const assignedMembership = myCustomer?.membershipId
     ? memberships.find((m) => m.id === myCustomer.membershipId) ?? null
     : null;
+  const hasLegacyOnyxSelection =
+    assignedMembership?.membershipType === ONYX_PROGRAMME_CONFIGURATION_TYPE;
+  const currentMembership = hasLegacyOnyxSelection ? null : assignedMembership;
 
   const availableTiers = useMemo(() => {
     if (!memberships.length) return [];
-    return memberships.filter((m) => m.isActive);
+    return memberships.filter(
+      (membership) =>
+        membership.isActive &&
+        membership.membershipType !== ONYX_PROGRAMME_CONFIGURATION_TYPE,
+    );
   }, [memberships]);
 
   const currentSavingsWindow = useMemo(() => {
@@ -294,6 +302,24 @@ export const CustomerDashboard = () => {
           </StatusMessage>
         ) : null}
 
+        {hasLegacyOnyxSelection ? (
+          <StatusMessage tone="info">
+            <span>
+              Your previous Onyx selection still needs to be completed. Confirm
+              how you are joining so the system can record your payment and
+              activation progress.
+            </span>
+            <LinkButton
+              className="ml-3"
+              href="/member/programmes"
+              size="sm"
+              variant="outline"
+            >
+              Complete Onyx joining
+            </LinkButton>
+          </StatusMessage>
+        ) : null}
+
         {isOrderError ? (
           <StatusMessage tone="error">
             {orderErrorMessage ?? "Unable to reserve this product."}
@@ -396,6 +422,19 @@ export const CustomerDashboard = () => {
                       No membership tiers are available right now.
                     </div>
                   ) : null}
+                  <div className="flex items-center justify-between gap-4 rounded-lg border border-accent/25 bg-accent/5 px-4 py-3">
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        Entry and Onyx programmes
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Choose how to join, then follow your payment and activation progress.
+                      </p>
+                    </div>
+                    <LinkButton href="/member/programmes" size="sm">
+                      View programmes
+                    </LinkButton>
+                  </div>
                 </div>
               </div>
             </div>
