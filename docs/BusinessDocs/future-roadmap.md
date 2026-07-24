@@ -61,6 +61,8 @@
 - [x] Member-accepted and administrator-approved Onyx loan agreement domain and persistence foundation
 - [x] Four explicit weekly minimum repayments and three-month settlement deadline foundation
 - [x] Member-only loan compliance holds and idempotent release domain transitions
+- [x] Secured Club Member loan history and administrator reconciliation views
+- [ ] Loan offer, member acceptance, Club approval, and provider-confirmed repayment workflows
 - [ ] Inventory and explicitly migrate legacy `BusinessPremier` membership data
 - [ ] Investment project catalog and participation (60/40 profit share, bi-quarterly distribution)
 - [ ] Funeral plan auto-link for Club Millionaire (R30,000, 6-month waiting)

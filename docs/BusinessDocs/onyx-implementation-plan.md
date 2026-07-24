@@ -230,11 +230,17 @@ The provider-neutral Onyx loan lifecycle foundation is complete:
   idempotent release transition;
 - the agreement, requirements, repayment allocations, payment references, and
   audit fields are persisted by the PostgreSQL model.
+- Club Members can securely review their persisted loan terms, weekly
+  requirements, confirmed repayments, outstanding balance, and any own-payout
+  hold;
+- administrators can reconcile persisted loan agreements within their Area,
+  while a host-wide view separately requires all-Areas permission.
 
-Secured member acceptance, administrator approval, provider callback,
-reconciliation, and automated payout orchestration remain application-workflow work. A
-loan agreement does not yet create an Onyx participation because the placement
-of a graduating member in the Onyx network has not been confirmed.
+Loan offer creation, secured member acceptance, administrator approval,
+provider callbacks, payment allocation workflows, and automated payout
+orchestration remain application-workflow work. A loan agreement does not yet
+create an Onyx participation because the placement of a graduating member in
+the Onyx network has not been confirmed.
 
 ### Phase 5 Onyx network and earnings status
 
