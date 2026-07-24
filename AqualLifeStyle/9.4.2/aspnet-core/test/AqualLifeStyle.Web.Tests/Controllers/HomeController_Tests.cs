@@ -19,6 +19,7 @@ using AqualLifeStyle.Authentication.JwtBearer;
 
 namespace AqualLifeStyle.Web.Tests.Controllers
 {
+    [Collection("Authentication web journeys")]
     public class HomeController_Tests: AqualLifeStyleWebTestBase
     {
         private void EnsureAdminPassword(int? tenantId, string password)
