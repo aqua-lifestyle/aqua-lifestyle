@@ -199,7 +199,7 @@ namespace AqualLifeStyle.Domain.Onyx
             if (paidAt == default)
             {
                 throw new ArgumentException(
-                    "The payment time cannot precede release.",
+                    "A commission payment time is required.",
                     nameof(paidAt));
             }
 
