@@ -102,6 +102,11 @@ export const apiEndpoints = {
     getAdminAccounts: "/api/services/app/AdminSavings/GetAll",
     getMyAccount: "/api/services/app/ClubMemberSavings/GetMyAccount",
   },
+  loans: {
+    getAdminAgreements: "/api/services/app/AdminOnyxLoan/GetAll",
+    getMyAgreements:
+      "/api/services/app/ClubMemberOnyxLoan/GetMyAgreements",
+  },
   weeklyEarnings: {
     calculateLatestClosedWeek:
       "/api/services/app/AdminCommission/CalculateLatestClosedWeek",

@@ -42,6 +42,7 @@ const SetSession = () => {
               "Aqua.Members.Delete",
               "Aqua.Admin.Customers.View",
               "Aqua.Savings.ViewSelf",
+              "Aqua.Loans.ViewSelf",
               "Pages.Customers",
               "Pages.Products",
               "Pages.Enquiries",
@@ -84,6 +85,10 @@ describe("Navbar", () => {
     expect(screen.getByRole("link", { name: "My savings" })).toHaveAttribute(
       "href",
       "/member/savings",
+    );
+    expect(screen.getByRole("link", { name: "My loans" })).toHaveAttribute(
+      "href",
+      "/member/loans",
     );
   });
 

@@ -29,6 +29,7 @@ describe("AdminSidebar", () => {
       "Aqua.Admin.ProgrammeParticipations.View",
       "Aqua.Admin.Commissions.View",
       "Aqua.Admin.Savings.View",
+      "Aqua.Admin.Loans.View",
       "Aqua.Admin.Users.View",
       "Pages.Roles",
     ]));
@@ -44,6 +45,7 @@ describe("AdminSidebar", () => {
     expect(screen.getByRole("link", { name: "Programme participation" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Weekly earnings" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Savings accounts" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Loan agreements" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Areas" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Club members" })).not.toBeInTheDocument();
   });
