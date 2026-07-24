@@ -107,6 +107,12 @@ export const apiEndpoints = {
     getMyAgreements:
       "/api/services/app/ClubMemberOnyxLoan/GetMyAgreements",
   },
+  entryMonthlyObligations: {
+    getAdminObligations:
+      "/api/services/app/AdminEntryMonthlyObligation/GetAll",
+    getMyObligations:
+      "/api/services/app/ClubMemberEntryMonthlyObligation/GetMyObligations",
+  },
   weeklyEarnings: {
     calculateLatestClosedWeek:
       "/api/services/app/AdminCommission/CalculateLatestClosedWeek",

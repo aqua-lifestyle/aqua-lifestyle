@@ -43,6 +43,7 @@ const SetSession = () => {
               "Aqua.Admin.Customers.View",
               "Aqua.Savings.ViewSelf",
               "Aqua.Loans.ViewSelf",
+              "Aqua.EntryMonthlyObligations.ViewSelf",
               "Pages.Customers",
               "Pages.Products",
               "Pages.Enquiries",
@@ -90,6 +91,9 @@ describe("Navbar", () => {
       "href",
       "/member/loans",
     );
+    expect(
+      screen.getByRole("link", { name: "Entry commitments" }),
+    ).toHaveAttribute("href", "/member/entry-commitments");
   });
 
   it("highlights the active link", async () => {

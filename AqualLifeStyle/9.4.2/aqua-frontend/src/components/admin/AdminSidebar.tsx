@@ -32,6 +32,7 @@ const adminLinks = [
   { href: "/admin/weekly-earnings", icon: HandCoins, label: "Weekly earnings", permission: "Aqua.Admin.Commissions.View" },
   { href: "/admin/savings", icon: PiggyBank, label: "Savings accounts", permission: "Aqua.Admin.Savings.View" },
   { href: "/admin/loans", icon: HandCoins, label: "Loan agreements", permission: "Aqua.Admin.Loans.View" },
+  { href: "/admin/entry-commitments", icon: HandCoins, label: "Entry commitments", permission: "Aqua.Admin.EntryMonthlyObligations.View" },
 ] as const;
 
 export const AdminSidebar = () => {
