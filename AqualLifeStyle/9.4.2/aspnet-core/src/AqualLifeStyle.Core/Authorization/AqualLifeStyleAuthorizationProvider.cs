@@ -156,6 +156,15 @@ namespace AqualLifeStyle.Authorization
                 AquaPermissions.Admin.Commissions.Release,
                 AquaPermissions.Admin.Commissions.RecordPayment);
 
+            var savings = admin.CreateChildPermission(
+                AquaPermissions.Admin.Savings.Default,
+                L(AquaPermissions.Admin.Savings.Default),
+                multiTenancySides: sides);
+            CreateChildren(
+                savings,
+                sides,
+                AquaPermissions.Admin.Savings.View);
+
             CreateChildren(admin, host, AquaPermissions.Admin.AllTenants);
             var tenants = admin.CreateChildPermission(
                 AquaPermissions.Admin.Tenants.Default,

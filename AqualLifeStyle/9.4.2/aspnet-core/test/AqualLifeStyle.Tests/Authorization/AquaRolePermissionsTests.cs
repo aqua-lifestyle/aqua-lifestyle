@@ -43,6 +43,17 @@ namespace AqualLifeStyle.Tests.Authorization
         }
 
         [Fact]
+        public void NestedAdminSavingsPermissions_AreIncludedForSystemAdmin()
+        {
+            AquaPermissions.GetAll().ShouldContain(
+                AquaPermissions.Admin.Savings.Default);
+            AquaPermissions.GetAll().ShouldContain(
+                AquaPermissions.Admin.Savings.View);
+            AquaRolePermissions.GetFor(AquaUserRole.SystemAdmin).ShouldContain(
+                AquaPermissions.Admin.Savings.View);
+        }
+
+        [Fact]
         public void Guest_HasOnlySelfServicePermissions()
         {
             AquaRolePermissions.GetFor(AquaUserRole.Guest).ShouldBe(new[]
@@ -99,6 +110,7 @@ namespace AqualLifeStyle.Tests.Authorization
         [InlineData(AquaPermissions.Admin.Commissions.Calculate, AquaPermissions.Admin.Commissions.Default)]
         [InlineData(AquaPermissions.Admin.Commissions.Release, AquaPermissions.Admin.Commissions.Default)]
         [InlineData(AquaPermissions.Admin.Commissions.RecordPayment, AquaPermissions.Admin.Commissions.Default)]
+        [InlineData(AquaPermissions.Admin.Savings.View, AquaPermissions.Admin.Savings.Default)]
         public void Provider_RegistersExpectedParent(string childName, string parentName)
         {
             var permissions = PermissionFinder.GetAllPermissions(new AqualLifeStyleAuthorizationProvider());

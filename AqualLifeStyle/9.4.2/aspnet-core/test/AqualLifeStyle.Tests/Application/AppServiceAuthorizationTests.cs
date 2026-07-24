@@ -10,6 +10,7 @@ using AqualLifeStyle.Application.Admin.Facilitators;
 using AqualLifeStyle.Application.Admin.Members;
 using AqualLifeStyle.Application.Admin.Tenants;
 using AqualLifeStyle.Application.Admin.Commissions;
+using AqualLifeStyle.Application.Admin.Savings;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Enquiries;
@@ -19,6 +20,7 @@ using AqualLifeStyle.Application.MyAccount;
 using AqualLifeStyle.Application.Orders;
 using AqualLifeStyle.Application.Products;
 using AqualLifeStyle.Application.Referrals;
+using AqualLifeStyle.Application.Savings;
 using AqualLifeStyle.Authorization;
 using Shouldly;
 using Xunit;
@@ -178,6 +180,19 @@ namespace AqualLifeStyle.Tests.Application
             AssertHostWideFinancialAction(
                 nameof(AdminCommissionAppService.RecordPaymentAsync),
                 AquaPermissions.Admin.Commissions.RecordPayment);
+        }
+
+        [Fact]
+        public void SavingsServices_ShouldSeparateSelfAndAdministratorViews()
+        {
+            AssertAuthorizeAttribute(
+                typeof(ClubMemberSavingsAppService),
+                nameof(ClubMemberSavingsAppService.GetMyAccountAsync),
+                AquaPermissions.Savings.ViewSelf);
+            AssertAuthorizeAttribute(
+                typeof(AdminSavingsAppService),
+                nameof(AdminSavingsAppService.GetAllAsync),
+                AquaPermissions.Admin.Savings.View);
         }
 
         [Fact]

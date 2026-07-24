@@ -185,6 +185,12 @@ namespace AqualLifeStyle.Authorization
                 public const string Release = Default + ".Release";
                 public const string RecordPayment = Default + ".RecordPayment";
             }
+
+            public static class Savings
+            {
+                public const string Default = Admin.Default + ".Savings";
+                public const string View = Default + ".View";
+            }
         }
 
         private static readonly Lazy<IReadOnlyCollection<string>> AllPermissionNames =
