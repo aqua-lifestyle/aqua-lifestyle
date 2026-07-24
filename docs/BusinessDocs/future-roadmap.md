@@ -41,7 +41,8 @@
 - [x] Domain and persistence foundations for complete-level Entry commissions and the approved Onyx Level 1 R250 commission
 - [x] Onyx structural qualification through Level 5 without enabling unapproved higher-level earnings
 - [x] Level 3 travel eligibility, three-month waiting period, and activation tracking
-- [ ] Secured administrator calculation, review, release, and payment workflows
+- [x] Secured administrator calculation and review for the latest completed Johannesburg week
+- [ ] Administrator release and payment workflows
 - [ ] Onyx Levels 2–5 commission rules after their cumulative totals are approved
 - [ ] Jasper activation plans (Standard R950 / Premium R1200) with combo allocation
 - [ ] Virtual membership cards with QR codes

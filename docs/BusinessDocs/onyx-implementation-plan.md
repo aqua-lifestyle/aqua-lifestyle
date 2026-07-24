@@ -183,8 +183,23 @@ The Entry weekly commission-ledger foundation is also complete:
 - an overdue customer's own record is held, while structural network
   qualification remains unchanged and no unconfirmed upline effect is applied.
 
-The secured administrator-triggered calculation, discrepancy reporting, and
-automatic scheduling remain application-layer work.
+The secured administrator-triggered calculation and review workflow is complete:
+
+- only a host administrator with both the dedicated calculation permission and
+  all-Areas access can prepare earnings;
+- the calculation derives the latest fully completed Monday-to-Sunday week in
+  `Africa/Johannesburg` time rather than accepting administrator-entered dates;
+- active Entry networks are evaluated across Areas while ledger records are
+  created only for the selected Area;
+- repeating the calculation returns the existing period without duplicating
+  ledger records;
+- Area-scoped administrators can review only their own Area, while unscoped host
+  review requires all-Areas permission;
+- the administrator interface describes the records as weekly earnings and
+  states that calculation does not release or pay funds.
+
+Discrepancy reporting, release, payment, and automatic scheduling remain
+application-layer work.
 
 ### Phase 4 loan-agreement status
 
@@ -236,9 +251,11 @@ The independently calculated Onyx network foundation is complete:
 - earned commission is released and marked paid through explicit, idempotent
   transitions.
 
-Secured calculation, review, release, and payment workflows remain
-application-layer work. No Onyx hold rule has been inferred from Entry
-obligations or the unresolved effect of overdue members on their uplines.
+Secured calculation and review use the same latest-completed-week, permission,
+Area-scope, audit, and idempotency controls documented for Entry. Release and
+payment workflows remain application-layer work. No Onyx hold rule has been
+inferred from Entry obligations or the unresolved effect of overdue members on
+their uplines.
 
 ### Phase 6 benefits and separate accounts status
 
