@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 
 import { cn } from "@/src/shared/lib/utils";
 
@@ -29,14 +29,15 @@ export const Dialog = ({
   title,
 }: DialogProps) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
 
-    if (open) {
+    if (open && !dialog.open) {
       dialog.showModal();
-    } else {
+    } else if (!open && dialog.open) {
       dialog.close();
     }
   }, [open]);
@@ -57,6 +58,7 @@ export const Dialog = ({
 
   return (
     <dialog
+      aria-labelledby={titleId}
       ref={dialogRef}
       className={cn(
         "m-auto rounded-2xl bg-card p-0 text-card-foreground shadow-lg backdrop:bg-primary/20 backdrop:backdrop-blur-sm",
@@ -71,7 +73,7 @@ export const Dialog = ({
     >
       <div className="flex flex-col gap-4 p-6">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold" id="dialog-title">
+          <h2 className="text-lg font-semibold" id={titleId}>
             {title}
           </h2>
           <button

@@ -102,5 +102,7 @@ export const apiEndpoints = {
     calculateLatestClosedWeek:
       "/api/services/app/AdminCommission/CalculateLatestClosedWeek",
     getAll: "/api/services/app/AdminCommission/GetAll",
+    recordPayment: "/api/services/app/AdminCommission/RecordPayment",
+    release: "/api/services/app/AdminCommission/Release",
   },
 } as const;

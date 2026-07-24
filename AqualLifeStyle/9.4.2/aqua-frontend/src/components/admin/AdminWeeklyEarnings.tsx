@@ -17,6 +17,8 @@ import {
   Tabs,
 } from "@/src/shared/ui";
 import { AdminAreaSelectionField } from "./AdminAreaSelectionField";
+import { AdminJustificationDialog } from "./AdminJustificationDialog";
+import { RecordWeeklyEarningPaymentDialog } from "./RecordWeeklyEarningPaymentDialog";
 
 type Programme = "entry" | "onyx";
 
@@ -38,7 +40,11 @@ type WeeklyEarning = {
   id: string;
   periodEnd: string;
   periodStart: string;
+  paidAt: string | null;
+  paymentReference: string | null;
   programmeName: string;
+  releasedAt: string | null;
+  releaseReason: string | null;
   status: string;
   tenantId: number;
   totalAmount: number;
@@ -63,6 +69,8 @@ type CalculationResult = {
 
 const VIEW_PERMISSION = "Aqua.Admin.Commissions.View";
 const CALCULATE_PERMISSION = "Aqua.Admin.Commissions.Calculate";
+const RELEASE_PERMISSION = "Aqua.Admin.Commissions.Release";
+const RECORD_PAYMENT_PERMISSION = "Aqua.Admin.Commissions.RecordPayment";
 
 const programmeValue = (programme: Programme) =>
   programme === "entry" ? 0 : 1;
@@ -83,6 +91,8 @@ export const AdminWeeklyEarnings = () => {
   const permissions = session?.user?.permissions ?? [];
   const canView = permissions.includes(VIEW_PERMISSION);
   const canCalculate = permissions.includes(CALCULATE_PERMISSION);
+  const canRelease = permissions.includes(RELEASE_PERMISSION);
+  const canRecordPayment = permissions.includes(RECORD_PAYMENT_PERMISSION);
   const [programme, setProgramme] = useState<Programme>("entry");
   const [selectedAreaId, setSelectedAreaId] = useState("");
   const [earnings, setEarnings] = useState<WeeklyEarning[]>([]);
@@ -156,6 +166,28 @@ export const AdminWeeklyEarnings = () => {
     } finally {
       setCalculating(false);
     }
+  };
+
+  const releaseForPayment = async (
+    earning: WeeklyEarning,
+    justification: string,
+  ) => {
+    await httpClient.post(apiEndpoints.weeklyEarnings.release, {
+      id: earning.id,
+      justification,
+      programme: programmeValue(programme),
+    });
+    setCalculationNotice(
+      `${earning.customerName}'s earnings were released for external payment. No money was transferred by the platform.`,
+    );
+    await loadEarnings();
+  };
+
+  const paymentRecorded = async (earning: WeeklyEarning) => {
+    setCalculationNotice(
+      `${earning.customerName}'s external payment was recorded.`,
+    );
+    await loadEarnings();
   };
 
   const totalEarned = useMemo(
@@ -258,10 +290,53 @@ export const AdminWeeklyEarnings = () => {
               {item.holdReason}
             </span>
           ) : null}
+          {item.paymentReference ? (
+            <span className="text-xs text-muted-foreground">
+              Reference: {item.paymentReference}
+            </span>
+          ) : null}
         </div>
       ),
       sortable: true,
     },
+    ...(canRelease || canRecordPayment ? [{
+      header: "Actions",
+      key: "actions",
+      render: (item: WeeklyEarning) => (
+        <div className="flex flex-wrap gap-2">
+          {canRelease && item.status === "Earned — awaiting release" ? (
+            <AdminJustificationDialog
+              confirmLabel="Release for payment"
+              description={`Approve ${item.customerName}'s calculated earnings for external payment. This does not transfer money.`}
+              onConfirm={(justification) =>
+                releaseForPayment(item, justification)}
+              title="Release weekly earnings"
+              triggerLabel="Release for payment"
+            />
+          ) : null}
+          {canRecordPayment &&
+          item.status === "Released — awaiting payment" ? (
+            <RecordWeeklyEarningPaymentDialog
+              earning={{
+                customerName: item.customerName,
+                id: item.id,
+                programme: programmeValue(programme),
+              }}
+              onRecorded={() => paymentRecorded(item)}
+            />
+          ) : null}
+          {!(
+            (canRelease && item.status === "Earned — awaiting release") ||
+            (canRecordPayment &&
+              item.status === "Released — awaiting payment")
+          ) ? (
+            <span className="text-xs text-muted-foreground">
+              No action available
+            </span>
+          ) : null}
+        </div>
+      ),
+    }] : []),
   ];
 
   const table = loading ? (

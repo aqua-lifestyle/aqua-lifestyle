@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthState } from "@/src/providers";
@@ -47,22 +53,60 @@ const weeklyEarnings = {
       id: "earning-1",
       periodEnd: "2026-07-19T21:59:59Z",
       periodStart: "2026-07-12T22:00:00Z",
+      paidAt: null,
+      paymentReference: null,
       programmeName: "Entry",
+      releasedAt: null,
+      releaseReason: null,
       status: "Earned — awaiting release",
       tenantId: 3,
       totalAmount: 150,
     },
+    {
+      calculatedAt: "2026-07-20T08:00:00Z",
+      components: [{ amount: 150, level: 1 }],
+      currency: "ZAR",
+      customerId: 43,
+      customerName: "Lethabo Mokoena",
+      email: "lethabo@example.com",
+      highestCommissionedLevel: 1,
+      highestQualifiedLevel: 1,
+      holdReason: null,
+      id: "earning-2",
+      paidAt: null,
+      paymentReference: null,
+      periodEnd: "2026-07-19T21:59:59Z",
+      periodStart: "2026-07-12T22:00:00Z",
+      programmeName: "Entry",
+      releasedAt: "2026-07-20T09:00:00Z",
+      releaseReason: "Eligible weekly commission released.",
+      status: "Released — awaiting payment",
+      tenantId: 3,
+      totalAmount: 150,
+    },
   ],
-  totalCount: 1,
+  totalCount: 2,
 };
 
 describe("AdminWeeklyEarnings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    HTMLDialogElement.prototype.showModal = vi.fn(function (
+      this: HTMLDialogElement,
+    ) {
+      this.setAttribute("open", "");
+    });
+    HTMLDialogElement.prototype.close = vi.fn(function (
+      this: HTMLDialogElement,
+    ) {
+      this.removeAttribute("open");
+    });
     vi.mocked(useAuthState).mockReturnValue(
       authState([
         "Aqua.Admin.Commissions.View",
         "Aqua.Admin.Commissions.Calculate",
+        "Aqua.Admin.Commissions.Release",
+        "Aqua.Admin.Commissions.RecordPayment",
       ]),
     );
     vi.mocked(httpClient.get).mockImplementation(async (url) =>
@@ -90,7 +134,9 @@ describe("AdminWeeklyEarnings", () => {
     render(<AdminWeeklyEarnings />);
 
     await screen.findByText("Dora Shongwe");
-    expect(screen.getAllByText(/R\s*150\.00/).length).toBeGreaterThan(0);
+    expect(
+      screen.getByText("Earned — awaiting release"),
+    ).toBeInTheDocument();
     expect(httpClient.get).toHaveBeenCalledWith(
       `${apiEndpoints.weeklyEarnings.getAll}?Programme=0&MaxResultCount=100`,
     );
@@ -123,6 +169,72 @@ describe("AdminWeeklyEarnings", () => {
     expect(
       await screen.findByText(/were prepared for 6 Club Members/i),
     ).toBeInTheDocument();
+  });
+
+  it("separates release approval from recording an external payment", async () => {
+    render(<AdminWeeklyEarnings />);
+    await screen.findByText("Dora Shongwe");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Release for payment" }),
+    );
+    const releaseDialog = screen.getByRole("dialog", {
+      name: "Release weekly earnings",
+    });
+    fireEvent.change(
+      within(releaseDialog).getByLabelText("Reason for action"),
+      { target: { value: "Calculation reviewed and approved." } },
+    );
+    fireEvent.click(
+      within(releaseDialog).getByRole("button", {
+        name: "Release for payment",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(httpClient.post).toHaveBeenCalledWith(
+        apiEndpoints.weeklyEarnings.release,
+        {
+          id: "earning-1",
+          justification: "Calculation reviewed and approved.",
+          programme: 0,
+        },
+      ),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Record external payment" }),
+    );
+    const paymentDialog = screen.getByRole("dialog", {
+      name: "Record external payment",
+    });
+    fireEvent.change(
+      within(paymentDialog).getByLabelText("External payment reference"),
+      { target: { value: "bank-payment-entry-2" } },
+    );
+    fireEvent.change(
+      within(paymentDialog).getByLabelText(
+        "Reason for recording this payment",
+      ),
+      { target: { value: "Bank transfer confirmed." } },
+    );
+    fireEvent.click(
+      within(paymentDialog).getByRole("button", {
+        name: "Confirm payment record",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(httpClient.post).toHaveBeenCalledWith(
+        apiEndpoints.weeklyEarnings.recordPayment,
+        {
+          id: "earning-2",
+          justification: "Bank transfer confirmed.",
+          paymentReference: "bank-payment-entry-2",
+          programme: 0,
+        },
+      ),
+    );
   });
 
   it("does not load records without the review permission", () => {
