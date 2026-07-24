@@ -80,6 +80,29 @@ describe("MemberProgrammes", () => {
     await waitFor(() => expect(httpClient.get).toHaveBeenCalledTimes(2));
   });
 
+  it("starts Onyx for a customer without a membership assignment", async () => {
+    render(<MemberProgrammes />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Join Onyx" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm joining choice" }),
+    );
+
+    await waitFor(() =>
+      expect(httpClient.post).toHaveBeenCalledWith(
+        apiEndpoints.programmeParticipations.startDirectOnyx,
+        { recruiterCustomerId: null },
+      ),
+    );
+    expect(
+      await screen.findByText(/Onyx participation started/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/pending the confirmed R6,120 payment/i))
+      .toBeInTheDocument();
+  });
+
   it("does not load participation without the dedicated permission", () => {
     vi.mocked(useAuthState).mockReturnValue(authState([]));
 
