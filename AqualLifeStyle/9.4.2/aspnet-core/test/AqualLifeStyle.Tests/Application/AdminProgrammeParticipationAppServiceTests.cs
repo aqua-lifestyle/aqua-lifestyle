@@ -85,7 +85,7 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task HostReviewerWithoutAllAreasPermission_CannotRequestAllParticipations()
+        public async Task HostReviewerWithoutAllAreasPermission_CannotRequestAreaParticipations()
         {
             var suffix = Guid.NewGuid().ToString("N");
             var userName = $"host-programme-reviewer-{suffix}";
@@ -119,6 +119,7 @@ namespace AqualLifeStyle.Tests.Application
             await Should.ThrowAsync<AbpAuthorizationException>(() =>
                 _service.GetAllAsync(new AdminProgrammeParticipationListInput
                 {
+                    TenantId = 1,
                     Programme = AdminProgrammeType.Entry
                 }));
         }

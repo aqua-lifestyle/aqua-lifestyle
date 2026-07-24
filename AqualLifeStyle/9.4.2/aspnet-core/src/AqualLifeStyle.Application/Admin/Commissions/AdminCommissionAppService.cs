@@ -72,7 +72,6 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             input ??= new AdminCommissionListInput();
             ValidateRequestedTenant(input.TenantId, "Commission");
             if (!AbpSession.TenantId.HasValue &&
-                !input.TenantId.HasValue &&
                 !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
             {
                 throw new AbpAuthorizationException(
@@ -157,14 +156,13 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                         TryMutation(
                             () => commission.ReleaseEligiblePayout(releasedAt),
                             "Weekly earnings release");
+                        LogMutation(
+                            commission.TenantId,
+                            commission.Id,
+                            "Onyx",
+                            "released for payment",
+                            input.Justification);
                     }
-
-                    LogMutation(
-                        commission.TenantId,
-                        commission.Id,
-                        "Onyx",
-                        "released for payment",
-                        input.Justification);
                 }
                 else
                 {
@@ -179,14 +177,13 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                         TryMutation(
                             () => commission.ReleaseEligiblePayout(releasedAt),
                             "Weekly earnings release");
+                        LogMutation(
+                            commission.TenantId,
+                            commission.Id,
+                            "Entry",
+                            "released for payment",
+                            input.Justification);
                     }
-
-                    LogMutation(
-                        commission.TenantId,
-                        commission.Id,
-                        "Entry",
-                        "released for payment",
-                        input.Justification);
                 }
 
                 await CurrentUnitOfWork.SaveChangesAsync();

@@ -35,7 +35,6 @@ namespace AqualLifeStyle.Application.Admin.Loans
             input ??= new AdminOnyxLoanAgreementListInput();
             ValidateRequestedTenant(input.TenantId, "Loan");
             if (!AbpSession.TenantId.HasValue &&
-                !input.TenantId.HasValue &&
                 !await PermissionChecker.IsGrantedAsync(
                     AquaPermissions.Admin.AllTenants))
             {

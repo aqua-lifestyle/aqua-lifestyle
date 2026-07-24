@@ -125,7 +125,7 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task HostReviewerWithoutAllAreasPermission_CannotRequestAllLoans()
+        public async Task HostReviewerWithoutAllAreasPermission_CannotRequestAreaLoans()
         {
             var suffix = Guid.NewGuid().ToString("N");
             var userName = $"host-loan-reviewer-{suffix}";
@@ -160,6 +160,7 @@ namespace AqualLifeStyle.Tests.Application
                 _adminService.GetAllAsync(
                     new AdminOnyxLoanAgreementListInput
                     {
+                        TenantId = 1,
                         MaxResultCount = 20
                     }));
         }

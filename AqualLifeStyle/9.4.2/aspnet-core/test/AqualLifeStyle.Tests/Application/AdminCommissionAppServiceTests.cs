@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Abp.Authorization;
+using Castle.Core.Logging;
 using AqualLifeStyle.Application.Admin.Commissions;
 using AqualLifeStyle.Application.Admin.Commissions.Dto;
 using AqualLifeStyle.Application.ProgrammeParticipations;
@@ -9,9 +11,14 @@ using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
+using AqualLifeStyle.Authorization;
+using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.EntityFrameworkCore;
+using Moq;
 using Shouldly;
 using Xunit;
+using RolePermissionSetting = Abp.Authorization.Roles.RolePermissionSetting;
+using UserRole = Abp.Authorization.Users.UserRole;
 
 namespace AqualLifeStyle.Tests.Application
 {
@@ -65,6 +72,9 @@ namespace AqualLifeStyle.Tests.Application
             earnedCommission.Status.ShouldBe("Earned — awaiting release");
             earnedCommission.Components.Single().Level.ShouldBe(1);
 
+            var releaseService = (AdminCommissionAppService)_service;
+            var logger = new Mock<ILogger>();
+            releaseService.Logger = logger.Object;
             await _service.ReleaseAsync(new ReleaseWeeklyEarningInput
             {
                 Id = earnedCommission.Id,
@@ -77,6 +87,11 @@ namespace AqualLifeStyle.Tests.Application
                 Programme = AdminCommissionProgramme.Entry,
                 Justification = "Repeated request after reviewing the weekly calculation."
             });
+            logger.Verify(
+                item => item.Info(It.Is<string>(message =>
+                    message.Contains("released for payment") &&
+                    message.Contains("programme=Entry"))),
+                Times.Once);
 
             var releasedReview = await _service.GetAllAsync(
                 new AdminCommissionListInput
@@ -120,6 +135,46 @@ namespace AqualLifeStyle.Tests.Application
             paidCommission.PaymentReference.ShouldBe(
                 "bank-payment-2026-07-entry-1");
             paidCommission.PaidAt.ShouldNotBeNull();
+        }
+
+        [Fact]
+        public async Task HostReviewerWithoutAllAreas_CannotReviewOneArea()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userName = $"host-earnings-reviewer-{suffix}";
+            var userId = await CreateTestUserAsync(
+                null,
+                userName,
+                $"{userName}@example.com");
+            await UsingDbContextAsync(null, async context =>
+            {
+                var role = new Role(
+                    null,
+                    $"EarningsReviewer-{suffix}",
+                    $"Earnings Reviewer {suffix}");
+                context.Roles.Add(role);
+                await context.SaveChangesAsync();
+                context.UserRoles.RemoveRange(
+                    context.UserRoles.Where(item => item.UserId == userId));
+                context.UserRoles.Add(new UserRole(null, userId, role.Id));
+                context.Permissions.Add(new RolePermissionSetting
+                {
+                    TenantId = null,
+                    Name = AquaPermissions.Admin.Commissions.View,
+                    IsGranted = true,
+                    RoleId = role.Id
+                });
+                await context.SaveChangesAsync();
+            });
+            LoginAsHost(userName);
+
+            await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                _service.GetAllAsync(new AdminCommissionListInput
+                {
+                    TenantId = 1,
+                    Programme = AdminCommissionProgramme.Entry,
+                    MaxResultCount = 20
+                }));
         }
 
         private async Task CreateQualifiedLevelOneEntryNetworkAsync()

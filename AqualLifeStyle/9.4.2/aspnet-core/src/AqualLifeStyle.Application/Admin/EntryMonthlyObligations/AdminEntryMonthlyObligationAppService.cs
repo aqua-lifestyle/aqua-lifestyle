@@ -36,7 +36,6 @@ namespace AqualLifeStyle.Application.Admin.EntryMonthlyObligations
             input ??= new AdminEntryMonthlyObligationListInput();
             ValidateRequestedTenant(input.TenantId, "Entry commitment");
             if (!AbpSession.TenantId.HasValue &&
-                !input.TenantId.HasValue &&
                 !await PermissionChecker.IsGrantedAsync(
                     AquaPermissions.Admin.AllTenants))
             {
