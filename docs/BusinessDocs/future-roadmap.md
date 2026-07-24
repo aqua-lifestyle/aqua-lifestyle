@@ -35,6 +35,8 @@
 - [x] Entry activation after two confirmed R600 payments, with independent joining or an optional verified Entry recruiter
 - [x] Secured customer joining/status screens and read-only administrator reconciliation
 - [x] Guest-to-Club-Member access promotion after verified final activation payment
+- [x] Secured Entry monthly-commitment history and administrator reconciliation views
+- [ ] Automatic Entry commitment scheduling and confirmed-payment allocation
 - [ ] Provider checkout and signed callback adapter for real payments
 - [ ] Entry-to-Onyx graduation that preserves Entry history
 - [ ] Registration channels (online/office/presentation) with required documents (ID, bank letter)

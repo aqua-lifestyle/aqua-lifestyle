@@ -163,6 +163,10 @@ The Entry monthly-obligation foundation is complete:
 - overdue status blocks only the customer's own payout eligibility;
 - confirmed late payment settles the debt and restores that eligibility without
   deleting the fact that the obligation became overdue;
+- Club Members can securely review persisted commitment months, due dates,
+  grace periods, outstanding balances, and payment status;
+- administrators can reconcile commitments within their Area, while host-wide
+  review separately requires all-Areas permission;
 - no upline contribution effect is inferred from the obligation state because
   that business rule remains unresolved.
 
