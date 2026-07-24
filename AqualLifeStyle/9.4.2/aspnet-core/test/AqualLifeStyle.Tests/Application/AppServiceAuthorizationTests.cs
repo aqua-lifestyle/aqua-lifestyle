@@ -9,6 +9,7 @@ using AqualLifeStyle.Application.Admin.AreaLeaders;
 using AqualLifeStyle.Application.Admin.Facilitators;
 using AqualLifeStyle.Application.Admin.Members;
 using AqualLifeStyle.Application.Admin.Tenants;
+using AqualLifeStyle.Application.Admin.Commissions;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Enquiries;
@@ -153,6 +154,27 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public void AdminCommissionAppService_ShouldSeparateReviewAndHostWideCalculationPermissions()
+        {
+            AssertAuthorizeAttribute(
+                typeof(AdminCommissionAppService),
+                nameof(AdminCommissionAppService.GetAllAsync),
+                AquaPermissions.Admin.Commissions.View);
+            AssertAuthorizeAttribute(
+                typeof(AdminCommissionAppService),
+                nameof(AdminCommissionAppService.CalculateLatestClosedWeekAsync),
+                AquaPermissions.Admin.Commissions.Calculate);
+            AssertAuthorizeAttribute(
+                typeof(AdminCommissionAppService),
+                nameof(AdminCommissionAppService.CalculateLatestClosedWeekAsync),
+                AquaPermissions.Admin.AllTenants);
+            GetAuthorizeAttribute(
+                    typeof(AdminCommissionAppService),
+                    nameof(AdminCommissionAppService.CalculateLatestClosedWeekAsync))
+                .RequireAllPermissions.ShouldBeTrue();
+        }
+
+        [Fact]
         public void MembershipAppService_ShouldRequireMembershipPermissions()
         {
             AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.GetAllAsync), AquaPermissions.Memberships.View);
@@ -218,15 +240,25 @@ namespace AqualLifeStyle.Tests.Application
 
         private static void AssertAuthorizeAttribute(Type serviceType, string methodName, string permissionName)
         {
+            var attribute = GetAuthorizeAttribute(serviceType, methodName);
+
+            attribute.Permissions.ShouldContain(permissionName);
+        }
+
+        private static AbpAuthorizeAttribute GetAuthorizeAttribute(
+            Type serviceType,
+            string methodName)
+        {
             var method = serviceType.GetMethod(methodName);
             method.ShouldNotBeNull($"{serviceType.Name}.{methodName} should exist.");
 
-            var attribute = method.GetCustomAttributes(typeof(AbpAuthorizeAttribute), inherit: true)
+            var attribute = method
+                .GetCustomAttributes(typeof(AbpAuthorizeAttribute), inherit: true)
                 .Cast<AbpAuthorizeAttribute>()
                 .SingleOrDefault();
-
-            attribute.ShouldNotBeNull($"{serviceType.Name}.{methodName} should declare AbpAuthorize.");
-            attribute.Permissions.ShouldContain(permissionName);
+            attribute.ShouldNotBeNull(
+                $"{serviceType.Name}.{methodName} should declare AbpAuthorize.");
+            return attribute;
         }
     }
 }

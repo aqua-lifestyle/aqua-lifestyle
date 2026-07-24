@@ -176,6 +176,13 @@ namespace AqualLifeStyle.Authorization
                 public const string Default = Admin.Default + ".ProgrammeParticipations";
                 public const string View = Default + ".View";
             }
+
+            public static class Commissions
+            {
+                public const string Default = Admin.Default + ".Commissions";
+                public const string View = Default + ".View";
+                public const string Calculate = Default + ".Calculate";
+            }
         }
 
         private static readonly Lazy<IReadOnlyCollection<string>> AllPermissionNames =

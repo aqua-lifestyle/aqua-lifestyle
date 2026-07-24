@@ -141,6 +141,19 @@ namespace AqualLifeStyle.Authorization
                 AquaPermissions.Admin.ProgrammeParticipations.View);
 
             var host = MultiTenancySides.Host;
+            var commissions = admin.CreateChildPermission(
+                AquaPermissions.Admin.Commissions.Default,
+                L(AquaPermissions.Admin.Commissions.Default),
+                multiTenancySides: sides);
+            CreateChildren(
+                commissions,
+                sides,
+                AquaPermissions.Admin.Commissions.View);
+            CreateChildren(
+                commissions,
+                host,
+                AquaPermissions.Admin.Commissions.Calculate);
+
             CreateChildren(admin, host, AquaPermissions.Admin.AllTenants);
             var tenants = admin.CreateChildPermission(
                 AquaPermissions.Admin.Tenants.Default,
