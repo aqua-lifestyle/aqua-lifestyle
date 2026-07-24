@@ -98,4 +98,9 @@ export const apiEndpoints = {
     startEntry:
       "/api/services/app/ClubMemberProgrammeParticipation/StartEntry",
   },
+  weeklyEarnings: {
+    calculateLatestClosedWeek:
+      "/api/services/app/AdminCommission/CalculateLatestClosedWeek",
+    getAll: "/api/services/app/AdminCommission/GetAll",
+  },
 } as const;

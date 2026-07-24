@@ -2,6 +2,7 @@
 
 import {
   Building2,
+  HandCoins,
   KeyRound,
   LayoutDashboard,
   Network,
@@ -27,6 +28,7 @@ const adminLinks = [
   { href: "/admin/facilitators", icon: UserCheck, label: "Facilitators", permission: "Aqua.Admin.Facilitators.View" },
   { href: "/admin/members", icon: UsersRound, label: "Club members", permission: "Aqua.Admin.Members.View" },
   { href: "/admin/programme-participations", icon: Route, label: "Programme participation", permission: "Aqua.Admin.ProgrammeParticipations.View" },
+  { href: "/admin/weekly-earnings", icon: HandCoins, label: "Weekly earnings", permission: "Aqua.Admin.Commissions.View" },
 ] as const;
 
 export const AdminSidebar = () => {
