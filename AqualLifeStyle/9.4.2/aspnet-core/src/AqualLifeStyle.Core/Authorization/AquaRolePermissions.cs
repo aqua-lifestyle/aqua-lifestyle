@@ -65,6 +65,8 @@ namespace AqualLifeStyle.Authorization
                     AquaPermissions.Members.EditSelf,
                     AquaPermissions.Memberships.ViewSelf,
                     AquaPermissions.Memberships.Upgrade,
+                    AquaPermissions.ProgrammeParticipations.ViewSelf,
+                    AquaPermissions.ProgrammeParticipations.Join,
                     AquaPermissions.Enquiries.View,
                     AquaPermissions.Enquiries.Create,
                     AquaPermissions.Enquiries.ViewSelf,
@@ -84,6 +86,8 @@ namespace AqualLifeStyle.Authorization
                     AquaPermissions.Members.ViewSelf,
                     AquaPermissions.Memberships.ViewSelf,
                     AquaPermissions.Memberships.Upgrade,
+                    AquaPermissions.ProgrammeParticipations.ViewSelf,
+                    AquaPermissions.ProgrammeParticipations.Join,
                     AquaPermissions.Orders.Place
                 }
             };

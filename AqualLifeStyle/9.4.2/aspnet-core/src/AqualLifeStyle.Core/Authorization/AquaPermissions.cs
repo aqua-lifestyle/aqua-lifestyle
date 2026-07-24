@@ -95,6 +95,13 @@ namespace AqualLifeStyle.Authorization
             public const string Upgrade = Default + ".Upgrade";
         }
 
+        public static class ProgrammeParticipations
+        {
+            public const string Default = "Aqua.ProgrammeParticipations";
+            public const string ViewSelf = Default + ".ViewSelf";
+            public const string Join = Default + ".Join";
+        }
+
         public static class Admin
         {
             public const string Default = "Aqua.Admin";

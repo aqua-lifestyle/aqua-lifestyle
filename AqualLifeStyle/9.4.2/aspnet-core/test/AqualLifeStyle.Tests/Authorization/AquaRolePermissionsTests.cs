@@ -20,6 +20,8 @@ namespace AqualLifeStyle.Tests.Authorization
                 AquaPermissions.Members.ViewSelf,
                 AquaPermissions.Memberships.ViewSelf,
                 AquaPermissions.Memberships.Upgrade,
+                AquaPermissions.ProgrammeParticipations.ViewSelf,
+                AquaPermissions.ProgrammeParticipations.Join,
                 AquaPermissions.Orders.Place
             }, ignoreOrder: true);
         }
@@ -61,6 +63,7 @@ namespace AqualLifeStyle.Tests.Authorization
         [InlineData(AquaPermissions.Savings.Withdraw, AquaPermissions.Savings.Default)]
         [InlineData(AquaPermissions.Enquiries.Resolve, AquaPermissions.Enquiries.Default)]
         [InlineData(AquaPermissions.Referrals.Confirm, AquaPermissions.Referrals.Default)]
+        [InlineData(AquaPermissions.ProgrammeParticipations.Join, AquaPermissions.ProgrammeParticipations.Default)]
         public void Provider_RegistersExpectedParent(string childName, string parentName)
         {
             var permissions = PermissionFinder.GetAllPermissions(new AqualLifeStyleAuthorizationProvider());
