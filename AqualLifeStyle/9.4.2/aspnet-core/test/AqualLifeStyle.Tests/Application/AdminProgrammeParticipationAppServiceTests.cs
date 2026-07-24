@@ -5,6 +5,8 @@ using Abp.Authorization;
 using AqualLifeStyle.Application.Admin.ProgrammeParticipations;
 using AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto;
 using AqualLifeStyle.Application.ProgrammeParticipations;
+using AqualLifeStyle.Authorization;
+using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Onyx;
@@ -12,6 +14,8 @@ using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.Payments;
 using Shouldly;
 using Xunit;
+using RolePermissionSetting = Abp.Authorization.Roles.RolePermissionSetting;
+using UserRole = Abp.Authorization.Users.UserRole;
 
 namespace AqualLifeStyle.Tests.Application
 {
@@ -76,6 +80,45 @@ namespace AqualLifeStyle.Tests.Application
                 _service.GetAllAsync(new AdminProgrammeParticipationListInput
                 {
                     TenantId = 2,
+                    Programme = AdminProgrammeType.Entry
+                }));
+        }
+
+        [Fact]
+        public async Task HostReviewerWithoutAllAreasPermission_CannotRequestAllParticipations()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userName = $"host-programme-reviewer-{suffix}";
+            var userId = await CreateTestUserAsync(
+                null,
+                userName,
+                $"{userName}@example.com");
+            await UsingDbContextAsync(null, async context =>
+            {
+                var role = new Role(
+                    null,
+                    $"ProgrammeReviewer-{suffix}",
+                    $"Programme Reviewer {suffix}");
+                context.Roles.Add(role);
+                await context.SaveChangesAsync();
+
+                context.UserRoles.RemoveRange(
+                    context.UserRoles.Where(userRole => userRole.UserId == userId));
+                context.UserRoles.Add(new UserRole(null, userId, role.Id));
+                context.Permissions.Add(new RolePermissionSetting
+                {
+                    TenantId = null,
+                    Name = AquaPermissions.Admin.ProgrammeParticipations.View,
+                    IsGranted = true,
+                    RoleId = role.Id
+                });
+                await context.SaveChangesAsync();
+            });
+            LoginAsHost(userName);
+
+            await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                _service.GetAllAsync(new AdminProgrammeParticipationListInput
+                {
                     Programme = AdminProgrammeType.Entry
                 }));
         }

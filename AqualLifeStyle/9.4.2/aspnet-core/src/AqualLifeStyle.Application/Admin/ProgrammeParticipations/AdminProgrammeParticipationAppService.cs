@@ -43,6 +43,14 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             input ??= new AdminProgrammeParticipationListInput();
             ValidateRequestedTenant(input.TenantId, "Programme participation");
+            if (!AbpSession.TenantId.HasValue &&
+                !input.TenantId.HasValue &&
+                !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
+            {
+                throw new AbpAuthorizationException(
+                    "Host-wide programme participation access requires permission to view all Areas.");
+            }
+
             using (DisableAllTenantDataFiltersForHost())
             {
                 return input.Programme == AdminProgrammeType.Onyx
