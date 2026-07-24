@@ -42,7 +42,8 @@
 - [x] Onyx structural qualification through Level 5 without enabling unapproved higher-level earnings
 - [x] Level 3 travel eligibility, three-month waiting period, and activation tracking
 - [x] Secured administrator calculation and review for the latest completed Johannesburg week
-- [ ] Administrator release and payment workflows
+- [ ] Confirm whether future earning periods should close on Friday instead of Sunday
+- [x] Host-administrator release and external-payment recording workflows
 - [ ] Onyx Levels 2–5 commission rules after their cumulative totals are approved
 - [ ] Jasper activation plans (Standard R950 / Premium R1200) with combo allocation
 - [ ] Virtual membership cards with QR codes

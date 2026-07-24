@@ -198,8 +198,13 @@ The secured administrator-triggered calculation and review workflow is complete:
 - the administrator interface describes the records as weekly earnings and
   states that calculation does not release or pay funds.
 
-Discrepancy reporting, release, payment, and automatic scheduling remain
-application-layer work.
+Eligible earnings can now be released for payment by a host administrator with
+separate release and all-Areas permissions. A separately permissioned action
+records an externally completed payment and its reference; the platform does not
+send money. Both actions require an audit justification and are idempotent.
+Held Entry earnings cannot be released through this workflow until compliance
+restoration can be verified from an approved policy. Discrepancy reporting and
+automatic scheduling remain application-layer work.
 
 ### Phase 4 loan-agreement status
 
@@ -251,11 +256,12 @@ The independently calculated Onyx network foundation is complete:
 - earned commission is released and marked paid through explicit, idempotent
   transitions.
 
-Secured calculation and review use the same latest-completed-week, permission,
-Area-scope, audit, and idempotency controls documented for Entry. Release and
-payment workflows remain application-layer work. No Onyx hold rule has been
-inferred from Entry obligations or the unresolved effect of overdue members on
-their uplines.
+Secured calculation, review, release, and external-payment recording use the same
+latest-completed-week, permission, Area-scope, audit, and idempotency controls
+documented for Entry. Payment recording requires the reference from a transfer
+completed outside the platform and does not initiate a transfer. No Onyx hold
+rule has been inferred from Entry obligations or the unresolved effect of
+overdue members on their uplines.
 
 ### Phase 6 benefits and separate accounts status
 
