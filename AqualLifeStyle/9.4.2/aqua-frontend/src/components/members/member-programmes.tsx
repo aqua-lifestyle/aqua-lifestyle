@@ -162,6 +162,7 @@ export const MemberProgrammes = () => {
     useState<MyProgrammeParticipations>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
+  const [success, setSuccess] = useState<string>();
 
   const loadParticipations = useCallback(async () => {
     if (!canView) {
@@ -187,6 +188,15 @@ export const MemberProgrammes = () => {
       setLoading(false);
     }
   }, [canView]);
+
+  const handleJoined = async (programme: "Entry" | "Onyx") => {
+    await loadParticipations();
+    setSuccess(
+      programme === "Onyx"
+        ? "Onyx participation started. Your place is recorded and activation is pending the confirmed R6,120 payment."
+        : "Entry participation started. Your place is recorded and activation is pending the required payments.",
+    );
+  };
 
   useEffect(() => {
     const task = window.setTimeout(() => void loadParticipations(), 0);
@@ -221,6 +231,9 @@ export const MemberProgrammes = () => {
         </header>
 
         {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
+        {success ? (
+          <StatusMessage tone="success">{success}</StatusMessage>
+        ) : null}
 
         {loading ? (
           <div className="grid gap-5 lg:grid-cols-2">
@@ -242,7 +255,7 @@ export const MemberProgrammes = () => {
                   </p>
                 </div>
                 <JoinProgrammeDialog
-                  onJoined={loadParticipations}
+                  onJoined={() => handleJoined("Entry")}
                   programme="Entry"
                 />
               </Card>
@@ -261,7 +274,7 @@ export const MemberProgrammes = () => {
                   </p>
                 </div>
                 <JoinProgrammeDialog
-                  onJoined={loadParticipations}
+                  onJoined={() => handleJoined("Onyx")}
                   programme="Onyx"
                 />
               </Card>
