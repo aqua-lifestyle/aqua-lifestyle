@@ -10,6 +10,7 @@ using Abp.Domain.Uow;
 using Abp.Runtime.Session;
 using Abp.Timing;
 using AqualLifeStyle.Application.Admin.Commissions.Dto;
+using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Onyx;
@@ -32,6 +33,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         private readonly IRepository<OnyxWeeklyCommission, Guid> _onyxCommissionRepository;
         private readonly ICurrentCommissionTermsProvider _termsProvider;
         private readonly LatestClosedCommissionWeekResolver _closedWeekResolver;
+        private readonly OnyxTravelBenefitEligibilityProcessor
+            _travelBenefitEligibilityProcessor;
 
         public AdminCommissionAppService(
             ICustomerRepository customerRepository,
@@ -44,7 +47,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             IRepository<EntryWeeklyCommission, Guid> entryCommissionRepository,
             IRepository<OnyxWeeklyCommission, Guid> onyxCommissionRepository,
             ICurrentCommissionTermsProvider termsProvider,
-            LatestClosedCommissionWeekResolver closedWeekResolver)
+            LatestClosedCommissionWeekResolver closedWeekResolver,
+            OnyxTravelBenefitEligibilityProcessor travelBenefitEligibilityProcessor)
         {
             _customerRepository = customerRepository;
             _entryParticipationRepository = entryParticipationRepository;
@@ -57,6 +61,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             _onyxCommissionRepository = onyxCommissionRepository;
             _termsProvider = termsProvider;
             _closedWeekResolver = closedWeekResolver;
+            _travelBenefitEligibilityProcessor =
+                travelBenefitEligibilityProcessor;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Commissions.View)]
@@ -350,6 +356,25 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             DateTime calculatedAt)
         {
             var terms = _termsProvider.GetOnyxTerms();
+            var networkParticipations = await _onyxParticipationRepository.GetAll()
+                .Where(participation =>
+                    participation.Status == OnyxParticipationStatus.Active &&
+                    participation.ActivatedAt <= closedWeek.PeriodEndUtc)
+                .ToListAsync();
+            var travelBenefitResult =
+                await _travelBenefitEligibilityProcessor.SynchronizeAsync(
+                    tenantId,
+                    networkParticipations,
+                    calculatedAt);
+            if (travelBenefitResult.GrantedCount > 0 ||
+                travelBenefitResult.ActivatedCount > 0)
+            {
+                Logger.Info(
+                    $"Onyx travel benefits synchronized tenant={tenantId} " +
+                    $"granted={travelBenefitResult.GrantedCount} " +
+                    $"activated={travelBenefitResult.ActivatedCount}");
+            }
+
             var existingPeriod = await _onyxPeriodRepository.FirstOrDefaultAsync(period =>
                 period.TenantId == tenantId &&
                 period.PeriodStart == closedWeek.PeriodStartUtc &&
@@ -375,11 +400,6 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     recordsCreated: 0);
             }
 
-            var networkParticipations = await _onyxParticipationRepository.GetAll()
-                .Where(participation =>
-                    participation.Status == OnyxParticipationStatus.Active &&
-                    participation.ActivatedAt <= closedWeek.PeriodEndUtc)
-                .ToListAsync();
             var targetParticipations = networkParticipations
                 .Where(participation => participation.TenantId == tenantId)
                 .ToList();

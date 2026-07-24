@@ -33,7 +33,17 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
         public int CustomerId { get; set; }
         public ProgrammeParticipationDto Entry { get; set; }
         public ProgrammeParticipationDto Onyx { get; set; }
+        public OnyxTravelBenefitDto TravelBenefit { get; set; }
         public bool CanJoinEntry => Entry == null;
         public bool CanJoinOnyxDirectly => Onyx == null;
+    }
+
+    public class OnyxTravelBenefitDto
+    {
+        public string Status { get; set; }
+        public DateTime EligibleAt { get; set; }
+        public DateTime WaitingPeriodEndsAt { get; set; }
+        public DateTime? ActivatedAt { get; set; }
+        public decimal MemberTripContributionPercent { get; set; }
     }
 }

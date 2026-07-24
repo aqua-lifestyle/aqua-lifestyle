@@ -26,6 +26,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         private readonly IMembershipRepository _membershipRepository;
         private readonly IRepository<EntryParticipation, Guid> _entryParticipationRepository;
         private readonly IRepository<OnyxParticipation, Guid> _onyxParticipationRepository;
+        private readonly IRepository<OnyxTravelBenefitEntitlement, Guid>
+            _travelBenefitRepository;
         private readonly ICurrentProgrammeTermsProvider _termsProvider;
 
         protected virtual DateTime UtcNow => DateTime.UtcNow;
@@ -35,12 +37,14 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             IMembershipRepository membershipRepository,
             IRepository<EntryParticipation, Guid> entryParticipationRepository,
             IRepository<OnyxParticipation, Guid> onyxParticipationRepository,
+            IRepository<OnyxTravelBenefitEntitlement, Guid> travelBenefitRepository,
             ICurrentProgrammeTermsProvider termsProvider)
         {
             _customerRepository = customerRepository;
             _membershipRepository = membershipRepository;
             _entryParticipationRepository = entryParticipationRepository;
             _onyxParticipationRepository = onyxParticipationRepository;
+            _travelBenefitRepository = travelBenefitRepository;
             _termsProvider = termsProvider;
         }
 
@@ -52,14 +56,34 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 participation => participation.CustomerId == customer.Id);
             var onyx = await _onyxParticipationRepository.FirstOrDefaultAsync(
                 participation => participation.CustomerId == customer.Id);
+            var travelBenefit =
+                await _travelBenefitRepository.FirstOrDefaultAsync(
+                    entitlement => entitlement.CustomerId == customer.Id);
 
             return new MyProgrammeParticipationsDto
             {
                 CustomerId = customer.Id,
                 Entry = entry == null ? null : Map(entry),
-                Onyx = onyx == null ? null : Map(onyx)
+                Onyx = onyx == null ? null : Map(onyx),
+                TravelBenefit = travelBenefit == null
+                    ? null
+                    : Map(travelBenefit)
             };
         }
+
+        private static OnyxTravelBenefitDto Map(
+            OnyxTravelBenefitEntitlement entitlement) =>
+            new OnyxTravelBenefitDto
+            {
+                Status = entitlement.Status == OnyxTravelBenefitStatus.Active
+                    ? "Available"
+                    : "Waiting period",
+                EligibleAt = entitlement.EligibleAt,
+                WaitingPeriodEndsAt = entitlement.WaitingPeriodEndsAt,
+                ActivatedAt = entitlement.ActivatedAt,
+                MemberTripContributionPercent =
+                    entitlement.MemberTripContributionPercent
+            };
 
         [AbpAuthorize(AquaPermissions.ProgrammeParticipations.Join)]
         public async Task<ProgrammeParticipationDto> StartEntryAsync(
