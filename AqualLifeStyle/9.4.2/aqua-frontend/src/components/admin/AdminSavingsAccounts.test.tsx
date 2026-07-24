@@ -93,4 +93,44 @@ describe("AdminSavingsAccounts", () => {
     ).toBeInTheDocument();
     expect(httpClient.get).not.toHaveBeenCalled();
   });
+
+  it("shows realized values after an account matures", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({
+      items: [
+        {
+          contributionWindowEndDay: 15,
+          contributionWindowStartDay: 1,
+          contributions: [],
+          currency: "ZAR",
+          customerId: 11,
+          customerName: "Matured Member",
+          email: "matured@example.com",
+          id: "account-matured",
+          maturedAt: "2026-07-20T10:00:00Z",
+          maturityInterestAmount: 150,
+          maturityInterestRatePercent: 20,
+          maturityPayoutAmount: 650,
+          maturityPrincipalAmount: 500,
+          maturesAt: "2026-07-20T10:00:00Z",
+          minimumContributionAmount: 100,
+          openedAt: "2025-07-20T10:00:00Z",
+          principalBalance: 500,
+          projectedInterestAmount: 100,
+          projectedMaturityAmount: 600,
+          requiresMaturityProcessing: false,
+          status: "Matured",
+          tenantId: 1,
+          termsVersion: "2025-07",
+        },
+      ],
+      totalCount: 1,
+    });
+
+    render(<AdminSavingsAccounts />);
+
+    expect(await screen.findByText("Matured Member")).toBeInTheDocument();
+    expect(screen.getByText(/R\s*150[,.]00/)).toBeInTheDocument();
+    expect(screen.getByText(/R\s*650[,.]00/)).toBeInTheDocument();
+    expect(screen.queryByText(/R\s*600[,.]00/)).not.toBeInTheDocument();
+  });
 });

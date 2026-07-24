@@ -29,6 +29,25 @@ const authState = (permissions: string[]) => ({
   },
 });
 
+const participation = {
+  activatedAt: null,
+  confirmedPayments: [],
+  currency: "ZAR",
+  customerId: 42,
+  customerName: "Dora Shongwe",
+  email: "dora@example.com",
+  id: "participation-1",
+  isActive: false,
+  joinedIndependently: true,
+  nextPaymentAmount: 600,
+  nextPaymentDescription: "Entry registration payment",
+  programmeName: "Entry",
+  recruiterCustomerId: null,
+  startedAt: "2026-07-24T10:00:00Z",
+  status: "Awaiting first payment",
+  tenantId: 3,
+};
+
 describe("AdminProgrammeParticipations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -36,28 +55,39 @@ describe("AdminProgrammeParticipations", () => {
       authState(["Aqua.Admin.ProgrammeParticipations.View"]),
     );
     vi.mocked(httpClient.get).mockResolvedValue({
-      items: [
-        {
-          activatedAt: null,
-          confirmedPayments: [],
-          currency: "ZAR",
-          customerId: 42,
-          customerName: "Dora Shongwe",
-          email: "dora@example.com",
-          id: "participation-1",
-          isActive: false,
-          joinedIndependently: true,
-          nextPaymentAmount: 600,
-          nextPaymentDescription: "Entry registration payment",
-          programmeName: "Entry",
-          recruiterCustomerId: null,
-          startedAt: "2026-07-24T10:00:00Z",
-          status: "Awaiting first payment",
-          tenantId: 3,
-        },
-      ],
+      items: [participation],
       totalCount: 1,
     });
+  });
+
+  it("loads every page reported by the service", async () => {
+    const firstPage = Array.from({ length: 100 }, (_, index) => ({
+      ...participation,
+      customerId: index + 1,
+      id: `participation-${index + 1}`,
+    }));
+    const finalParticipation = {
+      ...participation,
+      customerId: 101,
+      customerName: "Final Club Member",
+      id: "participation-101",
+    };
+    vi.mocked(httpClient.get)
+      .mockResolvedValueOnce({ items: firstPage, totalCount: 101 })
+      .mockResolvedValueOnce({
+        items: [finalParticipation],
+        totalCount: 101,
+      });
+
+    render(<AdminProgrammeParticipations />);
+
+    await waitFor(() =>
+      expect(httpClient.get).toHaveBeenNthCalledWith(
+        2,
+        `${apiEndpoints.programmeParticipations.getAdminParticipations}?Programme=0&SkipCount=100&MaxResultCount=100`,
+      ),
+    );
+    expect(screen.getByText("101")).toBeInTheDocument();
   });
 
   it("loads Entry records and switches to Onyx reconciliation", async () => {

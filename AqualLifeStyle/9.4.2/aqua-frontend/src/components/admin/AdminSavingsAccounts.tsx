@@ -129,7 +129,10 @@ export const AdminSavingsAccounts = () => {
           </p>
           <p className="text-xs text-muted-foreground">
             {formatCurrency(
-              account.projectedInterestAmount,
+              account.maturedAt
+                ? (account.maturityInterestAmount ??
+                    account.projectedInterestAmount)
+                : account.projectedInterestAmount,
               account.currency,
             )}{" "}
             projected interest
@@ -142,7 +145,13 @@ export const AdminSavingsAccounts = () => {
       header: "Projected maturity amount",
       key: "projectedMaturityAmount",
       render: (account: SavingsAccount) =>
-        formatCurrency(account.projectedMaturityAmount, account.currency),
+        formatCurrency(
+          account.maturedAt
+            ? (account.maturityPayoutAmount ??
+                account.projectedMaturityAmount)
+            : account.projectedMaturityAmount,
+          account.currency,
+        ),
       sortable: true,
     },
     {

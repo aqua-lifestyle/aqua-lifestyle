@@ -78,10 +78,19 @@ export const AdminProgrammeParticipations = () => {
     setError(undefined);
     try {
       const programmeValue = programme === "entry" ? 0 : 1;
-      const result = await httpClient.get<PagedParticipations>(
-        `${apiEndpoints.programmeParticipations.getAdminParticipations}?Programme=${programmeValue}&MaxResultCount=100`,
+      const pageSize = 100;
+      const firstPage = await httpClient.get<PagedParticipations>(
+        `${apiEndpoints.programmeParticipations.getAdminParticipations}?Programme=${programmeValue}&MaxResultCount=${pageSize}`,
       );
-      setParticipations(result.items);
+      const allParticipations = [...firstPage.items];
+      while (allParticipations.length < firstPage.totalCount) {
+        const nextPage = await httpClient.get<PagedParticipations>(
+          `${apiEndpoints.programmeParticipations.getAdminParticipations}?Programme=${programmeValue}&SkipCount=${allParticipations.length}&MaxResultCount=${pageSize}`,
+        );
+        if (nextPage.items.length === 0) break;
+        allParticipations.push(...nextPage.items);
+      }
+      setParticipations(allParticipations);
     } catch (requestError) {
       setError(
         getRequestErrorMessage(
@@ -196,7 +205,9 @@ export const AdminProgrammeParticipations = () => {
       emptyState={`No ${programme === "entry" ? "Entry" : "Onyx"} participation records found.`}
       keyExtractor={(item) => item.id}
       searchFn={(item, query) =>
-        `${item.customerName} ${item.email} ${item.status}`.toLowerCase().includes(query)
+        `${item.customerName} ${item.email} ${item.status}`
+          .toLowerCase()
+          .includes(query.toLowerCase())
       }
     />
   );

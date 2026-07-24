@@ -51,4 +51,17 @@ describe("AdminEntryCommitments", () => {
       screen.queryByRole("button", { name: /pay|record/i }),
     ).not.toBeInTheDocument();
   });
+
+  it("warns when the reconciliation result is truncated", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({
+      items: [overdueEntryCommitment],
+      totalCount: 101,
+    });
+
+    render(<AdminEntryCommitments />);
+
+    expect(
+      await screen.findByText(/Showing 1 of 101 records/i),
+    ).toBeInTheDocument();
+  });
 });

@@ -68,4 +68,17 @@ describe("AdminLoanAgreements", () => {
     ).toBeInTheDocument();
     expect(httpClient.get).not.toHaveBeenCalled();
   });
+
+  it("warns when the reconciliation result is truncated", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({
+      items: [activeLoanAgreement],
+      totalCount: 101,
+    });
+
+    render(<AdminLoanAgreements />);
+
+    expect(
+      await screen.findByText(/Showing 1 of 101 records/i),
+    ).toBeInTheDocument();
+  });
 });

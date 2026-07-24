@@ -13,6 +13,7 @@ import {
   StatusMessage,
 } from "@/src/shared/ui";
 import { EntryCommitmentsTable } from "../entry-commitments/EntryCommitmentsTable";
+import { TruncatedResultsWarning } from "./TruncatedResultsWarning";
 
 type PagedCommitments = {
   items: EntryMonthlyObligation[];
@@ -25,6 +26,7 @@ export const AdminEntryCommitments = () => {
   const canView =
     session?.user?.permissions?.includes(VIEW_PERMISSION) ?? false;
   const [items, setItems] = useState<EntryMonthlyObligation[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
 
@@ -40,6 +42,7 @@ export const AdminEntryCommitments = () => {
         `${apiEndpoints.entryMonthlyObligations.getAdminObligations}?MaxResultCount=100`,
       );
       setItems(result.items);
+      setTotalCount(result.totalCount);
     } catch (requestError) {
       setError(
         getRequestErrorMessage(
@@ -84,6 +87,10 @@ export const AdminEntryCommitments = () => {
           </p>
         </header>
         {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
+        <TruncatedResultsWarning
+          loadedCount={items.length}
+          totalCount={totalCount}
+        />
         <Card>
           {loading ? (
             <Skeleton className="h-80" />

@@ -348,7 +348,9 @@ export const AdminWeeklyEarnings = () => {
       emptyState={`No ${programme === "entry" ? "Entry" : "Onyx"} weekly earnings have been prepared yet.`}
       keyExtractor={(item) => item.id}
       searchFn={(item, query) =>
-        `${item.customerName} ${item.email} ${item.status}`.toLowerCase().includes(query)
+        `${item.customerName} ${item.email} ${item.status}`
+          .toLowerCase()
+          .includes(query.toLowerCase())
       }
     />
   );

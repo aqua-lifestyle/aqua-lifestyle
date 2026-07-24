@@ -15,6 +15,7 @@ import {
   Skeleton,
   StatusMessage,
 } from "@/src/shared/ui";
+import { TruncatedResultsWarning } from "./TruncatedResultsWarning";
 
 type PagedLoans = { items: OnyxLoanAgreement[]; totalCount: number };
 const VIEW_PERMISSION = "Aqua.Admin.Loans.View";
@@ -30,6 +31,7 @@ export const AdminLoanAgreements = () => {
   const canView =
     session?.user?.permissions?.includes(VIEW_PERMISSION) ?? false;
   const [loans, setLoans] = useState<OnyxLoanAgreement[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
 
@@ -45,6 +47,7 @@ export const AdminLoanAgreements = () => {
         `${apiEndpoints.loans.getAdminAgreements}?MaxResultCount=100`,
       );
       setLoans(result.items);
+      setTotalCount(result.totalCount);
     } catch (requestError) {
       setError(
         getRequestErrorMessage(
@@ -157,6 +160,10 @@ export const AdminLoanAgreements = () => {
           </p>
         </header>
         {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
+        <TruncatedResultsWarning
+          loadedCount={loans.length}
+          totalCount={totalCount}
+        />
         <Card>
           {loading ? (
             <Skeleton className="h-80" />
