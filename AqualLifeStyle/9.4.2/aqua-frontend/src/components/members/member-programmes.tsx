@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleDollarSign, Network, Route } from "lucide-react";
+import { CircleDollarSign, Network, Plane, Route } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { useAuthState } from "@/src/providers";
@@ -8,6 +8,7 @@ import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import type {
   MyProgrammeParticipations,
+  OnyxTravelBenefit,
   ProgrammeParticipation,
 } from "@/src/shared/domain/programme-participations";
 import {
@@ -96,6 +97,60 @@ const ParticipationCard = ({
         </div>
       </div>
     ) : null}
+  </Card>
+);
+
+const TravelBenefitCard = ({
+  travelBenefit,
+}: {
+  travelBenefit: OnyxTravelBenefit;
+}) => (
+  <Card className="flex flex-col gap-5">
+    <div className="flex items-start justify-between gap-4">
+      <div className="flex items-center gap-3">
+        <Plane className="size-7 text-accent" />
+        <div>
+          <p className="text-sm font-medium text-muted-foreground">
+            Onyx Level 3 benefit
+          </p>
+          <h2 className="mt-1 text-xl font-bold">Travel benefit</h2>
+        </div>
+      </div>
+      <Badge tone={travelBenefit.activatedAt ? "success" : "warning"}>
+        {travelBenefit.status}
+      </Badge>
+    </div>
+
+    <p className="text-sm text-muted-foreground">
+      Your eligibility is preserved after completing Onyx Level 3. You
+      contribute {travelBenefit.memberTripContributionPercent}% of the trip
+      cost when a future trip is arranged.
+    </p>
+
+    <dl className="grid gap-4 text-sm sm:grid-cols-2">
+      <div>
+        <dt className="text-muted-foreground">Eligible from</dt>
+        <dd className="mt-1 font-semibold">
+          {new Date(travelBenefit.eligibleAt).toLocaleDateString()}
+        </dd>
+      </div>
+      <div>
+        <dt className="text-muted-foreground">
+          {travelBenefit.activatedAt ? "Available since" : "Waiting period ends"}
+        </dt>
+        <dd className="mt-1 font-semibold">
+          {new Date(
+            travelBenefit.activatedAt ??
+              travelBenefit.waitingPeriodEndsAt,
+          ).toLocaleDateString()}
+        </dd>
+      </div>
+    </dl>
+
+    <StatusMessage tone="info">
+      Trip selection, pricing, and booking will be provided separately when
+      those services become available.
+    </StatusMessage>
   </Card>
 );
 
@@ -211,6 +266,11 @@ export const MemberProgrammes = () => {
                 />
               </Card>
             )}
+            {participations.travelBenefit ? (
+              <TravelBenefitCard
+                travelBenefit={participations.travelBenefit}
+              />
+            ) : null}
           </div>
         ) : null}
       </div>

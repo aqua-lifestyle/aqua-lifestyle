@@ -19,4 +19,13 @@ export type MyProgrammeParticipations = {
   customerId: number;
   entry: ProgrammeParticipation | null;
   onyx: ProgrammeParticipation | null;
+  travelBenefit: OnyxTravelBenefit | null;
+};
+
+export type OnyxTravelBenefit = {
+  activatedAt: string | null;
+  eligibleAt: string;
+  memberTripContributionPercent: number;
+  status: "Available" | "Waiting period";
+  waitingPeriodEndsAt: string;
 };

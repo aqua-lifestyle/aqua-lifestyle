@@ -45,7 +45,11 @@ describe("MemberProgrammes", () => {
     vi.mocked(useAuthState).mockReturnValue(
       authState(["Aqua.ProgrammeParticipations.ViewSelf"]),
     );
-    vi.mocked(httpClient.get).mockResolvedValue({ entry: null, onyx: null });
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: null,
+      onyx: null,
+      travelBenefit: null,
+    });
     vi.mocked(httpClient.post).mockResolvedValue({});
   });
 
@@ -87,5 +91,28 @@ describe("MemberProgrammes", () => {
       ),
     ).toBeInTheDocument();
     expect(httpClient.get).not.toHaveBeenCalled();
+  });
+
+  it("shows a qualified Club Member's travel benefit without promising a booking", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: null,
+      onyx: null,
+      travelBenefit: {
+        activatedAt: null,
+        eligibleAt: "2026-07-20T10:00:00Z",
+        memberTripContributionPercent: 10,
+        status: "Waiting period",
+        waitingPeriodEndsAt: "2026-10-20T10:00:00Z",
+      },
+    });
+
+    render(<MemberProgrammes />);
+
+    expect(await screen.findByText("Travel benefit")).toBeInTheDocument();
+    expect(screen.getByText("Waiting period")).toBeInTheDocument();
+    expect(screen.getByText(/contribute 10%/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/trip selection, pricing, and booking/i),
+    ).toBeInTheDocument();
   });
 });
