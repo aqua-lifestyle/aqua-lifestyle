@@ -16,6 +16,7 @@
             new HostRoleAndUserCreator(_context).Create();
             new DefaultSettingsCreator(_context).Create();
             new HostDemoDataBuilder(_context).Create();
+            new RequiredProgrammeConfigurationBuilder(_context).Create();
 
             _context.SaveChanges();
         }
