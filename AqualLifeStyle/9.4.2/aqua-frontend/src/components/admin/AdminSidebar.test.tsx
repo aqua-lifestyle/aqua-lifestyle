@@ -26,6 +26,7 @@ describe("AdminSidebar", () => {
   beforeEach(() => {
     vi.mocked(useAuthState).mockReturnValue(authState([
       "Aqua.Admin.Customers.View",
+      "Aqua.Admin.ProgrammeParticipations.View",
       "Aqua.Admin.Users.View",
       "Pages.Roles",
     ]));
@@ -38,6 +39,7 @@ describe("AdminSidebar", () => {
     expect(screen.getByRole("link", { name: "Customer accounts" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "User accounts & access" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Access levels" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Programme participation" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Areas" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Club members" })).not.toBeInTheDocument();
   });

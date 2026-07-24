@@ -88,4 +88,14 @@ export const apiEndpoints = {
       `/api/services/app/Product/GetAllForCustomer?customerId=${customerId}`,
     getById: (id: number) => `/api/services/app/Product/Get?id=${id}`,
   },
+  programmeParticipations: {
+    getAdminParticipations:
+      "/api/services/app/AdminProgrammeParticipation/GetAll",
+    getMyParticipations:
+      "/api/services/app/ClubMemberProgrammeParticipation/GetMyParticipations",
+    startDirectOnyx:
+      "/api/services/app/ClubMemberProgrammeParticipation/StartDirectOnyx",
+    startEntry:
+      "/api/services/app/ClubMemberProgrammeParticipation/StartEntry",
+  },
 } as const;

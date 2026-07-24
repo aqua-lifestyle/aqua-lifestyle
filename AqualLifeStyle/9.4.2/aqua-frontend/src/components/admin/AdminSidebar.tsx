@@ -5,6 +5,7 @@ import {
   KeyRound,
   LayoutDashboard,
   Network,
+  Route,
   ShieldCheck,
   UserCheck,
   Users,
@@ -25,6 +26,7 @@ const adminLinks = [
   { href: "/admin/area-leaders", icon: Network, label: "Area leaders", permission: "Aqua.Admin.AreaLeaders.View" },
   { href: "/admin/facilitators", icon: UserCheck, label: "Facilitators", permission: "Aqua.Admin.Facilitators.View" },
   { href: "/admin/members", icon: UsersRound, label: "Club members", permission: "Aqua.Admin.Members.View" },
+  { href: "/admin/programme-participations", icon: Route, label: "Programme participation", permission: "Aqua.Admin.ProgrammeParticipations.View" },
 ] as const;
 
 export const AdminSidebar = () => {
