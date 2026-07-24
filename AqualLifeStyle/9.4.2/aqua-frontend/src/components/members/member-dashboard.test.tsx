@@ -74,7 +74,7 @@ const baseAuthState = {
       email: "member@example.com",
       id: 1,
       name: "Member User",
-      permissions: [],
+      permissions: ["Aqua.Savings.ViewSelf"],
       role: "Member",
     },
   },
@@ -147,6 +147,9 @@ describe("MemberDashboard", () => {
 
     expect(screen.getByText("My Orders")).toBeDefined();
     expect(screen.getByText("1")).toBeDefined();
+    expect(
+      screen.getByRole("link", { name: "View my savings account" }),
+    ).toHaveAttribute("href", "/member/savings");
   });
 
   it("shows loading state", () => {

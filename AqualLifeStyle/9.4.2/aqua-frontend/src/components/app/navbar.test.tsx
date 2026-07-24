@@ -41,6 +41,7 @@ const SetSession = () => {
               "Aqua.Members.Edit",
               "Aqua.Members.Delete",
               "Aqua.Admin.Customers.View",
+              "Aqua.Savings.ViewSelf",
               "Pages.Customers",
               "Pages.Products",
               "Pages.Enquiries",
@@ -79,6 +80,11 @@ describe("Navbar", () => {
     expect(screen.getByRole("link", { name: "Admin customers" })).toHaveAttribute("href", "/admin/customers");
     expect(screen.getByRole("link", { name: "Products" })).toHaveAttribute("href", "/products");
     expect(screen.getByRole("link", { name: "Enquiries" })).toHaveAttribute("href", "/enquiries");
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(screen.getByRole("link", { name: "My savings" })).toHaveAttribute(
+      "href",
+      "/member/savings",
+    );
   });
 
   it("highlights the active link", async () => {

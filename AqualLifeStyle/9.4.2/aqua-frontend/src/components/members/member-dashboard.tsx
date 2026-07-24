@@ -220,6 +220,13 @@ export const MemberDashboard = () => {
                     />
                   )}
                 </div>
+                <LinkButton
+                  className="mt-4 w-full"
+                  href="/member/savings"
+                  variant="outline"
+                >
+                  View my savings account
+                </LinkButton>
               </Card>
             </section>
           </>
