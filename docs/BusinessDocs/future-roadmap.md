@@ -40,7 +40,7 @@
 - [ ] SMS/WhatsApp notifications (payment confirmation, welcome, collection dates)
 - [x] Domain and persistence foundations for complete-level Entry commissions and the approved Onyx Level 1 R250 commission
 - [x] Onyx structural qualification through Level 5 without enabling unapproved higher-level earnings
-- [x] Level 3 travel eligibility, three-month waiting period, and activation tracking
+- [x] Level 3 travel eligibility, three-month waiting period, automatic activation tracking, and Club Member visibility
 - [x] Secured administrator calculation and review for the latest completed Johannesburg week
 - [ ] Confirm whether future earning periods should close on Friday instead of Sunday
 - [x] Host-administrator release and external-payment recording workflows

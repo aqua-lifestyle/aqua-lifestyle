@@ -278,6 +278,13 @@ The confirmed Level 3 travel-entitlement foundation is complete:
 - the entitlement is persisted separately from participation, commissions,
   loans, payments, and future travel bookings.
 
+The secured application workflow now synchronizes travel eligibility during the
+administrator's Onyx weekly review. A verified complete Level 3 structure grants
+one entitlement, repeated reviews do not duplicate it, and a later review
+activates it after the three-month waiting period has elapsed. The signed-in
+Club Member can see the waiting-period end, availability status, and their 10%
+trip contribution in business language.
+
 Trip selection, pricing, booking, fulfilment, and payment are intentionally not
 implemented.
 
