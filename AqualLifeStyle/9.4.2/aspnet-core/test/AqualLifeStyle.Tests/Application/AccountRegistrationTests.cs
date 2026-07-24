@@ -6,6 +6,7 @@ using Abp.Authorization.Roles;
 using Abp.Configuration;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Memberships;
+using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Accounts;
 using AqualLifeStyle.Authorization.Accounts.Dto;
@@ -26,6 +27,56 @@ namespace AqualLifeStyle.Tests.Application
             _accountAppService = Resolve<IAccountAppService>();
             _customerAppService = Resolve<ICustomerAppService>();
             _membershipAppService = Resolve<IMembershipAppService>();
+        }
+
+        [Fact]
+        public async Task PublicRegistration_ProvisionsGuestAccessInTheDefaultArea()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var email = $"public_customer_{suffix}@test.com";
+            var userName = $"public_customer_{suffix}";
+            await Resolve<ISettingManager>().ChangeSettingForTenantAsync(
+                1,
+                "Abp.Account.IsSelfRegistrationEnabled",
+                "true");
+
+            using (UsingTenantId(null))
+            {
+                var result = await _accountAppService.Register(new RegisterInput
+                {
+                    EmailAddress = email,
+                    Name = "Public",
+                    Password = "Customer!101",
+                    Surname = "Customer",
+                    UserName = userName
+                });
+
+                result.CanLogin.ShouldBeTrue();
+            }
+
+            var userId = await UsingDbContextAsync(1, async context =>
+            {
+                var user = await context.Users.SingleAsync(
+                    item => item.UserName == userName);
+                var roleNames = await (
+                    from userRole in context.UserRoles
+                    join role in context.Roles on userRole.RoleId equals role.Id
+                    where userRole.UserId == user.Id
+                    select role.Name).ToListAsync();
+
+                roleNames.ShouldContain("Guest");
+                return user.Id;
+            });
+
+            SetCurrentUser(userId, 1);
+            (await _customerAppService.GetMyCustomerAsync()).Email.ShouldBe(email);
+            (await _membershipAppService.GetActiveTiersAsync()).ShouldNotBeEmpty();
+
+            var participations = await Resolve<
+                IClubMemberProgrammeParticipationAppService>()
+                .GetMyParticipationsAsync();
+            participations.CanJoinEntry.ShouldBeTrue();
+            participations.CanJoinOnyxDirectly.ShouldBeTrue();
         }
 
         [Fact]

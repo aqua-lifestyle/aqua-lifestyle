@@ -49,37 +49,53 @@ namespace AqualLifeStyle.Authorization.Users
             CheckForTenant();
 
             var tenant = await GetActiveTenantAsync();
-            var isSelfRegistrationEnabled = await _settingManager.GetSettingValueForTenantAsync<bool>(AppSettingNames.IsSelfRegistrationEnabled, tenant.Id);
-            if (!isSelfRegistrationEnabled)
+            using (CurrentUnitOfWork.SetTenantId(tenant.Id))
             {
-                throw new UserFriendlyException("Registration is disabled.", "Public self-registration is disabled.");
+                var isSelfRegistrationEnabled =
+                    await _settingManager.GetSettingValueForTenantAsync<bool>(
+                        AppSettingNames.IsSelfRegistrationEnabled,
+                        tenant.Id);
+                if (!isSelfRegistrationEnabled)
+                {
+                    throw new UserFriendlyException("Registration is disabled.", "Public self-registration is disabled.");
+                }
+
+                var user = new User
+                {
+                    TenantId = tenant.Id,
+                    Name = name,
+                    Surname = surname,
+                    EmailAddress = emailAddress,
+                    IsActive = true,
+                    UserName = userName,
+                    IsEmailConfirmed = isEmailConfirmed,
+                    Roles = new List<UserRole>()
+                };
+
+                user.SetNormalizedNames();
+
+                var defaultRoles = await _roleManager.Roles
+                    .Where(role => role.IsDefault)
+                    .ToListAsync();
+                if (!defaultRoles.Any())
+                {
+                    throw new UserFriendlyException(
+                        "Registration is temporarily unavailable.",
+                        "The Area does not have a default customer access level.");
+                }
+
+                foreach (var defaultRole in defaultRoles)
+                {
+                    user.Roles.Add(new UserRole(tenant.Id, user.Id, defaultRole.Id));
+                }
+
+                await _userManager.InitializeOptionsAsync(tenant.Id);
+
+                CheckErrors(await _userManager.CreateAsync(user, plainPassword));
+                await CurrentUnitOfWork.SaveChangesAsync();
+
+                return user;
             }
-
-            var user = new User
-            {
-                TenantId = tenant.Id,
-                Name = name,
-                Surname = surname,
-                EmailAddress = emailAddress,
-                IsActive = true,
-                UserName = userName,
-                IsEmailConfirmed = isEmailConfirmed,
-                Roles = new List<UserRole>()
-            };
-
-            user.SetNormalizedNames();
-            
-            foreach (var defaultRole in await _roleManager.Roles.Where(r => r.IsDefault).ToListAsync())
-            {
-                user.Roles.Add(new UserRole(tenant.Id, user.Id, defaultRole.Id));
-            }
-
-            await _userManager.InitializeOptionsAsync(tenant.Id);
-
-            CheckErrors(await _userManager.CreateAsync(user, plainPassword));
-            await CurrentUnitOfWork.SaveChangesAsync();
-
-            return user;
         }
 
         private void CheckForTenant()

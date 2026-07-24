@@ -37,7 +37,10 @@ namespace AqualLifeStyle.Tests
                 {
                     new System.Collections.Generic.KeyValuePair<string, string>(
                         "App:ClientRootAddress",
-                        "https://customers.example.test")
+                        "https://customers.example.test"),
+                    new System.Collections.Generic.KeyValuePair<string, string>(
+                        "App:DefaultTenantName",
+                        "Default")
                 })
                 .Build();
             IocManager.IocContainer.Register(Component.For<IConfiguration>().Instance(configuration));
