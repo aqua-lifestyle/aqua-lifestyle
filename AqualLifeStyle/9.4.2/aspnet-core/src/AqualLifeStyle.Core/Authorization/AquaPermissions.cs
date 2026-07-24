@@ -179,7 +179,7 @@ namespace AqualLifeStyle.Authorization
         }
 
         private static readonly Lazy<IReadOnlyCollection<string>> AllPermissionNames =
-            new Lazy<IReadOnlyCollection<string>>(() => typeof(AquaPermissions).GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)
+            new Lazy<IReadOnlyCollection<string>>(() => GetNestedTypesRecursively(typeof(AquaPermissions))
                 .SelectMany(type => type.GetFields(BindingFlags.Public | BindingFlags.Static))
                 .Where(field => field.IsLiteral && !field.IsInitOnly && field.FieldType == typeof(string))
                 .Select(field => (string)field.GetRawConstantValue())
@@ -187,5 +187,11 @@ namespace AqualLifeStyle.Authorization
                 .ToArray());
 
         public static IReadOnlyCollection<string> GetAll() => AllPermissionNames.Value;
+
+        private static IEnumerable<Type> GetNestedTypesRecursively(Type parentType) =>
+            parentType
+                .GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)
+                .SelectMany(nestedType =>
+                    new[] { nestedType }.Concat(GetNestedTypesRecursively(nestedType)));
     }
 }

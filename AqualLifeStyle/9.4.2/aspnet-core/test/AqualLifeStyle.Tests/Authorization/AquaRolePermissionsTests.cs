@@ -13,6 +13,19 @@ namespace AqualLifeStyle.Tests.Authorization
         public void SystemAdmin_HasEveryPermission() => AquaRolePermissions.GetFor(AquaUserRole.SystemAdmin).ShouldBe(AquaPermissions.GetAll(), ignoreOrder: true);
 
         [Fact]
+        public void NestedAdminProgrammePermissions_AreIncludedForSystemAdmin()
+        {
+            AquaPermissions.GetAll().ShouldContain(
+                AquaPermissions.Admin.ProgrammeParticipations.Default);
+            AquaPermissions.GetAll().ShouldContain(
+                AquaPermissions.Admin.ProgrammeParticipations.View);
+            AquaRolePermissions.GetFor(AquaUserRole.SystemAdmin).ShouldContain(
+                AquaPermissions.Admin.ProgrammeParticipations.Default);
+            AquaRolePermissions.GetFor(AquaUserRole.SystemAdmin).ShouldContain(
+                AquaPermissions.Admin.ProgrammeParticipations.View);
+        }
+
+        [Fact]
         public void Guest_HasOnlySelfServicePermissions()
         {
             AquaRolePermissions.GetFor(AquaUserRole.Guest).ShouldBe(new[]
