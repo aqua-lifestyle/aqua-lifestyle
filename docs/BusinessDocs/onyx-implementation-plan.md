@@ -290,3 +290,26 @@ application-layer work. The promised 20% return and use of member savings for
 lending require appropriate South African financial-services and consumer-credit
 review before production launch; the domain model records the confirmed business
 terms but does not establish regulatory compliance.
+
+### Phase 7 application and UI status
+
+The first secured programme-participation workflow is complete:
+
+- a signed-in customer can review their own Entry and Onyx participation;
+- a customer can start Entry or direct Onyx independently, or provide an
+  optional recruiter who must already be active in the same programme;
+- duplicate submissions preserve the original network-placement facts rather
+  than silently changing the recruiter;
+- the Club Member view explains current activation progress and the next amount
+  due without claiming that a payment has been taken;
+- a separately authorised administrator can reconcile participation status,
+  Area, network placement, and provider-confirmed payment references;
+- the administrator screen cannot mark payments as confirmed;
+- a verified final activation payment promotes a Guest account to Club Member
+  access, while Facilitator, Area Leader, and System Administrator roles are
+  never downgraded.
+
+The provider-neutral confirmation processor remains private. Checkout creation,
+Yoco callback signature verification, and customer payment instructions cannot
+be completed safely until the provider account, credentials, callback
+specification, and deployment URLs are supplied.

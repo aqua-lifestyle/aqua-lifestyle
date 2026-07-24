@@ -32,6 +32,9 @@
 - [x] Separate Entry and Onyx participation records; never convert one into the other
 - [x] Direct Onyx activation after a confirmed R6,120 payment
 - [x] Entry activation after two confirmed R600 payments, with independent joining or an optional verified Entry recruiter
+- [x] Secured customer joining/status screens and read-only administrator reconciliation
+- [x] Guest-to-Club-Member access promotion after verified final activation payment
+- [ ] Provider checkout and signed callback adapter for real payments
 - [ ] Entry-to-Onyx graduation that preserves Entry history
 - [ ] Registration channels (online/office/presentation) with required documents (ID, bank letter)
 - [ ] SMS/WhatsApp notifications (payment confirmation, welcome, collection dates)
