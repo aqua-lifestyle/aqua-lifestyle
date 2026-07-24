@@ -7,8 +7,11 @@ using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
 using AqualLifeStyle.Domain.Facilitators;
 using AqualLifeStyle.Domain.Memberships;
+using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Orders;
+using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.Domain.Products;
+using AqualLifeStyle.Domain.Savings;
 using AqualLifeStyle.MultiTenancy;
 
 namespace AqualLifeStyle.EntityFrameworkCore
@@ -27,6 +30,23 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<Referral> Referrals { get; set; }
         public virtual DbSet<AreaLeader> AreaLeaders { get; set; }
         public virtual DbSet<AreaSpace> AreaSpaces { get; set; }
+        public virtual DbSet<MemberPayment> MemberPayments { get; set; }
+        public virtual DbSet<EntryParticipation> EntryParticipations { get; set; }
+        public virtual DbSet<EntryRecruiterCorrection> EntryRecruiterCorrections { get; set; }
+        public virtual DbSet<EntryMonthlyObligation> EntryMonthlyObligations { get; set; }
+        public virtual DbSet<EntryCommissionPeriod> EntryCommissionPeriods { get; set; }
+        public virtual DbSet<EntryWeeklyCommission> EntryWeeklyCommissions { get; set; }
+        public virtual DbSet<EntryCommissionComponent> EntryCommissionComponents { get; set; }
+        public virtual DbSet<OnyxParticipation> OnyxParticipations { get; set; }
+        public virtual DbSet<OnyxCommissionPeriod> OnyxCommissionPeriods { get; set; }
+        public virtual DbSet<OnyxWeeklyCommission> OnyxWeeklyCommissions { get; set; }
+        public virtual DbSet<OnyxCommissionComponent> OnyxCommissionComponents { get; set; }
+        public virtual DbSet<OnyxTravelBenefitEntitlement> OnyxTravelBenefitEntitlements { get; set; }
+        public virtual DbSet<OnyxLoanAgreement> OnyxLoanAgreements { get; set; }
+        public virtual DbSet<OnyxLoanWeeklyRequirement> OnyxLoanWeeklyRequirements { get; set; }
+        public virtual DbSet<OnyxLoanRepaymentAllocation> OnyxLoanRepaymentAllocations { get; set; }
+        public virtual DbSet<SavingsAccount> SavingsAccounts { get; set; }
+        public virtual DbSet<SavingsContribution> SavingsContributions { get; set; }
 
         public AqualLifeStyleDbContext(DbContextOptions<AqualLifeStyleDbContext> options)
             : base(options)

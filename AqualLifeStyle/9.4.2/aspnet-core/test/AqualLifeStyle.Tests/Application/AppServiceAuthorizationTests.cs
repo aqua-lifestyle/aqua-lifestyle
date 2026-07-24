@@ -9,6 +9,10 @@ using AqualLifeStyle.Application.Admin.AreaLeaders;
 using AqualLifeStyle.Application.Admin.Facilitators;
 using AqualLifeStyle.Application.Admin.Members;
 using AqualLifeStyle.Application.Admin.Tenants;
+using AqualLifeStyle.Application.Admin.Commissions;
+using AqualLifeStyle.Application.Admin.Savings;
+using AqualLifeStyle.Application.Admin.Loans;
+using AqualLifeStyle.Application.Admin.EntryMonthlyObligations;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Enquiries;
@@ -18,6 +22,9 @@ using AqualLifeStyle.Application.MyAccount;
 using AqualLifeStyle.Application.Orders;
 using AqualLifeStyle.Application.Products;
 using AqualLifeStyle.Application.Referrals;
+using AqualLifeStyle.Application.Savings;
+using AqualLifeStyle.Application.Loans;
+using AqualLifeStyle.Application.EntryMonthlyObligations;
 using AqualLifeStyle.Authorization;
 using Shouldly;
 using Xunit;
@@ -153,6 +160,72 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public void AdminCommissionAppService_ShouldSeparateReviewAndHostWideCalculationPermissions()
+        {
+            AssertAuthorizeAttribute(
+                typeof(AdminCommissionAppService),
+                nameof(AdminCommissionAppService.GetAllAsync),
+                AquaPermissions.Admin.Commissions.View);
+            AssertAuthorizeAttribute(
+                typeof(AdminCommissionAppService),
+                nameof(AdminCommissionAppService.CalculateLatestClosedWeekAsync),
+                AquaPermissions.Admin.Commissions.Calculate);
+            AssertAuthorizeAttribute(
+                typeof(AdminCommissionAppService),
+                nameof(AdminCommissionAppService.CalculateLatestClosedWeekAsync),
+                AquaPermissions.Admin.AllTenants);
+            GetAuthorizeAttribute(
+                    typeof(AdminCommissionAppService),
+                    nameof(AdminCommissionAppService.CalculateLatestClosedWeekAsync))
+                .RequireAllPermissions.ShouldBeTrue();
+            AssertHostWideFinancialAction(
+                nameof(AdminCommissionAppService.ReleaseAsync),
+                AquaPermissions.Admin.Commissions.Release);
+            AssertHostWideFinancialAction(
+                nameof(AdminCommissionAppService.RecordPaymentAsync),
+                AquaPermissions.Admin.Commissions.RecordPayment);
+        }
+
+        [Fact]
+        public void SavingsServices_ShouldSeparateSelfAndAdministratorViews()
+        {
+            AssertAuthorizeAttribute(
+                typeof(ClubMemberSavingsAppService),
+                nameof(ClubMemberSavingsAppService.GetMyAccountAsync),
+                AquaPermissions.Savings.ViewSelf);
+            AssertAuthorizeAttribute(
+                typeof(AdminSavingsAppService),
+                nameof(AdminSavingsAppService.GetAllAsync),
+                AquaPermissions.Admin.Savings.View);
+        }
+
+        [Fact]
+        public void LoanServices_ShouldSeparateSelfAndAdministratorViews()
+        {
+            AssertAuthorizeAttribute(
+                typeof(ClubMemberOnyxLoanAppService),
+                nameof(ClubMemberOnyxLoanAppService.GetMyAgreementsAsync),
+                AquaPermissions.Loans.ViewSelf);
+            AssertAuthorizeAttribute(
+                typeof(AdminOnyxLoanAppService),
+                nameof(AdminOnyxLoanAppService.GetAllAsync),
+                AquaPermissions.Admin.Loans.View);
+        }
+
+        [Fact]
+        public void EntryCommitmentServices_ShouldSeparateSelfAndAdministratorViews()
+        {
+            AssertAuthorizeAttribute(
+                typeof(ClubMemberEntryMonthlyObligationAppService),
+                nameof(ClubMemberEntryMonthlyObligationAppService.GetMyObligationsAsync),
+                AquaPermissions.EntryMonthlyObligations.ViewSelf);
+            AssertAuthorizeAttribute(
+                typeof(AdminEntryMonthlyObligationAppService),
+                nameof(AdminEntryMonthlyObligationAppService.GetAllAsync),
+                AquaPermissions.Admin.EntryMonthlyObligations.View);
+        }
+
+        [Fact]
         public void MembershipAppService_ShouldRequireMembershipPermissions()
         {
             AssertAuthorizeAttribute(typeof(MembershipAppService), nameof(MembershipAppService.GetAllAsync), AquaPermissions.Memberships.View);
@@ -218,15 +291,41 @@ namespace AqualLifeStyle.Tests.Application
 
         private static void AssertAuthorizeAttribute(Type serviceType, string methodName, string permissionName)
         {
+            var attribute = GetAuthorizeAttribute(serviceType, methodName);
+
+            attribute.Permissions.ShouldContain(permissionName);
+        }
+
+        private static AbpAuthorizeAttribute GetAuthorizeAttribute(
+            Type serviceType,
+            string methodName)
+        {
             var method = serviceType.GetMethod(methodName);
             method.ShouldNotBeNull($"{serviceType.Name}.{methodName} should exist.");
 
-            var attribute = method.GetCustomAttributes(typeof(AbpAuthorizeAttribute), inherit: true)
+            var attribute = method
+                .GetCustomAttributes(typeof(AbpAuthorizeAttribute), inherit: true)
                 .Cast<AbpAuthorizeAttribute>()
                 .SingleOrDefault();
+            attribute.ShouldNotBeNull(
+                $"{serviceType.Name}.{methodName} should declare AbpAuthorize.");
+            return attribute;
+        }
 
-            attribute.ShouldNotBeNull($"{serviceType.Name}.{methodName} should declare AbpAuthorize.");
-            attribute.Permissions.ShouldContain(permissionName);
+        private static void AssertHostWideFinancialAction(
+            string methodName,
+            string actionPermission)
+        {
+            AssertAuthorizeAttribute(
+                typeof(AdminCommissionAppService),
+                methodName,
+                actionPermission);
+            AssertAuthorizeAttribute(
+                typeof(AdminCommissionAppService),
+                methodName,
+                AquaPermissions.Admin.AllTenants);
+            GetAuthorizeAttribute(typeof(AdminCommissionAppService), methodName)
+                .RequireAllPermissions.ShouldBeTrue();
         }
     }
 }

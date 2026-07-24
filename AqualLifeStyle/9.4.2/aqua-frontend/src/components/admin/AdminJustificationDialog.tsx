@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import { Button, Dialog, StatusMessage, TextAreaField } from "@/src/shared/ui";
@@ -23,6 +23,7 @@ export const AdminJustificationDialog = ({
   const [validationError, setValidationError] = useState<string>();
   const [requestError, setRequestError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
+  const justificationId = useId();
 
   const close = () => {
     setOpen(false); setJustification(""); setValidationError(undefined); setRequestError(undefined);
@@ -40,7 +41,7 @@ export const AdminJustificationDialog = ({
     <Button onClick={() => setOpen(true)} size="sm" variant={variant}>{triggerLabel}</Button>
     <Dialog onClose={close} open={open} title={title}>
       <p className="text-sm text-muted-foreground">{description}</p>
-      <TextAreaField errorMessage={validationError} label="Reason for action" maxLength={500} name="justification" onChange={(event) => setJustification(event.target.value)} required rows={3} value={justification} />
+      <TextAreaField errorMessage={validationError} id={justificationId} label="Reason for action" maxLength={500} name="justification" onChange={(event) => setJustification(event.target.value)} required rows={3} value={justification} />
       {requestError ? <StatusMessage tone="error">{requestError}</StatusMessage> : null}
       <div className="flex justify-end gap-3"><Button onClick={close} variant="ghost">Cancel</Button><Button isLoading={submitting} onClick={confirm} variant={variant === "danger" ? "danger" : "primary"}>{confirmLabel}</Button></div>
     </Dialog>

@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Threading.Tasks;
 using Abp.Runtime.Session;
 using Abp.UI;
@@ -27,23 +26,20 @@ namespace AqualLifeStyle.Tests
         }
 
         [Fact]
-        public void GetSavingsWindowStatuses_ReturnsTierSpecificWindowState()
+        public void GetSavingsWindowStatuses_ReturnsSharedContributionWindowState()
         {
             var statuses = _service.GetSavingsWindowStatuses("2026-07-16");
 
             Assert.Equal(4, statuses.Count);
 
-            var jasper = statuses.Single(status => status.Tier == (int)MembershipType.Jasper);
-            var onyx = statuses.Single(status => status.Tier == (int)MembershipType.Onyx);
-            var aqGreen = statuses.Single(status => status.Tier == (int)MembershipType.AQGreen);
-            var businessPremier = statuses.Single(status => status.Tier == (int)MembershipType.BusinessPremier);
-
-            Assert.False(jasper.IsSavingsWindowOpen);
-            Assert.Equal("Closed", jasper.StatusLabel);
-            Assert.True(onyx.IsSavingsWindowOpen);
-            Assert.True(aqGreen.IsSavingsWindowOpen);
-            Assert.True(businessPremier.IsSavingsWindowOpen);
-            Assert.All(statuses, status => Assert.Equal("2026-07-16", status.AsOfDate));
+            Assert.All(statuses, status =>
+            {
+                Assert.Equal(1, status.SavingsWindowOpenDay);
+                Assert.Equal(15, status.SavingsWindowCloseDay);
+                Assert.False(status.IsSavingsWindowOpen);
+                Assert.Equal("Closed", status.StatusLabel);
+                Assert.Equal("2026-07-16", status.AsOfDate);
+            });
         }
 
         [Fact]

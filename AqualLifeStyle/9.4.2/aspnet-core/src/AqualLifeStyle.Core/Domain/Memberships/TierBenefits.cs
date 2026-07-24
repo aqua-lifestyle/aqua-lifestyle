@@ -4,8 +4,9 @@ using AqualLifeStyle.Domain.Enums;
 namespace AqualLifeStyle.Domain.Memberships
 {
     /// <summary>
-    /// Value object representing tier-specific benefits for each membership type.
-    /// Benefits include order window rules, savings behaviour enforcement, and member perks.
+    /// Value object representing benefits for each membership type.
+    /// Tier-specific benefits include order rules and member perks. Savings terms are
+    /// common to all participating members.
     /// </summary>
     public class TierBenefits
     {
@@ -17,13 +18,13 @@ namespace AqualLifeStyle.Domain.Memberships
         public int OrderWindowStartDay { get; private set; }
         public int OrderWindowEndDay { get; private set; }
         
-        // Savings window boundaries
-        public int SavingsWindowOpenDay { get; private set; }      // 1st-15th
-        public int SavingsWindowCloseDay { get; private set; }     // 17th-24th
+        // Savings contribution window boundaries
+        public int SavingsWindowOpenDay { get; private set; }
+        public int SavingsWindowCloseDay { get; private set; }
         
         // Benefit multipliers and discounts
         public decimal ProductPricingDiscount { get; private set; } // % discount on products
-        public decimal InterestRate { get; private set; }          // Monthly interest on savings
+        public decimal SavingsMaturityInterestRate { get; private set; }
         public int MaxConcurrentOrders { get; private set; }       // Orders allowed per month
         
         // Commission and referral benefits
@@ -34,7 +35,7 @@ namespace AqualLifeStyle.Domain.Memberships
 
         private TierBenefits(MembershipType tier, string tierName, decimal monthlyObligation,
             int orderWindowStart, int orderWindowEnd, int savingsOpen, int savingsClose,
-            decimal discount, decimal interest, int maxOrders, 
+            decimal discount, decimal savingsMaturityInterestRate, int maxOrders,
             decimal referralRate, decimal profitShare)
         {
             Tier = tier;
@@ -45,7 +46,7 @@ namespace AqualLifeStyle.Domain.Memberships
             SavingsWindowOpenDay = savingsOpen;
             SavingsWindowCloseDay = savingsClose;
             ProductPricingDiscount = discount;
-            InterestRate = interest;
+            SavingsMaturityInterestRate = savingsMaturityInterestRate;
             MaxConcurrentOrders = maxOrders;
             ReferralCommissionRate = referralRate;
             ProfitSharePercentage = profitShare;
@@ -66,7 +67,7 @@ namespace AqualLifeStyle.Domain.Memberships
                 savingsOpen: 1,
                 savingsClose: 15,
                 discount: 0.05m,          // 5% discount
-                interest: 0.003m,         // 0.3% monthly = 3.6% annual
+                savingsMaturityInterestRate: 0.20m,
                 maxOrders: 1,
                 referralRate: 0.10m,      // 10% referral commission
                 profitShare: 0.0m         // No profit share at entry level
@@ -78,9 +79,9 @@ namespace AqualLifeStyle.Domain.Memberships
                 orderWindowStart: 1,
                 orderWindowEnd: 20,
                 savingsOpen: 1,
-                savingsClose: 20,
+                savingsClose: 15,
                 discount: 0.10m,          // 10% discount
-                interest: 0.005m,         // 0.5% monthly = 6% annual
+                savingsMaturityInterestRate: 0.20m,
                 maxOrders: 2,
                 referralRate: 0.15m,      // 15% referral commission
                 profitShare: 0.05m        // 5% profit share
@@ -92,9 +93,9 @@ namespace AqualLifeStyle.Domain.Memberships
                 orderWindowStart: 1,
                 orderWindowEnd: 25,
                 savingsOpen: 1,
-                savingsClose: 24,
+                savingsClose: 15,
                 discount: 0.15m,          // 15% discount
-                interest: 0.007m,         // 0.7% monthly = 8.4% annual
+                savingsMaturityInterestRate: 0.20m,
                 maxOrders: 3,
                 referralRate: 0.20m,      // 20% referral commission
                 profitShare: 0.10m        // 10% profit share
@@ -106,9 +107,9 @@ namespace AqualLifeStyle.Domain.Memberships
                 orderWindowStart: 1,
                 orderWindowEnd: 30,
                 savingsOpen: 1,
-                savingsClose: 24,
+                savingsClose: 15,
                 discount: 0.20m,          // 20% discount
-                interest: 0.010m,         // 1% monthly = 12% annual
+                savingsMaturityInterestRate: 0.20m,
                 maxOrders: 5,
                 referralRate: 0.25m,      // 25% referral commission
                 profitShare: 0.15m        // 15% profit share
@@ -126,13 +127,11 @@ namespace AqualLifeStyle.Domain.Memberships
         }
 
         /// <summary>
-        /// Check if today is within the savings window for this tier.
+        /// Check if today is within the savings contribution window.
         /// </summary>
         public bool IsSavingsWindowOpen(DateTime? date = null)
         {
             var today = (date ?? DateTime.UtcNow).Day;
-            // Savings window is 1st-15th (open) and 17th-24th (locked)
-            // This method returns true for the open window only
             return today >= SavingsWindowOpenDay && today <= SavingsWindowCloseDay;
         }
 
@@ -146,12 +145,12 @@ namespace AqualLifeStyle.Domain.Memberships
         }
 
         /// <summary>
-        /// Calculate monthly interest earned on a savings balance.
+        /// Calculate the interest earned when the savings account matures.
         /// </summary>
-        public decimal CalculateMonthlyInterest(decimal savingsBalance)
+        public decimal CalculateSavingsMaturityInterest(decimal savingsBalance)
         {
             if (savingsBalance < 0) throw new ArgumentException("Balance cannot be negative.", nameof(savingsBalance));
-            return savingsBalance * InterestRate;
+            return savingsBalance * SavingsMaturityInterestRate;
         }
 
         /// <summary>

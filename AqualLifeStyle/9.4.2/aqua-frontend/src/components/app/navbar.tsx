@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Menu,
   MessageSquare,
+  Network,
   Package,
   Plus,
   Users,
@@ -16,6 +17,7 @@ import {
   X,
   User,
   Mail,
+  PiggyBank,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -42,6 +44,10 @@ const moreLinks = [
   { href: "/facilitator/dashboard", icon: LayoutDashboard, label: "Facilitator dashboard", permission: "Pages.Facilitators" },
   { href: "/facilitator/my-referrals", icon: DollarSign, label: "My referrals", permission: "Pages.Referrals" },
   { href: "/member", icon: User, label: "Club member", permission: "Pages.Orders" },
+  { href: "/member/programmes", icon: Network, label: "My programmes", permission: "Aqua.ProgrammeParticipations.ViewSelf" },
+  { href: "/member/savings", icon: PiggyBank, label: "My savings", permission: "Aqua.Savings.ViewSelf" },
+  { href: "/member/loans", icon: DollarSign, label: "My loans", permission: "Aqua.Loans.ViewSelf" },
+  { href: "/member/entry-commitments", icon: DollarSign, label: "Entry commitments", permission: "Aqua.EntryMonthlyObligations.ViewSelf" },
   { href: "/member/enquiries", icon: MessageSquare, label: "My enquiries", permission: "Pages.Enquiries" },
   { href: "/catalog", icon: Package, label: "Catalog", permission: null },
   { href: "/contact", icon: Mail, label: "Contact", permission: null },

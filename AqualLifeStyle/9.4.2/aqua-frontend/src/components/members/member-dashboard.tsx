@@ -220,6 +220,17 @@ export const MemberDashboard = () => {
                     />
                   )}
                 </div>
+                {session?.user?.permissions?.includes(
+                  "Aqua.Savings.ViewSelf",
+                ) ? (
+                  <LinkButton
+                    className="mt-4 w-full"
+                    href="/member/savings"
+                    variant="outline"
+                  >
+                    View my savings account
+                  </LinkButton>
+                ) : null}
               </Card>
             </section>
           </>

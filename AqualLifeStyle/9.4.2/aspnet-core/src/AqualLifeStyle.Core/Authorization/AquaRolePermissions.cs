@@ -65,6 +65,8 @@ namespace AqualLifeStyle.Authorization
                     AquaPermissions.Members.EditSelf,
                     AquaPermissions.Memberships.ViewSelf,
                     AquaPermissions.Memberships.Upgrade,
+                    AquaPermissions.ProgrammeParticipations.ViewSelf,
+                    AquaPermissions.ProgrammeParticipations.Join,
                     AquaPermissions.Enquiries.View,
                     AquaPermissions.Enquiries.Create,
                     AquaPermissions.Enquiries.ViewSelf,
@@ -77,13 +79,17 @@ namespace AqualLifeStyle.Authorization
                     AquaPermissions.Savings.View,
                     AquaPermissions.Savings.Deposit,
                     AquaPermissions.Savings.Withdraw,
-                    AquaPermissions.Savings.ViewSelf
+                    AquaPermissions.Savings.ViewSelf,
+                    AquaPermissions.Loans.ViewSelf,
+                    AquaPermissions.EntryMonthlyObligations.ViewSelf
                 },
                 [AquaUserRole.Guest] = new[]
                 {
                     AquaPermissions.Members.ViewSelf,
                     AquaPermissions.Memberships.ViewSelf,
                     AquaPermissions.Memberships.Upgrade,
+                    AquaPermissions.ProgrammeParticipations.ViewSelf,
+                    AquaPermissions.ProgrammeParticipations.Join,
                     AquaPermissions.Orders.Place
                 }
             };

@@ -88,4 +88,36 @@ export const apiEndpoints = {
       `/api/services/app/Product/GetAllForCustomer?customerId=${customerId}`,
     getById: (id: number) => `/api/services/app/Product/Get?id=${id}`,
   },
+  programmeParticipations: {
+    getAdminParticipations:
+      "/api/services/app/AdminProgrammeParticipation/GetAll",
+    getMyParticipations:
+      "/api/services/app/ClubMemberProgrammeParticipation/GetMyParticipations",
+    startDirectOnyx:
+      "/api/services/app/ClubMemberProgrammeParticipation/StartDirectOnyx",
+    startEntry:
+      "/api/services/app/ClubMemberProgrammeParticipation/StartEntry",
+  },
+  savings: {
+    getAdminAccounts: "/api/services/app/AdminSavings/GetAll",
+    getMyAccount: "/api/services/app/ClubMemberSavings/GetMyAccount",
+  },
+  loans: {
+    getAdminAgreements: "/api/services/app/AdminOnyxLoan/GetAll",
+    getMyAgreements:
+      "/api/services/app/ClubMemberOnyxLoan/GetMyAgreements",
+  },
+  entryMonthlyObligations: {
+    getAdminObligations:
+      "/api/services/app/AdminEntryMonthlyObligation/GetAll",
+    getMyObligations:
+      "/api/services/app/ClubMemberEntryMonthlyObligation/GetMyObligations",
+  },
+  weeklyEarnings: {
+    calculateLatestClosedWeek:
+      "/api/services/app/AdminCommission/CalculateLatestClosedWeek",
+    getAll: "/api/services/app/AdminCommission/GetAll",
+    recordPayment: "/api/services/app/AdminCommission/RecordPayment",
+    release: "/api/services/app/AdminCommission/Release",
+  },
 } as const;

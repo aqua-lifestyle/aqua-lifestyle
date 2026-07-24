@@ -1,133 +1,132 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { SavingsWindowStatus } from "@/src/providers/Memberships/context";
-import { useAuthState, useMembershipsActions, useMembershipsState } from "@/src/providers";
-
+import { useAuthState } from "@/src/providers";
+import { apiEndpoints, httpClient } from "@/src/shared/api";
+import type { SavingsAccount } from "@/src/shared/domain/savings";
 import { MemberSavings } from "./member-savings";
 
-vi.mock("@/src/providers", async () => {
-  const actual = await vi.importActual<typeof import("@/src/providers")>(
-    "@/src/providers",
+vi.mock("@/src/providers", () => ({ useAuthState: vi.fn() }));
+vi.mock("@/src/shared/api", async () => {
+  const actual = await vi.importActual<typeof import("@/src/shared/api")>(
+    "@/src/shared/api",
   );
-  return {
-    ...actual,
-    useAuthState: vi.fn(),
-    useMembershipsActions: vi.fn(),
-    useMembershipsState: vi.fn(),
-  };
+  return { ...actual, httpClient: { get: vi.fn() } };
 });
 
-const savingsWindowStatuses: SavingsWindowStatus[] = [
-  {
-    tier: 0,
-    tierName: "Bronze",
-    savingsWindowOpenDay: 1,
-    savingsWindowCloseDay: 15,
-    currentDay: 10,
-    asOfDate: "2024-01-10",
-    isSavingsWindowOpen: true,
-    statusLabel: "Open",
-  },
-];
-
-const baseAuthState = {
+const authState = (permissions: string[]) => ({
   isAuthenticated: true,
   isReady: true,
   session: {
-    accessToken: "demo-token",
-    expiresAt: "2099-01-01",
+    accessToken: "token",
+    expiresAt: null,
     user: {
       email: "member@example.com",
-      id: 0,
-      name: "Member User",
-      permissions: [],
+      id: 7,
+      name: "Club Member",
+      permissions,
       role: "Member",
     },
   },
-};
-
-const baseState = {
-  errorMessage: null,
-  isError: false,
-  isPending: false,
-  isSelectedError: false,
-  isSelectedPending: false,
-  isSelectedSuccess: true,
-  isSuccess: true,
-  memberships: [],
-  selectedErrorMessage: null,
-  selectedMembership: null,
-  tierBenefits: null,
-  tierBenefitsErrorMessage: null,
-  isTierBenefitsError: false,
-  isTierBenefitsPending: false,
-  isTierBenefitsSuccess: false,
-  savingsWindowStatuses,
-  savingsWindowStatusesErrorMessage: null,
-  isSavingsWindowStatusesError: false,
-  isSavingsWindowStatusesPending: false,
-  isSavingsWindowStatusesSuccess: true,
-};
-
-beforeEach(() => {
-  vi.resetAllMocks();
-
-  vi.mocked(useAuthState).mockReturnValue(baseAuthState);
-  vi.mocked(useMembershipsState).mockReturnValue(baseState);
-  vi.mocked(useMembershipsActions).mockReturnValue({
-    getActiveTiers: vi.fn(),
-    getMembership: vi.fn(),
-    getMemberships: vi.fn(),
-    getSavingsWindowStatuses: vi.fn(),
-    getTierBenefits: vi.fn(),
-  });
 });
 
+const account: SavingsAccount = {
+  contributionWindowEndDay: 15,
+  contributionWindowStartDay: 1,
+  contributions: [
+    {
+      amount: 500,
+      contributedAt: "2026-07-10T10:00:00Z",
+      interestAmount: 100,
+      interestRatePercent: 20,
+      paymentId: "payment-1",
+    },
+  ],
+  currency: "ZAR",
+  customerId: 10,
+  customerName: "Club Member",
+  email: "member@example.com",
+  id: "account-1",
+  maturedAt: null,
+  maturityInterestAmount: null,
+  maturityInterestRatePercent: 20,
+  maturityPayoutAmount: null,
+  maturityPrincipalAmount: null,
+  maturesAt: "2027-07-05T10:00:00Z",
+  minimumContributionAmount: 100,
+  openedAt: "2026-07-05T10:00:00Z",
+  principalBalance: 500,
+  projectedInterestAmount: 100,
+  projectedMaturityAmount: 600,
+  requiresMaturityProcessing: false,
+  status: "Active",
+  tenantId: 1,
+  termsVersion: "2026-07",
+};
+
 describe("MemberSavings", () => {
-  it("renders the member savings page", async () => {
-    render(<MemberSavings />);
-
-    await waitFor(() => {
-      expect(screen.getByRole("heading", { name: /My savings/i })).toBeDefined();
-    });
-
-    expect(screen.getByText("Bronze")).toBeDefined();
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useAuthState).mockReturnValue(
+      authState(["Aqua.Savings.ViewSelf"]),
+    );
+    vi.mocked(httpClient.get).mockResolvedValue({ account });
   });
 
-  it("shows loading state", () => {
-    vi.mocked(useMembershipsState).mockReturnValue({
-      ...baseState,
-      isSavingsWindowStatusesPending: true,
-      savingsWindowStatuses: [],
-    });
-
+  it("shows the persisted savings ledger and projected maturity values", async () => {
     render(<MemberSavings />);
 
-    expect(screen.queryByText("Bronze")).toBeNull();
+    expect(
+      await screen.findByRole("heading", { name: "My savings" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "20% of this contribution",
+        {},
+        { timeout: 5_000 },
+      ),
+    ).toBeInTheDocument();
+    expect(httpClient.get).toHaveBeenCalledWith(
+      apiEndpoints.savings.getMyAccount,
+    );
+    expect(screen.getAllByText(/R\s*500[,.]00/)).toHaveLength(2);
+    expect(screen.getByText(/R\s*600[,.]00/)).toBeInTheDocument();
+    expect(screen.queryByText("Bronze")).not.toBeInTheDocument();
   });
 
-  it("shows error state", () => {
-    vi.mocked(useMembershipsState).mockReturnValue({
-      ...baseState,
-      isSavingsWindowStatusesError: true,
-      savingsWindowStatusesErrorMessage: "Failed to load savings",
-    });
+  it("shows an honest empty state when no account is persisted", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({ account: null });
 
     render(<MemberSavings />);
 
-    expect(screen.getByText("Failed to load savings")).toBeDefined();
+    expect(await screen.findByText("No savings account")).toBeInTheDocument();
+    expect(
+      screen.getByText(/contact the club team if you expected/i),
+    ).toBeInTheDocument();
   });
 
-  it("shows empty state when there are no savings records", () => {
-    vi.mocked(useMembershipsState).mockReturnValue({
-      ...baseState,
-      savingsWindowStatuses: [],
-    });
+  it("does not request savings without self-view permission", () => {
+    vi.mocked(useAuthState).mockReturnValue(authState([]));
 
     render(<MemberSavings />);
 
-    expect(screen.getByText("No savings")).toBeDefined();
-    expect(screen.getByText("You have no savings records.")).toBeDefined();
+    expect(
+      screen.getByText(
+        "Your account does not have access to Club Member savings.",
+      ),
+    ).toBeInTheDocument();
+    expect(httpClient.get).not.toHaveBeenCalled();
+  });
+
+  it("shows a descriptive request error", async () => {
+    vi.mocked(httpClient.get).mockRejectedValue(
+      new Error("Savings service unavailable"),
+    );
+
+    render(<MemberSavings />);
+
+    expect(
+      await screen.findByText("Savings service unavailable"),
+    ).toBeInTheDocument();
   });
 });

@@ -74,7 +74,7 @@ const baseAuthState = {
       email: "member@example.com",
       id: 1,
       name: "Member User",
-      permissions: [],
+      permissions: ["Aqua.Savings.ViewSelf"],
       role: "Member",
     },
   },
@@ -147,6 +147,9 @@ describe("MemberDashboard", () => {
 
     expect(screen.getByText("My Orders")).toBeDefined();
     expect(screen.getByText("1")).toBeDefined();
+    expect(
+      screen.getByRole("link", { name: "View my savings account" }),
+    ).toHaveAttribute("href", "/member/savings");
   });
 
   it("shows loading state", () => {
@@ -164,6 +167,26 @@ describe("MemberDashboard", () => {
     render(<MemberDashboard />);
 
     expect(screen.queryByText("My Orders")).toBeNull();
+  });
+
+  it("hides the savings account link without savings access", async () => {
+    vi.mocked(useAuthState).mockReturnValue({
+      ...baseAuthState,
+      session: {
+        ...baseAuthState.session,
+        user: {
+          ...baseAuthState.session.user,
+          permissions: [],
+        },
+      },
+    });
+
+    render(<MemberDashboard />);
+
+    await screen.findByRole("heading", { name: /Member dashboard/i });
+    expect(
+      screen.queryByRole("link", { name: "View my savings account" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows error state", () => {

@@ -68,6 +68,18 @@ namespace AqualLifeStyle.Authorization
             public const string ViewSelf = Default + ".ViewSelf";
         }
 
+        public static class Loans
+        {
+            public const string Default = "Aqua.Loans";
+            public const string ViewSelf = Default + ".ViewSelf";
+        }
+
+        public static class EntryMonthlyObligations
+        {
+            public const string Default = "Aqua.EntryMonthlyObligations";
+            public const string ViewSelf = Default + ".ViewSelf";
+        }
+
         public static class Enquiries
         {
             public const string Default = "Aqua.Enquiries";
@@ -93,6 +105,13 @@ namespace AqualLifeStyle.Authorization
             public const string View = Default + ".View";
             public const string ViewSelf = Default + ".ViewSelf";
             public const string Upgrade = Default + ".Upgrade";
+        }
+
+        public static class ProgrammeParticipations
+        {
+            public const string Default = "Aqua.ProgrammeParticipations";
+            public const string ViewSelf = Default + ".ViewSelf";
+            public const string Join = Default + ".Join";
         }
 
         public static class Admin
@@ -163,10 +182,44 @@ namespace AqualLifeStyle.Authorization
                 public const string Suspend = Default + ".Suspend";
                 public const string ChangeTier = Default + ".ChangeTier";
             }
+
+            public static class ProgrammeParticipations
+            {
+                public const string Default = Admin.Default + ".ProgrammeParticipations";
+                public const string View = Default + ".View";
+            }
+
+            public static class Commissions
+            {
+                public const string Default = Admin.Default + ".Commissions";
+                public const string View = Default + ".View";
+                public const string Calculate = Default + ".Calculate";
+                public const string Release = Default + ".Release";
+                public const string RecordPayment = Default + ".RecordPayment";
+            }
+
+            public static class Savings
+            {
+                public const string Default = Admin.Default + ".Savings";
+                public const string View = Default + ".View";
+            }
+
+            public static class Loans
+            {
+                public const string Default = Admin.Default + ".Loans";
+                public const string View = Default + ".View";
+            }
+
+            public static class EntryMonthlyObligations
+            {
+                public const string Default =
+                    Admin.Default + ".EntryMonthlyObligations";
+                public const string View = Default + ".View";
+            }
         }
 
         private static readonly Lazy<IReadOnlyCollection<string>> AllPermissionNames =
-            new Lazy<IReadOnlyCollection<string>>(() => typeof(AquaPermissions).GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)
+            new Lazy<IReadOnlyCollection<string>>(() => GetNestedTypesRecursively(typeof(AquaPermissions))
                 .SelectMany(type => type.GetFields(BindingFlags.Public | BindingFlags.Static))
                 .Where(field => field.IsLiteral && !field.IsInitOnly && field.FieldType == typeof(string))
                 .Select(field => (string)field.GetRawConstantValue())
@@ -174,5 +227,11 @@ namespace AqualLifeStyle.Authorization
                 .ToArray());
 
         public static IReadOnlyCollection<string> GetAll() => AllPermissionNames.Value;
+
+        private static IEnumerable<Type> GetNestedTypesRecursively(Type parentType) =>
+            parentType
+                .GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)
+                .SelectMany(nestedType =>
+                    new[] { nestedType }.Concat(GetNestedTypesRecursively(nestedType)));
     }
 }

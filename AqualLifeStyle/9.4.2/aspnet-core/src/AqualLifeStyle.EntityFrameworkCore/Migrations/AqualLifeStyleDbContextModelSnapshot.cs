@@ -2108,6 +2108,949 @@ namespace AqualLifeStyle.Migrations
                     b.ToTable("MembershipBenefits", (string)null);
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryCommissionComponent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("EntryWeeklyCommissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EntryWeeklyCommissionId", "Level")
+                        .IsUnique();
+
+                    b.ToTable("EntryCommissionComponents", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryCommissionPeriod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CalculatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("PeriodEnd")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("PeriodStart")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RulesVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "PeriodStart", "PeriodEnd")
+                        .IsUnique();
+
+                    b.ToTable("EntryCommissionPeriods", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryMonthlyObligation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AmountDue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("DueAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EntryParticipationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("GracePeriodDays")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("GracePeriodEndsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastAssessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("MarkedOverdueAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("OutstandingAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PeriodMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PeriodYear")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TermsVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("PaymentId");
+
+                    b.HasIndex("EntryParticipationId", "PeriodYear", "PeriodMonth")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "CustomerId", "Status");
+
+                    b.ToTable("EntryMonthlyObligations", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryParticipation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("ActivationPaymentAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("ActivationPaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("GracePeriodDays")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("MonthlyCommitmentAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int?>("RecruiterCustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("RegistrationPaymentAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("RegistrationPaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("TermsEffectiveFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TermsVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActivationPaymentId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("RecruiterCustomerId");
+
+                    b.HasIndex("RegistrationPaymentId");
+
+                    b.HasIndex("TenantId", "CustomerId")
+                        .IsUnique();
+
+                    b.ToTable("EntryParticipations", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryRecruiterCorrection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AdministratorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CorrectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EntryParticipationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("NewRecruiterCustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PreviousRecruiterCustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EntryParticipationId");
+
+                    b.ToTable("EntryRecruiterCorrections", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryWeeklyCommission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CalculatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CommissionPeriodId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EntryParticipationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("HighestCompletedLevel")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("HoldReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PaymentReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("PayoutStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ReleaseReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RulesVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CommissionPeriodId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("EntryParticipationId", "CommissionPeriodId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "CustomerId", "PayoutStatus");
+
+                    b.ToTable("EntryWeeklyCommissions", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxCommissionComponent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OnyxWeeklyCommissionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OnyxWeeklyCommissionId", "Level")
+                        .IsUnique();
+
+                    b.ToTable("OnyxCommissionComponents", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxCommissionPeriod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CalculatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("PeriodEnd")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("PeriodStart")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RulesVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "PeriodStart", "PeriodEnd")
+                        .IsUnique();
+
+                    b.ToTable("OnyxCommissionPeriods", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxLoanAgreement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("ApprovedByAdministratorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("EffectiveAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EntryParticipationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("InitialWeeklyMinimumAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("InitialWeeklyRequirementCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("InterestRatePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastAssessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("MemberAcceptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("MemberAcceptedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("MemberConfirmation")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTime>("OfferedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("OutstandingAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("PrincipalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("RepaymentDeadlineAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RepaymentPeriodMonths")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("SettledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TermsVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<decimal>("TotalPayableAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("EntryParticipationId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "CustomerId", "Status");
+
+                    b.ToTable("OnyxLoanAgreements", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxLoanRepaymentAllocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("OnyxLoanAgreementId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("WeeklyRequirementNumber")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OnyxLoanAgreementId");
+
+                    b.HasIndex("PaymentId")
+                        .IsUnique();
+
+                    b.ToTable("OnyxLoanRepaymentAllocations", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxLoanWeeklyRequirement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("CreditedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("DueAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("MarkedOverdueAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("MinimumAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("OnyxLoanAgreementId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RequirementNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("SatisfiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OnyxLoanAgreementId", "RequirementNumber")
+                        .IsUnique();
+
+                    b.ToTable("OnyxLoanWeeklyRequirements", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxParticipation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("AdmissionRoute")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("DirectEntryAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("DirectEntryPaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("EntryParticipationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("LoanAgreementId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("OnyxMembershipId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RecruiterCustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("TermsEffectiveFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TermsVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("DirectEntryPaymentId");
+
+                    b.HasIndex("EntryParticipationId");
+
+                    b.HasIndex("LoanAgreementId");
+
+                    b.HasIndex("OnyxMembershipId");
+
+                    b.HasIndex("RecruiterCustomerId");
+
+                    b.HasIndex("TenantId", "CustomerId")
+                        .IsUnique();
+
+                    b.ToTable("OnyxParticipations", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxTravelBenefitEntitlement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("EligibleAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("MemberTripContributionPercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)");
+
+                    b.Property<Guid>("OnyxParticipationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("QualifiedNetworkLevel")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RequiredNetworkLevel")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("TermsEffectiveFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TermsVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime>("WaitingPeriodEndsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("WaitingPeriodMonths")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("OnyxParticipationId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "Status", "WaitingPeriodEndsAt");
+
+                    b.ToTable("OnyxTravelBenefitEntitlements", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxWeeklyCommission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CalculatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CommissionPeriodId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("HighestCommissionedLevel")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("HighestQualifiedNetworkLevel")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("OnyxParticipationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PaymentReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("PayoutStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ReleaseReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RulesVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CommissionPeriodId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("OnyxParticipationId", "CommissionPeriodId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "CustomerId", "PayoutStatus");
+
+                    b.ToTable("OnyxWeeklyCommissions", (string)null);
+                });
+
             modelBuilder.Entity("AqualLifeStyle.Domain.Orders.OrderIntent", b =>
                 {
                     b.Property<int>("Id")
@@ -2155,6 +3098,82 @@ namespace AqualLifeStyle.Migrations
                     b.ToTable("OrderIntents", (string)null);
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.Domain.Payments.MemberPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExternalReference")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("InitiatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("Provider", "ExternalReference")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "CustomerId", "Purpose");
+
+                    b.ToTable("MemberPayments", (string)null);
+                });
+
             modelBuilder.Entity("AqualLifeStyle.Domain.Products.Product", b =>
                 {
                     b.Property<int>("Id")
@@ -2180,6 +3199,154 @@ namespace AqualLifeStyle.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Products", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Savings.SavingsAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ContributionWindowEndDay")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ContributionWindowStartDay")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("MaturedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("MaturesAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("MaturityInterestAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("MaturityInterestRatePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)");
+
+                    b.Property<decimal?>("MaturityPayoutAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("MaturityPeriodMonths")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("MaturityPrincipalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("MinimumContributionAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("OpenedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("PrincipalBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ProjectedInterestAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("TermsEffectiveFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TermsVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("TenantId", "CustomerId", "Status");
+
+                    b.HasIndex("TenantId", "Status", "MaturesAt");
+
+                    b.ToTable("SavingsAccounts", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Savings.SavingsContribution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("ContributedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("InterestAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("InterestRatePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SavingsAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TermsVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PaymentId")
+                        .IsUnique();
+
+                    b.HasIndex("SavingsAccountId", "ContributedAt");
+
+                    b.ToTable("SavingsContributions", (string)null);
                 });
 
             modelBuilder.Entity("AqualLifeStyle.MultiTenancy.Tenant", b =>
@@ -2578,6 +3745,241 @@ namespace AqualLifeStyle.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryCommissionComponent", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.EntryWeeklyCommission", null)
+                        .WithMany("Components")
+                        .HasForeignKey("EntryWeeklyCommissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryMonthlyObligation", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.EntryParticipation", null)
+                        .WithMany()
+                        .HasForeignKey("EntryParticipationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.Payments.MemberPayment", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryParticipation", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Payments.MemberPayment", null)
+                        .WithMany()
+                        .HasForeignKey("ActivationPaymentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("AqualLifeStyle.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("RecruiterCustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("AqualLifeStyle.Domain.Payments.MemberPayment", null)
+                        .WithMany()
+                        .HasForeignKey("RegistrationPaymentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryRecruiterCorrection", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.EntryParticipation", null)
+                        .WithMany("RecruiterCorrections")
+                        .HasForeignKey("EntryParticipationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryWeeklyCommission", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.EntryCommissionPeriod", null)
+                        .WithMany()
+                        .HasForeignKey("CommissionPeriodId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.EntryParticipation", null)
+                        .WithMany()
+                        .HasForeignKey("EntryParticipationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxCommissionComponent", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.OnyxWeeklyCommission", null)
+                        .WithMany("Components")
+                        .HasForeignKey("OnyxWeeklyCommissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxLoanAgreement", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.EntryParticipation", null)
+                        .WithMany()
+                        .HasForeignKey("EntryParticipationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxLoanRepaymentAllocation", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.OnyxLoanAgreement", null)
+                        .WithMany("Repayments")
+                        .HasForeignKey("OnyxLoanAgreementId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.Payments.MemberPayment", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxLoanWeeklyRequirement", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.OnyxLoanAgreement", null)
+                        .WithMany("WeeklyRequirements")
+                        .HasForeignKey("OnyxLoanAgreementId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxParticipation", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.Payments.MemberPayment", null)
+                        .WithMany()
+                        .HasForeignKey("DirectEntryPaymentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.EntryParticipation", null)
+                        .WithMany()
+                        .HasForeignKey("EntryParticipationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.OnyxLoanAgreement", null)
+                        .WithMany()
+                        .HasForeignKey("LoanAgreementId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("AqualLifeStyle.Domain.Memberships.Membership", null)
+                        .WithMany()
+                        .HasForeignKey("OnyxMembershipId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("RecruiterCustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxTravelBenefitEntitlement", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.OnyxParticipation", null)
+                        .WithMany()
+                        .HasForeignKey("OnyxParticipationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxWeeklyCommission", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.OnyxCommissionPeriod", null)
+                        .WithMany()
+                        .HasForeignKey("CommissionPeriodId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.OnyxParticipation", null)
+                        .WithMany()
+                        .HasForeignKey("OnyxParticipationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Payments.MemberPayment", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Savings.SavingsAccount", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Savings.SavingsContribution", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Payments.MemberPayment", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.Savings.SavingsAccount", null)
+                        .WithMany("Contributions")
+                        .HasForeignKey("SavingsAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("AqualLifeStyle.MultiTenancy.Tenant", b =>
                 {
                     b.HasOne("AqualLifeStyle.Domain.AreaLeaders.AreaLeader", null)
@@ -2684,6 +4086,33 @@ namespace AqualLifeStyle.Migrations
             modelBuilder.Entity("AqualLifeStyle.Domain.Enquiries.Enquiry", b =>
                 {
                     b.Navigation("FollowUps");
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryParticipation", b =>
+                {
+                    b.Navigation("RecruiterCorrections");
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryWeeklyCommission", b =>
+                {
+                    b.Navigation("Components");
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxLoanAgreement", b =>
+                {
+                    b.Navigation("Repayments");
+
+                    b.Navigation("WeeklyRequirements");
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxWeeklyCommission", b =>
+                {
+                    b.Navigation("Components");
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Savings.SavingsAccount", b =>
+                {
+                    b.Navigation("Contributions");
                 });
 #pragma warning restore 612, 618
         }
