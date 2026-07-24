@@ -152,7 +152,9 @@ namespace AqualLifeStyle.Authorization
             CreateChildren(
                 commissions,
                 host,
-                AquaPermissions.Admin.Commissions.Calculate);
+                AquaPermissions.Admin.Commissions.Calculate,
+                AquaPermissions.Admin.Commissions.Release,
+                AquaPermissions.Admin.Commissions.RecordPayment);
 
             CreateChildren(admin, host, AquaPermissions.Admin.AllTenants);
             var tenants = admin.CreateChildPermission(

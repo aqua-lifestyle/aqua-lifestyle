@@ -121,6 +121,137 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             }
         }
 
+        [UnitOfWork]
+        [AbpAuthorize(
+            AquaPermissions.Admin.Commissions.Release,
+            AquaPermissions.Admin.AllTenants,
+            RequireAllPermissions = true)]
+        public async Task ReleaseAsync(ReleaseWeeklyEarningInput input)
+        {
+            ValidateMutationInput(
+                input?.Id ?? Guid.Empty,
+                input?.Justification,
+                "Weekly earnings release");
+            var releasedAt = Clock.Now.ToUniversalTime();
+
+            using (CurrentUnitOfWork.DisableFilter(
+                       AbpDataFilters.MayHaveTenant,
+                       AbpDataFilters.MustHaveTenant))
+            {
+                if (input.Programme == AdminCommissionProgramme.Onyx)
+                {
+                    var commission = await GetOnyxCommissionAsync(
+                        input.Id,
+                        "Weekly earnings release");
+                    if (commission.PayoutStatus !=
+                        WeeklyCommissionPayoutStatus.Released &&
+                        commission.PayoutStatus !=
+                        WeeklyCommissionPayoutStatus.Paid)
+                    {
+                        TryMutation(
+                            () => commission.ReleaseEligiblePayout(releasedAt),
+                            "Weekly earnings release");
+                    }
+
+                    LogMutation(
+                        commission.TenantId,
+                        commission.Id,
+                        "Onyx",
+                        "released for payment",
+                        input.Justification);
+                }
+                else
+                {
+                    var commission = await GetEntryCommissionAsync(
+                        input.Id,
+                        "Weekly earnings release");
+                    if (commission.PayoutStatus !=
+                        WeeklyCommissionPayoutStatus.Released &&
+                        commission.PayoutStatus !=
+                        WeeklyCommissionPayoutStatus.Paid)
+                    {
+                        TryMutation(
+                            () => commission.ReleaseEligiblePayout(releasedAt),
+                            "Weekly earnings release");
+                    }
+
+                    LogMutation(
+                        commission.TenantId,
+                        commission.Id,
+                        "Entry",
+                        "released for payment",
+                        input.Justification);
+                }
+
+                await CurrentUnitOfWork.SaveChangesAsync();
+            }
+        }
+
+        [UnitOfWork]
+        [AbpAuthorize(
+            AquaPermissions.Admin.Commissions.RecordPayment,
+            AquaPermissions.Admin.AllTenants,
+            RequireAllPermissions = true)]
+        public async Task RecordPaymentAsync(
+            RecordWeeklyEarningPaymentInput input)
+        {
+            ValidateMutationInput(
+                input?.Id ?? Guid.Empty,
+                input?.Justification,
+                "Weekly earnings payment");
+            if (string.IsNullOrWhiteSpace(input.PaymentReference) ||
+                input.PaymentReference.Trim().Length > 128)
+            {
+                throw Failed(
+                    "Weekly earnings payment",
+                    "A valid external payment reference is required.");
+            }
+
+            var paymentReference = input.PaymentReference.Trim();
+            var paidAt = Clock.Now.ToUniversalTime();
+            using (CurrentUnitOfWork.DisableFilter(
+                       AbpDataFilters.MayHaveTenant,
+                       AbpDataFilters.MustHaveTenant))
+            {
+                if (input.Programme == AdminCommissionProgramme.Onyx)
+                {
+                    var commission = await GetOnyxCommissionAsync(
+                        input.Id,
+                        "Weekly earnings payment");
+                    RecordPayment(
+                        commission.PayoutStatus,
+                        commission.PaymentReference,
+                        paymentReference,
+                        () => commission.MarkPaid(paidAt, paymentReference));
+                    LogMutation(
+                        commission.TenantId,
+                        commission.Id,
+                        "Onyx",
+                        $"external payment recorded reference={SanitizeJustification(paymentReference)}",
+                        input.Justification);
+                }
+                else
+                {
+                    var commission = await GetEntryCommissionAsync(
+                        input.Id,
+                        "Weekly earnings payment");
+                    RecordPayment(
+                        commission.PayoutStatus,
+                        commission.PaymentReference,
+                        paymentReference,
+                        () => commission.MarkPaid(paidAt, paymentReference));
+                    LogMutation(
+                        commission.TenantId,
+                        commission.Id,
+                        "Entry",
+                        $"external payment recorded reference={SanitizeJustification(paymentReference)}",
+                        input.Justification);
+                }
+
+                await CurrentUnitOfWork.SaveChangesAsync();
+            }
+        }
+
         private async Task<CommissionCalculationResultDto> CalculateEntryAsync(
             int tenantId,
             ClosedCommissionWeek closedWeek,
@@ -408,6 +539,10 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 Status = CommissionPayoutStatusPresenter.ToBusinessLabel(
                     commission.PayoutStatus),
                 HoldReason = commission.HoldReason,
+                ReleasedAt = commission.ReleasedAt,
+                ReleaseReason = commission.ReleaseReason,
+                PaidAt = commission.PaidAt,
+                PaymentReference = commission.PaymentReference,
                 CalculatedAt = commission.CalculatedAt,
                 RulesVersion = commission.RulesVersion,
                 Components = commission.Components
@@ -441,6 +576,10 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 Currency = commission.Currency,
                 Status = CommissionPayoutStatusPresenter.ToBusinessLabel(
                     commission.PayoutStatus),
+                ReleasedAt = commission.ReleasedAt,
+                ReleaseReason = commission.ReleaseReason,
+                PaidAt = commission.PaidAt,
+                PaymentReference = commission.PaymentReference,
                 CalculatedAt = commission.CalculatedAt,
                 RulesVersion = commission.RulesVersion,
                 Components = commission.Components
@@ -495,6 +634,107 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 Amount = amount;
                 Status = status;
             }
+        }
+
+        private async Task<EntryWeeklyCommission> GetEntryCommissionAsync(
+            Guid id,
+            string operation)
+        {
+            var commission =
+                await _entryCommissionRepository.FirstOrDefaultAsync(id);
+            if (commission == null)
+            {
+                throw Failed(operation, "The Entry earning record was not found.");
+            }
+
+            return commission;
+        }
+
+        private async Task<OnyxWeeklyCommission> GetOnyxCommissionAsync(
+            Guid id,
+            string operation)
+        {
+            var commission =
+                await _onyxCommissionRepository.FirstOrDefaultAsync(id);
+            if (commission == null)
+            {
+                throw Failed(operation, "The Onyx earning record was not found.");
+            }
+
+            return commission;
+        }
+
+        private static void ValidateMutationInput(
+            Guid id,
+            string justification,
+            string operation)
+        {
+            if (id == Guid.Empty)
+            {
+                throw Failed(operation, "A valid weekly earning record is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(justification) ||
+                justification.Trim().Length < 3 ||
+                justification.Trim().Length > 500)
+            {
+                throw Failed(
+                    operation,
+                    "A clear reason for the administrator action is required.");
+            }
+        }
+
+        private static void RecordPayment(
+            WeeklyCommissionPayoutStatus status,
+            string existingReference,
+            string requestedReference,
+            Action markPaid)
+        {
+            if (status == WeeklyCommissionPayoutStatus.Paid)
+            {
+                if (!string.Equals(
+                        existingReference,
+                        requestedReference,
+                        StringComparison.Ordinal))
+                {
+                    throw Failed(
+                        "Weekly earnings payment",
+                        "This earning was already recorded with a different payment reference.");
+                }
+
+                return;
+            }
+
+            TryMutation(markPaid, "Weekly earnings payment");
+        }
+
+        private static void TryMutation(Action mutation, string operation)
+        {
+            try
+            {
+                mutation();
+            }
+            catch (ArgumentException exception)
+            {
+                throw Failed(operation, exception.Message);
+            }
+            catch (InvalidOperationException exception)
+            {
+                throw Failed(operation, exception.Message);
+            }
+        }
+
+        private void LogMutation(
+            int tenantId,
+            Guid commissionId,
+            string programme,
+            string action,
+            string justification)
+        {
+            Logger.Info(
+                $"Admin weekly earnings {action} actor={AbpSession.GetUserId()} " +
+                $"tenant={tenantId} programme={programme} commission={commissionId} " +
+                $"justification={SanitizeJustification(justification)}");
         }
     }
 }

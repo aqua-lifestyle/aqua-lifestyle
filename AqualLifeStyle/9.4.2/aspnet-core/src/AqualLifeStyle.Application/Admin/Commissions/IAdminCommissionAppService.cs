@@ -12,5 +12,9 @@ namespace AqualLifeStyle.Application.Admin.Commissions
 
         Task<CommissionCalculationResultDto> CalculateLatestClosedWeekAsync(
             CalculateLatestClosedCommissionWeekInput input);
+
+        Task ReleaseAsync(ReleaseWeeklyEarningInput input);
+
+        Task RecordPaymentAsync(RecordWeeklyEarningPaymentInput input);
     }
 }

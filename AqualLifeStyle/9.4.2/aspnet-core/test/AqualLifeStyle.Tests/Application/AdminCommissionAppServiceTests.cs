@@ -64,6 +64,62 @@ namespace AqualLifeStyle.Tests.Application
             earnedCommission.Currency.ShouldBe("ZAR");
             earnedCommission.Status.ShouldBe("Earned — awaiting release");
             earnedCommission.Components.Single().Level.ShouldBe(1);
+
+            await _service.ReleaseAsync(new ReleaseWeeklyEarningInput
+            {
+                Id = earnedCommission.Id,
+                Programme = AdminCommissionProgramme.Entry,
+                Justification = "Approved after reviewing the weekly calculation."
+            });
+            await _service.ReleaseAsync(new ReleaseWeeklyEarningInput
+            {
+                Id = earnedCommission.Id,
+                Programme = AdminCommissionProgramme.Entry,
+                Justification = "Repeated request after reviewing the weekly calculation."
+            });
+
+            var releasedReview = await _service.GetAllAsync(
+                new AdminCommissionListInput
+                {
+                    TenantId = 1,
+                    Programme = AdminCommissionProgramme.Entry,
+                    MaxResultCount = 20
+                });
+            var releasedCommission = releasedReview.Items.Single(item =>
+                item.Id == earnedCommission.Id);
+            releasedCommission.Status.ShouldBe("Released — awaiting payment");
+            releasedCommission.ReleasedAt.ShouldNotBeNull();
+
+            await _service.RecordPaymentAsync(
+                new RecordWeeklyEarningPaymentInput
+                {
+                    Id = earnedCommission.Id,
+                    Programme = AdminCommissionProgramme.Entry,
+                    PaymentReference = "bank-payment-2026-07-entry-1",
+                    Justification = "Recorded after confirming the external bank payment."
+                });
+            await _service.RecordPaymentAsync(
+                new RecordWeeklyEarningPaymentInput
+                {
+                    Id = earnedCommission.Id,
+                    Programme = AdminCommissionProgramme.Entry,
+                    PaymentReference = "bank-payment-2026-07-entry-1",
+                    Justification = "Repeated after confirming the external bank payment."
+                });
+
+            var paidReview = await _service.GetAllAsync(
+                new AdminCommissionListInput
+                {
+                    TenantId = 1,
+                    Programme = AdminCommissionProgramme.Entry,
+                    MaxResultCount = 20
+                });
+            var paidCommission = paidReview.Items.Single(item =>
+                item.Id == earnedCommission.Id);
+            paidCommission.Status.ShouldBe("Paid");
+            paidCommission.PaymentReference.ShouldBe(
+                "bank-payment-2026-07-entry-1");
+            paidCommission.PaidAt.ShouldNotBeNull();
         }
 
         private async Task CreateQualifiedLevelOneEntryNetworkAsync()

@@ -27,6 +27,29 @@ namespace AqualLifeStyle.Application.Admin.Commissions.Dto
         public AdminCommissionProgramme Programme { get; set; }
     }
 
+    public class ReleaseWeeklyEarningInput
+    {
+        public Guid Id { get; set; }
+
+        public AdminCommissionProgramme Programme { get; set; }
+
+        [Required, StringLength(500, MinimumLength = 3)]
+        public string Justification { get; set; }
+    }
+
+    public class RecordWeeklyEarningPaymentInput
+    {
+        public Guid Id { get; set; }
+
+        public AdminCommissionProgramme Programme { get; set; }
+
+        [Required, StringLength(128, MinimumLength = 3)]
+        public string PaymentReference { get; set; }
+
+        [Required, StringLength(500, MinimumLength = 3)]
+        public string Justification { get; set; }
+    }
+
     public class AdminCommissionComponentDto
     {
         public int Level { get; set; }
@@ -50,6 +73,10 @@ namespace AqualLifeStyle.Application.Admin.Commissions.Dto
         public string Currency { get; set; }
         public string Status { get; set; }
         public string HoldReason { get; set; }
+        public DateTime? ReleasedAt { get; set; }
+        public string ReleaseReason { get; set; }
+        public DateTime? PaidAt { get; set; }
+        public string PaymentReference { get; set; }
         public DateTime CalculatedAt { get; set; }
         public string RulesVersion { get; set; }
         public IReadOnlyList<AdminCommissionComponentDto> Components { get; set; }

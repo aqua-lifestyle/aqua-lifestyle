@@ -172,6 +172,12 @@ namespace AqualLifeStyle.Tests.Application
                     typeof(AdminCommissionAppService),
                     nameof(AdminCommissionAppService.CalculateLatestClosedWeekAsync))
                 .RequireAllPermissions.ShouldBeTrue();
+            AssertHostWideFinancialAction(
+                nameof(AdminCommissionAppService.ReleaseAsync),
+                AquaPermissions.Admin.Commissions.Release);
+            AssertHostWideFinancialAction(
+                nameof(AdminCommissionAppService.RecordPaymentAsync),
+                AquaPermissions.Admin.Commissions.RecordPayment);
         }
 
         [Fact]
@@ -259,6 +265,22 @@ namespace AqualLifeStyle.Tests.Application
             attribute.ShouldNotBeNull(
                 $"{serviceType.Name}.{methodName} should declare AbpAuthorize.");
             return attribute;
+        }
+
+        private static void AssertHostWideFinancialAction(
+            string methodName,
+            string actionPermission)
+        {
+            AssertAuthorizeAttribute(
+                typeof(AdminCommissionAppService),
+                methodName,
+                actionPermission);
+            AssertAuthorizeAttribute(
+                typeof(AdminCommissionAppService),
+                methodName,
+                AquaPermissions.Admin.AllTenants);
+            GetAuthorizeAttribute(typeof(AdminCommissionAppService), methodName)
+                .RequireAllPermissions.ShouldBeTrue();
         }
     }
 }

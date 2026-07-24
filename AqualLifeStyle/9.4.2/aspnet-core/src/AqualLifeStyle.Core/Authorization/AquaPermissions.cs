@@ -182,6 +182,8 @@ namespace AqualLifeStyle.Authorization
                 public const string Default = Admin.Default + ".Commissions";
                 public const string View = Default + ".View";
                 public const string Calculate = Default + ".Calculate";
+                public const string Release = Default + ".Release";
+                public const string RecordPayment = Default + ".RecordPayment";
             }
         }
 
