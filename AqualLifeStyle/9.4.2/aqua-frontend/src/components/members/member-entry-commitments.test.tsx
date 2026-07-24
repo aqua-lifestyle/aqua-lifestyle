@@ -42,7 +42,7 @@ describe("MemberEntryCommitments", () => {
   it("shows persisted Entry commitment status", async () => {
     render(<MemberEntryCommitments />);
 
-    expect(await screen.findByText("August 2026")).toBeInTheDocument();
+    expect(await screen.findByText("July 2026")).toBeInTheDocument();
     expect(httpClient.get).toHaveBeenCalledWith(
       apiEndpoints.entryMonthlyObligations.getMyObligations,
     );

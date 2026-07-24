@@ -79,9 +79,6 @@ describe("MemberSavings", () => {
     expect(
       await screen.findByRole("heading", { name: "My savings" }),
     ).toBeInTheDocument();
-    expect(httpClient.get).toHaveBeenCalledWith(
-      apiEndpoints.savings.getMyAccount,
-    );
     expect(
       await screen.findByText(
         "20% of this contribution",
@@ -89,6 +86,9 @@ describe("MemberSavings", () => {
         { timeout: 5_000 },
       ),
     ).toBeInTheDocument();
+    expect(httpClient.get).toHaveBeenCalledWith(
+      apiEndpoints.savings.getMyAccount,
+    );
     expect(screen.getAllByText(/R\s*500[,.]00/)).toHaveLength(2);
     expect(screen.getByText(/R\s*600[,.]00/)).toBeInTheDocument();
     expect(screen.queryByText("Bronze")).not.toBeInTheDocument();

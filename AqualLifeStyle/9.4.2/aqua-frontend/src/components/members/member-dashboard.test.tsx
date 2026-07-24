@@ -169,6 +169,26 @@ describe("MemberDashboard", () => {
     expect(screen.queryByText("My Orders")).toBeNull();
   });
 
+  it("hides the savings account link without savings access", async () => {
+    vi.mocked(useAuthState).mockReturnValue({
+      ...baseAuthState,
+      session: {
+        ...baseAuthState.session,
+        user: {
+          ...baseAuthState.session.user,
+          permissions: [],
+        },
+      },
+    });
+
+    render(<MemberDashboard />);
+
+    await screen.findByRole("heading", { name: /Member dashboard/i });
+    expect(
+      screen.queryByRole("link", { name: "View my savings account" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows error state", () => {
     vi.mocked(useMembershipsState).mockReturnValue({
       ...baseMembershipsState,
