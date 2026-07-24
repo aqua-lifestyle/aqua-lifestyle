@@ -265,7 +265,7 @@ export const MembershipDetails = ({ membershipId }: MembershipDetailsProps) => {
                           </dt>
                           <dd className="mt-1 font-medium text-zinc-950">
                             {formatPercent(
-                              tierBenefits.savingsMaturityInterestRate,
+                              tierBenefits.savingsMaturityInterestRate * 100,
                             )}
                           </dd>
                         </div>
