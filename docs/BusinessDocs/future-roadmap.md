@@ -18,7 +18,7 @@
 ## Phase 2: Savings & Order Cycle (Next Priority)
 - [x] Persist Club Member `SavingsAccount` and payment-linked contribution ledger
 - [ ] Add secured Club Member and administrator savings application services
-- [ ] Club account types with registration fees and tier minimums (FR-09)
+- [ ] Club account types with registration fees and tier minimums
 - [x] Savings contribution window enforcement from the 1st–15th
 - [ ] Refund-rule flagging (3-month threshold per tier) (BR-02–04)
 - [x] Full 20% interest per contribution with 12-month maturity and early-withdrawal lock

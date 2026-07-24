@@ -9,7 +9,7 @@
 
 ## 2. Functional Requirements
 
-Status legend: ✅ Implemented in codebase · ⚠️ Partially implemented / assumed · ❌ Missing
+Status legend: ✅ Implemented in codebase · 🔧 Domain/persistence foundation implemented; application layer pending · ⚠️ Partially implemented / assumed · ❌ Missing
 
 ### 2.1 Membership Management
 
