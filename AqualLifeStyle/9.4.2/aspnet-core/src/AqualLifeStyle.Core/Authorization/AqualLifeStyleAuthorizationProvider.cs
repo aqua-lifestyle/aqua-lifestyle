@@ -55,6 +55,10 @@ namespace AqualLifeStyle.Authorization
             CreateGroup(context, AquaPermissions.Orders.Default, AquaPermissions.Orders.View, AquaPermissions.Orders.Place, AquaPermissions.Orders.Process, AquaPermissions.Orders.Approve, AquaPermissions.Orders.ViewSelf);
             CreateGroup(context, AquaPermissions.Savings.Default, AquaPermissions.Savings.View, AquaPermissions.Savings.Deposit, AquaPermissions.Savings.Withdraw, AquaPermissions.Savings.Approve, AquaPermissions.Savings.ViewSelf);
             CreateGroup(context, AquaPermissions.Loans.Default, AquaPermissions.Loans.ViewSelf);
+            CreateGroup(
+                context,
+                AquaPermissions.EntryMonthlyObligations.Default,
+                AquaPermissions.EntryMonthlyObligations.ViewSelf);
             CreateGroup(context, AquaPermissions.Enquiries.Default, AquaPermissions.Enquiries.View, AquaPermissions.Enquiries.Create, AquaPermissions.Enquiries.Update, AquaPermissions.Enquiries.Resolve, AquaPermissions.Enquiries.ViewSelf);
             CreateGroup(context, AquaPermissions.Referrals.Default, AquaPermissions.Referrals.View, AquaPermissions.Referrals.Create, AquaPermissions.Referrals.Confirm, AquaPermissions.Referrals.ViewSelf);
             CreateGroup(context, AquaPermissions.Memberships.Default, AquaPermissions.Memberships.View, AquaPermissions.Memberships.ViewSelf, AquaPermissions.Memberships.Upgrade);
@@ -174,6 +178,15 @@ namespace AqualLifeStyle.Authorization
                 loans,
                 sides,
                 AquaPermissions.Admin.Loans.View);
+
+            var entryMonthlyObligations = admin.CreateChildPermission(
+                AquaPermissions.Admin.EntryMonthlyObligations.Default,
+                L(AquaPermissions.Admin.EntryMonthlyObligations.Default),
+                multiTenancySides: sides);
+            CreateChildren(
+                entryMonthlyObligations,
+                sides,
+                AquaPermissions.Admin.EntryMonthlyObligations.View);
 
             CreateChildren(admin, host, AquaPermissions.Admin.AllTenants);
             var tenants = admin.CreateChildPermission(

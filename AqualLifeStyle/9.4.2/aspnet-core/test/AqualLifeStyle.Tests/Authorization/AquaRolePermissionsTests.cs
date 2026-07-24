@@ -90,6 +90,7 @@ namespace AqualLifeStyle.Tests.Authorization
         [InlineData(AquaUserRole.Member, AquaPermissions.Savings.Deposit)]
         [InlineData(AquaUserRole.Member, AquaPermissions.Savings.Withdraw)]
         [InlineData(AquaUserRole.Member, AquaPermissions.Loans.ViewSelf)]
+        [InlineData(AquaUserRole.Member, AquaPermissions.EntryMonthlyObligations.ViewSelf)]
         public void Role_HasExpectedPermission(AquaUserRole role, string permission) => AquaRolePermissions.GetFor(role).ShouldContain(permission);
 
         [Theory]
@@ -125,6 +126,8 @@ namespace AqualLifeStyle.Tests.Authorization
         [InlineData(AquaPermissions.Admin.Savings.View, AquaPermissions.Admin.Savings.Default)]
         [InlineData(AquaPermissions.Loans.ViewSelf, AquaPermissions.Loans.Default)]
         [InlineData(AquaPermissions.Admin.Loans.View, AquaPermissions.Admin.Loans.Default)]
+        [InlineData(AquaPermissions.EntryMonthlyObligations.ViewSelf, AquaPermissions.EntryMonthlyObligations.Default)]
+        [InlineData(AquaPermissions.Admin.EntryMonthlyObligations.View, AquaPermissions.Admin.EntryMonthlyObligations.Default)]
         public void Provider_RegistersExpectedParent(string childName, string parentName)
         {
             var permissions = PermissionFinder.GetAllPermissions(new AqualLifeStyleAuthorizationProvider());

@@ -74,6 +74,12 @@ namespace AqualLifeStyle.Authorization
             public const string ViewSelf = Default + ".ViewSelf";
         }
 
+        public static class EntryMonthlyObligations
+        {
+            public const string Default = "Aqua.EntryMonthlyObligations";
+            public const string ViewSelf = Default + ".ViewSelf";
+        }
+
         public static class Enquiries
         {
             public const string Default = "Aqua.Enquiries";
@@ -201,6 +207,13 @@ namespace AqualLifeStyle.Authorization
             public static class Loans
             {
                 public const string Default = Admin.Default + ".Loans";
+                public const string View = Default + ".View";
+            }
+
+            public static class EntryMonthlyObligations
+            {
+                public const string Default =
+                    Admin.Default + ".EntryMonthlyObligations";
                 public const string View = Default + ".View";
             }
         }
