@@ -170,6 +170,12 @@ namespace AqualLifeStyle.Authorization
                 public const string Suspend = Default + ".Suspend";
                 public const string ChangeTier = Default + ".ChangeTier";
             }
+
+            public static class ProgrammeParticipations
+            {
+                public const string Default = Admin.Default + ".ProgrammeParticipations";
+                public const string View = Default + ".View";
+            }
         }
 
         private static readonly Lazy<IReadOnlyCollection<string>> AllPermissionNames =

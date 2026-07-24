@@ -64,6 +64,7 @@ namespace AqualLifeStyle.Tests.Authorization
         [InlineData(AquaPermissions.Enquiries.Resolve, AquaPermissions.Enquiries.Default)]
         [InlineData(AquaPermissions.Referrals.Confirm, AquaPermissions.Referrals.Default)]
         [InlineData(AquaPermissions.ProgrammeParticipations.Join, AquaPermissions.ProgrammeParticipations.Default)]
+        [InlineData(AquaPermissions.Admin.ProgrammeParticipations.View, AquaPermissions.Admin.ProgrammeParticipations.Default)]
         public void Provider_RegistersExpectedParent(string childName, string parentName)
         {
             var permissions = PermissionFinder.GetAllPermissions(new AqualLifeStyleAuthorizationProvider());

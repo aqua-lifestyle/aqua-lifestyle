@@ -131,6 +131,15 @@ namespace AqualLifeStyle.Authorization
                 AquaPermissions.Admin.Members.Suspend,
                 AquaPermissions.Admin.Members.ChangeTier);
 
+            var programmeParticipations = admin.CreateChildPermission(
+                AquaPermissions.Admin.ProgrammeParticipations.Default,
+                L(AquaPermissions.Admin.ProgrammeParticipations.Default),
+                multiTenancySides: sides);
+            CreateChildren(
+                programmeParticipations,
+                sides,
+                AquaPermissions.Admin.ProgrammeParticipations.View);
+
             var host = MultiTenancySides.Host;
             CreateChildren(admin, host, AquaPermissions.Admin.AllTenants);
             var tenants = admin.CreateChildPermission(

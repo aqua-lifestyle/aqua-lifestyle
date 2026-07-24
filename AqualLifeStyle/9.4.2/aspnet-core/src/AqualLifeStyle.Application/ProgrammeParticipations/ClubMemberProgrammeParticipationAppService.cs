@@ -272,67 +272,41 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
         private static ProgrammeParticipationDto Map(EntryParticipation participation)
         {
-            var awaitingRegistration =
-                participation.Status == EntryParticipationStatus.AwaitingRegistrationPayment;
-            var awaitingActivation =
-                participation.Status == EntryParticipationStatus.AwaitingActivationPayment;
+            var details = ProgrammeParticipationStatusPresenter.Describe(participation);
             return new ProgrammeParticipationDto
             {
                 Id = participation.Id,
                 ProgrammeName = "Entry",
-                Status = EntryStatusLabel(participation.Status),
-                IsActive = participation.Status == EntryParticipationStatus.Active,
+                Status = details.Status,
+                IsActive = details.IsActive,
                 JoinedIndependently = participation.JoinedIndependently,
                 RecruiterCustomerId = participation.RecruiterCustomerId,
                 StartedAt = participation.StartedAt,
                 ActivatedAt = participation.ActivatedAt,
-                NextPaymentAmount = awaitingRegistration
-                    ? participation.RegistrationPaymentAmount
-                    : awaitingActivation
-                        ? participation.ActivationPaymentAmount
-                        : null,
-                NextPaymentDescription = awaitingRegistration
-                    ? "Registration payment"
-                    : awaitingActivation
-                        ? "Activation payment"
-                        : null,
+                NextPaymentAmount = details.NextPaymentAmount,
+                NextPaymentDescription = details.NextPaymentDescription,
                 Currency = participation.Currency,
-                CanRecruitForThisProgramme = participation.IsQualifiedForNetwork
+                CanRecruitForThisProgramme = details.CanRecruit
             };
         }
 
         private static ProgrammeParticipationDto Map(OnyxParticipation participation)
         {
-            var awaitingPayment =
-                participation.Status == OnyxParticipationStatus.AwaitingDirectEntryPayment;
+            var details = ProgrammeParticipationStatusPresenter.Describe(participation);
             return new ProgrammeParticipationDto
             {
                 Id = participation.Id,
                 ProgrammeName = "Onyx",
-                Status = awaitingPayment ? "Awaiting full payment" : "Active",
-                IsActive = participation.Status == OnyxParticipationStatus.Active,
+                Status = details.Status,
+                IsActive = details.IsActive,
                 JoinedIndependently = participation.JoinedIndependently,
                 RecruiterCustomerId = participation.RecruiterCustomerId,
                 StartedAt = participation.StartedAt,
                 ActivatedAt = participation.ActivatedAt,
-                NextPaymentAmount = awaitingPayment ? participation.DirectEntryAmount : null,
-                NextPaymentDescription = awaitingPayment ? "Full Onyx participation payment" : null,
+                NextPaymentAmount = details.NextPaymentAmount,
+                NextPaymentDescription = details.NextPaymentDescription,
                 Currency = participation.Currency,
-                CanRecruitForThisProgramme =
-                    participation.Status == OnyxParticipationStatus.Active
-            };
-        }
-
-        private static string EntryStatusLabel(EntryParticipationStatus status)
-        {
-            return status switch
-            {
-                EntryParticipationStatus.AwaitingRegistrationPayment =>
-                    "Awaiting registration payment",
-                EntryParticipationStatus.AwaitingActivationPayment =>
-                    "Awaiting activation payment",
-                EntryParticipationStatus.Active => "Active",
-                _ => throw new ArgumentOutOfRangeException(nameof(status), status, null)
+                CanRecruitForThisProgramme = details.CanRecruit
             };
         }
     }
