@@ -214,7 +214,10 @@ function ProfileContent() {
                   </div>
                   <div>
                     <Button
-                      onClick={() => setIsEditing(true)}
+                      onClick={() => {
+                        setIsEditing(true);
+                        setSaveSuccess(false);
+                      }}
                       variant="outline"
                     >
                       Edit profile

@@ -17,5 +17,5 @@ export const customerContactNumberSchema = z.string().trim()
   .max(32, "Contact number must be 32 characters or fewer.");
 
 export const customerHomeAddressSchema = z.string().trim()
-  .min(3, "Home address is required.")
+  .min(3, "Home address must be at least 3 characters.")
   .max(512, "Home address must be 512 characters or fewer.");
