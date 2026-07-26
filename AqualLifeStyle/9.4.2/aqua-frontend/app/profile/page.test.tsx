@@ -72,4 +72,21 @@ describe("customer profile", () => {
     fireEvent.click(screen.getByRole("button", { name: "Edit profile" }));
     expect(screen.queryByText("Profile updated successfully.")).not.toBeInTheDocument();
   });
+
+  it("does not reload the profile when session details change for the same user", async () => {
+    const { rerender } = render(<ProfilePage />);
+    expect(await screen.findByText("10 Aqua Street, Johannesburg")).toBeInTheDocument();
+
+    vi.mocked(useAuthState).mockReturnValue({
+      isAuthenticated: true,
+      isReady: true,
+      session: {
+        ...session,
+        user: { ...session.user, name: "Updated Session Name" },
+      },
+    });
+    rerender(<ProfilePage />);
+
+    expect(httpClient.get).toHaveBeenCalledTimes(1);
+  });
 });

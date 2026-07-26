@@ -46,6 +46,7 @@ export default function ProfilePage() {
 function ProfileContent() {
   const { session } = useAuthState();
   const { setSession } = useAuthActions();
+  const authenticatedUserId = session?.user?.id;
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,14 +56,14 @@ function ProfileContent() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (!session) return;
+    if (!authenticatedUserId) return;
     let active = true;
     void httpClient.get<CustomerProfile>(apiEndpoints.myAccount.getProfile)
       .then((result) => { if (active) { setProfile(result); setSaveError(null); } })
       .catch((error) => { if (active) setSaveError(getRequestErrorMessage(error, "Your profile could not be loaded.")); })
       .finally(() => { if (active) setIsLoading(false); });
     return () => { active = false; };
-  }, [session]);
+  }, [authenticatedUserId]);
 
   if (!session) {
     return null;

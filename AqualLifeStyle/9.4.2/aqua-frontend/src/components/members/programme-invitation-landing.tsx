@@ -70,7 +70,7 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
   };
 
   const redirect = `/i/${encodeURIComponent(inviteCode)}`;
-  const signupUrl = preview
+  const signupUrl = preview && typeof preview.areaName === "string"
     ? `/signup?area=${encodeURIComponent(preview.areaName)}&redirect=${encodeURIComponent(redirect)}`
     : "/signup";
   const loginUrl = `/login?redirect=${encodeURIComponent(redirect)}`;

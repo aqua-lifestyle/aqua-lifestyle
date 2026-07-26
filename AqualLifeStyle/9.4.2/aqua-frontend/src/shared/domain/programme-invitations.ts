@@ -10,7 +10,7 @@ export type MyProgrammeInvitations = {
 };
 
 export type ProgrammeInvitationPreview = {
-  areaName: string;
+  areaName: string | null;
   inviteCode: string;
   programmeKey: "AQGREEN" | "ONYX";
   programmeName: "AQGreen" | "Onyx";

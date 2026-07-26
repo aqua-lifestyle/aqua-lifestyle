@@ -123,4 +123,21 @@ describe("ProgrammeInvitationLanding", () => {
     expect(screen.getByRole("link", { name: /sign in to continue/i }))
       .toHaveAttribute("href", "/login?redirect=%2Fi%2FAQ7G2X9KLMNP");
   });
+
+  it("uses the safe signup page when the invitation has no Area name", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({
+      ...preview,
+      areaName: null,
+    });
+    vi.mocked(useAuthState).mockReturnValue({
+      isAuthenticated: false,
+      isReady: true,
+      session: null,
+    });
+
+    render(<ProgrammeInvitationLanding inviteCode="AQ7G2X9KLMNP" />);
+
+    expect(await screen.findByRole("link", { name: /create my account/i }))
+      .toHaveAttribute("href", "/signup");
+  });
 });
