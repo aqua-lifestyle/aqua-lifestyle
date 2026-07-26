@@ -53,6 +53,12 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 throw new Abp.UI.UserFriendlyException(
                     "Recruiter correction failed.",
                     "The request was empty.");
+            if (!AbpSession.TenantId.HasValue &&
+                !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
+            {
+                throw new AbpAuthorizationException(
+                    "Cross-Area recruiter correction requires permission to manage all Areas.");
+            }
 
             Customer target;
             Customer newRecruiter = null;

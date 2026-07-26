@@ -129,6 +129,47 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task HostCorrectorWithoutAllAreasPermission_CannotLookupAreaMembers()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userName = $"host-programme-corrector-{suffix}";
+            var userId = await CreateTestUserAsync(
+                null,
+                userName,
+                $"{userName}@example.com");
+            await UsingDbContextAsync(null, async context =>
+            {
+                var role = new Role(
+                    null,
+                    $"ProgrammeCorrector-{suffix}",
+                    $"Programme Corrector {suffix}");
+                context.Roles.Add(role);
+                await context.SaveChangesAsync();
+
+                context.UserRoles.RemoveRange(
+                    context.UserRoles.Where(userRole => userRole.UserId == userId));
+                context.UserRoles.Add(new UserRole(null, userId, role.Id));
+                context.Permissions.Add(new RolePermissionSetting
+                {
+                    TenantId = null,
+                    Name = AquaPermissions.Admin.ProgrammeParticipations.CorrectRecruiter,
+                    IsGranted = true,
+                    RoleId = role.Id
+                });
+                await context.SaveChangesAsync();
+            });
+            LoginAsHost(userName);
+
+            await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+                {
+                    Programme = AdminProgrammeType.Entry,
+                    ClubMemberNumber = "CLB-NOTFOUND01",
+                    Reason = "Verifying cross-Area authorization"
+                }));
+        }
+
+        [Fact]
         public async Task AdministratorCorrection_PreservesHistoryRejectsCyclesAndIsIdempotent()
         {
             var network = await CreateActiveAQGreenNetworkAsync();
