@@ -21,8 +21,8 @@ rules below.
   confirmed R600 payments.
 - AQGreen Level 2 makes the loan agreement available. Member acceptance followed
   by administrator approval makes the agreement effective. Creation of the
-  separate Onyx participation remains deferred until the recruiter-placement rule
-  for a graduating member is confirmed.
+  separate Onyx participation uses independent placement: the graduate has no
+  Onyx recruiter and becomes the root of a new Onyx network.
 - Graduation never converts, deletes, or overwrites AQGreen participation, network
   placement, payments, or commissions.
 - Neither lifecycle is represented by replacing `Customer.MembershipId`.
@@ -250,9 +250,12 @@ The provider-neutral Onyx loan lifecycle foundation is complete:
 
 Loan offer creation, secured member acceptance, administrator approval,
 provider callbacks, payment allocation workflows, and automated payout
-orchestration remain application-workflow work. A loan agreement does not yet
-create an Onyx participation because the placement of a graduating member in
-the Onyx network has not been confirmed.
+orchestration remain application-workflow work. The domain now provides a
+transition for an effective agreement that creates a separate active Onyx
+participation with independent placement, linked to the original AQGreen
+participation and loan.
+The future secured approval workflow must invoke this transition atomically and
+idempotently so it cannot create duplicate Onyx participation records.
 
 ### Phase 5 Onyx network and earnings status
 

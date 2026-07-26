@@ -117,6 +117,83 @@ namespace AqualLifeStyle.Domain.Onyx
             };
         }
 
+        public static OnyxParticipation GraduateFromAQGreenIndependently(
+            EntryParticipation aqGreenParticipation,
+            OnyxLoanAgreement loanAgreement,
+            int onyxMembershipId,
+            OnyxPlanTerms terms,
+            DateTime graduatedAt)
+        {
+            if (aqGreenParticipation == null)
+            {
+                throw new ArgumentNullException(nameof(aqGreenParticipation));
+            }
+
+            if (loanAgreement == null)
+            {
+                throw new ArgumentNullException(nameof(loanAgreement));
+            }
+
+            if (terms == null)
+            {
+                throw new ArgumentNullException(nameof(terms));
+            }
+
+            if (aqGreenParticipation.Status != EntryParticipationStatus.Active)
+            {
+                throw new InvalidOperationException(
+                    "Only an active AQGreen participant can graduate to Onyx.");
+            }
+
+            if (loanAgreement.Status != OnyxLoanAgreementStatus.Active ||
+                !loanAgreement.EffectiveAt.HasValue)
+            {
+                throw new InvalidOperationException(
+                    "The Onyx loan agreement must be active before AQGreen graduation.");
+            }
+
+            if (loanAgreement.TenantId != aqGreenParticipation.TenantId ||
+                loanAgreement.CustomerId != aqGreenParticipation.CustomerId ||
+                loanAgreement.EntryParticipationId != aqGreenParticipation.Id)
+            {
+                throw new InvalidOperationException(
+                    "The loan agreement does not belong to this AQGreen participation.");
+            }
+
+            if (loanAgreement.PrincipalAmount != terms.DirectEntryAmount ||
+                !string.Equals(
+                    loanAgreement.Currency,
+                    terms.Currency,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "The loan agreement does not match the Onyx participation terms.");
+            }
+
+            if (graduatedAt < loanAgreement.EffectiveAt.Value)
+            {
+                throw new ArgumentException(
+                    "Graduation cannot precede the effective loan agreement.",
+                    nameof(graduatedAt));
+            }
+
+            return new OnyxParticipation(
+                aqGreenParticipation.TenantId,
+                aqGreenParticipation.CustomerId,
+                recruiterCustomerId: null,
+                onyxMembershipId,
+                terms,
+                graduatedAt)
+            {
+                Id = Guid.NewGuid(),
+                AdmissionRoute = OnyxAdmissionRoute.EntryGraduation,
+                Status = OnyxParticipationStatus.Active,
+                ActivatedAt = graduatedAt,
+                EntryParticipationId = aqGreenParticipation.Id,
+                LoanAgreementId = loanAgreement.Id
+            };
+        }
+
         public void ApplyConfirmedDirectEntryPayment(MemberPayment payment)
         {
             if (payment == null) throw new ArgumentNullException(nameof(payment));

@@ -39,6 +39,7 @@
 - [ ] Automatic AQGreen commitment scheduling and confirmed-payment allocation
 - [ ] Provider checkout and signed callback adapter for real payments
 - [ ] AQGreen-to-Onyx graduation that preserves AQGreen history
+- [x] Independent Onyx network placement confirmed for AQGreen graduates
 - [ ] Registration channels (online/office/presentation) with required documents (ID, bank letter)
 - [ ] SMS/WhatsApp notifications (payment confirmation, welcome, collection dates)
 - [x] Domain and persistence foundations for complete-level AQGreen and Onyx commissions
