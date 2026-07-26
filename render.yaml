@@ -45,6 +45,12 @@ services:
         value: https://www.aqualifestyleclub.co.za,https://aqualifestyleclub.co.za,https://aqua-lifestyle.vercel.app
       - key: Logging__MinimumLevel
         value: Information
+      - key: Yoco__SecretKey
+        sync: false
+      - key: Yoco__WebhookSecret
+        sync: false
+      - key: Yoco__Mode
+        value: test
 
   - type: keyvalue
     name: aqualifestyle-redis

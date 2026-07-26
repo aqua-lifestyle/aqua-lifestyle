@@ -24,7 +24,10 @@ namespace AqualLifeStyle.Web.Host.Startup
                 ["App:ClientRootAddress"] = "App__ClientRootAddress",
                 ["App:CorsOrigins"] = "App__CorsOrigins",
                 ["Authentication:JwtBearer:SecurityKey"] = "Authentication__JwtBearer__SecurityKey",
-                ["Redis:Configuration"] = "Redis__Configuration"
+                ["Redis:Configuration"] = "Redis__Configuration",
+                ["Yoco:SecretKey"] = "Yoco__SecretKey",
+                ["Yoco:WebhookSecret"] = "Yoco__WebhookSecret",
+                ["Yoco:Mode"] = "Yoco__Mode"
             };
             var missing = new List<string>();
             if (!IsConfigured(configuration["ConnectionStrings:Default"]) &&
@@ -45,6 +48,20 @@ namespace AqualLifeStyle.Web.Host.Startup
             {
                 throw new InvalidOperationException(
                     "Production configuration is incomplete. Set: " + string.Join(", ", missing));
+            }
+
+            var yocoMode = configuration["Yoco:Mode"]?.Trim().ToLowerInvariant();
+            var yocoSecretKey = configuration["Yoco:SecretKey"]?.Trim();
+            var expectedYocoKeyPrefix = yocoMode == "live"
+                ? "sk_live_"
+                : yocoMode == "test"
+                    ? "sk_test_"
+                    : null;
+            if (expectedYocoKeyPrefix == null ||
+                !yocoSecretKey.StartsWith(expectedYocoKeyPrefix, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Production Yoco configuration is invalid. Yoco__Mode must be test or live and must match the Yoco__SecretKey prefix.");
             }
         }
 

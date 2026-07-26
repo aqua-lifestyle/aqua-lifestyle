@@ -51,6 +51,9 @@ services:
       Authentication__JwtBearer__SecurityKey: ${JWT_SECURITY_KEY:?Set JWT_SECURITY_KEY in .env}
       Authentication__JwtBearer__Issuer: ${JWT_ISSUER:-AqualLifeStyle}
       Authentication__JwtBearer__Audience: ${JWT_AUDIENCE:-AqualLifeStyle}
+      Yoco__SecretKey: ${YOCO_SECRET_KEY:?Set YOCO_SECRET_KEY in .env}
+      Yoco__WebhookSecret: ${YOCO_WEBHOOK_SECRET:?Set YOCO_WEBHOOK_SECRET in .env}
+      Yoco__Mode: ${YOCO_MODE:-test}
     depends_on:
       postgres:
         condition: service_healthy
