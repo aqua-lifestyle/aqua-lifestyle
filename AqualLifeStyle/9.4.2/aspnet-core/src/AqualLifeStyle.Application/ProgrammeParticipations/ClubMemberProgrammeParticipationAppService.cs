@@ -91,11 +91,15 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         {
             input ??= new StartEntryParticipationInput();
             var customer = await GetCurrentActiveCustomerAsync();
+            await ClearLegacyProgrammeMembershipAssignmentAsync(
+                customer,
+                MembershipType.AQGreen,
+                "AQGreen");
             var existing = await _entryParticipationRepository.FirstOrDefaultAsync(
                 participation => participation.CustomerId == customer.Id);
             if (existing != null)
             {
-                EnsureSameRecruiter(existing.RecruiterCustomerId, input.RecruiterCustomerId, "Entry");
+                EnsureSameRecruiter(existing.RecruiterCustomerId, input.RecruiterCustomerId, "AQGreen");
                 return Map(existing);
             }
 
@@ -125,7 +129,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             await _entryParticipationRepository.InsertAsync(participation);
             await CurrentUnitOfWork.SaveChangesAsync();
             Logger.Info(
-                $"Entry participation started tenant={customer.TenantId} customer={customer.Id} independent={participation.JoinedIndependently}");
+                $"AQGreen participation started tenant={customer.TenantId} customer={customer.Id} independent={participation.JoinedIndependently}");
             return Map(participation);
         }
 
@@ -135,7 +139,10 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         {
             input ??= new StartDirectOnyxParticipationInput();
             var customer = await GetCurrentActiveCustomerAsync();
-            await ClearLegacyOnyxMembershipAssignmentAsync(customer);
+            await ClearLegacyProgrammeMembershipAssignmentAsync(
+                customer,
+                MembershipType.Onyx,
+                "Onyx");
             var existing = await _onyxParticipationRepository.FirstOrDefaultAsync(
                 participation => participation.CustomerId == customer.Id);
             if (existing != null)
@@ -177,7 +184,10 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             return Map(participation);
         }
 
-        private async Task ClearLegacyOnyxMembershipAssignmentAsync(Customer customer)
+        private async Task ClearLegacyProgrammeMembershipAssignmentAsync(
+            Customer customer,
+            MembershipType programmeMembershipType,
+            string programmeName)
         {
             if (!customer.MembershipId.HasValue)
             {
@@ -190,7 +200,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 assignedMembership = await _membershipRepository.FirstOrDefaultAsync(
                     customer.MembershipId.Value);
             }
-            if (assignedMembership?.MembershipType != MembershipType.Onyx)
+            if (assignedMembership?.MembershipType != programmeMembershipType)
             {
                 return;
             }
@@ -198,7 +208,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             customer.ChangeMembership(null);
             await _customerRepository.UpdateAsync(customer);
             Logger.Warn(
-                $"Cleared legacy direct Onyx membership assignment tenant={customer.TenantId} customer={customer.Id}");
+                $"Cleared legacy direct {programmeName} membership assignment tenant={customer.TenantId} customer={customer.Id}");
         }
 
         private async Task<Customer> GetCurrentActiveCustomerAsync()
@@ -240,7 +250,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 if (recruiter == null)
                 {
                     throw InvalidRecruiter(
-                        "The selected recruiter is not currently participating in Entry.");
+                        "The selected recruiter is not currently participating in AQGreen.");
                 }
 
                 return recruiter;
@@ -331,7 +341,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             return new ProgrammeParticipationDto
             {
                 Id = participation.Id,
-                ProgrammeName = "Entry",
+                ProgrammeName = "AQGreen",
                 Status = details.Status,
                 IsActive = details.IsActive,
                 JoinedIndependently = participation.JoinedIndependently,

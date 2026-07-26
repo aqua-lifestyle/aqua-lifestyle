@@ -43,7 +43,7 @@ export const MemberEntryCommitments = () => {
       setError(
         getRequestErrorMessage(
           requestError,
-          "Your Entry commitments could not be loaded.",
+          "Your AQGreen commitments could not be loaded.",
         ),
       );
     } finally {
@@ -60,7 +60,7 @@ export const MemberEntryCommitments = () => {
     return (
       <main className="p-6">
         <StatusMessage tone="error">
-          Your account does not have access to Entry commitments.
+          Your account does not have access to AQGreen commitments.
         </StatusMessage>
       </main>
     );
@@ -73,10 +73,10 @@ export const MemberEntryCommitments = () => {
           <Breadcrumb
             items={[
               { href: "/member/programmes", label: "My programmes" },
-              { label: "Entry commitments" },
+              { label: "AQGreen commitments" },
             ]}
           />
-          <h1 className="mt-2 text-3xl font-bold">Entry commitments</h1>
+          <h1 className="mt-2 text-3xl font-bold">AQGreen commitments</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
             Review recorded monthly commitments, due dates, grace periods, and
             confirmed payment status.
@@ -91,9 +91,9 @@ export const MemberEntryCommitments = () => {
           </Card>
         ) : (
           <EmptyState
-            description="No Entry monthly commitments are currently recorded."
+            description="No AQGreen monthly commitments are currently recorded."
             icon={CalendarCheck}
-            title="No Entry commitments"
+            title="No AQGreen commitments"
           />
         )}
       </div>

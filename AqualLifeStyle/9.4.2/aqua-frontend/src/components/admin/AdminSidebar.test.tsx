@@ -47,7 +47,7 @@ describe("AdminSidebar", () => {
     expect(screen.getByRole("link", { name: "Weekly earnings" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Savings accounts" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Loan agreements" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Entry commitments" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "AQGreen commitments" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Areas" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Club members" })).not.toBeInTheDocument();
   });

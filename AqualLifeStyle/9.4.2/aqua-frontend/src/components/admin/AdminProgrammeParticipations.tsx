@@ -202,7 +202,7 @@ export const AdminProgrammeParticipations = () => {
     <DataTable
       columns={columns}
       data={participations}
-      emptyState={`No ${programme === "entry" ? "Entry" : "Onyx"} participation records found.`}
+      emptyState={`No ${programme === "entry" ? "AQGreen" : "Onyx"} participation records found.`}
       keyExtractor={(item) => item.id}
       searchFn={(item, query) =>
         `${item.customerName} ${item.email} ${item.status}`
@@ -224,7 +224,7 @@ export const AdminProgrammeParticipations = () => {
           />
           <h1 className="mt-2 text-3xl font-bold">Programme participation</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Review Entry and Onyx activation progress, network placement, and
+            Review AQGreen and Onyx activation progress, network placement, and
             provider-confirmed payments. Payments cannot be confirmed from this
             screen.
           </p>
@@ -234,7 +234,7 @@ export const AdminProgrammeParticipations = () => {
           <Route className="size-6 text-accent" />
           <div>
             <p className="text-sm text-muted-foreground">
-              {programme === "entry" ? "Entry" : "Onyx"} records
+              {programme === "entry" ? "AQGreen" : "Onyx"} records
             </p>
             <p className="text-2xl font-bold">{participations.length}</p>
           </div>
@@ -245,7 +245,7 @@ export const AdminProgrammeParticipations = () => {
         <Tabs
           onChange={(value) => setProgramme(value as ProgrammeType)}
           tabs={[
-            { content: table, id: "entry", label: "Entry" },
+            { content: table, id: "entry", label: "AQGreen" },
             { content: table, id: "onyx", label: "Onyx" },
           ]}
           value={programme}

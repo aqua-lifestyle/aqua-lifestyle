@@ -345,7 +345,7 @@ export const AdminWeeklyEarnings = () => {
     <DataTable
       columns={columns}
       data={earnings}
-      emptyState={`No ${programme === "entry" ? "Entry" : "Onyx"} weekly earnings have been prepared yet.`}
+      emptyState={`No ${programme === "entry" ? "AQGreen" : "Onyx"} weekly earnings have been prepared yet.`}
       keyExtractor={(item) => item.id}
       searchFn={(item, query) =>
         `${item.customerName} ${item.email} ${item.status}`
@@ -367,7 +367,7 @@ export const AdminWeeklyEarnings = () => {
           />
           <h1 className="mt-2 text-3xl font-bold">Weekly earnings</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Review completed weekly Entry and Onyx network earnings. Preparing
+            Review completed weekly AQGreen and Onyx network earnings. Preparing
             a week records earnings only; it does not release or pay money.
           </p>
         </header>
@@ -426,7 +426,7 @@ export const AdminWeeklyEarnings = () => {
             setCalculationNotice(undefined);
           }}
           tabs={[
-            { content: table, id: "entry", label: "Entry" },
+            { content: table, id: "entry", label: "AQGreen" },
             { content: table, id: "onyx", label: "Onyx" },
           ]}
           value={programme}

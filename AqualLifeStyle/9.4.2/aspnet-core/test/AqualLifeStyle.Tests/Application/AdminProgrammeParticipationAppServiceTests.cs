@@ -60,14 +60,14 @@ namespace AqualLifeStyle.Tests.Application
             result.TotalCount.ShouldBe(1);
             var participation = result.Items.Single();
             participation.CustomerId.ShouldBe(customerId);
-            participation.ProgrammeName.ShouldBe("Entry");
+            participation.ProgrammeName.ShouldBe("AQGreen");
             participation.Status.ShouldBe("Awaiting activation payment");
             participation.NextPaymentAmount.ShouldBe(600m);
             participation.NextPaymentDescription.ShouldBe("Activation payment");
             participation.JoinedIndependently.ShouldBeTrue();
             participation.ConfirmedPayments.Count.ShouldBe(1);
             participation.ConfirmedPayments[0].Description.ShouldBe(
-                "Entry registration payment");
+                "AQGreen registration payment");
             participation.ConfirmedPayments[0].Provider.ShouldBe("YOCO");
             participation.ConfirmedPayments[0].ProviderReference.ShouldBe(
                 $"entry-registration-{suffix}");

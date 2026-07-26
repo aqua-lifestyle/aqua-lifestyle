@@ -53,22 +53,22 @@ describe("MemberProgrammes", () => {
     vi.mocked(httpClient.post).mockResolvedValue({});
   });
 
-  it("shows both joining choices without requiring a recruiter", async () => {
+  it("shows both network placements without requiring a recruiter", async () => {
     render(<MemberProgrammes />);
 
-    await screen.findByRole("button", { name: "Join Entry" });
+    await screen.findByRole("button", { name: "Join AQGreen" });
     expect(screen.getByRole("button", { name: "Join Onyx" })).toBeInTheDocument();
     expect(screen.getAllByText(/recruiter is optional/i)).toHaveLength(2);
   });
 
-  it("starts Entry independently and reloads the participation record", async () => {
+  it("starts AQGreen independently and reloads the participation record", async () => {
     render(<MemberProgrammes />);
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "Join Entry" }),
+      await screen.findByRole("button", { name: "Join AQGreen" }),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Confirm joining choice" }),
+      screen.getByRole("button", { name: "Confirm programme joining" }),
     );
 
     await waitFor(() =>
@@ -87,7 +87,7 @@ describe("MemberProgrammes", () => {
       await screen.findByRole("button", { name: "Join Onyx" }),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Confirm joining choice" }),
+      screen.getByRole("button", { name: "Confirm programme joining" }),
     );
 
     await waitFor(() =>

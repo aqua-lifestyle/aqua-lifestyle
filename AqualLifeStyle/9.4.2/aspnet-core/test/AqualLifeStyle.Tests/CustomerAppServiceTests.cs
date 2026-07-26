@@ -21,7 +21,7 @@ namespace AqualLifeStyle.Tests
         {
             var customer = Customer.Create(1, 50, "Old Name", new EmailAddress("old@example.com"), 1);
             customer.Id = 10;
-            var membership = Membership.Create(1, "AQGreen", "AQGreen membership", MembershipType.AQGreen);
+            var membership = Membership.Create(1, "Jasper", "Jasper membership", MembershipType.Jasper);
 
             var customerRepo = new Mock<ICustomerRepository>();
             customerRepo

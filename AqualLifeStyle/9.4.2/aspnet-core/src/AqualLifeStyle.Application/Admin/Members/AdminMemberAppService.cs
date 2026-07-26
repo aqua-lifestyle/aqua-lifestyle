@@ -77,6 +77,7 @@ namespace AqualLifeStyle.Application.Admin.Members
                 return await _membershipRepository.GetAll()
                     .Where(plan =>
                         plan.IsActive &&
+                        plan.MembershipType != MembershipType.AQGreen &&
                         plan.MembershipType != MembershipType.Onyx &&
                         (!plan.TenantId.HasValue || plan.TenantId == member.TenantId.Value))
                     .OrderBy(plan => plan.MembershipType).ThenBy(plan => plan.Name)

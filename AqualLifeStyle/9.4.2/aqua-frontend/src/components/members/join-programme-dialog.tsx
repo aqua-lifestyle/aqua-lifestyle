@@ -6,7 +6,7 @@ import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import { Button, Dialog, StatusMessage, TextField } from "@/src/shared/ui";
 
-type Programme = "Entry" | "Onyx";
+type Programme = "AQGreen" | "Onyx";
 
 type JoinProgrammeDialogProps = {
   onJoined: () => Promise<void>;
@@ -49,7 +49,7 @@ export const JoinProgrammeDialog = ({
     setError(undefined);
     try {
       const endpoint =
-        programme === "Entry"
+        programme === "AQGreen"
           ? apiEndpoints.programmeParticipations.startEntry
           : apiEndpoints.programmeParticipations.startDirectOnyx;
       await httpClient.post(endpoint, { recruiterCustomerId: recruiterId });
@@ -73,14 +73,14 @@ export const JoinProgrammeDialog = ({
       <Dialog onClose={close} open={open} title={`Join ${programme}`}>
         <form className="flex flex-col gap-5" onSubmit={submit}>
           <div className="rounded-lg bg-muted/60 p-4 text-sm text-muted-foreground">
-            {programme === "Entry"
-              ? "Entry is the feeder programme. Two R600 payments are required before participation becomes active."
-              : "Direct Onyx participation requires one full payment of R6,120. You do not need to complete Entry first."}
+            {programme === "AQGreen"
+              ? "AQGreen is the feeder programme. Two R600 payments are required before participation becomes active, after which you can work toward graduating to Onyx."
+              : "Joining Onyx directly requires one full payment of R6,120. AQGreen participation is not required."}
           </div>
 
           <fieldset className="flex flex-col gap-3">
             <legend className="text-sm font-semibold text-foreground">
-              How are you joining?
+              Network placement
             </legend>
             <label className="flex cursor-pointer gap-3 rounded-lg border border-border p-3">
               <input
@@ -90,7 +90,7 @@ export const JoinProgrammeDialog = ({
                 type="radio"
               />
               <span>
-                <span className="block font-medium">Join independently</span>
+                <span className="block font-medium">Start my own network</span>
                 <span className="block text-sm text-muted-foreground">
                   You will be the starting point of your own network.
                 </span>
@@ -104,7 +104,7 @@ export const JoinProgrammeDialog = ({
                 type="radio"
               />
               <span>
-                <span className="block font-medium">Join under a recruiter</span>
+                <span className="block font-medium">Join an existing network</span>
                 <span className="block text-sm text-muted-foreground">
                   The recruiter must already be active in {programme}.
                 </span>
@@ -133,7 +133,7 @@ export const JoinProgrammeDialog = ({
               Cancel
             </Button>
             <Button isLoading={submitting} type="submit">
-              Confirm joining choice
+              Confirm programme joining
             </Button>
           </div>
         </form>

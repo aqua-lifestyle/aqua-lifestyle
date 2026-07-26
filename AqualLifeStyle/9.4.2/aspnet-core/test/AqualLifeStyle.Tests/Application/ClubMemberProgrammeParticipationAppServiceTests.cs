@@ -32,7 +32,7 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task ClubMember_CanStartEntryAndDirectOnyxIndependently()
+        public async Task ClubMember_CanStartAQGreenAndDirectOnyxIndependently()
         {
             var customerId = await RegisterAndSignInCustomerAsync();
 
@@ -49,7 +49,7 @@ namespace AqualLifeStyle.Tests.Application
                 new StartDirectOnyxParticipationInput());
 
             entry.Id.ShouldBe(repeatedEntry.Id);
-            entry.ProgrammeName.ShouldBe("Entry");
+            entry.ProgrammeName.ShouldBe("AQGreen");
             entry.Status.ShouldBe("Awaiting registration payment");
             entry.JoinedIndependently.ShouldBeTrue();
             entry.NextPaymentAmount.ShouldBe(600m);
@@ -100,6 +100,34 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task StartingAQGreenParticipation_ClearsLegacyDirectMembershipAssignment()
+        {
+            var customerId = await RegisterAndSignInCustomerAsync();
+            var aqGreenMembershipId = await UsingDbContextAsync(1, async context =>
+            {
+                return await context.Memberships
+                    .Where(membership => membership.MembershipType == MembershipType.AQGreen)
+                    .Select(membership => membership.Id)
+                    .FirstAsync();
+            });
+            var customerRepository = Resolve<ICustomerRepository>();
+            var customer = await customerRepository.GetAsync(customerId);
+            customer.ChangeMembership(aqGreenMembershipId);
+            await customerRepository.UpdateAsync(customer);
+
+            var participation = await _participationService.StartEntryAsync(
+                new StartEntryParticipationInput());
+
+            participation.ProgrammeName.ShouldBe("AQGreen");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var persistedCustomer = await context.Customers.SingleAsync(
+                    item => item.Id == customerId);
+                persistedCustomer.MembershipId.ShouldBeNull();
+            });
+        }
+
+        [Fact]
         public async Task JoiningUnderRecruiter_RequiresActiveParticipationInSameProgramme()
         {
             var customerId = await RegisterAndSignInCustomerAsync();
@@ -112,7 +140,7 @@ namespace AqualLifeStyle.Tests.Application
                 }));
 
             exception.Message.ShouldBe("The recruiter could not be accepted.");
-            exception.Details.ShouldContain("not currently participating in Entry");
+            exception.Details.ShouldContain("not currently participating in AQGreen");
 
             await UsingDbContextAsync(1, async context =>
             {
@@ -134,7 +162,7 @@ namespace AqualLifeStyle.Tests.Application
                     RecruiterCustomerId = 999999
                 }));
 
-            exception.Message.ShouldBe("Entry participation already exists.");
+            exception.Message.ShouldBe("AQGreen participation already exists.");
             exception.Details.ShouldContain("cannot be changed through the joining form");
             (await _participationService.GetMyParticipationsAsync()).Entry.Id.ShouldBe(entry.Id);
         }
@@ -155,7 +183,7 @@ namespace AqualLifeStyle.Tests.Application
 
             exception.Message.ShouldBe("The recruiter could not be accepted.");
             exception.Details.ShouldContain(
-                "not currently participating in Entry");
+                "not currently participating in AQGreen");
         }
 
         [Fact]

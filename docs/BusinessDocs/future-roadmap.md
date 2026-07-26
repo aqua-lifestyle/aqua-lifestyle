@@ -23,25 +23,25 @@
 - [x] Savings contribution window enforcement from the 1st–15th
 - [ ] Refund-rule flagging (3-month threshold per tier) (BR-02–04)
 - [x] Full 20% interest per contribution with 12-month maturity and early-withdrawal lock
-- [ ] Maturity payout processing and pooled-fund/Entry-loan accounting
+- [ ] Maturity payout processing and pooled-fund/AQGreen-loan accounting
 - [ ] Order calendar enforcement (opening/cut-off/delivery cycles) on `OrderIntent`
 - [ ] Product combos with member vs Jasper pricing (FR-19)
 - [ ] Monthly buying obligation tied to actual orders (BR-05)
 
-## Phase 3: Entry and Onyx Participation
+## Phase 3: AQGreen and Onyx Participation
 - [x] Confirmed-payment records with idempotent external references
-- [x] Separate Entry and Onyx participation records; never convert one into the other
+- [x] Separate AQGreen and Onyx participation records; never convert one into the other
 - [x] Direct Onyx activation after a confirmed R6,120 payment
-- [x] Entry activation after two confirmed R600 payments, with independent joining or an optional verified Entry recruiter
+- [x] AQGreen activation after two confirmed R600 payments, with independent joining or an optional verified AQGreen recruiter
 - [x] Secured customer joining/status screens and read-only administrator reconciliation
 - [x] Guest-to-Club-Member access promotion after verified final activation payment
-- [x] Secured Entry monthly-commitment history and administrator reconciliation views
-- [ ] Automatic Entry commitment scheduling and confirmed-payment allocation
+- [x] Secured AQGreen monthly-commitment history and administrator reconciliation views
+- [ ] Automatic AQGreen commitment scheduling and confirmed-payment allocation
 - [ ] Provider checkout and signed callback adapter for real payments
-- [ ] Entry-to-Onyx graduation that preserves Entry history
+- [ ] AQGreen-to-Onyx graduation that preserves AQGreen history
 - [ ] Registration channels (online/office/presentation) with required documents (ID, bank letter)
 - [ ] SMS/WhatsApp notifications (payment confirmation, welcome, collection dates)
-- [x] Domain and persistence foundations for complete-level Entry and Onyx commissions
+- [x] Domain and persistence foundations for complete-level AQGreen and Onyx commissions
 - [x] Onyx structural qualification and confirmed commission components through Level 5
 - [x] Level 3 travel eligibility, three-month waiting period, automatic activation tracking, and Club Member visibility
 - [x] Secured administrator calculation and review for the latest completed Johannesburg week

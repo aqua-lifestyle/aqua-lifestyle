@@ -96,7 +96,7 @@ namespace AqualLifeStyle.Web.Tests.Controllers
                 enrollmentResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
                 var enrollmentBody =
                     await enrollmentResponse.Content.ReadAsStringAsync();
-                enrollmentBody.ShouldContain("\"programmeName\":\"Entry\"");
+                enrollmentBody.ShouldContain("\"programmeName\":\"AQGreen\"");
                 enrollmentBody.ShouldContain(
                     "\"status\":\"Awaiting registration payment\"");
             }

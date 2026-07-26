@@ -180,17 +180,18 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task MembershipPlans_ExcludeOnyxAndOtherAreaPlans_AndAllowPlatformAssignment()
+        public async Task MembershipPlans_ExcludeProgrammeConfigurationsAndOtherAreaPlans_AndAllowPlatformAssignment()
         {
             var planIds = await UsingDbContextAsync((int?)null, async context =>
             {
                 var platformPlan = Membership.Create(null, $"Platform-{Guid.NewGuid():N}", "Available in every Area", MembershipType.Jasper);
-                var currentAreaPlan = Membership.Create(1, $"Area-1-{Guid.NewGuid():N}", "Available in the current Area", MembershipType.AQGreen);
+                var currentAreaPlan = Membership.Create(1, $"Area-1-{Guid.NewGuid():N}", "Available in the current Area", MembershipType.BusinessPremier);
+                var aqGreenProgramme = Membership.Create(1, $"AQGreen-{Guid.NewGuid():N}", "Joined through programme participation", MembershipType.AQGreen);
                 var onyxProgramme = Membership.Create(1, $"Onyx-{Guid.NewGuid():N}", "Joined through programme participation", MembershipType.Onyx);
-                var otherAreaPlan = Membership.Create(2, $"Area-2-{Guid.NewGuid():N}", "Available in another Area", MembershipType.BusinessPremier);
-                context.Memberships.AddRange(platformPlan, currentAreaPlan, onyxProgramme, otherAreaPlan);
+                var otherAreaPlan = Membership.Create(2, $"Area-2-{Guid.NewGuid():N}", "Available in another Area", MembershipType.Jasper);
+                context.Memberships.AddRange(platformPlan, currentAreaPlan, aqGreenProgramme, onyxProgramme, otherAreaPlan);
                 await context.SaveChangesAsync();
-                return new[] { platformPlan.Id, currentAreaPlan.Id, onyxProgramme.Id, otherAreaPlan.Id };
+                return new[] { platformPlan.Id, currentAreaPlan.Id, aqGreenProgramme.Id, onyxProgramme.Id, otherAreaPlan.Id };
             });
 
             var options = await _service.GetMembershipOptionsAsync(new AdminCustomerMembershipOptionsInput { TenantId = 1 });
@@ -198,6 +199,7 @@ namespace AqualLifeStyle.Tests.Application
             options.Select(option => option.Id).ShouldContain(planIds[1]);
             options.Select(option => option.Id).ShouldNotContain(planIds[2]);
             options.Select(option => option.Id).ShouldNotContain(planIds[3]);
+            options.Select(option => option.Id).ShouldNotContain(planIds[4]);
 
             var email = $"platform-member-{Guid.NewGuid():N}@example.com";
             var customer = (await _service.CreateAsync(new AdminCreateCustomerInput

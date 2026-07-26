@@ -65,7 +65,7 @@ namespace AqualLifeStyle.Tests.Application
 
             var earnedCommission = review.Items.Single(item =>
                 item.TotalAmount > 0m);
-            earnedCommission.ProgrammeName.ShouldBe("Entry");
+            earnedCommission.ProgrammeName.ShouldBe("AQGreen");
             earnedCommission.HighestQualifiedLevel.ShouldBe(1);
             earnedCommission.TotalAmount.ShouldBe(150m);
             earnedCommission.Currency.ShouldBe("ZAR");
@@ -90,7 +90,7 @@ namespace AqualLifeStyle.Tests.Application
             logger.Verify(
                 item => item.Info(It.Is<string>(message =>
                     message.Contains("released for payment") &&
-                    message.Contains("programme=Entry"))),
+                    message.Contains("programme=AQGreen"))),
                 Times.Once);
 
             var releasedReview = await _service.GetAllAsync(

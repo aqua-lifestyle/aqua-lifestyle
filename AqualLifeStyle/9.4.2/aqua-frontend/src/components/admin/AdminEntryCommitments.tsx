@@ -47,7 +47,7 @@ export const AdminEntryCommitments = () => {
       setError(
         getRequestErrorMessage(
           requestError,
-          "Entry commitments could not be loaded.",
+          "AQGreen commitments could not be loaded.",
         ),
       );
     } finally {
@@ -64,7 +64,7 @@ export const AdminEntryCommitments = () => {
     return (
       <main className="p-6">
         <StatusMessage tone="error">
-          You do not have permission to view Entry commitments.
+          You do not have permission to view AQGreen commitments.
         </StatusMessage>
       </main>
     );
@@ -77,10 +77,10 @@ export const AdminEntryCommitments = () => {
           <Breadcrumb
             items={[
               { href: "/admin/dashboard", label: "Administration" },
-              { label: "Entry commitments" },
+              { label: "AQGreen commitments" },
             ]}
           />
-          <h1 className="mt-2 text-3xl font-bold">Entry commitments</h1>
+          <h1 className="mt-2 text-3xl font-bold">AQGreen commitments</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
             Reconcile recorded monthly commitments, grace periods, and overdue
             balances. Payments cannot be recorded from this screen.

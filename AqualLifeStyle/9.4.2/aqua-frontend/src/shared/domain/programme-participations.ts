@@ -7,7 +7,7 @@ export type ProgrammeParticipation = {
   joinedIndependently: boolean;
   nextPaymentAmount: number | null;
   nextPaymentDescription: string | null;
-  programmeName: "Entry" | "Onyx";
+  programmeName: "AQGreen" | "Onyx";
   recruiterCustomerId: number | null;
   startedAt: string;
   status: string;

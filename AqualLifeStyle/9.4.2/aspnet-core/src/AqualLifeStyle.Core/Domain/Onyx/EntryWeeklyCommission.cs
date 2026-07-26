@@ -57,7 +57,7 @@ namespace AqualLifeStyle.Domain.Onyx
             if (!participation.IsQualifiedForNetwork)
             {
                 throw new InvalidOperationException(
-                    "Weekly commission can only be calculated for an active Entry participant.");
+                    "Weekly commission can only be calculated for an active AQGreen participant.");
             }
 
             if (participation.TenantId != period.TenantId)

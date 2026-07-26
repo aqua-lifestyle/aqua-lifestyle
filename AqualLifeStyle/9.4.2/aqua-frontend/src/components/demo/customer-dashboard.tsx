@@ -46,6 +46,11 @@ const formatDate = (date: string) => {
 
 const MEMBERSHIP_LABELS = ["Jasper", "Onyx", "AQGreen", "Business Premier"];
 const ONYX_PROGRAMME_CONFIGURATION_TYPE = 1;
+const AQGREEN_PROGRAMME_CONFIGURATION_TYPE = 2;
+
+const isProgrammeConfigurationType = (membershipType: number) =>
+  membershipType === ONYX_PROGRAMME_CONFIGURATION_TYPE ||
+  membershipType === AQGREEN_PROGRAMME_CONFIGURATION_TYPE;
 
 export const CustomerDashboard = () => {
   const hasMounted = useHydrated();
@@ -128,16 +133,19 @@ export const CustomerDashboard = () => {
   const assignedMembership = myCustomer?.membershipId
     ? memberships.find((m) => m.id === myCustomer.membershipId) ?? null
     : null;
-  const hasLegacyOnyxSelection =
-    assignedMembership?.membershipType === ONYX_PROGRAMME_CONFIGURATION_TYPE;
-  const currentMembership = hasLegacyOnyxSelection ? null : assignedMembership;
+  const legacyProgrammeSelection =
+    assignedMembership &&
+    isProgrammeConfigurationType(assignedMembership.membershipType)
+      ? assignedMembership
+      : null;
+  const currentMembership = legacyProgrammeSelection ? null : assignedMembership;
 
   const availableTiers = useMemo(() => {
     if (!memberships.length) return [];
     return memberships.filter(
       (membership) =>
         membership.isActive &&
-        membership.membershipType !== ONYX_PROGRAMME_CONFIGURATION_TYPE,
+        !isProgrammeConfigurationType(membership.membershipType),
     );
   }, [memberships]);
 
@@ -302,12 +310,12 @@ export const CustomerDashboard = () => {
           </StatusMessage>
         ) : null}
 
-        {hasLegacyOnyxSelection ? (
+        {legacyProgrammeSelection ? (
           <StatusMessage tone="info">
             <span>
-              Your previous Onyx selection still needs to be completed. Confirm
-              how you are joining so the system can record your payment and
-              activation progress.
+              Your previous {legacyProgrammeSelection.name} selection still
+              needs to be completed. Confirm your network placement so the
+              system can record your payment and activation progress.
             </span>
             <LinkButton
               className="ml-3"
@@ -315,7 +323,7 @@ export const CustomerDashboard = () => {
               size="sm"
               variant="outline"
             >
-              Complete Onyx joining
+              Complete {legacyProgrammeSelection.name} joining
             </LinkButton>
           </StatusMessage>
         ) : null}
@@ -425,7 +433,7 @@ export const CustomerDashboard = () => {
                   <div className="flex items-center justify-between gap-4 rounded-lg border border-accent/25 bg-accent/5 px-4 py-3">
                     <div>
                       <p className="font-semibold text-foreground">
-                        Entry and Onyx programmes
+                        AQGreen and Onyx programmes
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Choose how to join, then follow your payment and activation progress.

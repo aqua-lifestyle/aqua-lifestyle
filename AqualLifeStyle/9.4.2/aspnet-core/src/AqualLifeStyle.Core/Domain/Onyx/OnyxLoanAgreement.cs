@@ -132,7 +132,7 @@ namespace AqualLifeStyle.Domain.Onyx
             if (level < EntryNetworkLevel.Level2)
             {
                 throw new InvalidOperationException(
-                    "The loan agreement becomes available at Entry Level 2.");
+                    "The loan agreement becomes available at AQGreen Level 2.");
             }
 
             return new OnyxLoanAgreement(participation, terms, offeredAt);

@@ -198,7 +198,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 participation.Id,
                 participation.TenantId,
                 customer,
-                "Entry",
+                "AQGreen",
                 details,
                 participation.JoinedIndependently,
                 participation.RecruiterCustomerId,
@@ -275,8 +275,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 Id = payment.Id,
                 Description = payment.Purpose switch
                 {
-                    MemberPaymentPurpose.EntryRegistration => "Entry registration payment",
-                    MemberPaymentPurpose.EntryActivation => "Entry activation payment",
+                    MemberPaymentPurpose.EntryRegistration => "AQGreen registration payment",
+                    MemberPaymentPurpose.EntryActivation => "AQGreen activation payment",
                     _ => "Full Onyx participation payment"
                 },
                 Amount = payment.Amount,

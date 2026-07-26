@@ -189,12 +189,12 @@ export const MemberProgrammes = () => {
     }
   }, [canView]);
 
-  const handleJoined = async (programme: "Entry" | "Onyx") => {
+  const handleJoined = async (programme: "AQGreen" | "Onyx") => {
     await loadParticipations();
     setSuccess(
       programme === "Onyx"
         ? "Onyx participation started. Your place is recorded and activation is pending the confirmed R6,120 payment."
-        : "Entry participation started. Your place is recorded and activation is pending the required payments.",
+        : "AQGreen participation started. Your place is recorded and activation is pending the required payments.",
     );
   };
 
@@ -225,7 +225,7 @@ export const MemberProgrammes = () => {
           />
           <h1 className="mt-2 text-3xl font-bold tracking-tight">My programmes</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Join Entry or Onyx, follow activation progress, and see whether your
+            Join AQGreen or Onyx, follow activation progress, and see whether your
             network starts independently or under an existing recruiter.
           </p>
         </header>
@@ -248,15 +248,15 @@ export const MemberProgrammes = () => {
               <Card className="flex flex-col items-start gap-4">
                 <Route className="size-8 text-accent" />
                 <div>
-                  <h2 className="text-xl font-bold">Entry</h2>
+                  <h2 className="text-xl font-bold">AQGreen</h2>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Start with the feeder programme and qualify for a separate
+                    Start with AQGreen and work toward graduating into a separate
                     Onyx participation later. A recruiter is optional.
                   </p>
                 </div>
                 <JoinProgrammeDialog
-                  onJoined={() => handleJoined("Entry")}
-                  programme="Entry"
+                  onJoined={() => handleJoined("AQGreen")}
+                  programme="AQGreen"
                 />
               </Card>
             )}
@@ -269,8 +269,8 @@ export const MemberProgrammes = () => {
                 <div>
                   <h2 className="text-xl font-bold">Onyx</h2>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Join Onyx directly with the full R6,120 payment. Entry
-                    participation is not required and a recruiter is optional.
+                    Join Onyx through its single direct joining path with the full
+                    R6,120 payment. AQGreen is not required and a recruiter is optional.
                   </p>
                 </div>
                 <JoinProgrammeDialog

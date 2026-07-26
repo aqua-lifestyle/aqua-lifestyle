@@ -40,8 +40,8 @@ const participation = {
   isActive: false,
   joinedIndependently: true,
   nextPaymentAmount: 600,
-  nextPaymentDescription: "Entry registration payment",
-  programmeName: "Entry",
+  nextPaymentDescription: "AQGreen registration payment",
+  programmeName: "AQGreen",
   recruiterCustomerId: null,
   startedAt: "2026-07-24T10:00:00Z",
   status: "Awaiting first payment",
@@ -90,7 +90,7 @@ describe("AdminProgrammeParticipations", () => {
     expect(screen.getByText("101")).toBeInTheDocument();
   });
 
-  it("loads Entry records and switches to Onyx reconciliation", async () => {
+  it("loads AQGreen records and switches to Onyx reconciliation", async () => {
     render(<AdminProgrammeParticipations />);
 
     await screen.findByText("Dora Shongwe");
