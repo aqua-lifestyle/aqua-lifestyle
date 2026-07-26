@@ -4,8 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthState } from "@/src/providers";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { MemberProgrammes } from "./member-programmes";
+import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 
 vi.mock("@/src/providers", () => ({ useAuthState: vi.fn() }));
+vi.mock("@/src/shared/browser/navigation", () => ({ navigateToExternalUrl: vi.fn() }));
 vi.mock("@/src/shared/api", async () => {
   const actual = await vi.importActual<typeof import("@/src/shared/api")>(
     "@/src/shared/api",
@@ -50,7 +52,11 @@ describe("MemberProgrammes", () => {
       onyx: null,
       travelBenefit: null,
     });
-    vi.mocked(httpClient.post).mockResolvedValue({});
+    vi.mocked(httpClient.post).mockResolvedValue({
+      amount: 6120,
+      checkoutUrl: "https://payments.example.test/checkout/onyx",
+      currency: "ZAR",
+    });
   });
 
   it("shows both network placements without requiring a recruiter", async () => {
@@ -83,27 +89,50 @@ describe("MemberProgrammes", () => {
     await waitFor(() => expect(httpClient.get).toHaveBeenCalledTimes(2));
   });
 
-  it("starts Onyx for a customer without a membership assignment", async () => {
+  it("creates an Onyx checkout without claiming participation has started", async () => {
     render(<MemberProgrammes />);
 
     fireEvent.click(
       await screen.findByRole("button", { name: "Join Onyx" }),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Confirm programme joining" }),
+      screen.getByRole("button", { name: "Continue to secure payment" }),
     );
 
     await waitFor(() =>
       expect(httpClient.post).toHaveBeenCalledWith(
-        apiEndpoints.programmeParticipations.startDirectOnyx,
+        apiEndpoints.programmeParticipations.createDirectOnyxCheckout,
         { recruiterCustomerId: null },
       ),
     );
-    expect(
-      await screen.findByText(/Onyx participation started/i),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/pending the confirmed R6,120 payment/i))
+    expect(screen.queryByText(/Onyx participation started/i)).not.toBeInTheDocument();
+    expect(navigateToExternalUrl).toHaveBeenCalledWith(
+      "https://payments.example.test/checkout/onyx",
+    );
+  });
+
+  it("shows a resumable checkout without presenting pending payment as participation", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: null,
+      onyx: null,
+      pendingDirectOnyxCheckout: {
+        amount: 6120,
+        checkoutUrl: "https://payments.example.test/checkout/resume",
+        currency: "ZAR",
+        status: "Awaiting payment",
+      },
+      travelBenefit: null,
+    });
+
+    render(<MemberProgrammes />);
+
+    expect(await screen.findByText("Awaiting payment")).toBeInTheDocument();
+    expect(screen.getByText(/participation and network place do not exist yet/i))
       .toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Continue secure payment" }))
+      .toHaveAttribute("href", "https://payments.example.test/checkout/resume");
+    expect(screen.queryByRole("button", { name: "Join Onyx" }))
+      .not.toBeInTheDocument();
   });
 
   it("does not load participation without the dedicated permission", () => {

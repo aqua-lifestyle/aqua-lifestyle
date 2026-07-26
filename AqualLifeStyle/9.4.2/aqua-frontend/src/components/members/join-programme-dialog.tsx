@@ -4,6 +4,8 @@ import { useState, type FormEvent } from "react";
 
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
+import type { DirectOnyxCheckout } from "@/src/shared/domain/programme-participations";
+import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 import { Button, Dialog, StatusMessage } from "@/src/shared/ui";
 
 type Programme = "AQGreen" | "Onyx";
@@ -32,13 +34,22 @@ export const JoinProgrammeDialog = ({
     setSubmitting(true);
     setError(undefined);
     try {
-      const endpoint =
-        programme === "AQGreen"
-          ? apiEndpoints.programmeParticipations.startEntry
-          : apiEndpoints.programmeParticipations.startDirectOnyx;
-      await httpClient.post(endpoint, { recruiterCustomerId: null });
-      await onJoined();
-      setOpen(false);
+      if (programme === "AQGreen") {
+        await httpClient.post(apiEndpoints.programmeParticipations.startEntry, {
+          recruiterCustomerId: null,
+        });
+        await onJoined();
+        setOpen(false);
+      } else {
+        const checkout = await httpClient.post<
+          DirectOnyxCheckout,
+          { recruiterCustomerId: null }
+        >(
+          apiEndpoints.programmeParticipations.createDirectOnyxCheckout,
+          { recruiterCustomerId: null },
+        );
+        navigateToExternalUrl(checkout.checkoutUrl);
+      }
     } catch (requestError) {
       setError(
         getRequestErrorMessage(
@@ -77,7 +88,7 @@ export const JoinProgrammeDialog = ({
               Cancel
             </Button>
             <Button isLoading={submitting} type="submit">
-              Confirm programme joining
+              {programme === "Onyx" ? "Continue to secure payment" : "Confirm programme joining"}
             </Button>
           </div>
         </form>

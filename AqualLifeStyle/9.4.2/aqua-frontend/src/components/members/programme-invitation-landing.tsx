@@ -7,6 +7,8 @@ import { useAuthState } from "@/src/providers";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import type { ProgrammeInvitationPreview } from "@/src/shared/domain/programme-invitations";
+import type { DirectOnyxCheckout } from "@/src/shared/domain/programme-participations";
+import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 import { Button, Card, LinkButton, Skeleton, StatusMessage } from "@/src/shared/ui";
 
 const unsupportedProgrammeMessage =
@@ -17,7 +19,7 @@ const getProgrammeJoinEndpoint = (programmeKey: string) => {
     case "AQGREEN":
       return apiEndpoints.programmeParticipations.startEntry;
     case "ONYX":
-      return apiEndpoints.programmeParticipations.startDirectOnyx;
+      return apiEndpoints.programmeParticipations.createDirectOnyxCheckout;
     default:
       return undefined;
   }
@@ -55,8 +57,18 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
     setJoining(true);
     setError(undefined);
     try {
-      await httpClient.post(endpoint, { inviteCode: preview.inviteCode });
-      setJoined(true);
+      if (preview.programmeKey === "ONYX") {
+        const checkout = await httpClient.post<
+          DirectOnyxCheckout,
+          { inviteCode: string }
+        >(endpoint, {
+          inviteCode: preview.inviteCode,
+        });
+        navigateToExternalUrl(checkout.checkoutUrl);
+      } else {
+        await httpClient.post(endpoint, { inviteCode: preview.inviteCode });
+        setJoined(true);
+      }
     } catch (requestError) {
       setError(
         getRequestErrorMessage(
@@ -112,9 +124,9 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
             </div>
 
             <StatusMessage tone="info">
-              Confirming records your place under this recruiter. Your
-              participation activates only after the required payment is
-              confirmed. Activation does not automatically pay commissions.
+              {preview.programmeKey === "ONYX"
+                ? "Confirming continues to Yoco for the full R6,120 payment. Your Onyx participation and network place are created only after Yoco confirms payment."
+                : "Confirming records your AQGreen place under this recruiter. Participation activates only after the required payments are confirmed."}
             </StatusMessage>
 
             {!programmeJoinEndpoint ? (
@@ -138,7 +150,9 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
                 isLoading={joining}
                 onClick={() => void confirm()}
               >
-                Confirm and join this network
+                {preview.programmeKey === "ONYX"
+                  ? "Confirm and continue to payment"
+                  : "Confirm and join this network"}
               </Button>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">

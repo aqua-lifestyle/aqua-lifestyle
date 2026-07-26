@@ -4,8 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthState } from "@/src/providers";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { ProgrammeInvitationLanding } from "./programme-invitation-landing";
+import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 
 vi.mock("@/src/providers", () => ({ useAuthState: vi.fn() }));
+vi.mock("@/src/shared/browser/navigation", () => ({ navigateToExternalUrl: vi.fn() }));
 vi.mock("@/src/shared/api", async () => {
   const actual = await vi.importActual<typeof import("@/src/shared/api")>(
     "@/src/shared/api",
@@ -27,7 +29,11 @@ describe("ProgrammeInvitationLanding", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(httpClient.get).mockResolvedValue(preview);
-    vi.mocked(httpClient.post).mockResolvedValue({});
+    vi.mocked(httpClient.post).mockResolvedValue({
+      amount: 6120,
+      checkoutUrl: "https://payments.example.test/checkout/onyx",
+      currency: "ZAR",
+    });
     vi.mocked(useAuthState).mockReturnValue({
       isAuthenticated: true,
       isReady: true,
@@ -52,9 +58,10 @@ describe("ProgrammeInvitationLanding", () => {
       { inviteCode: "AQ7G2X9KLMNP" },
     ));
     expect(httpClient.post).not.toHaveBeenCalledWith(
-      apiEndpoints.programmeParticipations.startDirectOnyx,
+      apiEndpoints.programmeParticipations.createDirectOnyxCheckout,
       expect.anything(),
     );
+    expect(navigateToExternalUrl).not.toHaveBeenCalled();
     expect(await screen.findByText(/network place is recorded/i)).toBeInTheDocument();
   });
 
@@ -68,18 +75,21 @@ describe("ProgrammeInvitationLanding", () => {
     render(<ProgrammeInvitationLanding inviteCode="AQ7G2X9KLMNP" />);
 
     fireEvent.click(
-      await screen.findByRole("button", { name: /confirm and join/i }),
+      await screen.findByRole("button", { name: /confirm and continue to payment/i }),
     );
 
     await waitFor(() =>
       expect(httpClient.post).toHaveBeenCalledWith(
-        apiEndpoints.programmeParticipations.startDirectOnyx,
+        apiEndpoints.programmeParticipations.createDirectOnyxCheckout,
         { inviteCode: "AQ7G2X9KLMNP" },
       ),
     );
     expect(httpClient.post).not.toHaveBeenCalledWith(
       apiEndpoints.programmeParticipations.startEntry,
       expect.anything(),
+    );
+    expect(navigateToExternalUrl).toHaveBeenCalledWith(
+      "https://payments.example.test/checkout/onyx",
     );
   });
 

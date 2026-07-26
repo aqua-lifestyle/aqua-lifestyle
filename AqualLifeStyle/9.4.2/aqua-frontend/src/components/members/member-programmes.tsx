@@ -192,9 +192,9 @@ export const MemberProgrammes = () => {
   const handleJoined = async (programme: "AQGreen" | "Onyx") => {
     await loadParticipations();
     setSuccess(
-      programme === "Onyx"
-        ? "Onyx participation started. Your place is recorded and activation is pending the confirmed R6,120 payment."
-        : "AQGreen participation started. Your place is recorded and activation is pending the required payments.",
+      programme === "AQGreen"
+        ? "AQGreen participation started. Your place is recorded and activation is pending the required payments."
+        : undefined,
     );
   };
 
@@ -202,6 +202,22 @@ export const MemberProgrammes = () => {
     const task = window.setTimeout(() => void loadParticipations(), 0);
     return () => window.clearTimeout(task);
   }, [loadParticipations]);
+
+  useEffect(() => {
+    const task = window.setTimeout(() => {
+      const paymentResult = new URLSearchParams(window.location.search).get("payment");
+      if (paymentResult === "success") {
+        setSuccess(
+          "Payment completed. We are waiting for Yoco's secure confirmation before creating your Onyx participation.",
+        );
+      } else if (paymentResult === "cancelled") {
+        setError("Payment was cancelled. No Onyx participation was created.");
+      } else if (paymentResult === "failed") {
+        setError("Payment was not completed. No Onyx participation was created. You can try again below.");
+      }
+    }, 0);
+    return () => window.clearTimeout(task);
+  }, []);
 
   if (!canView) {
     return (
@@ -279,6 +295,34 @@ export const MemberProgrammes = () => {
 
             {participations.onyx ? (
               <ParticipationCard participation={participations.onyx} />
+            ) : participations.pendingDirectOnyxCheckout ? (
+              <Card className="flex flex-col items-start gap-4">
+                <Network className="size-8 text-accent" />
+                <div>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-bold">Onyx</h2>
+                    <Badge tone="warning">
+                      {participations.pendingDirectOnyxCheckout.status}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Your Onyx participation and network place do not exist yet.
+                    They will be created only after Yoco confirms the full payment.
+                  </p>
+                  <p className="mt-3 text-2xl font-bold">
+                    {formatCurrency(
+                      participations.pendingDirectOnyxCheckout.amount,
+                      participations.pendingDirectOnyxCheckout.currency,
+                    )}
+                  </p>
+                </div>
+                <a
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
+                  href={participations.pendingDirectOnyxCheckout.checkoutUrl}
+                >
+                  Continue secure payment
+                </a>
+              </Card>
             ) : (
               <Card className="flex flex-col items-start gap-4">
                 <Network className="size-8 text-accent" />

@@ -18,7 +18,18 @@ export type MyProgrammeParticipations = {
   clubMemberNumber: string;
   entry: ProgrammeParticipation | null;
   onyx: ProgrammeParticipation | null;
+  pendingDirectOnyxCheckout: PendingDirectOnyxCheckout | null;
   travelBenefit: OnyxTravelBenefit | null;
+};
+
+export type DirectOnyxCheckout = {
+  amount: number;
+  checkoutUrl: string;
+  currency: string;
+};
+
+export type PendingDirectOnyxCheckout = DirectOnyxCheckout & {
+  status: "Awaiting payment";
 };
 
 export type OnyxTravelBenefit = {
