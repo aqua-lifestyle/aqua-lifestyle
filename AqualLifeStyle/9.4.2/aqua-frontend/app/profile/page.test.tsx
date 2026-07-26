@@ -68,7 +68,8 @@ describe("customer profile", () => {
       user: expect.objectContaining({ name: "Augusta Ada Lovelace" }),
     }));
 
-    fireEvent.click(await screen.findByRole("button", { name: "Edit profile" }));
+    expect(await screen.findByText("Profile updated successfully.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Edit profile" }));
     expect(screen.queryByText("Profile updated successfully.")).not.toBeInTheDocument();
   });
 });

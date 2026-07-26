@@ -162,11 +162,6 @@ function ProfileContent() {
                   {saveError ? (
                     <StatusMessage className="sm:col-span-2" tone="error">{saveError}</StatusMessage>
                   ) : null}
-                  {saveSuccess ? (
-                    <StatusMessage tone="success">
-                      Profile updated successfully.
-                    </StatusMessage>
-                  ) : null}
                   <div className="flex gap-2 sm:col-span-2">
                     <Button
                       disabled={isSaving}
@@ -190,6 +185,11 @@ function ProfileContent() {
                 </form>
               ) : !isLoading && profile ? (
                 <div className="flex flex-col gap-4">
+                  {saveSuccess ? (
+                    <StatusMessage tone="success">
+                      Profile updated successfully.
+                    </StatusMessage>
+                  ) : null}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <p className="text-sm text-muted-foreground">First name</p>
