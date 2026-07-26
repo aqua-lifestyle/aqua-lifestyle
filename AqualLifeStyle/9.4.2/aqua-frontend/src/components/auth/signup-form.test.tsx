@@ -93,9 +93,10 @@ describe("SignupForm", () => {
       await screen.findByText("Personal info"),
     ).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Full name"), {
-      target: { value: "Jane Doe" },
-    });
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Jane" } });
+    fireEvent.change(screen.getByLabelText("Surname"), { target: { value: "Doe" } });
+    fireEvent.change(screen.getByLabelText("Contact number"), { target: { value: "+27 82 123 4567" } });
+    fireEvent.change(screen.getByLabelText("Home address"), { target: { value: "25 Aqua Street, Johannesburg" } });
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 

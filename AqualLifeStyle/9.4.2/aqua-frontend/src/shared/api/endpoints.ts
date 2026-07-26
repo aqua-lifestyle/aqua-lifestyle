@@ -72,6 +72,10 @@ export const apiEndpoints = {
     getTierBenefits: (id: number) =>
       `/api/services/app/Membership/GetTierBenefits?id=${id}`,
   },
+  myAccount: {
+    getProfile: "/api/services/app/MyAccount/GetProfile",
+    updateProfile: "/api/services/app/MyAccount/UpdateProfile",
+  },
   orderIntents: {
     cancel: (id: number) => `/api/services/app/OrderIntent/Cancel?id=${id}`,
     complete: (id: number) => `/api/services/app/OrderIntent/Complete?id=${id}`,

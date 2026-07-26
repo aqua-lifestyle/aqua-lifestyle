@@ -12,9 +12,11 @@ import { ChangeMemberTierDialog } from "./ChangeMemberTierDialog";
 import { EditMemberProfileDialog } from "./EditMemberProfileDialog";
 
 type AdminMember = {
+  contactNumber: string | null;
   creationTime: string;
   email: string;
   firstName: string;
+  homeAddress: string | null;
   id: number;
   isActive: boolean;
   lastName: string;
@@ -68,7 +70,7 @@ export const AdminMembers = () => {
 
   if (!canView) return <main className="p-6"><StatusMessage tone="error">You do not have permission to view members.</StatusMessage></main>;
   const columns = [
-    { header: "Club member", key: "firstName", sortable: true, render: (member: AdminMember) => <div className="flex items-center gap-3"><Avatar fallback={`${member.firstName} ${member.lastName}`} size="sm" /><div><p className="font-semibold">{member.firstName} {member.lastName}</p><p className="text-xs text-muted-foreground">{member.email}</p></div></div> },
+    { header: "Club member", key: "firstName", sortable: true, render: (member: AdminMember) => <div className="flex items-center gap-3"><Avatar fallback={`${member.firstName} ${member.lastName}`} size="sm" /><div><p className="font-semibold">{member.firstName} {member.lastName}</p><p className="text-xs text-muted-foreground">{member.email}</p><p className="text-xs text-muted-foreground">{member.contactNumber ?? "No contact number"}</p></div></div> },
     { header: "Area", key: "tenantId", sortable: true, render: (member: AdminMember) => `Area ${member.tenantId}` },
     { header: "Membership", key: "membershipName", sortable: true, render: (member: AdminMember) => member.membershipName },
     { header: "Status", key: "isActive", sortable: true, render: (member: AdminMember) => <Badge tone={member.isActive ? "success" : "warning"}>{member.isActive ? "Active" : "Suspended"}</Badge> },
@@ -84,6 +86,6 @@ export const AdminMembers = () => {
     <header><Breadcrumb items={[{ href: "/admin/dashboard", label: "Administration" }, { label: "Club members" }]} /><h1 className="mt-2 text-3xl font-bold">Club members</h1><p className="mt-2 text-muted-foreground">Maintain club member profiles, membership plans, and account access.</p></header>
     <Card><div className="flex items-center gap-3"><UsersRound className="size-5 text-accent" /><div><p className="text-sm text-muted-foreground">Club members</p><p className="text-2xl font-bold">{members.length}</p></div></div></Card>
     {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
-    {loading ? <Skeleton className="h-72" /> : <DataTable columns={columns} data={members} emptyState="No club members found." keyExtractor={(member) => member.id} searchFn={(member, query) => `${member.firstName} ${member.lastName} ${member.email} ${member.membershipName}`.toLowerCase().includes(query)} />}
+    {loading ? <Skeleton className="h-72" /> : <DataTable columns={columns} data={members} emptyState="No club members found." keyExtractor={(member) => member.id} searchFn={(member, query) => `${member.firstName} ${member.lastName} ${member.email} ${member.contactNumber ?? ""} ${member.homeAddress ?? ""} ${member.membershipName}`.toLowerCase().includes(query)} />}
   </div></main>;
 };

@@ -7,17 +7,22 @@ import { httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import { Button, Dialog, StatusMessage, TextAreaField, TextField } from "@/src/shared/ui";
 import { adminAuditJustificationSchema } from "./admin-action-validation";
+import { customerContactNumberSchema, customerEmailSchema, customerFirstNameSchema, customerHomeAddressSchema, customerSurnameSchema } from "@/src/shared/validation/customer-personal-details";
 
 const editMemberProfileSchema = z.object({
-  email: z.string().trim().email("Enter a valid email address.").max(256),
-  firstName: z.string().trim().min(1, "First name is required.").max(64),
+  contactNumber: customerContactNumberSchema,
+  email: customerEmailSchema,
+  firstName: customerFirstNameSchema,
+  homeAddress: customerHomeAddressSchema,
   justification: adminAuditJustificationSchema,
-  lastName: z.string().trim().min(1, "Last name is required.").max(64),
+  lastName: customerSurnameSchema,
 });
 
 type EditableMemberProfile = {
+  contactNumber: string | null;
   email: string;
   firstName: string;
+  homeAddress: string | null;
   id: number;
   lastName: string;
 };
@@ -43,8 +48,10 @@ export const EditMemberProfileDialog = ({ member, onUpdated }: EditMemberProfile
     const form = event.currentTarget;
     const data = new FormData(form);
     const parsed = editMemberProfileSchema.safeParse({
+      contactNumber: data.get("contactNumber"),
       email: data.get("email"),
       firstName: data.get("firstName"),
+      homeAddress: data.get("homeAddress"),
       justification: data.get("justification"),
       lastName: data.get("lastName"),
     });
@@ -71,8 +78,10 @@ export const EditMemberProfileDialog = ({ member, onUpdated }: EditMemberProfile
     <Dialog onClose={close} open={open} size="lg" title="Edit club member profile">
       <form className="grid gap-4 sm:grid-cols-2" noValidate onSubmit={submit}>
         <TextField defaultValue={member.firstName} errorMessage={fieldErrors.firstName} label="First name" name="firstName" required />
-        <TextField defaultValue={member.lastName} errorMessage={fieldErrors.lastName} label="Last name" name="lastName" required />
+        <TextField defaultValue={member.lastName} errorMessage={fieldErrors.lastName} label="Surname" name="lastName" required />
         <TextField className="sm:col-span-2" defaultValue={member.email} errorMessage={fieldErrors.email} label="Email address" name="email" required type="email" />
+        <TextField autoComplete="tel" className="sm:col-span-2" defaultValue={member.contactNumber ?? ""} errorMessage={fieldErrors.contactNumber} label="Contact number" name="contactNumber" required type="tel" />
+        <TextAreaField autoComplete="street-address" className="sm:col-span-2" defaultValue={member.homeAddress ?? ""} errorMessage={fieldErrors.homeAddress} label="Home address" maxLength={512} name="homeAddress" required rows={3} />
         <TextAreaField className="sm:col-span-2" errorMessage={fieldErrors.justification} label="Reason for change" maxLength={500} name="justification" required rows={3} />
         {requestError ? <StatusMessage className="sm:col-span-2" tone="error">{requestError}</StatusMessage> : null}
         <div className="flex justify-end gap-3 sm:col-span-2">

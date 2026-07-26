@@ -103,7 +103,9 @@ export type LoginResult =
   | { ok: false; message: string };
 
 export type RegisterInput = {
+  contactNumber: string;
   email: string;
+  homeAddress: string;
   password: string;
   name: string;
   surname: string;
@@ -234,6 +236,8 @@ export const register = async (input: RegisterInput): Promise<RegisterResult> =>
         surname: input.surname,
         userName: input.email.split("@")[0],
         emailAddress: input.email,
+        contactNumber: input.contactNumber,
+        homeAddress: input.homeAddress,
         password: input.password,
       },
       {
