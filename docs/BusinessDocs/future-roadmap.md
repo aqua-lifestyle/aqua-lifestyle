@@ -37,7 +37,8 @@
 - [x] Guest-to-Club-Member access promotion after verified final activation payment
 - [x] Secured AQGreen monthly-commitment history and administrator reconciliation views
 - [ ] Automatic AQGreen commitment scheduling and confirmed-payment allocation
-- [ ] Provider checkout and signed callback adapter for real payments
+- [x] Yoco hosted checkout and signed webhook activation for direct Onyx payment
+- [ ] Yoco checkout workflows for AQGreen and other confirmed payment purposes
 - [ ] AQGreen-to-Onyx graduation that preserves AQGreen history
 - [x] Independent Onyx network placement confirmed for AQGreen graduates
 - [ ] Registration channels (online/office/presentation) with required documents (ID, bank letter)

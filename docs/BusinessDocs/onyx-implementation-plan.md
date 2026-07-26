@@ -157,8 +157,12 @@ The persistence and provider-neutral confirmation foundation is complete:
 - The confirmation processor is an internal application component, not a remote
   application service. Customers and administrators cannot call it as an API to
   mark a payment successful.
-- Provider-specific callback verification remains intentionally unimplemented
-  until Yoco credentials, signing rules, and webhook specifications are supplied.
+- Direct Onyx now uses a persisted pre-participation checkout intent, Yoco's
+  hosted checkout, and signature-verified payment webhooks. The adapter checks
+  timestamp freshness, deployment mode, exact amount/currency, invitation and
+  recruiter eligibility, and provider-reference idempotency before atomically
+  creating the active participation and placement. AQGreen provider checkout
+  orchestration remains separate and pending.
 
 ### Phase 3 obligation status
 

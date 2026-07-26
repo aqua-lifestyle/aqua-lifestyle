@@ -36,6 +36,43 @@ The API runtime uses the slim Debian ASP.NET image and its built-in non-root `ap
 
 Render supplies `DATABASE_URL`; the application converts it to the Npgsql keyword format without logging credentials. Redis is supplied through `Redis__Configuration` and becomes ABP's distributed cache backing implementation.
 
+### Yoco direct-Onyx payments
+
+Yoco credentials belong only in the Render API service. They must never be
+added to Vercel, a `NEXT_PUBLIC_*` variable, source control, screenshots, or
+application logs. The hosted Checkout API does not require a public key in the
+frontend.
+
+Before deploying the payment branch:
+
+1. Rotate any key that has been pasted into chat, email, an issue, or a terminal
+   transcript shared with another person.
+2. In the Yoco App, open the Checkout API integration and copy a new **Test
+   secret key**. Test keys begin with `sk_test_`.
+3. Register one test webhook for
+   `https://aqualifestyle-api.onrender.com/api/payments/yoco/webhook`. The Yoco
+   registration response returns a `whsec_` verification secret only once;
+   save it directly into the secret store.
+4. In the Render service Environment page, set `Yoco__SecretKey` to the test
+   secret, `Yoco__WebhookSecret` to the returned webhook secret, and
+   `Yoco__Mode` to `test`. The Blueprint marks both secret values `sync: false`,
+   so Git never contains them.
+5. Sync the Blueprint and deploy. Complete a payment with Yoco's published test
+   card details, then verify that exactly one active Onyx participation, one
+   payment ledger entry, and one completed checkout intent exist.
+
+The API rejects a mode/key mismatch: `test` requires `sk_test_`, while `live`
+requires `sk_live_`. A successful browser redirect is not proof of payment;
+only a valid Yoco webhook creates the Onyx participation and network placement.
+The webhook signature uses the raw body, `webhook-id`, and
+`webhook-timestamp`, and rejects notifications more than three minutes old.
+
+For live payments, first verify `https://www.aqualifestyleclub.co.za` in Yoco.
+Create a live webhook, then update all three Render values together to the live
+secret key, the live webhook's verification secret, and `live`. Keep the test
+and live webhook secrets separate. Do not reuse the test webhook secret in live
+mode.
+
 ## Vercel frontend
 
 Import the repository and set the project Root Directory to `AqualLifeStyle/9.4.2/aqua-frontend`. Configure these Vercel environment variables separately for Preview and Production:
