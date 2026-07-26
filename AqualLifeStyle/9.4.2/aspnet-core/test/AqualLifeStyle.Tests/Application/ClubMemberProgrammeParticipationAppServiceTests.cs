@@ -95,6 +95,10 @@ namespace AqualLifeStyle.Tests.Application
                 var participation = await context.EntryParticipations.SingleAsync(item =>
                     item.CustomerId == inviteeCustomerId);
                 participation.RecruiterCustomerId.ShouldBe(recruiterCustomerId);
+                (await context.OnyxParticipations.AnyAsync(item =>
+                    item.CustomerId == inviteeCustomerId)).ShouldBeFalse();
+                (await context.ProgrammeInvitations.AnyAsync(item =>
+                    item.Code == inviteCode)).ShouldBeTrue();
             });
 
             var recruiterUserId = await UsingDbContextAsync(1, async context =>
@@ -104,6 +108,134 @@ namespace AqualLifeStyle.Tests.Application
                 _participationService.StartEntryAsync(
                     new StartEntryParticipationInput { InviteCode = inviteCode }));
             selfException.Details.ShouldContain("own invitation");
+        }
+
+        [Fact]
+        public async Task OnyxInvitation_IsIdempotentAndCannotCreateAQGreenPlacement()
+        {
+            var recruiterCustomerId = await RegisterAndSignInCustomerAsync();
+            await ActivateCurrentOnyxParticipationAsync(recruiterCustomerId);
+            var inviteCode = (await _invitationService.GetMyInvitationsAsync())
+                .Invitations.Single(item =>
+                    item.ProgrammeKey == RecruitmentProgrammeKeys.Onyx).Code;
+
+            var inviteeCustomerId = await RegisterAndSignInCustomerAsync();
+            var mismatch = await Should.ThrowAsync<UserFriendlyException>(() =>
+                _participationService.StartEntryAsync(
+                    new StartEntryParticipationInput { InviteCode = inviteCode }));
+            mismatch.Details.ShouldContain("different programme");
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.EntryParticipations.AnyAsync(item =>
+                    item.CustomerId == inviteeCustomerId)).ShouldBeFalse();
+                (await context.OnyxParticipations.AnyAsync(item =>
+                    item.CustomerId == inviteeCustomerId)).ShouldBeFalse();
+                (await context.ProgrammeInvitations.AnyAsync(item =>
+                    item.Code == inviteCode)).ShouldBeTrue();
+            });
+
+            var first = await _participationService.StartDirectOnyxAsync(
+                new StartDirectOnyxParticipationInput { InviteCode = inviteCode });
+            var repeated = await _participationService.StartDirectOnyxAsync(
+                new StartDirectOnyxParticipationInput { InviteCode = inviteCode });
+            repeated.Status.ShouldBe(first.Status);
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.OnyxParticipations.SingleAsync(item =>
+                    item.CustomerId == inviteeCustomerId);
+                participation.RecruiterCustomerId.ShouldBe(recruiterCustomerId);
+                (await context.EntryParticipations.AnyAsync(item =>
+                    item.CustomerId == inviteeCustomerId)).ShouldBeFalse();
+            });
+        }
+
+        [Theory]
+        [InlineData("JASPER")]
+        [InlineData("BUSINESSPREMIER")]
+        [InlineData("FUTURE-PROGRAMME")]
+        public async Task UnsupportedInvitation_CannotCreateParticipationOrPlacement(
+            string programmeKey)
+        {
+            var inviteCode = await UsingDbContextAsync(1, async context =>
+            {
+                var invitation = ProgrammeInvitation.Create(
+                    1,
+                    programmeKey,
+                    Guid.NewGuid());
+                context.ProgrammeInvitations.Add(invitation);
+                await context.SaveChangesAsync();
+                return invitation.Code;
+            });
+            var inviteeCustomerId = await RegisterAndSignInCustomerAsync();
+
+            var aqGreenMismatch = await Should.ThrowAsync<UserFriendlyException>(() =>
+                _participationService.StartEntryAsync(
+                    new StartEntryParticipationInput { InviteCode = inviteCode }));
+            aqGreenMismatch.Details.ShouldContain("different programme");
+            var onyxMismatch = await Should.ThrowAsync<UserFriendlyException>(() =>
+                _participationService.StartDirectOnyxAsync(
+                    new StartDirectOnyxParticipationInput { InviteCode = inviteCode }));
+            onyxMismatch.Details.ShouldContain("different programme");
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.EntryParticipations.AnyAsync(item =>
+                    item.CustomerId == inviteeCustomerId)).ShouldBeFalse();
+                (await context.OnyxParticipations.AnyAsync(item =>
+                    item.CustomerId == inviteeCustomerId)).ShouldBeFalse();
+                var invitation = await context.ProgrammeInvitations.SingleAsync(item =>
+                    item.Code == inviteCode);
+                invitation.ProgrammeKey.ShouldBe(programmeKey);
+            });
+        }
+
+        [Fact]
+        public async Task InvitationWithoutAssociatedParticipation_CannotMutateJoiningState()
+        {
+            var inviteCode = await UsingDbContextAsync(1, async context =>
+            {
+                var invitation = ProgrammeInvitation.Create(
+                    1,
+                    RecruitmentProgrammeKeys.AQGreen,
+                    Guid.NewGuid());
+                context.ProgrammeInvitations.Add(invitation);
+                await context.SaveChangesAsync();
+                return invitation.Code;
+            });
+            var inviteeCustomerId = await RegisterAndSignInCustomerAsync();
+
+            var exception = await Should.ThrowAsync<UserFriendlyException>(() =>
+                _participationService.StartEntryAsync(
+                    new StartEntryParticipationInput { InviteCode = inviteCode }));
+            exception.Details.ShouldContain("not currently eligible");
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.EntryParticipations.AnyAsync(item =>
+                    item.CustomerId == inviteeCustomerId)).ShouldBeFalse();
+                (await context.ProgrammeInvitations.AnyAsync(item =>
+                    item.Code == inviteCode)).ShouldBeTrue();
+            });
+        }
+
+        [Fact]
+        public async Task MissingInvitation_CannotMutateJoiningState()
+        {
+            var inviteeCustomerId = await RegisterAndSignInCustomerAsync();
+
+            var exception = await Should.ThrowAsync<UserFriendlyException>(() =>
+                _participationService.StartEntryAsync(
+                    new StartEntryParticipationInput
+                    {
+                        InviteCode = "ZZZZZZZZZZZZ"
+                    }));
+            exception.Details.ShouldContain("not found");
+
+            await UsingDbContextAsync(1, async context =>
+                (await context.EntryParticipations.AnyAsync(item =>
+                    item.CustomerId == inviteeCustomerId)).ShouldBeFalse());
         }
 
         [Fact]
@@ -383,15 +515,28 @@ namespace AqualLifeStyle.Tests.Application
                 $"invite-activation-{suffix}"));
         }
 
+        private async Task ActivateCurrentOnyxParticipationAsync(int customerId)
+        {
+            await _participationService.StartDirectOnyxAsync(
+                new StartDirectOnyxParticipationInput());
+            await Resolve<ProgrammePaymentConfirmationProcessor>().ProcessAsync(
+                CreateConfirmation(
+                    customerId,
+                    MemberPaymentPurpose.OnyxDirectEntry,
+                    $"invite-onyx-{Guid.NewGuid():N}",
+                    6120m));
+        }
+
         private static ConfirmedProgrammePayment CreateConfirmation(
             int customerId,
             MemberPaymentPurpose purpose,
-            string reference) =>
+            string reference,
+            decimal amount = 600m) =>
             new ConfirmedProgrammePayment(
                 1,
                 customerId,
                 purpose,
-                600m,
+                amount,
                 "ZAR",
                 "Test",
                 reference,

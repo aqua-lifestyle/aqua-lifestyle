@@ -94,6 +94,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             };
 
         [AbpAuthorize(AquaPermissions.ProgrammeParticipations.Join)]
+        [UnitOfWork]
         public async Task<ProgrammeParticipationDto> StartEntryAsync(
             StartEntryParticipationInput input)
         {
@@ -147,6 +148,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         }
 
         [AbpAuthorize(AquaPermissions.ProgrammeParticipations.Join)]
+        [UnitOfWork]
         public async Task<ProgrammeParticipationDto> StartDirectOnyxAsync(
             StartDirectOnyxParticipationInput input)
         {

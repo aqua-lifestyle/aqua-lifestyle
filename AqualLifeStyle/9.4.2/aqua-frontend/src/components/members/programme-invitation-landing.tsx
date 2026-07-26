@@ -9,6 +9,20 @@ import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import type { ProgrammeInvitationPreview } from "@/src/shared/domain/programme-invitations";
 import { Button, Card, LinkButton, Skeleton, StatusMessage } from "@/src/shared/ui";
 
+const unsupportedProgrammeMessage =
+  "Invitations are not currently supported for this programme.";
+
+const getProgrammeJoinEndpoint = (programmeKey: string) => {
+  switch (programmeKey) {
+    case "AQGREEN":
+      return apiEndpoints.programmeParticipations.startEntry;
+    case "ONYX":
+      return apiEndpoints.programmeParticipations.startDirectOnyx;
+    default:
+      return undefined;
+  }
+};
+
 export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string }) => {
   const { session } = useAuthState();
   const [preview, setPreview] = useState<ProgrammeInvitationPreview>();
@@ -33,13 +47,14 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
 
   const confirm = async () => {
     if (!preview) return;
+    const endpoint = getProgrammeJoinEndpoint(preview.programmeKey);
+    if (!endpoint) {
+      setError(unsupportedProgrammeMessage);
+      return;
+    }
     setJoining(true);
     setError(undefined);
     try {
-      const endpoint =
-        preview.programmeKey === "AQGREEN"
-          ? apiEndpoints.programmeParticipations.startEntry
-          : apiEndpoints.programmeParticipations.startDirectOnyx;
       await httpClient.post(endpoint, { inviteCode: preview.inviteCode });
       setJoined(true);
     } catch (requestError) {
@@ -59,6 +74,9 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
     ? `/signup?area=${encodeURIComponent(preview.areaName)}&redirect=${encodeURIComponent(redirect)}`
     : "/signup";
   const loginUrl = `/login?redirect=${encodeURIComponent(redirect)}`;
+  const programmeJoinEndpoint = preview
+    ? getProgrammeJoinEndpoint(preview.programmeKey)
+    : undefined;
 
   return (
     <main className="min-h-dvh bg-muted/30 px-4 py-10 sm:px-6">
@@ -99,7 +117,11 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
               confirmed. Activation does not automatically pay commissions.
             </StatusMessage>
 
-            {joined ? (
+            {!programmeJoinEndpoint ? (
+              <StatusMessage tone="error">
+                {unsupportedProgrammeMessage}
+              </StatusMessage>
+            ) : joined ? (
               <div className="flex flex-col items-center gap-4 text-center">
                 <CheckCircle2 className="size-10 text-success" />
                 <div>

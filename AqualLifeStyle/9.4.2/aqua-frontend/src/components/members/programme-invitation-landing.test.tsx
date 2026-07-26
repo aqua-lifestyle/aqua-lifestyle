@@ -39,7 +39,7 @@ describe("ProgrammeInvitationLanding", () => {
     });
   });
 
-  it("previews the recruiter and confirms joining without exposing internal IDs", async () => {
+  it("routes an AQGreen invitation only to the AQGreen joining endpoint", async () => {
     render(<ProgrammeInvitationLanding inviteCode="AQ7G2X9KLMNP" />);
 
     expect(await screen.findByText("Ada Recruiter")).toBeInTheDocument();
@@ -51,8 +51,64 @@ describe("ProgrammeInvitationLanding", () => {
       apiEndpoints.programmeParticipations.startEntry,
       { inviteCode: "AQ7G2X9KLMNP" },
     ));
+    expect(httpClient.post).not.toHaveBeenCalledWith(
+      apiEndpoints.programmeParticipations.startDirectOnyx,
+      expect.anything(),
+    );
     expect(await screen.findByText(/network place is recorded/i)).toBeInTheDocument();
   });
+
+  it("routes an Onyx invitation only to the Onyx joining endpoint", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({
+      ...preview,
+      programmeKey: "ONYX",
+      programmeName: "Onyx",
+    });
+
+    render(<ProgrammeInvitationLanding inviteCode="AQ7G2X9KLMNP" />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /confirm and join/i }),
+    );
+
+    await waitFor(() =>
+      expect(httpClient.post).toHaveBeenCalledWith(
+        apiEndpoints.programmeParticipations.startDirectOnyx,
+        { inviteCode: "AQ7G2X9KLMNP" },
+      ),
+    );
+    expect(httpClient.post).not.toHaveBeenCalledWith(
+      apiEndpoints.programmeParticipations.startEntry,
+      expect.anything(),
+    );
+  });
+
+  it.each([
+    ["JASPER", "Jasper"],
+    ["BUSINESSPREMIER", "BusinessPremier"],
+    ["FUTURE-PROGRAMME", "Future programme"],
+  ])(
+    "fails closed for unsupported programme key %s",
+    async (programmeKey, programmeName) => {
+      vi.mocked(httpClient.get).mockResolvedValue({
+        ...preview,
+        programmeKey,
+        programmeName,
+      });
+
+      render(<ProgrammeInvitationLanding inviteCode="AQ7G2X9KLMNP" />);
+
+      expect(
+        await screen.findByText(
+          "Invitations are not currently supported for this programme.",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /confirm and join/i }),
+      ).not.toBeInTheDocument();
+      expect(httpClient.post).not.toHaveBeenCalled();
+    },
+  );
 
   it("offers registration and sign-in before confirmation", async () => {
     vi.mocked(useAuthState).mockReturnValue({
