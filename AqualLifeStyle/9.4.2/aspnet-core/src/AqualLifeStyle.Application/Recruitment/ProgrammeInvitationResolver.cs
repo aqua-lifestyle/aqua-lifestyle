@@ -60,8 +60,6 @@ namespace AqualLifeStyle.Application.Recruitment
                 .FindByParticipationAsync(invitation.ProgrammeParticipationId);
             if (source == null || !source.IsEligible)
                 throw InvalidInvitation("The recruiter is not currently eligible to recruit into this programme.");
-            if (source.TenantId != inviteeTenantId)
-                throw InvalidInvitation("The invitation belongs to a different Area.");
             if (source.CustomerId == inviteeCustomerId)
                 throw InvalidInvitation("You cannot accept your own invitation.");
 

@@ -6,6 +6,7 @@ using AqualLifeStyle.Authentication.JwtBearer;
 using AqualLifeStyle.Configuration;
 using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.Identity;
+using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Web.Resources;
 using AqualLifeStyle.Web.Startup;
 using Castle.MicroKernel.Registration;
@@ -38,6 +39,7 @@ namespace AqualLifeStyle.Web.Tests
             AuthConfigurer.Configure(services, _appConfiguration);
             
             services.AddScoped<IWebResourceManager, WebResourceManager>();
+            services.AddHttpClient<IYocoCheckoutGateway, YocoCheckoutGateway>();
 
             //Configure Abp and Dependency Injection
             return services.AddAbp<AqualLifeStyleWebTestModule>(options =>

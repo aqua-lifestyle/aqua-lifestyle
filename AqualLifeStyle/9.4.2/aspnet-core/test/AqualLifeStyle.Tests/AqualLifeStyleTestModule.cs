@@ -12,6 +12,8 @@ using Abp.Zero.EntityFrameworkCore;
 using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.Tests.DependencyInjection;
 using Microsoft.Extensions.Configuration;
+using AqualLifeStyle.Payments.Yoco;
+using AqualLifeStyle.Tests.Payments;
 
 namespace AqualLifeStyle.Tests
 {
@@ -40,7 +42,10 @@ namespace AqualLifeStyle.Tests
                         "https://customers.example.test"),
                     new System.Collections.Generic.KeyValuePair<string, string>(
                         "App:DefaultTenantName",
-                        "Default")
+                        "Default"),
+                    new System.Collections.Generic.KeyValuePair<string, string>(
+                        "Yoco:Mode",
+                        "test")
                 })
                 .Build();
             IocManager.IocContainer.Register(Component.For<IConfiguration>().Instance(configuration));
@@ -59,6 +64,10 @@ namespace AqualLifeStyle.Tests
             RegisterFakeService<AbpZeroDbMigrator<AqualLifeStyleDbContext>>();
 
             Configuration.ReplaceService<IEmailSender, NullEmailSender>(DependencyLifeStyle.Transient);
+            IocManager.IocContainer.Register(
+                Component.For<IYocoCheckoutGateway>()
+                    .ImplementedBy<FakeYocoCheckoutGateway>()
+                    .LifestyleSingleton());
         }
 
         public override void Initialize()
