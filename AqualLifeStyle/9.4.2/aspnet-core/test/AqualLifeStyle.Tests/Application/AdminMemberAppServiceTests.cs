@@ -42,6 +42,8 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Original",
                 LastName = "Member",
                 Email = originalEmail,
+                ContactNumber = "+27 76 666 6666",
+                HomeAddress = "6 Member Way, Johannesburg",
                 Password = "Temporary123!",
                 MembershipId = membershipIds[0],
                 IsActive = true,
@@ -55,6 +57,8 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Updated",
                 LastName = "Member",
                 Email = updatedEmail,
+                ContactNumber = "+27 77 777 7777",
+                HomeAddress = "7 Updated Way, Johannesburg",
                 Justification = "Member requested a profile correction"
             });
             edited.FirstName.ShouldBe("Updated");

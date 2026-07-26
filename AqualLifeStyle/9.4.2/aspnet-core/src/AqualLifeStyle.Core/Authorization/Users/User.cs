@@ -12,8 +12,11 @@ namespace AqualLifeStyle.Authorization.Users
     public class User : AbpUser<User>, IGeneratesDomainEvents
     {
         public const string DefaultPassword = "123qwe";
+        public const int MaxHomeAddressLength = 512;
 
         public AquaUserRole Role { get; private set; } = AquaUserRole.Guest;
+
+        public string HomeAddress { get; private set; }
 
         public ICollection<IEventData> DomainEvents { get; } = new List<IEventData>();
 
@@ -60,6 +63,34 @@ namespace AqualLifeStyle.Authorization.Users
         public void CompleteRequiredPasswordReset()
         {
             PasswordResetCode = null;
+        }
+
+        public void UpdateContactDetails(string contactNumber, string homeAddress)
+        {
+            if (string.IsNullOrWhiteSpace(contactNumber))
+            {
+                throw new ArgumentException("The contact number is required.", nameof(contactNumber));
+            }
+
+            var normalizedContactNumber = contactNumber.Trim();
+            if (normalizedContactNumber.Length > MaxPhoneNumberLength)
+            {
+                throw new ArgumentException($"The contact number cannot exceed {MaxPhoneNumberLength} characters.", nameof(contactNumber));
+            }
+
+            if (string.IsNullOrWhiteSpace(homeAddress))
+            {
+                throw new ArgumentException("The home address is required.", nameof(homeAddress));
+            }
+
+            var normalizedHomeAddress = homeAddress.Trim();
+            if (normalizedHomeAddress.Length > MaxHomeAddressLength)
+            {
+                throw new ArgumentException($"The home address cannot exceed {MaxHomeAddressLength} characters.", nameof(homeAddress));
+            }
+
+            PhoneNumber = normalizedContactNumber;
+            HomeAddress = normalizedHomeAddress;
         }
 
         public void SetRole(AquaUserRole role)

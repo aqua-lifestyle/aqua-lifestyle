@@ -219,6 +219,8 @@ namespace AqualLifeStyle.Tests.Application
                 await _accountAppService.Register(new RegisterInput
                 {
                     EmailAddress = email,
+                    ContactNumber = "+27 74 567 8901",
+                    HomeAddress = "40 Programme Lane, Johannesburg",
                     Name = "Programme",
                     Password = "Customer!101",
                     Surname = "Member",

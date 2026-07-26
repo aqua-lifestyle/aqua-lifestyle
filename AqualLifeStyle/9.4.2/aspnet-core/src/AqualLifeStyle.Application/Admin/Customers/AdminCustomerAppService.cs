@@ -124,6 +124,8 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 FirstName = input.FirstName,
                 LastName = input.LastName,
                 Email = input.Email,
+                ContactNumber = input.ContactNumber,
+                HomeAddress = input.HomeAddress,
                 Password = input.Password,
                 MembershipId = input.MembershipId,
                 IsActive = input.IsActive
@@ -166,6 +168,8 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 FirstName = input.FirstName,
                 LastName = input.LastName,
                 Email = input.Email,
+                ContactNumber = input.ContactNumber,
+                HomeAddress = input.HomeAddress,
                 MembershipId = input.MembershipId,
                 IsActive = input.IsActive
             });
@@ -192,6 +196,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 await _customerProfileUpdater.UpdateAsync(customer, new AdminCustomerProfileUpdate
                 {
                     FirstName = input.FirstName, LastName = input.LastName, Email = input.Email,
+                    ContactNumber = input.ContactNumber, HomeAddress = input.HomeAddress,
                     MembershipId = input.MembershipId, IsActive = input.IsActive
                 });
                 await CurrentUnitOfWork.SaveChangesAsync();

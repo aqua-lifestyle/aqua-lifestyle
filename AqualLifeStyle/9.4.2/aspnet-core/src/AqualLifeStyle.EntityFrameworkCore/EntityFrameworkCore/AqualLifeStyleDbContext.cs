@@ -66,6 +66,12 @@ namespace AqualLifeStyle.EntityFrameworkCore
                     .OnDelete(DeleteBehavior.SetNull);
             });
 
+            modelBuilder.Entity<User>(entity =>
+            {
+                entity.Property(user => user.HomeAddress)
+                    .HasMaxLength(User.MaxHomeAddressLength);
+            });
+
             modelBuilder.Entity<Membership>(entity =>
             {
                 entity.ToTable("Memberships");

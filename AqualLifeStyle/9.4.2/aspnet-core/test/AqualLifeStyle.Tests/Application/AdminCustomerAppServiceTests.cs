@@ -36,6 +36,8 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Ada",
                 LastName = "Lovelace",
                 Email = email,
+                ContactNumber = "+27 71 111 1111",
+                HomeAddress = "1 Customer Street, Johannesburg",
                 Password = "Temporary123!",
                 IsActive = true,
                 Justification = "Approved customer onboarding"
@@ -45,6 +47,8 @@ namespace AqualLifeStyle.Tests.Application
             creationResult.RequiresRestoreConfirmation.ShouldBeFalse();
             created.TenantId.ShouldBe(1);
             created.Name.ShouldBe("Ada Lovelace");
+            created.ContactNumber.ShouldBe("+27 71 111 1111");
+            created.HomeAddress.ShouldBe("1 Customer Street, Johannesburg");
             var originalCreationTime = created.CreationTime;
             var originalUserId = created.UserId;
             var createdUser = await Resolve<UserManager>().FindByEmailAsync(email);
@@ -69,11 +73,15 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Augusta Ada",
                 LastName = "Lovelace",
                 Email = email,
+                ContactNumber = "+27 72 222 2222",
+                HomeAddress = "2 Updated Avenue, Johannesburg",
                 IsActive = false,
                 Justification = "Customer requested an account pause"
             });
             updated.Name.ShouldBe("Augusta Ada Lovelace");
             updated.IsActive.ShouldBeFalse();
+            updated.ContactNumber.ShouldBe("+27 72 222 2222");
+            updated.HomeAddress.ShouldBe("2 Updated Avenue, Johannesburg");
 
             await _service.DeleteAsync(new AdminDeleteCustomerInput
             {
@@ -97,6 +105,8 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Dora",
                 LastName = "Shongwe",
                 Email = email,
+                ContactNumber = "+27 73 333 3333",
+                HomeAddress = "3 Restore Road, Johannesburg",
                 IsActive = true,
                 Justification = "Returning customer requested account restoration"
             });
@@ -115,6 +125,8 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Dora",
                 LastName = "Shongwe",
                 Email = email,
+                ContactNumber = "+27 73 333 3333",
+                HomeAddress = "3 Restore Road, Johannesburg",
                 IsActive = true,
                 Justification = "Returning customer explicitly approved for restoration"
             });
@@ -124,6 +136,8 @@ namespace AqualLifeStyle.Tests.Application
             restored.CreationTime.ShouldBe(originalCreationTime);
             restored.Name.ShouldBe("Dora Shongwe");
             restored.IsActive.ShouldBeTrue();
+            restored.ContactNumber.ShouldBe("+27 73 333 3333");
+            restored.HomeAddress.ShouldBe("3 Restore Road, Johannesburg");
             var restoredUser = await Resolve<UserManager>().FindByEmailAsync(email);
             restoredUser.ShouldNotBeNull();
             restoredUser.IsActive.ShouldBeTrue();
@@ -173,6 +187,8 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Cross",
                 LastName = "Tenant",
                 Email = $"cross-{Guid.NewGuid():N}@example.com",
+                ContactNumber = "+27 74 444 4444",
+                HomeAddress = "4 Cross Street, Cape Town",
                 Password = "Temporary123!",
                 IsActive = true,
                 Justification = "Invalid cross tenant attempt"
@@ -208,6 +224,8 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Platform",
                 LastName = "Member",
                 Email = email,
+                ContactNumber = "+27 75 555 5555",
+                HomeAddress = "5 Platform Place, Johannesburg",
                 Password = "Temporary123!",
                 IsActive = true,
                 Justification = "Approved customer onboarding"
@@ -218,6 +236,8 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Platform",
                 LastName = "Club Member",
                 Email = email,
+                ContactNumber = "+27 75 555 5555",
+                HomeAddress = "5 Platform Place, Johannesburg",
                 MembershipId = planIds[0],
                 IsActive = true,
                 Justification = "Customer selected a platform membership plan"

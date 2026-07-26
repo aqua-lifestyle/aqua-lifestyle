@@ -42,6 +42,8 @@ namespace AqualLifeStyle.Web.Tests.Controllers
                 registrationRequest.Content = JsonContent(new
                 {
                     emailAddress = $"{userName}@example.test",
+                    contactNumber = "+27 82 123 4567",
+                    homeAddress = "10 Enrollment Road, Johannesburg",
                     name = "Enrollment",
                     password,
                     surname = "Test",

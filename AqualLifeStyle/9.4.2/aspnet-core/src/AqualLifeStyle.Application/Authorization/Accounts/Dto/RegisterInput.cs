@@ -4,6 +4,7 @@ using Abp.Auditing;
 using Abp.Authorization.Users;
 using Abp.Extensions;
 using AqualLifeStyle.Validation;
+using AqualLifeStyle.Authorization.Users;
 
 namespace AqualLifeStyle.Authorization.Accounts.Dto
 {
@@ -25,6 +26,15 @@ namespace AqualLifeStyle.Authorization.Accounts.Dto
         [EmailAddress]
         [StringLength(AbpUserBase.MaxEmailAddressLength)]
         public string EmailAddress { get; set; }
+
+        [Required]
+        [Phone]
+        [StringLength(AbpUserBase.MaxPhoneNumberLength)]
+        public string ContactNumber { get; set; }
+
+        [Required]
+        [StringLength(User.MaxHomeAddressLength, MinimumLength = 3)]
+        public string HomeAddress { get; set; }
 
         [Required]
         [StringLength(AbpUserBase.MaxPlainPasswordLength)]

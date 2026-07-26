@@ -21,6 +21,8 @@ namespace AqualLifeStyle.Application.Admin.Customers
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public string Email { get; set; }
+        public string ContactNumber { get; set; }
+        public string HomeAddress { get; set; }
         public string Password { get; set; }
         public bool AllowSystemGeneratedPassword { get; set; }
         public int? MembershipId { get; set; }
@@ -111,6 +113,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
                     IsEmailConfirmed = false
                 };
                 user.SetNormalizedNames();
+                user.UpdateContactDetails(input.ContactNumber, input.HomeAddress);
                 user.SetRole(input.MembershipId.HasValue ? AquaUserRole.Member : AquaUserRole.Guest);
 
                 await _userManager.InitializeOptionsAsync(input.TenantId);
@@ -157,6 +160,8 @@ namespace AqualLifeStyle.Application.Admin.Customers
                     FirstName = input.FirstName,
                     LastName = input.LastName,
                     Email = input.Email,
+                    ContactNumber = input.ContactNumber,
+                    HomeAddress = input.HomeAddress,
                     MembershipId = input.MembershipId,
                     IsActive = input.IsActive
                 });
@@ -177,6 +182,15 @@ namespace AqualLifeStyle.Application.Admin.Customers
             catch (ArgumentException)
             {
                 throw new UserFriendlyException("Customer creation failed.", "A valid email address is required.");
+            }
+            try
+            {
+                var contactDetails = new User();
+                contactDetails.UpdateContactDetails(input.ContactNumber, input.HomeAddress);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new UserFriendlyException("Customer creation failed.", exception.Message);
             }
             if (input.MembershipId.HasValue && input.MembershipId <= 0)
                 throw new UserFriendlyException("Customer creation failed.", "MembershipId must be positive.");

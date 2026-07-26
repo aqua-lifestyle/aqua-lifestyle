@@ -6,7 +6,10 @@ using Abp.UI;
 using AqualLifeStyle.Application.MyAccount;
 using AqualLifeStyle.Application.MyAccount.Dto;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.Domain.Common;
+using AqualLifeStyle.Domain.Customers;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
 
@@ -94,6 +97,49 @@ namespace AqualLifeStyle.Tests.Application
                     CurrentPassword = User.DefaultPassword,
                     NewPassword = "NoSpecialCharacter123"
                 }));
+        }
+
+        [Fact]
+        public async Task Profile_UpdatePersistsPersonalDetailsOnTheLinkedUserAndCustomer()
+        {
+            var userId = await CreateAndLoginTestUserAsync();
+            await UsingDbContextAsync(async context =>
+            {
+                var user = await context.Users.FindAsync(userId);
+                user.UpdateContactDetails("+27 71 000 0000", "1 Original Road, Johannesburg");
+                context.Customers.Add(Customer.Create(
+                    user.TenantId,
+                    user.Id,
+                    $"{user.Name} {user.Surname}",
+                    new EmailAddress(user.EmailAddress),
+                    null,
+                    user));
+                await context.SaveChangesAsync();
+            });
+
+            var updated = await _service.UpdateProfileAsync(new UpdateMyProfileInput
+            {
+                FirstName = "Updated",
+                Surname = "Customer",
+                EmailAddress = $"updated-{Guid.NewGuid():N}@defaulttenant.com",
+                ContactNumber = "+27 82 123 4567",
+                HomeAddress = "25 New Home Avenue, Johannesburg"
+            });
+
+            updated.FirstName.ShouldBe("Updated");
+            updated.Surname.ShouldBe("Customer");
+            updated.ContactNumber.ShouldBe("+27 82 123 4567");
+            updated.HomeAddress.ShouldBe("25 New Home Avenue, Johannesburg");
+
+            await UsingDbContextAsync(async context =>
+            {
+                var customer = await context.Customers.Include(item => item.User)
+                    .SingleAsync(item => item.UserId == userId);
+                customer.Name.ShouldBe("Updated Customer");
+                customer.Email.Value.ShouldBe(updated.EmailAddress);
+                customer.User.PhoneNumber.ShouldBe(updated.ContactNumber);
+                customer.User.HomeAddress.ShouldBe(updated.HomeAddress);
+            });
         }
     }
 }

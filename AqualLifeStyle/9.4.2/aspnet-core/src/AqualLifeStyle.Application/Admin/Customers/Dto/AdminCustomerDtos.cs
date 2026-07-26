@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using Abp.Application.Services.Dto;
 using Abp.Auditing;
 using Abp.Authorization.Users;
+using AqualLifeStyle.Authorization.Users;
 
 namespace AqualLifeStyle.Application.Admin.Customers.Dto
 {
@@ -27,6 +28,8 @@ namespace AqualLifeStyle.Application.Admin.Customers.Dto
         public string LastName { get; set; }
         public string Name { get; set; }
         public string Email { get; set; }
+        public string ContactNumber { get; set; }
+        public string HomeAddress { get; set; }
         public int? MembershipId { get; set; }
         public string MembershipName { get; set; }
         public bool IsActive { get; set; }
@@ -44,6 +47,12 @@ namespace AqualLifeStyle.Application.Admin.Customers.Dto
 
         [Required, EmailAddress, StringLength(AbpUserBase.MaxEmailAddressLength)]
         public string Email { get; set; }
+
+        [Required, Phone, StringLength(AbpUserBase.MaxPhoneNumberLength)]
+        public string ContactNumber { get; set; }
+
+        [Required, StringLength(User.MaxHomeAddressLength, MinimumLength = 3)]
+        public string HomeAddress { get; set; }
 
         [Range(1, int.MaxValue)]
         public int? MembershipId { get; set; }
@@ -74,6 +83,7 @@ namespace AqualLifeStyle.Application.Admin.Customers.Dto
         public int CustomerId { get; set; }
         public string Name { get; set; }
         public string Email { get; set; }
+
         public DateTime? RemovalTime { get; set; }
     }
 
@@ -97,6 +107,12 @@ namespace AqualLifeStyle.Application.Admin.Customers.Dto
 
         [Required, EmailAddress, StringLength(AbpUserBase.MaxEmailAddressLength)]
         public string Email { get; set; }
+
+        [Required, Phone, StringLength(AbpUserBase.MaxPhoneNumberLength)]
+        public string ContactNumber { get; set; }
+
+        [Required, StringLength(User.MaxHomeAddressLength, MinimumLength = 3)]
+        public string HomeAddress { get; set; }
 
         [Range(1, int.MaxValue)]
         public int? MembershipId { get; set; }

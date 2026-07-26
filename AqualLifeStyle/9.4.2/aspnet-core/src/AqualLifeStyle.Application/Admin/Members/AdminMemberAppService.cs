@@ -100,7 +100,7 @@ namespace AqualLifeStyle.Application.Admin.Members
             if (input == null) throw Failed("Member profile update", "The request body was empty.");
             ValidatePositiveId(input.Id, "Member");
             var member = await GetMemberAsync(input.Id);
-            await UpdateMemberAsync(member, input.FirstName, input.LastName, input.Email, member.MembershipId.Value, member.IsActive);
+            await UpdateMemberAsync(member, input.FirstName, input.LastName, input.Email, input.ContactNumber, input.HomeAddress, member.MembershipId.Value, member.IsActive);
             LogAdminMutation("Member", "profile updated", member.Id, member.TenantId, input.Justification);
             return Map(member, await GetMembershipAsync(member.MembershipId.Value, member.TenantId.Value));
         }
@@ -111,7 +111,7 @@ namespace AqualLifeStyle.Application.Admin.Members
             if (input == null) throw Failed("Member suspension", "The request body was empty.");
             ValidatePositiveId(input.Id, "Member");
             var member = await GetMemberAsync(input.Id);
-            await UpdateMemberAsync(member, member.User.Name, member.User.Surname, member.User.EmailAddress, member.MembershipId.Value, false);
+            await UpdateMemberAsync(member, member.User.Name, member.User.Surname, member.User.EmailAddress, member.User.PhoneNumber, member.User.HomeAddress, member.MembershipId.Value, false);
             LogAdminMutation("Member", "suspended", member.Id, member.TenantId, input.Justification);
             return Map(member, await GetMembershipAsync(member.MembershipId.Value, member.TenantId.Value));
         }
@@ -123,15 +123,16 @@ namespace AqualLifeStyle.Application.Admin.Members
             ValidatePositiveId(input.Id, "Member");
             ValidatePositiveId(input.MembershipId, "Membership");
             var member = await GetMemberAsync(input.Id);
-            await UpdateMemberAsync(member, member.User.Name, member.User.Surname, member.User.EmailAddress, input.MembershipId, member.IsActive);
+            await UpdateMemberAsync(member, member.User.Name, member.User.Surname, member.User.EmailAddress, member.User.PhoneNumber, member.User.HomeAddress, input.MembershipId, member.IsActive);
             LogAdminMutation("Member", $"tier changed to {input.MembershipId}", member.Id, member.TenantId, input.Justification);
             return Map(member, await GetMembershipAsync(input.MembershipId, member.TenantId.Value));
         }
 
-        private Task UpdateMemberAsync(Customer member, string firstName, string lastName, string email, int membershipId, bool isActive) =>
+        private Task UpdateMemberAsync(Customer member, string firstName, string lastName, string email, string contactNumber, string homeAddress, int membershipId, bool isActive) =>
             _customerProfileUpdater.UpdateAsync(member, new AdminCustomerProfileUpdate
             {
                 FirstName = firstName, LastName = lastName, Email = email,
+                ContactNumber = contactNumber, HomeAddress = homeAddress,
                 MembershipId = membershipId, IsActive = isActive
             });
 
@@ -163,6 +164,7 @@ namespace AqualLifeStyle.Application.Admin.Members
         {
             Id = member.Id, TenantId = member.TenantId.Value, UserId = member.UserId,
             FirstName = member.User.Name, LastName = member.User.Surname, Email = member.Email.Value,
+            ContactNumber = member.User.PhoneNumber, HomeAddress = member.User.HomeAddress,
             MembershipId = membership.Id, MembershipName = membership.Name, MembershipType = (int)membership.MembershipType,
             IsActive = member.IsActive, CreationTime = member.CreationTime
         };

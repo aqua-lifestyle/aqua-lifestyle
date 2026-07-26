@@ -4,6 +4,8 @@ using System.ComponentModel.DataAnnotations;
 using Abp.Auditing;
 using Magicodes.ExporterAndImporter.Core;
 using Magicodes.ExporterAndImporter.Excel;
+using Abp.Authorization.Users;
+using AqualLifeStyle.Authorization.Users;
 
 namespace AqualLifeStyle.Application.Admin.Import.Dto
 {
@@ -49,6 +51,8 @@ namespace AqualLifeStyle.Application.Admin.Import.Dto
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public string Email { get; set; }
+        public string ContactNumber { get; set; }
+        public string HomeAddress { get; set; }
         public int? MembershipId { get; set; }
         public bool IsActive { get; set; }
     }
@@ -71,6 +75,12 @@ namespace AqualLifeStyle.Application.Admin.Import.Dto
 
         [Required, EmailAddress, StringLength(256), ImporterHeader(Name = "Email", AutoTrim = true)]
         public string Email { get; set; }
+
+        [Required, Phone, StringLength(AbpUserBase.MaxPhoneNumberLength), ImporterHeader(Name = "ContactNumber", AutoTrim = true)]
+        public string ContactNumber { get; set; }
+
+        [Required, StringLength(User.MaxHomeAddressLength, MinimumLength = 3), ImporterHeader(Name = "HomeAddress", AutoTrim = true)]
+        public string HomeAddress { get; set; }
 
         [ImporterHeader(Name = "MembershipId", AutoTrim = true)]
         public string MembershipId { get; set; }
@@ -95,6 +105,8 @@ namespace AqualLifeStyle.Application.Admin.Import.Dto
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public string Email { get; set; }
+        public string ContactNumber { get; set; }
+        public string HomeAddress { get; set; }
         public int? MembershipId { get; set; }
         public bool IsActive { get; set; }
     }
