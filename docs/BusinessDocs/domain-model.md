@@ -43,11 +43,18 @@ erDiagram
 ```typescript
 interface Customer {
   id: number;
+  userId: number;           // links to the ABP user that owns personal details
   name: string;
   email: EmailAddress;      // value object
   membershipId?: number;
 }
 ```
+
+Customer personal details have one source of truth on the linked ABP user:
+`Name` stores first name, `Surname` stores surname, `PhoneNumber` stores the
+contact number, and the Aqua extension `HomeAddress` stores the home address.
+The customer `name` and `email` fields remain synchronized compatibility/search
+values; phone and address are not duplicated on `Customer`.
 
 ### Membership (existing)
 ```typescript

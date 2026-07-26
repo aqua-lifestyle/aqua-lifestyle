@@ -100,6 +100,7 @@ Status legend: ✅ Implemented in codebase · 🔧 Domain/persistence foundation
 | FR-48 | Multi-tenancy | Critical | ✅ Implemented (ABP) |
 | FR-49 | User/role management and authentication (JWT) | Critical | ✅ Implemented (ABP) |
 | FR-50 | Admin UI for customers, products, memberships, enquiries, order intents | High | ✅ Implemented (Next.js frontend) |
+| FR-51 | Capture and maintain each customer's first name, surname, contact number, and home address during self-registration, administrator onboarding/import, and profile editing | High | ✅ Implemented on the linked ABP user profile |
 
 ## 3. Non-Functional Requirements
 
