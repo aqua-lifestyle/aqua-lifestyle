@@ -11,8 +11,13 @@ The lifecycle remains deliberately separated:
 
 `Customer → Programme participation → Recruitment relationship → Network placement → Activation → Qualification → Commission eligibility → Commission payment`
 
-Accepting an invitation records network placement. It does not activate the
-participation, confirm a payment, qualify a network, or pay a commission.
+Accepting an AQGreen invitation creates its pre-activation participation and
+records the recruiter placement; the existing two-payment lifecycle then governs
+activation. Confirming a direct-Onyx invitation records only the member's joining
+intent for checkout. It does not create an Onyx participation or placement.
+After Yoco confirms the R6,120 payment, the backend revalidates the invitation
+and atomically creates the active Onyx participation and recruiter placement.
+Neither flow directly qualifies a network or pays a commission.
 
 ## Customer workflow
 
@@ -24,9 +29,12 @@ participation, confirm a payment, qualify a network, or pay a commission.
    number, Area, programme, and current recruitment eligibility.
 6. An unauthenticated invitee creates an account or signs in and returns to the
    same invitation.
-7. The invitee explicitly confirms the placement.
-8. The normal programme joining workflow creates the participation in its
-   existing pre-activation state. Existing payment and activation rules apply.
+7. The invitee explicitly confirms the programme and intended recruiter.
+8. For AQGreen, the normal joining workflow creates the participation and
+   recruiter placement in its pre-activation state; existing payment and
+   activation rules apply. For direct Onyx, confirmation proceeds to the
+   R6,120 checkout without creating programme state. Only a confirmed payment
+   creates the active Onyx participation and recruiter placement.
 
 Joining independently remains supported. Manually entering internal customer
 or participation identifiers is not part of the normal customer experience.
@@ -60,7 +68,8 @@ The backend is authoritative. On every acceptance it verifies that:
 - the invitation exists and its code is well formed;
 - the invitation belongs to the requested programme;
 - the referenced participation still exists and remains eligible;
-- the inviter and invitee belong to the same currently supported Area scope;
+- the recruiter's participation remains eligible under the selected programme;
+- an Area difference does not invalidate an otherwise valid recruitment;
 - the invitee is not accepting their own invitation; and
 - existing idempotency and recruiter-reassignment protections still hold.
 

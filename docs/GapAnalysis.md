@@ -4,7 +4,7 @@ This report compares the business model described in the provided business docum
 (*National Club Aqgreen*, *Area Space / Area Leader*, *Membership*) against the current
 codebase (`AqualLifeStyle/9.4.2` — ASP.NET Boilerplate backend + Next.js frontend).
 
-> **Current authority (2026-07-23):** The confirmed Onyx decisions recorded in
+> **Current authority (2026-07-26):** The confirmed Onyx decisions recorded in
 > [`BusinessDocs/onyx-implementation-plan.md`](BusinessDocs/onyx-implementation-plan.md)
 > supersede the older membership assumptions in this report wherever they conflict.
 
@@ -55,7 +55,7 @@ Frontend (`aqua-frontend`, Next.js): pages exist for customers, enquiries, membe
 | 20% savings maturity interest | 🔧 Foundation implemented | Every contribution records its full 20% interest and maturity snapshots principal, interest, and payout separately. Maturity payout and pooled-fund accounting remain |
 | Refund rule (savings below threshold within 3 months → refund minus admin/branding) | ⚠️ Policy boundary | The existing three-month threshold check is preserved, but account-specific thresholds, deductions, approval, and refund payment workflow remain unresolved |
 | Registration workflows (WhatsApp/online/office/presentation channels, proof of payment, SMS confirmation) | ❌ Missing | Enquiry→Customer conversion exists but no payment-verified registration pipeline |
-| Onyx levels 1–5 with rental, product, and travel incentives | 🔧 Domain foundation | Structural qualification and confirmed weekly commission components are implemented through Level 5 independently from Entry. A persisted Level 3 travel entitlement tracks eligibility, its three-month wait, activation, and the 10% Club Member contribution. Rental workflows and configurable product rewards remain |
+| Onyx levels 1–5 with rental, product, and travel incentives | 🔧 Domain foundation | Structural qualification and confirmed weekly commission components are implemented through Level 5 independently from AQGreen. A persisted Level 3 travel entitlement tracks eligibility, its three-month wait, activation, and the 10% Club Member contribution. Rental workflows and configurable product rewards remain |
 | Area Leader licensing, application (20+ interested members, 42h review, 4 presentations) | ❌ Missing | No Area Leader/Area Space domain at all |
 | Area Leader ranks (Ruby → Ambassador) with order targets & income tables | ❌ Missing | |
 | Area Space approval & lifecycle | ❌ Missing | |
