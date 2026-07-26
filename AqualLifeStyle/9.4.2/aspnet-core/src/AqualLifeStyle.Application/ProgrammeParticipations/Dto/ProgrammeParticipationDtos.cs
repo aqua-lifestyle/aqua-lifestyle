@@ -1,25 +1,32 @@
 using System;
+using System.ComponentModel.DataAnnotations;
+using AqualLifeStyle.Domain.Recruitment;
 
 namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
 {
     public class StartEntryParticipationInput
     {
         public int? RecruiterCustomerId { get; set; }
+
+        [StringLength(ProgrammeInvitation.CodeLength, MinimumLength = ProgrammeInvitation.CodeLength)]
+        public string InviteCode { get; set; }
     }
 
     public class StartDirectOnyxParticipationInput
     {
         public int? RecruiterCustomerId { get; set; }
+
+        [StringLength(ProgrammeInvitation.CodeLength, MinimumLength = ProgrammeInvitation.CodeLength)]
+        public string InviteCode { get; set; }
     }
 
     public class ProgrammeParticipationDto
     {
-        public Guid Id { get; set; }
         public string ProgrammeName { get; set; }
         public string Status { get; set; }
         public bool IsActive { get; set; }
         public bool JoinedIndependently { get; set; }
-        public int? RecruiterCustomerId { get; set; }
+        public string RecruiterClubMemberNumber { get; set; }
         public DateTime StartedAt { get; set; }
         public DateTime? ActivatedAt { get; set; }
         public decimal? NextPaymentAmount { get; set; }
@@ -30,7 +37,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
 
     public class MyProgrammeParticipationsDto
     {
-        public int CustomerId { get; set; }
+        public string ClubMemberNumber { get; set; }
         public ProgrammeParticipationDto Entry { get; set; }
         public ProgrammeParticipationDto Onyx { get; set; }
         public OnyxTravelBenefitDto TravelBenefit { get; set; }

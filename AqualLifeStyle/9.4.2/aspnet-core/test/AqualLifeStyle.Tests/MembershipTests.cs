@@ -47,14 +47,17 @@ namespace AqualLifeStyle.Tests
             Assert.Throws<System.InvalidOperationException>(() => membership.EnsureCanBeAssignedToCustomer());
         }
 
-        [Fact]
-        public void EnsureCanBeAssignedToCustomer_RejectsOnyxProgrammeConfiguration()
+        [Theory]
+        [InlineData(MembershipType.AQGreen)]
+        [InlineData(MembershipType.Onyx)]
+        public void EnsureCanBeAssignedToCustomer_RejectsProgrammeConfiguration(
+            MembershipType membershipType)
         {
             var membership = Membership.Create(
                 null,
-                "Onyx",
-                "Onyx programme configuration",
-                MembershipType.Onyx);
+                membershipType.ToString(),
+                "Programme configuration",
+                membershipType);
 
             var exception = Assert.Throws<System.InvalidOperationException>(
                 () => membership.EnsureCanBeAssignedToCustomer());

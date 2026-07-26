@@ -113,7 +113,7 @@ export const AdminDashboard = () => {
     { href: "/admin/area-leaders", icon: Network, label: "Area leaders", permission: "Aqua.Admin.AreaLeaders.View", summary: "Review applications and manage progression." },
     { href: "/admin/facilitators", icon: UserCheck, label: "Facilitators", permission: "Aqua.Admin.Facilitators.View", summary: "Approve facilitators and monitor their network." },
     { href: "/admin/members", icon: UsersRound, label: "Club members", permission: "Aqua.Admin.Members.View", summary: "Maintain profiles, plans, and account access." },
-    { href: "/admin/weekly-earnings", icon: HandCoins, label: "Weekly earnings", permission: "Aqua.Admin.Commissions.View", summary: "Review calculated Entry and Onyx network earnings." },
+    { href: "/admin/weekly-earnings", icon: HandCoins, label: "Weekly earnings", permission: "Aqua.Admin.Commissions.View", summary: "Review calculated AQGreen and Onyx network earnings." },
   ].filter((item) => permissions.includes(item.permission));
 
   return (

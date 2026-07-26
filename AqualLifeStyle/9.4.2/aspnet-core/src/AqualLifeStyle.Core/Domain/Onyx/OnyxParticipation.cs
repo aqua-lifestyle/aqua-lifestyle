@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Abp.Domain.Entities;
 using Abp.Domain.Entities.Auditing;
 using AqualLifeStyle.Domain.Payments;
@@ -19,6 +20,8 @@ namespace AqualLifeStyle.Domain.Onyx
 
     public class OnyxParticipation : FullAuditedAggregateRoot<Guid>, IMustHaveTenant
     {
+        private readonly List<OnyxRecruiterCorrection> _recruiterCorrections = new();
+
         public int TenantId { get; set; }
         public int CustomerId { get; private set; }
         public int? RecruiterCustomerId { get; private set; }
@@ -35,6 +38,8 @@ namespace AqualLifeStyle.Domain.Onyx
         public DateTime TermsEffectiveFrom { get; private set; }
         public decimal DirectEntryAmount { get; private set; }
         public string Currency { get; private set; }
+        public IReadOnlyCollection<OnyxRecruiterCorrection> RecruiterCorrections =>
+            _recruiterCorrections.AsReadOnly();
 
         protected OnyxParticipation()
         {
@@ -117,6 +122,83 @@ namespace AqualLifeStyle.Domain.Onyx
             };
         }
 
+        public static OnyxParticipation GraduateFromAQGreenIndependently(
+            EntryParticipation aqGreenParticipation,
+            OnyxLoanAgreement loanAgreement,
+            int onyxMembershipId,
+            OnyxPlanTerms terms,
+            DateTime graduatedAt)
+        {
+            if (aqGreenParticipation == null)
+            {
+                throw new ArgumentNullException(nameof(aqGreenParticipation));
+            }
+
+            if (loanAgreement == null)
+            {
+                throw new ArgumentNullException(nameof(loanAgreement));
+            }
+
+            if (terms == null)
+            {
+                throw new ArgumentNullException(nameof(terms));
+            }
+
+            if (aqGreenParticipation.Status != EntryParticipationStatus.Active)
+            {
+                throw new InvalidOperationException(
+                    "Only an active AQGreen participant can graduate to Onyx.");
+            }
+
+            if (loanAgreement.Status != OnyxLoanAgreementStatus.Active ||
+                !loanAgreement.EffectiveAt.HasValue)
+            {
+                throw new InvalidOperationException(
+                    "The Onyx loan agreement must be active before AQGreen graduation.");
+            }
+
+            if (loanAgreement.TenantId != aqGreenParticipation.TenantId ||
+                loanAgreement.CustomerId != aqGreenParticipation.CustomerId ||
+                loanAgreement.EntryParticipationId != aqGreenParticipation.Id)
+            {
+                throw new InvalidOperationException(
+                    "The loan agreement does not belong to this AQGreen participation.");
+            }
+
+            if (loanAgreement.PrincipalAmount != terms.DirectEntryAmount ||
+                !string.Equals(
+                    loanAgreement.Currency,
+                    terms.Currency,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "The loan agreement does not match the Onyx participation terms.");
+            }
+
+            if (graduatedAt < loanAgreement.EffectiveAt.Value)
+            {
+                throw new ArgumentException(
+                    "Graduation cannot precede the effective loan agreement.",
+                    nameof(graduatedAt));
+            }
+
+            return new OnyxParticipation(
+                aqGreenParticipation.TenantId,
+                aqGreenParticipation.CustomerId,
+                recruiterCustomerId: null,
+                onyxMembershipId,
+                terms,
+                graduatedAt)
+            {
+                Id = Guid.NewGuid(),
+                AdmissionRoute = OnyxAdmissionRoute.EntryGraduation,
+                Status = OnyxParticipationStatus.Active,
+                ActivatedAt = graduatedAt,
+                EntryParticipationId = aqGreenParticipation.Id,
+                LoanAgreementId = loanAgreement.Id
+            };
+        }
+
         public void ApplyConfirmedDirectEntryPayment(MemberPayment payment)
         {
             if (payment == null) throw new ArgumentNullException(nameof(payment));
@@ -156,6 +238,54 @@ namespace AqualLifeStyle.Domain.Onyx
             Status = OnyxParticipationStatus.Active;
         }
 
+        public void CorrectRecruiter(
+            OnyxParticipation newRecruiterParticipation,
+            long administratorUserId,
+            string reason,
+            DateTime correctedAt)
+        {
+            if (newRecruiterParticipation == null)
+                throw new ArgumentNullException(nameof(newRecruiterParticipation));
+            if (newRecruiterParticipation.Status != OnyxParticipationStatus.Active)
+                throw new InvalidOperationException("The recruiting customer must have active Onyx participation.");
+
+            EnsureValidRecruiter(CustomerId, newRecruiterParticipation.CustomerId);
+            RecordRecruiterCorrection(
+                newRecruiterParticipation.CustomerId,
+                administratorUserId,
+                reason,
+                correctedAt);
+        }
+
+        public void CorrectToIndependent(
+            long administratorUserId,
+            string reason,
+            DateTime correctedAt) =>
+            RecordRecruiterCorrection(null, administratorUserId, reason, correctedAt);
+
+        private void RecordRecruiterCorrection(
+            int? newRecruiterCustomerId,
+            long administratorUserId,
+            string reason,
+            DateTime correctedAt)
+        {
+            EnsureValidRecruiter(CustomerId, newRecruiterCustomerId);
+            if (administratorUserId <= 0) throw new ArgumentOutOfRangeException(nameof(administratorUserId));
+            if (string.IsNullOrWhiteSpace(reason))
+                throw new ArgumentException("A correction reason is required.", nameof(reason));
+            if (correctedAt == default || correctedAt < StartedAt)
+                throw new ArgumentException("A valid correction time is required.", nameof(correctedAt));
+            if (newRecruiterCustomerId == RecruiterCustomerId) return;
+
+            _recruiterCorrections.Add(OnyxRecruiterCorrection.Record(
+                RecruiterCustomerId,
+                newRecruiterCustomerId,
+                administratorUserId,
+                reason,
+                correctedAt));
+            RecruiterCustomerId = newRecruiterCustomerId;
+        }
+
         private static void EnsureValidRecruiter(int customerId, int? recruiterCustomerId)
         {
             if (recruiterCustomerId.HasValue && recruiterCustomerId.Value <= 0)
@@ -168,5 +298,45 @@ namespace AqualLifeStyle.Domain.Onyx
                 throw new InvalidOperationException("A customer cannot recruit themselves.");
             }
         }
+    }
+
+    public class OnyxRecruiterCorrection : Entity<Guid>
+    {
+        public int? PreviousRecruiterCustomerId { get; private set; }
+        public int? NewRecruiterCustomerId { get; private set; }
+        public long AdministratorUserId { get; private set; }
+        public string Reason { get; private set; }
+        public DateTime CorrectedAt { get; private set; }
+
+        protected OnyxRecruiterCorrection()
+        {
+        }
+
+        private OnyxRecruiterCorrection(
+            int? previousRecruiterCustomerId,
+            int? newRecruiterCustomerId,
+            long administratorUserId,
+            string reason,
+            DateTime correctedAt)
+        {
+            PreviousRecruiterCustomerId = previousRecruiterCustomerId;
+            NewRecruiterCustomerId = newRecruiterCustomerId;
+            AdministratorUserId = administratorUserId;
+            Reason = reason.Trim();
+            CorrectedAt = correctedAt;
+        }
+
+        internal static OnyxRecruiterCorrection Record(
+            int? previousRecruiterCustomerId,
+            int? newRecruiterCustomerId,
+            long administratorUserId,
+            string reason,
+            DateTime correctedAt) =>
+            new OnyxRecruiterCorrection(
+                previousRecruiterCustomerId,
+                newRecruiterCustomerId,
+                administratorUserId,
+                reason,
+                correctedAt);
     }
 }

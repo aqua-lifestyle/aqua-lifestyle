@@ -115,7 +115,7 @@ namespace AqualLifeStyle.Domain.Onyx
                     ApplyCompletionPayment(payment);
                     return;
                 default:
-                    throw new InvalidOperationException("The confirmed payment is not an Entry activation payment.");
+                    throw new InvalidOperationException("The confirmed payment is not an AQGreen activation payment.");
             }
         }
 
@@ -182,7 +182,7 @@ namespace AqualLifeStyle.Domain.Onyx
 
             if (RegistrationPaymentId.HasValue)
             {
-                throw new InvalidOperationException("The Entry registration payment has already been recorded.");
+                throw new InvalidOperationException("The AQGreen registration payment has already been recorded.");
             }
 
             EnsureExactAmount(payment, RegistrationPaymentAmount);
@@ -199,12 +199,12 @@ namespace AqualLifeStyle.Domain.Onyx
 
             if (!RegistrationPaymentId.HasValue)
             {
-                throw new InvalidOperationException("The Entry registration payment must be confirmed first.");
+                throw new InvalidOperationException("The AQGreen registration payment must be confirmed first.");
             }
 
             if (ActivationPaymentId.HasValue)
             {
-                throw new InvalidOperationException("The Entry activation payment has already been recorded.");
+                throw new InvalidOperationException("The AQGreen activation payment has already been recorded.");
             }
 
             EnsureExactAmount(payment, ActivationPaymentAmount);
@@ -223,12 +223,12 @@ namespace AqualLifeStyle.Domain.Onyx
 
             if (payment.TenantId != TenantId || payment.CustomerId != CustomerId)
             {
-                throw new InvalidOperationException("The payment does not belong to this Entry participant.");
+                throw new InvalidOperationException("The payment does not belong to this AQGreen participant.");
             }
 
             if (!string.Equals(payment.Currency, Currency, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("The payment currency does not match the Entry terms.");
+                throw new InvalidOperationException("The payment currency does not match the AQGreen terms.");
             }
         }
 
@@ -252,7 +252,7 @@ namespace AqualLifeStyle.Domain.Onyx
             if (!recruiterParticipation.IsQualifiedForNetwork)
             {
                 throw new InvalidOperationException(
-                    "The recruiting customer must have active Entry participation.");
+                    "The recruiting customer must have active AQGreen participation.");
             }
 
             EnsureValidRecruiter(customerId, recruiterParticipation.CustomerId);
@@ -291,7 +291,6 @@ namespace AqualLifeStyle.Domain.Onyx
             string reason,
             DateTime correctedAt)
         {
-            Id = Guid.NewGuid();
             PreviousRecruiterCustomerId = previousRecruiterCustomerId;
             NewRecruiterCustomerId = newRecruiterCustomerId;
             AdministratorUserId = administratorUserId;

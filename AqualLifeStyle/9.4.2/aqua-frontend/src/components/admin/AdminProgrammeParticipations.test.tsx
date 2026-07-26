@@ -10,7 +10,7 @@ vi.mock("@/src/shared/api", async () => {
   const actual = await vi.importActual<typeof import("@/src/shared/api")>(
     "@/src/shared/api",
   );
-  return { ...actual, httpClient: { get: vi.fn() } };
+  return { ...actual, httpClient: { get: vi.fn(), post: vi.fn() } };
 });
 
 const authState = (permissions: string[]) => ({
@@ -31,26 +31,35 @@ const authState = (permissions: string[]) => ({
 
 const participation = {
   activatedAt: null,
+  areaName: "Johannesburg",
   confirmedPayments: [],
   currency: "ZAR",
-  customerId: 42,
+  clubMemberNumber: "CLB-DORA23456789",
   customerName: "Dora Shongwe",
   email: "dora@example.com",
-  id: "participation-1",
   isActive: false,
   joinedIndependently: true,
   nextPaymentAmount: 600,
-  nextPaymentDescription: "Entry registration payment",
-  programmeName: "Entry",
-  recruiterCustomerId: null,
+  nextPaymentDescription: "AQGreen registration payment",
+  programmeName: "AQGreen",
+  recruiterClubMemberNumber: null,
   startedAt: "2026-07-24T10:00:00Z",
   status: "Awaiting first payment",
-  tenantId: 3,
 };
 
 describe("AdminProgrammeParticipations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    HTMLDialogElement.prototype.showModal = vi.fn(function (
+      this: HTMLDialogElement,
+    ) {
+      this.setAttribute("open", "");
+    });
+    HTMLDialogElement.prototype.close = vi.fn(function (
+      this: HTMLDialogElement,
+    ) {
+      this.removeAttribute("open");
+    });
     vi.mocked(useAuthState).mockReturnValue(
       authState(["Aqua.Admin.ProgrammeParticipations.View"]),
     );
@@ -63,14 +72,12 @@ describe("AdminProgrammeParticipations", () => {
   it("loads every page reported by the service", async () => {
     const firstPage = Array.from({ length: 100 }, (_, index) => ({
       ...participation,
-      customerId: index + 1,
-      id: `participation-${index + 1}`,
+      clubMemberNumber: `CLB-${String(index + 1).padStart(12, "2")}`,
     }));
     const finalParticipation = {
       ...participation,
-      customerId: 101,
+      clubMemberNumber: "CLB-FINAL2345678",
       customerName: "Final Club Member",
-      id: "participation-101",
     };
     vi.mocked(httpClient.get)
       .mockResolvedValueOnce({ items: firstPage, totalCount: 101 })
@@ -90,7 +97,7 @@ describe("AdminProgrammeParticipations", () => {
     expect(screen.getByText("101")).toBeInTheDocument();
   });
 
-  it("loads Entry records and switches to Onyx reconciliation", async () => {
+  it("loads AQGreen records and switches to Onyx reconciliation", async () => {
     render(<AdminProgrammeParticipations />);
 
     await screen.findByText("Dora Shongwe");
@@ -119,5 +126,41 @@ describe("AdminProgrammeParticipations", () => {
       ),
     ).toBeInTheDocument();
     expect(httpClient.get).not.toHaveBeenCalled();
+  });
+
+  it("confirms an audited recruiter correction using public Club Member numbers", async () => {
+    vi.mocked(useAuthState).mockReturnValue(
+      authState([
+        "Aqua.Admin.ProgrammeParticipations.View",
+        "Aqua.Admin.ProgrammeParticipations.CorrectRecruiter",
+      ]),
+    );
+    vi.mocked(httpClient.post).mockResolvedValue(undefined);
+
+    render(<AdminProgrammeParticipations />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Correct recruiter" }));
+    fireEvent.change(screen.getByLabelText("New recruiter Club Member number"), {
+      target: { value: "clb-new23456789" },
+    });
+    fireEvent.change(screen.getByLabelText("Reason for correction"), {
+      target: { value: "Verified against the signed joining form" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm correction" }));
+
+    await waitFor(() =>
+      expect(httpClient.post).toHaveBeenCalledWith(
+        apiEndpoints.programmeParticipations.correctRecruiter,
+        {
+          clubMemberNumber: "CLB-DORA23456789",
+          newRecruiterClubMemberNumber: "CLB-NEW23456789",
+          programme: 0,
+          reason: "Verified against the signed joining form",
+        },
+      ),
+    );
+    expect(
+      await screen.findByText(/change was added to the audit history/i),
+    ).toBeInTheDocument();
   });
 });

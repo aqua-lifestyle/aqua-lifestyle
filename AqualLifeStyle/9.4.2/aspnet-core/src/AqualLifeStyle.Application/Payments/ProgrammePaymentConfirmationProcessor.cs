@@ -152,7 +152,7 @@ namespace AqualLifeStyle.Payments
             if (entryParticipation == null)
             {
                 throw new UserFriendlyException(
-                    "No Entry participation was found for this customer.");
+                    "No AQGreen participation was found for this customer.");
             }
 
             entryParticipation.ApplyConfirmedActivationPayment(payment);

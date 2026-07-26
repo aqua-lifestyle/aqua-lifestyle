@@ -29,8 +29,8 @@ namespace AqualLifeStyle.Tests.Application
         {
             var membershipIds = await UsingDbContextAsync(async context =>
             {
-                var entryTier = Membership.Create(1, $"Entry-{Guid.NewGuid():N}", "Entry membership", MembershipType.Jasper);
-                var upgradedTier = Membership.Create(1, $"Upgrade-{Guid.NewGuid():N}", "Upgraded membership", MembershipType.AQGreen);
+                var entryTier = Membership.Create(1, $"Starter-{Guid.NewGuid():N}", "Starter membership", MembershipType.Jasper);
+                var upgradedTier = Membership.Create(1, $"Upgrade-{Guid.NewGuid():N}", "Upgraded membership", MembershipType.BusinessPremier);
                 context.Memberships.AddRange(entryTier, upgradedTier);
                 await context.SaveChangesAsync();
                 return new[] { entryTier.Id, upgradedTier.Id };
@@ -42,6 +42,8 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Original",
                 LastName = "Member",
                 Email = originalEmail,
+                ContactNumber = "+27 76 666 6666",
+                HomeAddress = "6 Member Way, Johannesburg",
                 Password = "Temporary123!",
                 MembershipId = membershipIds[0],
                 IsActive = true,
@@ -55,10 +57,14 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Updated",
                 LastName = "Member",
                 Email = updatedEmail,
+                ContactNumber = "+27 77 777 7777",
+                HomeAddress = "7 Updated Way, Johannesburg",
                 Justification = "Member requested a profile correction"
             });
             edited.FirstName.ShouldBe("Updated");
             edited.Email.ShouldBe(updatedEmail);
+            edited.ContactNumber.ShouldBe("+27 77 777 7777");
+            edited.HomeAddress.ShouldBe("7 Updated Way, Johannesburg");
 
             var upgraded = await _memberAdministration.ChangeTierAsync(new ChangeMemberTierInput
             {
@@ -81,6 +87,8 @@ namespace AqualLifeStyle.Tests.Application
                     .SingleAsync(customer => customer.Id == member.Id);
                 persistedMember.Name.ShouldBe("Updated Member");
                 persistedMember.Email.Value.ShouldBe(updatedEmail);
+                persistedMember.User.PhoneNumber.ShouldBe("+27 77 777 7777");
+                persistedMember.User.HomeAddress.ShouldBe("7 Updated Way, Johannesburg");
                 persistedMember.MembershipId.ShouldBe(membershipIds[1]);
                 persistedMember.IsActive.ShouldBeFalse();
                 persistedMember.User.IsActive.ShouldBeFalse();

@@ -52,9 +52,13 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
 
         private static readonly OnyxCommissionTerms ApprovedOnyxCommissionTerms =
             OnyxCommissionTerms.Create(
-                "onyx-commission-2026-07",
+                "onyx-commission-2026-07-levels-1-5",
                 EffectiveFrom,
-                250m);
+                50m,
+                20m,
+                12.62m,
+                5m,
+                4m);
 
         private static readonly OnyxTravelBenefitTerms TravelBenefitTerms =
             OnyxTravelBenefitTerms.Create(

@@ -19,6 +19,23 @@ namespace AqualLifeStyle.Domain.Onyx
         public const int BranchSize = 5;
         public const int HighestConfirmedStructuralLevel = 5;
 
+        public static int GetRequiredPopulation(OnyxNetworkLevel level)
+        {
+            if (level < OnyxNetworkLevel.Level1 ||
+                level > OnyxNetworkLevel.Level5)
+            {
+                throw new ArgumentOutOfRangeException(nameof(level));
+            }
+
+            var requiredPopulation = 1;
+            for (var depth = 0; depth < (int)level; depth++)
+            {
+                requiredPopulation *= BranchSize;
+            }
+
+            return requiredPopulation;
+        }
+
         public OnyxNetworkLevel Evaluate(
             OnyxParticipation participation,
             IEnumerable<OnyxParticipation> networkParticipations)

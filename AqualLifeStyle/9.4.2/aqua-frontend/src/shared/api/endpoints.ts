@@ -72,6 +72,10 @@ export const apiEndpoints = {
     getTierBenefits: (id: number) =>
       `/api/services/app/Membership/GetTierBenefits?id=${id}`,
   },
+  myAccount: {
+    getProfile: "/api/services/app/MyAccount/GetProfile",
+    updateProfile: "/api/services/app/MyAccount/UpdateProfile",
+  },
   orderIntents: {
     cancel: (id: number) => `/api/services/app/OrderIntent/Cancel?id=${id}`,
     complete: (id: number) => `/api/services/app/OrderIntent/Complete?id=${id}`,
@@ -89,10 +93,16 @@ export const apiEndpoints = {
     getById: (id: number) => `/api/services/app/Product/Get?id=${id}`,
   },
   programmeParticipations: {
+    correctRecruiter:
+      "/api/services/app/AdminProgrammeParticipation/CorrectRecruiter",
     getAdminParticipations:
       "/api/services/app/AdminProgrammeParticipation/GetAll",
     getMyParticipations:
       "/api/services/app/ClubMemberProgrammeParticipation/GetMyParticipations",
+    getMyInvitations:
+      "/api/services/app/ProgrammeInvitation/GetMyInvitations",
+    getInvitationPreview: (inviteCode: string) =>
+      `/api/services/app/ProgrammeInvitation/GetPreview?InviteCode=${encodeURIComponent(inviteCode)}`,
     startDirectOnyx:
       "/api/services/app/ClubMemberProgrammeParticipation/StartDirectOnyx",
     startEntry:

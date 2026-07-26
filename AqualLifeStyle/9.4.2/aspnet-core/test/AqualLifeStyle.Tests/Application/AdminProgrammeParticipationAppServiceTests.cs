@@ -9,9 +9,12 @@ using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
+using AqualLifeStyle.Domain.Enums;
+using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.Payments;
+using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
 using RolePermissionSetting = Abp.Authorization.Roles.RolePermissionSetting;
@@ -59,15 +62,16 @@ namespace AqualLifeStyle.Tests.Application
 
             result.TotalCount.ShouldBe(1);
             var participation = result.Items.Single();
-            participation.CustomerId.ShouldBe(customerId);
-            participation.ProgrammeName.ShouldBe("Entry");
+            participation.ClubMemberNumber.ShouldStartWith("CLB-");
+            participation.AreaName.ShouldBe("Default");
+            participation.ProgrammeName.ShouldBe("AQGreen");
             participation.Status.ShouldBe("Awaiting activation payment");
             participation.NextPaymentAmount.ShouldBe(600m);
             participation.NextPaymentDescription.ShouldBe("Activation payment");
             participation.JoinedIndependently.ShouldBeTrue();
             participation.ConfirmedPayments.Count.ShouldBe(1);
             participation.ConfirmedPayments[0].Description.ShouldBe(
-                "Entry registration payment");
+                "AQGreen registration payment");
             participation.ConfirmedPayments[0].Provider.ShouldBe("YOCO");
             participation.ConfirmedPayments[0].ProviderReference.ShouldBe(
                 $"entry-registration-{suffix}");
@@ -124,6 +128,157 @@ namespace AqualLifeStyle.Tests.Application
                 }));
         }
 
+        [Fact]
+        public async Task HostCorrectorWithoutAllAreasPermission_CannotLookupAreaMembers()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userName = $"host-programme-corrector-{suffix}";
+            var userId = await CreateTestUserAsync(
+                null,
+                userName,
+                $"{userName}@example.com");
+            await UsingDbContextAsync(null, async context =>
+            {
+                var role = new Role(
+                    null,
+                    $"ProgrammeCorrector-{suffix}",
+                    $"Programme Corrector {suffix}");
+                context.Roles.Add(role);
+                await context.SaveChangesAsync();
+
+                context.UserRoles.RemoveRange(
+                    context.UserRoles.Where(userRole => userRole.UserId == userId));
+                context.UserRoles.Add(new UserRole(null, userId, role.Id));
+                context.Permissions.Add(new RolePermissionSetting
+                {
+                    TenantId = null,
+                    Name = AquaPermissions.Admin.ProgrammeParticipations.CorrectRecruiter,
+                    IsGranted = true,
+                    RoleId = role.Id
+                });
+                await context.SaveChangesAsync();
+            });
+            LoginAsHost(userName);
+
+            await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+                {
+                    Programme = AdminProgrammeType.Entry,
+                    ClubMemberNumber = "CLB-NOTFOUND01",
+                    Reason = "Verifying cross-Area authorization"
+                }));
+        }
+
+        [Fact]
+        public async Task AdministratorCorrection_PreservesHistoryRejectsCyclesAndIsIdempotent()
+        {
+            var network = await CreateActiveAQGreenNetworkAsync();
+
+            var selfPlacement = await Should.ThrowAsync<Abp.UI.UserFriendlyException>(() =>
+                _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+                {
+                    Programme = AdminProgrammeType.Entry,
+                    ClubMemberNumber = network.TargetNumber,
+                    NewRecruiterClubMemberNumber = network.TargetNumber,
+                    Reason = "Testing self-placement protection"
+                }));
+            selfPlacement.Details.ShouldContain("themselves");
+
+            var crossProgramme = await Should.ThrowAsync<Abp.UI.UserFriendlyException>(() =>
+                _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+                {
+                    Programme = AdminProgrammeType.Onyx,
+                    ClubMemberNumber = network.TargetNumber,
+                    NewRecruiterClubMemberNumber = network.RecruiterNumber,
+                    Reason = "Testing programme isolation"
+                }));
+            crossProgramme.Details.ShouldContain("Onyx participation was not found");
+
+            await _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+            {
+                Programme = AdminProgrammeType.Entry,
+                ClubMemberNumber = network.TargetNumber,
+                NewRecruiterClubMemberNumber = null,
+                Reason = "Correcting placement to independent"
+            });
+            var restoreInput = new CorrectProgrammeRecruiterInput
+            {
+                Programme = AdminProgrammeType.Entry,
+                ClubMemberNumber = network.TargetNumber,
+                NewRecruiterClubMemberNumber = network.RecruiterNumber,
+                Reason = "Restoring verified recruiter placement"
+            };
+            await _service.CorrectRecruiterAsync(restoreInput);
+            await _service.CorrectRecruiterAsync(restoreInput);
+
+            var cycle = await Should.ThrowAsync<Abp.UI.UserFriendlyException>(() =>
+                _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+                {
+                    Programme = AdminProgrammeType.Entry,
+                    ClubMemberNumber = network.RecruiterNumber,
+                    NewRecruiterClubMemberNumber = network.DescendantNumber,
+                    Reason = "Testing cycle protection"
+                }));
+            cycle.Details.ShouldContain("cycle");
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var target = await context.EntryParticipations
+                    .Include(item => item.RecruiterCorrections)
+                    .SingleAsync(item => item.CustomerId == network.TargetCustomerId);
+                target.RecruiterCustomerId.ShouldBe(network.RecruiterCustomerId);
+                target.RecruiterCorrections.Count.ShouldBe(2);
+                target.RecruiterCorrections.All(item =>
+                    item.AdministratorUserId > 0 &&
+                    !string.IsNullOrWhiteSpace(item.Reason)).ShouldBeTrue();
+            });
+        }
+
+        [Fact]
+        public async Task OnyxCorrection_PreservesHistoryRejectsCyclesAndIsIdempotent()
+        {
+            var network = await CreateActiveOnyxNetworkAsync();
+
+            await _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+            {
+                Programme = AdminProgrammeType.Onyx,
+                ClubMemberNumber = network.TargetNumber,
+                NewRecruiterClubMemberNumber = null,
+                Reason = "Correcting Onyx placement to independent"
+            });
+            var restoreInput = new CorrectProgrammeRecruiterInput
+            {
+                Programme = AdminProgrammeType.Onyx,
+                ClubMemberNumber = network.TargetNumber,
+                NewRecruiterClubMemberNumber = network.RecruiterNumber,
+                Reason = "Restoring verified Onyx recruiter placement"
+            };
+            await _service.CorrectRecruiterAsync(restoreInput);
+            await _service.CorrectRecruiterAsync(restoreInput);
+
+            var cycle = await Should.ThrowAsync<Abp.UI.UserFriendlyException>(() =>
+                _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+                {
+                    Programme = AdminProgrammeType.Onyx,
+                    ClubMemberNumber = network.RecruiterNumber,
+                    NewRecruiterClubMemberNumber = network.DescendantNumber,
+                    Reason = "Testing Onyx cycle protection"
+                }));
+            cycle.Details.ShouldContain("cycle");
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var target = await context.OnyxParticipations
+                    .Include(item => item.RecruiterCorrections)
+                    .SingleAsync(item => item.CustomerId == network.TargetCustomerId);
+                target.RecruiterCustomerId.ShouldBe(network.RecruiterCustomerId);
+                target.RecruiterCorrections.Count.ShouldBe(2);
+                target.RecruiterCorrections.All(item =>
+                    item.AdministratorUserId > 0 &&
+                    !string.IsNullOrWhiteSpace(item.Reason)).ShouldBeTrue();
+            });
+        }
+
         private async Task<int> CreateEntryParticipantAsync(string suffix)
         {
             var userId = await CreateTestUserAsync(
@@ -148,6 +303,123 @@ namespace AqualLifeStyle.Tests.Application
                 await context.SaveChangesAsync();
                 return customer.Id;
             });
+        }
+
+        private async Task<RecruitmentNetworkFixture> CreateActiveAQGreenNetworkAsync()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var recruiterUserId = await CreateTestUserAsync(1, $"recruiter-{suffix}", $"recruiter-{suffix}@example.com");
+            var targetUserId = await CreateTestUserAsync(1, $"target-{suffix}", $"target-{suffix}@example.com");
+            var descendantUserId = await CreateTestUserAsync(1, $"descendant-{suffix}", $"descendant-{suffix}@example.com");
+            return await UsingDbContextAsync(1, async context =>
+            {
+                var recruiterCustomer = Customer.Create(1, recruiterUserId, "Verified Recruiter", new EmailAddress($"recruiter-customer-{suffix}@example.com"));
+                var targetCustomer = Customer.Create(1, targetUserId, "Placed Member", new EmailAddress($"target-customer-{suffix}@example.com"));
+                var descendantCustomer = Customer.Create(1, descendantUserId, "Network Descendant", new EmailAddress($"descendant-customer-{suffix}@example.com"));
+                context.Customers.AddRange(recruiterCustomer, targetCustomer, descendantCustomer);
+                await context.SaveChangesAsync();
+
+                var terms = Resolve<ICurrentProgrammeTermsProvider>().GetEntryTerms();
+                var recruiter = EntryParticipation.StartIndependently(1, recruiterCustomer.Id, terms, EffectiveFrom);
+                var payments = new System.Collections.Generic.List<MemberPayment>();
+                payments.AddRange(Activate(recruiter, recruiterCustomer.Id, $"recruiter-{suffix}"));
+                var target = EntryParticipation.StartUnderRecruiter(1, targetCustomer.Id, recruiter, terms, EffectiveFrom);
+                payments.AddRange(Activate(target, targetCustomer.Id, $"target-{suffix}"));
+                var descendant = EntryParticipation.StartUnderRecruiter(1, descendantCustomer.Id, target, terms, EffectiveFrom);
+                payments.AddRange(Activate(descendant, descendantCustomer.Id, $"descendant-{suffix}"));
+                context.MemberPayments.AddRange(payments);
+                context.EntryParticipations.AddRange(recruiter, target, descendant);
+                await context.SaveChangesAsync();
+
+                return new RecruitmentNetworkFixture
+                {
+                    RecruiterCustomerId = recruiterCustomer.Id,
+                    RecruiterNumber = recruiterCustomer.ClubMemberNumber,
+                    TargetCustomerId = targetCustomer.Id,
+                    TargetNumber = targetCustomer.ClubMemberNumber,
+                    DescendantNumber = descendantCustomer.ClubMemberNumber
+                };
+            });
+        }
+
+        private async Task<RecruitmentNetworkFixture> CreateActiveOnyxNetworkAsync()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var recruiterUserId = await CreateTestUserAsync(1, $"onyx-recruiter-{suffix}", $"onyx-recruiter-{suffix}@example.com");
+            var targetUserId = await CreateTestUserAsync(1, $"onyx-target-{suffix}", $"onyx-target-{suffix}@example.com");
+            var descendantUserId = await CreateTestUserAsync(1, $"onyx-descendant-{suffix}", $"onyx-descendant-{suffix}@example.com");
+            return await UsingDbContextAsync(1, async context =>
+            {
+                var recruiterCustomer = Customer.Create(1, recruiterUserId, "Verified Onyx Recruiter", new EmailAddress($"onyx-recruiter-customer-{suffix}@example.com"));
+                var targetCustomer = Customer.Create(1, targetUserId, "Placed Onyx Member", new EmailAddress($"onyx-target-customer-{suffix}@example.com"));
+                var descendantCustomer = Customer.Create(1, descendantUserId, "Onyx Network Descendant", new EmailAddress($"onyx-descendant-customer-{suffix}@example.com"));
+                var membership = Membership.Create(1, $"Onyx-{suffix}", "Onyx correction test", MembershipType.Onyx);
+                context.Customers.AddRange(recruiterCustomer, targetCustomer, descendantCustomer);
+                context.Memberships.Add(membership);
+                await context.SaveChangesAsync();
+
+                var terms = Resolve<ICurrentProgrammeTermsProvider>().GetDirectOnyxTerms();
+                var recruiter = OnyxParticipation.StartDirectIndependently(1, recruiterCustomer.Id, membership.Id, terms, EffectiveFrom);
+                var payments = new System.Collections.Generic.List<MemberPayment>();
+                payments.Add(Activate(recruiter, recruiterCustomer.Id, $"onyx-recruiter-{suffix}"));
+                var target = OnyxParticipation.StartDirectUnderRecruiter(1, targetCustomer.Id, recruiter, membership.Id, terms, EffectiveFrom);
+                payments.Add(Activate(target, targetCustomer.Id, $"onyx-target-{suffix}"));
+                var descendant = OnyxParticipation.StartDirectUnderRecruiter(1, descendantCustomer.Id, target, membership.Id, terms, EffectiveFrom);
+                payments.Add(Activate(descendant, descendantCustomer.Id, $"onyx-descendant-{suffix}"));
+                context.MemberPayments.AddRange(payments);
+                context.OnyxParticipations.AddRange(recruiter, target, descendant);
+                await context.SaveChangesAsync();
+
+                return new RecruitmentNetworkFixture
+                {
+                    RecruiterCustomerId = recruiterCustomer.Id,
+                    RecruiterNumber = recruiterCustomer.ClubMemberNumber,
+                    TargetCustomerId = targetCustomer.Id,
+                    TargetNumber = targetCustomer.ClubMemberNumber,
+                    DescendantNumber = descendantCustomer.ClubMemberNumber
+                };
+            });
+        }
+
+        private static MemberPayment[] Activate(
+            EntryParticipation participation,
+            int customerId,
+            string reference)
+        {
+            var registration = MemberPayment.CreatePending(1, customerId, MemberPaymentPurpose.EntryRegistration, 600m, "Test", $"{reference}-registration", EffectiveFrom);
+            registration.Confirm(EffectiveFrom.AddMinutes(1));
+            participation.ApplyConfirmedActivationPayment(registration);
+            var activation = MemberPayment.CreatePending(1, customerId, MemberPaymentPurpose.EntryActivation, 600m, "Test", $"{reference}-activation", EffectiveFrom);
+            activation.Confirm(EffectiveFrom.AddMinutes(2));
+            participation.ApplyConfirmedActivationPayment(activation);
+            return new[] { registration, activation };
+        }
+
+        private static MemberPayment Activate(
+            OnyxParticipation participation,
+            int customerId,
+            string reference)
+        {
+            var payment = MemberPayment.CreatePending(
+                1,
+                customerId,
+                MemberPaymentPurpose.OnyxDirectEntry,
+                6120m,
+                "Test",
+                reference,
+                EffectiveFrom);
+            payment.Confirm(EffectiveFrom.AddMinutes(1));
+            participation.ApplyConfirmedDirectEntryPayment(payment);
+            return payment;
+        }
+
+        private sealed class RecruitmentNetworkFixture
+        {
+            public int RecruiterCustomerId { get; init; }
+            public string RecruiterNumber { get; init; }
+            public int TargetCustomerId { get; init; }
+            public string TargetNumber { get; init; }
+            public string DescendantNumber { get; init; }
         }
     }
 }

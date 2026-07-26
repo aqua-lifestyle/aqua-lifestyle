@@ -39,7 +39,7 @@ describe("MemberEntryCommitments", () => {
     vi.mocked(httpClient.get).mockResolvedValue([overdueEntryCommitment]);
   });
 
-  it("shows persisted Entry commitment status", async () => {
+  it("shows persisted AQGreen commitment status", async () => {
     render(<MemberEntryCommitments />);
 
     expect(await screen.findByText("July 2026")).toBeInTheDocument();
@@ -60,7 +60,7 @@ describe("MemberEntryCommitments", () => {
 
     expect(
       screen.getByText(
-        "Your account does not have access to Entry commitments.",
+        "Your account does not have access to AQGreen commitments.",
       ),
     ).toBeInTheDocument();
     expect(httpClient.get).not.toHaveBeenCalled();

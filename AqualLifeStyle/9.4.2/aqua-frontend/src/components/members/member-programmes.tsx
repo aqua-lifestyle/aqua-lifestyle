@@ -50,7 +50,7 @@ const ParticipationCard = ({
         <dd className="mt-1 font-semibold">
           {participation.joinedIndependently
             ? "Independent"
-            : `Under Club Member #${participation.recruiterCustomerId}`}
+            : `Under ${participation.recruiterClubMemberNumber ?? "a verified Club Member"}`}
         </dd>
       </div>
       <div>
@@ -189,12 +189,12 @@ export const MemberProgrammes = () => {
     }
   }, [canView]);
 
-  const handleJoined = async (programme: "Entry" | "Onyx") => {
+  const handleJoined = async (programme: "AQGreen" | "Onyx") => {
     await loadParticipations();
     setSuccess(
       programme === "Onyx"
         ? "Onyx participation started. Your place is recorded and activation is pending the confirmed R6,120 payment."
-        : "Entry participation started. Your place is recorded and activation is pending the required payments.",
+        : "AQGreen participation started. Your place is recorded and activation is pending the required payments.",
     );
   };
 
@@ -225,7 +225,7 @@ export const MemberProgrammes = () => {
           />
           <h1 className="mt-2 text-3xl font-bold tracking-tight">My programmes</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Join Entry or Onyx, follow activation progress, and see whether your
+            Join AQGreen or Onyx, follow activation progress, and see whether your
             network starts independently or under an existing recruiter.
           </p>
         </header>
@@ -233,6 +233,22 @@ export const MemberProgrammes = () => {
         {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
         {success ? (
           <StatusMessage tone="success">{success}</StatusMessage>
+        ) : null}
+
+        {participations?.entry?.canRecruitForThisProgramme ||
+        participations?.onyx?.canRecruitForThisProgramme ? (
+          <Card className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-bold">Grow your network</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Share a secure invitation link. Your friend will see your name
+                and programme before confirming.
+              </p>
+            </div>
+            <a className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark" href="/member/invitations">
+              Invite Club Members
+            </a>
+          </Card>
         ) : null}
 
         {loading ? (
@@ -248,15 +264,15 @@ export const MemberProgrammes = () => {
               <Card className="flex flex-col items-start gap-4">
                 <Route className="size-8 text-accent" />
                 <div>
-                  <h2 className="text-xl font-bold">Entry</h2>
+                  <h2 className="text-xl font-bold">AQGreen</h2>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Start with the feeder programme and qualify for a separate
+                    Start with AQGreen and work toward graduating into a separate
                     Onyx participation later. A recruiter is optional.
                   </p>
                 </div>
                 <JoinProgrammeDialog
-                  onJoined={() => handleJoined("Entry")}
-                  programme="Entry"
+                  onJoined={() => handleJoined("AQGreen")}
+                  programme="AQGreen"
                 />
               </Card>
             )}
@@ -269,8 +285,8 @@ export const MemberProgrammes = () => {
                 <div>
                   <h2 className="text-xl font-bold">Onyx</h2>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Join Onyx directly with the full R6,120 payment. Entry
-                    participation is not required and a recruiter is optional.
+                    Join Onyx through its single direct joining path with the full
+                    R6,120 payment. AQGreen is not required and a recruiter is optional.
                   </p>
                 </div>
                 <JoinProgrammeDialog

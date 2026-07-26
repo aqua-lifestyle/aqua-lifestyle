@@ -42,6 +42,8 @@ namespace AqualLifeStyle.Web.Tests.Controllers
                 registrationRequest.Content = JsonContent(new
                 {
                     emailAddress = $"{userName}@example.test",
+                    contactNumber = "+27 82 123 4567",
+                    homeAddress = "10 Enrollment Road, Johannesburg",
                     name = "Enrollment",
                     password,
                     surname = "Test",
@@ -78,6 +80,14 @@ namespace AqualLifeStyle.Web.Tests.Controllers
                 "__tenant",
                 AbpTenantBase.DefaultTenantName);
 
+            var profile = JsonDocument.Parse(await GetResponseAsStringAsync(
+                "/api/services/app/MyAccount/GetProfile"));
+            var profileResult = profile.RootElement.GetProperty("result");
+            profileResult.GetProperty("contactNumber").GetString()
+                .ShouldBe("+27 82 123 4567");
+            profileResult.GetProperty("homeAddress").GetString()
+                .ShouldBe("10 Enrollment Road, Johannesburg");
+
             var memberships = await GetResponseAsStringAsync(
                 "/api/services/app/Membership/GetActiveTiers");
             memberships.ShouldContain("\"success\":true");
@@ -96,7 +106,7 @@ namespace AqualLifeStyle.Web.Tests.Controllers
                 enrollmentResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
                 var enrollmentBody =
                     await enrollmentResponse.Content.ReadAsStringAsync();
-                enrollmentBody.ShouldContain("\"programmeName\":\"Entry\"");
+                enrollmentBody.ShouldContain("\"programmeName\":\"AQGreen\"");
                 enrollmentBody.ShouldContain(
                     "\"status\":\"Awaiting registration payment\"");
             }

@@ -48,9 +48,9 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
 
             var tiers = new List<Membership>
             {
-                Membership.Create(null, "Jasper", "Entry-level membership tier with starter benefits", Domain.Enums.MembershipType.Jasper),
-                Membership.Create(null, "Onyx", "Mid-tier membership with greater discounts", Domain.Enums.MembershipType.Onyx),
-                Membership.Create(null, "AQGreen", "High-tier membership with profit-sharing benefits", Domain.Enums.MembershipType.AQGreen),
+                Membership.Create(null, "Jasper", "Starter membership tier with starter benefits", Domain.Enums.MembershipType.Jasper),
+                Membership.Create(null, "Onyx", "Direct-join programme configuration", Domain.Enums.MembershipType.Onyx),
+                Membership.Create(null, "AQGreen", "Feeder programme configuration for progression toward Onyx", Domain.Enums.MembershipType.AQGreen),
                 Membership.Create(null, "Business Premier", "Top-tier business membership with maximum benefits", Domain.Enums.MembershipType.BusinessPremier)
             };
 
@@ -102,7 +102,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
             _context.Users.Add(brianUser);
             _context.SaveChanges();
 
-            var brian = Customer.Create(null, brianUser.Id, "Brian Okoro", new EmailAddress("brian@example.com"), _context.Memberships.First(m => m.MembershipType == Domain.Enums.MembershipType.Onyx).Id, brianUser);
+            var brian = Customer.Create(null, brianUser.Id, "Brian Okoro", new EmailAddress("brian@example.com"), null, brianUser);
 
             var cynthiaUser = new User
             {
@@ -119,7 +119,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Host
             _context.Users.Add(cynthiaUser);
             _context.SaveChanges();
 
-            var cynthia = Customer.Create(null, cynthiaUser.Id, "Cynthia Nwosu", new EmailAddress("cynthia@example.com"), _context.Memberships.First(m => m.MembershipType == Domain.Enums.MembershipType.AQGreen).Id, cynthiaUser);
+            var cynthia = Customer.Create(null, cynthiaUser.Id, "Cynthia Nwosu", new EmailAddress("cynthia@example.com"), null, cynthiaUser);
 
             _context.Customers.AddRange(alice, brian, cynthia);
             _context.SaveChanges();

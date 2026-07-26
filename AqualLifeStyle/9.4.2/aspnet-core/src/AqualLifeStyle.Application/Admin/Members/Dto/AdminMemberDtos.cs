@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using Abp.Application.Services.Dto;
 using Abp.Authorization.Users;
+using AqualLifeStyle.Authorization.Users;
 
 namespace AqualLifeStyle.Application.Admin.Members.Dto
 {
@@ -19,6 +20,8 @@ namespace AqualLifeStyle.Application.Admin.Members.Dto
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public string Email { get; set; }
+        public string ContactNumber { get; set; }
+        public string HomeAddress { get; set; }
         public int MembershipId { get; set; }
         public string MembershipName { get; set; }
         public int MembershipType { get; set; }
@@ -30,6 +33,8 @@ namespace AqualLifeStyle.Application.Admin.Members.Dto
         [Required, StringLength(AbpUserBase.MaxNameLength, MinimumLength = 1)] public string FirstName { get; set; }
         [Required, StringLength(AbpUserBase.MaxSurnameLength, MinimumLength = 1)] public string LastName { get; set; }
         [Required, EmailAddress, StringLength(AbpUserBase.MaxEmailAddressLength)] public string Email { get; set; }
+        [Required, Phone, StringLength(AbpUserBase.MaxPhoneNumberLength)] public string ContactNumber { get; set; }
+        [Required, StringLength(User.MaxHomeAddressLength, MinimumLength = 3)] public string HomeAddress { get; set; }
         [Required, StringLength(500, MinimumLength = 3)] public string Justification { get; set; }
     }
     public class SuspendMemberInput : EntityDto<int>

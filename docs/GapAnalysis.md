@@ -4,7 +4,7 @@ This report compares the business model described in the provided business docum
 (*National Club Aqgreen*, *Area Space / Area Leader*, *Membership*) against the current
 codebase (`AqualLifeStyle/9.4.2` — ASP.NET Boilerplate backend + Next.js frontend).
 
-> **Current authority (2026-07-23):** The confirmed Onyx decisions recorded in
+> **Current authority (2026-07-26):** The confirmed Onyx decisions recorded in
 > [`BusinessDocs/onyx-implementation-plan.md`](BusinessDocs/onyx-implementation-plan.md)
 > supersede the older membership assumptions in this report wherever they conflict.
 
@@ -42,8 +42,8 @@ Frontend (`aqua-frontend`, Next.js): pages exist for customers, enquiries, membe
 | Entry feeder participation | 🔧 Workflow in progress | Secured self-service joining and status, independent or verified optional-recruiter placement, two confirmed R600 activation payments, permanent history, and read-only administrator reconciliation are implemented; provider checkout/callback integration remains |
 | Direct Onyx participation | 🔧 Workflow in progress | Secured self-service joining and status are implemented. A confirmed R6,120 payment activates the separate Onyx record, grants Club Member access without downgrading higher roles, and does not create Entry history; provider checkout/callback integration remains |
 | Entry-to-Onyx graduation | ❌ Missing | Creates a separate Onyx participation while preserving Entry history |
-| Entry/Onyx five-person networks | 🔧 Domain foundation | Independent customers form network roots; optional recruiters must actively participate in the same programme; separate from sales referrals and cross-Area placement is permitted. Entry evaluates Levels 1–3 and Onyx structural qualification evaluates Levels 1–5 |
-| Weekly member commission ledger | 🔧 Foundation implemented | Entry and Onyx use separate persisted periods and ledgers. Entry retains its complete Levels 1–3 components and member-only compliance holds. Onyx implements only the approved Level 1 R250 component for five active direct Onyx recruits; deeper earnings remain disabled. Secured administrator-triggered calculation and payout workflows remain |
+| AQGreen/Onyx five-person networks | 🔧 Workflow in progress | Independent customers form network roots; optional recruiters must actively participate in the same programme. Secure participation-based invitation links, recruiter preview, explicit confirmation, immutable Club Member numbers, and audited administrator corrections are implemented. AQGreen evaluates Levels 1–3 and Onyx structural qualification evaluates Levels 1–5 |
+| Weekly member commission ledger | 🔧 Foundation implemented | AQGreen and Onyx use separate persisted periods and ledgers. AQGreen retains its complete Levels 1–3 components and member-only compliance holds. Onyx records the confirmed complete-level components through Level 5, including the exact R12.62 Level 3 per-person rate. Secured administrator-triggered calculation and payout workflows remain |
 | Member payment and Yoco reconciliation ledger | 🔧 Foundation implemented | Payments and participation are persisted; provider/reference uniqueness and idempotent confirmed-payment processing are enforced. A verified Yoco webhook adapter remains pending until its signing specification and credentials are supplied |
 | Onyx loan agreement and repayments | 🔧 Foundation implemented | Level 2 eligibility, versioned R6,120 + 30% terms, member acceptance, admin approval/effective date, four explicit weekly minimums, additional repayments, three-month deadline, idempotent payment allocation, persistence, and member-only commission holds are implemented; secured workflows and automated orchestration remain |
 | Product catalog + member eligibility | ✅ Implemented | `ProductEligibilityManager` |
@@ -55,7 +55,7 @@ Frontend (`aqua-frontend`, Next.js): pages exist for customers, enquiries, membe
 | 20% savings maturity interest | 🔧 Foundation implemented | Every contribution records its full 20% interest and maturity snapshots principal, interest, and payout separately. Maturity payout and pooled-fund accounting remain |
 | Refund rule (savings below threshold within 3 months → refund minus admin/branding) | ⚠️ Policy boundary | The existing three-month threshold check is preserved, but account-specific thresholds, deductions, approval, and refund payment workflow remain unresolved |
 | Registration workflows (WhatsApp/online/office/presentation channels, proof of payment, SMS confirmation) | ❌ Missing | Enquiry→Customer conversion exists but no payment-verified registration pipeline |
-| Onyx levels 1–5 with rental, product, and travel incentives | 🔧 Domain foundation | Structural Levels 1–5 are evaluated independently from Entry; only the confirmed Level 1 R250 commission is enabled. A persisted Level 3 travel entitlement tracks eligibility, its three-month wait, activation, and the 10% Club Member contribution. Levels 2–5 commission totals, rental workflows, and configurable product rewards remain |
+| Onyx levels 1–5 with rental, product, and travel incentives | 🔧 Domain foundation | Structural qualification and confirmed weekly commission components are implemented through Level 5 independently from AQGreen. A persisted Level 3 travel entitlement tracks eligibility, its three-month wait, activation, and the 10% Club Member contribution. Rental workflows and configurable product rewards remain |
 | Area Leader licensing, application (20+ interested members, 42h review, 4 presentations) | ❌ Missing | No Area Leader/Area Space domain at all |
 | Area Leader ranks (Ruby → Ambassador) with order targets & income tables | ❌ Missing | |
 | Area Space approval & lifecycle | ❌ Missing | |
@@ -102,8 +102,8 @@ feature is sequenced separately in
 2. Persist confirmed payments and member obligations with idempotent external references.
 3. Calculate complete network levels and immutable weekly Entry commissions.
 4. Add agreement approval, repayment compliance, and held-payout release.
-5. Extend the independent Onyx network beyond implemented Level 1 only after
-   Levels 2–5 totals are confirmed.
+5. Operate the confirmed complete-level Onyx commission rules through Level 5
+   while preserving separate immutable ledger components.
 6. Add rental, product-combo, travel, and savings workflows.
 7. Expose secured member/admin use cases and professional frontend workflows.
 

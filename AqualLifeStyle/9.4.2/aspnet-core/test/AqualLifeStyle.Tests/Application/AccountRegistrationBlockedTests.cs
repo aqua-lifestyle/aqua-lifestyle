@@ -42,6 +42,8 @@ namespace AqualLifeStyle.Tests.Application
                 var input = new RegisterInput
                 {
                     EmailAddress = $"blocked_{Guid.NewGuid():N}@test.com",
+                    ContactNumber = "+27 73 456 7890",
+                    HomeAddress = "30 Test Avenue, Johannesburg",
                     Name = "Blocked",
                     Password = "Customer!101",
                     Surname = "User",

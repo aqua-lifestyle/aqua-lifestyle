@@ -95,7 +95,7 @@ export const EntryCommitmentsTable = ({
     <DataTable
       columns={columns}
       data={obligations}
-      emptyState="No persisted Entry monthly commitments were found."
+      emptyState="No persisted AQGreen monthly commitments were found."
       keyExtractor={(item) => item.id}
       pageSize={10}
       searchFn={(item, query) =>

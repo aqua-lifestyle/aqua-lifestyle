@@ -8,6 +8,7 @@ using Abp.Domain.Uow;
 using Abp.Runtime.Session;
 using Abp.UI;
 using AqualLifeStyle.Application.ProgrammeParticipations.Dto;
+using AqualLifeStyle.Application.Recruitment;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
@@ -29,6 +30,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         private readonly IRepository<OnyxTravelBenefitEntitlement, Guid>
             _travelBenefitRepository;
         private readonly ICurrentProgrammeTermsProvider _termsProvider;
+        private readonly IProgrammeInvitationResolver _invitationResolver;
 
         protected virtual DateTime UtcNow => DateTime.UtcNow;
 
@@ -38,7 +40,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             IRepository<EntryParticipation, Guid> entryParticipationRepository,
             IRepository<OnyxParticipation, Guid> onyxParticipationRepository,
             IRepository<OnyxTravelBenefitEntitlement, Guid> travelBenefitRepository,
-            ICurrentProgrammeTermsProvider termsProvider)
+            ICurrentProgrammeTermsProvider termsProvider,
+            IProgrammeInvitationResolver invitationResolver)
         {
             _customerRepository = customerRepository;
             _membershipRepository = membershipRepository;
@@ -46,6 +49,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             _onyxParticipationRepository = onyxParticipationRepository;
             _travelBenefitRepository = travelBenefitRepository;
             _termsProvider = termsProvider;
+            _invitationResolver = invitationResolver;
         }
 
         [AbpAuthorize(AquaPermissions.ProgrammeParticipations.ViewSelf)]
@@ -62,9 +66,13 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
             return new MyProgrammeParticipationsDto
             {
-                CustomerId = customer.Id,
-                Entry = entry == null ? null : Map(entry),
-                Onyx = onyx == null ? null : Map(onyx),
+                ClubMemberNumber = customer.ClubMemberNumber,
+                Entry = entry == null
+                    ? null
+                    : Map(entry, await GetClubMemberNumberAsync(entry.RecruiterCustomerId)),
+                Onyx = onyx == null
+                    ? null
+                    : Map(onyx, await GetClubMemberNumberAsync(onyx.RecruiterCustomerId)),
                 TravelBenefit = travelBenefit == null
                     ? null
                     : Map(travelBenefit)
@@ -86,26 +94,36 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             };
 
         [AbpAuthorize(AquaPermissions.ProgrammeParticipations.Join)]
+        [UnitOfWork]
         public async Task<ProgrammeParticipationDto> StartEntryAsync(
             StartEntryParticipationInput input)
         {
             input ??= new StartEntryParticipationInput();
             var customer = await GetCurrentActiveCustomerAsync();
+            var recruiterCustomerId = await ResolveRequestedRecruiterAsync(
+                input.RecruiterCustomerId,
+                input.InviteCode,
+                RecruitmentProgrammeKeys.AQGreen,
+                customer);
+            await ClearLegacyProgrammeMembershipAssignmentAsync(
+                customer,
+                MembershipType.AQGreen,
+                "AQGreen");
             var existing = await _entryParticipationRepository.FirstOrDefaultAsync(
                 participation => participation.CustomerId == customer.Id);
             if (existing != null)
             {
-                EnsureSameRecruiter(existing.RecruiterCustomerId, input.RecruiterCustomerId, "Entry");
-                return Map(existing);
+                EnsureSameRecruiter(existing.RecruiterCustomerId, recruiterCustomerId, "AQGreen");
+                return Map(existing, await GetClubMemberNumberAsync(existing.RecruiterCustomerId));
             }
 
             EntryParticipation participation;
-            if (input.RecruiterCustomerId.HasValue)
+            if (recruiterCustomerId.HasValue)
             {
                 var recruiter = await GetActiveEntryRecruiterAsync(
                     customer.TenantId.Value,
                     customer.Id,
-                    input.RecruiterCustomerId.Value);
+                    recruiterCustomerId.Value);
                 participation = EntryParticipation.StartUnderRecruiter(
                     customer.TenantId.Value,
                     customer.Id,
@@ -125,33 +143,42 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             await _entryParticipationRepository.InsertAsync(participation);
             await CurrentUnitOfWork.SaveChangesAsync();
             Logger.Info(
-                $"Entry participation started tenant={customer.TenantId} customer={customer.Id} independent={participation.JoinedIndependently}");
-            return Map(participation);
+                $"AQGreen participation started tenant={customer.TenantId} customer={customer.Id} independent={participation.JoinedIndependently}");
+            return Map(participation, await GetClubMemberNumberAsync(participation.RecruiterCustomerId));
         }
 
         [AbpAuthorize(AquaPermissions.ProgrammeParticipations.Join)]
+        [UnitOfWork]
         public async Task<ProgrammeParticipationDto> StartDirectOnyxAsync(
             StartDirectOnyxParticipationInput input)
         {
             input ??= new StartDirectOnyxParticipationInput();
             var customer = await GetCurrentActiveCustomerAsync();
-            await ClearLegacyOnyxMembershipAssignmentAsync(customer);
+            var recruiterCustomerId = await ResolveRequestedRecruiterAsync(
+                input.RecruiterCustomerId,
+                input.InviteCode,
+                RecruitmentProgrammeKeys.Onyx,
+                customer);
+            await ClearLegacyProgrammeMembershipAssignmentAsync(
+                customer,
+                MembershipType.Onyx,
+                "Onyx");
             var existing = await _onyxParticipationRepository.FirstOrDefaultAsync(
                 participation => participation.CustomerId == customer.Id);
             if (existing != null)
             {
-                EnsureSameRecruiter(existing.RecruiterCustomerId, input.RecruiterCustomerId, "Onyx");
-                return Map(existing);
+                EnsureSameRecruiter(existing.RecruiterCustomerId, recruiterCustomerId, "Onyx");
+                return Map(existing, await GetClubMemberNumberAsync(existing.RecruiterCustomerId));
             }
 
             var membership = await GetCurrentOnyxMembershipAsync(customer.TenantId.Value);
             OnyxParticipation participation;
-            if (input.RecruiterCustomerId.HasValue)
+            if (recruiterCustomerId.HasValue)
             {
                 var recruiter = await GetActiveOnyxRecruiterAsync(
                     customer.TenantId.Value,
                     customer.Id,
-                    input.RecruiterCustomerId.Value);
+                    recruiterCustomerId.Value);
                 participation = OnyxParticipation.StartDirectUnderRecruiter(
                     customer.TenantId.Value,
                     customer.Id,
@@ -174,10 +201,13 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             await CurrentUnitOfWork.SaveChangesAsync();
             Logger.Info(
                 $"Direct Onyx participation started tenant={customer.TenantId} customer={customer.Id} independent={participation.JoinedIndependently}");
-            return Map(participation);
+            return Map(participation, await GetClubMemberNumberAsync(participation.RecruiterCustomerId));
         }
 
-        private async Task ClearLegacyOnyxMembershipAssignmentAsync(Customer customer)
+        private async Task ClearLegacyProgrammeMembershipAssignmentAsync(
+            Customer customer,
+            MembershipType programmeMembershipType,
+            string programmeName)
         {
             if (!customer.MembershipId.HasValue)
             {
@@ -190,7 +220,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 assignedMembership = await _membershipRepository.FirstOrDefaultAsync(
                     customer.MembershipId.Value);
             }
-            if (assignedMembership?.MembershipType != MembershipType.Onyx)
+            if (assignedMembership?.MembershipType != programmeMembershipType)
             {
                 return;
             }
@@ -198,7 +228,27 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             customer.ChangeMembership(null);
             await _customerRepository.UpdateAsync(customer);
             Logger.Warn(
-                $"Cleared legacy direct Onyx membership assignment tenant={customer.TenantId} customer={customer.Id}");
+                $"Cleared legacy {programmeName} membership assignment tenant={customer.TenantId} customer={customer.Id}");
+        }
+
+        private async Task<int?> ResolveRequestedRecruiterAsync(
+            int? recruiterCustomerId,
+            string inviteCode,
+            string programmeKey,
+            Customer customer)
+        {
+            if (recruiterCustomerId.HasValue && !string.IsNullOrWhiteSpace(inviteCode))
+            {
+                throw InvalidRecruiter(
+                    "Use either an invitation code or a recruiter reference, not both.");
+            }
+
+            if (string.IsNullOrWhiteSpace(inviteCode)) return recruiterCustomerId;
+            return await _invitationResolver.ResolveRecruiterForJoiningAsync(
+                inviteCode,
+                programmeKey,
+                customer.Id,
+                customer.TenantId.Value);
         }
 
         private async Task<Customer> GetCurrentActiveCustomerAsync()
@@ -224,6 +274,18 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             return customer;
         }
 
+        private async Task<string> GetClubMemberNumberAsync(int? customerId)
+        {
+            if (!customerId.HasValue) return null;
+            using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
+            {
+                return await _customerRepository.GetAll()
+                    .Where(customer => customer.Id == customerId.Value)
+                    .Select(customer => customer.ClubMemberNumber)
+                    .SingleOrDefaultAsync();
+            }
+        }
+
         private async Task<EntryParticipation> GetActiveEntryRecruiterAsync(
             int tenantId,
             int customerId,
@@ -240,7 +302,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 if (recruiter == null)
                 {
                     throw InvalidRecruiter(
-                        "The selected recruiter is not currently participating in Entry.");
+                        "The selected recruiter is not currently participating in AQGreen.");
                 }
 
                 return recruiter;
@@ -325,17 +387,18 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             return new UserFriendlyException("The recruiter could not be accepted.", details);
         }
 
-        private static ProgrammeParticipationDto Map(EntryParticipation participation)
+        private static ProgrammeParticipationDto Map(
+            EntryParticipation participation,
+            string recruiterClubMemberNumber)
         {
             var details = ProgrammeParticipationStatusPresenter.Describe(participation);
             return new ProgrammeParticipationDto
             {
-                Id = participation.Id,
-                ProgrammeName = "Entry",
+                ProgrammeName = "AQGreen",
                 Status = details.Status,
                 IsActive = details.IsActive,
                 JoinedIndependently = participation.JoinedIndependently,
-                RecruiterCustomerId = participation.RecruiterCustomerId,
+                RecruiterClubMemberNumber = recruiterClubMemberNumber,
                 StartedAt = participation.StartedAt,
                 ActivatedAt = participation.ActivatedAt,
                 NextPaymentAmount = details.NextPaymentAmount,
@@ -345,17 +408,18 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             };
         }
 
-        private static ProgrammeParticipationDto Map(OnyxParticipation participation)
+        private static ProgrammeParticipationDto Map(
+            OnyxParticipation participation,
+            string recruiterClubMemberNumber)
         {
             var details = ProgrammeParticipationStatusPresenter.Describe(participation);
             return new ProgrammeParticipationDto
             {
-                Id = participation.Id,
                 ProgrammeName = "Onyx",
                 Status = details.Status,
                 IsActive = details.IsActive,
                 JoinedIndependently = participation.JoinedIndependently,
-                RecruiterCustomerId = participation.RecruiterCustomerId,
+                RecruiterClubMemberNumber = recruiterClubMemberNumber,
                 StartedAt = participation.StartedAt,
                 ActivatedAt = participation.ActivatedAt,
                 NextPaymentAmount = details.NextPaymentAmount,

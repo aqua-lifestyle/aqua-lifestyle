@@ -9,5 +9,6 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
     {
         Task<PagedResultDto<AdminProgrammeParticipationDto>> GetAllAsync(
             AdminProgrammeParticipationListInput input);
+        Task CorrectRecruiterAsync(CorrectProgrammeRecruiterInput input);
     }
 }

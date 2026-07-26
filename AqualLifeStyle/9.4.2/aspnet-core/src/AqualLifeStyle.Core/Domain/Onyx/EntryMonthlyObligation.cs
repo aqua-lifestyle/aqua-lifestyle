@@ -52,7 +52,7 @@ namespace AqualLifeStyle.Domain.Onyx
             if (!participation.IsQualifiedForNetwork)
             {
                 throw new InvalidOperationException(
-                    "Monthly obligations can only be created for active Entry participants.");
+                    "Monthly obligations can only be created for active AQGreen participants.");
             }
 
             if (periodYear < 2000 || periodYear > 9999)
@@ -149,7 +149,7 @@ namespace AqualLifeStyle.Domain.Onyx
             if (Status == EntryMonthlyObligationStatus.Paid || PaymentId.HasValue)
             {
                 throw new InvalidOperationException(
-                    "This Entry monthly obligation has already been paid.");
+                    "This AQGreen monthly obligation has already been paid.");
             }
 
             if (payment.Status != MemberPaymentStatus.Confirmed)
@@ -161,13 +161,13 @@ namespace AqualLifeStyle.Domain.Onyx
             if (payment.TenantId != TenantId || payment.CustomerId != CustomerId)
             {
                 throw new InvalidOperationException(
-                    "The payment does not belong to this Entry participant.");
+                    "The payment does not belong to this AQGreen participant.");
             }
 
             if (payment.Purpose != MemberPaymentPurpose.EntryMonthlyCommitment)
             {
                 throw new InvalidOperationException(
-                    "The payment is not an Entry monthly commitment payment.");
+                    "The payment is not an AQGreen monthly commitment payment.");
             }
 
             if (!string.Equals(payment.Currency, Currency, StringComparison.Ordinal) ||

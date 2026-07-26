@@ -7,10 +7,12 @@ import { publicEnv } from "@/src/shared/config";
 import { Card, LinkButton } from "@/src/shared/ui";
 
 type TenantSelfRegistrationGateProps = {
+  redirectPath?: string;
   requestedTenancyName?: string;
 };
 
 export const TenantSelfRegistrationGate = ({
+  redirectPath,
   requestedTenancyName,
 }: TenantSelfRegistrationGateProps) => {
   const { currentTenant } = useTenantState();
@@ -20,7 +22,7 @@ export const TenantSelfRegistrationGate = ({
   const availability = useTenantSelfRegistrationAvailability(tenancyName);
 
   if (availability === "enabled") {
-    return <SignupForm tenancyName={tenancyName} />;
+    return <SignupForm redirectPath={redirectPath} tenancyName={tenancyName} />;
   }
 
   const isLoading = availability === "loading";

@@ -6,12 +6,15 @@ using Abp.Application.Services.Dto;
 using Abp.Auditing;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
+using Abp.Domain.Uow;
+using Abp.Runtime.Session;
 using AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto;
 using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
+using AqualLifeStyle.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
@@ -24,17 +27,85 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         private readonly IRepository<EntryParticipation, Guid> _entryParticipationRepository;
         private readonly IRepository<OnyxParticipation, Guid> _onyxParticipationRepository;
         private readonly IRepository<MemberPayment, Guid> _paymentRepository;
+        private readonly IRepository<Tenant> _tenantRepository;
+        private readonly IProgrammeRecruiterCorrectionPolicyResolver _correctionPolicyResolver;
 
         public AdminProgrammeParticipationAppService(
             ICustomerRepository customerRepository,
             IRepository<EntryParticipation, Guid> entryParticipationRepository,
             IRepository<OnyxParticipation, Guid> onyxParticipationRepository,
-            IRepository<MemberPayment, Guid> paymentRepository)
+            IRepository<MemberPayment, Guid> paymentRepository,
+            IRepository<Tenant> tenantRepository,
+            IProgrammeRecruiterCorrectionPolicyResolver correctionPolicyResolver)
         {
             _customerRepository = customerRepository;
             _entryParticipationRepository = entryParticipationRepository;
             _onyxParticipationRepository = onyxParticipationRepository;
             _paymentRepository = paymentRepository;
+            _tenantRepository = tenantRepository;
+            _correctionPolicyResolver = correctionPolicyResolver;
+        }
+
+        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.CorrectRecruiter)]
+        public async Task CorrectRecruiterAsync(CorrectProgrammeRecruiterInput input)
+        {
+            if (input == null)
+                throw new Abp.UI.UserFriendlyException(
+                    "Recruiter correction failed.",
+                    "The request was empty.");
+            if (!AbpSession.TenantId.HasValue &&
+                !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
+            {
+                throw new AbpAuthorizationException(
+                    "Cross-Area recruiter correction requires permission to manage all Areas.");
+            }
+
+            Customer target;
+            Customer newRecruiter = null;
+            using (DisableAllTenantDataFiltersForHost())
+            using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.SoftDelete))
+            {
+                var normalizedTarget = input.ClubMemberNumber.Trim().ToUpperInvariant();
+                target = await _customerRepository.GetAll()
+                    .SingleOrDefaultAsync(customer =>
+                        customer.ClubMemberNumber == normalizedTarget &&
+                        !customer.IsDeleted);
+                if (target == null)
+                    throw new Abp.UI.UserFriendlyException(
+                        "Recruiter correction failed.",
+                        "The Club Member participation was not found.");
+
+                ValidateRequestedTenant(target.TenantId, "Recruiter correction");
+                if (!string.IsNullOrWhiteSpace(input.NewRecruiterClubMemberNumber))
+                {
+                    var normalizedRecruiter = input.NewRecruiterClubMemberNumber
+                        .Trim()
+                        .ToUpperInvariant();
+                    newRecruiter = await _customerRepository.GetAll()
+                        .SingleOrDefaultAsync(customer =>
+                            customer.ClubMemberNumber == normalizedRecruiter &&
+                            !customer.IsDeleted);
+                    if (newRecruiter == null ||
+                        newRecruiter.TenantId != target.TenantId ||
+                        !newRecruiter.IsActive)
+                    {
+                        throw new Abp.UI.UserFriendlyException(
+                            "Recruiter correction failed.",
+                            "The new recruiter must be an active Club Member in the same Area.");
+                    }
+                }
+            }
+
+            await _correctionPolicyResolver.Resolve(input.Programme).CorrectAsync(
+                target.TenantId.Value,
+                target.Id,
+                newRecruiter?.Id,
+                AbpSession.GetUserId(),
+                input.Reason,
+                DateTime.UtcNow);
+            await CurrentUnitOfWork.SaveChangesAsync();
+            Logger.Warn(
+                $"Programme recruiter corrected programme={input.Programme} tenant={target.TenantId} member={target.ClubMemberNumber} recruiter={newRecruiter?.ClubMemberNumber ?? "independent"}");
         }
 
         [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.View)]
@@ -82,10 +153,14 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 row.Participation.RegistrationPaymentId,
                 row.Participation.ActivationPaymentId
             }));
+            var memberNumbers = await GetClubMemberNumbersAsync(
+                rows.Select(row => row.Participation.RecruiterCustomerId));
+            var areaNames = await GetAreaNamesAsync(
+                rows.Select(row => row.Participation.TenantId));
 
             return new PagedResultDto<AdminProgrammeParticipationDto>(
                 total,
-                rows.Select(row => Map(row.Participation, row.Customer, payments)).ToList());
+                rows.Select(row => Map(row.Participation, row.Customer, payments, memberNumbers, areaNames)).ToList());
         }
 
         private async Task<PagedResultDto<AdminProgrammeParticipationDto>>
@@ -109,10 +184,37 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 .ToListAsync();
             var payments = await GetPaymentsAsync(
                 rows.Select(row => row.Participation.DirectEntryPaymentId));
+            var memberNumbers = await GetClubMemberNumbersAsync(
+                rows.Select(row => row.Participation.RecruiterCustomerId));
+            var areaNames = await GetAreaNamesAsync(
+                rows.Select(row => row.Participation.TenantId));
 
             return new PagedResultDto<AdminProgrammeParticipationDto>(
                 total,
-                rows.Select(row => Map(row.Participation, row.Customer, payments)).ToList());
+                rows.Select(row => Map(row.Participation, row.Customer, payments, memberNumbers, areaNames)).ToList());
+        }
+
+        private async Task<IReadOnlyDictionary<int, string>> GetAreaNamesAsync(
+            IEnumerable<int> tenantIds)
+        {
+            var ids = tenantIds.Distinct().ToArray();
+            return await _tenantRepository.GetAll()
+                .Where(tenant => ids.Contains(tenant.Id))
+                .ToDictionaryAsync(tenant => tenant.Id, tenant => tenant.TenancyName);
+        }
+
+        private async Task<IReadOnlyDictionary<int, string>> GetClubMemberNumbersAsync(
+            IEnumerable<int?> customerIds)
+        {
+            var ids = customerIds.Where(id => id.HasValue)
+                .Select(id => id.Value)
+                .Distinct()
+                .ToArray();
+            if (ids.Length == 0) return new Dictionary<int, string>();
+
+            return await _customerRepository.GetAll()
+                .Where(customer => ids.Contains(customer.Id))
+                .ToDictionaryAsync(customer => customer.Id, customer => customer.ClubMemberNumber);
         }
 
         private IQueryable<EntryParticipationQueryRow> ApplyEntryScopeAndSearch(
@@ -191,14 +293,15 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         private static AdminProgrammeParticipationDto Map(
             EntryParticipation participation,
             Customer customer,
-            IReadOnlyDictionary<Guid, MemberPayment> payments)
+            IReadOnlyDictionary<Guid, MemberPayment> payments,
+            IReadOnlyDictionary<int, string> memberNumbers,
+            IReadOnlyDictionary<int, string> areaNames)
         {
             var details = ProgrammeParticipationStatusPresenter.Describe(participation);
             return MapCommon(
-                participation.Id,
                 participation.TenantId,
                 customer,
-                "Entry",
+                "AQGreen",
                 details,
                 participation.JoinedIndependently,
                 participation.RecruiterCustomerId,
@@ -206,17 +309,20 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 participation.ActivatedAt,
                 participation.Currency,
                 new[] { participation.RegistrationPaymentId, participation.ActivationPaymentId },
-                payments);
+                payments,
+                memberNumbers,
+                areaNames);
         }
 
         private static AdminProgrammeParticipationDto Map(
             OnyxParticipation participation,
             Customer customer,
-            IReadOnlyDictionary<Guid, MemberPayment> payments)
+            IReadOnlyDictionary<Guid, MemberPayment> payments,
+            IReadOnlyDictionary<int, string> memberNumbers,
+            IReadOnlyDictionary<int, string> areaNames)
         {
             var details = ProgrammeParticipationStatusPresenter.Describe(participation);
             return MapCommon(
-                participation.Id,
                 participation.TenantId,
                 customer,
                 "Onyx",
@@ -227,11 +333,12 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 participation.ActivatedAt,
                 participation.Currency,
                 new[] { participation.DirectEntryPaymentId },
-                payments);
+                payments,
+                memberNumbers,
+                areaNames);
         }
 
         private static AdminProgrammeParticipationDto MapCommon(
-            Guid id,
             int tenantId,
             Customer customer,
             string programmeName,
@@ -242,20 +349,26 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             DateTime? activatedAt,
             string currency,
             IEnumerable<Guid?> paymentIds,
-            IReadOnlyDictionary<Guid, MemberPayment> payments)
+            IReadOnlyDictionary<Guid, MemberPayment> payments,
+            IReadOnlyDictionary<int, string> memberNumbers,
+            IReadOnlyDictionary<int, string> areaNames)
         {
             return new AdminProgrammeParticipationDto
             {
-                Id = id,
-                TenantId = tenantId,
-                CustomerId = customer.Id,
+                AreaName = areaNames.TryGetValue(tenantId, out var areaName)
+                    ? areaName
+                    : "Area",
+                ClubMemberNumber = customer.ClubMemberNumber,
                 CustomerName = customer.Name,
                 Email = customer.Email.Value,
                 ProgrammeName = programmeName,
                 Status = details.Status,
                 IsActive = details.IsActive,
                 JoinedIndependently = joinedIndependently,
-                RecruiterCustomerId = recruiterCustomerId,
+                RecruiterClubMemberNumber = recruiterCustomerId.HasValue &&
+                    memberNumbers.TryGetValue(recruiterCustomerId.Value, out var memberNumber)
+                        ? memberNumber
+                        : null,
                 StartedAt = startedAt,
                 ActivatedAt = activatedAt,
                 NextPaymentAmount = details.NextPaymentAmount,
@@ -272,11 +385,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             return new AdminProgrammePaymentDto
             {
-                Id = payment.Id,
                 Description = payment.Purpose switch
                 {
-                    MemberPaymentPurpose.EntryRegistration => "Entry registration payment",
-                    MemberPaymentPurpose.EntryActivation => "Entry activation payment",
+                    MemberPaymentPurpose.EntryRegistration => "AQGreen registration payment",
+                    MemberPaymentPurpose.EntryActivation => "AQGreen activation payment",
                     _ => "Full Onyx participation payment"
                 },
                 Amount = payment.Amount,

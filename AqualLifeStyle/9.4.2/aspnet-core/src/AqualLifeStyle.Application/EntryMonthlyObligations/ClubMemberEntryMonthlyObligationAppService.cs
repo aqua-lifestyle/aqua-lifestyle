@@ -37,7 +37,7 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
             GetMyObligationsAsync()
         {
             var tenantId = GetRequiredTenantId(
-                "Your Entry monthly commitments are unavailable.");
+                "Your AQGreen monthly commitments are unavailable.");
             var customer = await _customerRepository.FirstOrDefaultAsync(
                 item =>
                     item.TenantId == tenantId &&
@@ -45,7 +45,7 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
             if (customer == null || !customer.IsActive)
             {
                 throw new UserFriendlyException(
-                    "Your Entry monthly commitments are unavailable.",
+                    "Your AQGreen monthly commitments are unavailable.",
                     "An active Club Member account is required.");
             }
 

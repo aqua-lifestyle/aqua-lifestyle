@@ -1,18 +1,39 @@
 "use client";
 
 import { User } from "lucide-react";
-import { useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
+import { z } from "zod";
 
 import { AuthenticatedPage } from "@/src/components/auth/authenticated-page";
 import { useAuthActions, useAuthState } from "@/src/providers";
+import { apiEndpoints, httpClient } from "@/src/shared/api";
+import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import {
   Avatar,
   Breadcrumb,
   Button,
   Card,
   StatusMessage,
+  TextAreaField,
   TextField,
 } from "@/src/shared/ui";
+import { customerContactNumberSchema, customerEmailSchema, customerFirstNameSchema, customerHomeAddressSchema, customerSurnameSchema } from "@/src/shared/validation/customer-personal-details";
+
+type CustomerProfile = {
+  contactNumber: string | null;
+  emailAddress: string;
+  firstName: string;
+  homeAddress: string | null;
+  surname: string;
+};
+
+const profileSchema = z.object({
+  contactNumber: customerContactNumberSchema,
+  emailAddress: customerEmailSchema,
+  firstName: customerFirstNameSchema,
+  homeAddress: customerHomeAddressSchema,
+  surname: customerSurnameSchema,
+});
 
 export default function ProfilePage() {
   return (
@@ -25,33 +46,52 @@ export default function ProfilePage() {
 function ProfileContent() {
   const { session } = useAuthState();
   const { setSession } = useAuthActions();
+  const authenticatedUserId = session?.user?.id;
   const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState(session?.user?.name ?? "");
-  const [email, setEmail] = useState(session?.user?.email ?? "");
+  const [profile, setProfile] = useState<CustomerProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!authenticatedUserId) return;
+    let active = true;
+    void httpClient.get<CustomerProfile>(apiEndpoints.myAccount.getProfile)
+      .then((result) => { if (active) { setProfile(result); setSaveError(null); } })
+      .catch((error) => { if (active) setSaveError(getRequestErrorMessage(error, "Your profile could not be loaded.")); })
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; };
+  }, [authenticatedUserId]);
 
   if (!session) {
     return null;
   }
 
-  const handleSave = () => {
+  const handleSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const parsed = profileSchema.safeParse(Object.fromEntries(data));
+    if (!parsed.success) {
+      setFieldErrors(Object.fromEntries(parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message])));
+      return;
+    }
     setIsSaving(true);
+    setFieldErrors({});
     setSaveError(null);
     setSaveSuccess(false);
-
-    // Update the session in-memory. A production app would also call a
-    // profile-update endpoint before updating local state.
-    setSession({
-      ...session,
-      user: session.user
-        ? { ...session.user, name, email }
-        : null,
-    });
-    setSaveSuccess(true);
-    setIsEditing(false);
-    setIsSaving(false);
+    try {
+      const updated = await httpClient.put<CustomerProfile, typeof parsed.data>(apiEndpoints.myAccount.updateProfile, parsed.data);
+      setProfile(updated);
+      setSession({ ...session, user: session.user ? { ...session.user, email: updated.emailAddress, name: `${updated.firstName} ${updated.surname}` } : null });
+      setSaveSuccess(true);
+      setIsEditing(false);
+    } catch (error) {
+      setSaveError(getRequestErrorMessage(error, "Your profile could not be updated. No changes were saved."));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const sessionUser = session.user;
@@ -89,34 +129,45 @@ function ProfileContent() {
                 </div>
               </div>
 
-              {isEditing ? (
-                <div className="flex flex-col gap-4">
+              {isLoading ? <p className="text-sm text-muted-foreground">Loading your profile…</p> : null}
+              {!isLoading && profile && isEditing ? (
+                <form className="grid gap-4 sm:grid-cols-2" noValidate onSubmit={handleSave}>
                   <TextField
-                    label="Name"
-                    name="name"
-                    onChange={(e) => setName(e.target.value)}
-                    value={name}
+                    autoComplete="given-name"
+                    defaultValue={profile.firstName}
+                    errorMessage={fieldErrors.firstName}
+                    label="First name"
+                    name="firstName"
+                    required
                   />
                   <TextField
-                    label="Email"
-                    name="email"
-                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="family-name"
+                    defaultValue={profile.surname}
+                    errorMessage={fieldErrors.surname}
+                    label="Surname"
+                    name="surname"
+                    required
+                  />
+                  <TextField
+                    autoComplete="email"
+                    className="sm:col-span-2"
+                    defaultValue={profile.emailAddress}
+                    errorMessage={fieldErrors.emailAddress}
+                    label="Email address"
+                    name="emailAddress"
+                    required
                     type="email"
-                    value={email}
                   />
+                  <TextField autoComplete="tel" className="sm:col-span-2" defaultValue={profile.contactNumber ?? ""} errorMessage={fieldErrors.contactNumber} label="Contact number" name="contactNumber" required type="tel" />
+                  <TextAreaField autoComplete="street-address" className="sm:col-span-2" defaultValue={profile.homeAddress ?? ""} errorMessage={fieldErrors.homeAddress} label="Home address" name="homeAddress" required rows={3} />
                   {saveError ? (
-                    <StatusMessage tone="error">{saveError}</StatusMessage>
+                    <StatusMessage className="sm:col-span-2" tone="error">{saveError}</StatusMessage>
                   ) : null}
-                  {saveSuccess ? (
-                    <StatusMessage tone="success">
-                      Profile updated successfully.
-                    </StatusMessage>
-                  ) : null}
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 sm:col-span-2">
                     <Button
                       disabled={isSaving}
                       isLoading={isSaving}
-                      onClick={handleSave}
+                      type="submit"
                       variant="primary"
                     >
                       Save changes
@@ -124,45 +175,59 @@ function ProfileContent() {
                     <Button
                       onClick={() => {
                         setIsEditing(false);
-                        setName(sessionUser.name ?? "");
-                        setEmail(sessionUser.email ?? "");
+                        setFieldErrors({});
+                        setSaveError(null);
                       }}
                       variant="outline"
                     >
                       Cancel
                     </Button>
                   </div>
-                </div>
-              ) : (
+                </form>
+              ) : !isLoading && profile ? (
                 <div className="flex flex-col gap-4">
+                  {saveSuccess ? (
+                    <StatusMessage tone="success">
+                      Profile updated successfully.
+                    </StatusMessage>
+                  ) : null}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <p className="text-sm text-muted-foreground">Name</p>
-                      <p className="font-medium">{sessionUser.name ?? "—"}</p>
+                      <p className="text-sm text-muted-foreground">First name</p>
+                      <p className="font-medium">{profile.firstName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Surname</p>
+                      <p className="font-medium">{profile.surname}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Email</p>
-                      <p className="font-medium">{sessionUser.email ?? "—"}</p>
+                      <p className="font-medium">{profile.emailAddress}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">User ID</p>
-                      <p className="font-medium">{sessionUser.id}</p>
+                      <p className="text-sm text-muted-foreground">Contact number</p>
+                      <p className="font-medium">{profile.contactNumber ?? "Not provided"}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Role</p>
-                      <p className="font-medium">{sessionUser.role}</p>
+                      <p className="text-sm text-muted-foreground">Home address</p>
+                      <p className="whitespace-pre-line font-medium">{profile.homeAddress ?? "Not provided"}</p>
                     </div>
                   </div>
                   <div>
                     <Button
-                      onClick={() => setIsEditing(true)}
+                      onClick={() => {
+                        setIsEditing(true);
+                        setSaveSuccess(false);
+                      }}
                       variant="outline"
                     >
                       Edit profile
                     </Button>
                   </div>
                 </div>
-              )}
+              ) : !isLoading && saveError ? (
+                <StatusMessage tone="error">{saveError}</StatusMessage>
+              ) : null}
             </div>
           </Card>
         ) : (

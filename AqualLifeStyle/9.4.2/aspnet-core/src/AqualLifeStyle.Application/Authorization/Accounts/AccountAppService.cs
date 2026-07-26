@@ -102,6 +102,7 @@ namespace AqualLifeStyle.Authorization.Accounts
                 input.Password,
                 true // Assumed email address is always confirmed. Change this if you want to implement email confirmation.
             );
+            user.UpdateContactDetails(input.ContactNumber, input.HomeAddress);
 
             var customerName = $"{input.Name} {input.Surname}".Trim();
             var customer = Customer.Create(

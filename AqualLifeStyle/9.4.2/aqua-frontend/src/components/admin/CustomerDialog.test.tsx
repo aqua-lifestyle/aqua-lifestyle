@@ -88,8 +88,10 @@ describe("CustomerDialog", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /add customer/i }));
     fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Ada" } });
-    fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Lovelace" } });
+    fireEvent.change(screen.getByLabelText("Surname"), { target: { value: "Lovelace" } });
     fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "ada@example.com" } });
+    fireEvent.change(screen.getByLabelText("Contact number"), { target: { value: "+27 82 123 4567" } });
+    fireEvent.change(screen.getByLabelText("Home address"), { target: { value: "10 Customer Road, Johannesburg" } });
     fireEvent.change(screen.getByLabelText("Temporary password for a new customer"), { target: { value: "Temporary123!" } });
     fireEvent.change(screen.getByLabelText("Reason for creating this account"), { target: { value: "Approved onboarding" } });
     fireEvent.click(screen.getByRole("button", { name: /create customer/i }));
@@ -98,7 +100,9 @@ describe("CustomerDialog", () => {
       "/api/services/app/AdminCustomer/Create",
       expect.objectContaining({
         email: "ada@example.com",
+        contactNumber: "+27 82 123 4567",
         firstName: "Ada",
+        homeAddress: "10 Customer Road, Johannesburg",
         justification: "Approved onboarding",
         lastName: "Lovelace",
         password: "Temporary123!",
@@ -129,8 +133,10 @@ describe("CustomerDialog", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /add customer/i }));
     fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Dora" } });
-    fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Shongwe" } });
+    fireEvent.change(screen.getByLabelText("Surname"), { target: { value: "Shongwe" } });
     fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "dora@example.com" } });
+    fireEvent.change(screen.getByLabelText("Contact number"), { target: { value: "+27 83 234 5678" } });
+    fireEvent.change(screen.getByLabelText("Home address"), { target: { value: "20 Restore Avenue, Johannesburg" } });
     fireEvent.change(screen.getByLabelText("Reason for creating this account"), { target: { value: "Returning customer approved" } });
     fireEvent.click(screen.getByRole("button", { name: /create customer/i }));
 

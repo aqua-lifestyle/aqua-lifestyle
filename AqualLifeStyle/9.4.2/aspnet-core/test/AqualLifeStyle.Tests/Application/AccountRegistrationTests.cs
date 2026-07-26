@@ -45,6 +45,8 @@ namespace AqualLifeStyle.Tests.Application
                 var result = await _accountAppService.Register(new RegisterInput
                 {
                     EmailAddress = email,
+                    ContactNumber = "+27 71 234 5678",
+                    HomeAddress = "10 Aqua Street, Johannesburg",
                     Name = "Public",
                     Password = "Customer!101",
                     Surname = "Customer",
@@ -58,6 +60,8 @@ namespace AqualLifeStyle.Tests.Application
             {
                 var user = await context.Users.SingleAsync(
                     item => item.UserName == userName);
+                user.PhoneNumber.ShouldBe("+27 71 234 5678");
+                user.HomeAddress.ShouldBe("10 Aqua Street, Johannesburg");
                 var roleNames = await (
                     from userRole in context.UserRoles
                     join role in context.Roles on userRole.RoleId equals role.Id
@@ -94,6 +98,8 @@ namespace AqualLifeStyle.Tests.Application
                 var result = await _accountAppService.Register(new RegisterInput
                 {
                     EmailAddress = email,
+                    ContactNumber = "+27 72 345 6789",
+                    HomeAddress = "20 Club Road, Johannesburg",
                     Name = "New",
                     Password = "Customer!101",
                     Surname = "Customer",
@@ -105,6 +111,8 @@ namespace AqualLifeStyle.Tests.Application
                 await UsingDbContextAsync(async context =>
                 {
                     var user = await context.Users.SingleAsync(item => item.UserName == userName);
+                    user.PhoneNumber.ShouldBe("+27 72 345 6789");
+                    user.HomeAddress.ShouldBe("20 Club Road, Johannesburg");
                     var customer = await context.Customers.SingleAsync(item => item.UserId == user.Id);
                     var roleNames = await (
                         from userRole in context.UserRoles

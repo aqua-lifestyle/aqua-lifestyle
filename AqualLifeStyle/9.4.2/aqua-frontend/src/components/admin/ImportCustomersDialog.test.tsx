@@ -51,7 +51,7 @@ describe("ImportCustomersDialog", () => {
         errors: [],
         fileName: "customers.csv",
         previewId: "preview-1",
-        rows: [{ email: "ada@example.com", firstName: "Ada", isActive: true, lastName: "Lovelace", membershipId: 1, rowNumber: 2 }],
+        rows: [{ contactNumber: "+27 82 123 4567", email: "ada@example.com", firstName: "Ada", homeAddress: "10 Aqua Street", isActive: true, lastName: "Lovelace", membershipId: 1, rowNumber: 2 }],
         totalRows: 1,
         validRows: 1,
       })
@@ -61,7 +61,7 @@ describe("ImportCustomersDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: /import customers/i }));
     act(() => {
       dropzone.onDropAccepted?.([
-        new File(["FirstName,LastName,Email\nAda,Lovelace,ada@example.com"], "customers.csv", { type: "text/csv" }),
+        new File(["FirstName,LastName,Email,ContactNumber,HomeAddress\nAda,Lovelace,ada@example.com,+27 82 123 4567,10 Aqua Street"], "customers.csv", { type: "text/csv" }),
       ]);
     });
     fireEvent.click(screen.getByRole("button", { name: /preview file/i }));

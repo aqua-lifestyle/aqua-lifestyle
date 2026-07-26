@@ -29,7 +29,7 @@ describe("administrator account management", () => {
     vi.mocked(useAuthState).mockReturnValue(state(["Aqua.Admin.Customers.View", "Aqua.Admin.Customers.Edit"]));
     vi.mocked(httpClient.get).mockImplementation(async (url: string) => url.includes("GetMembershipOptions")
       ? [{ id: 8, name: "AQGreen" }]
-      : { items: [{ creationTime: "2026-01-01", email: "customer@example.com", firstName: "Aqua", id: 2, isActive: true, lastName: "Customer", membershipId: null, membershipName: null, name: "Aqua Customer", tenantId: 1, userId: 3 }], totalCount: 1 });
+      : { items: [{ contactNumber: "+27 82 123 4567", creationTime: "2026-01-01", email: "customer@example.com", firstName: "Aqua", homeAddress: "10 Customer Road, Johannesburg", id: 2, isActive: true, lastName: "Customer", membershipId: null, membershipName: null, name: "Aqua Customer", tenantId: 1, userId: 3 }], totalCount: 1 });
     vi.mocked(httpClient.put).mockResolvedValue({ id: 2 });
     render(<AdminCustomers />);
 

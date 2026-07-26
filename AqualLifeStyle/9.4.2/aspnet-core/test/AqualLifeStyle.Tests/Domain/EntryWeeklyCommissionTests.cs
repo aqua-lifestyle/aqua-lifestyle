@@ -96,7 +96,7 @@ namespace AqualLifeStyle.Tests.Domain
             Assert.Equal(1, commission.HighestCompletedLevel);
             Assert.Equal(150m, commission.TotalAmount);
             Assert.Equal(WeeklyCommissionPayoutStatus.Held, commission.PayoutStatus);
-            Assert.Equal("Entry monthly commitment is overdue.", commission.HoldReason);
+            Assert.Equal("AQGreen monthly commitment is overdue.", commission.HoldReason);
             Assert.True(root.IsQualifiedForNetwork);
         }
 

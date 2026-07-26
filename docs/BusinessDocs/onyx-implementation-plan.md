@@ -1,6 +1,7 @@
 # Confirmed Onyx Model and Implementation Plan
 
-Status: approved business direction as of 2026-07-23.
+Status: approved business direction, including the AQGreen naming clarification,
+as of 2026-07-26.
 
 This document is the source of truth for the current Onyx feature phase. Older
 membership documents remain useful historical material but do not override the
@@ -8,26 +9,36 @@ rules below.
 
 ## Canonical participation model
 
-- Entry is a feeder programme into Onyx, not an Onyx subtype or a parallel
+- AQGreen is a feeder programme into Onyx, not an Onyx subtype or a parallel
   `MembershipType`.
+- AQGreen is the business name that replaces the earlier working name “Entry”.
+  Existing `Entry*` code identifiers, API routes, database tables, and immutable
+  records are retained for backward compatibility; they represent AQGreen and
+  must not be treated as a separate programme.
 - Direct entrants create an Onyx participation only after a confirmed R6,120
   payment.
-- Entry entrants create a separate Entry participation and qualify only after two
+- AQGreen entrants create a separate AQGreen participation and qualify only after two
   confirmed R600 payments.
-- Entry Level 2 makes the loan agreement available. Member acceptance followed
+- AQGreen Level 2 makes the loan agreement available. Member acceptance followed
   by administrator approval makes the agreement effective. Creation of the
-  separate Onyx participation remains deferred until the recruiter-placement rule
-  for a graduating member is confirmed.
-- Graduation never converts, deletes, or overwrites Entry participation, network
+  separate Onyx participation uses independent placement: the graduate has no
+  Onyx recruiter and becomes the root of a new Onyx network.
+- Graduation never converts, deletes, or overwrites AQGreen participation, network
   placement, payments, or commissions.
 - Neither lifecycle is represented by replacing `Customer.MembershipId`.
-- Entry and Onyx calculations remain independent so Entry commissions can continue
+- AQGreen and Onyx calculations remain independent so AQGreen commissions can continue
   after graduation.
 
-Customers may join Entry or Onyx independently without a recruiter. When a
+The customer-facing Onyx joining action has one path: direct Onyx entry. AQGreen
+graduation is a separate system-managed transition after the graduation rules
+are satisfied; it is not a second choice in the Onyx joining form. The eventual
+graduation transition must create a separate Onyx participation while preserving
+the complete AQGreen record.
+
+Customers may join AQGreen or Onyx independently without a recruiter. When a
 recruiter exists, the recruiter is another customer with active participation in
 the same programme. A recorded recruiter is therefore optional but verified:
-active Entry participation is required to recruit into Entry, and active Onyx
+active AQGreen participation is required to recruit into AQGreen, and active Onyx
 participation is required to recruit into Onyx. Missing recruiter information is
 valid and identifies the customer as the starting point of their own network.
 
@@ -38,7 +49,7 @@ administrator correction.
 
 ## Versioned financial terms
 
-The current Entry terms are:
+The current AQGreen terms are:
 
 - registration payment: R600;
 - activation payment: R600;
@@ -60,18 +71,14 @@ but does not itself establish regulatory compliance.
 
 ## Complete-level network rules
 
-Both programmes use five-person branches. Entry has three confirmed levels
+Both programmes use five-person branches. AQGreen has three confirmed levels
 (5, 25, 125). Onyx has five structural levels (5, 25, 125, 625, 3,125).
 An incomplete level earns no partial component.
 
-Only the Onyx Level 1 weekly cumulative total of R250 is currently confirmed by
-the available source material. The repository does not confirm cumulative totals
-for Levels 2–5.
+The business owner has confirmed the Onyx per-person weekly commission rates
+and cumulative totals through Level 5:
 
-If the proposed cumulative totals R250, R750, R2,327.50, R5,452.50, and
-R17,952.50 are later approved, their mathematical decomposition is:
-
-| Level | Population | Component | Implied per-person rate | Cumulative |
+| Level | Population | Component | Confirmed per-person rate | Cumulative |
 |---|---:|---:|---:|---:|
 | 1 | 5 | R250.00 | R50.00 | R250.00 |
 | 2 | 25 | R500.00 | R20.00 | R750.00 |
@@ -79,13 +86,14 @@ R17,952.50 are later approved, their mathematical decomposition is:
 | 4 | 625 | R3,125.00 | R5.00 | R5,452.50 |
 | 5 | 3,125 | R12,500.00 | R4.00 | R17,952.50 |
 
-The Level 3 division is exact to one cent: R1,577.50 / 125 = R12.62. These
-Levels 2–5 values remain provisional and must not enter executable commission
-rules until approved.
+The Level 3 rate is exactly R12.62 per qualifying participant and is retained as
+decimal currency without substitution or further rounding. Each complete level
+adds its own immutable ledger component; incomplete levels earn no partial
+component.
 
 ## Compliance boundaries
 
-An overdue Entry member keeps their placement and debt, while their own payout is
+An overdue AQGreen member keeps their placement and debt, while their own payout is
 held. The effect on uplines is unresolved. Structural network qualification must
 therefore remain separate from the future commission-contribution policy; no
 assumed upline effect may be embedded in placement or qualification.
@@ -117,19 +125,19 @@ No historical record is silently reinterpreted in the current phase.
 
 ## Delivery phases
 
-1. **Domain foundations:** versioned terms, separate Entry and Onyx participation,
+1. **Domain foundations:** versioned terms, separate AQGreen and Onyx participation,
    confirmed-payment activation transitions, optional verified recruiter
-   placement, independent network roots, and complete 5/25/125 Entry
+   placement, independent network roots, and complete 5/25/125 AQGreen
    qualification.
 2. **Persistence and payments:** EF mappings/migration, payment-provider boundary,
    unique external references, and controlled confirmed-payment processing.
-3. **Obligations and Entry commissions:** monthly debt/grace records, configurable
+3. **Obligations and AQGreen commissions:** monthly debt/grace records, configurable
    weeks, immutable components, and earned/held/released/paid transitions.
 4. **Loan agreement:** member acceptance, admin approval/effective date, four
    weekly R200 requirements, additional repayments, deadline, and compliance
    restoration.
-5. **Onyx network and earnings:** implement Level 1 first; add Levels 2–5 only
-   after cumulative totals are approved.
+5. **Onyx network and earnings:** calculate confirmed complete-level components
+   through Level 5 and retain every component in the immutable weekly ledger.
 6. **Benefits and separate accounts:** rental obligations, configurable product
    combos, travel entitlement, and persisted savings without mixing balances.
 7. **Application and UI:** secured member/admin services, audited corrections,
@@ -141,11 +149,11 @@ Every phase must build and pass its focused tests before the next phase begins.
 
 The persistence and provider-neutral confirmation foundation is complete:
 
-- Entry participation, Onyx participation, recruiter-correction history, and
+- AQGreen participation, Onyx participation, recruiter-correction history, and
   member payments have explicit EF Core mappings and a PostgreSQL migration.
 - A provider/reference pair is unique across the payment ledger.
 - A verified confirmation is reconciled idempotently and invokes the domain
-  transition for Entry registration, Entry activation, or direct Onyx entry.
+  transition for AQGreen registration, AQGreen activation, or direct Onyx entry.
 - The confirmation processor is an internal application component, not a remote
   application service. Customers and administrators cannot call it as an API to
   mark a payment successful.
@@ -154,12 +162,12 @@ The persistence and provider-neutral confirmation foundation is complete:
 
 ### Phase 3 obligation status
 
-The Entry monthly-obligation foundation is complete:
+The AQGreen monthly-obligation foundation is complete:
 
-- each obligation records its Entry participation, customer, year/month identity,
+- each obligation records its AQGreen participation, customer, year/month identity,
   applicable terms version, amount, due time, and seven-day grace boundary;
 - the lifecycle distinguishes due, grace period, overdue, and paid;
-- overdue debt and the permanent Entry network position are preserved;
+- overdue debt and the permanent AQGreen network position are preserved;
 - overdue status blocks only the customer's own payout eligibility;
 - confirmed late payment settles the debt and restores that eligibility without
   deleting the fact that the obligation became overdue;
@@ -173,14 +181,14 @@ The Entry monthly-obligation foundation is complete:
 Automatic obligation scheduling and payment allocation are deferred to the
 secured application workflow phase.
 
-The Entry weekly commission-ledger foundation is also complete:
+The AQGreen weekly commission-ledger foundation is also complete:
 
 - every closed period records its exact start, end, time zone, calculation time,
   and rules version;
 - incomplete network levels record no partial component;
 - completed levels retain separate R150, R250, and R1,250 components, producing
   the explainable cumulative total;
-- each Entry participation can have only one ledger record per commission period;
+- each AQGreen participation can have only one ledger record per commission period;
 - payout state distinguishes not earned, earned, held, released, and paid;
 - releasing held funds and recording payment use explicit, idempotent domain
   transitions without rewriting the calculated components;
@@ -193,7 +201,7 @@ The secured administrator-triggered calculation and review workflow is complete:
   all-Areas access can prepare earnings;
 - the calculation derives the latest fully completed Monday-to-Sunday week in
   `Africa/Johannesburg` time rather than accepting administrator-entered dates;
-- active Entry networks are evaluated across Areas while ledger records are
+- active AQGreen networks are evaluated across Areas while ledger records are
   created only for the selected Area;
 - repeating the calculation returns the existing period without duplicating
   ledger records;
@@ -206,7 +214,7 @@ Eligible earnings can now be released for payment by a host administrator with
 separate release and all-Areas permissions. A separately permissioned action
 records an externally completed payment and its reference; the platform does not
 send money. Both actions require an audit justification and are idempotent.
-Held Entry earnings cannot be released through this workflow until compliance
+Held AQGreen earnings cannot be released through this workflow until compliance
 restoration can be verified from an approved policy. Discrepancy reporting and
 automatic scheduling remain application-layer work.
 
@@ -214,7 +222,7 @@ automatic scheduling remain application-layer work.
 
 The provider-neutral Onyx loan lifecycle foundation is complete:
 
-- only an active Entry participant who has completed Level 2 may be offered the
+- only an active AQGreen participant who has completed Level 2 may be offered the
   current versioned loan terms;
 - the current R6,120 principal and 30% interest produce an explicit R7,956 total;
 - member acceptance is recorded before administrator approval, and the
@@ -227,7 +235,7 @@ The provider-neutral Onyx loan lifecycle foundation is complete:
 - payment application is idempotent and prevents overpayment;
 - missed weekly requirements and an outstanding balance after the three-month
   deadline expose a payout-hold decision without changing network placement;
-- the Entry commission calculator applies that decision only to the borrowing
+- the AQGreen commission calculator applies that decision only to the borrowing
   member's own payout, and an already-earned payout can be placed on hold without
   rewriting its calculated components;
 - after compliance is restored, the held payout uses the existing explicit,
@@ -242,35 +250,38 @@ The provider-neutral Onyx loan lifecycle foundation is complete:
 
 Loan offer creation, secured member acceptance, administrator approval,
 provider callbacks, payment allocation workflows, and automated payout
-orchestration remain application-workflow work. A loan agreement does not yet
-create an Onyx participation because the placement of a graduating member in
-the Onyx network has not been confirmed.
+orchestration remain application-workflow work. The domain now provides a
+transition for an effective agreement that creates a separate active Onyx
+participation with independent placement, linked to the original AQGreen
+participation and loan.
+The future secured approval workflow must invoke this transition atomically and
+idempotently so it cannot create duplicate Onyx participation records.
 
 ### Phase 5 Onyx network and earnings status
 
 The independently calculated Onyx network foundation is complete:
 
-- only active Onyx participation contributes to the Onyx network; Entry
+- only active Onyx participation contributes to the Onyx network; AQGreen
   participation and sales referrals cannot contribute to this calculation;
 - structural qualification evaluates the confirmed five-person branches through
   Levels 1–5;
-- incomplete Level 1 records no partial commission;
-- the approved Level 1 weekly commission is one immutable R250 component;
+- an incomplete level records no partial commission for that level;
+- confirmed Levels 1–5 each record a separate immutable weekly component;
 - commission records preserve both the highest structurally qualified level and
-  the highest commissioned level, so deeper structure does not accidentally
-  create Levels 2–5 earnings while those amounts remain unapproved;
+  the highest commissioned level, with cumulative totals derived from only the
+  fully completed levels;
 - every closed Onyx period records its exact boundaries, time zone, calculation
   time, and rules version;
 - each Onyx participation has at most one commission record per period in a
-  ledger separate from Entry;
+  ledger separate from AQGreen;
 - earned commission is released and marked paid through explicit, idempotent
   transitions.
 
 Secured calculation, review, release, and external-payment recording use the same
 latest-completed-week, permission, Area-scope, audit, and idempotency controls
-documented for Entry. Payment recording requires the reference from a transfer
+documented for AQGreen. Payment recording requires the reference from a transfer
 completed outside the platform and does not initiate a transfer. No Onyx hold
-rule has been inferred from Entry obligations or the unresolved effect of
+rule has been inferred from AQGreen obligations or the unresolved effect of
 overdue members on their uplines.
 
 ### Phase 6 benefits and separate accounts status
@@ -319,7 +330,7 @@ The Club Member savings domain and persistence foundation is complete:
 - the existing caller-supplied three-month refund-threshold policy boundary is
   preserved until account-specific refund thresholds are confirmed.
 
-The Club may use pooled savings to support loans for customers entering Entry,
+The Club may use pooled savings to support loans for customers entering AQGreen,
 but no individual Club Member contribution is assigned to or netted against a
 specific borrower. Savings ownership, loan receivables, loan repayments, and
 maturity liabilities remain separate ledgers.
@@ -342,8 +353,8 @@ terms but does not establish regulatory compliance.
 
 The first secured programme-participation workflow is complete:
 
-- a signed-in customer can review their own Entry and Onyx participation;
-- a customer can start Entry or direct Onyx independently, or provide an
+- a signed-in customer can review their own AQGreen and Onyx participation;
+- a customer can start AQGreen or direct Onyx independently, or provide an
   optional recruiter who must already be active in the same programme;
 - duplicate submissions preserve the original network-placement facts rather
   than silently changing the recruiter;

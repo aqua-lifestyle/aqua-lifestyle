@@ -112,6 +112,7 @@ namespace AqualLifeStyle.Authorization
             public const string Default = "Aqua.ProgrammeParticipations";
             public const string ViewSelf = Default + ".ViewSelf";
             public const string Join = Default + ".Join";
+            public const string Invite = Default + ".Invite";
         }
 
         public static class Admin
@@ -187,6 +188,7 @@ namespace AqualLifeStyle.Authorization
             {
                 public const string Default = Admin.Default + ".ProgrammeParticipations";
                 public const string View = Default + ".View";
+                public const string CorrectRecruiter = Default + ".CorrectRecruiter";
             }
 
             public static class Commissions

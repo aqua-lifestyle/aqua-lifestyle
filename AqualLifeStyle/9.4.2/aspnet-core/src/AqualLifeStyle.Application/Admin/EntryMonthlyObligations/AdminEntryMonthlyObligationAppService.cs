@@ -34,13 +34,13 @@ namespace AqualLifeStyle.Application.Admin.EntryMonthlyObligations
             GetAllAsync(AdminEntryMonthlyObligationListInput input)
         {
             input ??= new AdminEntryMonthlyObligationListInput();
-            ValidateRequestedTenant(input.TenantId, "Entry commitment");
+            ValidateRequestedTenant(input.TenantId, "AQGreen commitment");
             if (!AbpSession.TenantId.HasValue &&
                 !await PermissionChecker.IsGrantedAsync(
                     AquaPermissions.Admin.AllTenants))
             {
                 throw new AbpAuthorizationException(
-                    "Host-wide Entry commitment access requires permission to view all Areas.");
+                    "Host-wide AQGreen commitment access requires permission to view all Areas.");
             }
 
             using (DisableAllTenantDataFiltersForHost())

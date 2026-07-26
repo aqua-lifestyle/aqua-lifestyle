@@ -167,6 +167,8 @@ namespace AqualLifeStyle.Application.Admin.Import
                 FirstName = row.FirstName,
                 LastName = row.LastName,
                 Email = row.Email,
+                ContactNumber = row.ContactNumber,
+                HomeAddress = row.HomeAddress,
                 MembershipId = row.MembershipId,
                 IsActive = row.IsActive,
                 AllowSystemGeneratedPassword = true,
@@ -212,12 +214,24 @@ namespace AqualLifeStyle.Application.Admin.Import
                 var firstName = source.FirstName?.Trim();
                 var lastName = source.LastName?.Trim();
                 var email = source.Email?.Trim();
+                var contactNumber = source.ContactNumber?.Trim();
+                var homeAddress = source.HomeAddress?.Trim();
                 if (string.IsNullOrWhiteSpace(firstName)) errors.Add(Error(rowNumber, "FirstName", "First name is required."));
                 else if (firstName.Length > 64) errors.Add(Error(rowNumber, "FirstName", "First name cannot exceed 64 characters."));
                 if (string.IsNullOrWhiteSpace(lastName)) errors.Add(Error(rowNumber, "LastName", "Last name is required."));
                 else if (lastName.Length > 64) errors.Add(Error(rowNumber, "LastName", "Last name cannot exceed 64 characters."));
                 try { _ = new EmailAddress(email); }
                 catch (ArgumentException) { errors.Add(Error(rowNumber, "Email", "Email is required and must be valid.")); }
+                try
+                {
+                    var contactDetails = new User();
+                    contactDetails.UpdateContactDetails(contactNumber, homeAddress);
+                }
+                catch (ArgumentException exception)
+                {
+                    var field = exception.ParamName == "homeAddress" ? "HomeAddress" : "ContactNumber";
+                    errors.Add(Error(rowNumber, field, exception.Message));
+                }
 
                 int? membershipId = null;
                 if (!string.IsNullOrWhiteSpace(source.MembershipId))
@@ -234,6 +248,7 @@ namespace AqualLifeStyle.Application.Admin.Import
                 rows.Add(new CachedCustomerImportRow
                 {
                     RowNumber = rowNumber, FirstName = firstName, LastName = lastName, Email = email ?? string.Empty,
+                    ContactNumber = contactNumber, HomeAddress = homeAddress,
                     MembershipId = membershipId, IsActive = isActive
                 });
             }
@@ -319,6 +334,7 @@ namespace AqualLifeStyle.Application.Admin.Import
         private static CustomerImportRowDto ToDto(CachedCustomerImportRow row) => new CustomerImportRowDto
         {
             RowNumber = row.RowNumber, FirstName = row.FirstName, LastName = row.LastName, Email = row.Email,
+            ContactNumber = row.ContactNumber, HomeAddress = row.HomeAddress,
             MembershipId = row.MembershipId, IsActive = row.IsActive
         };
     }

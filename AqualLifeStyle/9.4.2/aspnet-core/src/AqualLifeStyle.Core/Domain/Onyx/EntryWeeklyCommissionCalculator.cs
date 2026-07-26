@@ -53,7 +53,7 @@ namespace AqualLifeStyle.Domain.Onyx
             var holdReasons = new List<string>();
             if (hasOverdueOwnObligation)
             {
-                holdReasons.Add("Entry monthly commitment is overdue.");
+                holdReasons.Add("AQGreen monthly commitment is overdue.");
             }
 
             if (hasOverdueOwnLoan)

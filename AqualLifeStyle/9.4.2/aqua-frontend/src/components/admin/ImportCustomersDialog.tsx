@@ -20,8 +20,10 @@ type ImportError = {
 };
 
 type PreviewRow = {
+  contactNumber: string;
   email: string;
   firstName: string;
+  homeAddress: string;
   isActive: boolean;
   lastName: string;
   membershipId: number | null;
@@ -114,6 +116,8 @@ export const ImportCustomersDialog = ({ onImported }: ImportCustomersDialogProps
       render: (row: PreviewRow) => <span className="font-medium">{row.firstName} {row.lastName}</span>,
     },
     { header: "Email", key: "email", sortable: true },
+    { header: "Contact number", key: "contactNumber", sortable: true },
+    { header: "Home address", key: "homeAddress" },
     {
       header: "Membership",
       key: "membershipId",
@@ -192,7 +196,7 @@ export const ImportCustomersDialog = ({ onImported }: ImportCustomersDialogProps
                 {file ? file.name : isDragActive ? "Drop the file here" : "Drop a CSV or XLSX file here"}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                FirstName, LastName and Email are required. MembershipId and IsActive are optional. Maximum 5 MB and 1,000 rows.
+                FirstName, LastName, Email, ContactNumber and HomeAddress are required. MembershipId and IsActive are optional. Maximum 5 MB and 1,000 rows.
               </p>
             </div>
           ) : null}

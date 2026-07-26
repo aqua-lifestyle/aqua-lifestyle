@@ -9,7 +9,8 @@ import { login, register } from "@/src/shared/api/auth-service";
 import { publicEnv } from "@/src/shared/config";
 import { securePasswordSchema } from "@/src/shared/auth/password-policy";
 import { useAuthActions, useTenantState, useToast } from "@/src/providers";
-import { Button, Card, LinkButton, TextField } from "@/src/shared/ui";
+import { Button, Card, LinkButton, TextAreaField, TextField } from "@/src/shared/ui";
+import { customerContactNumberSchema, customerFirstNameSchema, customerHomeAddressSchema, customerSurnameSchema } from "@/src/shared/validation/customer-personal-details";
 
 const step1Schema = z
   .object({
@@ -23,7 +24,10 @@ const step1Schema = z
   });
 
 const step2Schema = z.object({
-  name: z.string().trim().min(2, "Full name must be at least 2 characters."),
+  contactNumber: customerContactNumberSchema,
+  firstName: customerFirstNameSchema,
+  homeAddress: customerHomeAddressSchema,
+  surname: customerSurnameSchema,
 });
 
 const steps = [
@@ -33,10 +37,11 @@ const steps = [
 ];
 
 type SignupFormProps = {
+  redirectPath?: string;
   tenancyName?: string;
 };
 
-export const SignupForm = ({ tenancyName }: SignupFormProps) => {
+export const SignupForm = ({ redirectPath, tenancyName }: SignupFormProps) => {
   const router = useRouter();
   const { setSession } = useAuthActions();
   const { currentTenant } = useTenantState();
@@ -47,9 +52,12 @@ export const SignupForm = ({ tenancyName }: SignupFormProps) => {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [formData, setFormData] = useState({
     confirmPassword: "",
+    contactNumber: "",
     email: "",
-    name: "",
+    firstName: "",
+    homeAddress: "",
     password: "",
+    surname: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -69,7 +77,10 @@ export const SignupForm = ({ tenancyName }: SignupFormProps) => {
       result = step1Schema.safeParse(formData);
     } else if (step === 1) {
       result = step2Schema.safeParse({
-        name: formData.name,
+        contactNumber: formData.contactNumber,
+        firstName: formData.firstName,
+        homeAddress: formData.homeAddress,
+        surname: formData.surname,
       });
     } else {
       return true;
@@ -112,21 +123,17 @@ export const SignupForm = ({ tenancyName }: SignupFormProps) => {
 
     setIsLoading(true);
 
-    // Real registration via the ABP /api/account/register endpoint.
-    // Split full name into first name + surname (ABP requires both).
-    const nameParts = formData.name.trim().split(/\s+/);
-    const firstName = nameParts[0] ?? formData.name;
-    const lastName = nameParts.slice(1).join(" ") || ".";
-
     const resolvedTenant = tenancyName ??
       currentTenant ??
       publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME;
 
     const registerResult = await register({
+      contactNumber: formData.contactNumber,
       email: formData.email,
+      homeAddress: formData.homeAddress,
       password: formData.password,
-      name: firstName,
-      surname: lastName,
+      name: formData.firstName,
+      surname: formData.surname,
       tenant: resolvedTenant,
     });
 
@@ -168,7 +175,7 @@ export const SignupForm = ({ tenancyName }: SignupFormProps) => {
         type: "success",
       });
       setIsLoading(false);
-      router.push("/dashboard");
+      router.push(redirectPath ?? "/dashboard");
       return;
     }
 
@@ -178,7 +185,11 @@ export const SignupForm = ({ tenancyName }: SignupFormProps) => {
       type: "success",
     });
     setIsLoading(false);
-    router.push("/login");
+    router.push(
+      redirectPath
+        ? `/login?redirect=${encodeURIComponent(redirectPath)}`
+        : "/login",
+    );
   };
 
   const getPasswordStrength = () => {
@@ -320,14 +331,42 @@ export const SignupForm = ({ tenancyName }: SignupFormProps) => {
                 {step === 1 ? (
                   <>
                     <TextField
-                      autoComplete="name"
-                      errorMessage={errors.name}
-                      label="Full name"
-                      name="name"
-                      onChange={(e) => updateField("name", e.target.value)}
-                      placeholder="Jane Doe"
+                      autoComplete="given-name"
+                      errorMessage={errors.firstName}
+                      label="First name"
+                      name="firstName"
+                      onChange={(e) => updateField("firstName", e.target.value)}
                       required
-                      value={formData.name}
+                      value={formData.firstName}
+                    />
+                    <TextField
+                      autoComplete="family-name"
+                      errorMessage={errors.surname}
+                      label="Surname"
+                      name="surname"
+                      onChange={(e) => updateField("surname", e.target.value)}
+                      required
+                      value={formData.surname}
+                    />
+                    <TextField
+                      autoComplete="tel"
+                      errorMessage={errors.contactNumber}
+                      label="Contact number"
+                      name="contactNumber"
+                      onChange={(e) => updateField("contactNumber", e.target.value)}
+                      required
+                      type="tel"
+                      value={formData.contactNumber}
+                    />
+                    <TextAreaField
+                      autoComplete="street-address"
+                      errorMessage={errors.homeAddress}
+                      label="Home address"
+                      name="homeAddress"
+                      onChange={(e) => updateField("homeAddress", e.target.value)}
+                      required
+                      rows={3}
+                      value={formData.homeAddress}
                     />
                     {currentTenant ? (
                       <p className="text-sm text-muted-foreground">
@@ -348,7 +387,15 @@ export const SignupForm = ({ tenancyName }: SignupFormProps) => {
                         </div>
                         <div className="flex justify-between">
                           <dt className="text-muted-foreground">Name</dt>
-                          <dd className="text-foreground">{formData.name}</dd>
+                          <dd className="text-foreground">{formData.firstName} {formData.surname}</dd>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted-foreground">Contact number</dt>
+                          <dd className="text-right text-foreground">{formData.contactNumber}</dd>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted-foreground">Home address</dt>
+                          <dd className="text-right text-foreground">{formData.homeAddress}</dd>
                         </div>
                       </dl>
                     </div>

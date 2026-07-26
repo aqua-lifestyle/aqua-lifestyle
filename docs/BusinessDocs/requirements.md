@@ -4,7 +4,7 @@
 
 - **Project Name**: aQua Lifestyle Club (AqualLifeStyle)
 - **Description**: Membership, savings-club, and product-subscription platform for aQua Lifestyle Club — a wellness club selling aQuathz water products through membership tiers, a national savings club (AQGreen), and a distributed network of Area Leaders and Facilitators.
-- **Target Users**: Club members (Jasper, Onyx, AQGreen, Business Premier), Area Leaders, Facilitators, and aQua administration staff.
+- **Target Users**: Club Members, AQGreen and Onyx programme participants, Area Leaders, Facilitators, and aQua administration staff.
 - **Business Goal**: "Live in health, inspire to wealth" — recurring product subscriptions, structured monthly savings with interest/profit share, and a licensed area-based distribution network.
 
 ## 2. Functional Requirements
@@ -15,7 +15,7 @@ Status legend: ✅ Implemented in codebase · 🔧 Domain/persistence foundation
 
 | ID | Requirement | Priority | Status |
 |----|-------------|----------|--------|
-| FR-01 | Support membership tiers: Jasper, Onyx, AQGreen, Business Premier | Critical | ✅ Implemented |
+| FR-01 | Preserve the legacy membership configuration values Jasper, Onyx, AQGreen, and Business Premier while programme joining is represented by participation records rather than `Customer.MembershipId` | Critical | ⚠️ Compatibility model implemented; wider legacy migration pending |
 | FR-02 | Track membership activation date | Critical | ✅ Implemented |
 | FR-03 | Track tier-specific monthly obligations and mark them met | Critical | ✅ Implemented |
 | FR-04 | Jasper activation plans: Standard R950, Premium R1200 (limited offer) with combo allocations | High | ❌ Missing |
@@ -100,6 +100,7 @@ Status legend: ✅ Implemented in codebase · 🔧 Domain/persistence foundation
 | FR-48 | Multi-tenancy | Critical | ✅ Implemented (ABP) |
 | FR-49 | User/role management and authentication (JWT) | Critical | ✅ Implemented (ABP) |
 | FR-50 | Admin UI for customers, products, memberships, enquiries, order intents | High | ✅ Implemented (Next.js frontend) |
+| FR-51 | Capture and maintain each customer's first name, surname, contact number, and home address during self-registration, administrator onboarding/import, and profile editing | High | ✅ Implemented on the linked ABP user profile |
 
 ## 3. Non-Functional Requirements
 
@@ -129,7 +130,9 @@ Status legend: ✅ Implemented in codebase · 🔧 Domain/persistence foundation
 | BR-10 | Funeral cover has a 6-month waiting period | National Club doc |
 | BR-11 | Borrowing requires 6 months of saving without skipping | National Club doc |
 | BR-12 | Withdrawals are blocked until 12 months after account opening; every accepted contribution receives the full 20% interest at maturity | Current confirmed rule |
-| BR-13 | Pooled savings may finance Entry customer loans, but Club Member savings and borrower loan ledgers remain separate | Current confirmed rule |
+| BR-13 | Pooled savings may finance AQGreen customer loans, but Club Member savings and borrower loan ledgers remain separate | Current confirmed rule |
+| BR-14 | AQGreen replaces the earlier working name “Entry”; all existing Entry participation, payment, network, obligation, commission, and ledger behavior remains AQGreen behavior | Current confirmed rule |
+| BR-15 | The customer-facing Onyx joining action is direct entry only; AQGreen-to-Onyx graduation creates a separate Onyx participation without a recruiter, starts a new independent Onyx network, and does not rewrite AQGreen history | Current confirmed rule |
 
 ## 5. Assumptions
 

@@ -11,6 +11,8 @@ namespace AqualLifeStyle.Application.Admin.Customers.Dto
                 .ForMember(dto => dto.TenantId, options => options.MapFrom(customer => customer.TenantId ?? 0))
                 .ForMember(dto => dto.FirstName, options => options.MapFrom(customer => customer.User.Name))
                 .ForMember(dto => dto.LastName, options => options.MapFrom(customer => customer.User.Surname))
+                .ForMember(dto => dto.ContactNumber, options => options.MapFrom(customer => customer.User.PhoneNumber))
+                .ForMember(dto => dto.HomeAddress, options => options.MapFrom(customer => customer.User.HomeAddress))
                 .ForMember(dto => dto.Email, options => options.MapFrom(customer => customer.Email.Value));
         }
     }

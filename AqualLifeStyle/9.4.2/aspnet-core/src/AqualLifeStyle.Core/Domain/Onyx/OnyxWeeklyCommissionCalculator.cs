@@ -29,17 +29,12 @@ namespace AqualLifeStyle.Domain.Onyx
             var highestQualifiedNetworkLevel = _networkQualificationEvaluator.Evaluate(
                 participation,
                 networkParticipations);
-            var highestCommissionedLevel =
-                highestQualifiedNetworkLevel >= OnyxNetworkLevel.Level1
-                    ? OnyxNetworkLevel.Level1
-                    : OnyxNetworkLevel.None;
-
             return OnyxWeeklyCommission.RecordCalculation(
                 participation,
                 period,
                 terms,
                 highestQualifiedNetworkLevel,
-                highestCommissionedLevel);
+                highestQualifiedNetworkLevel);
         }
     }
 }

@@ -26,8 +26,12 @@ namespace AqualLifeStyle.Application.Admin.Commissions
 
         public OnyxCommissionTerms GetOnyxTerms() =>
             OnyxCommissionTerms.Create(
-                version: "2026-07",
+                version: "2026-07-onyx-levels-1-5",
                 effectiveFrom: EffectiveFrom,
-                levelOneCommissionAmount: 250m);
+                levelOnePerPersonRate: 50m,
+                levelTwoPerPersonRate: 20m,
+                levelThreePerPersonRate: 12.62m,
+                levelFourPerPersonRate: 5m,
+                levelFivePerPersonRate: 4m);
     }
 }

@@ -180,7 +180,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                         LogMutation(
                             commission.TenantId,
                             commission.Id,
-                            "Entry",
+                            "AQGreen",
                             "released for payment",
                             input.Justification);
                     }
@@ -246,7 +246,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     LogMutation(
                         commission.TenantId,
                         commission.Id,
-                        "Entry",
+                        "AQGreen",
                         $"external payment recorded reference={SanitizeJustification(paymentReference)}",
                         input.Justification);
                 }
@@ -273,7 +273,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     .ToListAsync();
                 return BuildResult(
                     existingPeriod.Id,
-                    "Entry",
+                    "AQGreen",
                     existingPeriod.PeriodStart,
                     existingPeriod.PeriodEnd,
                     existingPeriod.TimeZoneId,
@@ -334,7 +334,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             await CurrentUnitOfWork.SaveChangesAsync();
             return BuildResult(
                 period.Id,
-                "Entry",
+                "AQGreen",
                 period.PeriodStart,
                 period.PeriodEnd,
                 period.TimeZoneId,
@@ -545,7 +545,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 CustomerId = commission.CustomerId,
                 CustomerName = customer.Name,
                 Email = customer.User.EmailAddress,
-                ProgrammeName = "Entry",
+                ProgrammeName = "AQGreen",
                 PeriodStart = period.PeriodStart,
                 PeriodEnd = period.PeriodEnd,
                 TimeZoneId = period.TimeZoneId,
@@ -661,7 +661,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 await _entryCommissionRepository.FirstOrDefaultAsync(id);
             if (commission == null)
             {
-                throw Failed(operation, "The Entry earning record was not found.");
+                throw Failed(operation, "The AQGreen earning record was not found.");
             }
 
             return commission;

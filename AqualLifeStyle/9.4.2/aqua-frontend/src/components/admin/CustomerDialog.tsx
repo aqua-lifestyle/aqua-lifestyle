@@ -19,14 +19,17 @@ import {
   TextField,
 } from "@/src/shared/ui";
 import { AdminAreaSelectionField } from "./AdminAreaSelectionField";
+import { customerContactNumberSchema, customerEmailSchema, customerFirstNameSchema, customerHomeAddressSchema, customerSurnameSchema } from "@/src/shared/validation/customer-personal-details";
 
 const CREATE_PERMISSION = "Aqua.Admin.Customers.Create";
 const schema = z.object({
-  email: z.string().trim().email("Enter a valid email address.").max(256),
-  firstName: z.string().trim().min(1, "First name is required.").max(64),
+  contactNumber: customerContactNumberSchema,
+  email: customerEmailSchema,
+  firstName: customerFirstNameSchema,
+  homeAddress: customerHomeAddressSchema,
   isActive: z.boolean(),
   justification: z.string().trim().min(3, "Explain why this account is being created.").max(500),
-  lastName: z.string().trim().min(1, "Last name is required.").max(64),
+  lastName: customerSurnameSchema,
   membershipId: z.union([z.literal(""), z.coerce.number().int().positive()])
     .transform((value) => value === "" ? null : value),
   password: z.string().max(128).refine(
@@ -36,7 +39,7 @@ const schema = z.object({
   tenantId: z.coerce.number().int().positive("Select a valid area."),
 });
 
-type Fields = "email" | "firstName" | "justification" | "lastName" | "membershipId" | "password" | "tenantId";
+type Fields = "contactNumber" | "email" | "firstName" | "homeAddress" | "justification" | "lastName" | "membershipId" | "password" | "tenantId";
 type FieldErrors = Partial<Record<Fields, string>>;
 
 type CustomerDialogProps = {
@@ -92,7 +95,9 @@ export const CustomerDialog = ({ onCreated }: CustomerDialogProps) => {
     const data = new FormData(form);
     const parsed = schema.safeParse({
       email: data.get("email"),
+      contactNumber: data.get("contactNumber"),
       firstName: data.get("firstName"),
+      homeAddress: data.get("homeAddress"),
       isActive: data.get("isActive") === "on",
       justification: data.get("justification"),
       lastName: data.get("lastName"),
@@ -144,7 +149,9 @@ export const CustomerDialog = ({ onCreated }: CustomerDialogProps) => {
     try {
       const details = {
         email: pendingRestore.input.email,
+        contactNumber: pendingRestore.input.contactNumber,
         firstName: pendingRestore.input.firstName,
+        homeAddress: pendingRestore.input.homeAddress,
         isActive: pendingRestore.input.isActive,
         justification: pendingRestore.input.justification,
         lastName: pendingRestore.input.lastName,
@@ -238,8 +245,10 @@ export const CustomerDialog = ({ onCreated }: CustomerDialogProps) => {
             ))}
           </SelectField>
           <TextField autoComplete="given-name" errorMessage={fieldErrors.firstName} label="First name" name="firstName" required />
-          <TextField autoComplete="family-name" errorMessage={fieldErrors.lastName} label="Last name" name="lastName" required />
+          <TextField autoComplete="family-name" errorMessage={fieldErrors.lastName} label="Surname" name="lastName" required />
           <TextField autoComplete="email" className="sm:col-span-2" errorMessage={fieldErrors.email} label="Email address" name="email" required type="email" />
+          <TextField autoComplete="tel" className="sm:col-span-2" errorMessage={fieldErrors.contactNumber} label="Contact number" name="contactNumber" required type="tel" />
+          <TextAreaField autoComplete="street-address" className="sm:col-span-2" errorMessage={fieldErrors.homeAddress} label="Home address" maxLength={512} name="homeAddress" required rows={3} />
           <TextField autoComplete="new-password" className="sm:col-span-2" errorMessage={fieldErrors.password} label="Temporary password for a new customer" minLength={8} name="password" type="password" />
           <p className="-mt-2 text-xs text-muted-foreground sm:col-span-2">This is used only for a brand-new account. Restored customers receive a one-time password setup link instead.</p>
           <TextAreaField className="sm:col-span-2" errorMessage={fieldErrors.justification} label="Reason for creating this account" maxLength={500} name="justification" required rows={3} />

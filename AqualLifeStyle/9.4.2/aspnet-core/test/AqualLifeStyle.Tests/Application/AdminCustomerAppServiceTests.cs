@@ -36,6 +36,8 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Ada",
                 LastName = "Lovelace",
                 Email = email,
+                ContactNumber = "+27 71 111 1111",
+                HomeAddress = "1 Customer Street, Johannesburg",
                 Password = "Temporary123!",
                 IsActive = true,
                 Justification = "Approved customer onboarding"
@@ -45,6 +47,8 @@ namespace AqualLifeStyle.Tests.Application
             creationResult.RequiresRestoreConfirmation.ShouldBeFalse();
             created.TenantId.ShouldBe(1);
             created.Name.ShouldBe("Ada Lovelace");
+            created.ContactNumber.ShouldBe("+27 71 111 1111");
+            created.HomeAddress.ShouldBe("1 Customer Street, Johannesburg");
             var originalCreationTime = created.CreationTime;
             var originalUserId = created.UserId;
             var createdUser = await Resolve<UserManager>().FindByEmailAsync(email);
@@ -69,11 +73,15 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Augusta Ada",
                 LastName = "Lovelace",
                 Email = email,
+                ContactNumber = "+27 72 222 2222",
+                HomeAddress = "2 Updated Avenue, Johannesburg",
                 IsActive = false,
                 Justification = "Customer requested an account pause"
             });
             updated.Name.ShouldBe("Augusta Ada Lovelace");
             updated.IsActive.ShouldBeFalse();
+            updated.ContactNumber.ShouldBe("+27 72 222 2222");
+            updated.HomeAddress.ShouldBe("2 Updated Avenue, Johannesburg");
 
             await _service.DeleteAsync(new AdminDeleteCustomerInput
             {
@@ -97,6 +105,8 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Dora",
                 LastName = "Shongwe",
                 Email = email,
+                ContactNumber = "+27 73 333 3333",
+                HomeAddress = "3 Restore Road, Johannesburg",
                 IsActive = true,
                 Justification = "Returning customer requested account restoration"
             });
@@ -115,6 +125,8 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Dora",
                 LastName = "Shongwe",
                 Email = email,
+                ContactNumber = "+27 73 333 3333",
+                HomeAddress = "3 Restore Road, Johannesburg",
                 IsActive = true,
                 Justification = "Returning customer explicitly approved for restoration"
             });
@@ -124,6 +136,8 @@ namespace AqualLifeStyle.Tests.Application
             restored.CreationTime.ShouldBe(originalCreationTime);
             restored.Name.ShouldBe("Dora Shongwe");
             restored.IsActive.ShouldBeTrue();
+            restored.ContactNumber.ShouldBe("+27 73 333 3333");
+            restored.HomeAddress.ShouldBe("3 Restore Road, Johannesburg");
             var restoredUser = await Resolve<UserManager>().FindByEmailAsync(email);
             restoredUser.ShouldNotBeNull();
             restoredUser.IsActive.ShouldBeTrue();
@@ -173,6 +187,8 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Cross",
                 LastName = "Tenant",
                 Email = $"cross-{Guid.NewGuid():N}@example.com",
+                ContactNumber = "+27 74 444 4444",
+                HomeAddress = "4 Cross Street, Cape Town",
                 Password = "Temporary123!",
                 IsActive = true,
                 Justification = "Invalid cross tenant attempt"
@@ -180,17 +196,18 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task MembershipPlans_ExcludeOnyxAndOtherAreaPlans_AndAllowPlatformAssignment()
+        public async Task MembershipPlans_ExcludeProgrammeConfigurationsAndOtherAreaPlans_AndAllowPlatformAssignment()
         {
             var planIds = await UsingDbContextAsync((int?)null, async context =>
             {
                 var platformPlan = Membership.Create(null, $"Platform-{Guid.NewGuid():N}", "Available in every Area", MembershipType.Jasper);
-                var currentAreaPlan = Membership.Create(1, $"Area-1-{Guid.NewGuid():N}", "Available in the current Area", MembershipType.AQGreen);
+                var currentAreaPlan = Membership.Create(1, $"Area-1-{Guid.NewGuid():N}", "Available in the current Area", MembershipType.BusinessPremier);
+                var aqGreenProgramme = Membership.Create(1, $"AQGreen-{Guid.NewGuid():N}", "Joined through programme participation", MembershipType.AQGreen);
                 var onyxProgramme = Membership.Create(1, $"Onyx-{Guid.NewGuid():N}", "Joined through programme participation", MembershipType.Onyx);
-                var otherAreaPlan = Membership.Create(2, $"Area-2-{Guid.NewGuid():N}", "Available in another Area", MembershipType.BusinessPremier);
-                context.Memberships.AddRange(platformPlan, currentAreaPlan, onyxProgramme, otherAreaPlan);
+                var otherAreaPlan = Membership.Create(2, $"Area-2-{Guid.NewGuid():N}", "Available in another Area", MembershipType.Jasper);
+                context.Memberships.AddRange(platformPlan, currentAreaPlan, aqGreenProgramme, onyxProgramme, otherAreaPlan);
                 await context.SaveChangesAsync();
-                return new[] { platformPlan.Id, currentAreaPlan.Id, onyxProgramme.Id, otherAreaPlan.Id };
+                return new[] { platformPlan.Id, currentAreaPlan.Id, aqGreenProgramme.Id, onyxProgramme.Id, otherAreaPlan.Id };
             });
 
             var options = await _service.GetMembershipOptionsAsync(new AdminCustomerMembershipOptionsInput { TenantId = 1 });
@@ -198,6 +215,7 @@ namespace AqualLifeStyle.Tests.Application
             options.Select(option => option.Id).ShouldContain(planIds[1]);
             options.Select(option => option.Id).ShouldNotContain(planIds[2]);
             options.Select(option => option.Id).ShouldNotContain(planIds[3]);
+            options.Select(option => option.Id).ShouldNotContain(planIds[4]);
 
             var email = $"platform-member-{Guid.NewGuid():N}@example.com";
             var customer = (await _service.CreateAsync(new AdminCreateCustomerInput
@@ -206,6 +224,8 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Platform",
                 LastName = "Member",
                 Email = email,
+                ContactNumber = "+27 75 555 5555",
+                HomeAddress = "5 Platform Place, Johannesburg",
                 Password = "Temporary123!",
                 IsActive = true,
                 Justification = "Approved customer onboarding"
@@ -216,6 +236,8 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Platform",
                 LastName = "Club Member",
                 Email = email,
+                ContactNumber = "+27 75 555 5555",
+                HomeAddress = "5 Platform Place, Johannesburg",
                 MembershipId = planIds[0],
                 IsActive = true,
                 Justification = "Customer selected a platform membership plan"

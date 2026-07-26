@@ -83,7 +83,7 @@ namespace AqualLifeStyle.Domain.Onyx
             if (duplicateCustomer != null)
             {
                 throw new InvalidOperationException(
-                    $"Customer {duplicateCustomer.Key} has more than one qualified Entry participation.");
+                    $"Customer {duplicateCustomer.Key} has more than one qualified AQGreen participation.");
             }
         }
     }

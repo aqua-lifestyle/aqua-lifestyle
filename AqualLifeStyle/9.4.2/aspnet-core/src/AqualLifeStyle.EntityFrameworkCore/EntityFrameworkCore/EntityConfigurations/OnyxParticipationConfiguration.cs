@@ -1,3 +1,4 @@
+using System;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
@@ -59,6 +60,29 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
                 .WithMany()
                 .HasForeignKey(participation => participation.LoanAgreementId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasMany(participation => participation.RecruiterCorrections)
+                .WithOne()
+                .HasForeignKey("OnyxParticipationId")
+                .IsRequired()
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Navigation(participation => participation.RecruiterCorrections)
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+        }
+    }
+
+    internal sealed class OnyxRecruiterCorrectionConfiguration
+        : IEntityTypeConfiguration<OnyxRecruiterCorrection>
+    {
+        public void Configure(EntityTypeBuilder<OnyxRecruiterCorrection> builder)
+        {
+            builder.ToTable("OnyxRecruiterCorrections");
+            builder.Property<Guid>("OnyxParticipationId").IsRequired();
+            builder.Property(correction => correction.AdministratorUserId).IsRequired();
+            builder.Property(correction => correction.Reason).HasMaxLength(1000).IsRequired();
+            builder.Property(correction => correction.CorrectedAt).IsRequired();
+            builder.HasIndex("OnyxParticipationId");
         }
     }
 }

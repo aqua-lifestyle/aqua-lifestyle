@@ -1493,6 +1493,10 @@ namespace AqualLifeStyle.Migrations
                         .HasMaxLength(328)
                         .HasColumnType("character varying(328)");
 
+                    b.Property<string>("HomeAddress")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -1743,6 +1747,11 @@ namespace AqualLifeStyle.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ClubMemberNumber")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<DateTime>("CreationTime")
                         .HasColumnType("timestamp with time zone");
 
@@ -1782,6 +1791,9 @@ namespace AqualLifeStyle.Migrations
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ClubMemberNumber")
+                        .IsUnique();
 
                     b.HasIndex("TenantId");
 
@@ -2877,6 +2889,39 @@ namespace AqualLifeStyle.Migrations
                     b.ToTable("OnyxParticipations", (string)null);
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxRecruiterCorrection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AdministratorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CorrectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("NewRecruiterCustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OnyxParticipationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("PreviousRecruiterCustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OnyxParticipationId");
+
+                    b.ToTable("OnyxRecruiterCorrections", (string)null);
+                });
+
             modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxTravelBenefitEntitlement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3199,6 +3244,60 @@ namespace AqualLifeStyle.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Products", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Recruitment.ProgrammeInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ProgrammeKey")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("ProgrammeParticipationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("ProgrammeKey", "ProgrammeParticipationId")
+                        .IsUnique();
+
+                    b.ToTable("ProgrammeInvitations", (string)null);
                 });
 
             modelBuilder.Entity("AqualLifeStyle.Domain.Savings.SavingsAccount", b =>
@@ -3911,6 +4010,15 @@ namespace AqualLifeStyle.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxRecruiterCorrection", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.OnyxParticipation", null)
+                        .WithMany("RecruiterCorrections")
+                        .HasForeignKey("OnyxParticipationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxTravelBenefitEntitlement", b =>
                 {
                     b.HasOne("AqualLifeStyle.Domain.Customers.Customer", null)
@@ -4103,6 +4211,11 @@ namespace AqualLifeStyle.Migrations
                     b.Navigation("Repayments");
 
                     b.Navigation("WeeklyRequirements");
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxParticipation", b =>
+                {
+                    b.Navigation("RecruiterCorrections");
                 });
 
             modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.OnyxWeeklyCommission", b =>

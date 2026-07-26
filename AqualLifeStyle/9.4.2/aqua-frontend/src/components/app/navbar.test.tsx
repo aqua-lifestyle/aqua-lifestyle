@@ -92,7 +92,7 @@ describe("Navbar", () => {
       "/member/loans",
     );
     expect(
-      screen.getByRole("link", { name: "Entry commitments" }),
+      screen.getByRole("link", { name: "AQGreen commitments" }),
     ).toHaveAttribute("href", "/member/entry-commitments");
   });
 

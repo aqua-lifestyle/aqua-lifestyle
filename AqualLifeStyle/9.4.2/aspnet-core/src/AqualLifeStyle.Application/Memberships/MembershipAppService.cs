@@ -38,6 +38,7 @@ namespace AqualLifeStyle.Application.Memberships
             var memberships = await _membershipRepository.GetAll()
                 .Where(membership =>
                     membership.IsActive &&
+                    membership.MembershipType != MembershipType.AQGreen &&
                     membership.MembershipType != MembershipType.Onyx)
                 .ToListAsync();
             return _objectMapper.Map<List<MembershipDto>>(memberships);
