@@ -59,6 +59,9 @@ describe("MemberProgrammes", () => {
     await screen.findByRole("button", { name: "Join AQGreen" });
     expect(screen.getByRole("button", { name: "Join Onyx" })).toBeInTheDocument();
     expect(screen.getAllByText(/recruiter is optional/i)).toHaveLength(2);
+    expect(
+      screen.queryByRole("link", { name: "Invite Club Members" }),
+    ).not.toBeInTheDocument();
   });
 
   it("starts AQGreen independently and reloads the participation record", async () => {

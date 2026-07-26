@@ -50,7 +50,7 @@ const ParticipationCard = ({
         <dd className="mt-1 font-semibold">
           {participation.joinedIndependently
             ? "Independent"
-            : `Under Club Member #${participation.recruiterCustomerId}`}
+            : `Under ${participation.recruiterClubMemberNumber ?? "a verified Club Member"}`}
         </dd>
       </div>
       <div>
@@ -233,6 +233,22 @@ export const MemberProgrammes = () => {
         {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
         {success ? (
           <StatusMessage tone="success">{success}</StatusMessage>
+        ) : null}
+
+        {participations?.entry?.canRecruitForThisProgramme ||
+        participations?.onyx?.canRecruitForThisProgramme ? (
+          <Card className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-bold">Grow your network</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Share a secure invitation link. Your friend will see your name
+                and programme before confirming.
+              </p>
+            </div>
+            <a className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark" href="/member/invitations">
+              Invite Club Members
+            </a>
+          </Card>
         ) : null}
 
         {loading ? (

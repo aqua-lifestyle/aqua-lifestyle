@@ -2,13 +2,12 @@ export type ProgrammeParticipation = {
   activatedAt: string | null;
   canRecruitForThisProgramme: boolean;
   currency: string;
-  id: string;
   isActive: boolean;
   joinedIndependently: boolean;
   nextPaymentAmount: number | null;
   nextPaymentDescription: string | null;
   programmeName: "AQGreen" | "Onyx";
-  recruiterCustomerId: number | null;
+  recruiterClubMemberNumber: string | null;
   startedAt: string;
   status: string;
 };
@@ -16,7 +15,7 @@ export type ProgrammeParticipation = {
 export type MyProgrammeParticipations = {
   canJoinEntry: boolean;
   canJoinOnyxDirectly: boolean;
-  customerId: number;
+  clubMemberNumber: string;
   entry: ProgrammeParticipation | null;
   onyx: ProgrammeParticipation | null;
   travelBenefit: OnyxTravelBenefit | null;

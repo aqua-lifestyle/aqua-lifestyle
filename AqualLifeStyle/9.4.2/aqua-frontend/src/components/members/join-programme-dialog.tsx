@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
-import { Button, Dialog, StatusMessage, TextField } from "@/src/shared/ui";
+import { Button, Dialog, StatusMessage } from "@/src/shared/ui";
 
 type Programme = "AQGreen" | "Onyx";
 
@@ -18,10 +18,6 @@ export const JoinProgrammeDialog = ({
   programme,
 }: JoinProgrammeDialogProps) => {
   const [open, setOpen] = useState(false);
-  const [joiningMethod, setJoiningMethod] = useState<"independent" | "recruited">(
-    "independent",
-  );
-  const [recruiterCustomerId, setRecruiterCustomerId] = useState("");
   const [error, setError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
 
@@ -33,18 +29,6 @@ export const JoinProgrammeDialog = ({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const recruiterId =
-      joiningMethod === "recruited" ? Number(recruiterCustomerId) : null;
-    if (
-      joiningMethod === "recruited" &&
-      (recruiterId === null ||
-        !Number.isInteger(recruiterId) ||
-        recruiterId <= 0)
-    ) {
-      setError("Enter the recruiter’s valid Club Member number.");
-      return;
-    }
-
     setSubmitting(true);
     setError(undefined);
     try {
@@ -52,7 +36,7 @@ export const JoinProgrammeDialog = ({
         programme === "AQGreen"
           ? apiEndpoints.programmeParticipations.startEntry
           : apiEndpoints.programmeParticipations.startDirectOnyx;
-      await httpClient.post(endpoint, { recruiterCustomerId: recruiterId });
+      await httpClient.post(endpoint, { recruiterCustomerId: null });
       await onJoined();
       setOpen(false);
     } catch (requestError) {
@@ -78,53 +62,13 @@ export const JoinProgrammeDialog = ({
               : "Joining Onyx directly requires one full payment of R6,120. AQGreen participation is not required."}
           </div>
 
-          <fieldset className="flex flex-col gap-3">
-            <legend className="text-sm font-semibold text-foreground">
-              Network placement
-            </legend>
-            <label className="flex cursor-pointer gap-3 rounded-lg border border-border p-3">
-              <input
-                checked={joiningMethod === "independent"}
-                name={`${programme}-joining-method`}
-                onChange={() => setJoiningMethod("independent")}
-                type="radio"
-              />
-              <span>
-                <span className="block font-medium">Start my own network</span>
-                <span className="block text-sm text-muted-foreground">
-                  You will be the starting point of your own network.
-                </span>
-              </span>
-            </label>
-            <label className="flex cursor-pointer gap-3 rounded-lg border border-border p-3">
-              <input
-                checked={joiningMethod === "recruited"}
-                name={`${programme}-joining-method`}
-                onChange={() => setJoiningMethod("recruited")}
-                type="radio"
-              />
-              <span>
-                <span className="block font-medium">Join an existing network</span>
-                <span className="block text-sm text-muted-foreground">
-                  The recruiter must already be active in {programme}.
-                </span>
-              </span>
-            </label>
-          </fieldset>
-
-          {joiningMethod === "recruited" ? (
-            <TextField
-              inputMode="numeric"
-              label="Recruiter’s Club Member number"
-              min={1}
-              name="recruiterCustomerId"
-              onChange={(event) => setRecruiterCustomerId(event.target.value)}
-              placeholder="For example, 1042"
-              required
-              type="number"
-              value={recruiterCustomerId}
-            />
-          ) : null}
+          <div className="rounded-lg border border-border p-4">
+            <p className="font-medium">Start my own network</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              You will be the starting point of your own network. To join under
+              another Club Member, open the secure invitation link they shared.
+            </p>
+          </div>
 
           {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
 

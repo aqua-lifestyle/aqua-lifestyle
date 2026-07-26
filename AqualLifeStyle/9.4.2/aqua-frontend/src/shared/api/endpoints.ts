@@ -93,10 +93,16 @@ export const apiEndpoints = {
     getById: (id: number) => `/api/services/app/Product/Get?id=${id}`,
   },
   programmeParticipations: {
+    correctRecruiter:
+      "/api/services/app/AdminProgrammeParticipation/CorrectRecruiter",
     getAdminParticipations:
       "/api/services/app/AdminProgrammeParticipation/GetAll",
     getMyParticipations:
       "/api/services/app/ClubMemberProgrammeParticipation/GetMyParticipations",
+    getMyInvitations:
+      "/api/services/app/ProgrammeInvitation/GetMyInvitations",
+    getInvitationPreview: (inviteCode: string) =>
+      `/api/services/app/ProgrammeInvitation/GetPreview?InviteCode=${encodeURIComponent(inviteCode)}`,
     startDirectOnyx:
       "/api/services/app/ClubMemberProgrammeParticipation/StartDirectOnyx",
     startEntry:

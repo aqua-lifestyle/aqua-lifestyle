@@ -37,10 +37,11 @@ const steps = [
 ];
 
 type SignupFormProps = {
+  redirectPath?: string;
   tenancyName?: string;
 };
 
-export const SignupForm = ({ tenancyName }: SignupFormProps) => {
+export const SignupForm = ({ redirectPath, tenancyName }: SignupFormProps) => {
   const router = useRouter();
   const { setSession } = useAuthActions();
   const { currentTenant } = useTenantState();
@@ -174,7 +175,7 @@ export const SignupForm = ({ tenancyName }: SignupFormProps) => {
         type: "success",
       });
       setIsLoading(false);
-      router.push("/dashboard");
+      router.push(redirectPath ?? "/dashboard");
       return;
     }
 
@@ -184,7 +185,11 @@ export const SignupForm = ({ tenancyName }: SignupFormProps) => {
       type: "success",
     });
     setIsLoading(false);
-    router.push("/login");
+    router.push(
+      redirectPath
+        ? `/login?redirect=${encodeURIComponent(redirectPath)}`
+        : "/login",
+    );
   };
 
   const getPasswordStrength = () => {
