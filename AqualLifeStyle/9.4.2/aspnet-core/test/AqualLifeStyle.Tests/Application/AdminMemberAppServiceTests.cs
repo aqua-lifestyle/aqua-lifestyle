@@ -63,6 +63,8 @@ namespace AqualLifeStyle.Tests.Application
             });
             edited.FirstName.ShouldBe("Updated");
             edited.Email.ShouldBe(updatedEmail);
+            edited.ContactNumber.ShouldBe("+27 77 777 7777");
+            edited.HomeAddress.ShouldBe("7 Updated Way, Johannesburg");
 
             var upgraded = await _memberAdministration.ChangeTierAsync(new ChangeMemberTierInput
             {
@@ -85,6 +87,8 @@ namespace AqualLifeStyle.Tests.Application
                     .SingleAsync(customer => customer.Id == member.Id);
                 persistedMember.Name.ShouldBe("Updated Member");
                 persistedMember.Email.Value.ShouldBe(updatedEmail);
+                persistedMember.User.PhoneNumber.ShouldBe("+27 77 777 7777");
+                persistedMember.User.HomeAddress.ShouldBe("7 Updated Way, Johannesburg");
                 persistedMember.MembershipId.ShouldBe(membershipIds[1]);
                 persistedMember.IsActive.ShouldBeFalse();
                 persistedMember.User.IsActive.ShouldBeFalse();

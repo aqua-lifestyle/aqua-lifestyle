@@ -66,7 +66,7 @@ namespace AqualLifeStyle.Tests.Application
                 (await context.ProgrammeInvitations.CountAsync()).ShouldBe(1);
                 var persisted = await context.ProgrammeInvitations.SingleAsync();
                 persisted.ProgrammeParticipationId.ShouldNotBe(Guid.Empty);
-                persisted.Code.ShouldNotContain(customerId.ToString());
+                persisted.Code.ShouldBe(invitation.Code);
             });
         }
 

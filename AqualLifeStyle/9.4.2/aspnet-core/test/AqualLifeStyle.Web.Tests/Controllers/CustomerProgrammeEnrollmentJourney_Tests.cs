@@ -80,6 +80,14 @@ namespace AqualLifeStyle.Web.Tests.Controllers
                 "__tenant",
                 AbpTenantBase.DefaultTenantName);
 
+            var profile = JsonDocument.Parse(await GetResponseAsStringAsync(
+                "/api/services/app/MyAccount/GetProfile"));
+            var profileResult = profile.RootElement.GetProperty("result");
+            profileResult.GetProperty("contactNumber").GetString()
+                .ShouldBe("+27 82 123 4567");
+            profileResult.GetProperty("homeAddress").GetString()
+                .ShouldBe("10 Enrollment Road, Johannesburg");
+
             var memberships = await GetResponseAsStringAsync(
                 "/api/services/app/Membership/GetActiveTiers");
             memberships.ShouldContain("\"success\":true");

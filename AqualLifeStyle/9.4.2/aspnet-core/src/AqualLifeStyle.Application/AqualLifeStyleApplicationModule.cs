@@ -5,6 +5,7 @@ using Abp.Reflection.Extensions;
 using AqualLifeStyle.Application.Admin.ProgrammeParticipations;
 using AqualLifeStyle.Application.Recruitment;
 using AqualLifeStyle.Authorization;
+using Castle.MicroKernel.Resolvers.SpecializedResolvers;
 
 namespace AqualLifeStyle
 {
@@ -15,6 +16,10 @@ namespace AqualLifeStyle
     {
         public override void PreInitialize()
         {
+            IocManager.IocContainer.Kernel.Resolver.AddSubResolver(
+                new CollectionResolver(IocManager.IocContainer.Kernel, true));
+            IocManager.IocContainer.Kernel.Resolver.AddSubResolver(
+                new ArrayResolver(IocManager.IocContainer.Kernel, true));
             Configuration.Authorization.Providers.Add<AqualLifeStyleAuthorizationProvider>();
         }
 

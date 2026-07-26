@@ -19,7 +19,7 @@ namespace AqualLifeStyle.Migrations
             migrationBuilder.Sql(
                 """
                 UPDATE "Customers"
-                SET "ClubMemberNumber" = 'CLB-' || UPPER(SUBSTRING(MD5(RANDOM()::text || "Id"::text || CLOCK_TIMESTAMP()::text), 1, 12))
+                SET "ClubMemberNumber" = 'CLB-' || UPPER(LPAD(TO_HEX("Id"), 12, '0'))
                 WHERE "ClubMemberNumber" IS NULL;
                 """);
 
