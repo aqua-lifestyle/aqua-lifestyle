@@ -83,6 +83,10 @@ create duplicate history.
 
 ## Operational notes and future improvements
 
+- Technical debt: the AQGreen/Entry domain classes currently remain under the
+  `Domain.Onyx` namespace and directory. This does not affect programme-policy
+  resolution or network isolation, but a future naming-only migration should
+  move them to a programme-neutral or AQGreen-specific location.
 - Invitation codes are stable, not expiring, because the confirmed requirement
   is one stable invitation per participation. Eligibility is checked on every
   preview and acceptance, so an inactive recruiter cannot create a placement.

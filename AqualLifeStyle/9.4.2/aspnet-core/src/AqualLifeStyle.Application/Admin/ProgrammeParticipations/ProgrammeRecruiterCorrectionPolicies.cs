@@ -92,7 +92,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     item.CustomerId == newRecruiterCustomerId.Value &&
                     item.Status == EntryParticipationStatus.Active);
                 if (recruiter == null) throw InvalidRecruiter("The new recruiter must have active AQGreen participation in the same Area.");
-                EnsureNoCycle(participations.Select(item => (item.CustomerId, item.RecruiterCustomerId)), customerId, recruiter.CustomerId);
+                RecruiterPlacementCycleValidator.EnsureNoCycle(
+                    participations.Select(item => (item.CustomerId, item.RecruiterCustomerId)),
+                    customerId,
+                    recruiter.CustomerId);
                 target.CorrectRecruiter(recruiter, administratorUserId, reason, correctedAt);
             }
         }
@@ -103,28 +106,6 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         private static UserFriendlyException InvalidRecruiter(string details) =>
             new UserFriendlyException("Recruiter correction failed.", details);
 
-        internal static void EnsureNoCycle(
-            IEnumerable<(int CustomerId, int? RecruiterCustomerId)> placements,
-            int targetCustomerId,
-            int newRecruiterCustomerId)
-        {
-            if (targetCustomerId == newRecruiterCustomerId)
-                throw InvalidRecruiter("A Club Member cannot recruit themselves.");
-
-            var byCustomer = placements.ToDictionary(item => item.CustomerId);
-            var visited = new HashSet<int>();
-            var current = newRecruiterCustomerId;
-            while (visited.Add(current) && byCustomer.TryGetValue(current, out var placement))
-            {
-                if (current == targetCustomerId)
-                    throw InvalidRecruiter("This correction would create a recruitment cycle.");
-                if (!placement.RecruiterCustomerId.HasValue) return;
-                current = placement.RecruiterCustomerId.Value;
-            }
-
-            if (current == targetCustomerId)
-                throw InvalidRecruiter("This correction would create a recruitment cycle.");
-        }
     }
 
     public sealed class OnyxRecruiterCorrectionPolicy
@@ -170,7 +151,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     item.Status == OnyxParticipationStatus.Active);
                 if (recruiter == null)
                     throw new UserFriendlyException("Recruiter correction failed.", "The new recruiter must have active Onyx participation in the same Area.");
-                AQGreenRecruiterCorrectionPolicy.EnsureNoCycle(
+                RecruiterPlacementCycleValidator.EnsureNoCycle(
                     participations.Select(item => (item.CustomerId, item.RecruiterCustomerId)),
                     customerId,
                     recruiter.CustomerId);
