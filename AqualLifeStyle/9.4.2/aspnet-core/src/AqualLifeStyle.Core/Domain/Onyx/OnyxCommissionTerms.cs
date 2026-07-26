@@ -6,13 +6,21 @@ namespace AqualLifeStyle.Domain.Onyx
     {
         public string Version { get; }
         public DateTime EffectiveFrom { get; }
-        public decimal LevelOneCommissionAmount { get; }
+        public decimal LevelOnePerPersonRate { get; }
+        public decimal LevelTwoPerPersonRate { get; }
+        public decimal LevelThreePerPersonRate { get; }
+        public decimal LevelFourPerPersonRate { get; }
+        public decimal LevelFivePerPersonRate { get; }
         public string Currency { get; }
 
         private OnyxCommissionTerms(
             string version,
             DateTime effectiveFrom,
-            decimal levelOneCommissionAmount,
+            decimal levelOnePerPersonRate,
+            decimal levelTwoPerPersonRate,
+            decimal levelThreePerPersonRate,
+            decimal levelFourPerPersonRate,
+            decimal levelFivePerPersonRate,
             string currency)
         {
             if (string.IsNullOrWhiteSpace(version))
@@ -27,12 +35,11 @@ namespace AqualLifeStyle.Domain.Onyx
                 throw new ArgumentException("An effective date is required.", nameof(effectiveFrom));
             }
 
-            if (levelOneCommissionAmount <= 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(levelOneCommissionAmount),
-                    "The Level 1 commission must be greater than zero.");
-            }
+            EnsurePositiveRate(levelOnePerPersonRate, nameof(levelOnePerPersonRate), 1);
+            EnsurePositiveRate(levelTwoPerPersonRate, nameof(levelTwoPerPersonRate), 2);
+            EnsurePositiveRate(levelThreePerPersonRate, nameof(levelThreePerPersonRate), 3);
+            EnsurePositiveRate(levelFourPerPersonRate, nameof(levelFourPerPersonRate), 4);
+            EnsurePositiveRate(levelFivePerPersonRate, nameof(levelFivePerPersonRate), 5);
 
             if (string.IsNullOrWhiteSpace(currency) || currency.Trim().Length != 3)
             {
@@ -43,30 +50,67 @@ namespace AqualLifeStyle.Domain.Onyx
 
             Version = version.Trim();
             EffectiveFrom = effectiveFrom;
-            LevelOneCommissionAmount = levelOneCommissionAmount;
+            LevelOnePerPersonRate = levelOnePerPersonRate;
+            LevelTwoPerPersonRate = levelTwoPerPersonRate;
+            LevelThreePerPersonRate = levelThreePerPersonRate;
+            LevelFourPerPersonRate = levelFourPerPersonRate;
+            LevelFivePerPersonRate = levelFivePerPersonRate;
             Currency = currency.Trim().ToUpperInvariant();
         }
 
         public static OnyxCommissionTerms Create(
             string version,
             DateTime effectiveFrom,
-            decimal levelOneCommissionAmount,
+            decimal levelOnePerPersonRate,
+            decimal levelTwoPerPersonRate,
+            decimal levelThreePerPersonRate,
+            decimal levelFourPerPersonRate,
+            decimal levelFivePerPersonRate,
             string currency = "ZAR")
         {
             return new OnyxCommissionTerms(
                 version,
                 effectiveFrom,
-                levelOneCommissionAmount,
+                levelOnePerPersonRate,
+                levelTwoPerPersonRate,
+                levelThreePerPersonRate,
+                levelFourPerPersonRate,
+                levelFivePerPersonRate,
                 currency);
         }
 
-        public decimal GetCommissionAmount(OnyxNetworkLevel level)
+        public decimal GetPerPersonRate(OnyxNetworkLevel level)
         {
-            return level == OnyxNetworkLevel.Level1
-                ? LevelOneCommissionAmount
-                : throw new ArgumentOutOfRangeException(
+            return level switch
+            {
+                OnyxNetworkLevel.Level1 => LevelOnePerPersonRate,
+                OnyxNetworkLevel.Level2 => LevelTwoPerPersonRate,
+                OnyxNetworkLevel.Level3 => LevelThreePerPersonRate,
+                OnyxNetworkLevel.Level4 => LevelFourPerPersonRate,
+                OnyxNetworkLevel.Level5 => LevelFivePerPersonRate,
+                _ => throw new ArgumentOutOfRangeException(
                     nameof(level),
-                    "Only the approved Onyx Level 1 commission is supported.");
+                    "An Onyx commission rate is available only for Levels 1 through 5.")
+            };
+        }
+
+        public decimal GetLevelComponentAmount(OnyxNetworkLevel level)
+        {
+            return GetPerPersonRate(level) *
+                OnyxNetworkQualificationEvaluator.GetRequiredPopulation(level);
+        }
+
+        private static void EnsurePositiveRate(
+            decimal rate,
+            string parameterName,
+            int level)
+        {
+            if (rate <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    parameterName,
+                    $"The Level {level} per-person commission rate must be greater than zero.");
+            }
         }
     }
 }

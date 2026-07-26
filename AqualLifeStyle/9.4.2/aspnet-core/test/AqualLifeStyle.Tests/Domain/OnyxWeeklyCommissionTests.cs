@@ -17,9 +17,13 @@ namespace AqualLifeStyle.Tests.Domain
 
         private static readonly OnyxCommissionTerms CommissionTerms =
             OnyxCommissionTerms.Create(
-                "onyx-commission-2026-07",
+                "onyx-commission-2026-07-levels-1-5",
                 EffectiveFrom,
-                250m);
+                50m,
+                20m,
+                12.62m,
+                5m,
+                4m);
 
         [Fact]
         public void FourActiveDirectRecruits_RecordNoPartialCommission()
@@ -103,7 +107,7 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
-        public void DeeperNetwork_DoesNotCreateUnapprovedOnyxEarnings()
+        public void IncompleteLevelTwo_DoesNotEarnAPartialLevelTwoComponent()
         {
             var network = OnyxNetworkTestBuilder.BuildLevelOneNetwork(
                 OnyxNetworkQualificationEvaluator.BranchSize,
@@ -128,7 +132,7 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
-        public void CompleteLevelTwo_RecordsQualificationButNoUnapprovedCommission()
+        public void CompleteLevelTwo_RecordsSeparateCumulativeComponents()
         {
             var network = OnyxNetworkTestBuilder.BuildCompleteNetwork(
                 maximumDepth: 2,
@@ -138,9 +142,42 @@ namespace AqualLifeStyle.Tests.Domain
             var commission = Calculate(network);
 
             Assert.Equal(2, commission.HighestQualifiedNetworkLevel);
-            Assert.Equal(1, commission.HighestCommissionedLevel);
-            Assert.Equal(250m, commission.TotalAmount);
-            Assert.Single(commission.Components);
+            Assert.Equal(2, commission.HighestCommissionedLevel);
+            Assert.Equal(750m, commission.TotalAmount);
+            Assert.Collection(
+                commission.Components,
+                levelOne =>
+                {
+                    Assert.Equal(1, levelOne.Level);
+                    Assert.Equal(250m, levelOne.Amount);
+                },
+                levelTwo =>
+                {
+                    Assert.Equal(2, levelTwo.Level);
+                    Assert.Equal(500m, levelTwo.Amount);
+                });
+        }
+
+        [Fact]
+        public void CompleteLevelFive_UsesExactConfirmedRatesAndAuditableComponents()
+        {
+            var network = OnyxNetworkTestBuilder.BuildCompleteNetwork(
+                maximumDepth: 5,
+                PlanTerms,
+                EffectiveFrom);
+
+            var commission = Calculate(network);
+
+            Assert.Equal(5, commission.HighestQualifiedNetworkLevel);
+            Assert.Equal(5, commission.HighestCommissionedLevel);
+            Assert.Equal(17952.50m, commission.TotalAmount);
+            Assert.Collection(
+                commission.Components,
+                component => AssertComponent(component, 1, 250m),
+                component => AssertComponent(component, 2, 500m),
+                component => AssertComponent(component, 3, 1577.50m),
+                component => AssertComponent(component, 4, 3125m),
+                component => AssertComponent(component, 5, 12500m));
         }
 
         [Fact]
@@ -166,10 +203,29 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
-        public void Terms_RejectAnUnapprovedCommissionLevel()
+        public void Terms_UseTheExactConfirmedPerPersonRates()
+        {
+            Assert.Equal(50m, CommissionTerms.GetPerPersonRate(OnyxNetworkLevel.Level1));
+            Assert.Equal(20m, CommissionTerms.GetPerPersonRate(OnyxNetworkLevel.Level2));
+            Assert.Equal(12.62m, CommissionTerms.GetPerPersonRate(OnyxNetworkLevel.Level3));
+            Assert.Equal(5m, CommissionTerms.GetPerPersonRate(OnyxNetworkLevel.Level4));
+            Assert.Equal(4m, CommissionTerms.GetPerPersonRate(OnyxNetworkLevel.Level5));
+        }
+
+        [Fact]
+        public void Terms_RejectANonCommissionLevel()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() =>
-                CommissionTerms.GetCommissionAmount(OnyxNetworkLevel.None));
+                CommissionTerms.GetLevelComponentAmount(OnyxNetworkLevel.None));
+        }
+
+        private static void AssertComponent(
+            OnyxCommissionComponent component,
+            int expectedLevel,
+            decimal expectedAmount)
+        {
+            Assert.Equal(expectedLevel, component.Level);
+            Assert.Equal(expectedAmount, component.Amount);
         }
 
         private static OnyxWeeklyCommission Calculate(

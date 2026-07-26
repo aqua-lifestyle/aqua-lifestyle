@@ -64,14 +64,10 @@ Both programmes use five-person branches. Entry has three confirmed levels
 (5, 25, 125). Onyx has five structural levels (5, 25, 125, 625, 3,125).
 An incomplete level earns no partial component.
 
-Only the Onyx Level 1 weekly cumulative total of R250 is currently confirmed by
-the available source material. The repository does not confirm cumulative totals
-for Levels 2–5.
+The business owner has confirmed the Onyx per-person weekly commission rates
+and cumulative totals through Level 5:
 
-If the proposed cumulative totals R250, R750, R2,327.50, R5,452.50, and
-R17,952.50 are later approved, their mathematical decomposition is:
-
-| Level | Population | Component | Implied per-person rate | Cumulative |
+| Level | Population | Component | Confirmed per-person rate | Cumulative |
 |---|---:|---:|---:|---:|
 | 1 | 5 | R250.00 | R50.00 | R250.00 |
 | 2 | 25 | R500.00 | R20.00 | R750.00 |
@@ -79,9 +75,10 @@ R17,952.50 are later approved, their mathematical decomposition is:
 | 4 | 625 | R3,125.00 | R5.00 | R5,452.50 |
 | 5 | 3,125 | R12,500.00 | R4.00 | R17,952.50 |
 
-The Level 3 division is exact to one cent: R1,577.50 / 125 = R12.62. These
-Levels 2–5 values remain provisional and must not enter executable commission
-rules until approved.
+The Level 3 rate is exactly R12.62 per qualifying participant and is retained as
+decimal currency without substitution or further rounding. Each complete level
+adds its own immutable ledger component; incomplete levels earn no partial
+component.
 
 ## Compliance boundaries
 
@@ -128,8 +125,8 @@ No historical record is silently reinterpreted in the current phase.
 4. **Loan agreement:** member acceptance, admin approval/effective date, four
    weekly R200 requirements, additional repayments, deadline, and compliance
    restoration.
-5. **Onyx network and earnings:** implement Level 1 first; add Levels 2–5 only
-   after cumulative totals are approved.
+5. **Onyx network and earnings:** calculate confirmed complete-level components
+   through Level 5 and retain every component in the immutable weekly ledger.
 6. **Benefits and separate accounts:** rental obligations, configurable product
    combos, travel entitlement, and persisted savings without mixing balances.
 7. **Application and UI:** secured member/admin services, audited corrections,
@@ -254,11 +251,11 @@ The independently calculated Onyx network foundation is complete:
   participation and sales referrals cannot contribute to this calculation;
 - structural qualification evaluates the confirmed five-person branches through
   Levels 1–5;
-- incomplete Level 1 records no partial commission;
-- the approved Level 1 weekly commission is one immutable R250 component;
+- an incomplete level records no partial commission for that level;
+- confirmed Levels 1–5 each record a separate immutable weekly component;
 - commission records preserve both the highest structurally qualified level and
-  the highest commissioned level, so deeper structure does not accidentally
-  create Levels 2–5 earnings while those amounts remain unapproved;
+  the highest commissioned level, with cumulative totals derived from only the
+  fully completed levels;
 - every closed Onyx period records its exact boundaries, time zone, calculation
   time, and rules version;
 - each Onyx participation has at most one commission record per period in a

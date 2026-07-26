@@ -66,7 +66,7 @@ namespace AqualLifeStyle.Domain.Onyx
             }
 
             if (highestCommissionedLevel < OnyxNetworkLevel.None ||
-                highestCommissionedLevel > OnyxNetworkLevel.Level1 ||
+                highestCommissionedLevel > OnyxNetworkLevel.Level5 ||
                 highestCommissionedLevel > highestQualifiedNetworkLevel)
             {
                 throw new ArgumentOutOfRangeException(nameof(highestCommissionedLevel));
@@ -83,13 +83,17 @@ namespace AqualLifeStyle.Domain.Onyx
             RulesVersion = terms.Version;
             CalculatedAt = period.CalculatedAt;
 
-            if (highestCommissionedLevel == OnyxNetworkLevel.Level1)
+            if (highestCommissionedLevel > OnyxNetworkLevel.None)
             {
-                var amount = terms.GetCommissionAmount(OnyxNetworkLevel.Level1);
-                _components.Add(OnyxCommissionComponent.Create(
-                    OnyxNetworkLevel.Level1,
-                    amount));
-                TotalAmount = amount;
+                for (var level = OnyxNetworkLevel.Level1;
+                     level <= highestCommissionedLevel;
+                     level++)
+                {
+                    var amount = terms.GetLevelComponentAmount(level);
+                    _components.Add(OnyxCommissionComponent.Create(level, amount));
+                    TotalAmount += amount;
+                }
+
                 PayoutStatus = WeeklyCommissionPayoutStatus.Earned;
             }
             else
@@ -209,11 +213,12 @@ namespace AqualLifeStyle.Domain.Onyx
             OnyxNetworkLevel level,
             decimal amount)
         {
-            if (level != OnyxNetworkLevel.Level1)
+            if (level < OnyxNetworkLevel.Level1 ||
+                level > OnyxNetworkLevel.Level5)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(level),
-                    "Only the approved Onyx Level 1 commission is supported.");
+                    "An Onyx commission component must be for Levels 1 through 5.");
             }
 
             if (amount <= 0)

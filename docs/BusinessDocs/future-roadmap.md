@@ -41,13 +41,13 @@
 - [ ] Entry-to-Onyx graduation that preserves Entry history
 - [ ] Registration channels (online/office/presentation) with required documents (ID, bank letter)
 - [ ] SMS/WhatsApp notifications (payment confirmation, welcome, collection dates)
-- [x] Domain and persistence foundations for complete-level Entry commissions and the approved Onyx Level 1 R250 commission
-- [x] Onyx structural qualification through Level 5 without enabling unapproved higher-level earnings
+- [x] Domain and persistence foundations for complete-level Entry and Onyx commissions
+- [x] Onyx structural qualification and confirmed commission components through Level 5
 - [x] Level 3 travel eligibility, three-month waiting period, automatic activation tracking, and Club Member visibility
 - [x] Secured administrator calculation and review for the latest completed Johannesburg week
 - [ ] Confirm whether future earning periods should close on Friday instead of Sunday
 - [x] Host-administrator release and external-payment recording workflows
-- [ ] Onyx Levels 2–5 commission rules after their cumulative totals are approved
+- [x] Onyx Levels 2–5 commission rules using the confirmed per-person rates and cumulative totals
 - [ ] Jasper activation plans (Standard R950 / Premium R1200) with combo allocation
 - [ ] Virtual membership cards with QR codes
 
