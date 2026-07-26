@@ -11,6 +11,7 @@ using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Orders;
 using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.Domain.Products;
+using AqualLifeStyle.Domain.Recruitment;
 using AqualLifeStyle.Domain.Savings;
 using AqualLifeStyle.MultiTenancy;
 
@@ -38,6 +39,8 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<EntryWeeklyCommission> EntryWeeklyCommissions { get; set; }
         public virtual DbSet<EntryCommissionComponent> EntryCommissionComponents { get; set; }
         public virtual DbSet<OnyxParticipation> OnyxParticipations { get; set; }
+        public virtual DbSet<OnyxRecruiterCorrection> OnyxRecruiterCorrections { get; set; }
+        public virtual DbSet<ProgrammeInvitation> ProgrammeInvitations { get; set; }
         public virtual DbSet<OnyxCommissionPeriod> OnyxCommissionPeriods { get; set; }
         public virtual DbSet<OnyxWeeklyCommission> OnyxWeeklyCommissions { get; set; }
         public virtual DbSet<OnyxCommissionComponent> OnyxCommissionComponents { get; set; }
@@ -98,6 +101,10 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 entity.HasIndex(e => e.TenantId);
                 entity.Property(e => e.UserId).IsRequired();
                 entity.HasIndex(e => e.UserId).IsUnique();
+                entity.Property(e => e.ClubMemberNumber)
+                    .HasMaxLength(Customer.MaxClubMemberNumberLength)
+                    .IsRequired();
+                entity.HasIndex(e => e.ClubMemberNumber).IsUnique();
                 entity.HasOne(e => e.User)
                     .WithOne()
                     .HasForeignKey<Customer>(e => e.UserId)

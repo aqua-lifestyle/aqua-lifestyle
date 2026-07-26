@@ -291,7 +291,6 @@ namespace AqualLifeStyle.Domain.Onyx
             string reason,
             DateTime correctedAt)
         {
-            Id = Guid.NewGuid();
             PreviousRecruiterCustomerId = previousRecruiterCustomerId;
             NewRecruiterCustomerId = newRecruiterCustomerId;
             AdministratorUserId = administratorUserId;

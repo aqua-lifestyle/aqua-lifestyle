@@ -134,6 +134,38 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
+        public void AdministrativeRecruiterCorrection_PreservesOnyxHistoryAndIsIdempotent()
+        {
+            var originalRecruiter = OnyxParticipation.StartDirectIndependently(
+                1, 20, 7, Terms, EffectiveFrom);
+            var newRecruiter = OnyxParticipation.StartDirectIndependently(
+                1, 30, 7, Terms, EffectiveFrom);
+            Activate(originalRecruiter, "onyx-original-recruiter");
+            Activate(newRecruiter, "onyx-new-recruiter");
+            var participation = OnyxParticipation.StartDirectUnderRecruiter(
+                1, 10, originalRecruiter, 7, Terms, EffectiveFrom);
+            var correctedAt = EffectiveFrom.AddHours(1);
+
+            participation.CorrectRecruiter(
+                newRecruiter,
+                999,
+                "Verified against the signed joining record",
+                correctedAt);
+            participation.CorrectRecruiter(
+                newRecruiter,
+                999,
+                "Repeated request",
+                correctedAt.AddMinutes(1));
+
+            var correction = Assert.Single(participation.RecruiterCorrections);
+            Assert.Equal(20, correction.PreviousRecruiterCustomerId);
+            Assert.Equal(30, correction.NewRecruiterCustomerId);
+            Assert.Equal(999, correction.AdministratorUserId);
+            Assert.Equal("Verified against the signed joining record", correction.Reason);
+            Assert.Equal(30, participation.RecruiterCustomerId);
+        }
+
+        [Fact]
         public void AQGreenGraduation_StartsAnIndependentActiveOnyxNetwork()
         {
             var aqGreenParticipation = CreateActiveAQGreenParticipation();

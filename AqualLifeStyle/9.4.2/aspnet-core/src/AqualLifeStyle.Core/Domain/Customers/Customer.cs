@@ -8,9 +8,12 @@ namespace AqualLifeStyle.Domain.Customers
 {
     public class Customer : FullAuditedAggregateRoot<int>, IMayHaveTenant
     {
+        public const int MaxClubMemberNumberLength = 16;
+
         public int? TenantId { get; set; }
         public long UserId { get; private set; }
         public virtual User User { get; set; }
+        public string ClubMemberNumber { get; private set; }
         public string Name { get; private set; }
         public EmailAddress Email { get; private set; }
         public int? MembershipId { get; private set; }
@@ -32,6 +35,7 @@ namespace AqualLifeStyle.Domain.Customers
 
             TenantId = tenantId;
             UserId = userId;
+            ClubMemberNumber = $"CLB-{SecurePublicCode.Generate(12)}";
             SetName(name);
             Email = email ?? throw new ArgumentNullException(nameof(email));
             MembershipId = membershipId;

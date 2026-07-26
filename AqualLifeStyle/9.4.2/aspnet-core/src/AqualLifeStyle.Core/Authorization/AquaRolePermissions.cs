@@ -67,6 +67,7 @@ namespace AqualLifeStyle.Authorization
                     AquaPermissions.Memberships.Upgrade,
                     AquaPermissions.ProgrammeParticipations.ViewSelf,
                     AquaPermissions.ProgrammeParticipations.Join,
+                    AquaPermissions.ProgrammeParticipations.Invite,
                     AquaPermissions.Enquiries.View,
                     AquaPermissions.Enquiries.Create,
                     AquaPermissions.Enquiries.ViewSelf,

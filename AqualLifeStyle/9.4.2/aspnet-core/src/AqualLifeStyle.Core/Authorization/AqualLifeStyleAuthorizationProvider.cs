@@ -62,7 +62,7 @@ namespace AqualLifeStyle.Authorization
             CreateGroup(context, AquaPermissions.Enquiries.Default, AquaPermissions.Enquiries.View, AquaPermissions.Enquiries.Create, AquaPermissions.Enquiries.Update, AquaPermissions.Enquiries.Resolve, AquaPermissions.Enquiries.ViewSelf);
             CreateGroup(context, AquaPermissions.Referrals.Default, AquaPermissions.Referrals.View, AquaPermissions.Referrals.Create, AquaPermissions.Referrals.Confirm, AquaPermissions.Referrals.ViewSelf);
             CreateGroup(context, AquaPermissions.Memberships.Default, AquaPermissions.Memberships.View, AquaPermissions.Memberships.ViewSelf, AquaPermissions.Memberships.Upgrade);
-            CreateGroup(context, AquaPermissions.ProgrammeParticipations.Default, AquaPermissions.ProgrammeParticipations.ViewSelf, AquaPermissions.ProgrammeParticipations.Join);
+            CreateGroup(context, AquaPermissions.ProgrammeParticipations.Default, AquaPermissions.ProgrammeParticipations.ViewSelf, AquaPermissions.ProgrammeParticipations.Join, AquaPermissions.ProgrammeParticipations.Invite);
             RegisterAdminPermissions(context);
         }
 
@@ -143,7 +143,8 @@ namespace AqualLifeStyle.Authorization
             CreateChildren(
                 programmeParticipations,
                 sides,
-                AquaPermissions.Admin.ProgrammeParticipations.View);
+                AquaPermissions.Admin.ProgrammeParticipations.View,
+                AquaPermissions.Admin.ProgrammeParticipations.CorrectRecruiter);
 
             var host = MultiTenancySides.Host;
             var commissions = admin.CreateChildPermission(
