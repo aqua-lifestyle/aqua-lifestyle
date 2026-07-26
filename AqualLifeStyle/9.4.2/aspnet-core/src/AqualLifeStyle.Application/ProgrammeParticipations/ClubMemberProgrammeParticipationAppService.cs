@@ -208,7 +208,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             customer.ChangeMembership(null);
             await _customerRepository.UpdateAsync(customer);
             Logger.Warn(
-                $"Cleared legacy direct {programmeName} membership assignment tenant={customer.TenantId} customer={customer.Id}");
+                $"Cleared legacy {programmeName} membership assignment tenant={customer.TenantId} customer={customer.Id}");
         }
 
         private async Task<Customer> GetCurrentActiveCustomerAsync()
