@@ -12,7 +12,8 @@ namespace AqualLifeStyle.Domain.Payments
         EntryMonthlyCommitment = 3,
         OnyxLoanRepayment = 4,
         OnyxRental = 5,
-        SavingsContribution = 6
+        SavingsContribution = 6,
+        AQGreenJoining = 7
     }
 
     public enum MemberPaymentStatus

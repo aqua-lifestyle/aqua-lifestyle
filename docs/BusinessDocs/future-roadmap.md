@@ -32,12 +32,13 @@
 - [x] Confirmed-payment records with idempotent external references
 - [x] Separate AQGreen and Onyx participation records; never convert one into the other
 - [x] Direct Onyx activation after a confirmed R6,120 payment
-- [x] AQGreen activation after two confirmed R600 payments, with independent joining or an optional verified AQGreen recruiter
+- [x] AQGreen activation after one confirmed R1,200 joining payment, with independent joining or an optional verified AQGreen recruiter
 - [x] Secured customer joining/status screens and read-only administrator reconciliation
 - [x] Guest-to-Club-Member access promotion after verified final activation payment
 - [x] Secured AQGreen monthly-commitment history and administrator reconciliation views
 - [ ] Automatic AQGreen commitment scheduling and confirmed-payment allocation
-- [ ] Provider checkout and signed callback adapter for real payments
+- [x] Yoco hosted checkout and signed webhook activation for direct Onyx and AQGreen joining payments
+- [ ] Yoco checkout workflows for other confirmed payment purposes
 - [ ] AQGreen-to-Onyx graduation that preserves AQGreen history
 - [x] Independent Onyx network placement confirmed for AQGreen graduates
 - [ ] Registration channels (online/office/presentation) with required documents (ID, bank letter)

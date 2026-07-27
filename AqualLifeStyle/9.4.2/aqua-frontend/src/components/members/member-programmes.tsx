@@ -1,11 +1,12 @@
 "use client";
 
 import { CircleDollarSign, Network, Plane, Route } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { useAuthState } from "@/src/providers";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
+import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 import type {
   MyProgrammeParticipations,
   OnyxTravelBenefit,
@@ -14,6 +15,7 @@ import type {
 import {
   Badge,
   Breadcrumb,
+  Button,
   Card,
   Skeleton,
   StatusMessage,
@@ -29,8 +31,10 @@ const formatCurrency = (amount: number, currency: string) =>
   }).format(amount);
 
 const ParticipationCard = ({
+  paymentAction,
   participation,
 }: {
+  paymentAction?: ReactNode;
   participation: ProgrammeParticipation;
 }) => (
   <Card className="flex flex-col gap-5">
@@ -90,13 +94,14 @@ const ParticipationCard = ({
               )}
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Payment instructions will be provided by the club. Participation
-              activates only after the payment provider confirms receipt.
+              Participation activates only after the payment provider confirms
+              receipt.
             </p>
           </div>
         </div>
       </div>
     ) : null}
+    {paymentAction}
   </Card>
 );
 
@@ -163,6 +168,7 @@ export const MemberProgrammes = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
+  const [startingAQGreenPayment, setStartingAQGreenPayment] = useState(false);
 
   const loadParticipations = useCallback(async () => {
     if (!canView) {
@@ -189,19 +195,57 @@ export const MemberProgrammes = () => {
     }
   }, [canView]);
 
-  const handleJoined = async (programme: "AQGreen" | "Onyx") => {
-    await loadParticipations();
-    setSuccess(
-      programme === "Onyx"
-        ? "Onyx participation started. Your place is recorded and activation is pending the confirmed R6,120 payment."
-        : "AQGreen participation started. Your place is recorded and activation is pending the required payments.",
-    );
-  };
-
   useEffect(() => {
     const task = window.setTimeout(() => void loadParticipations(), 0);
     return () => window.clearTimeout(task);
   }, [loadParticipations]);
+
+  useEffect(() => {
+    const task = window.setTimeout(() => {
+      const paymentResult = new URLSearchParams(window.location.search).get("payment");
+      const programme = new URLSearchParams(window.location.search).get("programme");
+      if (paymentResult === "success") {
+        setSuccess(
+          programme === "aqgreen"
+            ? "Payment completed. We are waiting for Yoco's secure confirmation before activating your AQGreen participation."
+            : "Payment completed. We are waiting for Yoco's secure confirmation before creating your Onyx participation.",
+        );
+      } else if (paymentResult === "cancelled") {
+        setError(
+          programme === "aqgreen"
+            ? "Payment was cancelled. Your AQGreen place remains recorded, but it is not active."
+            : "Payment was cancelled. No Onyx participation was created.",
+        );
+      } else if (paymentResult === "failed") {
+        setError(
+          programme === "aqgreen"
+            ? "Payment was not completed. Your AQGreen participation is not active. You can try again below."
+            : "Payment was not completed. No Onyx participation was created. You can try again below.",
+        );
+      }
+    }, 0);
+    return () => window.clearTimeout(task);
+  }, []);
+
+  const startAQGreenPayment = async () => {
+    setStartingAQGreenPayment(true);
+    setError(undefined);
+    try {
+      const checkout = await httpClient.post<{ checkoutUrl: string }>(
+        apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+      );
+      navigateToExternalUrl(checkout.checkoutUrl);
+    } catch (requestError) {
+      setError(
+        getRequestErrorMessage(
+          requestError,
+          "AQGreen payment could not be started. No payment has been taken.",
+        ),
+      );
+    } finally {
+      setStartingAQGreenPayment(false);
+    }
+  };
 
   if (!canView) {
     return (
@@ -259,7 +303,31 @@ export const MemberProgrammes = () => {
         ) : participations ? (
           <div className="grid gap-5 lg:grid-cols-2">
             {participations.entry ? (
-              <ParticipationCard participation={participations.entry} />
+              <ParticipationCard
+                participation={participations.entry}
+                paymentAction={
+                  participations.entry.isActive ? undefined : participations.pendingAQGreenCheckout ? (
+                    <a
+                      className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
+                      href={participations.pendingAQGreenCheckout.checkoutUrl}
+                    >
+                      Continue secure payment
+                    </a>
+                  ) : participations.entry.nextPaymentAmount === 1200 ? (
+                    <Button
+                      isLoading={startingAQGreenPayment}
+                      onClick={() => void startAQGreenPayment()}
+                    >
+                      Pay R1,200 securely
+                    </Button>
+                  ) : (
+                    <StatusMessage tone="info">
+                      Contact the club team to complete your previous AQGreen
+                      payment arrangement without being charged again.
+                    </StatusMessage>
+                  )
+                }
+              />
             ) : (
               <Card className="flex flex-col items-start gap-4">
                 <Route className="size-8 text-accent" />
@@ -270,15 +338,40 @@ export const MemberProgrammes = () => {
                     Onyx participation later. A recruiter is optional.
                   </p>
                 </div>
-                <JoinProgrammeDialog
-                  onJoined={() => handleJoined("AQGreen")}
-                  programme="AQGreen"
-                />
+                <JoinProgrammeDialog programme="AQGreen" />
               </Card>
             )}
 
             {participations.onyx ? (
               <ParticipationCard participation={participations.onyx} />
+            ) : participations.pendingDirectOnyxCheckout ? (
+              <Card className="flex flex-col items-start gap-4">
+                <Network className="size-8 text-accent" />
+                <div>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-bold">Onyx</h2>
+                    <Badge tone="warning">
+                      {participations.pendingDirectOnyxCheckout.status}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Your Onyx participation and network place do not exist yet.
+                    They will be created only after Yoco confirms the full payment.
+                  </p>
+                  <p className="mt-3 text-2xl font-bold">
+                    {formatCurrency(
+                      participations.pendingDirectOnyxCheckout.amount,
+                      participations.pendingDirectOnyxCheckout.currency,
+                    )}
+                  </p>
+                </div>
+                <a
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
+                  href={participations.pendingDirectOnyxCheckout.checkoutUrl}
+                >
+                  Continue secure payment
+                </a>
+              </Card>
             ) : (
               <Card className="flex flex-col items-start gap-4">
                 <Network className="size-8 text-accent" />
@@ -289,10 +382,7 @@ export const MemberProgrammes = () => {
                     R6,120 payment. AQGreen is not required and a recruiter is optional.
                   </p>
                 </div>
-                <JoinProgrammeDialog
-                  onJoined={() => handleJoined("Onyx")}
-                  programme="Onyx"
-                />
+                <JoinProgrammeDialog programme="Onyx" />
               </Card>
             )}
             {participations.travelBenefit ? (

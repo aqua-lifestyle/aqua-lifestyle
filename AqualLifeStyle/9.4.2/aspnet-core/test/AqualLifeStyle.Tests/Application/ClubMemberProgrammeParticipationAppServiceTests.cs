@@ -86,8 +86,8 @@ namespace AqualLifeStyle.Tests.Application
             repeated.Status.ShouldBe(first.Status);
 
             var programmeException = await Should.ThrowAsync<UserFriendlyException>(() =>
-                _participationService.StartDirectOnyxAsync(
-                    new StartDirectOnyxParticipationInput { InviteCode = inviteCode }));
+                _participationService.CreateDirectOnyxCheckoutAsync(
+                    new CreateDirectOnyxCheckoutInput { InviteCode = inviteCode }));
             programmeException.Details.ShouldContain("different programme");
 
             await UsingDbContextAsync(1, async context =>
@@ -135,17 +135,19 @@ namespace AqualLifeStyle.Tests.Application
                     item.Code == inviteCode)).ShouldBeTrue();
             });
 
-            var first = await _participationService.StartDirectOnyxAsync(
-                new StartDirectOnyxParticipationInput { InviteCode = inviteCode });
-            var repeated = await _participationService.StartDirectOnyxAsync(
-                new StartDirectOnyxParticipationInput { InviteCode = inviteCode });
-            repeated.Status.ShouldBe(first.Status);
+            var first = await _participationService.CreateDirectOnyxCheckoutAsync(
+                new CreateDirectOnyxCheckoutInput { InviteCode = inviteCode });
+            var repeated = await _participationService.CreateDirectOnyxCheckoutAsync(
+                new CreateDirectOnyxCheckoutInput { InviteCode = inviteCode });
+            repeated.CheckoutUrl.ShouldBe(first.CheckoutUrl);
 
             await UsingDbContextAsync(1, async context =>
             {
-                var participation = await context.OnyxParticipations.SingleAsync(item =>
+                (await context.OnyxParticipations.AnyAsync(item =>
+                    item.CustomerId == inviteeCustomerId)).ShouldBeFalse();
+                var checkout = await context.DirectOnyxCheckoutIntents.SingleAsync(item =>
                     item.CustomerId == inviteeCustomerId);
-                participation.RecruiterCustomerId.ShouldBe(recruiterCustomerId);
+                checkout.RecruiterCustomerId.ShouldBe(recruiterCustomerId);
                 (await context.EntryParticipations.AnyAsync(item =>
                     item.CustomerId == inviteeCustomerId)).ShouldBeFalse();
             });
@@ -175,8 +177,8 @@ namespace AqualLifeStyle.Tests.Application
                     new StartEntryParticipationInput { InviteCode = inviteCode }));
             aqGreenMismatch.Details.ShouldContain("different programme");
             var onyxMismatch = await Should.ThrowAsync<UserFriendlyException>(() =>
-                _participationService.StartDirectOnyxAsync(
-                    new StartDirectOnyxParticipationInput { InviteCode = inviteCode }));
+                _participationService.CreateDirectOnyxCheckoutAsync(
+                    new CreateDirectOnyxCheckoutInput { InviteCode = inviteCode }));
             onyxMismatch.Details.ShouldContain("different programme");
 
             await UsingDbContextAsync(1, async context =>
@@ -307,30 +309,203 @@ namespace AqualLifeStyle.Tests.Application
                 new StartEntryParticipationInput());
             var repeatedEntry = await _participationService.StartEntryAsync(
                 new StartEntryParticipationInput());
-            var onyx = await _participationService.StartDirectOnyxAsync(
-                new StartDirectOnyxParticipationInput());
+            var onyxCheckout = await _participationService.CreateDirectOnyxCheckoutAsync(
+                new CreateDirectOnyxCheckoutInput());
 
             repeatedEntry.Status.ShouldBe(entry.Status);
             entry.ProgrammeName.ShouldBe("AQGreen");
-            entry.Status.ShouldBe("Awaiting registration payment");
+            entry.Status.ShouldBe("Awaiting joining payment");
             entry.JoinedIndependently.ShouldBeTrue();
-            entry.NextPaymentAmount.ShouldBe(600m);
-            entry.NextPaymentDescription.ShouldBe("Registration payment");
+            entry.NextPaymentAmount.ShouldBe(1200m);
+            entry.NextPaymentDescription.ShouldBe("Full AQGreen joining payment");
             entry.CanRecruitForThisProgramme.ShouldBeFalse();
 
-            onyx.ProgrammeName.ShouldBe("Onyx");
-            onyx.Status.ShouldBe("Awaiting full payment");
-            onyx.JoinedIndependently.ShouldBeTrue();
-            onyx.NextPaymentAmount.ShouldBe(6120m);
-            onyx.NextPaymentDescription.ShouldBe("Full Onyx participation payment");
-            onyx.CanRecruitForThisProgramme.ShouldBeFalse();
+            onyxCheckout.Amount.ShouldBe(6120m);
+            onyxCheckout.Currency.ShouldBe("ZAR");
+            onyxCheckout.CheckoutUrl.ShouldStartWith("https://payments.example.test/");
 
             await UsingDbContextAsync(1, async context =>
             {
                 (await context.EntryParticipations.CountAsync(
                     participation => participation.CustomerId == customerId)).ShouldBe(1);
                 (await context.OnyxParticipations.CountAsync(
-                    participation => participation.CustomerId == customerId)).ShouldBe(1);
+                    participation => participation.CustomerId == customerId)).ShouldBe(0);
+                (await context.DirectOnyxCheckoutIntents.CountAsync(
+                    intent => intent.CustomerId == customerId)).ShouldBe(1);
+            });
+        }
+
+        [Fact]
+        public async Task DirectOnyxCheckout_CreatesParticipationOnlyAfterVerifiedPayment()
+        {
+            var customerId = await RegisterAndSignInCustomerAsync();
+            var checkout = await _participationService.CreateDirectOnyxCheckoutAsync(
+                new CreateDirectOnyxCheckoutInput());
+            checkout.Amount.ShouldBe(6120m);
+
+            var intentId = await UsingDbContextAsync(1, async context =>
+            {
+                (await context.OnyxParticipations.AnyAsync(item =>
+                    item.CustomerId == customerId)).ShouldBeFalse();
+                (await context.MemberPayments.AnyAsync(item =>
+                    item.CustomerId == customerId &&
+                    item.Purpose == MemberPaymentPurpose.OnyxDirectEntry)).ShouldBeFalse();
+                var intent = await context.DirectOnyxCheckoutIntents.SingleAsync(item =>
+                    item.CustomerId == customerId);
+                intent.Status.ShouldBe(HostedPaymentCheckoutStatus.AwaitingPayment);
+                return intent.Id;
+            });
+
+            var processor = Resolve<ProgrammePaymentConfirmationProcessor>();
+            await Should.ThrowAsync<InvalidOperationException>(() =>
+                processor.ProcessDirectOnyxCheckoutAsync(
+                    intentId,
+                    "Yoco",
+                    $"wrong-amount-{Guid.NewGuid():N}",
+                    $"checkout_{intentId:N}",
+                    6119m,
+                    "ZAR",
+                    DateTime.UtcNow));
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.OnyxParticipations.AnyAsync(item =>
+                    item.CustomerId == customerId)).ShouldBeFalse();
+                (await context.MemberPayments.AnyAsync(item =>
+                    item.CustomerId == customerId &&
+                    item.Purpose == MemberPaymentPurpose.OnyxDirectEntry)).ShouldBeFalse();
+            });
+
+            var paymentReference = $"yoco-payment-{Guid.NewGuid():N}";
+            var first = await processor.ProcessDirectOnyxCheckoutAsync(
+                intentId,
+                "Yoco",
+                paymentReference,
+                $"checkout_{intentId:N}",
+                6120m,
+                "ZAR",
+                DateTime.UtcNow);
+            var repeated = await processor.ProcessDirectOnyxCheckoutAsync(
+                intentId,
+                "Yoco",
+                paymentReference,
+                $"checkout_{intentId:N}",
+                6120m,
+                "ZAR",
+                DateTime.UtcNow);
+            repeated.WasAlreadyProcessed.ShouldBeTrue();
+            repeated.PaymentId.ShouldBe(first.PaymentId);
+            repeated.ParticipationId.ShouldBe(first.ParticipationId);
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.OnyxParticipations.SingleAsync(item =>
+                    item.CustomerId == customerId);
+                participation.Status.ShouldBe(OnyxParticipationStatus.Active);
+                participation.RecruiterCustomerId.ShouldBeNull();
+                participation.DirectEntryPaymentId.ShouldBe(first.PaymentId);
+                var intent = await context.DirectOnyxCheckoutIntents.SingleAsync(item =>
+                    item.Id == intentId);
+                intent.Status.ShouldBe(HostedPaymentCheckoutStatus.Completed);
+                intent.ParticipationId.ShouldBe(participation.Id);
+                (await context.MemberPayments.CountAsync(item =>
+                    item.CustomerId == customerId &&
+                    item.Purpose == MemberPaymentPurpose.OnyxDirectEntry)).ShouldBe(1);
+            });
+        }
+
+        [Fact]
+        public async Task AQGreenCheckout_ActivatesOnlyAfterOneVerifiedTwelveHundredRandPayment()
+        {
+            var customerId = await RegisterAndSignInCustomerAsync();
+            await _participationService.StartEntryAsync(
+                new StartEntryParticipationInput());
+            var checkoutResult = await _participationService
+                .CreateAQGreenJoiningCheckoutAsync();
+            var repeatedCheckout = await _participationService
+                .CreateAQGreenJoiningCheckoutAsync();
+
+            repeatedCheckout.CheckoutUrl.ShouldBe(checkoutResult.CheckoutUrl);
+            checkoutResult.Amount.ShouldBe(1200m);
+            checkoutResult.Currency.ShouldBe("ZAR");
+
+            var checkout = await UsingDbContextAsync(1, async context =>
+            {
+                var persisted = await context.AQGreenJoiningCheckouts.SingleAsync(
+                    item => item.CustomerId == customerId);
+                persisted.Status.ShouldBe(HostedPaymentCheckoutStatus.AwaitingPayment);
+                (await context.MemberPayments.AnyAsync(item =>
+                    item.CustomerId == customerId &&
+                    item.Purpose == MemberPaymentPurpose.AQGreenJoining)).ShouldBeFalse();
+                (await context.EntryParticipations.SingleAsync(item =>
+                    item.CustomerId == customerId)).Status.ShouldBe(
+                    EntryParticipationStatus.AwaitingJoiningPayment);
+                return persisted;
+            });
+
+            var processor = Resolve<ProgrammePaymentConfirmationProcessor>();
+            await Should.ThrowAsync<InvalidOperationException>(() =>
+                processor.ProcessAQGreenJoiningCheckoutAsync(
+                    checkout.Id,
+                    "Yoco",
+                    $"wrong-checkout-{Guid.NewGuid():N}",
+                    "checkout_that_does_not_match",
+                    1200m,
+                    "ZAR",
+                    DateTime.UtcNow));
+            await Should.ThrowAsync<InvalidOperationException>(() =>
+                processor.ProcessAQGreenJoiningCheckoutAsync(
+                    checkout.Id,
+                    "Yoco",
+                    $"wrong-amount-{Guid.NewGuid():N}",
+                    checkout.ProviderCheckoutId,
+                    600m,
+                    "ZAR",
+                    DateTime.UtcNow));
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.MemberPayments.AnyAsync(item =>
+                    item.CustomerId == customerId &&
+                    item.Purpose == MemberPaymentPurpose.AQGreenJoining)).ShouldBeFalse();
+                (await context.EntryParticipations.SingleAsync(item =>
+                    item.CustomerId == customerId)).Status.ShouldBe(
+                    EntryParticipationStatus.AwaitingJoiningPayment);
+            });
+
+            var paymentReference = $"aqgreen-payment-{Guid.NewGuid():N}";
+            var first = await processor.ProcessAQGreenJoiningCheckoutAsync(
+                checkout.Id,
+                "Yoco",
+                paymentReference,
+                checkout.ProviderCheckoutId,
+                1200m,
+                "ZAR",
+                DateTime.UtcNow);
+            var repeated = await processor.ProcessAQGreenJoiningCheckoutAsync(
+                checkout.Id,
+                "Yoco",
+                paymentReference,
+                checkout.ProviderCheckoutId,
+                1200m,
+                "ZAR",
+                DateTime.UtcNow);
+
+            repeated.WasAlreadyProcessed.ShouldBeTrue();
+            repeated.PaymentId.ShouldBe(first.PaymentId);
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations.SingleAsync(
+                    item => item.CustomerId == customerId);
+                participation.Status.ShouldBe(EntryParticipationStatus.Active);
+                participation.JoiningPaymentId.ShouldBe(first.PaymentId);
+                var persistedCheckout = await context.AQGreenJoiningCheckouts.SingleAsync(
+                    item => item.Id == checkout.Id);
+                persistedCheckout.Status.ShouldBe(HostedPaymentCheckoutStatus.Completed);
+                persistedCheckout.PaymentId.ShouldBe(first.PaymentId);
+                (await context.MemberPayments.CountAsync(item =>
+                    item.CustomerId == customerId &&
+                    item.Purpose == MemberPaymentPurpose.AQGreenJoining)).ShouldBe(1);
             });
         }
 
@@ -350,14 +525,15 @@ namespace AqualLifeStyle.Tests.Application
             customer.ChangeMembership(onyxMembershipId);
             await customerRepository.UpdateAsync(customer);
 
-            var participation = await _participationService.StartDirectOnyxAsync(
-                new StartDirectOnyxParticipationInput());
+            await _participationService.CreateDirectOnyxCheckoutAsync(
+                new CreateDirectOnyxCheckoutInput());
 
-            participation.Status.ShouldBe("Awaiting full payment");
             await UsingDbContextAsync(1, async context =>
             {
                 var customer = await context.Customers.SingleAsync(item => item.Id == customerId);
-                customer.MembershipId.ShouldBeNull();
+                customer.MembershipId.ShouldBe(onyxMembershipId);
+                (await context.OnyxParticipations.AnyAsync(item =>
+                    item.CustomerId == customerId)).ShouldBeFalse();
             });
         }
 
@@ -430,41 +606,45 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task RecruiterParticipation_MustBelongToTheSameArea()
+        public async Task AQGreenRecruitment_CanCrossAreaBoundaries()
         {
-            await RegisterAndSignInCustomerAsync();
+            var customerId = await RegisterAndSignInCustomerAsync();
             var recruiterCustomerId =
                 await CreateActiveEntryParticipantAsync(2);
 
-            var exception = await Should.ThrowAsync<UserFriendlyException>(() =>
-                _participationService.StartEntryAsync(
-                    new StartEntryParticipationInput
-                    {
-                        RecruiterCustomerId = recruiterCustomerId
-                    }));
+            await _participationService.StartEntryAsync(
+                new StartEntryParticipationInput
+                {
+                    RecruiterCustomerId = recruiterCustomerId
+                });
 
-            exception.Message.ShouldBe("The recruiter could not be accepted.");
-            exception.Details.ShouldContain(
-                "not currently participating in AQGreen");
+            await UsingDbContextAsync(1, async context =>
+                (await context.EntryParticipations.SingleAsync(item =>
+                    item.CustomerId == customerId)).RecruiterCustomerId
+                    .ShouldBe(recruiterCustomerId));
         }
 
         [Fact]
-        public async Task OnyxRecruiterParticipation_MustBelongToTheSameArea()
+        public async Task OnyxRecruitment_CanCrossAreaBoundariesWithoutPrematurePlacement()
         {
-            await RegisterAndSignInCustomerAsync();
+            var customerId = await RegisterAndSignInCustomerAsync();
             var recruiterCustomerId =
                 await CreateActiveOnyxParticipantAsync(2);
 
-            var exception = await Should.ThrowAsync<UserFriendlyException>(() =>
-                _participationService.StartDirectOnyxAsync(
-                    new StartDirectOnyxParticipationInput
-                    {
-                        RecruiterCustomerId = recruiterCustomerId
-                    }));
+            await _participationService.CreateDirectOnyxCheckoutAsync(
+                new CreateDirectOnyxCheckoutInput
+                {
+                    RecruiterCustomerId = recruiterCustomerId
+                });
 
-            exception.Message.ShouldBe("The recruiter could not be accepted.");
-            exception.Details.ShouldContain(
-                "not currently participating in Onyx");
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.DirectOnyxCheckoutIntents.SingleAsync(item =>
+                    item.CustomerId == customerId)).RecruiterCustomerId
+                    .ShouldBe(recruiterCustomerId);
+                (await context.OnyxParticipations.AnyAsync(item =>
+                    item.CustomerId == customerId)).ShouldBeFalse();
+            });
         }
 
         private async Task<int> RegisterAndSignInCustomerAsync()
@@ -503,28 +683,35 @@ namespace AqualLifeStyle.Tests.Application
         private async Task ActivateCurrentAQGreenParticipationAsync(int customerId)
         {
             await _participationService.StartEntryAsync(new StartEntryParticipationInput());
-            var suffix = Guid.NewGuid().ToString("N");
-            var processor = Resolve<ProgrammePaymentConfirmationProcessor>();
-            await processor.ProcessAsync(CreateConfirmation(
-                customerId,
-                MemberPaymentPurpose.EntryRegistration,
-                $"invite-registration-{suffix}"));
-            await processor.ProcessAsync(CreateConfirmation(
-                customerId,
-                MemberPaymentPurpose.EntryActivation,
-                $"invite-activation-{suffix}"));
+            await _participationService.CreateAQGreenJoiningCheckoutAsync();
+            var checkout = await UsingDbContextAsync(1, context =>
+                context.AQGreenJoiningCheckouts.SingleAsync(
+                    item => item.CustomerId == customerId));
+            await Resolve<ProgrammePaymentConfirmationProcessor>()
+                .ProcessAQGreenJoiningCheckoutAsync(
+                    checkout.Id,
+                    "Test",
+                    $"invite-aqgreen-{Guid.NewGuid():N}",
+                    checkout.ProviderCheckoutId,
+                    1200m,
+                    "ZAR",
+                    DateTime.UtcNow);
         }
 
         private async Task ActivateCurrentOnyxParticipationAsync(int customerId)
         {
-            await _participationService.StartDirectOnyxAsync(
-                new StartDirectOnyxParticipationInput());
-            await Resolve<ProgrammePaymentConfirmationProcessor>().ProcessAsync(
-                CreateConfirmation(
-                    customerId,
-                    MemberPaymentPurpose.OnyxDirectEntry,
-                    $"invite-onyx-{Guid.NewGuid():N}",
-                    6120m));
+            await _participationService.CreateDirectOnyxCheckoutAsync(
+                new CreateDirectOnyxCheckoutInput());
+            var intent = await UsingDbContextAsync(1, context => context.DirectOnyxCheckoutIntents
+                .SingleAsync(item => item.CustomerId == customerId));
+            await Resolve<ProgrammePaymentConfirmationProcessor>().ProcessDirectOnyxCheckoutAsync(
+                intent.Id,
+                "Test",
+                $"invite-onyx-{Guid.NewGuid():N}",
+                intent.ProviderCheckoutId,
+                6120m,
+                "ZAR",
+                DateTime.UtcNow);
         }
 
         private static ConfirmedProgrammePayment CreateConfirmation(
@@ -593,19 +780,14 @@ namespace AqualLifeStyle.Tests.Application
                     customer.Id,
                     Resolve<ICurrentProgrammeTermsProvider>().GetEntryTerms(),
                     DateTime.UtcNow.AddMinutes(-2));
-                var registration = CreateConfirmedPayment(
+                var joiningPayment = CreateConfirmedPayment(
                     tenantId,
                     customer.Id,
-                    MemberPaymentPurpose.EntryRegistration,
-                    $"cross-area-registration-{suffix}");
-                participation.ApplyConfirmedActivationPayment(registration);
-                var activation = CreateConfirmedPayment(
-                    tenantId,
-                    customer.Id,
-                    MemberPaymentPurpose.EntryActivation,
-                    $"cross-area-activation-{suffix}");
-                participation.ApplyConfirmedActivationPayment(activation);
-                context.MemberPayments.AddRange(registration, activation);
+                    MemberPaymentPurpose.AQGreenJoining,
+                    $"cross-area-joining-{suffix}",
+                    1200m);
+                participation.ApplyConfirmedJoiningPayment(joiningPayment);
+                context.MemberPayments.Add(joiningPayment);
                 context.EntryParticipations.Add(participation);
                 await context.SaveChangesAsync();
                 return customer.Id;

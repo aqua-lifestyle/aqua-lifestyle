@@ -17,8 +17,8 @@ rules below.
   must not be treated as a separate programme.
 - Direct entrants create an Onyx participation only after a confirmed R6,120
   payment.
-- AQGreen entrants create a separate AQGreen participation and qualify only after two
-  confirmed R600 payments.
+- AQGreen entrants create a separate AQGreen participation and qualify only after one
+  confirmed R1,200 joining payment.
 - AQGreen Level 2 makes the loan agreement available. Member acceptance followed
   by administrator approval makes the agreement effective. Creation of the
   separate Onyx participation uses independent placement: the graduate has no
@@ -51,8 +51,7 @@ administrator correction.
 
 The current AQGreen terms are:
 
-- registration payment: R600;
-- activation payment: R600;
+- joining payment: R1,200;
 - monthly commitment: R600;
 - grace period: seven days;
 - complete Level 1 component: R150;
@@ -153,12 +152,16 @@ The persistence and provider-neutral confirmation foundation is complete:
   member payments have explicit EF Core mappings and a PostgreSQL migration.
 - A provider/reference pair is unique across the payment ledger.
 - A verified confirmation is reconciled idempotently and invokes the domain
-  transition for AQGreen registration, AQGreen activation, or direct Onyx entry.
+  transition for an AQGreen joining payment, legacy AQGreen split payments, or direct Onyx entry.
 - The confirmation processor is an internal application component, not a remote
   application service. Customers and administrators cannot call it as an API to
   mark a payment successful.
-- Provider-specific callback verification remains intentionally unimplemented
-  until Yoco credentials, signing rules, and webhook specifications are supplied.
+- Direct Onyx and AQGreen joining now use persisted checkout records, Yoco's
+  hosted checkout, and signature-verified payment webhooks. The adapter checks
+  timestamp freshness, deployment mode, exact amount/currency, invitation and
+  recruiter eligibility, and provider-reference idempotency before atomically
+  creating or activating programme state. AQGreen placement exists before payment,
+  but it becomes active only after the verified full R1,200 payment.
 
 ### Phase 3 obligation status
 

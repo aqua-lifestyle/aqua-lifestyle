@@ -103,8 +103,10 @@ export const apiEndpoints = {
       "/api/services/app/ProgrammeInvitation/GetMyInvitations",
     getInvitationPreview: (inviteCode: string) =>
       `/api/services/app/ProgrammeInvitation/GetPreview?InviteCode=${encodeURIComponent(inviteCode)}`,
-    startDirectOnyx:
-      "/api/services/app/ClubMemberProgrammeParticipation/StartDirectOnyx",
+    createDirectOnyxCheckout:
+      "/api/services/app/ClubMemberProgrammeParticipation/CreateDirectOnyxCheckout",
+    createAQGreenJoiningCheckout:
+      "/api/services/app/ClubMemberProgrammeParticipation/CreateAQGreenJoiningCheckout",
     startEntry:
       "/api/services/app/ClubMemberProgrammeParticipation/StartEntry",
   },

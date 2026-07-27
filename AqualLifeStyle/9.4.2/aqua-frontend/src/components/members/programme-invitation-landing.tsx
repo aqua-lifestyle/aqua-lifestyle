@@ -1,12 +1,14 @@
 "use client";
 
-import { CheckCircle2, Network, ShieldCheck } from "lucide-react";
+import { Network, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useAuthState } from "@/src/providers";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import type { ProgrammeInvitationPreview } from "@/src/shared/domain/programme-invitations";
+import type { ProgrammeCheckout } from "@/src/shared/domain/programme-participations";
+import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 import { Button, Card, LinkButton, Skeleton, StatusMessage } from "@/src/shared/ui";
 
 const unsupportedProgrammeMessage =
@@ -17,7 +19,7 @@ const getProgrammeJoinEndpoint = (programmeKey: string) => {
     case "AQGREEN":
       return apiEndpoints.programmeParticipations.startEntry;
     case "ONYX":
-      return apiEndpoints.programmeParticipations.startDirectOnyx;
+      return apiEndpoints.programmeParticipations.createDirectOnyxCheckout;
     default:
       return undefined;
   }
@@ -29,7 +31,6 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string>();
-  const [joined, setJoined] = useState(false);
 
   useEffect(() => {
     void httpClient
@@ -55,8 +56,21 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
     setJoining(true);
     setError(undefined);
     try {
-      await httpClient.post(endpoint, { inviteCode: preview.inviteCode });
-      setJoined(true);
+      if (preview.programmeKey === "ONYX") {
+        const checkout = await httpClient.post<
+          ProgrammeCheckout,
+          { inviteCode: string }
+        >(endpoint, {
+          inviteCode: preview.inviteCode,
+        });
+        navigateToExternalUrl(checkout.checkoutUrl);
+      } else {
+        await httpClient.post(endpoint, { inviteCode: preview.inviteCode });
+        const checkout = await httpClient.post<ProgrammeCheckout>(
+          apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+        );
+        navigateToExternalUrl(checkout.checkoutUrl);
+      }
     } catch (requestError) {
       setError(
         getRequestErrorMessage(
@@ -112,33 +126,24 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
             </div>
 
             <StatusMessage tone="info">
-              Confirming records your place under this recruiter. Your
-              participation activates only after the required payment is
-              confirmed. Activation does not automatically pay commissions.
+              {preview.programmeKey === "ONYX"
+                ? "Confirming continues to Yoco for the full R6,120 payment. Your Onyx participation and network place are created only after Yoco confirms payment."
+                : "Confirming records your AQGreen place under this recruiter and continues to Yoco for one full R1,200 payment. Participation activates only after Yoco confirms payment."}
             </StatusMessage>
 
             {!programmeJoinEndpoint ? (
               <StatusMessage tone="error">
                 {unsupportedProgrammeMessage}
               </StatusMessage>
-            ) : joined ? (
-              <div className="flex flex-col items-center gap-4 text-center">
-                <CheckCircle2 className="size-10 text-success" />
-                <div>
-                  <h2 className="text-xl font-bold">Your network place is recorded</h2>
-                  <p className="mt-2 text-muted-foreground">
-                    Review your programme page for activation and payment instructions.
-                  </p>
-                </div>
-                <LinkButton href="/member/programmes">View my programmes</LinkButton>
-              </div>
             ) : session ? (
               <Button
                 disabled={!preview.recruiterEligible}
                 isLoading={joining}
                 onClick={() => void confirm()}
               >
-                Confirm and join this network
+                {preview.programmeKey === "ONYX"
+                  ? "Confirm and continue to payment"
+                  : "Confirm and continue to payment"}
               </Button>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">

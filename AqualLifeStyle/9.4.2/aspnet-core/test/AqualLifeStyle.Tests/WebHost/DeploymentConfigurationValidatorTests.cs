@@ -12,7 +12,7 @@ namespace AqualLifeStyle.Tests.WebHost
     /// <summary>
     /// Covers <see cref="DeploymentConfigurationValidator"/>, which fails fast at startup when a
     /// Production deployment is missing required configuration (connection string, JWT key,
-    /// public addresses, Redis) or still has a placeholder value from appsettings.Production.json.
+    /// public addresses, Redis, Yoco) or still has a placeholder value from appsettings.Production.json.
     /// </summary>
     public class DeploymentConfigurationValidatorTests
     {
@@ -40,7 +40,10 @@ namespace AqualLifeStyle.Tests.WebHost
                 ["App:ClientRootAddress"] = "https://app.example.com/",
                 ["App:CorsOrigins"] = "https://app.example.com",
                 ["Authentication:JwtBearer:SecurityKey"] = "a-real-secret-key",
-                ["Redis:Configuration"] = "redis:6379"
+                ["Redis:Configuration"] = "redis:6379",
+                ["Yoco:SecretKey"] = "sk_test_safe-test-placeholder",
+                ["Yoco:WebhookSecret"] = "whsec_safe-test-placeholder",
+                ["Yoco:Mode"] = "test"
             };
         }
 
@@ -120,6 +123,20 @@ namespace AqualLifeStyle.Tests.WebHost
         }
 
         [Fact]
+        public void Validate_InProduction_WithLiveModeAndTestKey_RejectsMismatch()
+        {
+            var settings = CompleteProductionSettings();
+            settings["Yoco:Mode"] = "live";
+            var services = BuildServiceProvider("Production", settings);
+
+            var ex = Should.Throw<InvalidOperationException>(
+                () => DeploymentConfigurationValidator.Validate(services));
+
+            ex.Message.ShouldContain("mode");
+            ex.Message.ShouldContain("prefix");
+        }
+
+        [Fact]
         public void Validate_InProduction_WithNothingConfigured_ListsEveryMissingSetting()
         {
             var services = BuildServiceProvider("Production", new Dictionary<string, string>());
@@ -133,6 +150,9 @@ namespace AqualLifeStyle.Tests.WebHost
             ex.Message.ShouldContain("App__CorsOrigins");
             ex.Message.ShouldContain("Authentication__JwtBearer__SecurityKey");
             ex.Message.ShouldContain("Redis__Configuration");
+            ex.Message.ShouldContain("Yoco__SecretKey");
+            ex.Message.ShouldContain("Yoco__WebhookSecret");
+            ex.Message.ShouldContain("Yoco__Mode");
         }
     }
 }

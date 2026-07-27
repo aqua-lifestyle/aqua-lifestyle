@@ -6,6 +6,7 @@ namespace AqualLifeStyle.Domain.Onyx
     {
         public string Version { get; }
         public DateTime EffectiveFrom { get; }
+        public decimal JoiningPaymentAmount { get; }
         public decimal RegistrationPaymentAmount { get; }
         public decimal ActivationPaymentAmount { get; }
         public decimal MonthlyCommitmentAmount { get; }
@@ -15,6 +16,7 @@ namespace AqualLifeStyle.Domain.Onyx
         private EntryProgrammeTerms(
             string version,
             DateTime effectiveFrom,
+            decimal joiningPaymentAmount,
             decimal registrationPaymentAmount,
             decimal activationPaymentAmount,
             decimal monthlyCommitmentAmount,
@@ -31,8 +33,20 @@ namespace AqualLifeStyle.Domain.Onyx
                 throw new ArgumentException("An effective date is required.", nameof(effectiveFrom));
             }
 
-            EnsurePositive(registrationPaymentAmount, nameof(registrationPaymentAmount));
-            EnsurePositive(activationPaymentAmount, nameof(activationPaymentAmount));
+            if (joiningPaymentAmount > 0m)
+            {
+                EnsurePositive(joiningPaymentAmount, nameof(joiningPaymentAmount));
+                if (registrationPaymentAmount != 0m || activationPaymentAmount != 0m)
+                {
+                    throw new ArgumentException(
+                        "Single-payment terms cannot also define legacy split payments.");
+                }
+            }
+            else
+            {
+                EnsurePositive(registrationPaymentAmount, nameof(registrationPaymentAmount));
+                EnsurePositive(activationPaymentAmount, nameof(activationPaymentAmount));
+            }
             EnsurePositive(monthlyCommitmentAmount, nameof(monthlyCommitmentAmount));
             if (gracePeriodDays < 0)
             {
@@ -41,6 +55,7 @@ namespace AqualLifeStyle.Domain.Onyx
 
             Version = version.Trim();
             EffectiveFrom = effectiveFrom;
+            JoiningPaymentAmount = joiningPaymentAmount;
             RegistrationPaymentAmount = registrationPaymentAmount;
             ActivationPaymentAmount = activationPaymentAmount;
             MonthlyCommitmentAmount = monthlyCommitmentAmount;
@@ -60,8 +75,28 @@ namespace AqualLifeStyle.Domain.Onyx
             return new EntryProgrammeTerms(
                 version,
                 effectiveFrom,
+                joiningPaymentAmount: 0m,
                 registrationPaymentAmount,
                 activationPaymentAmount,
+                monthlyCommitmentAmount,
+                gracePeriodDays,
+                currency);
+        }
+
+        public static EntryProgrammeTerms CreateSingleJoiningPayment(
+            string version,
+            DateTime effectiveFrom,
+            decimal joiningPaymentAmount,
+            decimal monthlyCommitmentAmount,
+            int gracePeriodDays,
+            string currency = "ZAR")
+        {
+            return new EntryProgrammeTerms(
+                version,
+                effectiveFrom,
+                joiningPaymentAmount,
+                registrationPaymentAmount: 0m,
+                activationPaymentAmount: 0m,
                 monthlyCommitmentAmount,
                 gracePeriodDays,
                 currency);

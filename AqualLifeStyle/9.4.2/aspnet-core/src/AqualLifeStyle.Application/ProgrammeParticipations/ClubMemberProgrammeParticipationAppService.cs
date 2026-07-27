@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Transactions;
 using Abp.Auditing;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
@@ -14,7 +15,10 @@ using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
+using AqualLifeStyle.Domain.Payments;
+using AqualLifeStyle.Payments.Yoco;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace AqualLifeStyle.Application.ProgrammeParticipations
 {
@@ -27,10 +31,17 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         private readonly IMembershipRepository _membershipRepository;
         private readonly IRepository<EntryParticipation, Guid> _entryParticipationRepository;
         private readonly IRepository<OnyxParticipation, Guid> _onyxParticipationRepository;
+        private readonly IRepository<DirectOnyxCheckoutIntent, Guid>
+            _directOnyxCheckoutIntentRepository;
+        private readonly IRepository<AQGreenJoiningCheckout, Guid>
+            _aqGreenJoiningCheckoutRepository;
         private readonly IRepository<OnyxTravelBenefitEntitlement, Guid>
             _travelBenefitRepository;
         private readonly ICurrentProgrammeTermsProvider _termsProvider;
         private readonly IProgrammeInvitationResolver _invitationResolver;
+        private readonly IYocoCheckoutGateway _yocoCheckoutGateway;
+        private readonly IUnitOfWorkManager _unitOfWorkManager;
+        private readonly IConfiguration _configuration;
 
         protected virtual DateTime UtcNow => DateTime.UtcNow;
 
@@ -39,17 +50,27 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             IMembershipRepository membershipRepository,
             IRepository<EntryParticipation, Guid> entryParticipationRepository,
             IRepository<OnyxParticipation, Guid> onyxParticipationRepository,
+            IRepository<DirectOnyxCheckoutIntent, Guid> directOnyxCheckoutIntentRepository,
+            IRepository<AQGreenJoiningCheckout, Guid> aqGreenJoiningCheckoutRepository,
             IRepository<OnyxTravelBenefitEntitlement, Guid> travelBenefitRepository,
             ICurrentProgrammeTermsProvider termsProvider,
-            IProgrammeInvitationResolver invitationResolver)
+            IProgrammeInvitationResolver invitationResolver,
+            IYocoCheckoutGateway yocoCheckoutGateway,
+            IUnitOfWorkManager unitOfWorkManager,
+            IConfiguration configuration)
         {
             _customerRepository = customerRepository;
             _membershipRepository = membershipRepository;
             _entryParticipationRepository = entryParticipationRepository;
             _onyxParticipationRepository = onyxParticipationRepository;
+            _directOnyxCheckoutIntentRepository = directOnyxCheckoutIntentRepository;
+            _aqGreenJoiningCheckoutRepository = aqGreenJoiningCheckoutRepository;
             _travelBenefitRepository = travelBenefitRepository;
             _termsProvider = termsProvider;
             _invitationResolver = invitationResolver;
+            _yocoCheckoutGateway = yocoCheckoutGateway;
+            _unitOfWorkManager = unitOfWorkManager;
+            _configuration = configuration;
         }
 
         [AbpAuthorize(AquaPermissions.ProgrammeParticipations.ViewSelf)]
@@ -60,6 +81,18 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 participation => participation.CustomerId == customer.Id);
             var onyx = await _onyxParticipationRepository.FirstOrDefaultAsync(
                 participation => participation.CustomerId == customer.Id);
+            var directOnyxCheckout = await _directOnyxCheckoutIntentRepository.FirstOrDefaultAsync(
+                intent =>
+                    intent.CustomerId == customer.Id &&
+                    intent.Status != HostedPaymentCheckoutStatus.Completed);
+            AQGreenJoiningCheckout aqGreenCheckout = null;
+            if (entry != null)
+            {
+                aqGreenCheckout = await _aqGreenJoiningCheckoutRepository.FirstOrDefaultAsync(
+                    checkout =>
+                        checkout.ParticipationId == entry.Id &&
+                        checkout.Status != HostedPaymentCheckoutStatus.Completed);
+            }
             var travelBenefit =
                 await _travelBenefitRepository.FirstOrDefaultAsync(
                     entitlement => entitlement.CustomerId == customer.Id);
@@ -73,11 +106,34 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 Onyx = onyx == null
                     ? null
                     : Map(onyx, await GetClubMemberNumberAsync(onyx.RecruiterCustomerId)),
+                PendingAQGreenCheckout = MapPendingCheckout(aqGreenCheckout),
+                PendingDirectOnyxCheckout = directOnyxCheckout == null ||
+                    string.IsNullOrWhiteSpace(directOnyxCheckout.CheckoutUrl)
+                    ? null
+                    : new PendingProgrammeCheckoutDto
+                    {
+                        Amount = directOnyxCheckout.Amount,
+                        Currency = directOnyxCheckout.Currency,
+                        CheckoutUrl = directOnyxCheckout.CheckoutUrl,
+                        Status = "Awaiting payment"
+                    },
                 TravelBenefit = travelBenefit == null
                     ? null
                     : Map(travelBenefit)
             };
         }
+
+        private static PendingProgrammeCheckoutDto MapPendingCheckout(
+            HostedPaymentCheckout checkout) =>
+            checkout == null || string.IsNullOrWhiteSpace(checkout.CheckoutUrl)
+                ? null
+                : new PendingProgrammeCheckoutDto
+                {
+                    Amount = checkout.Amount,
+                    Currency = checkout.Currency,
+                    CheckoutUrl = checkout.CheckoutUrl,
+                    Status = "Awaiting payment"
+                };
 
         private static OnyxTravelBenefitDto Map(
             OnyxTravelBenefitEntitlement entitlement) =>
@@ -121,7 +177,6 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             if (recruiterCustomerId.HasValue)
             {
                 var recruiter = await GetActiveEntryRecruiterAsync(
-                    customer.TenantId.Value,
                     customer.Id,
                     recruiterCustomerId.Value);
                 participation = EntryParticipation.StartUnderRecruiter(
@@ -148,61 +203,235 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         }
 
         [AbpAuthorize(AquaPermissions.ProgrammeParticipations.Join)]
-        [UnitOfWork]
-        public async Task<ProgrammeParticipationDto> StartDirectOnyxAsync(
-            StartDirectOnyxParticipationInput input)
+        [UnitOfWork(IsDisabled = true)]
+        public async Task<ProgrammeCheckoutDto> CreateAQGreenJoiningCheckoutAsync()
         {
-            input ??= new StartDirectOnyxParticipationInput();
-            var customer = await GetCurrentActiveCustomerAsync();
-            var recruiterCustomerId = await ResolveRequestedRecruiterAsync(
-                input.RecruiterCustomerId,
-                input.InviteCode,
-                RecruitmentProgrammeKeys.Onyx,
-                customer);
-            await ClearLegacyProgrammeMembershipAssignmentAsync(
-                customer,
-                MembershipType.Onyx,
-                "Onyx");
-            var existing = await _onyxParticipationRepository.FirstOrDefaultAsync(
-                participation => participation.CustomerId == customer.Id);
-            if (existing != null)
+            var tenantId = GetRequiredTenantId("AQGreen payment is unavailable.");
+            AQGreenJoiningCheckout paymentCheckout;
+
+            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
             {
-                EnsureSameRecruiter(existing.RecruiterCustomerId, recruiterCustomerId, "Onyx");
-                return Map(existing, await GetClubMemberNumberAsync(existing.RecruiterCustomerId));
+                IsTransactional = true,
+                IsolationLevel = IsolationLevel.Serializable
+            }))
+            using (_unitOfWorkManager.Current.SetTenantId(tenantId))
+            {
+                var customer = await GetCurrentActiveCustomerAsync();
+                var participation = await _entryParticipationRepository.FirstOrDefaultAsync(
+                    candidate => candidate.CustomerId == customer.Id);
+                if (participation == null)
+                    throw new UserFriendlyException(
+                        "Join AQGreen before starting payment.",
+                        "Your recruiter placement must be recorded before checkout.");
+                if (participation.Status == EntryParticipationStatus.Active)
+                    throw new UserFriendlyException(
+                        "Your AQGreen participation is already active.",
+                        "No additional joining payment is required.");
+                if (participation.JoiningPaymentAmount <= 0m ||
+                    participation.RegistrationPaymentId.HasValue ||
+                    participation.ActivationPaymentId.HasValue)
+                    throw new UserFriendlyException(
+                        "Online payment is unavailable for this historical AQGreen record.",
+                        "Contact the club team so an existing payment is not charged again.");
+
+                paymentCheckout = await _aqGreenJoiningCheckoutRepository.FirstOrDefaultAsync(
+                    checkout => checkout.ParticipationId == participation.Id);
+                if (paymentCheckout == null)
+                {
+                    paymentCheckout = AQGreenJoiningCheckout.Create(
+                        tenantId,
+                        participation.Id,
+                        customer.Id,
+                        participation.JoiningPaymentAmount,
+                        participation.Currency,
+                        UtcNow);
+                    await _aqGreenJoiningCheckoutRepository.InsertAsync(paymentCheckout);
+                    await _unitOfWorkManager.Current.SaveChangesAsync();
+                }
+
+                await uow.CompleteAsync();
             }
 
-            var membership = await GetCurrentOnyxMembershipAsync(customer.TenantId.Value);
-            OnyxParticipation participation;
-            if (recruiterCustomerId.HasValue)
+            if (!string.IsNullOrWhiteSpace(paymentCheckout.CheckoutUrl))
+                return MapCheckout(paymentCheckout);
+
+            var checkout = await CreateYocoCheckoutAsync(
+                paymentCheckout,
+                YocoCheckoutMetadata.AQGreenJoiningCheckoutId,
+                "AQGreenJoining",
+                "AQGreen joining payment",
+                "aqgreen");
+
+            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
             {
-                var recruiter = await GetActiveOnyxRecruiterAsync(
-                    customer.TenantId.Value,
-                    customer.Id,
-                    recruiterCustomerId.Value);
-                participation = OnyxParticipation.StartDirectUnderRecruiter(
-                    customer.TenantId.Value,
-                    customer.Id,
-                    recruiter,
-                    membership.Id,
-                    _termsProvider.GetDirectOnyxTerms(),
-                    UtcNow);
-            }
-            else
+                IsTransactional = true
+            }))
+            using (_unitOfWorkManager.Current.SetTenantId(tenantId))
             {
-                participation = OnyxParticipation.StartDirectIndependently(
-                    customer.TenantId.Value,
-                    customer.Id,
-                    membership.Id,
-                    _termsProvider.GetDirectOnyxTerms(),
-                    UtcNow);
+                paymentCheckout = await _aqGreenJoiningCheckoutRepository.GetAsync(paymentCheckout.Id);
+                paymentCheckout.RecordCheckout(checkout.Id, checkout.RedirectUrl, UtcNow);
+                await _unitOfWorkManager.Current.SaveChangesAsync();
+                await uow.CompleteAsync();
             }
 
-            await _onyxParticipationRepository.InsertAsync(participation);
-            await CurrentUnitOfWork.SaveChangesAsync();
             Logger.Info(
-                $"Direct Onyx participation started tenant={customer.TenantId} customer={customer.Id} independent={participation.JoinedIndependently}");
-            return Map(participation, await GetClubMemberNumberAsync(participation.RecruiterCustomerId));
+                $"AQGreen joining checkout created tenant={tenantId} checkout={paymentCheckout.Id}");
+            return MapCheckout(paymentCheckout);
         }
+
+        [AbpAuthorize(AquaPermissions.ProgrammeParticipations.Join)]
+        [UnitOfWork(IsDisabled = true)]
+        public async Task<ProgrammeCheckoutDto> CreateDirectOnyxCheckoutAsync(
+            CreateDirectOnyxCheckoutInput input)
+        {
+            input ??= new CreateDirectOnyxCheckoutInput();
+            var tenantId = GetRequiredTenantId("Onyx checkout is unavailable.");
+            DirectOnyxCheckoutIntent intent;
+
+            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+            {
+                IsTransactional = true,
+                IsolationLevel = IsolationLevel.Serializable
+            }))
+            using (_unitOfWorkManager.Current.SetTenantId(tenantId))
+            {
+                var customer = await GetCurrentActiveCustomerAsync();
+                var recruiterCustomerId = await ResolveRequestedRecruiterAsync(
+                    input.RecruiterCustomerId,
+                    input.InviteCode,
+                    RecruitmentProgrammeKeys.Onyx,
+                    customer);
+                if (recruiterCustomerId.HasValue)
+                {
+                    await GetActiveOnyxRecruiterAsync(
+                        customer.Id,
+                        recruiterCustomerId.Value);
+                }
+
+                var existingParticipation = await _onyxParticipationRepository.FirstOrDefaultAsync(
+                    participation => participation.CustomerId == customer.Id);
+                if (existingParticipation != null)
+                    throw new UserFriendlyException(
+                        "You already participate in Onyx.",
+                        "No additional Onyx payment is required through this joining flow.");
+
+                intent = await _directOnyxCheckoutIntentRepository.FirstOrDefaultAsync(
+                    checkout => checkout.CustomerId == customer.Id);
+                if (intent == null)
+                {
+                    var membership = await GetCurrentOnyxMembershipAsync(customer.TenantId.Value);
+                    intent = DirectOnyxCheckoutIntent.Create(
+                        customer.TenantId.Value,
+                        customer.Id,
+                        recruiterCustomerId,
+                        input.InviteCode,
+                        membership.Id,
+                        _termsProvider.GetDirectOnyxTerms(),
+                        UtcNow);
+                    await _directOnyxCheckoutIntentRepository.InsertAsync(intent);
+                    await _unitOfWorkManager.Current.SaveChangesAsync();
+                }
+                else
+                {
+                    EnsureSameCheckoutPlacement(intent, recruiterCustomerId, input.InviteCode);
+                }
+
+                await uow.CompleteAsync();
+            }
+
+            if (!string.IsNullOrWhiteSpace(intent.CheckoutUrl))
+                return MapCheckout(intent);
+
+            var checkout = await CreateYocoCheckoutAsync(
+                intent,
+                YocoCheckoutMetadata.DirectOnyxCheckoutIntentId,
+                "OnyxDirectEntry",
+                "Direct Onyx participation",
+                "onyx");
+
+            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+            {
+                IsTransactional = true
+            }))
+            using (_unitOfWorkManager.Current.SetTenantId(tenantId))
+            {
+                intent = await _directOnyxCheckoutIntentRepository.GetAsync(intent.Id);
+                intent.RecordCheckout(checkout.Id, checkout.RedirectUrl, UtcNow);
+                await _unitOfWorkManager.Current.SaveChangesAsync();
+                await uow.CompleteAsync();
+            }
+
+            Logger.Info(
+                $"Direct Onyx checkout created tenant={tenantId} intent={intent.Id} independent={!intent.RecruiterCustomerId.HasValue}");
+            return MapCheckout(intent);
+        }
+
+        private Uri GetClientRootAddress()
+        {
+            var configured = _configuration["App:ClientRootAddress"];
+            var environment = _configuration["ASPNETCORE_ENVIRONMENT"];
+            var isDevelopment = string.Equals(
+                environment,
+                "Development",
+                StringComparison.OrdinalIgnoreCase);
+
+            if (!Uri.TryCreate(configured, UriKind.Absolute, out var root) ||
+                root.Scheme != Uri.UriSchemeHttps &&
+                (!isDevelopment || root.Scheme != Uri.UriSchemeHttp))
+                throw new UserFriendlyException(
+                    "Online payment is temporarily unavailable.",
+                    "The customer website address has not been configured correctly.");
+
+            return root;
+        }
+
+        private static void EnsureSameCheckoutPlacement(
+            DirectOnyxCheckoutIntent intent,
+            int? recruiterCustomerId,
+            string inviteCode)
+        {
+            var normalizedInviteCode = string.IsNullOrWhiteSpace(inviteCode)
+                ? null
+                : ProgrammeInvitationResolver.NormalizeCode(inviteCode);
+            if (intent.RecruiterCustomerId == recruiterCustomerId &&
+                string.Equals(intent.InviteCode, normalizedInviteCode, StringComparison.Ordinal))
+                return;
+
+            throw new UserFriendlyException(
+                "An Onyx payment is already awaiting completion.",
+                "Complete the existing checkout. Contact the club team if its recruiter placement is incorrect.");
+        }
+
+        private async Task<YocoCheckout> CreateYocoCheckoutAsync(
+            HostedPaymentCheckout paymentCheckout,
+            string referenceMetadataKey,
+            string purpose,
+            string description,
+            string programme)
+        {
+            var clientRootAddress = GetClientRootAddress();
+            var query = $"payment={{0}}&programme={Uri.EscapeDataString(programme)}";
+            return await _yocoCheckoutGateway.CreateAsync(new CreateYocoCheckout
+            {
+                ReferenceId = paymentCheckout.Id,
+                ReferenceMetadataKey = referenceMetadataKey,
+                Purpose = purpose,
+                Amount = paymentCheckout.Amount,
+                Currency = paymentCheckout.Currency,
+                Description = description,
+                SuccessUrl = new Uri(clientRootAddress, $"member/programmes?{string.Format(query, "success")}").ToString(),
+                CancelUrl = new Uri(clientRootAddress, $"member/programmes?{string.Format(query, "cancelled")}").ToString(),
+                FailureUrl = new Uri(clientRootAddress, $"member/programmes?{string.Format(query, "failed")}").ToString()
+            });
+        }
+
+        private static ProgrammeCheckoutDto MapCheckout(HostedPaymentCheckout checkout) =>
+            new ProgrammeCheckoutDto
+            {
+                Amount = checkout.Amount,
+                Currency = checkout.Currency,
+                CheckoutUrl = checkout.CheckoutUrl
+            };
 
         private async Task ClearLegacyProgrammeMembershipAssignmentAsync(
             Customer customer,
@@ -287,7 +516,6 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         }
 
         private async Task<EntryParticipation> GetActiveEntryRecruiterAsync(
-            int tenantId,
             int customerId,
             int recruiterCustomerId)
         {
@@ -296,7 +524,6 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             {
                 var recruiter = await _entryParticipationRepository.FirstOrDefaultAsync(
                     participation =>
-                        participation.TenantId == tenantId &&
                         participation.CustomerId == recruiterCustomerId &&
                         participation.Status == EntryParticipationStatus.Active);
                 if (recruiter == null)
@@ -310,7 +537,6 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         }
 
         private async Task<OnyxParticipation> GetActiveOnyxRecruiterAsync(
-            int tenantId,
             int customerId,
             int recruiterCustomerId)
         {
@@ -319,7 +545,6 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             {
                 var recruiter = await _onyxParticipationRepository.FirstOrDefaultAsync(
                     participation =>
-                        participation.TenantId == tenantId &&
                         participation.CustomerId == recruiterCustomerId &&
                         participation.Status == OnyxParticipationStatus.Active);
                 if (recruiter == null)

@@ -12,7 +12,7 @@ The lifecycle remains deliberately separated:
 `Customer → Programme participation → Recruitment relationship → Network placement → Activation → Qualification → Commission eligibility → Commission payment`
 
 Accepting an AQGreen invitation creates its pre-activation participation and
-records the recruiter placement; the existing two-payment lifecycle then governs
+records the recruiter placement; one confirmed R1,200 joining payment then governs
 activation. Confirming a direct-Onyx invitation records only the member's joining
 intent for checkout. It does not create an Onyx participation or placement.
 After Yoco confirms the R6,120 payment, the backend revalidates the invitation
@@ -31,8 +31,8 @@ Neither flow directly qualifies a network or pays a commission.
    same invitation.
 7. The invitee explicitly confirms the programme and intended recruiter.
 8. For AQGreen, the normal joining workflow creates the participation and
-   recruiter placement in its pre-activation state; existing payment and
-   activation rules apply. For direct Onyx, confirmation proceeds to the
+   recruiter placement in its pre-activation state; Yoco confirmation of the full
+   R1,200 joining payment activates it. For direct Onyx, confirmation proceeds to the
    R6,120 checkout without creating programme state. Only a confirmed payment
    creates the active Onyx participation and recruiter placement.
 
