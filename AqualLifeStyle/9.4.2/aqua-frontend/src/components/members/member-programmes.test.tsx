@@ -54,7 +54,7 @@ describe("MemberProgrammes", () => {
     });
     vi.mocked(httpClient.post).mockResolvedValue({
       amount: 6120,
-      checkoutUrl: "https://payments.example.test/checkout/onyx",
+      checkoutUrl: "https://payments.example.test/checkout/secure",
       currency: "ZAR",
     });
   });
@@ -70,14 +70,14 @@ describe("MemberProgrammes", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("starts AQGreen independently and reloads the participation record", async () => {
+  it("records an independent AQGreen place and continues to one checkout", async () => {
     render(<MemberProgrammes />);
 
     fireEvent.click(
       await screen.findByRole("button", { name: "Join AQGreen" }),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Confirm programme joining" }),
+      screen.getByRole("button", { name: "Continue to secure payment" }),
     );
 
     await waitFor(() =>
@@ -86,7 +86,12 @@ describe("MemberProgrammes", () => {
         { recruiterCustomerId: null },
       ),
     );
-    await waitFor(() => expect(httpClient.get).toHaveBeenCalledTimes(2));
+    expect(httpClient.post).toHaveBeenCalledWith(
+      apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+    );
+    expect(navigateToExternalUrl).toHaveBeenCalledWith(
+      "https://payments.example.test/checkout/secure",
+    );
   });
 
   it("creates an Onyx checkout without claiming participation has started", async () => {
@@ -107,17 +112,59 @@ describe("MemberProgrammes", () => {
     );
     expect(screen.queryByText(/Onyx participation started/i)).not.toBeInTheDocument();
     expect(navigateToExternalUrl).toHaveBeenCalledWith(
-      "https://payments.example.test/checkout/onyx",
+      "https://payments.example.test/checkout/secure",
     );
   });
 
   it("shows a resumable checkout without presenting pending payment as participation", async () => {
+      vi.mocked(useAuthState).mockReturnValue(
+        authState([
+          "Aqua.ProgrammeParticipations.ViewSelf",
+          "Aqua.ProgrammeParticipations.Join",
+        ]),
+      );
+      vi.mocked(httpClient.get).mockResolvedValue({
+        entry: null,
+        onyx: null,
+        pendingDirectOnyxCheckout: {
+          amount: 6120,
+          checkoutUrl: "https://payments.example.test/checkout/resume",
+          currency: "ZAR",
+          status: "Awaiting payment",
+        },
+        travelBenefit: null,
+      });
+
+      render(<MemberProgrammes />);
+
+    expect(await screen.findByText("Awaiting payment")).toBeInTheDocument();
+    expect(screen.getByText(/participation and network place do not exist yet/i))
+      .toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Continue secure payment" }))
+      .toHaveAttribute("href", "https://payments.example.test/checkout/resume");
+    expect(screen.queryByRole("button", { name: "Join Onyx" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("lets an awaiting AQGreen participant resume the same secure checkout", async () => {
     vi.mocked(httpClient.get).mockResolvedValue({
-      entry: null,
+      entry: {
+        activatedAt: null,
+        canRecruitForThisProgramme: false,
+        currency: "ZAR",
+        isActive: false,
+        joinedIndependently: true,
+        nextPaymentAmount: 1200,
+        nextPaymentDescription: "Full AQGreen joining payment",
+        programmeName: "AQGreen",
+        recruiterClubMemberNumber: null,
+        startedAt: "2026-07-26T10:00:00Z",
+        status: "Awaiting joining payment",
+      },
       onyx: null,
-      pendingDirectOnyxCheckout: {
-        amount: 6120,
-        checkoutUrl: "https://payments.example.test/checkout/resume",
+      pendingAQGreenCheckout: {
+        amount: 1200,
+        checkoutUrl: "https://payments.example.test/checkout/aqgreen-resume",
         currency: "ZAR",
         status: "Awaiting payment",
       },
@@ -126,12 +173,14 @@ describe("MemberProgrammes", () => {
 
     render(<MemberProgrammes />);
 
-    expect(await screen.findByText("Awaiting payment")).toBeInTheDocument();
-    expect(screen.getByText(/participation and network place do not exist yet/i))
+    expect(await screen.findByText("Awaiting joining payment"))
       .toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Continue secure payment" }))
-      .toHaveAttribute("href", "https://payments.example.test/checkout/resume");
-    expect(screen.queryByRole("button", { name: "Join Onyx" }))
+      .toHaveAttribute(
+        "href",
+        "https://payments.example.test/checkout/aqgreen-resume",
+      );
+    expect(screen.queryByRole("button", { name: "Pay R1,200 securely" }))
       .not.toBeInTheDocument();
   });
 

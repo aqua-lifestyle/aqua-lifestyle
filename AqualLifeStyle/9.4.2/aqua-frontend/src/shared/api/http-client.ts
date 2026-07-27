@@ -7,7 +7,7 @@ export const httpClient = {
     return unwrapAbpResponse(response.data);
   },
 
-  post: async <TResponse, TBody>(url: string, body: TBody) => {
+  post: async <TResponse, TBody = undefined>(url: string, body?: TBody) => {
     const response = await apiClient.post<TResponse | AbpResponseEnvelope<TResponse>>(url, body);
     return unwrapAbpResponse(response.data);
   },

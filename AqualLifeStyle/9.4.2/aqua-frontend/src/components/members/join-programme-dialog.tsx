@@ -4,19 +4,17 @@ import { useState, type FormEvent } from "react";
 
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
-import type { DirectOnyxCheckout } from "@/src/shared/domain/programme-participations";
+import type { ProgrammeCheckout } from "@/src/shared/domain/programme-participations";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 import { Button, Dialog, StatusMessage } from "@/src/shared/ui";
 
 type Programme = "AQGreen" | "Onyx";
 
 type JoinProgrammeDialogProps = {
-  onJoined: () => Promise<void>;
   programme: Programme;
 };
 
 export const JoinProgrammeDialog = ({
-  onJoined,
   programme,
 }: JoinProgrammeDialogProps) => {
   const [open, setOpen] = useState(false);
@@ -38,11 +36,13 @@ export const JoinProgrammeDialog = ({
         await httpClient.post(apiEndpoints.programmeParticipations.startEntry, {
           recruiterCustomerId: null,
         });
-        await onJoined();
-        setOpen(false);
+        const checkout = await httpClient.post<ProgrammeCheckout>(
+          apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+        );
+        navigateToExternalUrl(checkout.checkoutUrl);
       } else {
         const checkout = await httpClient.post<
-          DirectOnyxCheckout,
+          ProgrammeCheckout,
           { recruiterCustomerId: null }
         >(
           apiEndpoints.programmeParticipations.createDirectOnyxCheckout,
@@ -69,7 +69,7 @@ export const JoinProgrammeDialog = ({
         <form className="flex flex-col gap-5" onSubmit={submit}>
           <div className="rounded-lg bg-muted/60 p-4 text-sm text-muted-foreground">
             {programme === "AQGreen"
-              ? "AQGreen is the feeder programme. Two R600 payments are required before participation becomes active, after which you can work toward graduating to Onyx."
+              ? "AQGreen is the feeder programme. One full R1,200 payment is required before participation becomes active, after which you can work toward graduating to Onyx."
               : "Joining Onyx directly requires one full payment of R6,120. AQGreen participation is not required."}
           </div>
 
@@ -88,7 +88,7 @@ export const JoinProgrammeDialog = ({
               Cancel
             </Button>
             <Button isLoading={submitting} type="submit">
-              {programme === "Onyx" ? "Continue to secure payment" : "Confirm programme joining"}
+              Continue to secure payment
             </Button>
           </div>
         </form>

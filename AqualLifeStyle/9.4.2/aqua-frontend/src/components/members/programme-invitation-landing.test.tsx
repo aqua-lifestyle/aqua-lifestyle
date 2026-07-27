@@ -31,7 +31,7 @@ describe("ProgrammeInvitationLanding", () => {
     vi.mocked(httpClient.get).mockResolvedValue(preview);
     vi.mocked(httpClient.post).mockResolvedValue({
       amount: 6120,
-      checkoutUrl: "https://payments.example.test/checkout/onyx",
+      checkoutUrl: "https://payments.example.test/checkout/secure",
       currency: "ZAR",
     });
     vi.mocked(useAuthState).mockReturnValue({
@@ -51,18 +51,22 @@ describe("ProgrammeInvitationLanding", () => {
     expect(await screen.findByText("Ada Recruiter")).toBeInTheDocument();
     expect(screen.getByText("CLB-ABCDEFGH2345")).toBeInTheDocument();
     expect(screen.getByText(/eligible to recruit into AQGreen/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /confirm and join/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirm and continue to payment/i }));
 
     await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
       apiEndpoints.programmeParticipations.startEntry,
       { inviteCode: "AQ7G2X9KLMNP" },
     ));
+    expect(httpClient.post).toHaveBeenCalledWith(
+      apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+    );
     expect(httpClient.post).not.toHaveBeenCalledWith(
       apiEndpoints.programmeParticipations.createDirectOnyxCheckout,
       expect.anything(),
     );
-    expect(navigateToExternalUrl).not.toHaveBeenCalled();
-    expect(await screen.findByText(/network place is recorded/i)).toBeInTheDocument();
+    expect(navigateToExternalUrl).toHaveBeenCalledWith(
+      "https://payments.example.test/checkout/secure",
+    );
   });
 
   it("routes an Onyx invitation only to the Onyx joining endpoint", async () => {
@@ -89,7 +93,7 @@ describe("ProgrammeInvitationLanding", () => {
       expect.anything(),
     );
     expect(navigateToExternalUrl).toHaveBeenCalledWith(
-      "https://payments.example.test/checkout/onyx",
+      "https://payments.example.test/checkout/secure",
     );
   });
 

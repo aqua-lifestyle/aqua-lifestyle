@@ -105,6 +105,8 @@ export const apiEndpoints = {
       `/api/services/app/ProgrammeInvitation/GetPreview?InviteCode=${encodeURIComponent(inviteCode)}`,
     createDirectOnyxCheckout:
       "/api/services/app/ClubMemberProgrammeParticipation/CreateDirectOnyxCheckout",
+    createAQGreenJoiningCheckout:
+      "/api/services/app/ClubMemberProgrammeParticipation/CreateAQGreenJoiningCheckout",
     startEntry:
       "/api/services/app/ClubMemberProgrammeParticipation/StartEntry",
   },
