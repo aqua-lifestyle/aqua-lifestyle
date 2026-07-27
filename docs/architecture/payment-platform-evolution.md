@@ -76,6 +76,87 @@ Each programme aggregate decides what a confirmed payment activates. The shared 
 
 Historical split-payment participations (R600 + R600) are preserved in the database and are explicitly excluded from the new checkout flow. The migration updates only wholly unpaid rows to the new terms.
 
+### AQGreen Migration Rollback Behavior and Tests
+
+Migration `20260726162000_AddAQGreenSingleJoiningPayment` introduces
+`JoiningPaymentAmount`, `JoiningPaymentId`, `AQGreenJoiningCheckouts`, and
+`AQGreenMigrationBackup`. Its `Down()` path is deliberately blocked by
+PostgreSQL `DO $$ ... RAISE EXCEPTION` guards when:
+
+- Any `EntryParticipation` has a non-null `JoiningPaymentId`, **or**
+- Any `AQGreenJoiningCheckout` row exists.
+
+This prevents partial downgrade from falsifying financial history. If a
+rollback becomes necessary after such records exist, the only safe recovery
+is restoring from a database snapshot taken before the upgrade.
+
+The behavior is validated by `AQGreenMigrationRollbackPostgreSqlTests` in
+`test/AqualLifeStyle.Tests/EntityFrameworkCore/AQGreenMigrationRollbackTests.cs`.
+
+These tests execute the **real** EF Core PostgreSQL migrator against a
+disposable `postgres:16-alpine` container on a random host port. They do
+not use an in-memory provider because the rollback logic depends on
+PostgreSQL `DO $$` blocks, `RAISE EXCEPTION`, transactional DDL, foreign
+keys, indexes, migration history, and provider-generated SQL.
+
+Each fact begins with `ResetDatabaseAsync()`, which:
+
+1. Terminates all backends connected to the test database.
+2. Drops the database if it exists.
+3. Recreates it with the correct owner.
+4. Calls `NpgsqlConnection.ClearAllPools()` to eliminate stale pooled
+   connections.
+
+This guarantees order independence: a failed downgrade or leftover schema
+in one test cannot affect the next.
+
+**Scenario 1 — confirmed joining payment blocks downgrade**
+
+- Migrate to the latest schema.
+- Create an `EntryParticipation` with single-joining-payment terms and
+  persist a confirmed `MemberPayment` whose `Status` is `Confirmed`.
+- Set `JoiningPaymentId` on the participation and save.
+- Verify via a separate DbContext that the payment row is `Confirmed` with
+  the expected `ConfirmedAt`, and that the participation row carries the
+  same `JoiningPaymentId`.
+- Execute the real downgrade to
+  `20260726145201_AddDirectOnyxCheckoutIntents`.
+- Assert `Npgsql.PostgresException` with `SqlState == "P0001"` and
+  `MessageText` containing `"Cannot downgrade the AQGreen single-joining-payment migration"`.
+- Assert the migration remains applied and the schema is intact.
+
+**Scenario 2 — checkout records block downgrade**
+
+- Migrate to the latest schema.
+- Create an `AQGreenJoiningCheckout` row.
+- Execute the real downgrade.
+- Assert the same `PostgresException` guard.
+- Assert the migration remains applied and the checkout row still exists.
+
+**Scenario 3 — successful downgrade when no protected data exists**
+
+- Migrate to the latest schema.
+- Create an AQGreen participation with no `JoiningPaymentId` and no
+  checkout records.
+- Execute the real downgrade.
+- Assert the AQGreen migration is removed from `__EFMigrationsHistory`.
+- Assert `JoiningPaymentId` / `JoiningPaymentAmount` columns no longer
+  exist on `EntryParticipations`.
+- Assert `AQGreenJoiningCheckouts` and `AQGreenMigrationBackup` tables no
+  longer exist.
+
+The success-path assertions use a small `CountAsync` helper that opens a
+raw `NpgsqlConnection` and calls `ExecuteScalarAsync()` against
+`information_schema.columns` and `information_schema.tables` with
+`table_schema = 'public'`. This is necessary because
+`Database.ExecuteSqlRawAsync()` returns rows affected, not the scalar
+result of a `SELECT COUNT(*)`.
+
+The test infrastructure and these scenarios together prove that the
+migration’s financial-history guards are executed by PostgreSQL, that a
+failed downgrade rolls back atomically, and that a safe downgrade
+completely removes the AQGreen payment schema.
+
 ### Onyx Payment Lifecycle
 
 1. Customer requests a direct Onyx checkout. No participation exists yet.
