@@ -73,6 +73,17 @@ secret key, the live webhook's verification secret, and `live`. Keep the test
 and live webhook secrets separate. Do not reuse the test webhook secret in live
 mode.
 
+### AQGreen migration rollback safety
+
+Before applying migration `20260726162000_AddAQGreenSingleJoiningPayment`
+in any environment, ensure a verified database snapshot or other restorable
+backup exists. The `Down()` path is deliberately blocked once AQGreen payment
+checkouts or confirmed joining payments exist, because a partial downgrade
+could falsify financial history. If a downgrade becomes operationally
+necessary after such records exist, restore the database from the snapshot
+taken before the upgrade; the migration cannot safely reconstruct the
+original values on its own.
+
 ## Vercel frontend
 
 Import the repository and set the project Root Directory to `AqualLifeStyle/9.4.2/aqua-frontend`. Configure these Vercel environment variables separately for Preview and Production:

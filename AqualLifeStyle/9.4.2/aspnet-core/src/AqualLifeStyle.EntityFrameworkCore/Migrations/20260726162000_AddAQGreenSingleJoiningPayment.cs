@@ -169,10 +169,8 @@ namespace AqualLifeStyle.Migrations
 
                     IF EXISTS (
                         SELECT 1
-                        FROM "EntryParticipations" ep
-                        INNER JOIN "AQGreenMigrationBackup" backup
-                            ON ep."Id" = backup."ParticipationId"
-                        WHERE ep."JoiningPaymentId" IS NOT NULL
+                        FROM "EntryParticipations"
+                        WHERE "JoiningPaymentId" IS NOT NULL
                     ) THEN
                         RAISE EXCEPTION 'Cannot downgrade the AQGreen single-joining-payment migration: '
                             'confirmed AQGreen joining payments exist. Downgrade would falsify financial '
