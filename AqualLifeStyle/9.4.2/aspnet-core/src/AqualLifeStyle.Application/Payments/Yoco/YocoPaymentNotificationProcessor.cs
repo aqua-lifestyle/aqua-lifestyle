@@ -29,7 +29,7 @@ namespace AqualLifeStyle.Payments.Yoco
         public YocoWebhookTransientException(string message) : base(message) { }
     }
 
-    public sealed class YocoPaymentNotificationProcessor : ITransientDependency
+    public class YocoPaymentNotificationProcessor : ITransientDependency
     {
         private readonly ProgrammePaymentConfirmationProcessor _confirmationProcessor;
         private readonly IConfiguration _configuration;
@@ -42,7 +42,7 @@ namespace AqualLifeStyle.Payments.Yoco
             _configuration = configuration;
         }
 
-        public async Task ProcessAsync(VerifiedYocoPaymentNotification notification)
+        public virtual async Task ProcessAsync(VerifiedYocoPaymentNotification notification)
         {
             if (notification == null) throw new ArgumentNullException(nameof(notification));
             if (!string.Equals(notification.EventType, "payment.succeeded", StringComparison.Ordinal))

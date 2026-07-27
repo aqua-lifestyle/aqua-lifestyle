@@ -8,23 +8,32 @@ using Abp.Dependency;
 using AqualLifeStyle.Payments.Yoco;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace AqualLifeStyle.Web.Host.Controllers
 {
+    /// <summary>
+    /// Explicit protocol adapter for Yoco webhooks. ABP conventional controllers cannot
+    /// preserve the exact raw request body, provider signature headers, and unwrapped
+    /// HTTP status codes required for webhook signature verification and retry semantics.
+    /// </summary>
     [ApiController]
     [Route("api/payments/yoco")]
     public sealed class YocoPaymentsController : ControllerBase, ITransientDependency
-    {
-        private readonly IYocoWebhookSignatureVerifier _signatureVerifier;
-        private readonly YocoPaymentNotificationProcessor _notificationProcessor;
-
-        public YocoPaymentsController(
-            IYocoWebhookSignatureVerifier signatureVerifier,
-            YocoPaymentNotificationProcessor notificationProcessor)
         {
-            _signatureVerifier = signatureVerifier;
-            _notificationProcessor = notificationProcessor;
-        }
+            private readonly IYocoWebhookSignatureVerifier _signatureVerifier;
+            private readonly YocoPaymentNotificationProcessor _notificationProcessor;
+            private readonly JsonSerializerOptions _jsonOptions;
+
+            public YocoPaymentsController(
+                IYocoWebhookSignatureVerifier signatureVerifier,
+                YocoPaymentNotificationProcessor notificationProcessor,
+                IOptions<Microsoft.AspNetCore.Mvc.JsonOptions> jsonOptions)
+            {
+                _signatureVerifier = signatureVerifier;
+                _notificationProcessor = notificationProcessor;
+                _jsonOptions = jsonOptions.Value.JsonSerializerOptions;
+            }
 
         [HttpPost("webhook")]
         [IgnoreAntiforgeryToken]
@@ -53,7 +62,7 @@ namespace AqualLifeStyle.Web.Host.Controllers
             {
                 webhookEvent = JsonSerializer.Deserialize<YocoPaymentWebhookEvent>(
                     rawBody,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    _jsonOptions);
             }
             catch (JsonException)
             {

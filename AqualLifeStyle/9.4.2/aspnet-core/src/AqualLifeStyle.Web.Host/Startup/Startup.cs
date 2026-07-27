@@ -39,6 +39,10 @@ namespace AqualLifeStyle.Web.Host.Startup
             services.AddControllersWithViews(options =>
             {
                 options.Filters.Add(new AbpAutoValidateAntiforgeryTokenAttribute());
+            })
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
             });
 
             IdentityRegistrar.Register(services);
