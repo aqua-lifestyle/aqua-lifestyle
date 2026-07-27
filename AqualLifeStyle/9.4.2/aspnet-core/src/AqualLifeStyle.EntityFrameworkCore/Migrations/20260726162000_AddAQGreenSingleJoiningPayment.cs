@@ -13,6 +13,33 @@ namespace AqualLifeStyle.Migrations
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // 1. Preserve original programme terms for rows that will be migrated
+            // so they can be restored exactly if Downgrade is executed before any
+            // post-migration AQGreen payment checkouts exist.
+            migrationBuilder.CreateTable(
+                name: "AQGreenMigrationBackup",
+                columns: table => new
+                {
+                    ParticipationId = table.Column<Guid>(type: "uuid", nullable: false),
+                    OldTermsVersion = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    OldTermsEffectiveFrom = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AQGreenMigrationBackup", x => x.ParticipationId);
+                });
+
+            migrationBuilder.Sql(
+                """
+                INSERT INTO "AQGreenMigrationBackup" ("ParticipationId", "OldTermsVersion", "OldTermsEffectiveFrom")
+                SELECT "Id", "TermsVersion", "TermsEffectiveFrom"
+                FROM "EntryParticipations"
+                WHERE "Status" = 0
+                  AND "RegistrationPaymentId" IS NULL
+                  AND "ActivationPaymentId" IS NULL
+                  AND "IsDeleted" = FALSE;
+                """);
+
             migrationBuilder.AddColumn<decimal>(
                 name: "JoiningPaymentAmount",
                 table: "EntryParticipations",
@@ -28,9 +55,6 @@ namespace AqualLifeStyle.Migrations
                 type: "uuid",
                 nullable: true);
 
-            // Move only wholly unpaid AQGreen participations to the new single-payment
-            // terms. Any participation with a historical R600 payment keeps its
-            // original split-payment terms and must be handled by support.
             migrationBuilder.Sql(
                 """
                 UPDATE "EntryParticipations"
@@ -130,10 +154,61 @@ namespace AqualLifeStyle.Migrations
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            throw new NotSupportedException(
-                "The AQGreen single-joining-payment migration cannot be rolled back. " +
-                "It mutates existing EntryParticipation payment terms and creates new checkout tables " +
-                "whose data cannot be precisely reconstructed.");
+            // Block downgrade if new-term transactional or in-flight data exists.
+            migrationBuilder.Sql(
+                """
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM "AQGreenJoiningCheckouts"
+                    ) THEN
+                        RAISE EXCEPTION 'Cannot downgrade the AQGreen single-joining-payment migration: '
+                            'AQGreen payment checkouts exist. Downgrade would destroy pending or confirmed '
+                            'payment records. Restore the database from a pre-migration snapshot instead.';
+                    END IF;
+
+                    IF EXISTS (
+                        SELECT 1
+                        FROM "EntryParticipations" ep
+                        INNER JOIN "AQGreenMigrationBackup" backup
+                            ON ep."Id" = backup."ParticipationId"
+                        WHERE ep."JoiningPaymentId" IS NOT NULL
+                    ) THEN
+                        RAISE EXCEPTION 'Cannot downgrade the AQGreen single-joining-payment migration: '
+                            'confirmed AQGreen joining payments exist. Downgrade would falsify financial '
+                            'history. Restore the database from a pre-migration snapshot instead.';
+                    END IF;
+                END $$;
+                """);
+
+            migrationBuilder.Sql(
+                """
+                UPDATE "EntryParticipations" ep
+                SET "TermsVersion" = backup."OldTermsVersion",
+                    "TermsEffectiveFrom" = backup."OldTermsEffectiveFrom"
+                FROM "AQGreenMigrationBackup" backup
+                WHERE ep."Id" = backup."ParticipationId";
+                """);
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_EntryParticipations_MemberPayments_JoiningPaymentId",
+                table: "EntryParticipations");
+
+            migrationBuilder.DropTable(name: "AQGreenJoiningCheckouts");
+
+            migrationBuilder.DropIndex(
+                name: "IX_EntryParticipations_JoiningPaymentId",
+                table: "EntryParticipations");
+
+            migrationBuilder.DropColumn(
+                name: "JoiningPaymentId",
+                table: "EntryParticipations");
+
+            migrationBuilder.DropColumn(
+                name: "JoiningPaymentAmount",
+                table: "EntryParticipations");
+
+            migrationBuilder.DropTable(name: "AQGreenMigrationBackup");
         }
     }
 }
