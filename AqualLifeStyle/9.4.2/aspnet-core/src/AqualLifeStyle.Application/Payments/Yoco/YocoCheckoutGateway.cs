@@ -12,7 +12,9 @@ namespace AqualLifeStyle.Payments.Yoco
 {
     public sealed class CreateYocoCheckout
     {
-        public Guid IntentId { get; set; }
+        public Guid ReferenceId { get; set; }
+        public string ReferenceMetadataKey { get; set; }
+        public string Purpose { get; set; }
         public decimal Amount { get; set; }
         public string Currency { get; set; }
         public string SuccessUrl { get; set; }
@@ -47,6 +49,12 @@ namespace AqualLifeStyle.Payments.Yoco
         public async Task<YocoCheckout> CreateAsync(CreateYocoCheckout checkout)
         {
             if (checkout == null) throw new ArgumentNullException(nameof(checkout));
+            if (checkout.ReferenceId == Guid.Empty)
+                throw new ArgumentException("A checkout reference is required.", nameof(checkout));
+            if (!YocoCheckoutMetadata.IsSupportedReference(checkout.ReferenceMetadataKey))
+                throw new ArgumentException("The checkout reference type is not supported.", nameof(checkout));
+            if (string.IsNullOrWhiteSpace(checkout.Purpose))
+                throw new ArgumentException("A checkout purpose is required.", nameof(checkout));
             var secretKey = _configuration["Yoco:SecretKey"]?.Trim();
             if (string.IsNullOrWhiteSpace(secretKey))
                 throw new UserFriendlyException(
@@ -64,7 +72,7 @@ namespace AqualLifeStyle.Payments.Yoco
                     "The club's payment mode and secure key do not match.");
 
             var amountInCents = ToCents(checkout.Amount);
-            var reference = checkout.IntentId.ToString("N");
+            var reference = checkout.ReferenceId.ToString("N");
             var requestBody = new
             {
                 amount = amountInCents,
@@ -74,8 +82,8 @@ namespace AqualLifeStyle.Payments.Yoco
                 failureUrl = checkout.FailureUrl,
                 metadata = new Dictionary<string, object>
                 {
-                    ["directOnyxCheckoutIntentId"] = reference,
-                    ["purpose"] = "OnyxDirectEntry"
+                    [checkout.ReferenceMetadataKey] = reference,
+                    ["purpose"] = checkout.Purpose
                 },
                 subtotalAmount = amountInCents,
                 lineItems = new[]

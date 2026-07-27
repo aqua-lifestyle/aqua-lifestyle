@@ -50,7 +50,7 @@ services:
       - key: Yoco__WebhookSecret
         sync: false
       - key: Yoco__Mode
-        value: test
+        value: live
 
   - type: keyvalue
     name: aqualifestyle-redis

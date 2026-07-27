@@ -12,16 +12,18 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
     public class CurrentProgrammeTermsProvider : ICurrentProgrammeTermsProvider, ITransientDependency
     {
-        private static readonly DateTime EffectiveFrom =
+        private static readonly DateTime OnyxEffectiveFrom =
             new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        private static readonly DateTime AQGreenSinglePaymentEffectiveFrom =
+            new DateTime(2026, 7, 26, 0, 0, 0, DateTimeKind.Utc);
 
         public EntryProgrammeTerms GetEntryTerms()
         {
-            return EntryProgrammeTerms.Create(
-                version: "2026-07",
-                effectiveFrom: EffectiveFrom,
-                registrationPaymentAmount: 600m,
-                activationPaymentAmount: 600m,
+            return EntryProgrammeTerms.CreateSingleJoiningPayment(
+                version: "2026-07-single-1200",
+                effectiveFrom: AQGreenSinglePaymentEffectiveFrom,
+                joiningPaymentAmount: 1200m,
                 monthlyCommitmentAmount: 600m,
                 gracePeriodDays: 7);
         }
@@ -30,7 +32,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         {
             return OnyxPlanTerms.Create(
                 version: "2026-07",
-                effectiveFrom: EffectiveFrom,
+                effectiveFrom: OnyxEffectiveFrom,
                 directEntryAmount: 6120m);
         }
     }

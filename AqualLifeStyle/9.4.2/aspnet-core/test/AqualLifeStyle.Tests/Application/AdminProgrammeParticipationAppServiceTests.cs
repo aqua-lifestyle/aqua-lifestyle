@@ -28,6 +28,15 @@ namespace AqualLifeStyle.Tests.Application
         private static readonly DateTime EffectiveFrom =
             new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
 
+        private static readonly EntryProgrammeTerms LegacySplitPaymentTerms =
+            EntryProgrammeTerms.Create(
+                "entry-2026-07",
+                EffectiveFrom,
+                registrationPaymentAmount: 600m,
+                activationPaymentAmount: 600m,
+                monthlyCommitmentAmount: 600m,
+                gracePeriodDays: 7);
+
         private readonly IAdminProgrammeParticipationAppService _service;
 
         public AdminProgrammeParticipationAppServiceTests()
@@ -298,7 +307,7 @@ namespace AqualLifeStyle.Tests.Application
                 context.EntryParticipations.Add(EntryParticipation.StartIndependently(
                     1,
                     customer.Id,
-                    Resolve<ICurrentProgrammeTermsProvider>().GetEntryTerms(),
+                    LegacySplitPaymentTerms,
                     EffectiveFrom));
                 await context.SaveChangesAsync();
                 return customer.Id;
@@ -319,7 +328,7 @@ namespace AqualLifeStyle.Tests.Application
                 context.Customers.AddRange(recruiterCustomer, targetCustomer, descendantCustomer);
                 await context.SaveChangesAsync();
 
-                var terms = Resolve<ICurrentProgrammeTermsProvider>().GetEntryTerms();
+                var terms = LegacySplitPaymentTerms;
                 var recruiter = EntryParticipation.StartIndependently(1, recruiterCustomer.Id, terms, EffectiveFrom);
                 var payments = new System.Collections.Generic.List<MemberPayment>();
                 payments.AddRange(Activate(recruiter, recruiterCustomer.Id, $"recruiter-{suffix}"));

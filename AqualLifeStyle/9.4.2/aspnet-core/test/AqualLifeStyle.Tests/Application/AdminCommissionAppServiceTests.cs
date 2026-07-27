@@ -24,6 +24,18 @@ namespace AqualLifeStyle.Tests.Application
 {
     public class AdminCommissionAppServiceTests : AqualLifeStyleTestBase
     {
+        private static readonly DateTime EffectiveFrom =
+            new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        private static readonly EntryProgrammeTerms LegacySplitPaymentTerms =
+            EntryProgrammeTerms.Create(
+                "entry-2026-07",
+                EffectiveFrom,
+                registrationPaymentAmount: 600m,
+                activationPaymentAmount: 600m,
+                monthlyCommitmentAmount: 600m,
+                gracePeriodDays: 7);
+
         private readonly IAdminCommissionAppService _service;
 
         public AdminCommissionAppServiceTests()
@@ -192,8 +204,7 @@ namespace AqualLifeStyle.Tests.Application
             var closedWeek = Resolve<LatestClosedCommissionWeekResolver>()
                 .Resolve(DateTime.UtcNow);
             var activatedAt = closedWeek.PeriodStartUtc.AddMinutes(1);
-            var programmeTerms =
-                Resolve<ICurrentProgrammeTermsProvider>().GetEntryTerms();
+            var programmeTerms = LegacySplitPaymentTerms;
 
             await UsingDbContextAsync(1, async context =>
             {

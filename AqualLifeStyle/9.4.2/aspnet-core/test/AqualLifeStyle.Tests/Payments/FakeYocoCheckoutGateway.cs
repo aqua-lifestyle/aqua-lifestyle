@@ -8,8 +8,8 @@ namespace AqualLifeStyle.Tests.Payments
         public Task<YocoCheckout> CreateAsync(CreateYocoCheckout checkout) =>
             Task.FromResult(new YocoCheckout
             {
-                Id = $"checkout_{checkout.IntentId:N}",
-                RedirectUrl = $"https://payments.example.test/checkout/{checkout.IntentId:N}"
+                Id = $"checkout_{checkout.ReferenceId:N}",
+                RedirectUrl = $"https://payments.example.test/checkout/{checkout.ReferenceId:N}"
             });
     }
 }

@@ -150,6 +150,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 .ToListAsync();
             var payments = await GetPaymentsAsync(rows.SelectMany(row => new[]
             {
+                row.Participation.JoiningPaymentId,
                 row.Participation.RegistrationPaymentId,
                 row.Participation.ActivationPaymentId
             }));
@@ -308,7 +309,12 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 participation.StartedAt,
                 participation.ActivatedAt,
                 participation.Currency,
-                new[] { participation.RegistrationPaymentId, participation.ActivationPaymentId },
+                new[]
+                {
+                    participation.JoiningPaymentId,
+                    participation.RegistrationPaymentId,
+                    participation.ActivationPaymentId
+                },
                 payments,
                 memberNumbers,
                 areaNames);
@@ -387,6 +393,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             {
                 Description = payment.Purpose switch
                 {
+                    MemberPaymentPurpose.AQGreenJoining => "Full AQGreen joining payment",
                     MemberPaymentPurpose.EntryRegistration => "AQGreen registration payment",
                     MemberPaymentPurpose.EntryActivation => "AQGreen activation payment",
                     _ => "Full Onyx participation payment"

@@ -15,6 +15,13 @@ namespace AqualLifeStyle.Tests.Domain
             activationPaymentAmount: 600m,
             monthlyCommitmentAmount: 600m,
             gracePeriodDays: 7);
+        private static readonly EntryProgrammeTerms SinglePaymentTerms =
+            EntryProgrammeTerms.CreateSingleJoiningPayment(
+                "aqgreen-2026-07-single-1200",
+                EffectiveFrom,
+                joiningPaymentAmount: 1200m,
+                monthlyCommitmentAmount: 600m,
+                gracePeriodDays: 7);
 
         [Fact]
         public void Customer_CanStartEntryIndependently()
@@ -108,6 +115,58 @@ namespace AqualLifeStyle.Tests.Domain
 
             Assert.Throws<InvalidOperationException>(() =>
                 participation.ApplyConfirmedActivationPayment(activationPayment));
+        }
+
+        [Fact]
+        public void AQGreenParticipant_ActivatesAfterOneConfirmedTwelveHundredRandPayment()
+        {
+            var participation = EntryParticipation.StartIndependently(
+                tenantId: 1,
+                customerId: 10,
+                SinglePaymentTerms,
+                EffectiveFrom);
+            var payment = MemberPayment.CreatePending(
+                participation.TenantId,
+                participation.CustomerId,
+                MemberPaymentPurpose.AQGreenJoining,
+                amount: 1200m,
+                provider: "Yoco",
+                externalReference: "aqgreen-joining-10",
+                initiatedAt: EffectiveFrom);
+            payment.Confirm(EffectiveFrom.AddMinutes(1));
+
+            participation.ApplyConfirmedJoiningPayment(payment);
+            participation.ApplyConfirmedJoiningPayment(payment);
+
+            Assert.Equal(EntryParticipationStatus.Active, participation.Status);
+            Assert.True(participation.IsQualifiedForNetwork);
+            Assert.Equal(payment.Id, participation.JoiningPaymentId);
+            Assert.Null(participation.RegistrationPaymentId);
+            Assert.Null(participation.ActivationPaymentId);
+            Assert.Equal(1200m, participation.JoiningPaymentAmount);
+        }
+
+        [Fact]
+        public void AQGreenSinglePayment_RejectsAConfirmedSixHundredRandPayment()
+        {
+            var participation = EntryParticipation.StartIndependently(
+                tenantId: 1,
+                customerId: 10,
+                SinglePaymentTerms,
+                EffectiveFrom);
+            var payment = CreatePayment(
+                participation.TenantId,
+                participation.CustomerId,
+                MemberPaymentPurpose.AQGreenJoining,
+                "aqgreen-underpayment-10");
+            payment.Confirm(EffectiveFrom.AddMinutes(1));
+
+            Assert.Throws<InvalidOperationException>(() =>
+                participation.ApplyConfirmedJoiningPayment(payment));
+            Assert.Equal(
+                EntryParticipationStatus.AwaitingJoiningPayment,
+                participation.Status);
+            Assert.Null(participation.JoiningPaymentId);
         }
 
         [Fact]

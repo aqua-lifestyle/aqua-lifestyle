@@ -8,6 +8,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
     {
         Task<MyProgrammeParticipationsDto> GetMyParticipationsAsync();
         Task<ProgrammeParticipationDto> StartEntryAsync(StartEntryParticipationInput input);
-        Task<DirectOnyxCheckoutDto> CreateDirectOnyxCheckoutAsync(CreateDirectOnyxCheckoutInput input);
+        Task<ProgrammeCheckoutDto> CreateAQGreenJoiningCheckoutAsync();
+        Task<ProgrammeCheckoutDto> CreateDirectOnyxCheckoutAsync(CreateDirectOnyxCheckoutInput input);
     }
 }

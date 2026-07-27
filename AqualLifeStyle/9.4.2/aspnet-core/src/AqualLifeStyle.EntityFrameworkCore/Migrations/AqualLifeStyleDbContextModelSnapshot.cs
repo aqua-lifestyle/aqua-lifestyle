@@ -2341,6 +2341,13 @@ namespace AqualLifeStyle.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<decimal>("JoiningPaymentAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("JoiningPaymentId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("LastModificationTime")
                         .HasColumnType("timestamp with time zone");
 
@@ -2383,6 +2390,8 @@ namespace AqualLifeStyle.Migrations
                     b.HasIndex("ActivationPaymentId");
 
                     b.HasIndex("CustomerId");
+
+                    b.HasIndex("JoiningPaymentId");
 
                     b.HasIndex("RecruiterCustomerId");
 
@@ -3141,6 +3150,90 @@ namespace AqualLifeStyle.Migrations
                     b.HasIndex("EnquiryId");
 
                     b.ToTable("OrderIntents", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Payments.AQGreenJoiningCheckout", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("CheckoutCreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CheckoutUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("ParticipationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProviderCheckoutId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("ParticipationId")
+                        .IsUnique();
+
+                    b.HasIndex("PaymentId")
+                        .IsUnique();
+
+                    b.HasIndex("ProviderCheckoutId")
+                        .IsUnique();
+
+                    b.ToTable("AQGreenJoiningCheckouts", (string)null);
                 });
 
             modelBuilder.Entity("AqualLifeStyle.Domain.Payments.DirectOnyxCheckoutIntent", b =>
@@ -3995,6 +4088,11 @@ namespace AqualLifeStyle.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("AqualLifeStyle.Domain.Payments.MemberPayment", null)
+                        .WithMany()
+                        .HasForeignKey("JoiningPaymentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("AqualLifeStyle.Domain.Customers.Customer", null)
                         .WithMany()
                         .HasForeignKey("RecruiterCustomerId")
@@ -4162,6 +4260,26 @@ namespace AqualLifeStyle.Migrations
                         .HasForeignKey("OnyxParticipationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Payments.AQGreenJoiningCheckout", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.EntryParticipation", null)
+                        .WithMany()
+                        .HasForeignKey("ParticipationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.Payments.MemberPayment", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("AqualLifeStyle.Domain.Payments.DirectOnyxCheckoutIntent", b =>

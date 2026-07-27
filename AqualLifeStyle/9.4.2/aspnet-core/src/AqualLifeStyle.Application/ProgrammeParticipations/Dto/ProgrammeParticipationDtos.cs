@@ -20,14 +20,14 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
         public string InviteCode { get; set; }
     }
 
-    public class DirectOnyxCheckoutDto
+    public class ProgrammeCheckoutDto
     {
         public decimal Amount { get; set; }
         public string Currency { get; set; }
         public string CheckoutUrl { get; set; }
     }
 
-    public class PendingDirectOnyxCheckoutDto
+    public class PendingProgrammeCheckoutDto
     {
         public decimal Amount { get; set; }
         public string Currency { get; set; }
@@ -55,7 +55,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
         public string ClubMemberNumber { get; set; }
         public ProgrammeParticipationDto Entry { get; set; }
         public ProgrammeParticipationDto Onyx { get; set; }
-        public PendingDirectOnyxCheckoutDto PendingDirectOnyxCheckout { get; set; }
+        public PendingProgrammeCheckoutDto PendingAQGreenCheckout { get; set; }
+        public PendingProgrammeCheckoutDto PendingDirectOnyxCheckout { get; set; }
         public OnyxTravelBenefitDto TravelBenefit { get; set; }
         public bool CanJoinEntry => Entry == null;
         public bool CanJoinOnyxDirectly => Onyx == null && PendingDirectOnyxCheckout == null;

@@ -8,7 +8,8 @@ namespace AqualLifeStyle.Domain.Onyx
 {
     public enum EntryParticipationStatus
     {
-        AwaitingRegistrationPayment = 0,
+        AwaitingJoiningPayment = 0,
+        AwaitingRegistrationPayment = AwaitingJoiningPayment,
         AwaitingActivationPayment = 1,
         Active = 2
     }
@@ -24,10 +25,12 @@ namespace AqualLifeStyle.Domain.Onyx
         public EntryParticipationStatus Status { get; private set; }
         public DateTime StartedAt { get; private set; }
         public DateTime? ActivatedAt { get; private set; }
+        public Guid? JoiningPaymentId { get; private set; }
         public Guid? RegistrationPaymentId { get; private set; }
         public Guid? ActivationPaymentId { get; private set; }
         public string TermsVersion { get; private set; }
         public DateTime TermsEffectiveFrom { get; private set; }
+        public decimal JoiningPaymentAmount { get; private set; }
         public decimal RegistrationPaymentAmount { get; private set; }
         public decimal ActivationPaymentAmount { get; private set; }
         public decimal MonthlyCommitmentAmount { get; private set; }
@@ -63,12 +66,13 @@ namespace AqualLifeStyle.Domain.Onyx
             StartedAt = startedAt;
             TermsVersion = terms.Version;
             TermsEffectiveFrom = terms.EffectiveFrom;
+            JoiningPaymentAmount = terms.JoiningPaymentAmount;
             RegistrationPaymentAmount = terms.RegistrationPaymentAmount;
             ActivationPaymentAmount = terms.ActivationPaymentAmount;
             MonthlyCommitmentAmount = terms.MonthlyCommitmentAmount;
             GracePeriodDays = terms.GracePeriodDays;
             Currency = terms.Currency;
-            Status = EntryParticipationStatus.AwaitingRegistrationPayment;
+            Status = EntryParticipationStatus.AwaitingJoiningPayment;
         }
 
         public static EntryParticipation StartIndependently(
@@ -104,6 +108,11 @@ namespace AqualLifeStyle.Domain.Onyx
 
         public void ApplyConfirmedActivationPayment(MemberPayment payment)
         {
+            if (JoiningPaymentAmount > 0m)
+            {
+                throw new InvalidOperationException(
+                    "This AQGreen participation uses the single joining payment lifecycle.");
+            }
             EnsurePaymentBelongsToParticipation(payment);
 
             switch (payment.Purpose)
@@ -117,6 +126,41 @@ namespace AqualLifeStyle.Domain.Onyx
                 default:
                     throw new InvalidOperationException("The confirmed payment is not an AQGreen activation payment.");
             }
+        }
+
+        public void ApplyConfirmedJoiningPayment(MemberPayment payment)
+        {
+            if (JoiningPaymentAmount <= 0m)
+            {
+                throw new InvalidOperationException(
+                    "This historical AQGreen participation uses the previous split-payment lifecycle.");
+            }
+
+            EnsurePaymentBelongsToParticipation(payment);
+            if (payment.Purpose != MemberPaymentPurpose.AQGreenJoining)
+            {
+                throw new InvalidOperationException(
+                    "The confirmed payment is not an AQGreen joining payment.");
+            }
+            if (JoiningPaymentId == payment.Id)
+            {
+                return;
+            }
+            if (Status == EntryParticipationStatus.Active || JoiningPaymentId.HasValue)
+            {
+                throw new InvalidOperationException(
+                    "The AQGreen joining payment has already been recorded.");
+            }
+            if (RegistrationPaymentId.HasValue || ActivationPaymentId.HasValue)
+            {
+                throw new InvalidOperationException(
+                    "A historical AQGreen payment already exists for this participation.");
+            }
+
+            EnsureExactAmount(payment, JoiningPaymentAmount);
+            JoiningPaymentId = payment.Id;
+            ActivatedAt = payment.ConfirmedAt;
+            Status = EntryParticipationStatus.Active;
         }
 
         public void CorrectRecruiter(

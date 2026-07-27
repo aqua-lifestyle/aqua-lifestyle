@@ -63,7 +63,9 @@ namespace AqualLifeStyle.Tests.Payments
 
         private static CreateYocoCheckout CreateRequest(Guid intentId) => new()
         {
-            IntentId = intentId,
+            ReferenceId = intentId,
+            ReferenceMetadataKey = YocoCheckoutMetadata.DirectOnyxCheckoutIntentId,
+            Purpose = "OnyxDirectEntry",
             Amount = 6120m,
             Currency = "ZAR",
             SuccessUrl = "https://club.example.test/member/programmes?payment=success",

@@ -152,8 +152,10 @@ namespace AqualLifeStyle.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "DirectOnyxCheckoutIntents");
+            throw new NotSupportedException(
+                "The direct Onyx checkout-intent migration cannot be rolled back. " +
+                "It migrates existing premature Onyx participations into checkout intents and deletes " +
+                "the original participation rows, so the pre-migration state cannot be restored.");
         }
     }
 }

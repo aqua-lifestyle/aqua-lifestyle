@@ -63,17 +63,24 @@ namespace AqualLifeStyle.Web.Host.Controllers
             if (webhookEvent?.Payload == null)
                 return BadRequest();
 
-            await _notificationProcessor.ProcessAsync(new VerifiedYocoPaymentNotification
+            try
             {
-                EventType = webhookEvent.Type,
-                PaymentId = webhookEvent.Payload.Id,
-                AmountInCents = webhookEvent.Payload.Amount,
-                Currency = webhookEvent.Payload.Currency,
-                Mode = webhookEvent.Payload.Mode,
-                ConfirmedAt = webhookEvent.Payload.CreatedDate,
-                Metadata = webhookEvent.Payload.Metadata
-            });
-            return Ok();
+                await _notificationProcessor.ProcessAsync(new VerifiedYocoPaymentNotification
+                {
+                    EventType = webhookEvent.Type,
+                    PaymentId = webhookEvent.Payload.Id,
+                    AmountInCents = webhookEvent.Payload.Amount,
+                    Currency = webhookEvent.Payload.Currency,
+                    Mode = webhookEvent.Payload.Mode,
+                    ConfirmedAt = webhookEvent.Payload.CreatedDate.UtcDateTime,
+                    Metadata = webhookEvent.Payload.Metadata
+                });
+                return Ok();
+            }
+            catch (AqualLifeStyle.Payments.Yoco.YocoWebhookValidationException)
+            {
+                return BadRequest();
+            }
         }
 
         private sealed class YocoPaymentWebhookEvent
@@ -85,7 +92,7 @@ namespace AqualLifeStyle.Web.Host.Controllers
         private sealed class YocoPaymentWebhookPayload
         {
             public int Amount { get; set; }
-            public DateTime CreatedDate { get; set; }
+            public DateTimeOffset CreatedDate { get; set; }
             public string Currency { get; set; }
             public string Id { get; set; }
             public string Mode { get; set; }

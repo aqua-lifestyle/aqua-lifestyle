@@ -25,8 +25,10 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             {
                 Status = participation.Status switch
                 {
-                    EntryParticipationStatus.AwaitingRegistrationPayment =>
-                        "Awaiting registration payment",
+                    EntryParticipationStatus.AwaitingJoiningPayment =>
+                        participation.JoiningPaymentAmount > 0m
+                            ? "Awaiting joining payment"
+                            : "Awaiting registration payment",
                     EntryParticipationStatus.AwaitingActivationPayment =>
                         "Awaiting activation payment",
                     EntryParticipationStatus.Active => "Active",
@@ -37,12 +39,16 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 },
                 IsActive = participation.Status == EntryParticipationStatus.Active,
                 NextPaymentAmount = awaitingRegistration
-                    ? participation.RegistrationPaymentAmount
+                    ? participation.JoiningPaymentAmount > 0m
+                        ? participation.JoiningPaymentAmount
+                        : participation.RegistrationPaymentAmount
                     : awaitingActivation
                         ? participation.ActivationPaymentAmount
                         : null,
                 NextPaymentDescription = awaitingRegistration
-                    ? "Registration payment"
+                    ? participation.JoiningPaymentAmount > 0m
+                        ? "Full AQGreen joining payment"
+                        : "Registration payment"
                     : awaitingActivation
                         ? "Activation payment"
                         : null,

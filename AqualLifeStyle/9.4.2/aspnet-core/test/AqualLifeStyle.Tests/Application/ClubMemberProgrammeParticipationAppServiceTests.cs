@@ -314,10 +314,10 @@ namespace AqualLifeStyle.Tests.Application
 
             repeatedEntry.Status.ShouldBe(entry.Status);
             entry.ProgrammeName.ShouldBe("AQGreen");
-            entry.Status.ShouldBe("Awaiting registration payment");
+            entry.Status.ShouldBe("Awaiting joining payment");
             entry.JoinedIndependently.ShouldBeTrue();
-            entry.NextPaymentAmount.ShouldBe(600m);
-            entry.NextPaymentDescription.ShouldBe("Registration payment");
+            entry.NextPaymentAmount.ShouldBe(1200m);
+            entry.NextPaymentDescription.ShouldBe("Full AQGreen joining payment");
             entry.CanRecruitForThisProgramme.ShouldBeFalse();
 
             onyxCheckout.Amount.ShouldBe(6120m);
@@ -352,7 +352,7 @@ namespace AqualLifeStyle.Tests.Application
                     item.Purpose == MemberPaymentPurpose.OnyxDirectEntry)).ShouldBeFalse();
                 var intent = await context.DirectOnyxCheckoutIntents.SingleAsync(item =>
                     item.CustomerId == customerId);
-                intent.Status.ShouldBe(DirectOnyxCheckoutIntentStatus.AwaitingPayment);
+                intent.Status.ShouldBe(HostedPaymentCheckoutStatus.AwaitingPayment);
                 return intent.Id;
             });
 
@@ -362,6 +362,7 @@ namespace AqualLifeStyle.Tests.Application
                     intentId,
                     "Yoco",
                     $"wrong-amount-{Guid.NewGuid():N}",
+                    $"checkout_{intentId:N}",
                     6119m,
                     "ZAR",
                     DateTime.UtcNow));
@@ -380,6 +381,7 @@ namespace AqualLifeStyle.Tests.Application
                 intentId,
                 "Yoco",
                 paymentReference,
+                $"checkout_{intentId:N}",
                 6120m,
                 "ZAR",
                 DateTime.UtcNow);
@@ -387,6 +389,7 @@ namespace AqualLifeStyle.Tests.Application
                 intentId,
                 "Yoco",
                 paymentReference,
+                $"checkout_{intentId:N}",
                 6120m,
                 "ZAR",
                 DateTime.UtcNow);
@@ -403,11 +406,106 @@ namespace AqualLifeStyle.Tests.Application
                 participation.DirectEntryPaymentId.ShouldBe(first.PaymentId);
                 var intent = await context.DirectOnyxCheckoutIntents.SingleAsync(item =>
                     item.Id == intentId);
-                intent.Status.ShouldBe(DirectOnyxCheckoutIntentStatus.Completed);
+                intent.Status.ShouldBe(HostedPaymentCheckoutStatus.Completed);
                 intent.ParticipationId.ShouldBe(participation.Id);
                 (await context.MemberPayments.CountAsync(item =>
                     item.CustomerId == customerId &&
                     item.Purpose == MemberPaymentPurpose.OnyxDirectEntry)).ShouldBe(1);
+            });
+        }
+
+        [Fact]
+        public async Task AQGreenCheckout_ActivatesOnlyAfterOneVerifiedTwelveHundredRandPayment()
+        {
+            var customerId = await RegisterAndSignInCustomerAsync();
+            await _participationService.StartEntryAsync(
+                new StartEntryParticipationInput());
+            var checkoutResult = await _participationService
+                .CreateAQGreenJoiningCheckoutAsync();
+            var repeatedCheckout = await _participationService
+                .CreateAQGreenJoiningCheckoutAsync();
+
+            repeatedCheckout.CheckoutUrl.ShouldBe(checkoutResult.CheckoutUrl);
+            checkoutResult.Amount.ShouldBe(1200m);
+            checkoutResult.Currency.ShouldBe("ZAR");
+
+            var checkout = await UsingDbContextAsync(1, async context =>
+            {
+                var persisted = await context.AQGreenJoiningCheckouts.SingleAsync(
+                    item => item.CustomerId == customerId);
+                persisted.Status.ShouldBe(HostedPaymentCheckoutStatus.AwaitingPayment);
+                (await context.MemberPayments.AnyAsync(item =>
+                    item.CustomerId == customerId &&
+                    item.Purpose == MemberPaymentPurpose.AQGreenJoining)).ShouldBeFalse();
+                (await context.EntryParticipations.SingleAsync(item =>
+                    item.CustomerId == customerId)).Status.ShouldBe(
+                    EntryParticipationStatus.AwaitingJoiningPayment);
+                return persisted;
+            });
+
+            var processor = Resolve<ProgrammePaymentConfirmationProcessor>();
+            await Should.ThrowAsync<InvalidOperationException>(() =>
+                processor.ProcessAQGreenJoiningCheckoutAsync(
+                    checkout.Id,
+                    "Yoco",
+                    $"wrong-checkout-{Guid.NewGuid():N}",
+                    "checkout_that_does_not_match",
+                    1200m,
+                    "ZAR",
+                    DateTime.UtcNow));
+            await Should.ThrowAsync<InvalidOperationException>(() =>
+                processor.ProcessAQGreenJoiningCheckoutAsync(
+                    checkout.Id,
+                    "Yoco",
+                    $"wrong-amount-{Guid.NewGuid():N}",
+                    checkout.ProviderCheckoutId,
+                    600m,
+                    "ZAR",
+                    DateTime.UtcNow));
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.MemberPayments.AnyAsync(item =>
+                    item.CustomerId == customerId &&
+                    item.Purpose == MemberPaymentPurpose.AQGreenJoining)).ShouldBeFalse();
+                (await context.EntryParticipations.SingleAsync(item =>
+                    item.CustomerId == customerId)).Status.ShouldBe(
+                    EntryParticipationStatus.AwaitingJoiningPayment);
+            });
+
+            var paymentReference = $"aqgreen-payment-{Guid.NewGuid():N}";
+            var first = await processor.ProcessAQGreenJoiningCheckoutAsync(
+                checkout.Id,
+                "Yoco",
+                paymentReference,
+                checkout.ProviderCheckoutId,
+                1200m,
+                "ZAR",
+                DateTime.UtcNow);
+            var repeated = await processor.ProcessAQGreenJoiningCheckoutAsync(
+                checkout.Id,
+                "Yoco",
+                paymentReference,
+                checkout.ProviderCheckoutId,
+                1200m,
+                "ZAR",
+                DateTime.UtcNow);
+
+            repeated.WasAlreadyProcessed.ShouldBeTrue();
+            repeated.PaymentId.ShouldBe(first.PaymentId);
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations.SingleAsync(
+                    item => item.CustomerId == customerId);
+                participation.Status.ShouldBe(EntryParticipationStatus.Active);
+                participation.JoiningPaymentId.ShouldBe(first.PaymentId);
+                var persistedCheckout = await context.AQGreenJoiningCheckouts.SingleAsync(
+                    item => item.Id == checkout.Id);
+                persistedCheckout.Status.ShouldBe(HostedPaymentCheckoutStatus.Completed);
+                persistedCheckout.PaymentId.ShouldBe(first.PaymentId);
+                (await context.MemberPayments.CountAsync(item =>
+                    item.CustomerId == customerId &&
+                    item.Purpose == MemberPaymentPurpose.AQGreenJoining)).ShouldBe(1);
             });
         }
 
@@ -585,16 +683,19 @@ namespace AqualLifeStyle.Tests.Application
         private async Task ActivateCurrentAQGreenParticipationAsync(int customerId)
         {
             await _participationService.StartEntryAsync(new StartEntryParticipationInput());
-            var suffix = Guid.NewGuid().ToString("N");
-            var processor = Resolve<ProgrammePaymentConfirmationProcessor>();
-            await processor.ProcessAsync(CreateConfirmation(
-                customerId,
-                MemberPaymentPurpose.EntryRegistration,
-                $"invite-registration-{suffix}"));
-            await processor.ProcessAsync(CreateConfirmation(
-                customerId,
-                MemberPaymentPurpose.EntryActivation,
-                $"invite-activation-{suffix}"));
+            await _participationService.CreateAQGreenJoiningCheckoutAsync();
+            var checkout = await UsingDbContextAsync(1, context =>
+                context.AQGreenJoiningCheckouts.SingleAsync(
+                    item => item.CustomerId == customerId));
+            await Resolve<ProgrammePaymentConfirmationProcessor>()
+                .ProcessAQGreenJoiningCheckoutAsync(
+                    checkout.Id,
+                    "Test",
+                    $"invite-aqgreen-{Guid.NewGuid():N}",
+                    checkout.ProviderCheckoutId,
+                    1200m,
+                    "ZAR",
+                    DateTime.UtcNow);
         }
 
         private async Task ActivateCurrentOnyxParticipationAsync(int customerId)
@@ -607,6 +708,7 @@ namespace AqualLifeStyle.Tests.Application
                 intent.Id,
                 "Test",
                 $"invite-onyx-{Guid.NewGuid():N}",
+                intent.ProviderCheckoutId,
                 6120m,
                 "ZAR",
                 DateTime.UtcNow);
@@ -678,19 +780,14 @@ namespace AqualLifeStyle.Tests.Application
                     customer.Id,
                     Resolve<ICurrentProgrammeTermsProvider>().GetEntryTerms(),
                     DateTime.UtcNow.AddMinutes(-2));
-                var registration = CreateConfirmedPayment(
+                var joiningPayment = CreateConfirmedPayment(
                     tenantId,
                     customer.Id,
-                    MemberPaymentPurpose.EntryRegistration,
-                    $"cross-area-registration-{suffix}");
-                participation.ApplyConfirmedActivationPayment(registration);
-                var activation = CreateConfirmedPayment(
-                    tenantId,
-                    customer.Id,
-                    MemberPaymentPurpose.EntryActivation,
-                    $"cross-area-activation-{suffix}");
-                participation.ApplyConfirmedActivationPayment(activation);
-                context.MemberPayments.AddRange(registration, activation);
+                    MemberPaymentPurpose.AQGreenJoining,
+                    $"cross-area-joining-{suffix}",
+                    1200m);
+                participation.ApplyConfirmedJoiningPayment(joiningPayment);
+                context.MemberPayments.Add(joiningPayment);
                 context.EntryParticipations.Add(participation);
                 await context.SaveChangesAsync();
                 return customer.Id;
