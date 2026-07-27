@@ -24,6 +24,11 @@ namespace AqualLifeStyle.Payments.Yoco
         public YocoWebhookValidationException(string message, Exception inner) : base(message, inner) { }
     }
 
+    public sealed class YocoWebhookTransientException : Exception
+    {
+        public YocoWebhookTransientException(string message) : base(message) { }
+    }
+
     public sealed class YocoPaymentNotificationProcessor : ITransientDependency
     {
         private readonly ProgrammePaymentConfirmationProcessor _confirmationProcessor;
@@ -101,6 +106,10 @@ namespace AqualLifeStyle.Payments.Yoco
 
                 throw new YocoWebhookValidationException(
                     "The Yoco payment is missing a supported programme checkout reference.");
+            }
+            catch (YocoWebhookTransientException)
+            {
+                throw;
             }
             catch (YocoWebhookValidationException)
             {

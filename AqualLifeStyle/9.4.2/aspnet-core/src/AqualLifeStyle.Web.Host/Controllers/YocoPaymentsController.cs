@@ -77,6 +77,10 @@ namespace AqualLifeStyle.Web.Host.Controllers
                 });
                 return Ok();
             }
+            catch (AqualLifeStyle.Payments.Yoco.YocoWebhookTransientException)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
             catch (AqualLifeStyle.Payments.Yoco.YocoWebhookValidationException)
             {
                 return BadRequest();

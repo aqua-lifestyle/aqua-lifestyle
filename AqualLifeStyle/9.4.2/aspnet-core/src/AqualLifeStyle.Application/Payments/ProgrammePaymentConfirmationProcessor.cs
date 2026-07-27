@@ -10,6 +10,7 @@ using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
+using AqualLifeStyle.Payments.Yoco;
 using Microsoft.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Payments
@@ -167,8 +168,23 @@ namespace AqualLifeStyle.Payments
                 var existingParticipation = await _onyxParticipationRepository.FirstOrDefaultAsync(
                     participation => participation.CustomerId == intent.CustomerId);
                 if (existingParticipation != null)
+                {
+                    if (existingParticipation.DirectEntryPaymentId.HasValue)
+                    {
+                        var recoveredPayment = await _paymentRepository.GetAsync(
+                            existingParticipation.DirectEntryPaymentId.Value);
+                        EnsureMatchingPaymentFacts(recoveredPayment, candidate);
+
+                        return new ProgrammePaymentConfirmationResult(
+                            recoveredPayment.Id,
+                            existingParticipation.Id,
+                            ProgrammeParticipationKind.Onyx,
+                            true);
+                    }
+
                     throw new InvalidOperationException(
                         "An Onyx participation already exists for this checkout customer.");
+                }
 
                 OnyxParticipation participation;
                 if (intent.RecruiterCustomerId.HasValue)
@@ -313,7 +329,8 @@ namespace AqualLifeStyle.Payments
         {
             if (checkout.Status != HostedPaymentCheckoutStatus.AwaitingPayment ||
                 string.IsNullOrWhiteSpace(checkout.ProviderCheckoutId))
-                throw new InvalidOperationException($"The {programmeName} checkout is not awaiting payment confirmation.");
+                throw new YocoWebhookTransientException(
+                    $"The {programmeName} checkout is not yet ready for payment confirmation.");
             EnsureProviderCheckoutMatches(checkout, providerCheckoutId, programmeName);
             if (checkout.Amount != amount ||
                 !string.Equals(checkout.Currency, currency?.Trim(), StringComparison.OrdinalIgnoreCase))
