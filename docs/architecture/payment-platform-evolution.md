@@ -86,9 +86,18 @@ PostgreSQL `DO $$ ... RAISE EXCEPTION` guards when:
 - Any `EntryParticipation` has a non-null `JoiningPaymentId`, **or**
 - Any `AQGreenJoiningCheckout` row exists.
 
-This prevents partial downgrade from falsifying financial history. If a
-rollback becomes necessary after such records exist, the only safe recovery
-is restoring from a database snapshot taken before the upgrade.
+This prevents partial downgrade from falsifying financial history. When
+protected records exist, the preferred remediation is a data-preserving
+forward path: archive the protected `JoiningPaymentId` references and
+`AQGreenJoiningCheckout` rows to an external ledger, nullify the foreign
+keys, remove the checkout rows, then downgrade. This preserves post-upgrade
+payment and checkout history outside the database.
+
+Pre-upgrade snapshot restoration remains available only as an incident
+procedure. It returns the database to an exact pre-upgrade state, but it
+discards all post-upgrade payments and checkout records, so it requires
+financial reconciliation against provider settlement data before the
+restored database is trusted.
 
 The behavior is validated by `AQGreenMigrationRollbackPostgreSqlTests` in
 `test/AqualLifeStyle.Tests/EntityFrameworkCore/AQGreenMigrationRollbackTests.cs`.
