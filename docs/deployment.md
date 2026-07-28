@@ -36,7 +36,7 @@ The API runtime uses the slim Debian ASP.NET image and its built-in non-root `ap
 
 Render supplies `DATABASE_URL`; the application converts it to the Npgsql keyword format without logging credentials. Redis is supplied through `Redis__Configuration` and becomes ABP's distributed cache backing implementation.
 
-### Yoco direct-Onyx payments
+### Yoco programme payments
 
 Yoco credentials belong only in the Render API service. They must never be
 added to Vercel, a `NEXT_PUBLIC_*` variable, source control, screenshots, or
@@ -63,7 +63,8 @@ Before deploying the payment branch:
 
 The API rejects a mode/key mismatch: `test` requires `sk_test_`, while `live`
 requires `sk_live_`. A successful browser redirect is not proof of payment;
-only a valid Yoco webhook creates the Onyx participation and network placement.
+only a valid Yoco webhook activates AQGreen or creates and activates the Onyx
+participation and network placement.
 The webhook signature uses the raw body, `webhook-id`, and
 `webhook-timestamp`, and rejects notifications more than three minutes old.
 
@@ -72,6 +73,51 @@ Create a live webhook, then update all three Render values together to the live
 secret key, the live webhook's verification secret, and `live`. Keep the test
 and live webhook secrets separate. Do not reuse the test webhook secret in live
 mode.
+
+The Render Blueprint runs the migrator before every API deployment. Deployment
+of migration `20260728110000_AddYocoWebhookReceipts` therefore creates the
+successful-event receipt table and unique event-ID index before the updated API
+starts. Do not run the migrator from a workstation against production; confirm
+the Render pre-deploy step succeeds instead.
+
+### Payment operations alerts
+
+The API emits structured JSON events whose message begins with
+`PaymentOperationsAlert`. It never includes webhook bodies, signatures, customer
+IDs, payment amounts, checkout URLs, or credentials. Current alert types are:
+
+- `yoco_webhook_processing_deferred`: authenticated delivery could not complete
+  and Yoco should retry;
+- `yoco_webhook_signature_rejected`: signature validation failed;
+- `yoco_webhook_payload_rejected` and `yoco_webhook_validation_rejected`: a
+  signed or unsigned request was malformed or failed authoritative validation;
+- `yoco_payment_monitor_failed`: the stale-checkout monitoring query failed;
+- `stale_yoco_checkouts`: aggregate AQGreen and Onyx checkout counts remain
+  awaiting confirmation beyond the operational threshold.
+
+The monitor scans every 15 minutes and treats a checkout as stale after 60
+minutes. Override these values through
+`Yoco__Monitoring__ScanIntervalMinutes` and
+`Yoco__Monitoring__StaleCheckoutThresholdMinutes`; both must be positive whole
+minutes. A stale checkout does not prove that payment succeeded. Operations must
+compare it with Yoco before changing any programme state.
+
+Render's normal email/Slack notifications cover Render service events, not
+application log patterns. To turn these signals into human notifications:
+
+1. In the Render workspace, open **Integrations → Log Streams** and connect an
+   HTTPS or syslog destination such as Better Stack, Datadog, or Papertrail.
+2. In that destination, create an immediate alert for
+   `AlertType=yoco_webhook_processing_deferred` and
+   `AlertType=stale_yoco_checkouts`, plus
+   `AlertType=yoco_payment_monitor_failed`.
+3. Create a rate-based alert, rather than one notification per request, for the
+   signature and validation rejection event types.
+4. Send alerts to the monitored club operations email or Slack channel and run a
+   test-mode payment to verify delivery end to end.
+5. Until a log destination is connected, search Render logs for
+   `PaymentOperationsAlert` at least daily and manually reconcile every stale
+   checkout.
 
 ### AQGreen migration rollback safety
 

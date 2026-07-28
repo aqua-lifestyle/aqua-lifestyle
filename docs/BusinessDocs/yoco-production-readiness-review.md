@@ -145,7 +145,10 @@ should recover through the same idempotency key, but this behaviour needs a real
 provider contract/integration test. Typed `HttpClient` is used, but explicit
 timeouts, bounded retry/backoff, and circuit-breaking policy are not configured.
 Provider errors are intentionally converted to safe customer messages, but no
-operations alert is raised.
+customer data or secrets are logged. Webhook failures now emit structured
+`PaymentOperationsAlert` events, and the periodic monitor emits an aggregate
+warning for checkouts that remain awaiting confirmation beyond the configured
+threshold. An external notification destination must consume those events.
 
 ## Security review
 
@@ -163,14 +166,17 @@ configuration names and placeholders only.
 
 ## Observability
 
-The implementation logs checkout creation without keys or payment data and the
-platform already emits console logs. For production operations it still needs:
+The implementation logs checkout creation without keys or payment data and emits
+structured `PaymentOperationsAlert` events for signature rejection, malformed or
+invalid notifications, retryable processing failures, and stale checkouts. The
+stale monitor reports only programme counts and age. For production operations it
+still needs:
 
 - structured fields for checkout ID, provider payment reference, tenant/Area,
   programme, event ID, processing outcome, duration, and correlation ID;
 - counters for created, completed, rejected, duplicate, and stuck checkouts;
-- alerts for signature failures, repeated processing failures, checkout-creation
-  error rate, and payments awaiting reconciliation beyond a threshold;
+- a configured log-stream notification rule for the emitted operational events,
+  with rate-based alerting for signature/validation noise;
 - an administrator view that exposes safe payment state and reconciliation history
   without exposing secrets or raw sensitive payloads.
 
@@ -197,8 +203,9 @@ High-priority missing tests are:
 - Rotate every exposed or shared Yoco key and webhook secret.
 - Configure live mode, live secret, webhook secret, and public webhook URL only in
   the production secret store; verify a signed live-mode webhook end to end.
-- Add monitoring for webhook failures and manually reconcile every checkout that
-  remains awaiting payment beyond the agreed operational threshold.
+- Connect the emitted `PaymentOperationsAlert` events to an operations notification
+  destination and manually reconcile every checkout that remains awaiting payment
+  beyond the agreed operational threshold.
 
 ### High priority
 
@@ -214,7 +221,7 @@ High-priority missing tests are:
 - Model expiration/cancellation only after confirming Yoco's authoritative events
   and retry semantics.
 - Add settlement, refund, and dispute records before offering those operations.
-- Add structured payment metrics, dashboards, and alerts.
+- Add structured payment metrics and an administrator-facing dashboard.
 - Define how refunds or chargebacks affect activation, network qualification, and
   commission holds without rewriting historical ledgers.
 
