@@ -51,6 +51,10 @@ services:
         sync: false
       - key: Yoco__Mode
         value: live
+      - key: Yoco__Monitoring__ScanIntervalMinutes
+        value: "15"
+      - key: Yoco__Monitoring__StaleCheckoutThresholdMinutes
+        value: "60"
 
   - type: keyvalue
     name: aqualifestyle-redis

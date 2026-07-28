@@ -10,6 +10,7 @@ using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Web.Host.Controllers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Shouldly;
@@ -50,7 +51,8 @@ namespace AqualLifeStyle.Tests.Payments
             string secret,
             out Mock<IYocoWebhookSignatureVerifier> verifierMock,
             out TestYocoPaymentNotificationProcessor testProcessor,
-            JsonSerializerOptions? jsonOptions = null)
+            JsonSerializerOptions? jsonOptions = null,
+            TestLogger<YocoPaymentsController>? logger = null)
         {
             verifierMock = new Mock<IYocoWebhookSignatureVerifier>();
             verifierMock.Setup(v => v.IsValid(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
@@ -65,7 +67,8 @@ namespace AqualLifeStyle.Tests.Payments
             var controller = new YocoPaymentsController(
                 verifierMock.Object,
                 testProcessor,
-                new OptionsWrapper<Microsoft.AspNetCore.Mvc.JsonOptions>(new Microsoft.AspNetCore.Mvc.JsonOptions()));
+                new OptionsWrapper<Microsoft.AspNetCore.Mvc.JsonOptions>(new Microsoft.AspNetCore.Mvc.JsonOptions()),
+                logger ?? new TestLogger<YocoPaymentsController>());
 
             if (jsonOptions != null)
             {
@@ -111,7 +114,13 @@ namespace AqualLifeStyle.Tests.Payments
             var signature = $"v1,{Sign(secret, $"{webhookId}.{timestamp}.{rawBody}")}";
 
             var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var controller = CreateController(secret, out var verifierMock, out var testProcessor, jsonOptions);
+            var logger = new TestLogger<YocoPaymentsController>();
+            var controller = CreateController(
+                secret,
+                out var verifierMock,
+                out var testProcessor,
+                jsonOptions,
+                logger);
             controller.ControllerContext = new ControllerContext
             {
                 HttpContext = CreateHttpContext(rawBody, webhookId, timestamp, signature)
@@ -143,7 +152,13 @@ namespace AqualLifeStyle.Tests.Payments
             var tamperedBody = originalBody + " ";
 
             var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var controller = CreateController(secret, out var verifierMock, out var testProcessor, jsonOptions);
+            var logger = new TestLogger<YocoPaymentsController>();
+            var controller = CreateController(
+                secret,
+                out var verifierMock,
+                out var testProcessor,
+                jsonOptions,
+                logger);
             controller.ControllerContext = new ControllerContext
             {
                 HttpContext = CreateHttpContext(tamperedBody, webhookId, timestamp, signature)
@@ -156,6 +171,9 @@ namespace AqualLifeStyle.Tests.Payments
             statusResult.StatusCode.ShouldBe((int)HttpStatusCode.Forbidden);
             verifierMock.Verify(v => v.IsValid(webhookId, timestamp, signature, tamperedBody), Times.Once);
             testProcessor.LastNotification.ShouldBeNull();
+            logger.Entries.ShouldContain(entry =>
+                entry.Level == LogLevel.Warning &&
+                entry.Message.Contains("yoco_webhook_signature_rejected"));
         }
 
         [Fact]
@@ -182,7 +200,13 @@ namespace AqualLifeStyle.Tests.Payments
             var signature = $"v1,{Sign(secret, $"{webhookId}.{timestamp}.{rawBody}")}";
 
             var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var controller = CreateController(secret, out var verifierMock, out var testProcessor, jsonOptions);
+            var logger = new TestLogger<YocoPaymentsController>();
+            var controller = CreateController(
+                secret,
+                out var verifierMock,
+                out var testProcessor,
+                jsonOptions,
+                logger);
             controller.ControllerContext = new ControllerContext
             {
                 HttpContext = CreateHttpContext(rawBody, webhookId, timestamp, signature)
@@ -195,6 +219,9 @@ namespace AqualLifeStyle.Tests.Payments
             result.ShouldBeOfType<StatusCodeResult>();
             var statusResult = result as StatusCodeResult;
             statusResult.StatusCode.ShouldBe((int)HttpStatusCode.InternalServerError);
+            logger.Entries.ShouldContain(entry =>
+                entry.Level == LogLevel.Error &&
+                entry.Message.Contains("yoco_webhook_processing_deferred"));
         }
 
         [Fact]
@@ -221,7 +248,13 @@ namespace AqualLifeStyle.Tests.Payments
             var signature = $"v1,{Sign(secret, $"{webhookId}.{timestamp}.{rawBody}")}";
 
             var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var controller = CreateController(secret, out var verifierMock, out var testProcessor, jsonOptions);
+            var logger = new TestLogger<YocoPaymentsController>();
+            var controller = CreateController(
+                secret,
+                out var verifierMock,
+                out var testProcessor,
+                jsonOptions,
+                logger);
             controller.ControllerContext = new ControllerContext
             {
                 HttpContext = CreateHttpContext(rawBody, webhookId, timestamp, signature)
@@ -232,6 +265,9 @@ namespace AqualLifeStyle.Tests.Payments
             var result = await controller.WebhookAsync();
 
             result.ShouldBeOfType<BadRequestResult>();
+            logger.Entries.ShouldContain(entry =>
+                entry.Level == LogLevel.Warning &&
+                entry.Message.Contains("yoco_webhook_validation_rejected"));
         }
     }
 }
