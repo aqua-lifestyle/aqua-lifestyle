@@ -36,7 +36,10 @@ Yoco delivers `payment.succeeded` events to `YocoPaymentsController.WebhookAsync
 - The timestamp is checked against a maximum skew of 3 minutes.
 - The event `Mode` is compared against the deployment's configured `Yoco:Mode`.
 
-Only after these checks does `YocoPaymentNotificationProcessor` dispatch to the programme-specific processor.
+Only after these checks does `YocoPaymentNotificationProcessor` resolve the
+persisted programme checkout from Yoco's documented `metadata.checkoutId` and
+dispatch to the programme-specific processor. Application entity IDs submitted
+as custom metadata are not trusted for routing.
 
 ### Idempotent Payment Processing
 
@@ -71,7 +74,7 @@ Each programme aggregate decides what a confirmed payment activates. The shared 
 1. Customer is already registered with an `EntryParticipation` in `AwaitingJoiningPayment` status (recruiter placement recorded).
 2. Customer requests a checkout. The app service creates an `AQGreenJoiningCheckout` for R1,200.
 3. Existing incomplete checkout is reused if present (resume-payment support).
-4. Yoco checkout is recorded with a stable metadata reference.
+4. The returned Yoco checkout ID is recorded as the stable provider reference.
 5. Webhook confirms payment → atomic activation → participation becomes `Active`.
 
 Historical split-payment participations (R600 + R600) are preserved in the database and are explicitly excluded from the new checkout flow. The migration updates only wholly unpaid rows to the new terms.
@@ -220,7 +223,7 @@ Before a webhook can activate a participation, the processor validates that the 
 
 ### Provider Reference Validation
 
-`MemberPayments` has a unique index on `(Provider, ExternalReference)`. This guarantees that the same provider payment reference cannot create duplicate confirmed payment records, which is the cornerstone of idempotency. It does not by itself deduplicate incoming webhook event IDs.
+`MemberPayments` has a unique index on `(Provider, ExternalReference)`. This guarantees that the same provider payment reference cannot create duplicate confirmed payment records. Successfully processed Yoco event IDs are also recorded in `YocoWebhookReceipts`, whose unique event-ID index deduplicates provider retries independently of the payment reference.
 
 ### Transactional Consistency
 
@@ -228,11 +231,19 @@ Activation happens inside a single database transaction. If any step fails, the 
 
 ### Idempotency
 
-Repeat webhook delivery is expected and handled. The processor detects already-confirmed payments via `WasAlreadyProcessed` and returns the existing `PaymentId` and `ParticipationId` without side effects.
+Repeat webhook delivery is expected and handled. A successfully processed event
+receipt is committed in the same transaction as payment confirmation and
+activation. Repeated delivery with the same event ID and matching payload hash
+returns without side effects. The same event ID with a conflicting payload hash
+is rejected; payment-reference idempotency remains a second line of defence.
 
 ### Auditability
 
-`MemberPayment` records carry `InitiatedAt`, `ConfirmedAt`, `CreatorUserId`, and `LastModificationTime`. `HostedPaymentCheckout` records carry `CreatedAt`, `CheckoutCreatedAt`, `CompletedAt`, and the linkage to the confirmed payment. Together these allow full reconstruction of the payment timeline from the database.
+`MemberPayment` records carry `InitiatedAt`, `ConfirmedAt`, `CreatorUserId`, and
+`LastModificationTime`. `HostedPaymentCheckout` records carry `CreatedAt`,
+`CheckoutCreatedAt`, `CompletedAt`, and the linkage to the confirmed payment.
+Together with `YocoWebhookReceipts`, these allow reconstruction of successful
+Yoco payment flows. Rejected and failed delivery attempts are not fully retained.
 
 ### Separation of Concerns
 
@@ -370,7 +381,8 @@ This could be implemented as an append-only ledger table or as a series of domai
 #### Problems It Solves
 
 - Today, reconstructing the payment journey requires joining `AQGreenJoiningCheckouts` or `DirectOnyxCheckoutIntents`, `MemberPayments`, and `EntryParticipations`/`OnyxParticipations`, and the timing of each transition is implicit.
-- If Yoco introduces webhook retries or out-of-order delivery, there is no operational record of what was received and when.
+- Successful Yoco events now have a durable receipt, but rejected and failed
+  delivery attempts are not yet retained as a complete operational timeline.
 
 #### Complexity Introduced
 

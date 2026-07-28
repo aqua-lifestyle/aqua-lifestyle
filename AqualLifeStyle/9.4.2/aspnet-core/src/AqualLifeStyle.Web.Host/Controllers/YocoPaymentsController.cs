@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -8,6 +9,7 @@ using Abp.Dependency;
 using AqualLifeStyle.Payments.Yoco;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace AqualLifeStyle.Web.Host.Controllers
@@ -24,15 +26,18 @@ namespace AqualLifeStyle.Web.Host.Controllers
             private readonly IYocoWebhookSignatureVerifier _signatureVerifier;
             private readonly YocoPaymentNotificationProcessor _notificationProcessor;
             private readonly JsonSerializerOptions _jsonOptions;
+            private readonly ILogger<YocoPaymentsController> _logger;
 
             public YocoPaymentsController(
                 IYocoWebhookSignatureVerifier signatureVerifier,
                 YocoPaymentNotificationProcessor notificationProcessor,
-                IOptions<Microsoft.AspNetCore.Mvc.JsonOptions> jsonOptions)
+                IOptions<Microsoft.AspNetCore.Mvc.JsonOptions> jsonOptions,
+                ILogger<YocoPaymentsController> logger)
             {
                 _signatureVerifier = signatureVerifier;
                 _notificationProcessor = notificationProcessor;
                 _jsonOptions = jsonOptions.Value.JsonSerializerOptions;
+                _logger = logger;
             }
 
         [HttpPost("webhook")]
@@ -55,7 +60,13 @@ namespace AqualLifeStyle.Web.Host.Controllers
                     Request.Headers["webhook-timestamp"],
                     Request.Headers["webhook-signature"],
                     rawBody))
+            {
+                _logger.LogWarning(
+                    "PaymentOperationsAlert {AlertType}: Yoco webhook signature validation failed; TraceId={TraceId}",
+                    "yoco_webhook_signature_rejected",
+                    HttpContext.TraceIdentifier);
                 return StatusCode(StatusCodes.Status403Forbidden);
+            }
 
             YocoPaymentWebhookEvent webhookEvent;
             try
@@ -64,40 +75,67 @@ namespace AqualLifeStyle.Web.Host.Controllers
                     rawBody,
                     _jsonOptions);
             }
-            catch (JsonException)
+            catch (JsonException exception)
             {
+                _logger.LogWarning(
+                    "PaymentOperationsAlert {AlertType}: Yoco webhook JSON was rejected; Reason={Reason}; TraceId={TraceId}",
+                    "yoco_webhook_payload_rejected",
+                    exception.GetType().Name,
+                    HttpContext.TraceIdentifier);
                 return BadRequest();
             }
 
             if (webhookEvent?.Payload == null)
+            {
+                _logger.LogWarning(
+                    "PaymentOperationsAlert {AlertType}: Yoco webhook payload was missing; TraceId={TraceId}",
+                    "yoco_webhook_payload_rejected",
+                    HttpContext.TraceIdentifier);
                 return BadRequest();
+            }
 
             try
             {
                 await _notificationProcessor.ProcessAsync(new VerifiedYocoPaymentNotification
                 {
+                    EventId = webhookEvent.Id,
                     EventType = webhookEvent.Type,
                     PaymentId = webhookEvent.Payload.Id,
                     AmountInCents = webhookEvent.Payload.Amount,
                     Currency = webhookEvent.Payload.Currency,
                     Mode = webhookEvent.Payload.Mode,
-                    ConfirmedAt = webhookEvent.Payload.CreatedDate.UtcDateTime,
+                    ConfirmedAt = webhookEvent.Payload.CreatedDate,
+                    PayloadHash = Convert.ToHexString(
+                        SHA256.HashData(Encoding.UTF8.GetBytes(rawBody))),
                     Metadata = webhookEvent.Payload.Metadata
                 });
                 return Ok();
             }
-            catch (AqualLifeStyle.Payments.Yoco.YocoWebhookTransientException)
+            catch (AqualLifeStyle.Payments.Yoco.YocoWebhookTransientException exception)
             {
+                _logger.LogError(
+                    exception,
+                    "PaymentOperationsAlert {AlertType}: Yoco webhook processing must be retried; EventId={EventId}; TraceId={TraceId}",
+                    "yoco_webhook_processing_deferred",
+                    webhookEvent.Id,
+                    HttpContext.TraceIdentifier);
                 return StatusCode(StatusCodes.Status500InternalServerError);
             }
-            catch (AqualLifeStyle.Payments.Yoco.YocoWebhookValidationException)
+            catch (AqualLifeStyle.Payments.Yoco.YocoWebhookValidationException exception)
             {
+                _logger.LogWarning(
+                    "PaymentOperationsAlert {AlertType}: Yoco webhook was rejected; EventId={EventId}; Reason={Reason}; TraceId={TraceId}",
+                    "yoco_webhook_validation_rejected",
+                    webhookEvent.Id,
+                    exception.Message,
+                    HttpContext.TraceIdentifier);
                 return BadRequest();
             }
         }
 
         private sealed class YocoPaymentWebhookEvent
         {
+            public string Id { get; set; }
             public string Type { get; set; }
             public YocoPaymentWebhookPayload Payload { get; set; }
         }

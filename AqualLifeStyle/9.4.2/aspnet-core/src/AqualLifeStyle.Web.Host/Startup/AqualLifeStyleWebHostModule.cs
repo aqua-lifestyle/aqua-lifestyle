@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Abp.Modules;
 using Abp.Reflection.Extensions;
+using Abp.Threading.BackgroundWorkers;
 using AqualLifeStyle.Configuration;
+using AqualLifeStyle.Web.Host.Payments.Yoco;
 using Abp.Runtime.Caching.Redis;
 
 namespace AqualLifeStyle.Web.Host.Startup
@@ -60,6 +62,9 @@ namespace AqualLifeStyle.Web.Host.Startup
                 // Swallow any errors here to avoid startup crash; ABP will fall back
                 // to default behavior if the ErrorInfoBuilder is not available.
             }
+
+            IocManager.Resolve<IBackgroundWorkerManager>().Add(
+                IocManager.Resolve<YocoPaymentOperationsMonitor>());
         }
 
         private static string NormalizeRedisConfiguration(string configuration)

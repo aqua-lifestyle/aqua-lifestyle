@@ -1,6 +1,6 @@
 # Yoco payment production-readiness review
 
-Status: reviewed against the implementation on 2026-07-26, including direct
+Status: reviewed against the implementation on 2026-07-28, including direct
 Onyx and AQGreen joining payments.
 
 ## Executive summary
@@ -14,12 +14,13 @@ normal webhook retries safe. Direct Onyx creates no participation before the
 confirmed R6,120 payment; AQGreen records placement first and activates only
 after one confirmed R1,200 joining payment.
 
-It is not yet a complete mature payment-operations platform. The largest gaps
-are a durable webhook inbox/event audit, reconciliation for a successful payment
-whose webhook never completes, explicit failed/expired/refunded/disputed states,
-concurrency stress coverage, and operational metrics and alerts. These gaps do
-not justify a speculative rules engine or a rewrite, but they should be addressed
-before payment volume or financial exposure becomes material.
+It is not yet a complete mature payment-operations platform. Successfully
+processed webhook events now have a transactional, uniquely keyed receipt, but
+the largest gaps are a complete webhook inbox, reconciliation for a successful
+payment whose webhook never completes, explicit failed/expired/refunded/disputed
+states, concurrency stress coverage, and operational metrics and alerts. These
+gaps do not justify a speculative rules engine or a rewrite, but they should be
+addressed before payment volume or financial exposure becomes material.
 
 ## Scores
 
@@ -28,7 +29,7 @@ before payment volume or financial exposure becomes material.
 | Overall production readiness | 7.0/10 | Safe core checkout and confirmation path; operational recovery remains incomplete |
 | Security | 8.5/10 | Strong signature, secret, mode, checkout, and server-authority controls |
 | Financial correctness | 8.0/10 | Exact decimal/cents validation and traceable immutable references; no refund/dispute reconciliation yet |
-| Reliability | 6.5/10 | Idempotent success path, but no durable inbox or missing-webhook reconciliation |
+| Reliability | 7.0/10 | Durable successful-event idempotency, but no complete inbox or missing-webhook reconciliation |
 | Maintainability | 8.0/10 | Shared hosted-checkout lifecycle with programme-specific activation rules |
 | Scalability | 6.5/10 | Stateless API and database invariants scale normally; synchronous webhook processing and limited operations tooling will constrain growth |
 | Testability | 7.5/10 | Good domain, gateway, signature, rollback, and UI coverage; controller and concurrency coverage remain |
@@ -81,14 +82,16 @@ and post-settlement states without deleting the original success history.
 ## Webhooks, retries, and concurrency
 
 Normal duplicate success delivery is safe through the stored provider reference,
-database unique indexes, completed-checkout verification, and idempotent domain
-methods. Unknown event types are acknowledged without mutation. Invalid signed
-payloads or mismatched payment facts fail before programme changes.
+the unique Yoco event receipt, database unique indexes, completed-checkout
+verification, and idempotent domain methods. Unknown event types are acknowledged
+without mutation. Invalid signed payloads or mismatched payment facts fail before
+programme changes.
 
 The following gaps remain:
 
-- Webhook event ID, receipt time, payload hash, processing result, attempt count,
-  and failure reason are not persisted in a durable inbox.
+- Successful webhook event ID, receipt time, and payload hash are persisted in
+  the same transaction as activation. Rejected or failed attempts, attempt count,
+  and failure reason are not yet persisted in a complete durable inbox.
 - Concurrent first deliveries are protected by database uniqueness constraints
   on `(Provider, ExternalReference)` payments and `(TenantId, CustomerId)`
   participations, plus duplicate-handling recovery in the confirmation processor.
@@ -142,7 +145,10 @@ should recover through the same idempotency key, but this behaviour needs a real
 provider contract/integration test. Typed `HttpClient` is used, but explicit
 timeouts, bounded retry/backoff, and circuit-breaking policy are not configured.
 Provider errors are intentionally converted to safe customer messages, but no
-operations alert is raised.
+customer data or secrets are logged. Webhook failures now emit structured
+`PaymentOperationsAlert` events, and the periodic monitor emits an aggregate
+warning for checkouts that remain awaiting confirmation beyond the configured
+threshold. An external notification destination must consume those events.
 
 ## Security review
 
@@ -160,14 +166,17 @@ configuration names and placeholders only.
 
 ## Observability
 
-The implementation logs checkout creation without keys or payment data and the
-platform already emits console logs. For production operations it still needs:
+The implementation logs checkout creation without keys or payment data and emits
+structured `PaymentOperationsAlert` events for signature rejection, malformed or
+invalid notifications, retryable processing failures, and stale checkouts. The
+stale monitor reports only programme counts and age. For production operations it
+still needs:
 
 - structured fields for checkout ID, provider payment reference, tenant/Area,
   programme, event ID, processing outcome, duration, and correlation ID;
 - counters for created, completed, rejected, duplicate, and stuck checkouts;
-- alerts for signature failures, repeated processing failures, checkout-creation
-  error rate, and payments awaiting reconciliation beyond a threshold;
+- a configured log-stream notification rule for the emitted operational events,
+  with rate-based alerting for signature/validation noise;
 - an administrator view that exposes safe payment state and reconciliation history
   without exposing secrets or raw sensitive payloads.
 
@@ -194,12 +203,14 @@ High-priority missing tests are:
 - Rotate every exposed or shared Yoco key and webhook secret.
 - Configure live mode, live secret, webhook secret, and public webhook URL only in
   the production secret store; verify a signed live-mode webhook end to end.
-- Add monitoring for webhook failures and manually reconcile every checkout that
-  remains awaiting payment beyond the agreed operational threshold.
+- Connect the emitted `PaymentOperationsAlert` events to an operations notification
+  destination and manually reconcile every checkout that remains awaiting payment
+  beyond the agreed operational threshold.
 
 ### High priority
 
-- Add a durable webhook inbox with unique provider event IDs and processing status.
+- Extend successful-event receipts into a durable webhook inbox with processing
+  status, attempt history, and safe failure details.
 - Add provider reconciliation and an audited, permission-protected recovery action.
 - Make concurrent duplicate delivery deterministically return the completed result.
 - Add explicit HTTP timeout and bounded transient-failure policy.
@@ -210,7 +221,7 @@ High-priority missing tests are:
 - Model expiration/cancellation only after confirming Yoco's authoritative events
   and retry semantics.
 - Add settlement, refund, and dispute records before offering those operations.
-- Add structured payment metrics, dashboards, and alerts.
+- Add structured payment metrics and an administrator-facing dashboard.
 - Define how refunds or chargebacks affect activation, network qualification, and
   commission holds without rewriting historical ledgers.
 
@@ -223,8 +234,8 @@ High-priority missing tests are:
 
 ## Assumptions and technical debt
 
-- Yoco returns `checkoutId` in successful payment webhook metadata and preserves
-  the application metadata submitted during checkout creation.
+- Yoco returns its documented `checkoutId` in successful payment webhook metadata;
+  application custom metadata is not required for webhook routing.
 - A successful, signed `payment.succeeded` event is the current authorization and
   capture confirmation; separate authorization/capture is not modelled.
 - ZAR one-time joining payments are the only current online payment use cases.
@@ -234,6 +245,6 @@ High-priority missing tests are:
   for compatibility.
 - Checkout records currently remain stable rather than expiring or being revoked.
 
-Before production, the assumptions about webhook metadata, retry signing,
+Before production, the assumptions about retry signing,
 settlement semantics, and idempotency-key retention must be validated against the
 configured Yoco account and a test-mode end-to-end webhook run.
