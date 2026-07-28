@@ -233,12 +233,17 @@ Activation happens inside a single database transaction. If any step fails, the 
 
 Repeat webhook delivery is expected and handled. A successfully processed event
 receipt is committed in the same transaction as payment confirmation and
-activation. Repeated delivery of the same authenticated event returns without
-side effects; payment-reference idempotency remains a second line of defence.
+activation. Repeated delivery with the same event ID and matching payload hash
+returns without side effects. The same event ID with a conflicting payload hash
+is rejected; payment-reference idempotency remains a second line of defence.
 
 ### Auditability
 
-`MemberPayment` records carry `InitiatedAt`, `ConfirmedAt`, `CreatorUserId`, and `LastModificationTime`. `HostedPaymentCheckout` records carry `CreatedAt`, `CheckoutCreatedAt`, `CompletedAt`, and the linkage to the confirmed payment. Together these allow full reconstruction of the payment timeline from the database.
+`MemberPayment` records carry `InitiatedAt`, `ConfirmedAt`, `CreatorUserId`, and
+`LastModificationTime`. `HostedPaymentCheckout` records carry `CreatedAt`,
+`CheckoutCreatedAt`, `CompletedAt`, and the linkage to the confirmed payment.
+Together with `YocoWebhookReceipts`, these allow reconstruction of successful
+Yoco payment flows. Rejected and failed delivery attempts are not fully retained.
 
 ### Separation of Concerns
 
