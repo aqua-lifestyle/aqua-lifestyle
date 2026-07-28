@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Abp.Application.Services;
 using Abp.Domain.Uow;
@@ -484,6 +486,197 @@ namespace AqualLifeStyle.Tests.Application
                 participation.DirectEntryPaymentId.ShouldBe(payment.Id);
             });
         }
+
+        [Fact]
+        public async Task YocoNotification_RoutesAQGreenByDocumentedCheckoutIdAndRecordsOneReceipt()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"aqgreen-webhook-{suffix}",
+                $"aqgreen-webhook-{suffix}@example.com");
+            var persisted = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "AQGreen Webhook Test",
+                    new EmailAddress($"aqgreen-webhook-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    EntryProgrammeTerms.CreateSingleJoiningPayment(
+                        "aqgreen-2026-07-single-1200",
+                        AQGreenSinglePaymentEffectiveFrom,
+                        1200m,
+                        600m,
+                        7),
+                    AQGreenSinglePaymentEffectiveFrom);
+                var checkout = AQGreenJoiningCheckout.Create(
+                    1,
+                    participation.Id,
+                    customer.Id,
+                    1200m,
+                    "ZAR",
+                    AQGreenSinglePaymentEffectiveFrom);
+                var providerCheckoutId = $"ch_aqgreen_{suffix}";
+                checkout.RecordCheckout(
+                    providerCheckoutId,
+                    $"https://payments.example.test/{providerCheckoutId}",
+                    AQGreenSinglePaymentEffectiveFrom);
+                context.EntryParticipations.Add(participation);
+                context.AQGreenJoiningCheckouts.Add(checkout);
+                await context.SaveChangesAsync();
+                return new
+                {
+                    CheckoutId = checkout.Id,
+                    ParticipationId = participation.Id,
+                    ProviderCheckoutId = providerCheckoutId
+                };
+            });
+
+            var notification = CreateNotification(
+                $"evt_{suffix}",
+                $"pay_{suffix}",
+                persisted.ProviderCheckoutId,
+                120000);
+            var processor = Resolve<YocoPaymentNotificationProcessor>();
+
+            await processor.ProcessAsync(notification);
+            await processor.ProcessAsync(notification);
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations.SingleAsync(
+                    item => item.Id == persisted.ParticipationId);
+                participation.Status.ShouldBe(EntryParticipationStatus.Active);
+                (await context.MemberPayments.CountAsync(payment =>
+                    payment.ExternalReference == notification.PaymentId)).ShouldBe(1);
+                var receipt = await context.YocoWebhookReceipts.SingleAsync();
+                receipt.EventId.ShouldBe(notification.EventId);
+                receipt.ProviderCheckoutId.ShouldBe(persisted.ProviderCheckoutId);
+                receipt.Programme.ShouldBe(YocoCheckoutProgramme.AQGreen);
+                receipt.CheckoutReferenceId.ShouldBe(persisted.CheckoutId);
+            });
+
+            var conflictingReplay = CreateNotification(
+                notification.EventId,
+                notification.PaymentId,
+                persisted.ProviderCheckoutId,
+                120000);
+            conflictingReplay.PayloadHash = new string('B', 64);
+            await Should.ThrowAsync<YocoWebhookValidationException>(() =>
+                processor.ProcessAsync(conflictingReplay));
+        }
+
+        [Fact]
+        public async Task YocoNotification_RoutesOnyxByDocumentedCheckoutIdOnly()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"onyx-webhook-{suffix}",
+                $"onyx-webhook-{suffix}@example.com");
+            var persisted = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "Onyx Webhook Test",
+                    new EmailAddress($"onyx-webhook-customer-{suffix}@example.com"));
+                var membership = Membership.Create(
+                    1,
+                    $"Onyx-webhook-{suffix}",
+                    "Onyx webhook test plan",
+                    MembershipType.Onyx);
+                context.Customers.Add(customer);
+                context.Memberships.Add(membership);
+                await context.SaveChangesAsync();
+
+                var checkout = DirectOnyxCheckoutIntent.Create(
+                    1,
+                    customer.Id,
+                    null,
+                    null,
+                    membership.Id,
+                    OnyxPlanTerms.Create("2026-07", EffectiveFrom, 6120m),
+                    EffectiveFrom);
+                var providerCheckoutId = $"ch_onyx_{suffix}";
+                checkout.RecordCheckout(
+                    providerCheckoutId,
+                    $"https://payments.example.test/{providerCheckoutId}",
+                    EffectiveFrom);
+                context.DirectOnyxCheckoutIntents.Add(checkout);
+                await context.SaveChangesAsync();
+                return new
+                {
+                    CheckoutId = checkout.Id,
+                    CustomerId = customer.Id,
+                    ProviderCheckoutId = providerCheckoutId
+                };
+            });
+
+            var notification = CreateNotification(
+                $"evt_{suffix}",
+                $"pay_{suffix}",
+                persisted.ProviderCheckoutId,
+                612000);
+
+            await Resolve<YocoPaymentNotificationProcessor>().ProcessAsync(notification);
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.OnyxParticipations.SingleAsync(participation =>
+                    participation.CustomerId == persisted.CustomerId)).Status.ShouldBe(
+                    OnyxParticipationStatus.Active);
+                var receipt = await context.YocoWebhookReceipts.SingleAsync();
+                receipt.Programme.ShouldBe(YocoCheckoutProgramme.Onyx);
+                receipt.CheckoutReferenceId.ShouldBe(persisted.CheckoutId);
+            });
+        }
+
+        [Fact]
+        public async Task YocoNotification_UnknownCheckoutRemainsRetryableWithoutReceipt()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var notification = CreateNotification(
+                $"evt_{suffix}",
+                $"pay_{suffix}",
+                $"ch_unknown_{suffix}",
+                120000);
+
+            await Should.ThrowAsync<YocoWebhookTransientException>(() =>
+                Resolve<YocoPaymentNotificationProcessor>().ProcessAsync(notification));
+
+            await UsingDbContextAsync(1, async context =>
+                (await context.YocoWebhookReceipts.AnyAsync()).ShouldBeFalse());
+        }
+
+        private static VerifiedYocoPaymentNotification CreateNotification(
+            string eventId,
+            string paymentId,
+            string providerCheckoutId,
+            int amountInCents) => new()
+            {
+                EventId = eventId,
+                EventType = "payment.succeeded",
+                PaymentId = paymentId,
+                AmountInCents = amountInCents,
+                Currency = "ZAR",
+                Mode = "test",
+                ConfirmedAt = new DateTimeOffset(
+                    AQGreenSinglePaymentEffectiveFrom.AddMinutes(1),
+                    TimeSpan.Zero),
+                PayloadHash = new string('A', 64),
+                Metadata = new Dictionary<string, JsonElement>
+                {
+                    [YocoCheckoutMetadata.ProviderCheckoutId] =
+                        JsonSerializer.SerializeToElement(providerCheckoutId)
+                }
+            };
 
         private static ConfirmedProgrammePayment CreateConfirmation(
             int customerId,

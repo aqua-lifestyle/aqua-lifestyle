@@ -34,6 +34,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<MemberPayment> MemberPayments { get; set; }
         public virtual DbSet<DirectOnyxCheckoutIntent> DirectOnyxCheckoutIntents { get; set; }
         public virtual DbSet<AQGreenJoiningCheckout> AQGreenJoiningCheckouts { get; set; }
+        public virtual DbSet<YocoWebhookReceipt> YocoWebhookReceipts { get; set; }
         public virtual DbSet<EntryParticipation> EntryParticipations { get; set; }
         public virtual DbSet<EntryRecruiterCorrection> EntryRecruiterCorrections { get; set; }
         public virtual DbSet<EntryMonthlyObligation> EntryMonthlyObligations { get; set; }

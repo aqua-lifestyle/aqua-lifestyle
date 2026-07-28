@@ -22,7 +22,7 @@ namespace AqualLifeStyle.Tests.Payments
         private sealed class TestYocoPaymentNotificationProcessor : YocoPaymentNotificationProcessor
         {
             public TestYocoPaymentNotificationProcessor()
-                : base(null!, null!)
+                : base(null!, null!, null!, null!, null!, null!)
             {
             }
 
@@ -95,6 +95,7 @@ namespace AqualLifeStyle.Tests.Payments
             var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
             var payload = new
             {
+                id = webhookId,
                 type = "payment.succeeded",
                 payload = new
                 {
@@ -121,11 +122,14 @@ namespace AqualLifeStyle.Tests.Payments
             result.ShouldBeOfType<OkResult>();
             verifierMock.Verify(v => v.IsValid(webhookId, timestamp, signature, rawBody), Times.Once);
             testProcessor.LastNotification.ShouldNotBeNull();
+            testProcessor.LastNotification.EventId.ShouldBe(webhookId);
             testProcessor.LastNotification.EventType.ShouldBe("payment.succeeded");
             testProcessor.LastNotification.PaymentId.ShouldBe(payload.payload.id);
             testProcessor.LastNotification.AmountInCents.ShouldBe(payload.payload.amount);
             testProcessor.LastNotification.Currency.ShouldBe(payload.payload.currency);
             testProcessor.LastNotification.Mode.ShouldBe(payload.payload.mode);
+            testProcessor.LastNotification.PayloadHash.ShouldBe(
+                Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawBody))));
         }
 
         [Fact]
@@ -162,6 +166,7 @@ namespace AqualLifeStyle.Tests.Payments
             var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
             var payload = new
             {
+                id = webhookId,
                 type = "payment.succeeded",
                 payload = new
                 {
@@ -200,6 +205,7 @@ namespace AqualLifeStyle.Tests.Payments
             var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
             var payload = new
             {
+                id = webhookId,
                 type = "payment.succeeded",
                 payload = new
                 {

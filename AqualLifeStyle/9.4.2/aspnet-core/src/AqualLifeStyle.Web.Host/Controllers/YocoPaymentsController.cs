@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -76,12 +77,15 @@ namespace AqualLifeStyle.Web.Host.Controllers
             {
                 await _notificationProcessor.ProcessAsync(new VerifiedYocoPaymentNotification
                 {
+                    EventId = webhookEvent.Id,
                     EventType = webhookEvent.Type,
                     PaymentId = webhookEvent.Payload.Id,
                     AmountInCents = webhookEvent.Payload.Amount,
                     Currency = webhookEvent.Payload.Currency,
                     Mode = webhookEvent.Payload.Mode,
-                    ConfirmedAt = webhookEvent.Payload.CreatedDate.UtcDateTime,
+                    ConfirmedAt = webhookEvent.Payload.CreatedDate,
+                    PayloadHash = Convert.ToHexString(
+                        SHA256.HashData(Encoding.UTF8.GetBytes(rawBody))),
                     Metadata = webhookEvent.Payload.Metadata
                 });
                 return Ok();
@@ -98,6 +102,7 @@ namespace AqualLifeStyle.Web.Host.Controllers
 
         private sealed class YocoPaymentWebhookEvent
         {
+            public string Id { get; set; }
             public string Type { get; set; }
             public YocoPaymentWebhookPayload Payload { get; set; }
         }

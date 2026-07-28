@@ -3,18 +3,23 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Abp.Dependency;
+using Abp.Domain.Repositories;
+using Abp.Domain.Uow;
+using AqualLifeStyle.Domain.Payments;
 using Microsoft.Extensions.Configuration;
 
 namespace AqualLifeStyle.Payments.Yoco
 {
     public sealed class VerifiedYocoPaymentNotification
     {
+        public string EventId { get; set; }
         public string EventType { get; set; }
         public string PaymentId { get; set; }
         public int AmountInCents { get; set; }
         public string Currency { get; set; }
         public string Mode { get; set; }
         public DateTimeOffset ConfirmedAt { get; set; }
+        public string PayloadHash { get; set; }
         public IReadOnlyDictionary<string, JsonElement> Metadata { get; set; }
     }
 
@@ -33,15 +38,28 @@ namespace AqualLifeStyle.Payments.Yoco
     {
         private readonly ProgrammePaymentConfirmationProcessor _confirmationProcessor;
         private readonly IConfiguration _configuration;
+        private readonly IRepository<DirectOnyxCheckoutIntent, Guid> _onyxCheckoutRepository;
+        private readonly IRepository<AQGreenJoiningCheckout, Guid> _aqGreenCheckoutRepository;
+        private readonly IRepository<YocoWebhookReceipt, Guid> _receiptRepository;
+        private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public YocoPaymentNotificationProcessor(
             ProgrammePaymentConfirmationProcessor confirmationProcessor,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IRepository<DirectOnyxCheckoutIntent, Guid> onyxCheckoutRepository,
+            IRepository<AQGreenJoiningCheckout, Guid> aqGreenCheckoutRepository,
+            IRepository<YocoWebhookReceipt, Guid> receiptRepository,
+            IUnitOfWorkManager unitOfWorkManager)
         {
             _confirmationProcessor = confirmationProcessor;
             _configuration = configuration;
+            _onyxCheckoutRepository = onyxCheckoutRepository;
+            _aqGreenCheckoutRepository = aqGreenCheckoutRepository;
+            _receiptRepository = receiptRepository;
+            _unitOfWorkManager = unitOfWorkManager;
         }
 
+        [UnitOfWork]
         public virtual async Task ProcessAsync(VerifiedYocoPaymentNotification notification)
         {
             if (notification == null) throw new ArgumentNullException(nameof(notification));
@@ -56,8 +74,14 @@ namespace AqualLifeStyle.Payments.Yoco
                 throw new YocoWebhookValidationException("The Yoco payment amount is invalid.");
             if (string.IsNullOrWhiteSpace(notification.PaymentId))
                 throw new YocoWebhookValidationException("The Yoco payment reference is missing.");
+            if (string.IsNullOrWhiteSpace(notification.EventId))
+                throw new YocoWebhookValidationException("The Yoco event reference is missing.");
+            if (notification.EventId.Trim().Length > YocoWebhookReceipt.MaxEventIdLength)
+                throw new YocoWebhookValidationException("The Yoco event reference is invalid.");
             if (notification.ConfirmedAt == default)
                 throw new YocoWebhookValidationException("The Yoco payment confirmation time is missing.");
+            if (!IsSha256Hash(notification.PayloadHash))
+                throw new YocoWebhookValidationException("The Yoco event payload hash is invalid.");
             var providerCheckoutId = GetRequiredMetadataText(
                 notification.Metadata,
                 YocoCheckoutMetadata.ProviderCheckoutId,
@@ -66,46 +90,66 @@ namespace AqualLifeStyle.Payments.Yoco
 
             try
             {
-                if (TryGetReference(
-                        notification.Metadata,
-                        YocoCheckoutMetadata.DirectOnyxCheckoutIntentId,
-                        out var onyxCheckoutId))
+                var checkout = await ResolveCheckoutAsync(providerCheckoutId);
+                YocoWebhookReceipt existingReceipt;
+                using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
                 {
-                    if (TryGetReference(
-                            notification.Metadata,
-                            YocoCheckoutMetadata.AQGreenJoiningCheckoutId,
-                            out _))
+                    existingReceipt = await _receiptRepository.FirstOrDefaultAsync(
+                        receipt => receipt.EventId == notification.EventId.Trim());
+                }
+                if (existingReceipt != null)
+                {
+                    if (!existingReceipt.Matches(
+                            notification.PaymentId,
+                            providerCheckoutId,
+                            notification.PayloadHash,
+                            checkout.Programme,
+                            checkout.ReferenceId))
                         throw new YocoWebhookValidationException(
-                            "The Yoco payment contains conflicting programme checkout references.");
-                    await _confirmationProcessor.ProcessDirectOnyxCheckoutAsync(
-                        onyxCheckoutId,
-                        "Yoco",
-                        notification.PaymentId,
-                        providerCheckoutId,
-                        notification.AmountInCents / 100m,
-                        notification.Currency,
-                        confirmedAt);
+                            "The Yoco event reference is already associated with different payment facts.");
                     return;
                 }
 
-                if (TryGetReference(
-                        notification.Metadata,
-                        YocoCheckoutMetadata.AQGreenJoiningCheckoutId,
-                        out var aqGreenCheckoutId))
+                using (_unitOfWorkManager.Current.SetTenantId(checkout.TenantId))
                 {
-                    await _confirmationProcessor.ProcessAQGreenJoiningCheckoutAsync(
-                        aqGreenCheckoutId,
-                        "Yoco",
+                    switch (checkout.Programme)
+                    {
+                        case YocoCheckoutProgramme.Onyx:
+                            await _confirmationProcessor.ProcessDirectOnyxCheckoutAsync(
+                                checkout.ReferenceId,
+                                "Yoco",
+                                notification.PaymentId,
+                                providerCheckoutId,
+                                notification.AmountInCents / 100m,
+                                notification.Currency,
+                                confirmedAt);
+                            break;
+                        case YocoCheckoutProgramme.AQGreen:
+                            await _confirmationProcessor.ProcessAQGreenJoiningCheckoutAsync(
+                                checkout.ReferenceId,
+                                "Yoco",
+                                notification.PaymentId,
+                                providerCheckoutId,
+                                notification.AmountInCents / 100m,
+                                notification.Currency,
+                                confirmedAt);
+                            break;
+                        default:
+                            throw new YocoWebhookValidationException(
+                                "The Yoco checkout programme is not supported.");
+                    }
+
+                    await _receiptRepository.InsertAsync(YocoWebhookReceipt.Record(
+                        checkout.TenantId,
+                        notification.EventId,
                         notification.PaymentId,
                         providerCheckoutId,
-                        notification.AmountInCents / 100m,
-                        notification.Currency,
-                        confirmedAt);
-                    return;
+                        notification.PayloadHash,
+                        checkout.Programme,
+                        checkout.ReferenceId,
+                        DateTime.UtcNow));
+                    await _unitOfWorkManager.Current.SaveChangesAsync();
                 }
-
-                throw new YocoWebhookValidationException(
-                    "The Yoco payment is missing a supported programme checkout reference.");
             }
             catch (YocoWebhookTransientException)
             {
@@ -121,16 +165,50 @@ namespace AqualLifeStyle.Payments.Yoco
             }
         }
 
-        private static bool TryGetReference(
-            IReadOnlyDictionary<string, JsonElement> metadata,
-            string key,
-            out Guid reference)
+        private async Task<ResolvedYocoCheckout> ResolveCheckoutAsync(
+            string providerCheckoutId)
         {
-            reference = Guid.Empty;
-            return metadata != null &&
-                   metadata.TryGetValue(key, out var value) &&
-                   value.ValueKind == JsonValueKind.String &&
-                   Guid.TryParseExact(value.GetString(), "N", out reference);
+            DirectOnyxCheckoutIntent onyxCheckout;
+            AQGreenJoiningCheckout aqGreenCheckout;
+            using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
+            {
+                onyxCheckout = await _onyxCheckoutRepository.FirstOrDefaultAsync(
+                    checkout => checkout.ProviderCheckoutId == providerCheckoutId);
+                aqGreenCheckout = await _aqGreenCheckoutRepository.FirstOrDefaultAsync(
+                    checkout => checkout.ProviderCheckoutId == providerCheckoutId);
+            }
+
+            if (onyxCheckout != null && aqGreenCheckout != null)
+                throw new YocoWebhookValidationException(
+                    "The Yoco checkout reference matches more than one programme payment.");
+            if (onyxCheckout != null)
+                return new ResolvedYocoCheckout(
+                    onyxCheckout.TenantId,
+                    onyxCheckout.Id,
+                    YocoCheckoutProgramme.Onyx);
+            if (aqGreenCheckout != null)
+                return new ResolvedYocoCheckout(
+                    aqGreenCheckout.TenantId,
+                    aqGreenCheckout.Id,
+                    YocoCheckoutProgramme.AQGreen);
+
+            throw new YocoWebhookTransientException(
+                "The Yoco checkout has not been recorded locally yet.");
+        }
+
+        private static bool IsSha256Hash(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) ||
+                value.Trim().Length != YocoWebhookReceipt.Sha256HexLength)
+                return false;
+            foreach (var character in value.Trim())
+            {
+                if (!char.IsDigit(character) &&
+                    (character < 'a' || character > 'f') &&
+                    (character < 'A' || character > 'F'))
+                    return false;
+            }
+            return true;
         }
 
         private static string GetRequiredMetadataText(
@@ -144,6 +222,23 @@ namespace AqualLifeStyle.Payments.Yoco
                 !string.IsNullOrWhiteSpace(value.GetString()))
                 return value.GetString().Trim();
             throw new YocoWebhookValidationException(errorMessage);
+        }
+
+        private sealed class ResolvedYocoCheckout
+        {
+            public int TenantId { get; }
+            public Guid ReferenceId { get; }
+            public YocoCheckoutProgramme Programme { get; }
+
+            public ResolvedYocoCheckout(
+                int tenantId,
+                Guid referenceId,
+                YocoCheckoutProgramme programme)
+            {
+                TenantId = tenantId;
+                ReferenceId = referenceId;
+                Programme = programme;
+            }
         }
     }
 }
