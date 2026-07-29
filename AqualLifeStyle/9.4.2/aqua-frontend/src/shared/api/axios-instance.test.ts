@@ -99,6 +99,43 @@ describe("getExpiredSessionLoginUrl", () => {
 });
 
 describe("session refresh failures", () => {
+  it("shares one refresh request across concurrent unauthorized responses", async () => {
+    const { apiClient, setRefreshTokenProvider } = await importAxiosInstance();
+    const refresh = vi.fn(async () => "renewed-token");
+    setRefreshTokenProvider(refresh);
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig & { _retry?: boolean }) => {
+      if (!config._retry) {
+        throw new AxiosError(
+          "Unauthorized",
+          "ERR_BAD_REQUEST",
+          config,
+          undefined,
+          {
+            config,
+            data: {},
+            headers: new AxiosHeaders(),
+            status: 401,
+            statusText: "Unauthorized",
+          },
+        );
+      }
+      return {
+        config,
+        data: { ok: true },
+        headers: new AxiosHeaders(),
+        status: 200,
+        statusText: "OK",
+      };
+    });
+
+    await Promise.all([
+      apiClient.request({ adapter, url: "/first" }),
+      apiClient.request({ adapter, url: "/second" }),
+    ]);
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it("does not turn a transient refresh failure into a login redirect", async () => {
     const { apiClient, setRefreshTokenProvider } = await importAxiosInstance();
     const transientFailure = new Error("The authentication server is unavailable.");

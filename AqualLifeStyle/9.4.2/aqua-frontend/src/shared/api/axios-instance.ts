@@ -21,6 +21,8 @@ type RequestContextProvider = () => string | null | Promise<string | null>;
 let accessTokenProvider: RequestContextProvider | null = null;
 let tenantProvider: RequestContextProvider | null = null;
 let refreshTokenProvider: (() => Promise<string | null>) | null = null;
+let activeRefreshProvider: (() => Promise<string | null>) | null = null;
+let activeRefreshRequest: Promise<string | null> | null = null;
 
 export const setAccessTokenProvider = (provider: RequestContextProvider) => {
   accessTokenProvider = provider;
@@ -32,6 +34,26 @@ export const setTenantProvider = (provider: RequestContextProvider) => {
 
 export const setRefreshTokenProvider = (provider: () => Promise<string | null>) => {
   refreshTokenProvider = provider;
+};
+
+export const refreshAccessToken = async () => {
+  const provider = refreshTokenProvider;
+  if (!provider) return null;
+  if (activeRefreshRequest && activeRefreshProvider === provider) {
+    return activeRefreshRequest;
+  }
+
+  const request = Promise.resolve().then(provider);
+  activeRefreshProvider = provider;
+  activeRefreshRequest = request;
+  try {
+    return await request;
+  } finally {
+    if (activeRefreshRequest === request) {
+      activeRefreshProvider = null;
+      activeRefreshRequest = null;
+    }
+  }
 };
 
 export const getExpiredSessionLoginUrl = (path: string) => {
@@ -83,7 +105,7 @@ apiClient.interceptors.response.use(
         originalRequest._retry = true;
 
         try {
-          const newToken = await refreshTokenProvider();
+          const newToken = await refreshAccessToken();
           if (newToken) {
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
             return apiClient(originalRequest);

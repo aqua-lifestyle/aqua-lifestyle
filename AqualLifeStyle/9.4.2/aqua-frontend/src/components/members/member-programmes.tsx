@@ -1,10 +1,15 @@
 "use client";
 
 import { CircleDollarSign, Network, Plane, Route } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { useAuthState } from "@/src/providers";
-import { apiEndpoints, httpClient } from "@/src/shared/api";
+import {
+  apiEndpoints,
+  getExpiredSessionLoginUrl,
+  httpClient,
+  refreshAccessToken,
+} from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 import type {
@@ -171,6 +176,44 @@ export const MemberProgrammes = () => {
   const [actionError, setActionError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [startingAQGreenPayment, setStartingAQGreenPayment] = useState(false);
+  const [accessRefreshFinished, setAccessRefreshFinished] = useState(false);
+  const accessRefreshAttempted = useRef(false);
+  const hasActiveInvitationAccess = Boolean(
+    participations?.entry?.canRecruitForThisProgramme ||
+      participations?.onyx?.canRecruitForThisProgramme,
+  );
+  const hasInvitationPermission =
+    session?.user?.permissions?.includes(
+      "Aqua.ProgrammeParticipations.Invite",
+    ) ?? false;
+
+  useEffect(() => {
+    if (
+      !hasActiveInvitationAccess ||
+      hasInvitationPermission ||
+      accessRefreshAttempted.current
+    ) {
+      return;
+    }
+
+    accessRefreshAttempted.current = true;
+    void refreshAccessToken()
+      .then((accessToken) => {
+        if (accessToken) {
+          setAccessRefreshFinished(true);
+          return;
+        }
+        if (typeof window === "undefined") return;
+        const returnPath = `${window.location.pathname}${window.location.search}`;
+        window.location.href = getExpiredSessionLoginUrl(returnPath);
+      })
+      .catch(() => {
+        setAccessRefreshFinished(true);
+        setActionError(
+          "Your programme is active, but your updated account access could not be loaded. Check your connection and try signing in again.",
+        );
+      });
+  }, [hasActiveInvitationAccess, hasInvitationPermission]);
 
   useEffect(() => {
     const task = window.setTimeout(() => {
@@ -253,8 +296,7 @@ export const MemberProgrammes = () => {
           <StatusMessage tone="success">{success}</StatusMessage>
         ) : null}
 
-        {participations?.entry?.canRecruitForThisProgramme ||
-        participations?.onyx?.canRecruitForThisProgramme ? (
+        {hasActiveInvitationAccess ? (
           <Card className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-bold">Grow your network</h2>
@@ -263,9 +305,17 @@ export const MemberProgrammes = () => {
                 and programme before confirming.
               </p>
             </div>
-            <a className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark" href="/member/invitations">
-              Invite Club Members
-            </a>
+            {hasInvitationPermission ? (
+              <a className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark" href="/member/invitations">
+                Invite Club Members
+              </a>
+            ) : (
+              <p className="text-sm font-medium text-muted-foreground">
+                {accessRefreshFinished
+                  ? "Sign out and sign in again to load your updated Club Member access."
+                  : "Updating your Club Member access…"}
+              </p>
+            )}
           </Card>
         ) : null}
 
