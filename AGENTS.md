@@ -1,96 +1,46 @@
 # Aqua Lifestyle engineering instructions
 
-These instructions apply to the entire repository. More specific `AGENTS.md` files may add rules for their own directories.
+These instructions apply repository-wide. A nested `AGENTS.md` may add stricter rules for its directory but must not weaken these requirements. Detailed review methodology is in `docs/review-benchmark.md`; supported commands and scope gates are in `docs/development/validation.md`.
 
 ## Working agreement
 
-- Inspect the current implementation, relevant tests, business documentation, and `git status` before changing code.
-- Treat the latest confirmed business rules as authoritative. Do not infer missing rules; ask when an unresolved decision would materially change behaviour.
-- Verify reported findings against the current code and fix only issues that still apply.
-- Make the smallest complete change. Preserve unrelated and user-authored work.
-- Do not commit, push, merge, delete branches, or modify external services unless the user explicitly requests that action.
-- Never place credentials, provider/API secrets, personal information, or production data in source control, logs, URLs, tests, or examples. Treat one-time account links as sensitive and never log them.
-- Update configuration examples and documentation whenever deployment requirements or operational behaviour change.
+- Before changing code, inspect the current implementation, tests, relevant business documents, applicable repository instructions, and `git status`.
+- Treat the latest confirmed business decisions as authoritative. Do not invent unresolved rules.
+- Stop and ask, or explicitly report uncertainty, when it materially affects money, eligibility, programme state, authorization, contractual obligations, or externally visible behaviour.
+- For minor technical decisions, follow established repository patterns and disclose assumptions that materially affect the result.
+- Verify reported findings against current code. Fix only findings that still apply, using the smallest complete change.
+- Preserve unrelated and user-authored work. Do not commit, push, merge, delete branches, or modify external services unless explicitly requested.
+- Never expose credentials, API/provider secrets, one-time account links, personal information, or production data in source, URLs, logs, tests, examples, or tool output.
+- Update relevant documentation and configuration examples when behaviour or operational requirements change.
 
 ## Architecture and implementation
 
-- Follow the existing ABP layered architecture and dependency direction. Keep domain rules in the domain layer, orchestration in the application layer, persistence in Entity Framework Core, and provider details at infrastructure boundaries.
-- Preserve aggregate, Area/tenant, authorization, and programme boundaries.
-- Prefer explicit, descriptive business terminology and names that state what a service or class actually does.
-- Apply KISS, SOLID, DRY, and YAGNI. Reuse proven abstractions without introducing speculative frameworks or generic fallback behaviour.
-- Treat all client input, provider callbacks, webhook payloads, and external API responses as untrusted.
-- Keep external calls outside long-running database transactions. Use durable outbox/inbox patterns where database state and external delivery must remain consistent.
-- Design shared-state changes for concurrent requests and multiple application instances. Check atomicity, uniqueness constraints, idempotency, retry ownership, stale-work recovery, and terminal failure behaviour.
+- Follow the existing ABP dependency direction: domain and identity foundations in `AqualLifeStyle.Core`; use-case orchestration in `AqualLifeStyle.Application`; persistence mapping and database integration in `AqualLifeStyle.EntityFrameworkCore`; HTTP/authentication concerns in the existing Web projects; migration execution in `AqualLifeStyle.Migrator`.
+- Keep domain invariants and state transitions in the domain layer, orchestration in the application layer, HTTP concerns at API boundaries, and EF Core configuration and repositories in the EF Core project.
+- Keep provider-specific implementations behind explicit abstractions and within established integration boundaries. Do not create a generic `Infrastructure` project unless the architecture is intentionally changed.
+- Preserve aggregate, Area/tenant, authorization, programme, payment, and ownership boundaries.
+- Use descriptive business terminology. Apply KISS, SOLID, DRY, and YAGNI without speculative abstractions or permissive fallback behaviour.
+- Treat client input, provider callbacks, webhook payloads, external claims, and API responses as untrusted.
+- Keep external calls outside long-running database transactions.
+- Use an outbox when committed database state requires reliable asynchronous external delivery. Use an inbox or durable receipt when duplicate external delivery could change business state.
+- Design shared-state changes for multiple requests and instances: verify atomicity, database uniqueness, idempotency, ordering, retry ownership, stale-work recovery, rollback, and terminal failure.
 
 ## Payments and transactional communication
 
-- Resolve payments from server-stored provider identifiers and verify provider authenticity before changing business state.
-- Do not activate programme participation until payment confirmation is verified.
-- Preserve payment and webhook idempotency, immutable history, and reconciliation paths.
-- Never manually alter production payment state without an auditable reconciliation process.
-- Do not log or return provider secrets, tokens, message bodies containing account links, or sensitive customer data.
+- Apply a payment only after authoritative provider confirmation verified server-side through a valid provider signature or provider API response.
+- Before changing business state, verify the merchant account, provider payment identifier, merchant reference, expected amount, currency, final provider status, payment purpose, and whether the payment was already received or applied.
+- Do not activate participation, settle an obligation, release an entitlement, or make commission available before verified payment confirmation.
+- Make webhook receipt and processing idempotent. Retain the provider receipt/payload hash needed to reject conflicting replays, without exposing sensitive contents.
+- Distinguish mutable current-state projections from append-only history. Preserve append-only records of payment attempts, provider notifications, reconciliation actions, and material status transitions.
+- Correct production payment state only through an authorised, auditable reconciliation workflow.
+- Do not log or return provider secrets, tokens, sensitive links, customer data, payment details, or raw webhook contents.
 
-## Review standard
+## Validation and handoff
 
-Before declaring a change ready:
-
-- Review the complete diff and its call sites, not only the edited lines.
-- Establish intent from the request, current business documents, acceptance criteria, relevant issue or pull-request history, and existing tests before judging the implementation.
-- Trace contracts across frontend, API DTOs, application services, domain entities, persistence configuration, migrations, background workers, and deployment configuration.
-- Check success, validation, authorization, privacy, null/empty, failure, timeout, retry, duplicate, concurrency, and rollback paths.
-- Confirm migrations have a safe `Up`, a valid `Down`, matching model configuration/snapshot state, and appropriate database constraints.
-- Add regression coverage for each fixed defect and for important negative paths.
-- Run focused tests first, then the relevant frontend and backend suites, type checking, linting, security audit, and Release builds in proportion to risk.
-- Report commands and results accurately. Do not claim a check passed if it was skipped, failed, or only partially executed.
-- Summarise changed files, architectural decisions, operational requirements, risks, and unresolved business decisions.
-
-## Living review benchmark
-
-Use this benchmark for reviews of committed and uncommitted work. It combines context-aware, multi-pass, rule-driven, and tool-assisted review practices into one repository standard; no external reviewer is the authority over the current code and confirmed business rules. The rationale, workflow, evidence model, and improvement process are documented in `docs/review-benchmark.md`.
-
-### Review passes
-
-Perform distinct passes so one concern does not hide another:
-
-1. **Intent and scope:** compare the implementation with the request, acceptance criteria, current business rules, related history, and the complete diff. Identify missing work and unrelated changes.
-2. **Correctness and contracts:** trace inputs, outputs, state transitions, invariants, nullability, serialization, call sites, and compatibility across every affected layer.
-3. **Security and privacy:** review authentication, authorization, tenant/Area isolation, ownership, validation, injection, secrets, personal data, sensitive URLs, logging, and safe failure behaviour.
-4. **Reliability and concurrency:** review transaction boundaries, atomicity, idempotency, uniqueness, retries, duplicate delivery, ordering, race conditions, rollback, stale-work recovery, and terminal failure.
-5. **Persistence and operations:** review schema constraints, migrations, backfills, provider/database compatibility, configuration, observability, deployment sequencing, and recovery or reconciliation paths.
-6. **User experience and accessibility:** review business language, loading/empty/success/error states, actionable messages, navigation continuity, keyboard and screen-reader behaviour, and responsive presentation.
-7. **Maintainability and performance:** review dependency direction, naming, cohesion, duplication, unnecessary abstraction, query and allocation cost, bounded work, cancellation, and resource disposal.
-8. **Tests and evidence:** map each requirement and material risk to a focused test or other evidence, then run the broader validation required to detect integration regressions.
-
-After these passes, perform an adversarial second look: try to disprove the implementation's assumptions, follow at least one complete success journey and one failure journey, and inspect nearby unchanged code that participates in those journeys.
-
-### Finding quality
-
-- Verify every finding against the current code before reporting or fixing it.
-- Prioritise findings by customer/business impact and likelihood. Distinguish blocking defects from improvements and avoid low-value cosmetic noise.
-- Distinguish defects introduced by the change from pre-existing problems, and do not attribute an existing defect to the current work. Report a severe pre-existing risk separately when it materially affects readiness.
-- For each material finding, identify the violated requirement or invariant, the concrete failure scenario, affected scope, supporting evidence, and the smallest safe correction.
-- Trace a suspected defect far enough to rule out protection elsewhere in the stack. Do not report speculative issues as facts.
-- Deduplicate findings that share one root cause. Prefer one well-supported explanation that covers every affected call site over repeated line-level comments.
-- Do not restate formatter, compiler, analyzer, or test output as an inferred review finding; run the relevant tool and report its actual result.
-- Re-review the resulting diff after fixes. A fix is incomplete if it creates a regression, weakens a boundary, leaves a call site inconsistent, or lacks validation.
-
-### Rules and continuous learning
-
-- Treat repository instructions and confirmed business rules as a maintained rule system. More specific scoped instructions may strengthen, but must not silently contradict, repository-wide safety requirements.
-- When rules overlap, duplicate one another, become obsolete, or conflict with current business decisions, reconcile them instead of accumulating contradictory guidance.
-- When an internal or external review discovers a missed issue, determine the general failure pattern rather than copying a one-off finding. Add or refine the smallest reusable instruction, automated check, test, or constraint that would prevent the class of defect.
-- Record a new benchmark rule only after validating it against the current architecture and at least one real example. Remove or revise rules when later evidence disproves them.
-- Prefer executable enforcement—tests, analyzers, linters, schema constraints, and CI checks—over prose where practical, while retaining the business reason in documentation.
-- Use prior accepted and rejected review findings as context, not unquestionable precedent. Current requirements, security, and verified behaviour take priority.
-- Keep review instructions concise enough to remain usable. Periodically consolidate repeated rules and remove stale tool- or vendor-specific wording.
-
-### Completion gate
-
-A review is complete only when:
-
-- every changed file and relevant untracked file has been inspected;
-- affected call sites and cross-layer contracts have been traced;
-- material findings are fixed or explicitly reported with evidence;
-- focused and integration validation results are known;
-- migrations, dependencies, generated files, configuration, and secret exposure have been checked where relevant;
-- the final diff contains no accidental edits, debug artifacts, unsupported claims, or undisclosed validation gaps.
+- Inspect the complete diff, staged changes, and relevant untracked files; trace affected call sites and contracts across all participating layers.
+- Check success and negative paths proportionate to risk, including authorization, Area/tenant isolation, privacy, null/empty input, dependency failure, timeout, cancellation, retry, duplicate, concurrency, rollback, and recovery.
+- For persistence changes, verify migration `Up`/`Down` safety, database constraints, model configuration, snapshot alignment, provider compatibility, and deployment ordering.
+- Add focused regression tests for fixed defects and material negative paths. Run only commands documented in `docs/development/validation.md` or verified directly from current build configuration.
+- Report successful, failed, skipped, stale, partial, and unavailable checks accurately; distinguish introduced warnings from pre-existing ones.
+- Re-review the final diff after fixes for inconsistent call sites, weakened boundaries, accidental edits, debug artifacts, generated output, and secret exposure.
+- At handoff, report changed files, architectural/security decisions, validation evidence, operational or migration requirements, risks, unresolved business decisions, and validation gaps.

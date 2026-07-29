@@ -32,8 +32,6 @@ The benchmark incorporates these independently useful approaches:
 - **Governed rules:** maintain explicit repository standards, reconcile conflicts, and revise them as validated requirements change.
 - **Continuous learning:** use accepted and rejected findings as evidence while preventing historical precedent from overriding current security or business rules.
 
-Useful upstream references include [Qodo Code Review](https://docs.qodo.ai/code-review), [Qodo PR-history indexing](https://docs.qodo.ai/core-concepts/pr-history), [Claude Code Review](https://code.claude.com/docs/en/code-review), and [CodeRabbit's review overview](https://docs.coderabbit.ai/guides/code-review-overview).
-
 ## Sources of truth
 
 Review decisions use this precedence:
@@ -80,7 +78,7 @@ Review unchanged code when it participates in the affected journey. A correct lo
 
 ### 3. Perform specialised passes
 
-Run the eight passes defined in `AGENTS.md` independently:
+Run these eight passes independently:
 
 1. Intent and scope
 2. Correctness and contracts
@@ -91,7 +89,7 @@ Run the eight passes defined in `AGENTS.md` independently:
 7. Maintainability and performance
 8. Tests and evidence
 
-For high-risk authentication, authorization, payment, tenant isolation, migration, or distributed-processing changes, explicitly trace at least:
+For every behavioural change, trace one complete success path and one complete failure path, including nearby unchanged code involved in those flows. For high-risk authentication, authorization, payment, tenant isolation, migration, or distributed-processing changes, also trace at least:
 
 - one successful journey;
 - one validation or authorization rejection;
@@ -117,7 +115,7 @@ After the primary review, challenge its assumptions:
 Every material finding should include:
 
 - **Classification:** introduced regression, pre-existing risk, requirement gap, or improvement.
-- **Severity:** blocking, high, medium, or low, based on impact and likelihood.
+- **Severity:** critical, high, medium, or low, based on impact and likelihood.
 - **Invariant:** the requirement, security boundary, or expected behaviour being violated.
 - **Scenario:** a concrete path that demonstrates the failure.
 - **Evidence:** relevant code location, test, command output, provider contract, or approved documentation.
@@ -127,14 +125,16 @@ Every material finding should include:
 
 Do not create multiple findings for symptoms with one root cause. Do not report a possibility as a fact when the failure path has not been established. Do not attribute a pre-existing problem to the current change.
 
+After fixes, repeat the affected review passes and inspect the complete resulting diff. Confirm the correction covers every affected call site, does not weaken another boundary, introduces no unrelated change, and has current validation evidence.
+
 ### Severity guidance
 
 | Severity | Meaning |
 | --- | --- |
-| Blocking | Security breach, data loss/corruption, broken authorization or tenant isolation, unsafe payment state, irreversible migration failure, or a primary journey that cannot operate. |
-| High | Likely production defect, material requirement violation, race condition, unreliable recovery, or significant customer harm. |
-| Medium | Real but bounded defect with a workaround or limited scope; should normally be corrected before completion. |
-| Low | Non-blocking maintainability, clarity, accessibility, or efficiency improvement supported by evidence. |
+| Critical | Likely financial loss, unauthorized access, severe privacy exposure, or irreversible production data corruption. |
+| High | Probable incorrect business state, payment inconsistency, tenant boundary violation, deployment failure, or another material production defect. |
+| Medium | Bounded functional failure with a practical workaround or limited scope; should normally be corrected before completion. |
+| Low | Limited-impact maintainability, usability, accessibility, or operational improvement supported by evidence. |
 
 Formatting preferences and speculative refactors are not material findings unless they violate an explicit repository rule or create a demonstrated risk.
 
@@ -153,7 +153,7 @@ A command that was skipped, failed, used stale build output, or required unavail
 
 ## Continuous-learning loop
 
-When CodeRabbit, Qodo, Claude, another reviewer, CI, production telemetry, or a user journey reveals a missed issue:
+When an internal or external reviewer, CI, production telemetry, or a user journey reveals a missed issue:
 
 1. Verify the finding against the current code and reproduce or prove the failure path.
 2. Identify why the review missed it: incomplete context, weak contract tracing, absent negative case, concurrency blind spot, unclear rule, missing tool, or incorrect assumption.
