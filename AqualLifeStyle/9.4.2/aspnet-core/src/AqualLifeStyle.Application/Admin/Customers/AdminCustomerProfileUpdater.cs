@@ -30,17 +30,20 @@ namespace AqualLifeStyle.Application.Admin.Customers
         private readonly ICustomerPersonalDetailsUpdater _personalDetailsUpdater;
         private readonly ICustomerMembershipPlanAssignmentValidator _membershipPlanAssignmentValidator;
         private readonly IAdminUserRoleSynchronizer _userRoleSynchronizer;
+        private readonly ICustomerFallbackRoleResolver _fallbackRoleResolver;
 
         public AdminCustomerProfileUpdater(
             ICustomerRepository customerRepository,
             ICustomerPersonalDetailsUpdater personalDetailsUpdater,
             ICustomerMembershipPlanAssignmentValidator membershipPlanAssignmentValidator,
-            IAdminUserRoleSynchronizer userRoleSynchronizer)
+            IAdminUserRoleSynchronizer userRoleSynchronizer,
+            ICustomerFallbackRoleResolver fallbackRoleResolver)
         {
             _customerRepository = customerRepository;
             _personalDetailsUpdater = personalDetailsUpdater;
             _membershipPlanAssignmentValidator = membershipPlanAssignmentValidator;
             _userRoleSynchronizer = userRoleSynchronizer;
+            _fallbackRoleResolver = fallbackRoleResolver;
         }
 
         public async Task UpdateAsync(Customer customer, AdminCustomerProfileUpdate update)
@@ -62,8 +65,11 @@ namespace AqualLifeStyle.Application.Admin.Customers
 
             var user = customer.User;
             user.IsActive = update.IsActive;
-            await _userRoleSynchronizer.SynchronizeAsync(user, update.MembershipId.HasValue ? AquaUserRole.Member : AquaUserRole.Guest);
             customer.ChangeMembership(update.MembershipId);
+            if (user.Role == AquaUserRole.Guest || user.Role == AquaUserRole.Member)
+                await _userRoleSynchronizer.SynchronizeAsync(
+                    user,
+                    await _fallbackRoleResolver.ResolveAsync(customer));
             if (update.IsActive) customer.Activate(); else customer.Deactivate();
             await _customerRepository.UpdateAsync(customer);
         }

@@ -2,14 +2,18 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
+using Abp.Authorization.Users;
 using Abp.UI;
 using AqualLifeStyle.Application.Admin.Customers;
 using AqualLifeStyle.Application.Admin.Customers.Dto;
+using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Authorization.Accounts;
 using AqualLifeStyle.Authorization.Accounts.Dto;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
+using AqualLifeStyle.Domain.Onyx;
+using AqualLifeStyle.Domain.Payments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.WebUtilities;
 using Shouldly;
@@ -24,6 +28,136 @@ namespace AqualLifeStyle.Tests.Application
         public AdminCustomerAppServiceTests()
         {
             _service = Resolve<IAdminCustomerAppService>();
+        }
+
+        [Fact]
+        public async Task EditingActiveAQGreenParticipant_PreservesMemberAccessWithoutLegacyMembership()
+        {
+            var email = $"aqgreen-member-{Guid.NewGuid():N}@example.com";
+            var customer = (await _service.CreateAsync(new AdminCreateCustomerInput
+            {
+                TenantId = 1,
+                FirstName = "Active",
+                LastName = "Participant",
+                Email = email,
+                ContactNumber = "+27 72 123 4567",
+                HomeAddress = "12 Programme Road, Johannesburg",
+                Password = "Temporary123!",
+                IsActive = true,
+                Justification = "Creating an AQGreen participant"
+            })).Customer;
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    Resolve<ICurrentProgrammeTermsProvider>().GetEntryTerms(),
+                    DateTime.UtcNow.AddMinutes(-2));
+                var payment = MemberPayment.CreatePending(
+                    1,
+                    customer.Id,
+                    MemberPaymentPurpose.AQGreenJoining,
+                    1200m,
+                    "Test",
+                    $"aqgreen-admin-edit-{Guid.NewGuid():N}",
+                    DateTime.UtcNow.AddMinutes(-1));
+                payment.Confirm(DateTime.UtcNow);
+                participation.ApplyConfirmedJoiningPayment(payment);
+                context.MemberPayments.Add(payment);
+                context.EntryParticipations.Add(participation);
+                var user = await context.Users.SingleAsync(item => item.Id == customer.UserId);
+                user.SetRole(AquaUserRole.Member);
+                await context.SaveChangesAsync();
+            });
+
+            await _service.UpdateAsync(new AdminUpdateCustomerInput
+            {
+                Id = customer.Id,
+                FirstName = "Updated",
+                LastName = "Participant",
+                Email = email,
+                ContactNumber = "+27 72 123 4567",
+                HomeAddress = "12 Programme Road, Johannesburg",
+                MembershipId = null,
+                IsActive = true,
+                Justification = "Correcting the participant name"
+            });
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var persisted = await context.Customers.Include(item => item.User)
+                    .SingleAsync(item => item.Id == customer.Id);
+                persisted.MembershipId.ShouldBeNull();
+                persisted.User.Role.ShouldBe(AquaUserRole.Member);
+                var roleNames = await (from assignment in context.UserRoles
+                    join role in context.Roles on assignment.RoleId equals role.Id
+                    where assignment.UserId == persisted.UserId
+                    select role.Name).ToListAsync();
+                roleNames.ShouldContain(AquaUserRole.Member.ToString());
+                roleNames.ShouldNotContain(AquaUserRole.Guest.ToString());
+            });
+        }
+
+        [Fact]
+        public async Task EditingCustomerProfile_DoesNotReplaceHigherBusinessRole()
+        {
+            var email = $"area-leader-profile-{Guid.NewGuid():N}@example.com";
+            var customer = (await _service.CreateAsync(new AdminCreateCustomerInput
+            {
+                TenantId = 1,
+                FirstName = "Area",
+                LastName = "Leader",
+                Email = email,
+                ContactNumber = "+27 73 123 4567",
+                HomeAddress = "14 Leadership Lane, Johannesburg",
+                Password = "Temporary123!",
+                IsActive = true,
+                Justification = "Creating a customer-linked Area Leader"
+            })).Customer;
+            await UsingDbContextAsync(1, async context =>
+            {
+                var user = await context.Users.SingleAsync(item => item.Id == customer.UserId);
+                user.SetRole(AquaUserRole.AreaLeader);
+                var guestRoleId = await context.Roles
+                    .Where(role => role.Name == AquaUserRole.Guest.ToString())
+                    .Select(role => role.Id)
+                    .SingleAsync();
+                var areaLeaderRoleId = await context.Roles
+                    .Where(role => role.Name == AquaUserRole.AreaLeader.ToString())
+                    .Select(role => role.Id)
+                    .SingleAsync();
+                context.UserRoles.RemoveRange(context.UserRoles.Where(assignment =>
+                    assignment.UserId == customer.UserId && assignment.RoleId == guestRoleId));
+                context.UserRoles.Add(new UserRole(1, customer.UserId, areaLeaderRoleId));
+                await context.SaveChangesAsync();
+            });
+
+            await _service.UpdateAsync(new AdminUpdateCustomerInput
+            {
+                Id = customer.Id,
+                FirstName = "Updated Area",
+                LastName = "Leader",
+                Email = email,
+                ContactNumber = "+27 73 123 4567",
+                HomeAddress = "14 Leadership Lane, Johannesburg",
+                MembershipId = null,
+                IsActive = true,
+                Justification = "Correcting the Area Leader profile"
+            });
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var persisted = await context.Customers.Include(item => item.User)
+                    .SingleAsync(item => item.Id == customer.Id);
+                persisted.User.Role.ShouldBe(AquaUserRole.AreaLeader);
+                var roleNames = await (from assignment in context.UserRoles
+                    join role in context.Roles on assignment.RoleId equals role.Id
+                    where assignment.UserId == persisted.UserId
+                    select role.Name).ToListAsync();
+                roleNames.ShouldContain(AquaUserRole.AreaLeader.ToString());
+                roleNames.ShouldNotContain(AquaUserRole.Guest.ToString());
+            });
         }
 
         [Fact]

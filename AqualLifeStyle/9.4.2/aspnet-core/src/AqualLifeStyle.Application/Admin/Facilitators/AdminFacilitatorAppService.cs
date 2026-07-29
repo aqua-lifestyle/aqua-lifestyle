@@ -4,6 +4,7 @@ using Abp.Application.Services.Dto;
 using Abp.Auditing;
 using Abp.Authorization;
 using AqualLifeStyle.Application.Admin.Facilitators.Dto;
+using AqualLifeStyle.Application.Admin.Customers;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
@@ -18,15 +19,18 @@ namespace AqualLifeStyle.Application.Admin.Facilitators
         private readonly IFacilitatorRepository _facilitatorRepository;
         private readonly ICustomerRepository _customerRepository;
         private readonly IAdminUserRoleSynchronizer _userRoleSynchronizer;
+        private readonly ICustomerFallbackRoleResolver _fallbackRoleResolver;
 
         public AdminFacilitatorAppService(
             IFacilitatorRepository facilitatorRepository,
             ICustomerRepository customerRepository,
-            IAdminUserRoleSynchronizer userRoleSynchronizer)
+            IAdminUserRoleSynchronizer userRoleSynchronizer,
+            ICustomerFallbackRoleResolver fallbackRoleResolver)
         {
             _facilitatorRepository = facilitatorRepository;
             _customerRepository = customerRepository;
             _userRoleSynchronizer = userRoleSynchronizer;
+            _fallbackRoleResolver = fallbackRoleResolver;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Facilitators.View)]
@@ -112,10 +116,11 @@ namespace AqualLifeStyle.Application.Admin.Facilitators
             ValidateMutation(input, "removal");
             var facilitator = await GetFacilitatorAsync(input.Id);
             var customer = await GetCustomerAsync(facilitator);
-            var replacementRole = customer.MembershipId.HasValue ? AquaUserRole.Member : AquaUserRole.Guest;
             using (CurrentUnitOfWork.SetTenantId(facilitator.TenantId))
             {
-                await _userRoleSynchronizer.SynchronizeAsync(customer.User, replacementRole);
+                await _userRoleSynchronizer.SynchronizeAsync(
+                    customer.User,
+                    await _fallbackRoleResolver.ResolveAsync(customer));
                 await _facilitatorRepository.DeleteAsync(facilitator);
             }
             LogAdminMutation("Facilitator", "removed", facilitator.Id, facilitator.TenantId, input.Justification);
