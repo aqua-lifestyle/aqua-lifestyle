@@ -90,11 +90,14 @@ apiClient.interceptors.response.use(
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
             return apiClient(originalRequest);
           }
-        } catch {
-          // Refresh failed — will fall through to the redirect below
+        } catch (refreshError) {
+          // A temporary network or server failure must not invalidate a valid
+          // session or present it as expired. Let the caller's normal error
+          // path handle the refresh failure and allow a later retry.
+          throw refreshError;
         }
 
-        // Redirect to login if refresh fails
+        // A null result means the refresh credential was definitively rejected.
         if (typeof window !== "undefined") {
           const returnPath = `${window.location.pathname}${window.location.search}`;
           window.location.href = getExpiredSessionLoginUrl(returnPath);

@@ -5,6 +5,7 @@ import {
   claimsToUser,
   getAuthenticationErrorMessage,
   getTenantSelfRegistrationAvailability,
+  refreshToken,
 } from "./auth-service";
 
 describe("claimsToUser", () => {
@@ -78,5 +79,44 @@ describe("getTenantSelfRegistrationAvailability", () => {
     });
 
     get.mockRestore();
+  });
+});
+
+describe("refreshToken", () => {
+  it("classifies a rejected refresh credential as definitive invalidation", async () => {
+    const post = vi.spyOn(axios, "post").mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        data: { error_description: "The refresh token is invalid." },
+        status: 400,
+      },
+    });
+
+    await expect(refreshToken("invalid-token")).resolves.toEqual({
+      failure: "invalid",
+      message: "The refresh token is invalid.",
+      ok: false,
+    });
+    post.mockRestore();
+  });
+
+  it("classifies server and network failures as transient", async () => {
+    const post = vi.spyOn(axios, "post");
+    post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { data: {}, status: 503 },
+    });
+
+    await expect(refreshToken("valid-token")).resolves.toMatchObject({
+      failure: "transient",
+      ok: false,
+    });
+
+    post.mockRejectedValueOnce(new Error("offline"));
+    await expect(refreshToken("valid-token")).resolves.toMatchObject({
+      failure: "transient",
+      ok: false,
+    });
+    post.mockRestore();
   });
 });

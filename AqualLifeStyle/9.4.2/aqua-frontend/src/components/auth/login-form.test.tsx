@@ -77,6 +77,19 @@ describe("LoginForm", () => {
     );
   });
 
+  it("does not describe a temporary refresh problem as an ended session", async () => {
+    searchParams.current = new URLSearchParams("reason=refresh-temporary");
+
+    render(<LoginForm />);
+
+    expect(
+      screen.queryByText(/secure session ended because your access changed or expired/i),
+    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(getTenantSelfRegistrationAvailability).toHaveBeenCalled(),
+    );
+  });
+
   it("does not let a generic redirect override a role dashboard", () => {
     expect(getLoginDestination("AreaLeader", "/")).toBe(
       "/area-leader/dashboard",

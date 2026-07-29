@@ -80,6 +80,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         dispatch(setAuthSession(result.session));
         return result.session.accessToken;
       }
+      if (result.failure === "transient") {
+        throw new Error(result.message);
+      }
       setAccessTokenProvider(() => null);
       dispatch(clearAuthSession());
       return null;
