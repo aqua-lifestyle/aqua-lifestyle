@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
@@ -12,6 +18,13 @@ export const useMyProgrammeParticipations = (enabled: boolean) => {
   const [isLoading, setIsLoading] = useState(enabled);
   const enabledRef = useRef(enabled);
   const requestIdentifierRef = useRef(0);
+
+  useLayoutEffect(() => {
+    enabledRef.current = enabled;
+    if (!enabled) {
+      requestIdentifierRef.current += 1;
+    }
+  }, [enabled]);
 
   const reload = useCallback(async () => {
     const requestIdentifier = ++requestIdentifierRef.current;
@@ -57,11 +70,6 @@ export const useMyProgrammeParticipations = (enabled: boolean) => {
   }, [enabled]);
 
   useEffect(() => {
-    enabledRef.current = enabled;
-    if (!enabled) {
-      requestIdentifierRef.current += 1;
-    }
-
     const task = window.setTimeout(() => {
       if (enabled) {
         void reload();
