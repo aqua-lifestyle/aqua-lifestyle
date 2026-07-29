@@ -51,6 +51,7 @@ export const MemberDashboard = () => {
   const {
     isMyCustomerError,
     isMyCustomerPending,
+    isMyCustomerSuccess,
     myCustomer,
     myCustomerErrorMessage,
   } = useCustomersState();
@@ -102,7 +103,8 @@ export const MemberDashboard = () => {
     isMyCustomerPending ||
     isProgrammesPending ||
     !isOrdersSuccess ||
-    !isMembershipsSuccess;
+    !isMembershipsSuccess ||
+    !isMyCustomerSuccess;
   const hasError =
     isOrdersError || isMembershipsError || isMyCustomerError || Boolean(programmeErrorMessage);
 

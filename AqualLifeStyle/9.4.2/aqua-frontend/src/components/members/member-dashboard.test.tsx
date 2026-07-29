@@ -299,6 +299,18 @@ describe("MemberDashboard", () => {
     expect(screen.queryByText("My Orders")).toBeNull();
   });
 
+  it("keeps loading until the Club Member account request succeeds", () => {
+    vi.mocked(useCustomersState).mockReturnValue({
+      ...baseCustomersState,
+      isMyCustomerSuccess: false,
+      myCustomer: null,
+    });
+
+    render(<MemberDashboard />);
+
+    expect(screen.queryByText("My Orders")).not.toBeInTheDocument();
+  });
+
   it("hides the savings account link without savings access", async () => {
     vi.mocked(useAuthState).mockReturnValue({
       ...baseAuthState,
