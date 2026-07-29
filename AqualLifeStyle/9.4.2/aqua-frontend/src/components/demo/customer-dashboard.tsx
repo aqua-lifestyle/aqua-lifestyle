@@ -31,7 +31,8 @@ import { Badge, Button, Card, LinkButton, StatusMessage } from "@/src/shared/ui"
 import { useHydrated } from "@/src/shared/lib/use-hydrated";
 import {
   getActiveProgrammeNames,
-  getPendingProgrammeNames,
+  getProgrammeStatusDescription,
+  getProgrammeStatusLabel,
 } from "@/src/shared/domain/programme-participations";
 import { useMyProgrammeParticipations } from "@/src/shared/hooks/use-my-programme-participations";
 
@@ -154,20 +155,16 @@ export const CustomerDashboard = () => {
       : null;
   const currentMembership = legacyProgrammeSelection ? null : assignedMembership;
   const activeProgrammeNames = getActiveProgrammeNames(programmeParticipations);
-  const pendingProgrammeNames = getPendingProgrammeNames(programmeParticipations);
   const isClubMember = Boolean(currentMembership || activeProgrammeNames.length > 0);
-  const clubStatusLabel =
-    activeProgrammeNames.join(" and ") ||
-    currentMembership?.name ||
-    (pendingProgrammeNames.length > 0 ? "Activation pending" : "Customer");
-  const clubStatusDescription =
-    activeProgrammeNames.length > 0
-      ? "Active programme participation"
-      : currentMembership
-        ? "Active membership plan"
-        : pendingProgrammeNames.length > 0
-          ? `${pendingProgrammeNames.join(" and ")} payment confirmation pending`
-          : "No active membership or programme";
+  const clubStatusLabel = getProgrammeStatusLabel(
+    programmeParticipations,
+    currentMembership?.name,
+    "Customer",
+  );
+  const clubStatusDescription = getProgrammeStatusDescription(
+    programmeParticipations,
+    currentMembership?.name,
+  );
 
   const availableTiers = useMemo(() => {
     if (!memberships.length) return [];
@@ -322,7 +319,11 @@ export const CustomerDashboard = () => {
               <div>
                 <p className="text-sm text-muted-foreground">Account</p>
                 <p className="text-2xl font-bold">
-                  {myCustomer?.isActive ? "Active" : "Inactive"}
+                  {myCustomer
+                    ? myCustomer.isActive
+                      ? "Active"
+                      : "Inactive"
+                    : "Unavailable"}
                 </p>
                 <p className="text-xs text-muted-foreground">Manage details in your profile</p>
               </div>

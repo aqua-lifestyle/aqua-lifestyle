@@ -13,8 +13,7 @@ import {
   useOrderIntentsState,
 } from "@/src/providers";
 import {
-  getActiveProgrammeNames,
-  getPendingProgrammeNames,
+  getProgrammeStatusLabel,
 } from "@/src/shared/domain/programme-participations";
 import { useMyProgrammeParticipations } from "@/src/shared/hooks/use-my-programme-participations";
 import {
@@ -82,12 +81,11 @@ export const MemberDashboard = () => {
       null,
     [memberships, myCustomer?.membershipId],
   );
-  const activeProgrammeNames = getActiveProgrammeNames(programmeParticipations);
-  const pendingProgrammeNames = getPendingProgrammeNames(programmeParticipations);
-  const participationLabel =
-    activeProgrammeNames.join(" and ") ||
-    assignedMembership?.name ||
-    (pendingProgrammeNames.length > 0 ? "Activation pending" : "No active participation");
+  const participationLabel = getProgrammeStatusLabel(
+    programmeParticipations,
+    assignedMembership?.name,
+    "No active participation",
+  );
 
   const openSavingsWindow = useMemo(() => {
     if (!assignedMembership) return null;

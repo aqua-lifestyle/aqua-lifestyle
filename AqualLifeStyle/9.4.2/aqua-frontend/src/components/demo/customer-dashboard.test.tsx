@@ -351,6 +351,18 @@ describe("CustomerDashboard", () => {
     expect(changeMembership).not.toHaveBeenCalled();
   });
 
+  it("does not describe an unavailable customer account as inactive", async () => {
+    vi.mocked(useCustomersState).mockReturnValue({
+      ...customersState,
+      myCustomer: null,
+    });
+
+    render(<CustomerDashboard />);
+
+    expect(await screen.findByText("Unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("Inactive")).not.toBeInTheDocument();
+  });
+
   it("gives customers with a legacy Onyx selection a completion path", async () => {
     vi.mocked(useCustomersState).mockReturnValue({
       ...customersState,
