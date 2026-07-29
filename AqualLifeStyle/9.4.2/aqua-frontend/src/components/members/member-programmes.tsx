@@ -1,17 +1,17 @@
 "use client";
 
 import { CircleDollarSign, Network, Plane, Route } from "lucide-react";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { useAuthState } from "@/src/providers";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 import type {
-  MyProgrammeParticipations,
   OnyxTravelBenefit,
   ProgrammeParticipation,
 } from "@/src/shared/domain/programme-participations";
+import { useMyProgrammeParticipations } from "@/src/shared/hooks/use-my-programme-participations";
 import {
   Badge,
   Breadcrumb,
@@ -163,42 +163,14 @@ export const MemberProgrammes = () => {
   const { session } = useAuthState();
   const canView =
     session?.user?.permissions?.includes(VIEW_PERMISSION) ?? false;
-  const [participations, setParticipations] =
-    useState<MyProgrammeParticipations>();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>();
+  const {
+    data: participations,
+    errorMessage: loadError,
+    isLoading: loading,
+  } = useMyProgrammeParticipations(canView);
+  const [actionError, setActionError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [startingAQGreenPayment, setStartingAQGreenPayment] = useState(false);
-
-  const loadParticipations = useCallback(async () => {
-    if (!canView) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(undefined);
-    try {
-      setParticipations(
-        await httpClient.get<MyProgrammeParticipations>(
-          apiEndpoints.programmeParticipations.getMyParticipations,
-        ),
-      );
-    } catch (requestError) {
-      setError(
-        getRequestErrorMessage(
-          requestError,
-          "Your programme participation could not be loaded.",
-        ),
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [canView]);
-
-  useEffect(() => {
-    const task = window.setTimeout(() => void loadParticipations(), 0);
-    return () => window.clearTimeout(task);
-  }, [loadParticipations]);
 
   useEffect(() => {
     const task = window.setTimeout(() => {
@@ -211,13 +183,13 @@ export const MemberProgrammes = () => {
             : "Payment completed. We are waiting for Yoco's secure confirmation before creating your Onyx participation.",
         );
       } else if (paymentResult === "cancelled") {
-        setError(
+        setActionError(
           programme === "aqgreen"
             ? "Payment was cancelled. Your AQGreen place remains recorded, but it is not active."
             : "Payment was cancelled. No Onyx participation was created.",
         );
       } else if (paymentResult === "failed") {
-        setError(
+        setActionError(
           programme === "aqgreen"
             ? "Payment was not completed. Your AQGreen participation is not active. You can try again below."
             : "Payment was not completed. No Onyx participation was created. You can try again below.",
@@ -229,14 +201,14 @@ export const MemberProgrammes = () => {
 
   const startAQGreenPayment = async () => {
     setStartingAQGreenPayment(true);
-    setError(undefined);
+    setActionError(undefined);
     try {
       const checkout = await httpClient.post<{ checkoutUrl: string }>(
         apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
       );
       navigateToExternalUrl(checkout.checkoutUrl);
     } catch (requestError) {
-      setError(
+      setActionError(
         getRequestErrorMessage(
           requestError,
           "AQGreen payment could not be started. No payment has been taken.",
@@ -274,7 +246,9 @@ export const MemberProgrammes = () => {
           </p>
         </header>
 
-        {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
+        {loadError || actionError ? (
+          <StatusMessage tone="error">{loadError ?? actionError}</StatusMessage>
+        ) : null}
         {success ? (
           <StatusMessage tone="success">{success}</StatusMessage>
         ) : null}

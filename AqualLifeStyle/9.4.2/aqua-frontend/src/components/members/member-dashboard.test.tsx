@@ -3,7 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Membership, SavingsWindowStatus } from "@/src/providers/Memberships/context";
 import type { OrderIntent } from "@/src/providers/OrderIntents/context";
-import { useAuthState, useMembershipsActions, useMembershipsState, useOrderIntentsActions, useOrderIntentsState } from "@/src/providers";
+import type { CustomersState } from "@/src/providers/Customers/context";
+import {
+  useAuthState,
+  useCustomersActions,
+  useCustomersState,
+  useMembershipsActions,
+  useMembershipsState,
+  useOrderIntentsActions,
+  useOrderIntentsState,
+} from "@/src/providers";
+import { useMyProgrammeParticipations } from "@/src/shared/hooks/use-my-programme-participations";
 
 import { MemberDashboard } from "./member-dashboard";
 
@@ -14,12 +24,18 @@ vi.mock("@/src/providers", async () => {
   return {
     ...actual,
     useAuthState: vi.fn(),
+    useCustomersActions: vi.fn(),
+    useCustomersState: vi.fn(),
     useMembershipsActions: vi.fn(),
     useMembershipsState: vi.fn(),
     useOrderIntentsActions: vi.fn(),
     useOrderIntentsState: vi.fn(),
   };
 });
+
+vi.mock("@/src/shared/hooks/use-my-programme-participations", () => ({
+  useMyProgrammeParticipations: vi.fn(),
+}));
 
 const memberships: Membership[] = [
   {
@@ -115,12 +131,52 @@ const baseOrderIntentsState = {
   orderIntents,
 };
 
+const baseCustomersState: CustomersState = {
+  changeMembershipErrorMessage: null,
+  createErrorMessage: null,
+  customers: [],
+  isChangeMembershipError: false,
+  isChangeMembershipPending: false,
+  isChangeMembershipSuccess: false,
+  isCreateError: false,
+  isCreatePending: false,
+  isCreateSuccess: false,
+  isLoadError: false,
+  isLoadPending: false,
+  isLoadSuccess: false,
+  isMyCustomerError: false,
+  isMyCustomerPending: false,
+  isMyCustomerSuccess: true,
+  isSelectedError: false,
+  isSelectedPending: false,
+  isSelectedSuccess: false,
+  isUpdateError: false,
+  isUpdatePending: false,
+  isUpdateSuccess: false,
+  loadErrorMessage: null,
+  myCustomer: {
+    email: "member@example.com",
+    id: 7,
+    isActive: true,
+    membershipId: 1,
+    name: "Member User",
+    tenantId: 1,
+    userId: 1,
+  },
+  myCustomerErrorMessage: null,
+  selectedCustomer: null,
+  selectedErrorMessage: null,
+  updateErrorMessage: null,
+};
+
 const getMyOrderIntents = vi.fn();
+const getMyCustomer = vi.fn();
 
 beforeEach(() => {
   vi.resetAllMocks();
 
   vi.mocked(useAuthState).mockReturnValue(baseAuthState);
+  vi.mocked(useCustomersState).mockReturnValue(baseCustomersState);
   vi.mocked(useMembershipsState).mockReturnValue(baseMembershipsState);
   vi.mocked(useOrderIntentsState).mockReturnValue(baseOrderIntentsState);
   vi.mocked(useMembershipsActions).mockReturnValue({
@@ -130,6 +186,14 @@ beforeEach(() => {
     getSavingsWindowStatuses: vi.fn(),
     getTierBenefits: vi.fn(),
   });
+  vi.mocked(useCustomersActions).mockReturnValue({
+    changeMembership: vi.fn(),
+    createCustomer: vi.fn(),
+    getCustomer: vi.fn(),
+    getCustomers: vi.fn(),
+    getMyCustomer,
+    updateCustomer: vi.fn(),
+  });
   vi.mocked(useOrderIntentsActions).mockReturnValue({
     cancelOrderIntent: vi.fn(),
     completeOrderIntent: vi.fn(),
@@ -137,6 +201,12 @@ beforeEach(() => {
     createFromEnquiry: vi.fn(),
     getOrderIntents: vi.fn(),
     getMyOrderIntents,
+  });
+  vi.mocked(useMyProgrammeParticipations).mockReturnValue({
+    data: undefined,
+    errorMessage: undefined,
+    isLoading: false,
+    reload: vi.fn(),
   });
 });
 
@@ -151,9 +221,65 @@ describe("MemberDashboard", () => {
     expect(screen.getByText("My Orders")).toBeDefined();
     expect(screen.getByText("1")).toBeDefined();
     expect(getMyOrderIntents).toHaveBeenCalledOnce();
+    expect(getMyCustomer).toHaveBeenCalledOnce();
     expect(
       screen.getByRole("link", { name: "View my savings account" }),
     ).toHaveAttribute("href", "/member/savings");
+  });
+
+  it("shows active programme participation without a legacy membership", async () => {
+    vi.mocked(useAuthState).mockReturnValue({
+      ...baseAuthState,
+      session: {
+        ...baseAuthState.session,
+        user: {
+          ...baseAuthState.session.user,
+          permissions: [
+            "Aqua.ProgrammeParticipations.ViewSelf",
+            "Aqua.Savings.ViewSelf",
+          ],
+        },
+      },
+    });
+    vi.mocked(useCustomersState).mockReturnValue({
+      ...baseCustomersState,
+      myCustomer: {
+        ...baseCustomersState.myCustomer!,
+        membershipId: null,
+      },
+    });
+    vi.mocked(useMyProgrammeParticipations).mockReturnValue({
+      data: {
+        canJoinEntry: false,
+        canJoinOnyxDirectly: true,
+        clubMemberNumber: "CLB-000000000001",
+        entry: {
+          activatedAt: "2026-07-29T00:00:00Z",
+          canRecruitForThisProgramme: true,
+          currency: "ZAR",
+          isActive: true,
+          joinedIndependently: true,
+          nextPaymentAmount: null,
+          nextPaymentDescription: null,
+          programmeName: "AQGreen",
+          recruiterClubMemberNumber: null,
+          startedAt: "2026-07-29T00:00:00Z",
+          status: "Active",
+        },
+        onyx: null,
+        pendingAQGreenCheckout: null,
+        pendingDirectOnyxCheckout: null,
+        travelBenefit: null,
+      },
+      errorMessage: undefined,
+      isLoading: false,
+      reload: vi.fn(),
+    });
+
+    render(<MemberDashboard />);
+
+    expect(await screen.findByText("AQGreen")).toBeInTheDocument();
+    expect(screen.queryByText("No active participation")).not.toBeInTheDocument();
   });
 
   it("shows loading state", () => {

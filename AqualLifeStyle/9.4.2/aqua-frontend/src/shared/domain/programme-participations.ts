@@ -40,3 +40,17 @@ export type OnyxTravelBenefit = {
   status: "Available" | "Waiting period";
   waitingPeriodEndsAt: string;
 };
+
+export const getActiveProgrammeNames = (
+  participations: MyProgrammeParticipations | undefined,
+) =>
+  [participations?.entry, participations?.onyx]
+    .filter((participation) => participation?.isActive)
+    .map((participation) => participation!.programmeName);
+
+export const getPendingProgrammeNames = (
+  participations: MyProgrammeParticipations | undefined,
+) =>
+  [participations?.entry, participations?.onyx]
+    .filter((participation) => participation && !participation.isActive)
+    .map((participation) => participation!.programmeName);

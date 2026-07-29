@@ -5,11 +5,18 @@ import { useEffect, useMemo } from "react";
 
 import {
   useAuthState,
+  useCustomersActions,
+  useCustomersState,
   useMembershipsActions,
   useMembershipsState,
   useOrderIntentsActions,
   useOrderIntentsState,
 } from "@/src/providers";
+import {
+  getActiveProgrammeNames,
+  getPendingProgrammeNames,
+} from "@/src/shared/domain/programme-participations";
+import { useMyProgrammeParticipations } from "@/src/shared/hooks/use-my-programme-participations";
 import {
   Avatar,
   Badge,
@@ -24,6 +31,7 @@ import { getOrderStatusLabel, getOrderStatusTone } from "@/src/shared/lib/order-
 
 export const MemberDashboard = () => {
   const { getMyOrderIntents } = useOrderIntentsActions();
+  const { getMyCustomer } = useCustomersActions();
   const { getMemberships, getSavingsWindowStatuses } = useMembershipsActions();
   const {
     isLoadError: isOrdersError,
@@ -40,30 +48,63 @@ export const MemberDashboard = () => {
     memberships,
     savingsWindowStatuses,
   } = useMembershipsState();
+  const {
+    isMyCustomerError,
+    isMyCustomerPending,
+    myCustomer,
+    myCustomerErrorMessage,
+  } = useCustomersState();
   const { session } = useAuthState();
+  const canViewProgrammes =
+    session?.user?.permissions?.includes(
+      "Aqua.ProgrammeParticipations.ViewSelf",
+    ) ?? false;
+  const canViewSavings =
+    session?.user?.permissions?.includes("Aqua.Savings.ViewSelf") ?? false;
+  const {
+    data: programmeParticipations,
+    errorMessage: programmeErrorMessage,
+    isLoading: isProgrammesPending,
+  } = useMyProgrammeParticipations(canViewProgrammes);
 
   // ALL hooks before early returns
   useEffect(() => {
     void getMyOrderIntents();
+    void getMyCustomer();
     void getMemberships();
     void getSavingsWindowStatuses();
-  }, [getMemberships, getMyOrderIntents, getSavingsWindowStatuses]);
+  }, [getMemberships, getMyCustomer, getMyOrderIntents, getSavingsWindowStatuses]);
 
-  const activeMembership = useMemo(() => {
-    return memberships.find((membership) => membership.isActive) ?? null;
-  }, [memberships]);
+  const assignedMembership = useMemo(
+    () =>
+      memberships.find((membership) => membership.id === myCustomer?.membershipId) ??
+      null,
+    [memberships, myCustomer?.membershipId],
+  );
+  const activeProgrammeNames = getActiveProgrammeNames(programmeParticipations);
+  const pendingProgrammeNames = getPendingProgrammeNames(programmeParticipations);
+  const participationLabel =
+    activeProgrammeNames.join(" and ") ||
+    assignedMembership?.name ||
+    (pendingProgrammeNames.length > 0 ? "Activation pending" : "No active participation");
 
   const openSavingsWindow = useMemo(() => {
-    if (!activeMembership) return null;
+    if (!assignedMembership) return null;
     return (
-      savingsWindowStatuses.find((s) => s.tier === activeMembership.membershipType) ??
+      savingsWindowStatuses.find((s) => s.tier === assignedMembership.membershipType) ??
       null
     );
-  }, [activeMembership, savingsWindowStatuses]);
+  }, [assignedMembership, savingsWindowStatuses]);
 
   const isLoading =
-    isOrdersPending || isMembershipsPending || !isOrdersSuccess || !isMembershipsSuccess;
-  const hasError = isOrdersError || isMembershipsError;
+    isOrdersPending ||
+    isMembershipsPending ||
+    isMyCustomerPending ||
+    isProgrammesPending ||
+    !isOrdersSuccess ||
+    !isMembershipsSuccess;
+  const hasError =
+    isOrdersError || isMembershipsError || isMyCustomerError || Boolean(programmeErrorMessage);
 
   return (
     <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
@@ -90,7 +131,11 @@ export const MemberDashboard = () => {
           </div>
         ) : hasError ? (
           <StatusMessage tone="error">
-            {ordersErrorMessage ?? membershipsErrorMessage ?? "Unable to load dashboard data."}
+            {ordersErrorMessage ??
+              membershipsErrorMessage ??
+              myCustomerErrorMessage ??
+              programmeErrorMessage ??
+              "Unable to load dashboard data."}
           </StatusMessage>
         ) : (
           <>
@@ -109,9 +154,9 @@ export const MemberDashboard = () => {
                   <Package className="size-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Membership</p>
+                  <p className="text-sm text-muted-foreground">Club participation</p>
                   <p className="text-2xl font-bold">
-                    {activeMembership?.name ?? "None"}
+                    {participationLabel}
                   </p>
                 </div>
               </Card>
@@ -120,9 +165,11 @@ export const MemberDashboard = () => {
                   <PiggyBank className="size-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Savings Window</p>
+                  <p className="text-sm text-muted-foreground">Savings access</p>
                   <p className="text-2xl font-bold">
-                    {openSavingsWindow ? openSavingsWindow.statusLabel : "Closed"}
+                    {canViewSavings
+                      ? (openSavingsWindow?.statusLabel ?? "Available")
+                      : "Not available"}
                   </p>
                 </div>
               </Card>
@@ -205,17 +252,21 @@ export const MemberDashboard = () => {
                         </span>
                       </div>
                     </div>
+                  ) : canViewSavings ? (
+                    <EmptyState
+                      description="Open your savings account to see contributions and maturity progress."
+                      icon={PiggyBank}
+                      title="Savings account available"
+                    />
                   ) : (
                     <EmptyState
-                      description="No active savings window."
+                      description="Savings becomes available with eligible Club Member access."
                       icon={PiggyBank}
-                      title="Savings closed"
+                      title="Savings not available"
                     />
                   )}
                 </div>
-                {session?.user?.permissions?.includes(
-                  "Aqua.Savings.ViewSelf",
-                ) ? (
+                {canViewSavings ? (
                   <LinkButton
                     className="mt-4 w-full"
                     href="/member/savings"

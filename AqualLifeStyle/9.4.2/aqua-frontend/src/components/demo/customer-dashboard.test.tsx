@@ -15,6 +15,7 @@ import {
 import type { CustomersState } from "@/src/providers/Customers/context";
 import type { MembershipsState } from "@/src/providers/Memberships/context";
 import type { ProductsState } from "@/src/providers/Products/context";
+import { useMyProgrammeParticipations } from "@/src/shared/hooks/use-my-programme-participations";
 
 import { CustomerDashboard } from "./customer-dashboard";
 
@@ -43,6 +44,10 @@ vi.mock("@/src/providers", async () => {
     useProductsState: vi.fn(),
   };
 });
+
+vi.mock("@/src/shared/hooks/use-my-programme-participations", () => ({
+  useMyProgrammeParticipations: vi.fn(),
+}));
 
 const customersState: CustomersState = {
   changeMembershipErrorMessage: null,
@@ -233,6 +238,12 @@ describe("CustomerDashboard", () => {
       getProducts: vi.fn(),
     });
     vi.mocked(useProductsState).mockReturnValue(productsState);
+    vi.mocked(useMyProgrammeParticipations).mockReturnValue({
+      data: undefined,
+      errorMessage: undefined,
+      isLoading: false,
+      reload: vi.fn(),
+    });
   });
 
   it("redirects signed-out visitors without loading customer data", async () => {
@@ -270,6 +281,64 @@ describe("CustomerDashboard", () => {
     expect(screen.getByText("Monthly obligation").parentElement).toHaveTextContent(
       /R\s*0[,.]00/,
     );
+  });
+
+  it("recognises active programme participation without a legacy membership", async () => {
+    vi.mocked(useAuthState).mockReturnValue({
+      isAuthenticated: true,
+      isReady: true,
+      session: {
+        accessToken: "token",
+        expiresAt: "2099-01-01",
+        user: {
+          email: "jane@example.com",
+          id: 42,
+          name: "Jane Customer",
+          permissions: ["Aqua.ProgrammeParticipations.ViewSelf"],
+          role: "Member",
+        },
+      },
+    });
+    vi.mocked(useCustomersState).mockReturnValue({
+      ...customersState,
+      myCustomer: {
+        ...customersState.myCustomer!,
+        membershipId: null,
+      },
+    });
+    vi.mocked(useMyProgrammeParticipations).mockReturnValue({
+      data: {
+        canJoinEntry: true,
+        canJoinOnyxDirectly: false,
+        clubMemberNumber: "CLB-000000000007",
+        entry: null,
+        onyx: {
+          activatedAt: "2026-07-29T00:00:00Z",
+          canRecruitForThisProgramme: true,
+          currency: "ZAR",
+          isActive: true,
+          joinedIndependently: true,
+          nextPaymentAmount: null,
+          nextPaymentDescription: null,
+          programmeName: "Onyx",
+          recruiterClubMemberNumber: null,
+          startedAt: "2026-07-29T00:00:00Z",
+          status: "Active",
+        },
+        pendingAQGreenCheckout: null,
+        pendingDirectOnyxCheckout: null,
+        travelBenefit: null,
+      },
+      errorMessage: undefined,
+      isLoading: false,
+      reload: vi.fn(),
+    });
+
+    render(<CustomerDashboard />);
+
+    expect(await screen.findByText("Club Member")).toBeInTheDocument();
+    expect(screen.getByText("Active programme participation")).toBeInTheDocument();
+    expect(screen.getByText("Onyx")).toBeInTheDocument();
   });
 
   it("routes Onyx joining through the programme participation workflow", async () => {
