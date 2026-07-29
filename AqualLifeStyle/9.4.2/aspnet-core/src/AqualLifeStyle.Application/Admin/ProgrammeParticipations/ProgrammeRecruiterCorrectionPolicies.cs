@@ -45,8 +45,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             var policy = _policies.SingleOrDefault(item => item.Programme == programme);
             if (policy == null)
                 throw new UserFriendlyException(
-                    "Recruiter correction failed.",
-                    "The selected programme does not support recruiter corrections.");
+                    "Network placement correction failed.",
+                    "The selected programme does not support network placement corrections.");
             return policy;
         }
     }
@@ -91,7 +91,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 var recruiter = participations.SingleOrDefault(item =>
                     item.CustomerId == newRecruiterCustomerId.Value &&
                     item.Status == EntryParticipationStatus.Active);
-                if (recruiter == null) throw InvalidRecruiter("The new recruiter must have active AQGreen participation.");
+                if (recruiter == null) throw InvalidRecruiter("The new inviting Club Member must have active AQGreen participation.");
                 RecruiterPlacementCycleValidator.EnsureNoCycle(
                     participations.Select(item => (item.CustomerId, item.RecruiterCustomerId)),
                     customerId,
@@ -101,10 +101,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         }
 
         private static UserFriendlyException NotFound() =>
-            new UserFriendlyException("Recruiter correction failed.", "The AQGreen participation was not found.");
+            new UserFriendlyException("Network placement correction failed.", "The AQGreen participation was not found.");
 
         private static UserFriendlyException InvalidRecruiter(string details) =>
-            new UserFriendlyException("Recruiter correction failed.", details);
+            new UserFriendlyException("Network placement correction failed.", details);
 
     }
 
@@ -139,7 +139,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 var target = participations.SingleOrDefault(item =>
                     item.TenantId == tenantId && item.CustomerId == customerId);
                 if (target == null)
-                    throw new UserFriendlyException("Recruiter correction failed.", "The Onyx participation was not found.");
+                    throw new UserFriendlyException("Network placement correction failed.", "The Onyx participation was not found.");
                 if (!newRecruiterCustomerId.HasValue)
                 {
                     target.CorrectToIndependent(administratorUserId, reason, correctedAt);
@@ -150,7 +150,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     item.CustomerId == newRecruiterCustomerId.Value &&
                     item.Status == OnyxParticipationStatus.Active);
                 if (recruiter == null)
-                    throw new UserFriendlyException("Recruiter correction failed.", "The new recruiter must have active Onyx participation.");
+                    throw new UserFriendlyException("Network placement correction failed.", "The new inviting Club Member must have active Onyx participation.");
                 RecruiterPlacementCycleValidator.EnsureNoCycle(
                     participations.Select(item => (item.CustomerId, item.RecruiterCustomerId)),
                     customerId,

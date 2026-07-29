@@ -326,7 +326,7 @@ namespace AqualLifeStyle.Tests.Application
                     NewRecruiterClubMemberNumber = fixture.RecruiterNumber,
                     Reason = "Attempting an unauthorised cross-Area placement"
                 }));
-            exception.Details.ShouldContain("authorised to manage");
+            exception.Details.ShouldContain("management authority");
 
             await UsingDbContextAsync(1, async context =>
             {

@@ -59,12 +59,15 @@ describe("MemberProgrammes", () => {
     });
   });
 
-  it("shows both network placements without requiring a recruiter", async () => {
+  it("shows both network placements without requiring an invitation", async () => {
     render(<MemberProgrammes />);
 
     await screen.findByRole("button", { name: "Join AQGreen" });
     expect(screen.getByRole("button", { name: "Join Onyx" })).toBeInTheDocument();
-    expect(screen.getAllByText(/recruiter is optional/i)).toHaveLength(2);
+    expect(screen.getByText(/an invitation is optional/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/AQGreen and an invitation are not required/i),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: "Invite Club Members" }),
     ).not.toBeInTheDocument();

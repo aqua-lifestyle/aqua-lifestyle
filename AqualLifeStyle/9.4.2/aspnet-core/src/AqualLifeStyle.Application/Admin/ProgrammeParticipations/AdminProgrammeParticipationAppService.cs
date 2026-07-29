@@ -51,13 +51,13 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             if (input == null)
                 throw new Abp.UI.UserFriendlyException(
-                    "Recruiter correction failed.",
+                    "Network placement correction failed.",
                     "The request was empty.");
             if (!AbpSession.TenantId.HasValue &&
                 !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
             {
                 throw new AbpAuthorizationException(
-                    "Cross-Area recruiter correction requires permission to manage all Areas.");
+                    "Cross-Area network placement correction requires permission to manage all Areas.");
             }
 
             Customer target;
@@ -72,10 +72,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                         !customer.IsDeleted);
                 if (target == null)
                     throw new Abp.UI.UserFriendlyException(
-                        "Recruiter correction failed.",
+                        "Network placement correction failed.",
                         "The Club Member participation was not found.");
 
-                ValidateRequestedTenant(target.TenantId, "Recruiter correction");
+                ValidateRequestedTenant(target.TenantId, "Network placement correction");
                 if (!string.IsNullOrWhiteSpace(input.NewRecruiterClubMemberNumber))
                 {
                     var normalizedRecruiter = input.NewRecruiterClubMemberNumber
@@ -91,8 +91,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                         !newRecruiter.IsActive)
                     {
                         throw new Abp.UI.UserFriendlyException(
-                            "Recruiter correction failed.",
-                            "The new recruiter must be an active Club Member you are authorised to manage.");
+                            "Network placement correction failed.",
+                            "The new inviting Club Member must be active and within your management authority.");
                     }
                 }
             }

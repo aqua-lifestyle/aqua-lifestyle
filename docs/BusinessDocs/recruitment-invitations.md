@@ -1,5 +1,15 @@
 # Programme recruitment invitations
 
+## Customer-facing language
+
+The product calls this feature **Member invitations**. Customer and
+administrator interfaces use **Inviting Club Member**, **Member network**, and
+**Network placement** instead of recruitment terminology. Existing internal
+class names, API properties, permissions, database columns, and audit records
+retain their current recruiter/recruitment names until a separately planned
+technical migration is justified. This terminology boundary avoids breaking
+contracts while keeping the customer experience clear and professional.
+
 ## Purpose
 
 The invitation experience makes programme recruitment discoverable without

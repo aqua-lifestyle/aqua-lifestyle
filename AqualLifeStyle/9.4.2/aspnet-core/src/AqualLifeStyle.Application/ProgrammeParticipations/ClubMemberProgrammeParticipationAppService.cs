@@ -222,7 +222,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 if (participation == null)
                     throw new UserFriendlyException(
                         "Join AQGreen before starting payment.",
-                        "Your recruiter placement must be recorded before checkout.");
+                        "Your network placement must be recorded before checkout.");
                 if (participation.Status == EntryParticipationStatus.Active)
                     throw new UserFriendlyException(
                         "Your AQGreen participation is already active.",
@@ -399,7 +399,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
             throw new UserFriendlyException(
                 "An Onyx payment is already awaiting completion.",
-                "Complete the existing checkout. Contact the club team if its recruiter placement is incorrect.");
+                "Complete the existing checkout. Contact the club team if its network placement is incorrect.");
         }
 
         private async Task<YocoCheckout> CreateYocoCheckoutAsync(
@@ -469,7 +469,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             if (recruiterCustomerId.HasValue && !string.IsNullOrWhiteSpace(inviteCode))
             {
                 throw InvalidRecruiter(
-                    "Use either an invitation code or a recruiter reference, not both.");
+                    "Use either an invitation code or an inviting Club Member reference, not both.");
             }
 
             if (string.IsNullOrWhiteSpace(inviteCode)) return recruiterCustomerId;
@@ -529,7 +529,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 if (recruiter == null)
                 {
                     throw InvalidRecruiter(
-                        "The selected recruiter is not currently participating in AQGreen.");
+                        "The inviting Club Member is not currently participating in AQGreen.");
                 }
 
                 return recruiter;
@@ -550,7 +550,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 if (recruiter == null)
                 {
                     throw InvalidRecruiter(
-                        "The selected recruiter is not currently participating in Onyx.");
+                        "The inviting Club Member is not currently participating in Onyx.");
                 }
 
                 return recruiter;
@@ -583,12 +583,12 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         {
             if (recruiterCustomerId <= 0)
             {
-                throw InvalidRecruiter("Enter a valid recruiter reference.");
+                throw InvalidRecruiter("Enter a valid inviting Club Member reference.");
             }
 
             if (customerId == recruiterCustomerId)
             {
-                throw InvalidRecruiter("You cannot recruit yourself.");
+                throw InvalidRecruiter("You cannot use yourself as the inviting Club Member.");
             }
         }
 
@@ -604,12 +604,12 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
             throw new UserFriendlyException(
                 $"{programmeName} participation already exists.",
-                "The recruiter cannot be changed through the joining form. Contact an administrator if the recorded placement is incorrect.");
+                "The inviting Club Member cannot be changed through the joining form. Contact an administrator if the recorded placement is incorrect.");
         }
 
         private static UserFriendlyException InvalidRecruiter(string details)
         {
-            return new UserFriendlyException("The recruiter could not be accepted.", details);
+            return new UserFriendlyException("The network placement could not be accepted.", details);
         }
 
         private static ProgrammeParticipationDto Map(

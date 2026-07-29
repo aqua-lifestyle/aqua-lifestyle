@@ -28,7 +28,7 @@ const getProgrammeJoinEndpoint = (programmeKey: string) => {
 const getProgrammePaymentExplanation = (programmeKey: string) => {
   switch (programmeKey) {
     case "AQGREEN":
-      return "Confirming records your AQGreen place under this recruiter and continues to Yoco for one full R1,200 payment. Participation activates only after Yoco confirms payment.";
+      return "Confirming records your AQGreen place under this inviting Club Member and continues to Yoco for one full R1,200 payment. Participation activates only after Yoco confirms payment.";
     case "ONYX":
       return "Confirming continues to Yoco for the full R6,120 payment. Your Onyx participation and network place are created only after Yoco confirms payment.";
     default:
@@ -126,7 +126,7 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
             </div>
 
             <div className="rounded-xl border border-border p-5">
-              <p className="text-sm text-muted-foreground">Your recruiter</p>
+              <p className="text-sm text-muted-foreground">Inviting Club Member</p>
               <p className="mt-1 text-xl font-bold">{preview.recruiterName}</p>
               <p className="mt-1 font-mono text-sm text-muted-foreground">
                 {preview.recruiterClubMemberNumber}
@@ -134,8 +134,8 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
               <div className="mt-4 flex items-center gap-2 text-sm font-medium text-success">
                 <ShieldCheck className="size-4" />
                 {preview.recruiterEligible
-                  ? `Eligible to recruit into ${preview.programmeName}`
-                  : "Recruitment eligibility is currently unavailable"}
+                  ? `Eligible to invite Club Members to ${preview.programmeName}`
+                  : "Invitation access is currently unavailable"}
               </div>
             </div>
 

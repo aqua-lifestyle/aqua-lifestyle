@@ -199,7 +199,7 @@ export const AdminProgrammeParticipations = () => {
           <span className="text-xs text-muted-foreground">
             {item.joinedIndependently
               ? "Independent network"
-              : `Recruited by ${item.recruiterClubMemberNumber ?? "a verified Club Member"}`}
+              : `Invited by ${item.recruiterClubMemberNumber ?? "a verified Club Member"}`}
           </span>
         </div>
       ),
@@ -254,7 +254,7 @@ export const AdminProgrammeParticipations = () => {
           key: "actions",
           render: (item: AdminProgrammeParticipation) => (
             <Button onClick={() => openCorrection(item)} size="sm" variant="outline">
-              <PencilLine className="size-4" /> Correct recruiter
+              <PencilLine className="size-4" /> Correct network placement
             </Button>
           ),
         }]
@@ -325,11 +325,11 @@ export const AdminProgrammeParticipations = () => {
             <form className="flex flex-col gap-4" onSubmit={submitCorrection}>
               <StatusMessage tone="warning">
                 You are correcting {selected.customerName}&apos;s {selected.programmeName}
-                network placement. Leave the recruiter number empty to make this
-                Club Member an independent network starting point.
+                network placement. Leave the inviting Club Member number empty
+                to make this Club Member an independent network starting point.
               </StatusMessage>
               <TextField
-                label="New recruiter Club Member number"
+                label="New inviting Club Member number"
                 name="newRecruiterClubMemberNumber"
                 onChange={(event) => setNewRecruiterNumber(event.target.value.toUpperCase())}
                 placeholder="CLB-… or leave empty"

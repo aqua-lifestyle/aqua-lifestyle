@@ -54,7 +54,7 @@ const ParticipationCard = ({
         <dd className="mt-1 font-semibold">
           {participation.joinedIndependently
             ? "Independent"
-            : `Under ${participation.recruiterClubMemberNumber ?? "a verified Club Member"}`}
+            : `Invited by ${participation.recruiterClubMemberNumber ?? "a verified Club Member"}`}
         </dd>
       </div>
       <div>
@@ -64,10 +64,10 @@ const ParticipationCard = ({
         </dd>
       </div>
       <div>
-        <dt className="text-muted-foreground">Recruitment eligibility</dt>
+        <dt className="text-muted-foreground">Member invitations</dt>
         <dd className="mt-1 font-semibold">
           {participation.canRecruitForThisProgramme
-            ? `May recruit into ${participation.programmeName}`
+            ? `May invite Club Members to ${participation.programmeName}`
             : "Available after activation"}
         </dd>
       </div>
@@ -242,7 +242,7 @@ export const MemberProgrammes = () => {
           <h1 className="mt-2 text-3xl font-bold tracking-tight">My programmes</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
             Join AQGreen or Onyx, follow activation progress, and see whether your
-            network starts independently or under an existing recruiter.
+            network starts independently or through an inviting Club Member.
           </p>
         </header>
 
@@ -309,7 +309,7 @@ export const MemberProgrammes = () => {
                   <h2 className="text-xl font-bold">AQGreen</h2>
                   <p className="mt-2 text-sm text-muted-foreground">
                     Start with AQGreen and work toward graduating into a separate
-                    Onyx participation later. A recruiter is optional.
+                    Onyx participation later. An invitation is optional.
                   </p>
                 </div>
                 <JoinProgrammeDialog programme="AQGreen" />
@@ -353,7 +353,7 @@ export const MemberProgrammes = () => {
                   <h2 className="text-xl font-bold">Onyx</h2>
                   <p className="mt-2 text-sm text-muted-foreground">
                     Join Onyx through its single direct joining path with the full
-                    R6,120 payment. AQGreen is not required and a recruiter is optional.
+                    R6,120 payment. AQGreen and an invitation are not required.
                   </p>
                 </div>
                 <JoinProgrammeDialog programme="Onyx" />

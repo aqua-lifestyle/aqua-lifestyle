@@ -128,7 +128,7 @@ describe("AdminProgrammeParticipations", () => {
     expect(httpClient.get).not.toHaveBeenCalled();
   });
 
-  it("confirms an audited recruiter correction using public Club Member numbers", async () => {
+  it("confirms an audited network placement correction using public Club Member numbers", async () => {
     vi.mocked(useAuthState).mockReturnValue(
       authState([
         "Aqua.Admin.ProgrammeParticipations.View",
@@ -139,8 +139,10 @@ describe("AdminProgrammeParticipations", () => {
 
     render(<AdminProgrammeParticipations />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Correct recruiter" }));
-    fireEvent.change(screen.getByLabelText("New recruiter Club Member number"), {
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Correct network placement" }),
+    );
+    fireEvent.change(screen.getByLabelText("New inviting Club Member number"), {
       target: { value: "clb-new23456789" },
     });
     fireEvent.change(screen.getByLabelText("Reason for correction"), {

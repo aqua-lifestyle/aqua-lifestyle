@@ -58,8 +58,8 @@ namespace AqualLifeStyle.Application.Recruitment
             if (policy == null)
             {
                 throw new UserFriendlyException(
-                    "Recruitment unavailable.",
-                    "Recruitment is not currently configured for this programme.");
+                    "Member invitations unavailable.",
+                    "Member invitations are not currently configured for this programme.");
             }
 
             return policy;
