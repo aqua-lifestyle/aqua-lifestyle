@@ -1,5 +1,3 @@
-export type DashboardSource = "live" | "fallback";
-
 export type DashboardMember = {
   id: number;
   name: string;
@@ -27,8 +25,7 @@ export type DashboardActivity = {
 export type AdminDashboardData = {
   activity: DashboardActivity[];
   leaders: {
-    pendingApplications: number;
-    source: DashboardSource;
+    pendingApplications: number | null;
     total: number;
   };
   members: {
@@ -47,17 +44,15 @@ export type AdminDashboardData = {
     totalFacilitators: number;
   };
   savings: {
-    interestAccrued: number;
-    source: DashboardSource;
-    total: number;
+    interestAccrued: number | null;
+    total: number | null;
   };
-  source: DashboardSource;
   stats: {
     totalEnquiries: number;
-    totalMembers: number;
+    totalCustomerAccounts: number;
     totalOrders: number;
     totalRevenue: number;
-    totalSavings: number;
+    totalSavings: number | null;
   };
 };
 
@@ -98,8 +93,6 @@ export type DashboardInputs = {
   customers: DashboardCustomerInput[];
   enquiries: DashboardEnquiryInput[];
   facilitatorCount: number;
-  fallback: AdminDashboardData;
-  failed: boolean;
   memberships: DashboardMembershipInput[];
   now?: Date;
   orders: DashboardOrderInput[];
@@ -122,17 +115,11 @@ export const buildAdminDashboard = ({
   customers,
   enquiries,
   facilitatorCount,
-  fallback,
-  failed,
   memberships,
   now = new Date(),
   orders,
   referrals,
 }: DashboardInputs): AdminDashboardData => {
-  if (failed) {
-    return fallback;
-  }
-
   const customerById = new Map(customers.map((customer) => [customer.id, customer]));
   const membershipById = new Map(
     memberships.map((membership) => [membership.id, membership.name]),
@@ -203,8 +190,7 @@ export const buildAdminDashboard = ({
       .sort((a, b) => newestFirst(a.timestamp, b.timestamp))
       .slice(0, 8),
     leaders: {
-      pendingApplications: fallback.leaders.pendingApplications,
-      source: "fallback",
+      pendingApplications: null,
       total: areaLeaderCount,
     },
     members: {
@@ -227,14 +213,16 @@ export const buildAdminDashboard = ({
       ).length,
       totalFacilitators: facilitatorCount,
     },
-    savings: fallback.savings,
-    source: "live",
+    savings: {
+      interestAccrued: null,
+      total: null,
+    },
     stats: {
       totalEnquiries: enquiries.length,
-      totalMembers: customers.length,
+      totalCustomerAccounts: customers.length,
       totalOrders: orders.length,
       totalRevenue,
-      totalSavings: fallback.savings.total,
+      totalSavings: null,
     },
   };
 };

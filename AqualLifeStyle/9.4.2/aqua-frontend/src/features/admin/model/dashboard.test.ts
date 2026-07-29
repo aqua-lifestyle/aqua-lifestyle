@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { buildAdminDashboard } from "./dashboard";
-import { mockAdminDashboard } from "./mock-data";
 
 describe("buildAdminDashboard", () => {
   it("aggregates live platform records", () => {
@@ -13,8 +12,6 @@ describe("buildAdminDashboard", () => {
       ],
       enquiries: [{ createdAt: "2026-07-12T10:00:00Z", customerId: 1, id: 9, isPending: true }],
       facilitatorCount: 3,
-      failed: false,
-      fallback: mockAdminDashboard,
       memberships: [{ id: 10, name: "Jasper" }, { id: 20, name: "Onyx" }],
       now: new Date("2026-07-14T12:00:00Z"),
       orders: [
@@ -24,25 +21,14 @@ describe("buildAdminDashboard", () => {
       referrals: [{ convertedAt: "2026-07-01T10:00:00Z" }],
     });
 
-    expect(dashboard.source).toBe("live");
-    expect(dashboard.stats).toMatchObject({ totalEnquiries: 1, totalMembers: 2, totalOrders: 2, totalRevenue: 750 });
+    expect(dashboard.stats).toMatchObject({ totalCustomerAccounts: 2, totalEnquiries: 1, totalOrders: 2, totalRevenue: 750 });
+    expect(dashboard.stats.totalSavings).toBeNull();
+    expect(dashboard.savings).toEqual({ interestAccrued: null, total: null });
+    expect(dashboard.leaders.pendingApplications).toBeNull();
     expect(dashboard.members.byTier).toEqual([{ name: "Jasper", value: 1 }, { name: "Onyx", value: 1 }]);
     expect(dashboard.orders).toMatchObject({ monthRevenue: 500, monthVolume: 1 });
     expect(dashboard.people.recentReferrals).toBe(1);
     expect(dashboard.activity[0].title).toBe("Enquiry #9");
   });
 
-  it("returns demo data when a required API dataset fails", () => {
-    expect(buildAdminDashboard({
-      areaLeaderCount: 0,
-      customers: [],
-      enquiries: [],
-      facilitatorCount: 0,
-      failed: true,
-      fallback: mockAdminDashboard,
-      memberships: [],
-      orders: [],
-      referrals: [],
-    })).toBe(mockAdminDashboard);
-  });
 });
