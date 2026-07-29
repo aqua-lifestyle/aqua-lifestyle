@@ -23,7 +23,7 @@ import {
 import { getOrderStatusLabel, getOrderStatusTone } from "@/src/shared/lib/order-status";
 
 export const MemberDashboard = () => {
-  const { getOrderIntents } = useOrderIntentsActions();
+  const { getMyOrderIntents } = useOrderIntentsActions();
   const { getMemberships, getSavingsWindowStatuses } = useMembershipsActions();
   const {
     isLoadError: isOrdersError,
@@ -44,17 +44,10 @@ export const MemberDashboard = () => {
 
   // ALL hooks before early returns
   useEffect(() => {
-    void getOrderIntents();
+    void getMyOrderIntents();
     void getMemberships();
     void getSavingsWindowStatuses();
-  }, [getMemberships, getOrderIntents, getSavingsWindowStatuses]);
-
-  const currentUserId = session?.user?.id ?? null;
-
-  const customerOrders = useMemo(() => {
-    if (!currentUserId) return [];
-    return orderIntents.filter((order) => order.customerId === currentUserId);
-  }, [orderIntents, currentUserId]);
+  }, [getMemberships, getMyOrderIntents, getSavingsWindowStatuses]);
 
   const activeMembership = useMemo(() => {
     return memberships.find((membership) => membership.isActive) ?? null;
@@ -108,7 +101,7 @@ export const MemberDashboard = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">My Orders</p>
-                  <p className="text-2xl font-bold">{customerOrders.length}</p>
+                  <p className="text-2xl font-bold">{orderIntents.length}</p>
                 </div>
               </Card>
               <Card className="flex items-center gap-4">
@@ -140,7 +133,7 @@ export const MemberDashboard = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Activity</p>
                   <p className="text-2xl font-bold">
-                    {customerOrders.filter((o) => o.status === 2).length} completed
+                    {orderIntents.filter((o) => o.status === 2).length} completed
                   </p>
                 </div>
               </Card>
@@ -150,7 +143,7 @@ export const MemberDashboard = () => {
               <Card>
                 <h2 className="text-lg font-semibold">Recent orders</h2>
                 <div className="mt-4">
-                  {customerOrders.length === 0 ? (
+                  {orderIntents.length === 0 ? (
                     <EmptyState
                       description="You have no orders yet."
                       icon={Package}
@@ -158,7 +151,7 @@ export const MemberDashboard = () => {
                     />
                   ) : (
                     <div className="flex flex-col gap-3">
-                      {customerOrders.slice(0, 5).map((order) => (
+                      {orderIntents.slice(0, 5).map((order) => (
                         <LinkButton
                           key={order.id}
                           href={`/member/orders`}

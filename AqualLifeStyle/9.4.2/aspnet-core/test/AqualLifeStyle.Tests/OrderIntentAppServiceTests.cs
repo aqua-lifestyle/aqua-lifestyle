@@ -67,6 +67,30 @@ namespace AqualLifeStyle.Tests
         }
 
         [Fact]
+        public async Task GetMineAsync_FiltersOrdersByTheAuthenticatedCustomer()
+        {
+            var customer = CreateCustomer(membershipId: 1);
+            Expression<System.Func<OrderIntent, bool>> appliedFilter = null;
+            _customerRepositoryMock
+                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<System.Func<Customer, bool>>>() ))
+                .ReturnsAsync(customer);
+            _orderIntentRepositoryMock
+                .Setup(r => r.GetAllListAsync(It.IsAny<Expression<System.Func<OrderIntent, bool>>>() ))
+                .Callback((Expression<System.Func<OrderIntent, bool>> filter) => appliedFilter = filter)
+                .ReturnsAsync(new List<OrderIntent>());
+            _objectMapperMock
+                .Setup(m => m.Map<List<OrderIntentDto>>(It.IsAny<List<OrderIntent>>()))
+                .Returns(new List<OrderIntentDto>());
+
+            await _service.GetMineAsync();
+
+            Assert.NotNull(appliedFilter);
+            var predicate = appliedFilter.Compile();
+            Assert.True(predicate(OrderIntent.CreateReserved(1, 2, null, 100m, 90m, System.DateTime.UtcNow)));
+            Assert.False(predicate(OrderIntent.CreateReserved(2, 2, null, 100m, 90m, System.DateTime.UtcNow)));
+        }
+
+        [Fact]
         public async Task CreateForCurrentCustomerAsync_UsesAuthenticatedCustomerAndTierPricing()
         {
             var customer = CreateCustomer(membershipId: 1);

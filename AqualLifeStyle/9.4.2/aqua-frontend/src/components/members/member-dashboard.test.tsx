@@ -115,6 +115,8 @@ const baseOrderIntentsState = {
   orderIntents,
 };
 
+const getMyOrderIntents = vi.fn();
+
 beforeEach(() => {
   vi.resetAllMocks();
 
@@ -134,6 +136,7 @@ beforeEach(() => {
     createForCurrentCustomer: vi.fn(),
     createFromEnquiry: vi.fn(),
     getOrderIntents: vi.fn(),
+    getMyOrderIntents,
   });
 });
 
@@ -147,6 +150,7 @@ describe("MemberDashboard", () => {
 
     expect(screen.getByText("My Orders")).toBeDefined();
     expect(screen.getByText("1")).toBeDefined();
+    expect(getMyOrderIntents).toHaveBeenCalledOnce();
     expect(
       screen.getByRole("link", { name: "View my savings account" }),
     ).toHaveAttribute("href", "/member/savings");

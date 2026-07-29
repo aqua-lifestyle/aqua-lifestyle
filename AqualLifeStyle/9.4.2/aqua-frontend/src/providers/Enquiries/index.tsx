@@ -48,18 +48,26 @@ const getErrorMessage = (error: unknown): string => {
 export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
   const [state, dispatch] = useReducer(enquiriesReducer, initialEnquiriesState);
 
-  const getEnquiries = useCallback(async () => {
+  const loadEnquiries = useCallback(async (endpoint: string) => {
     dispatch(getEnquiriesPending());
 
     try {
-      const enquiries = await httpClient.get<Enquiry[]>(
-        apiEndpoints.enquiries.getAll,
-      );
+      const enquiries = await httpClient.get<Enquiry[]>(endpoint);
       dispatch(getEnquiriesSuccess(enquiries));
     } catch (error) {
       dispatch(getEnquiriesError(getErrorMessage(error)));
     }
   }, []);
+
+  const getEnquiries = useCallback(
+    () => loadEnquiries(apiEndpoints.enquiries.getAll),
+    [loadEnquiries],
+  );
+
+  const getMyEnquiries = useCallback(
+    () => loadEnquiries(apiEndpoints.enquiries.getMine),
+    [loadEnquiries],
+  );
 
   const createEnquiry = useCallback(async (input: CreateEnquiryInput) => {
     dispatch(createEnquiryPending());
@@ -198,6 +206,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       convertEnquiryToCustomer,
       createEnquiry,
       getEnquiries,
+      getMyEnquiries,
       getEnquiry,
       getSalesReadyEnquiries,
       recordFollowUp,
@@ -209,6 +218,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       convertEnquiryToCustomer,
       createEnquiry,
       getEnquiries,
+      getMyEnquiries,
       getEnquiry,
       getSalesReadyEnquiries,
       recordFollowUp,

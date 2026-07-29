@@ -53,6 +53,8 @@ const baseState = {
   orderIntents,
 };
 
+const getMyOrderIntents = vi.fn();
+
 beforeEach(() => {
   vi.resetAllMocks();
 
@@ -108,6 +110,7 @@ beforeEach(() => {
     createForCurrentCustomer: vi.fn(),
     createFromEnquiry: vi.fn(),
     getOrderIntents: vi.fn(),
+    getMyOrderIntents,
   });
 });
 
@@ -120,6 +123,7 @@ describe("MemberOrders", () => {
     });
 
     expect(screen.getByText("Order #1")).toBeDefined();
+    expect(getMyOrderIntents).toHaveBeenCalledOnce();
   });
 
   it("shows loading state", () => {

@@ -8,6 +8,7 @@ namespace AqualLifeStyle.Application.Orders
     public interface IOrderIntentAppService : IApplicationService
     {
         Task<IReadOnlyList<OrderIntentDto>> GetAllAsync();
+        Task<IReadOnlyList<OrderIntentDto>> GetMineAsync();
         Task<OrderIntentDto> GetAsync(int id);
         Task<OrderIntentDto> CreateForCurrentCustomerAsync(int productId);
         Task<OrderIntentDto> CreateFromEnquiryAsync(int enquiryId);

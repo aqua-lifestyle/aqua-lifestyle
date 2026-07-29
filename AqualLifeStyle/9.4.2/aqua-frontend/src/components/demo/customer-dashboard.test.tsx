@@ -214,6 +214,7 @@ describe("CustomerDashboard", () => {
       createForCurrentCustomer,
       createFromEnquiry: vi.fn(),
       getOrderIntents: vi.fn(),
+      getMyOrderIntents: vi.fn(),
     });
     vi.mocked(useOrderIntentsState).mockReturnValue({
       actionErrorMessage: null,

@@ -16,7 +16,6 @@ using AqualLifeStyle.Domain.Products;
 
 namespace AqualLifeStyle.Application.Orders
 {
-    [AbpAuthorize(PermissionNames.Pages_Orders)]
     public class OrderIntentAppService : AqualLifeStyleAppServiceBase, IOrderIntentAppService
     {
         private readonly IOrderIntentRepository _orderIntentRepository;
@@ -43,12 +42,23 @@ namespace AqualLifeStyle.Application.Orders
             _objectMapper = objectMapper;
         }
 
+        [AbpAuthorize(AquaPermissions.Orders.View)]
         public async Task<IReadOnlyList<OrderIntentDto>> GetAllAsync()
         {
             var orderIntents = await _orderIntentRepository.GetAllListAsync();
             return _objectMapper.Map<List<OrderIntentDto>>(orderIntents);
         }
 
+        [AbpAuthorize(AquaPermissions.Orders.ViewSelf)]
+        public async Task<IReadOnlyList<OrderIntentDto>> GetMineAsync()
+        {
+            var customer = await GetCurrentCustomerAsync("Order lookup failed.");
+            var orderIntents = await _orderIntentRepository.GetAllListAsync(
+                orderIntent => orderIntent.CustomerId == customer.Id);
+            return _objectMapper.Map<List<OrderIntentDto>>(orderIntents);
+        }
+
+        [AbpAuthorize(AquaPermissions.Orders.View)]
         public async Task<OrderIntentDto> GetAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -254,6 +264,20 @@ namespace AqualLifeStyle.Application.Orders
             }
 
             return orderIntent;
+        }
+
+        private async Task<Customer> GetCurrentCustomerAsync(string operation)
+        {
+            if (!AbpSession.UserId.HasValue)
+                throw new AqualLifeStyleAuthorizationException($"{operation} A user context is required.");
+
+            var tenantId = GetRequiredTenantId(operation);
+            var customer = await _customerRepository.FirstOrDefaultAsync(item =>
+                item.TenantId == tenantId && item.UserId == AbpSession.UserId.Value);
+            if (customer == null)
+                throw new UserFriendlyException(operation, "No customer profile is linked to this account.");
+
+            return customer;
         }
 
         private void EnsureMembershipAllowsReservation(Customer customer, Product product, Membership membership)

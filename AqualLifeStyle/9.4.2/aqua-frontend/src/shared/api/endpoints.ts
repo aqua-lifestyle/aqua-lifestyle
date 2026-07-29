@@ -42,6 +42,7 @@ export const apiEndpoints = {
       `/api/services/app/Enquiry/ConvertToCustomer?id=${id}`,
     create: "/api/services/app/Enquiry/Create",
     getAll: "/api/services/app/Enquiry/GetAll",
+    getMine: "/api/services/app/Enquiry/GetMine",
     getById: (id: number) => `/api/services/app/Enquiry/Get?id=${id}`,
     getSalesReady: "/api/services/app/Enquiry/GetSalesReadyEnquiries",
     recordFollowUp: (id: number) =>
@@ -84,6 +85,7 @@ export const apiEndpoints = {
     createForCurrentCustomer: (productId: number) =>
       `/api/services/app/OrderIntent/CreateForCurrentCustomer?productId=${productId}`,
     getAll: "/api/services/app/OrderIntent/GetAll",
+    getMine: "/api/services/app/OrderIntent/GetMine",
     getById: (id: number) => `/api/services/app/OrderIntent/Get?id=${id}`,
   },
   products: {

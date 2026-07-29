@@ -41,18 +41,26 @@ export const OrderIntentsProvider = ({
     initialOrderIntentsState,
   );
 
-  const getOrderIntents = useCallback(async () => {
+  const loadOrderIntents = useCallback(async (endpoint: string) => {
     dispatch(getOrderIntentsPending());
 
     try {
-      const orderIntents = await httpClient.get<OrderIntent[]>(
-        apiEndpoints.orderIntents.getAll,
-      );
+      const orderIntents = await httpClient.get<OrderIntent[]>(endpoint);
       dispatch(getOrderIntentsSuccess(orderIntents));
     } catch (error) {
       dispatch(getOrderIntentsError(getErrorMessage(error)));
     }
   }, []);
+
+  const getOrderIntents = useCallback(
+    () => loadOrderIntents(apiEndpoints.orderIntents.getAll),
+    [loadOrderIntents],
+  );
+
+  const getMyOrderIntents = useCallback(
+    () => loadOrderIntents(apiEndpoints.orderIntents.getMine),
+    [loadOrderIntents],
+  );
 
   const createFromEnquiry = useCallback(async (enquiryId: number) => {
     dispatch(orderIntentActionPending());
@@ -125,8 +133,9 @@ export const OrderIntentsProvider = ({
       createFromEnquiry,
       createForCurrentCustomer,
       getOrderIntents,
+      getMyOrderIntents,
     }),
-    [cancelOrderIntent, completeOrderIntent, createForCurrentCustomer, createFromEnquiry, getOrderIntents],
+    [cancelOrderIntent, completeOrderIntent, createForCurrentCustomer, createFromEnquiry, getMyOrderIntents, getOrderIntents],
   );
 
   return (
