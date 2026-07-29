@@ -263,6 +263,16 @@ export const LoginForm = () => {
                 Forgot your password?
               </LinkButton>
             </p>
+            {selectedWorkspace ? (
+              <p className="mt-3 text-center text-sm">
+                <LinkButton
+                  href={`/verify-email-sent?area=${encodeURIComponent(selectedWorkspace)}`}
+                  variant="ghost"
+                >
+                  Resend verification email
+                </LinkButton>
+              </p>
+            ) : null}
           </div>
         </div>
       </div>

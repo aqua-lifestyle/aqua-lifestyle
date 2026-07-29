@@ -53,6 +53,7 @@ namespace AqualLifeStyle.Tests.Application
             var originalUserId = created.UserId;
             var createdUser = await Resolve<UserManager>().FindByEmailAsync(email);
             createdUser.ShouldNotBeNull();
+            createdUser.IsEmailConfirmed.ShouldBeFalse();
             var originalPasswordHash = createdUser.Password;
             var originalSecurityStamp = createdUser.SecurityStamp;
             (await Resolve<UserManager>().CheckPasswordAsync(createdUser, "Temporary123!")).ShouldBeTrue();
@@ -60,6 +61,11 @@ namespace AqualLifeStyle.Tests.Application
             {
                 var customer = await context.Customers.Include(item => item.User).SingleAsync(item => item.Id == created.Id);
                 customer.User.EmailAddress.ShouldBe(email);
+                var verification = await context.TransactionalEmailOutboxMessages.SingleAsync(message =>
+                    message.NotificationType == "EmailVerification" &&
+                    message.Recipient == email &&
+                    message.IdempotencyKey.Contains("admin-created"));
+                verification.HtmlBody.ShouldContain("/verify-email?");
                 var roles = await (from assignment in context.UserRoles
                     join role in context.Roles on assignment.RoleId equals role.Id
                     where assignment.UserId == customer.UserId
@@ -144,6 +150,10 @@ namespace AqualLifeStyle.Tests.Application
             restoredUser.Password.ShouldBe(originalPasswordHash);
             restoredUser.SecurityStamp.ShouldNotBe(removedSecurityStamp);
             restoredUser.RequiresPasswordReset().ShouldBeTrue();
+            await UsingDbContextAsync(async context =>
+                (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
+                    message.NotificationType == "EmailVerification" &&
+                    message.Recipient == email)).ShouldBe(2));
             (await Resolve<UserManager>().CheckPasswordAsync(restoredUser, "Temporary123!")).ShouldBeTrue();
             await UsingDbContextAsync(async context =>
             {

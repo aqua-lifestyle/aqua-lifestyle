@@ -106,7 +106,16 @@ namespace AqualLifeStyle.Domain.Email
                 : TransactionalEmailStatus.Pending;
             ProcessingStartedAt = null;
             ProcessingToken = null;
-            if (Status == TransactionalEmailStatus.Pending)
+            if (Status == TransactionalEmailStatus.Failed)
+            {
+                // A terminal record retains operational metadata, but no address,
+                // subject, customer content, or one-time account links.
+                Recipient = "[redacted]";
+                Subject = "[redacted]";
+                HtmlBody = null;
+                TextBody = null;
+            }
+            else
             {
                 NextAttemptAt = nextAttemptAt;
             }

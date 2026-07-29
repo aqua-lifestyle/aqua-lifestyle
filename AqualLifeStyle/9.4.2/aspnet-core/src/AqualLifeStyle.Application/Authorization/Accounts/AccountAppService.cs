@@ -27,6 +27,8 @@ namespace AqualLifeStyle.Authorization.Accounts
         private readonly ITransactionalEmailOutbox _emailOutbox;
         private readonly TransactionalEmailTemplateBuilder _emailTemplates;
         private readonly IAccountEmailThrottleRepository _emailThrottleRepository;
+        private readonly AccountEmailVerificationScheduler _emailVerificationScheduler;
+        private readonly AccountEmailLinkBuilder _emailLinkBuilder;
 
         public AccountAppService(
             UserRegistrationManager userRegistrationManager,
@@ -34,7 +36,9 @@ namespace AqualLifeStyle.Authorization.Accounts
             ICustomerRepository customerRepository,
             ITransactionalEmailOutbox emailOutbox,
             TransactionalEmailTemplateBuilder emailTemplates,
-            IAccountEmailThrottleRepository emailThrottleRepository)
+            IAccountEmailThrottleRepository emailThrottleRepository,
+            AccountEmailVerificationScheduler emailVerificationScheduler,
+            AccountEmailLinkBuilder emailLinkBuilder)
         {
             _userRegistrationManager = userRegistrationManager;
             _configuration = configuration;
@@ -42,6 +46,8 @@ namespace AqualLifeStyle.Authorization.Accounts
             _emailOutbox = emailOutbox;
             _emailTemplates = emailTemplates;
             _emailThrottleRepository = emailThrottleRepository;
+            _emailVerificationScheduler = emailVerificationScheduler;
+            _emailLinkBuilder = emailLinkBuilder;
         }
 
         public async Task<IsTenantAvailableOutput> IsTenantAvailable(IsTenantAvailableInput input)
@@ -128,8 +134,7 @@ namespace AqualLifeStyle.Authorization.Accounts
             await _customerRepository.InsertAsync(customer);
             using (CurrentUnitOfWork.SetTenantId(user.TenantId))
             {
-                await UserManager.InitializeOptionsAsync(user.TenantId);
-                await EnqueueVerificationAsync(
+                await _emailVerificationScheduler.ScheduleAsync(
                     user,
                     $"email-verification:{user.TenantId}:{user.Id}:registration",
                     input.RedirectPath);
@@ -169,7 +174,7 @@ namespace AqualLifeStyle.Authorization.Accounts
             using (CurrentUnitOfWork.SetTenantId(context.TenantId))
             {
                 var key = $"email-verification:{context.TenantId}:{context.User.Id}:resend:{Guid.NewGuid():N}";
-                var enqueued = await EnqueueVerificationAsync(
+                var enqueued = await _emailVerificationScheduler.ScheduleAsync(
                     context.User,
                     key,
                     input.RedirectPath);
@@ -189,7 +194,7 @@ namespace AqualLifeStyle.Authorization.Accounts
             {
                 await UserManager.InitializeOptionsAsync(context.TenantId);
                 var token = await UserManager.GeneratePasswordResetTokenAsync(context.User);
-                var url = BuildClientUrl(
+                var url = _emailLinkBuilder.Build(
                     "/reset-password", context.TenantId, context.User.Id, token,
                     context.AreaName, input.RedirectPath);
                 var key = $"password-reset:{context.TenantId}:{context.User.Id}:{Guid.NewGuid():N}";
@@ -219,48 +224,6 @@ namespace AqualLifeStyle.Authorization.Accounts
                 CheckErrors(await UserManager.UpdateAsync(user));
                 return true;
             }
-        }
-
-        private async Task<bool> EnqueueVerificationAsync(
-            User user,
-            string idempotencyKey,
-            string redirectPath = null)
-        {
-            await UserManager.InitializeOptionsAsync(user.TenantId);
-            var token = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-            var tenant = await TenantManager.GetByIdAsync(user.TenantId.Value);
-            var url = BuildClientUrl(
-                "/verify-email", user.TenantId.Value, user.Id, token,
-                tenant.TenancyName, redirectPath);
-            return await _emailOutbox.EnqueueAsync(user.TenantId, "EmailVerification", idempotencyKey,
-                _emailTemplates.VerifyEmail(user.Name, user.EmailAddress, url, idempotencyKey));
-        }
-
-        private string BuildClientUrl(
-            string path, int tenantId, long userId, string token,
-            string areaName = null, string redirectPath = null)
-        {
-            var root = _configuration["App:ClientRootAddress"]?.TrimEnd('/');
-            if (string.IsNullOrWhiteSpace(root)) throw new InvalidOperationException("The client application address is not configured.");
-            var url = $"{root}{path}?tenantId={tenantId}&userId={userId}&token={Uri.EscapeDataString(token)}";
-            if (!string.IsNullOrWhiteSpace(areaName))
-                url += "&area=" + Uri.EscapeDataString(areaName);
-            var safeRedirect = SafeClientRedirect(redirectPath);
-            if (safeRedirect != null)
-                url += "&redirect=" + Uri.EscapeDataString(safeRedirect);
-            return url;
-        }
-
-        private static string SafeClientRedirect(string value)
-        {
-            var candidate = value?.Trim();
-            return !string.IsNullOrWhiteSpace(candidate) &&
-                   candidate.StartsWith("/", StringComparison.Ordinal) &&
-                   !candidate.StartsWith("//", StringComparison.Ordinal) &&
-                   candidate.IndexOf('\\') < 0 &&
-                   Uri.TryCreate(candidate, UriKind.Relative, out _)
-                ? candidate
-                : null;
         }
 
         private async Task<(int TenantId, string AreaName, User User)> FindEligibleUserAsync(

@@ -114,6 +114,26 @@ describe("LoginForm", () => {
     );
   });
 
+  it("provides a verification recovery path for unconfirmed accounts", async () => {
+    render(<LoginForm />);
+
+    expect(
+      await screen.findByRole("link", { name: "Resend verification email" }),
+    ).toHaveAttribute("href", "/verify-email-sent?area=Default");
+  });
+
+  it("does not offer Area verification for platform administration", async () => {
+    render(<LoginForm />);
+
+    fireEvent.change(screen.getByLabelText("Workspace"), {
+      target: { value: "" },
+    });
+
+    expect(
+      screen.queryByRole("link", { name: "Resend verification email" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("calls login from auth-service and sets session after successful submit", async () => {
     const { login } = await import("@/src/shared/api/auth-service");
     vi.mocked(login).mockResolvedValue({

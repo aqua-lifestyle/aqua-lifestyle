@@ -63,7 +63,11 @@ The API stores delivery intent in `TransactionalEmailOutboxMessages` in the same
 transaction as the business change. A worker retries pending records with capped
 backoff. Inspect pending rows by status, attempt count, next-attempt time, and the
 redacted last-error summary; never copy stored token-bearing message bodies into
-logs or support tickets. Successfully transmitted bodies are cleared. The worker
+logs or support tickets. Successfully transmitted bodies are cleared. Terminally
+failed records immediately redact the recipient, subject, and bodies while retaining
+only the operational metadata needed to diagnose the failed intent. Support staff
+must create a new email intent after correcting the cause; terminal messages cannot
+be replayed from retained customer content. The worker
 sends the durable outbox key in Bird's `Idempotency-Key` header. Bird replays the
 original response for a matching request during its documented idempotency window
 (three hours by default), closing the normal accept-then-crash retry gap. The

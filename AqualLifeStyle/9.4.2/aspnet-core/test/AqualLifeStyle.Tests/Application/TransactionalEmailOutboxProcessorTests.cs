@@ -133,6 +133,10 @@ namespace AqualLifeStyle.Tests.Application
 
             message.Status.ShouldBe(TransactionalEmailStatus.Failed);
             message.AttemptCount.ShouldBe(TransactionalEmailOutboxMessage.MaxDeliveryAttempts);
+            message.Recipient.ShouldBe("[redacted]");
+            message.Subject.ShouldBe("[redacted]");
+            message.HtmlBody.ShouldBeNull();
+            message.TextBody.ShouldBeNull();
         }
 
         [Fact]
