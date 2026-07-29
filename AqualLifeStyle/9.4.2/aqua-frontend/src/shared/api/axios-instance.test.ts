@@ -89,6 +89,12 @@ describe("getExpiredSessionLoginUrl", () => {
     expect(getExpiredSessionLoginUrl("//untrusted.example")).toBe(
       "/login?reason=session-ended&redirect=%2Fdashboard",
     );
+    expect(getExpiredSessionLoginUrl("/\\untrusted.example")).toBe(
+      "/login?reason=session-ended&redirect=%2Fdashboard",
+    );
+    expect(getExpiredSessionLoginUrl("/\\/untrusted.example")).toBe(
+      "/login?reason=session-ended&redirect=%2Fdashboard",
+    );
   });
 });
 

@@ -334,10 +334,13 @@ export const refreshToken = async (
     if (axios.isAxiosError(error) && error.response) {
       const isDefinitiveInvalidation =
         error.response.status === 400 || error.response.status === 401;
+      const errorDescription = (
+        error.response.data as { error_description?: string } | null | undefined
+      )?.error_description;
       return {
         failure: isDefinitiveInvalidation ? "invalid" : "transient",
         ok: false,
-        message: (error.response.data as { error_description?: string }).error_description ??
+        message: errorDescription ??
           (isDefinitiveInvalidation
             ? "Session expired. Please sign in again."
             : "Unable to refresh your session. Please try again."),

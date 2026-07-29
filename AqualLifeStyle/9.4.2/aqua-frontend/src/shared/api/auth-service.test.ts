@@ -100,6 +100,20 @@ describe("refreshToken", () => {
     post.mockRestore();
   });
 
+  it("uses the invalid-session fallback when a rejected refresh has no body", async () => {
+    const post = vi.spyOn(axios, "post").mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { data: null, status: 401 },
+    });
+
+    await expect(refreshToken("invalid-token")).resolves.toEqual({
+      failure: "invalid",
+      message: "Session expired. Please sign in again.",
+      ok: false,
+    });
+    post.mockRestore();
+  });
+
   it("classifies server and network failures as transient", async () => {
     const post = vi.spyOn(axios, "post");
     post.mockRejectedValueOnce({

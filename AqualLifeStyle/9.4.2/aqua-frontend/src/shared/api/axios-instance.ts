@@ -35,9 +35,7 @@ export const setRefreshTokenProvider = (provider: () => Promise<string | null>) 
 };
 
 export const getExpiredSessionLoginUrl = (path: string) => {
-  const safePath = path.startsWith("/") && !path.startsWith("//")
-    ? path
-    : "/dashboard";
+  const safePath = /^\/(?![\\/])/.test(path) ? path : "/dashboard";
   return `/login?reason=session-ended&redirect=${encodeURIComponent(safePath)}`;
 };
 
