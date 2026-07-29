@@ -25,6 +25,17 @@ const getProgrammeJoinEndpoint = (programmeKey: string) => {
   }
 };
 
+const getProgrammePaymentExplanation = (programmeKey: string) => {
+  switch (programmeKey) {
+    case "AQGREEN":
+      return "Confirming records your AQGreen place under this recruiter and continues to Yoco for one full R1,200 payment. Participation activates only after Yoco confirms payment.";
+    case "ONYX":
+      return "Confirming continues to Yoco for the full R6,120 payment. Your Onyx participation and network place are created only after Yoco confirms payment.";
+    default:
+      return undefined;
+  }
+};
+
 export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string }) => {
   const { session } = useAuthState();
   const [preview, setPreview] = useState<ProgrammeInvitationPreview>();
@@ -91,6 +102,9 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
   const programmeJoinEndpoint = preview
     ? getProgrammeJoinEndpoint(preview.programmeKey)
     : undefined;
+  const programmePaymentExplanation = preview
+    ? getProgrammePaymentExplanation(preview.programmeKey)
+    : undefined;
 
   return (
     <main className="min-h-dvh bg-muted/30 px-4 py-10 sm:px-6">
@@ -125,11 +139,11 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
               </div>
             </div>
 
-            <StatusMessage tone="info">
-              {preview.programmeKey === "ONYX"
-                ? "Confirming continues to Yoco for the full R6,120 payment. Your Onyx participation and network place are created only after Yoco confirms payment."
-                : "Confirming records your AQGreen place under this recruiter and continues to Yoco for one full R1,200 payment. Participation activates only after Yoco confirms payment."}
-            </StatusMessage>
+            {programmePaymentExplanation ? (
+              <StatusMessage tone="info">
+                {programmePaymentExplanation}
+              </StatusMessage>
+            ) : null}
 
             {!programmeJoinEndpoint ? (
               <StatusMessage tone="error">
@@ -141,9 +155,7 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
                 isLoading={joining}
                 onClick={() => void confirm()}
               >
-                {preview.programmeKey === "ONYX"
-                  ? "Confirm and continue to payment"
-                  : "Confirm and continue to payment"}
+                Confirm and continue to payment
               </Button>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">

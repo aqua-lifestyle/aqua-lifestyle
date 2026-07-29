@@ -67,3 +67,23 @@ describe("applyRequestContext", () => {
     expect(config.headers.__tenant).toBe("area-space-1");
   });
 });
+
+describe("getExpiredSessionLoginUrl", () => {
+  it("preserves a safe return path and explains why sign-in is required", async () => {
+    const { getExpiredSessionLoginUrl } = await importAxiosInstance();
+
+    expect(
+      getExpiredSessionLoginUrl("/member/programmes?payment=success&programme=aqgreen"),
+    ).toBe(
+      "/login?reason=session-ended&redirect=%2Fmember%2Fprogrammes%3Fpayment%3Dsuccess%26programme%3Daqgreen",
+    );
+  });
+
+  it("rejects an unsafe return path", async () => {
+    const { getExpiredSessionLoginUrl } = await importAxiosInstance();
+
+    expect(getExpiredSessionLoginUrl("//untrusted.example")).toBe(
+      "/login?reason=session-ended&redirect=%2Fdashboard",
+    );
+  });
+});

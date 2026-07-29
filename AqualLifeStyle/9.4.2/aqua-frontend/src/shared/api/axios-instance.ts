@@ -34,6 +34,13 @@ export const setRefreshTokenProvider = (provider: () => Promise<string | null>) 
   refreshTokenProvider = provider;
 };
 
+export const getExpiredSessionLoginUrl = (path: string) => {
+  const safePath = path.startsWith("/") && !path.startsWith("//")
+    ? path
+    : "/dashboard";
+  return `/login?reason=session-ended&redirect=${encodeURIComponent(safePath)}`;
+};
+
 export const apiClient: AxiosInstance = axios.create({
   baseURL: publicEnv.NEXT_PUBLIC_ABP_API_URL,
   timeout: DEFAULT_TIMEOUT_MS,
@@ -89,7 +96,8 @@ apiClient.interceptors.response.use(
 
         // Redirect to login if refresh fails
         if (typeof window !== "undefined") {
-          window.location.href = "/login";
+          const returnPath = `${window.location.pathname}${window.location.search}`;
+          window.location.href = getExpiredSessionLoginUrl(returnPath);
         }
       }
 

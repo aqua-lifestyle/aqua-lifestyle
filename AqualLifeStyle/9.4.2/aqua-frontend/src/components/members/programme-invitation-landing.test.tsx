@@ -120,6 +120,7 @@ describe("ProgrammeInvitationLanding", () => {
       expect(
         screen.queryByRole("button", { name: /confirm and join/i }),
       ).not.toBeInTheDocument();
+      expect(screen.queryByText(/R1,200|R6,120/)).not.toBeInTheDocument();
       expect(httpClient.post).not.toHaveBeenCalled();
     },
   );
