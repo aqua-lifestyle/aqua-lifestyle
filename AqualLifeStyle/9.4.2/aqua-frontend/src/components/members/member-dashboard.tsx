@@ -100,9 +100,9 @@ export const MemberDashboard = () => {
     isMembershipsPending ||
     isMyCustomerPending ||
     isProgrammesPending ||
-    !isOrdersSuccess ||
-    !isMembershipsSuccess ||
-    !isMyCustomerSuccess;
+    (!isOrdersSuccess && !isOrdersError) ||
+    (!isMembershipsSuccess && !isMembershipsError) ||
+    (!isMyCustomerSuccess && !isMyCustomerError);
   const hasError =
     isOrdersError || isMembershipsError || isMyCustomerError || Boolean(programmeErrorMessage);
 
@@ -113,10 +113,10 @@ export const MemberDashboard = () => {
           <Breadcrumb
             items={[
               { href: "/", label: "Dashboard" },
-              { label: "Member dashboard" },
+              { label: "Club Member dashboard" },
             ]}
           />
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">Member dashboard</h1>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">Club Member dashboard</h1>
           <p className="mt-2 max-w-2xl text-base text-muted-foreground">
             Overview of your orders, savings, and membership activity.
           </p>

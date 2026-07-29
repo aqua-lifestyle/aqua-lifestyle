@@ -91,7 +91,7 @@ export const MemberOrders = () => {
             <Breadcrumb
               items={[
                 { href: "/", label: "Dashboard" },
-                { href: "/member", label: "Club member" },
+                { href: "/member", label: "Club Member" },
                 { label: "My orders" },
               ]}
             />

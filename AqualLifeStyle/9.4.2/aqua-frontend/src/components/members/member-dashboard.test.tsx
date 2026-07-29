@@ -334,6 +334,7 @@ describe("MemberDashboard", () => {
   it("shows error state", () => {
     vi.mocked(useMembershipsState).mockReturnValue({
       ...baseMembershipsState,
+      isSuccess: false,
       isError: true,
       errorMessage: "Failed to load memberships",
     });

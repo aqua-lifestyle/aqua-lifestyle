@@ -98,16 +98,19 @@ export const CustomerDashboard = () => {
     errorMessage: membershipsErrorMessage,
     isError: isMembershipsError,
     isPending: isMembershipsPending,
+    isSuccess: isMembershipsSuccess,
     memberships,
     savingsWindowStatuses,
     isSavingsWindowStatusesError,
     isSavingsWindowStatusesPending,
+    isSavingsWindowStatusesSuccess,
     savingsWindowStatusesErrorMessage,
   } = useMembershipsState();
   const {
     eligibleProducts,
     isEligibleError,
     isEligiblePending,
+    isEligibleSuccess,
     eligibleErrorMessage,
   } = useProductsState();
 
@@ -197,7 +200,11 @@ export const CustomerDashboard = () => {
     isMyCustomerPending ||
     isSavingsWindowStatusesPending ||
     isProgrammesPending ||
-    isEligiblePending;
+    isEligiblePending ||
+    (!isMembershipsSuccess && !isMembershipsError) ||
+    (!isMyCustomerSuccess && !isMyCustomerError) ||
+    (!isSavingsWindowStatusesSuccess && !isSavingsWindowStatusesError) ||
+    (Boolean(myCustomer?.id) && !isEligibleSuccess && !isEligibleError);
   const hasError =
     isMembershipsError ||
     isMyCustomerError ||
@@ -239,7 +246,7 @@ export const CustomerDashboard = () => {
             <div>
               <p className="text-sm font-semibold text-accent">Welcome back</p>
               <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                {user?.name ?? "Club member"}
+                {user?.name ?? "Club Member"}
               </h1>
               <p className="mt-1 text-base text-muted-foreground">
                 {user?.email}

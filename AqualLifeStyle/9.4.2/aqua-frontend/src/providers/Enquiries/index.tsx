@@ -6,6 +6,7 @@ import {
   useContext,
   useMemo,
   useReducer,
+  useRef,
 } from "react";
 
 import { apiEndpoints, getRequestErrorMessage, httpClient } from "@/src/shared/api";
@@ -47,15 +48,21 @@ const getErrorMessage = (error: unknown): string => {
 
 export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
   const [state, dispatch] = useReducer(enquiriesReducer, initialEnquiriesState);
+  const loadRequestIdentifier = useRef(0);
 
   const loadEnquiries = useCallback(async (endpoint: string) => {
+    const requestIdentifier = ++loadRequestIdentifier.current;
     dispatch(getEnquiriesPending());
 
     try {
       const enquiries = await httpClient.get<Enquiry[]>(endpoint);
-      dispatch(getEnquiriesSuccess(enquiries));
+      if (requestIdentifier === loadRequestIdentifier.current) {
+        dispatch(getEnquiriesSuccess(enquiries));
+      }
     } catch (error) {
-      dispatch(getEnquiriesError(getErrorMessage(error)));
+      if (requestIdentifier === loadRequestIdentifier.current) {
+        dispatch(getEnquiriesError(getErrorMessage(error)));
+      }
     }
   }, []);
 

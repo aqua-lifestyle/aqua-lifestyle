@@ -43,7 +43,7 @@ const moreLinks = [
   { href: "/facilitator", icon: UserPlus, label: "Facilitators", permission: "Pages.Facilitators" },
   { href: "/facilitator/dashboard", icon: LayoutDashboard, label: "Facilitator dashboard", permission: "Pages.Facilitators" },
   { href: "/facilitator/my-referrals", icon: DollarSign, label: "My referrals", permission: "Pages.Referrals" },
-  { href: "/member", icon: User, label: "Club member", permission: "Aqua.Orders.ViewSelf" },
+  { href: "/member", icon: User, label: "Club Member", permission: "Aqua.Orders.ViewSelf" },
   { href: "/member/programmes", icon: Network, label: "My programmes", permission: "Aqua.ProgrammeParticipations.ViewSelf" },
   { href: "/member/savings", icon: PiggyBank, label: "My savings", permission: "Aqua.Savings.ViewSelf" },
   { href: "/member/loans", icon: DollarSign, label: "My loans", permission: "Aqua.Loans.ViewSelf" },

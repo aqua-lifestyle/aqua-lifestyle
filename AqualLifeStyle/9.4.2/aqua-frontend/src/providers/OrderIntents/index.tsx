@@ -6,6 +6,7 @@ import {
   useContext,
   useMemo,
   useReducer,
+  useRef,
 } from "react";
 
 import { apiEndpoints, getRequestErrorMessage, httpClient } from "@/src/shared/api";
@@ -40,15 +41,21 @@ export const OrderIntentsProvider = ({
     orderIntentsReducer,
     initialOrderIntentsState,
   );
+  const loadRequestIdentifier = useRef(0);
 
   const loadOrderIntents = useCallback(async (endpoint: string) => {
+    const requestIdentifier = ++loadRequestIdentifier.current;
     dispatch(getOrderIntentsPending());
 
     try {
       const orderIntents = await httpClient.get<OrderIntent[]>(endpoint);
-      dispatch(getOrderIntentsSuccess(orderIntents));
+      if (requestIdentifier === loadRequestIdentifier.current) {
+        dispatch(getOrderIntentsSuccess(orderIntents));
+      }
     } catch (error) {
-      dispatch(getOrderIntentsError(getErrorMessage(error)));
+      if (requestIdentifier === loadRequestIdentifier.current) {
+        dispatch(getOrderIntentsError(getErrorMessage(error)));
+      }
     }
   }, []);
 
