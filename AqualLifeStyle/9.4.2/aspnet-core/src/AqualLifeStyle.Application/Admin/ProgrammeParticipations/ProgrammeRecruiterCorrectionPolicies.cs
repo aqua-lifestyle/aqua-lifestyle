@@ -77,10 +77,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
             {
-                var participations = await _repository.GetAll()
-                    .ToListAsync();
-                var target = participations.SingleOrDefault(item =>
-                    item.TenantId == tenantId && item.CustomerId == customerId);
+                var target = await _repository.GetAll()
+                    .SingleOrDefaultAsync(item =>
+                        item.TenantId == tenantId && item.CustomerId == customerId);
                 if (target == null) throw NotFound();
                 if (!newRecruiterCustomerId.HasValue)
                 {
@@ -88,12 +87,18 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     return;
                 }
 
-                var recruiter = participations.SingleOrDefault(item =>
-                    item.CustomerId == newRecruiterCustomerId.Value &&
-                    item.Status == EntryParticipationStatus.Active);
+                var recruiter = await _repository.GetAll()
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(item =>
+                        item.CustomerId == newRecruiterCustomerId.Value &&
+                        item.Status == EntryParticipationStatus.Active);
                 if (recruiter == null) throw InvalidRecruiter("The new inviting Club Member must have active AQGreen participation.");
+                var placements = await _repository.GetAll()
+                    .AsNoTracking()
+                    .Select(item => new { item.CustomerId, item.RecruiterCustomerId })
+                    .ToListAsync();
                 RecruiterPlacementCycleValidator.EnsureNoCycle(
-                    participations.Select(item => (item.CustomerId, item.RecruiterCustomerId)),
+                    placements.Select(item => (item.CustomerId, item.RecruiterCustomerId)),
                     customerId,
                     recruiter.CustomerId);
                 target.CorrectRecruiter(recruiter, administratorUserId, reason, correctedAt);
@@ -134,10 +139,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
             {
-                var participations = await _repository.GetAll()
-                    .ToListAsync();
-                var target = participations.SingleOrDefault(item =>
-                    item.TenantId == tenantId && item.CustomerId == customerId);
+                var target = await _repository.GetAll()
+                    .SingleOrDefaultAsync(item =>
+                        item.TenantId == tenantId && item.CustomerId == customerId);
                 if (target == null)
                     throw new UserFriendlyException("Network placement correction failed.", "The Onyx participation was not found.");
                 if (!newRecruiterCustomerId.HasValue)
@@ -146,13 +150,19 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     return;
                 }
 
-                var recruiter = participations.SingleOrDefault(item =>
-                    item.CustomerId == newRecruiterCustomerId.Value &&
-                    item.Status == OnyxParticipationStatus.Active);
+                var recruiter = await _repository.GetAll()
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(item =>
+                        item.CustomerId == newRecruiterCustomerId.Value &&
+                        item.Status == OnyxParticipationStatus.Active);
                 if (recruiter == null)
                     throw new UserFriendlyException("Network placement correction failed.", "The new inviting Club Member must have active Onyx participation.");
+                var placements = await _repository.GetAll()
+                    .AsNoTracking()
+                    .Select(item => new { item.CustomerId, item.RecruiterCustomerId })
+                    .ToListAsync();
                 RecruiterPlacementCycleValidator.EnsureNoCycle(
-                    participations.Select(item => (item.CustomerId, item.RecruiterCustomerId)),
+                    placements.Select(item => (item.CustomerId, item.RecruiterCustomerId)),
                     customerId,
                     recruiter.CustomerId);
                 target.CorrectRecruiter(recruiter, administratorUserId, reason, correctedAt);
