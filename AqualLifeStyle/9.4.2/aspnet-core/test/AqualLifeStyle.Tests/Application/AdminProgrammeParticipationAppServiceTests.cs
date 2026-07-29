@@ -13,6 +13,7 @@ using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
+using AqualLifeStyle.MultiTenancy;
 using AqualLifeStyle.Payments;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -288,6 +289,79 @@ namespace AqualLifeStyle.Tests.Application
             });
         }
 
+        [Fact]
+        public async Task HostAdministrator_CanCorrectAQGreenRecruiterAcrossAreas()
+        {
+            var fixture = await CreateCrossAreaAQGreenPlacementAsync();
+            LoginAsHostAdmin();
+
+            await _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+            {
+                Programme = AdminProgrammeType.Entry,
+                ClubMemberNumber = fixture.TargetNumber,
+                NewRecruiterClubMemberNumber = fixture.RecruiterNumber,
+                Reason = "Correcting a verified cross-Area placement"
+            });
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations
+                    .Include(item => item.RecruiterCorrections)
+                    .SingleAsync(item => item.CustomerId == fixture.TargetCustomerId);
+                participation.RecruiterCustomerId.ShouldBe(fixture.RecruiterCustomerId);
+                participation.RecruiterCorrections.Count.ShouldBe(1);
+            });
+        }
+
+        [Fact]
+        public async Task TenantAdministrator_CannotCorrectRecruiterAcrossAreas()
+        {
+            var fixture = await CreateCrossAreaAQGreenPlacementAsync();
+
+            var exception = await Should.ThrowAsync<Abp.UI.UserFriendlyException>(() =>
+                _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+                {
+                    Programme = AdminProgrammeType.Entry,
+                    ClubMemberNumber = fixture.TargetNumber,
+                    NewRecruiterClubMemberNumber = fixture.RecruiterNumber,
+                    Reason = "Attempting an unauthorised cross-Area placement"
+                }));
+            exception.Details.ShouldContain("authorised to manage");
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations
+                    .Include(item => item.RecruiterCorrections)
+                    .SingleAsync(item => item.CustomerId == fixture.TargetCustomerId);
+                participation.RecruiterCustomerId.ShouldBeNull();
+                participation.RecruiterCorrections.ShouldBeEmpty();
+            });
+        }
+
+        [Fact]
+        public async Task HostAdministrator_CanCorrectOnyxRecruiterAcrossAreas()
+        {
+            var fixture = await CreateCrossAreaOnyxPlacementAsync();
+            LoginAsHostAdmin();
+
+            await _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+            {
+                Programme = AdminProgrammeType.Onyx,
+                ClubMemberNumber = fixture.TargetNumber,
+                NewRecruiterClubMemberNumber = fixture.RecruiterNumber,
+                Reason = "Correcting a verified cross-Area Onyx placement"
+            });
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.OnyxParticipations
+                    .Include(item => item.RecruiterCorrections)
+                    .SingleAsync(item => item.CustomerId == fixture.TargetCustomerId);
+                participation.RecruiterCustomerId.ShouldBe(fixture.RecruiterCustomerId);
+                participation.RecruiterCorrections.Count.ShouldBe(1);
+            });
+        }
+
         private async Task<int> CreateEntryParticipantAsync(string suffix)
         {
             var userId = await CreateTestUserAsync(
@@ -351,6 +425,164 @@ namespace AqualLifeStyle.Tests.Application
             });
         }
 
+        private async Task<RecruitmentNetworkFixture> CreateCrossAreaAQGreenPlacementAsync()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            await EnsureCrossAreaTenantAsync();
+            var targetUserId = await CreateTestUserAsync(
+                1,
+                $"cross-area-target-{suffix}",
+                $"cross-area-target-{suffix}@example.com");
+            var recruiterUserId = await CreateTestUserAsync(
+                2,
+                $"cross-area-recruiter-{suffix}",
+                $"cross-area-recruiter-{suffix}@example.com");
+
+            Customer targetCustomer = null;
+            await UsingDbContextAsync(1, async context =>
+            {
+                targetCustomer = Customer.Create(
+                    1,
+                    targetUserId,
+                    "Cross Area Target",
+                    new EmailAddress($"cross-area-target-customer-{suffix}@example.com"));
+                context.Customers.Add(targetCustomer);
+                await context.SaveChangesAsync();
+                context.EntryParticipations.Add(EntryParticipation.StartIndependently(
+                    1,
+                    targetCustomer.Id,
+                    LegacySplitPaymentTerms,
+                    EffectiveFrom));
+                await context.SaveChangesAsync();
+            });
+
+            Customer recruiterCustomer = null;
+            await UsingDbContextAsync(2, async context =>
+            {
+                recruiterCustomer = Customer.Create(
+                    2,
+                    recruiterUserId,
+                    "Cross Area Recruiter",
+                    new EmailAddress($"cross-area-recruiter-customer-{suffix}@example.com"));
+                context.Customers.Add(recruiterCustomer);
+                await context.SaveChangesAsync();
+                var recruiter = EntryParticipation.StartIndependently(
+                    2,
+                    recruiterCustomer.Id,
+                    LegacySplitPaymentTerms,
+                    EffectiveFrom);
+                context.MemberPayments.AddRange(Activate(
+                    recruiter,
+                    recruiterCustomer.Id,
+                    $"cross-area-recruiter-{suffix}",
+                    2));
+                context.EntryParticipations.Add(recruiter);
+                await context.SaveChangesAsync();
+            });
+
+            return new RecruitmentNetworkFixture
+            {
+                RecruiterCustomerId = recruiterCustomer.Id,
+                RecruiterNumber = recruiterCustomer.ClubMemberNumber,
+                TargetCustomerId = targetCustomer.Id,
+                TargetNumber = targetCustomer.ClubMemberNumber
+            };
+        }
+
+        private async Task<RecruitmentNetworkFixture> CreateCrossAreaOnyxPlacementAsync()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            await EnsureCrossAreaTenantAsync();
+            var targetUserId = await CreateTestUserAsync(
+                1,
+                $"cross-area-onyx-target-{suffix}",
+                $"cross-area-onyx-target-{suffix}@example.com");
+            var recruiterUserId = await CreateTestUserAsync(
+                2,
+                $"cross-area-onyx-recruiter-{suffix}",
+                $"cross-area-onyx-recruiter-{suffix}@example.com");
+            var terms = Resolve<ICurrentProgrammeTermsProvider>().GetDirectOnyxTerms();
+
+            Customer targetCustomer = null;
+            await UsingDbContextAsync(1, async context =>
+            {
+                targetCustomer = Customer.Create(
+                    1,
+                    targetUserId,
+                    "Cross Area Onyx Target",
+                    new EmailAddress($"cross-area-onyx-target-customer-{suffix}@example.com"));
+                var membership = Membership.Create(
+                    1,
+                    $"Cross-Area-Onyx-Target-{suffix}",
+                    "Cross-Area Onyx correction test",
+                    MembershipType.Onyx);
+                context.Customers.Add(targetCustomer);
+                context.Memberships.Add(membership);
+                await context.SaveChangesAsync();
+                var target = OnyxParticipation.StartDirectIndependently(
+                    1,
+                    targetCustomer.Id,
+                    membership.Id,
+                    terms,
+                    EffectiveFrom);
+                context.MemberPayments.Add(Activate(
+                    target,
+                    targetCustomer.Id,
+                    $"cross-area-onyx-target-{suffix}"));
+                context.OnyxParticipations.Add(target);
+                await context.SaveChangesAsync();
+            });
+
+            Customer recruiterCustomer = null;
+            await UsingDbContextAsync(2, async context =>
+            {
+                recruiterCustomer = Customer.Create(
+                    2,
+                    recruiterUserId,
+                    "Cross Area Onyx Recruiter",
+                    new EmailAddress($"cross-area-onyx-recruiter-customer-{suffix}@example.com"));
+                var membership = Membership.Create(
+                    2,
+                    $"Cross-Area-Onyx-Recruiter-{suffix}",
+                    "Cross-Area Onyx correction test",
+                    MembershipType.Onyx);
+                context.Customers.Add(recruiterCustomer);
+                context.Memberships.Add(membership);
+                await context.SaveChangesAsync();
+                var recruiter = OnyxParticipation.StartDirectIndependently(
+                    2,
+                    recruiterCustomer.Id,
+                    membership.Id,
+                    terms,
+                    EffectiveFrom);
+                context.MemberPayments.Add(Activate(
+                    recruiter,
+                    recruiterCustomer.Id,
+                    $"cross-area-onyx-recruiter-{suffix}",
+                    2));
+                context.OnyxParticipations.Add(recruiter);
+                await context.SaveChangesAsync();
+            });
+
+            return new RecruitmentNetworkFixture
+            {
+                RecruiterCustomerId = recruiterCustomer.Id,
+                RecruiterNumber = recruiterCustomer.ClubMemberNumber,
+                TargetCustomerId = targetCustomer.Id,
+                TargetNumber = targetCustomer.ClubMemberNumber
+            };
+        }
+
+        private async Task EnsureCrossAreaTenantAsync()
+        {
+            await UsingDbContextAsync(null, async context =>
+            {
+                if (await context.Tenants.AnyAsync(tenant => tenant.Id == 2)) return;
+                context.Tenants.Add(new Tenant("CrossArea", "Cross Area"));
+                await context.SaveChangesAsync();
+            });
+        }
+
         private async Task<RecruitmentNetworkFixture> CreateActiveOnyxNetworkAsync()
         {
             var suffix = Guid.NewGuid().ToString("N");
@@ -393,12 +625,13 @@ namespace AqualLifeStyle.Tests.Application
         private static MemberPayment[] Activate(
             EntryParticipation participation,
             int customerId,
-            string reference)
+            string reference,
+            int tenantId = 1)
         {
-            var registration = MemberPayment.CreatePending(1, customerId, MemberPaymentPurpose.EntryRegistration, 600m, "Test", $"{reference}-registration", EffectiveFrom);
+            var registration = MemberPayment.CreatePending(tenantId, customerId, MemberPaymentPurpose.EntryRegistration, 600m, "Test", $"{reference}-registration", EffectiveFrom);
             registration.Confirm(EffectiveFrom.AddMinutes(1));
             participation.ApplyConfirmedActivationPayment(registration);
-            var activation = MemberPayment.CreatePending(1, customerId, MemberPaymentPurpose.EntryActivation, 600m, "Test", $"{reference}-activation", EffectiveFrom);
+            var activation = MemberPayment.CreatePending(tenantId, customerId, MemberPaymentPurpose.EntryActivation, 600m, "Test", $"{reference}-activation", EffectiveFrom);
             activation.Confirm(EffectiveFrom.AddMinutes(2));
             participation.ApplyConfirmedActivationPayment(activation);
             return new[] { registration, activation };
@@ -407,10 +640,11 @@ namespace AqualLifeStyle.Tests.Application
         private static MemberPayment Activate(
             OnyxParticipation participation,
             int customerId,
-            string reference)
+            string reference,
+            int tenantId = 1)
         {
             var payment = MemberPayment.CreatePending(
-                1,
+                tenantId,
                 customerId,
                 MemberPaymentPurpose.OnyxDirectEntry,
                 6120m,

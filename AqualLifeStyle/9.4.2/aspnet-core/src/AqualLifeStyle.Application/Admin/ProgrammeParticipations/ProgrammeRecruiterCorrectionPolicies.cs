@@ -78,9 +78,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
             {
                 var participations = await _repository.GetAll()
-                    .Where(item => item.TenantId == tenantId)
                     .ToListAsync();
-                var target = participations.SingleOrDefault(item => item.CustomerId == customerId);
+                var target = participations.SingleOrDefault(item =>
+                    item.TenantId == tenantId && item.CustomerId == customerId);
                 if (target == null) throw NotFound();
                 if (!newRecruiterCustomerId.HasValue)
                 {
@@ -91,7 +91,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 var recruiter = participations.SingleOrDefault(item =>
                     item.CustomerId == newRecruiterCustomerId.Value &&
                     item.Status == EntryParticipationStatus.Active);
-                if (recruiter == null) throw InvalidRecruiter("The new recruiter must have active AQGreen participation in the same Area.");
+                if (recruiter == null) throw InvalidRecruiter("The new recruiter must have active AQGreen participation.");
                 RecruiterPlacementCycleValidator.EnsureNoCycle(
                     participations.Select(item => (item.CustomerId, item.RecruiterCustomerId)),
                     customerId,
@@ -135,9 +135,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
             {
                 var participations = await _repository.GetAll()
-                    .Where(item => item.TenantId == tenantId)
                     .ToListAsync();
-                var target = participations.SingleOrDefault(item => item.CustomerId == customerId);
+                var target = participations.SingleOrDefault(item =>
+                    item.TenantId == tenantId && item.CustomerId == customerId);
                 if (target == null)
                     throw new UserFriendlyException("Recruiter correction failed.", "The Onyx participation was not found.");
                 if (!newRecruiterCustomerId.HasValue)
@@ -150,7 +150,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     item.CustomerId == newRecruiterCustomerId.Value &&
                     item.Status == OnyxParticipationStatus.Active);
                 if (recruiter == null)
-                    throw new UserFriendlyException("Recruiter correction failed.", "The new recruiter must have active Onyx participation in the same Area.");
+                    throw new UserFriendlyException("Recruiter correction failed.", "The new recruiter must have active Onyx participation.");
                 RecruiterPlacementCycleValidator.EnsureNoCycle(
                     participations.Select(item => (item.CustomerId, item.RecruiterCustomerId)),
                     customerId,

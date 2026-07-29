@@ -86,12 +86,13 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                             customer.ClubMemberNumber == normalizedRecruiter &&
                             !customer.IsDeleted);
                     if (newRecruiter == null ||
-                        newRecruiter.TenantId != target.TenantId ||
+                        (AbpSession.TenantId.HasValue &&
+                         newRecruiter.TenantId != target.TenantId) ||
                         !newRecruiter.IsActive)
                     {
                         throw new Abp.UI.UserFriendlyException(
                             "Recruiter correction failed.",
-                            "The new recruiter must be an active Club Member in the same Area.");
+                            "The new recruiter must be an active Club Member you are authorised to manage.");
                     }
                 }
             }
