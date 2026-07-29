@@ -20,6 +20,6 @@ export const KpiCards = ({ isLoading, stats }: KpiCardsProps) => (
     <MetricCard icon={ShoppingBag} isLoading={isLoading} label="Total orders" value={stats.totalOrders} />
     <MetricCard icon={PiggyBank} isLoading={isLoading} label="Total savings" value={stats.totalSavings === null ? "Unavailable" : formatCurrency(stats.totalSavings)} />
     <MetricCard icon={MessageSquareText} isLoading={isLoading} label="Total enquiries" value={stats.totalEnquiries} />
-    <MetricCard icon={Banknote} isLoading={isLoading} label="Total revenue" value={formatCurrency(stats.totalRevenue)} />
+    <MetricCard icon={Banknote} isLoading={isLoading} label="Reserved order value" value={formatCurrency(stats.totalReservedOrderValue)} />
   </section>
 );

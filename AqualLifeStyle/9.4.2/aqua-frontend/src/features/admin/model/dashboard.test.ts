@@ -21,12 +21,12 @@ describe("buildAdminDashboard", () => {
       referrals: [{ convertedAt: "2026-07-01T10:00:00Z" }],
     });
 
-    expect(dashboard.stats).toMatchObject({ totalCustomerAccounts: 2, totalEnquiries: 1, totalOrders: 2, totalRevenue: 750 });
+    expect(dashboard.stats).toMatchObject({ totalCustomerAccounts: 2, totalEnquiries: 1, totalOrders: 2, totalReservedOrderValue: 750 });
     expect(dashboard.stats.totalSavings).toBeNull();
     expect(dashboard.savings).toEqual({ interestAccrued: null, total: null });
     expect(dashboard.leaders.pendingApplications).toBeNull();
     expect(dashboard.members.byTier).toEqual([{ name: "Jasper", value: 1 }, { name: "Onyx", value: 1 }]);
-    expect(dashboard.orders).toMatchObject({ monthRevenue: 500, monthVolume: 1 });
+    expect(dashboard.orders).toMatchObject({ monthReservedValue: 500, monthVolume: 1 });
     expect(dashboard.people.recentReferrals).toBe(1);
     expect(dashboard.activity[0].title).toBe("Enquiry #9");
   });

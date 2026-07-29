@@ -35,7 +35,7 @@ export type AdminDashboardData = {
     recent: DashboardMember[];
   };
   orders: {
-    monthRevenue: number;
+    monthReservedValue: number;
     monthVolume: number;
     recent: DashboardOrder[];
   };
@@ -51,7 +51,7 @@ export type AdminDashboardData = {
     totalEnquiries: number;
     totalCustomerAccounts: number;
     totalOrders: number;
-    totalRevenue: number;
+    totalReservedOrderValue: number;
     totalSavings: number | null;
   };
 };
@@ -164,7 +164,7 @@ export const buildAdminDashboard = ({
       kind: "member",
       meta: member.tier,
       timestamp: member.joinedAt,
-      title: "New member",
+      title: "New customer account",
     }));
   const orderActivity: DashboardActivity[] = recentOrders.map((order) => ({
     description: `${order.memberName} placed an order for ${formatCurrency(order.amount)}.`,
@@ -183,7 +183,10 @@ export const buildAdminDashboard = ({
     title: `Enquiry #${enquiry.id}`,
   }));
   const monthOrders = orders.filter((order) => isSameMonth(order.createdAt, now));
-  const totalRevenue = orders.reduce((total, order) => total + order.reservedPrice, 0);
+  const totalReservedOrderValue = orders.reduce(
+    (total, order) => total + order.reservedPrice,
+    0,
+  );
 
   return {
     activity: [...memberActivity, ...orderActivity, ...enquiryActivity]
@@ -200,7 +203,7 @@ export const buildAdminDashboard = ({
       recent: recentMembers,
     },
     orders: {
-      monthRevenue: monthOrders.reduce(
+      monthReservedValue: monthOrders.reduce(
         (total, order) => total + order.reservedPrice,
         0,
       ),
@@ -221,7 +224,7 @@ export const buildAdminDashboard = ({
       totalEnquiries: enquiries.length,
       totalCustomerAccounts: customers.length,
       totalOrders: orders.length,
-      totalRevenue,
+      totalReservedOrderValue,
       totalSavings: null,
     },
   };
