@@ -44,6 +44,9 @@ namespace AqualLifeStyle.Authorization.Accounts.Dto
         [DisableAuditing]
         public string CaptchaResponse { get; set; }
 
+        [StringLength(2048)]
+        public string RedirectPath { get; set; }
+
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
             if (!UserName.IsNullOrEmpty())

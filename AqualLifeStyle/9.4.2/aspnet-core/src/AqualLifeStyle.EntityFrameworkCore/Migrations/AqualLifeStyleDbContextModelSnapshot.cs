@@ -1897,6 +1897,36 @@ namespace AqualLifeStyle.Migrations
                     b.ToTable("EnquiryFollowUps", (string)null);
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.Domain.Email.TransactionalEmailOutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<int>("AttemptCount").HasColumnType("integer");
+                    b.Property<DateTime>("CreationTime").HasColumnType("timestamp with time zone");
+                    b.Property<long?>("CreatorUserId").HasColumnType("bigint");
+                    b.Property<long?>("DeleterUserId").HasColumnType("bigint");
+                    b.Property<DateTime?>("DeletionTime").HasColumnType("timestamp with time zone");
+                    b.Property<string>("HtmlBody").HasColumnType("text");
+                    b.Property<string>("IdempotencyKey").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
+                    b.Property<bool>("IsDeleted").HasColumnType("boolean");
+                    b.Property<DateTime?>("LastModificationTime").HasColumnType("timestamp with time zone");
+                    b.Property<long?>("LastModifierUserId").HasColumnType("bigint");
+                    b.Property<string>("LastError").HasMaxLength(512).HasColumnType("character varying(512)");
+                    b.Property<DateTime>("NextAttemptAt").HasColumnType("timestamp with time zone");
+                    b.Property<string>("NotificationType").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
+                    b.Property<DateTime?>("ProcessingStartedAt").HasColumnType("timestamp with time zone");
+                    b.Property<string>("ProviderMessageId").HasMaxLength(128).HasColumnType("character varying(128)");
+                    b.Property<string>("Recipient").IsRequired().HasMaxLength(256).HasColumnType("character varying(256)");
+                    b.Property<DateTime?>("SentAt").HasColumnType("timestamp with time zone");
+                    b.Property<int>("Status").HasColumnType("integer");
+                    b.Property<string>("Subject").IsRequired().HasMaxLength(256).HasColumnType("character varying(256)");
+                    b.Property<int?>("TenantId").HasColumnType("integer");
+                    b.Property<string>("TextBody").HasColumnType("text");
+                    b.HasKey("Id");
+                    b.HasIndex("IdempotencyKey").IsUnique();
+                    b.HasIndex("Status", "NextAttemptAt");
+                    b.ToTable("TransactionalEmailOutboxMessages", (string)null);
+                });
+
             modelBuilder.Entity("AqualLifeStyle.Domain.Facilitators.Facilitator", b =>
                 {
                     b.Property<int>("Id")

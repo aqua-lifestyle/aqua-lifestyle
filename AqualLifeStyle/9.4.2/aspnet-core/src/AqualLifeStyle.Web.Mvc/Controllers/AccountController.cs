@@ -130,6 +130,7 @@ namespace AqualLifeStyle.Web.Controllers
             switch (loginResult.Result)
             {
                 case AbpLoginResultType.Success:
+                    EnsureEmailIsConfirmed(loginResult.User);
                     EnsurePasswordResetIsComplete(loginResult.User);
                     return loginResult;
                 default:
@@ -144,6 +145,16 @@ namespace AqualLifeStyle.Web.Controllers
                 throw new UserFriendlyException(
                     "Password reset required.",
                     "Your customer account was restored. Use the secure password setup link provided to you before signing in.");
+            }
+        }
+
+        private static void EnsureEmailIsConfirmed(User user)
+        {
+            if (!user.IsEmailConfirmed)
+            {
+                throw new UserFriendlyException(
+                    "Email verification required.",
+                    "Verify your email address before signing in. You can request a new verification email from the sign-in page.");
             }
         }
 
@@ -338,6 +349,7 @@ namespace AqualLifeStyle.Web.Controllers
             switch (loginResult.Result)
             {
                 case AbpLoginResultType.Success:
+                    EnsureEmailIsConfirmed(loginResult.User);
                     EnsurePasswordResetIsComplete(loginResult.User);
                     await _signInManager.SignInAsync(loginResult.Identity, false);
                     return Redirect(returnUrl);

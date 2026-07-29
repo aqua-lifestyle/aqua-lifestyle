@@ -54,6 +54,11 @@ services:
       Yoco__SecretKey: ${YOCO_SECRET_KEY:?Set YOCO_SECRET_KEY in .env}
       Yoco__WebhookSecret: ${YOCO_WEBHOOK_SECRET:?Set YOCO_WEBHOOK_SECRET in .env}
       Yoco__Mode: ${YOCO_MODE:-test}
+      Bird__Enabled: ${BIRD_ENABLED:-false}
+      Bird__ApiKey: ${BIRD_API_KEY:-}
+      Bird__FromEmail: ${BIRD_FROM_EMAIL:-}
+      Bird__FromName: ${BIRD_FROM_NAME:-Aqua Lifestyle Club}
+      Bird__ReplyToEmail: ${BIRD_REPLY_TO_EMAIL:-}
     depends_on:
       postgres:
         condition: service_healthy

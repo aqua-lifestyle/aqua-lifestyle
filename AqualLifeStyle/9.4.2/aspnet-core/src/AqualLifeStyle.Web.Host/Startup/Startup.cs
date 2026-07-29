@@ -18,6 +18,8 @@ using Microsoft.OpenApi.Models;
 using System.IO;
 using Castle.Services.Logging.SerilogIntegration;
 using AqualLifeStyle.Payments.Yoco;
+using AqualLifeStyle.Email;
+using AqualLifeStyle.Web.Host.Email;
 
 namespace AqualLifeStyle.Web.Host.Startup
 {
@@ -74,6 +76,11 @@ namespace AqualLifeStyle.Web.Host.Startup
             // Register IHttpContextAccessor so ABP exception converters can access the current request correlation id.
             services.AddHttpContextAccessor();
             services.AddHttpClient<IYocoCheckoutGateway, YocoCheckoutGateway>();
+            services.Configure<BirdOptions>(_appConfiguration.GetSection("Bird"));
+            services.AddHttpClient<ITransactionalEmailDeliveryGateway, BirdTransactionalEmailDeliveryGateway>(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(15);
+            });
 
             // Configure Abp and Dependency Injection
             services.AddAbpWithoutCreatingServiceProvider<AqualLifeStyleWebHostModule>(

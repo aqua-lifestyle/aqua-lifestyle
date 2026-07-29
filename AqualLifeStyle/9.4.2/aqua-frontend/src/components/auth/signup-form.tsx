@@ -5,10 +5,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 
-import { login, register } from "@/src/shared/api/auth-service";
+import { register } from "@/src/shared/api/auth-service";
 import { publicEnv } from "@/src/shared/config";
 import { securePasswordSchema } from "@/src/shared/auth/password-policy";
-import { useAuthActions, useTenantState, useToast } from "@/src/providers";
+import { useTenantState, useToast } from "@/src/providers";
 import { Button, Card, LinkButton, TextAreaField, TextField } from "@/src/shared/ui";
 import { customerContactNumberSchema, customerFirstNameSchema, customerHomeAddressSchema, customerSurnameSchema } from "@/src/shared/validation/customer-personal-details";
 
@@ -43,7 +43,6 @@ type SignupFormProps = {
 
 export const SignupForm = ({ redirectPath, tenancyName }: SignupFormProps) => {
   const router = useRouter();
-  const { setSession } = useAuthActions();
   const { currentTenant } = useTenantState();
   const { toast } = useToast();
   const [step, setStep] = useState(0);
@@ -132,6 +131,7 @@ export const SignupForm = ({ redirectPath, tenancyName }: SignupFormProps) => {
       email: formData.email,
       homeAddress: formData.homeAddress,
       password: formData.password,
+      redirectPath,
       name: formData.firstName,
       surname: formData.surname,
       tenant: resolvedTenant,
@@ -160,36 +160,15 @@ export const SignupForm = ({ redirectPath, tenancyName }: SignupFormProps) => {
       return;
     }
 
-    // Auto-login after successful registration
-    const loginResult = await login({
-      email: formData.email,
-      password: formData.password,
-      tenant: resolvedTenant,
-    });
-
-    if (loginResult.ok) {
-      setSession(loginResult.session);
-      toast({
-        message: "Account created successfully.",
-        title: "Welcome",
-        type: "success",
-      });
-      setIsLoading(false);
-      router.push(redirectPath ?? "/dashboard");
-      return;
-    }
-
     toast({
-      message: "Account created. Please sign in.",
-      title: "Welcome",
+      message: "Account created. Check your email to verify your address.",
+      title: "Verify your email",
       type: "success",
     });
     setIsLoading(false);
-    router.push(
-      redirectPath
-        ? `/login?redirect=${encodeURIComponent(redirectPath)}`
-        : "/login",
-    );
+    const verification = new URLSearchParams({ area: resolvedTenant, email: formData.email });
+    if (redirectPath) verification.set("redirect", redirectPath);
+    router.push(`/verify-email-sent?${verification.toString()}`);
   };
 
   const getPasswordStrength = () => {

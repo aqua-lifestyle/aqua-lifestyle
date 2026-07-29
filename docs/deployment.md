@@ -36,6 +36,50 @@ The API runtime uses the slim Debian ASP.NET image and its built-in non-root `ap
 
 Render supplies `DATABASE_URL`; the application converts it to the Npgsql keyword format without logging credentials. Redis is supplied through `Redis__Configuration` and becomes ABP's distributed cache backing implementation.
 
+### Bird transactional email
+
+Registration verification, password resets, enquiry responses, and confirmed
+AQGreen or Onyx payment notices use Bird's Email API. Before enabling the
+feature, use Bird's current [Email API send-message reference](https://bird.com/en-us/docs/api/reference/create-email-message),
+not the older Channels API documentation:
+
+1. In Bird, add `aqualifestyleclub.co.za` as the sending domain. Add every DNS
+   record Bird provides (domain verification, SPF, DKIM, bounce, and tracking)
+   in Vercel DNS, because Vercel is the domain's authoritative DNS provider.
+   Wait until Bird shows all required checks as verified.
+2. Create a least-privilege Bird API key for email sending. A current key has a
+   `bk_{region}_...` format; the API selects its regional host from that prefix.
+3. In Render's API service, enter `Bird__ApiKey`, `Bird__FromEmail`, and
+   `Bird__ReplyToEmail` directly as secret values. Set `Bird__FromName` to the
+   customer-facing sender name. No Bird workspace or channel ID is required by
+   this API.
+4. Set `Bird__Enabled=true`, sync the Blueprint, and redeploy. Production startup
+   deliberately fails if transactional email is enabled with incomplete values,
+   or if it is disabled while verification is required.
+5. Register a disposable test Club Member, confirm the verification message is
+   delivered, follow the link, sign in, and test one password-reset request.
+
+The API stores delivery intent in `TransactionalEmailOutboxMessages` in the same
+transaction as the business change. A worker retries pending records with capped
+backoff. Inspect pending rows by status, attempt count, next-attempt time, and the
+redacted last-error summary; never copy stored token-bearing message bodies into
+logs or support tickets. Successfully transmitted bodies are cleared. The worker
+sends the durable outbox key in Bird's `Idempotency-Key` header. Bird replays the
+original response for a matching request during its documented idempotency window
+(three hours by default), closing the normal accept-then-crash retry gap. The
+database's unique outbox key permanently prevents duplicate business intents.
+This is still not an indefinite exactly-once guarantee: a lost success followed
+by a retry after Bird's window can send again. Keep one email worker instance for
+the current deployment; add a database-backed claim/lease before horizontally
+scaling API workers.
+
+To rotate the API key, create the replacement in Bird, update
+`Bird__ApiKey` in Render, redeploy and verify delivery, then revoke the old
+key. Never place keys in source files, Vercel variables, screenshots, commits,
+logs, or documentation. Existing confirmed users remain confirmed. Existing
+legitimate unconfirmed users must use the generic resend-verification flow; no
+bulk auto-confirm migration is performed.
+
 ### Yoco programme payments
 
 Yoco credentials belong only in the Render API service. They must never be

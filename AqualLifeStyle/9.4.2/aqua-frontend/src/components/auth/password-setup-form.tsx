@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
+import { completePasswordReset } from "@/src/shared/api/account-email-service";
 import { passwordPolicyDescription, securePasswordSchema } from "@/src/shared/auth/password-policy";
 import { Button, Card, LinkButton, StatusMessage, TextField } from "@/src/shared/ui";
 
@@ -19,15 +20,18 @@ const passwordSchema = z.object({
 type PasswordSetupFormProps = {
   areaName: string;
   resetToken: string;
+  tenantId?: number;
   userId: number;
 };
 
-export const PasswordSetupForm = ({ areaName, resetToken, userId }: PasswordSetupFormProps) => {
+export const PasswordSetupForm = ({ areaName, resetToken, tenantId = 0, userId }: PasswordSetupFormProps) => {
   const [error, setError] = useState<string>();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
-  const hasValidLink = Boolean(areaName && resetToken && Number.isSafeInteger(userId) && userId > 0);
+  const isEmailReset = Number.isSafeInteger(tenantId) && tenantId > 0;
+  const hasValidLink = Boolean((isEmailReset || areaName) && resetToken && Number.isSafeInteger(userId) && userId > 0);
+  const signInUrl = areaName ? `/login?area=${encodeURIComponent(areaName)}` : "/login";
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -45,12 +49,20 @@ export const PasswordSetupForm = ({ areaName, resetToken, userId }: PasswordSetu
     setError(undefined);
     setIsSubmitting(true);
     try {
-      await httpClient.post("/api/services/app/Account/CompletePasswordSetup", {
-        areaName,
-        newPassword: parsed.data.password,
-        resetToken,
-        userId,
-      });
+      if (isEmailReset) {
+        const result = await completePasswordReset(tenantId, userId, resetToken, parsed.data.password);
+        if (!result.ok) {
+          setError(result.message);
+          return;
+        }
+      } else {
+        await httpClient.post("/api/services/app/Account/CompletePasswordSetup", {
+          areaName,
+          newPassword: parsed.data.password,
+          resetToken,
+          userId,
+        });
+      }
       setIsComplete(true);
     } catch (requestError) {
       setError(getRequestErrorMessage(requestError, "Your password could not be set. Ask an administrator for a new setup link."));
@@ -62,14 +74,14 @@ export const PasswordSetupForm = ({ areaName, resetToken, userId }: PasswordSetu
   return (
     <main className="flex min-h-dvh items-center justify-center bg-muted/30 px-4 py-12">
       <Card className="w-full max-w-md">
-        <h1 className="text-2xl font-bold">Set up your password</h1>
+        <h1 className="text-2xl font-bold">{isEmailReset ? "Reset your password" : "Set up your password"}</h1>
         <p className="mt-2 text-sm text-muted-foreground">Choose a private password for your Aqua Lifestyle Club account.</p>
         {!hasValidLink ? (
           <StatusMessage className="mt-5" tone="error">This password setup link is incomplete. Ask an administrator for a new link.</StatusMessage>
         ) : isComplete ? (
           <div className="mt-5 flex flex-col gap-4">
             <StatusMessage tone="success">Your password is set and your sign-in access is ready.</StatusMessage>
-            <LinkButton href="/login" variant="primary">Continue to sign in</LinkButton>
+            <LinkButton href={signInUrl} variant="primary">Continue to sign in</LinkButton>
           </div>
         ) : (
           <form className="mt-5 flex flex-col gap-4" noValidate onSubmit={submit}>

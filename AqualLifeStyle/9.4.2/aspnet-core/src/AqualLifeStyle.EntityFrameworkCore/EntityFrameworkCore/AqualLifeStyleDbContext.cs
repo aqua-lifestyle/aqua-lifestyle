@@ -4,6 +4,7 @@ using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.AreaLeaders;
 using AqualLifeStyle.Domain.Customers;
+using AqualLifeStyle.Domain.Email;
 using AqualLifeStyle.Domain.Enquiries;
 using AqualLifeStyle.Domain.Facilitators;
 using AqualLifeStyle.Domain.Memberships;
@@ -35,6 +36,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<DirectOnyxCheckoutIntent> DirectOnyxCheckoutIntents { get; set; }
         public virtual DbSet<AQGreenJoiningCheckout> AQGreenJoiningCheckouts { get; set; }
         public virtual DbSet<YocoWebhookReceipt> YocoWebhookReceipts { get; set; }
+        public virtual DbSet<TransactionalEmailOutboxMessage> TransactionalEmailOutboxMessages { get; set; }
         public virtual DbSet<EntryParticipation> EntryParticipations { get; set; }
         public virtual DbSet<EntryRecruiterCorrection> EntryRecruiterCorrections { get; set; }
         public virtual DbSet<EntryMonthlyObligation> EntryMonthlyObligations { get; set; }

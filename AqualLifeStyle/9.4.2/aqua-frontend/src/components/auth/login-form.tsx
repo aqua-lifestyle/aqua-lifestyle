@@ -255,6 +255,14 @@ export const LoginForm = () => {
                 </LinkButton>
               </p>
             ) : null}
+            <p className="mt-3 text-center text-sm">
+              <LinkButton
+                href={`/forgot-password?area=${encodeURIComponent(selectedWorkspace)}`}
+                variant="ghost"
+              >
+                Forgot your password?
+              </LinkButton>
+            </p>
           </div>
         </div>
       </div>

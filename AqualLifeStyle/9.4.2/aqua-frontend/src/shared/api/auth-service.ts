@@ -107,6 +107,7 @@ export type RegisterInput = {
   email: string;
   homeAddress: string;
   password: string;
+  redirectPath?: string;
   name: string;
   surname: string;
   tenant?: string | null;
@@ -239,6 +240,7 @@ export const register = async (input: RegisterInput): Promise<RegisterResult> =>
         contactNumber: input.contactNumber,
         homeAddress: input.homeAddress,
         password: input.password,
+        redirectPath: input.redirectPath,
       },
       {
         headers,

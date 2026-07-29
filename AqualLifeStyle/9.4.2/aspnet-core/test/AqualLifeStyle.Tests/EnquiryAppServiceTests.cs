@@ -15,6 +15,7 @@ using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
 using AqualLifeStyle.Domain.Enums;
+using AqualLifeStyle.Email;
 
 namespace AqualLifeStyle.Tests
 {
@@ -24,15 +25,18 @@ namespace AqualLifeStyle.Tests
         private readonly Mock<IObjectMapper> _objectMapperMock;
         private readonly Mock<ICustomerRepository> _customerRepositoryMock;
         private readonly EnquiryAppService _service;
+        private readonly Mock<ITransactionalEmailOutbox> _emailOutboxMock;
 
         public EnquiryAppServiceTests()
         {
             _enquiryRepositoryMock = new Mock<IEnquiryRepository>();
             _objectMapperMock = new Mock<IObjectMapper>();
             _customerRepositoryMock = new Mock<ICustomerRepository>();
+            _emailOutboxMock = new Mock<ITransactionalEmailOutbox>();
             _service = new TestableEnquiryAppService(_enquiryRepositoryMock.Object,
                 _customerRepositoryMock.Object,
-                _objectMapperMock.Object)
+                _objectMapperMock.Object,
+                _emailOutboxMock.Object)
             {
                 AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1 && s.UserId == 1)
             };
@@ -68,6 +72,9 @@ namespace AqualLifeStyle.Tests
             Assert.Equal(EnquiryStatus.Responded, enquiry.Status);
             Assert.Equal("Here is the answer", enquiry.Response);
             _enquiryRepositoryMock.Verify(r => r.UpdateAsync(enquiry), Times.Once);
+            _emailOutboxMock.Verify(outbox => outbox.EnqueueAsync(
+                1, "EnquiryResponse", "enquiry-response:1", It.Is<TransactionalEmail>(email =>
+                    email.HtmlBody.Contains("Here is the answer"))), Times.Once);
         }
 
         [Fact]
@@ -268,8 +275,12 @@ namespace AqualLifeStyle.Tests
 
         private sealed class TestableEnquiryAppService : EnquiryAppService
         {
-            public TestableEnquiryAppService(IEnquiryRepository enquiryRepository, ICustomerRepository customerRepository, IObjectMapper objectMapper)
-                : base(enquiryRepository, customerRepository, objectMapper)
+            public TestableEnquiryAppService(
+                IEnquiryRepository enquiryRepository,
+                ICustomerRepository customerRepository,
+                IObjectMapper objectMapper,
+                ITransactionalEmailOutbox emailOutbox)
+                : base(enquiryRepository, customerRepository, objectMapper, emailOutbox, new TransactionalEmailTemplateBuilder())
             {
             }
         }

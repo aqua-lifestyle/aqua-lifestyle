@@ -43,7 +43,12 @@ namespace AqualLifeStyle.Tests.WebHost
                 ["Redis:Configuration"] = "redis:6379",
                 ["Yoco:SecretKey"] = "sk_test_safe-test-placeholder",
                 ["Yoco:WebhookSecret"] = "whsec_safe-test-placeholder",
-                ["Yoco:Mode"] = "test"
+                ["Yoco:Mode"] = "test",
+                ["Bird:Enabled"] = "true",
+                ["Bird:ApiKey"] = "bk_eu1_safe-test-placeholder",
+                ["Bird:FromEmail"] = "hello@example.test",
+                ["Bird:FromName"] = "Aqua Lifestyle Club",
+                ["Bird:ReplyToEmail"] = "help@example.test"
             };
         }
 
@@ -153,6 +158,39 @@ namespace AqualLifeStyle.Tests.WebHost
             ex.Message.ShouldContain("Yoco__SecretKey");
             ex.Message.ShouldContain("Yoco__WebhookSecret");
             ex.Message.ShouldContain("Yoco__Mode");
+            ex.Message.ShouldContain("Bird__Enabled=true");
+            ex.Message.ShouldContain("Bird__ApiKey");
+            ex.Message.ShouldContain("Bird__FromEmail");
+        }
+
+        [Fact]
+        public void Validate_InProduction_WithMissingBirdApiKey_RedactsConfiguredSecrets()
+        {
+            var settings = CompleteProductionSettings();
+            var secret = settings["Bird:ApiKey"];
+            settings["Bird:ApiKey"] = "";
+            var services = BuildServiceProvider("Production", settings);
+
+            var ex = Should.Throw<InvalidOperationException>(
+                () => DeploymentConfigurationValidator.Validate(services));
+
+            ex.Message.ShouldContain("Bird__ApiKey");
+            ex.Message.ShouldNotContain(secret);
+        }
+
+        [Fact]
+        public void Validate_InProduction_WithLegacyBirdKeyFormat_RejectsWithoutLeakingKey()
+        {
+            var settings = CompleteProductionSettings();
+            const string secret = "legacy-bird-key-must-not-leak";
+            settings["Bird:ApiKey"] = secret;
+            var services = BuildServiceProvider("Production", settings);
+
+            var ex = Should.Throw<InvalidOperationException>(
+                () => DeploymentConfigurationValidator.Validate(services));
+
+            ex.Message.ShouldContain("Bird__ApiKey");
+            ex.Message.ShouldNotContain(secret);
         }
     }
 }

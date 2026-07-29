@@ -55,6 +55,16 @@ services:
         value: "15"
       - key: Yoco__Monitoring__StaleCheckoutThresholdMinutes
         value: "60"
+      - key: Bird__Enabled
+        value: "true"
+      - key: Bird__ApiKey
+        sync: false
+      - key: Bird__FromEmail
+        sync: false
+      - key: Bird__FromName
+        value: Aqua Lifestyle Club
+      - key: Bird__ReplyToEmail
+        sync: false
 
   - type: keyvalue
     name: aqualifestyle-redis

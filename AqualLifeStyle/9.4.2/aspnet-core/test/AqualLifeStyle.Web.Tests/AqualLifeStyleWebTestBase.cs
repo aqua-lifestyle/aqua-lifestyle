@@ -36,6 +36,7 @@ namespace AqualLifeStyle.Web.Tests
             return base
                 .CreateWebHostBuilder()
                 .UseContentRoot(ContentRootFolder.Value)
+                .UseSetting("App:ClientRootAddress", "https://client.example.test")
                 .UseSetting(WebHostDefaults.ApplicationKey, typeof(AqualLifeStyleWebMvcModule).Assembly.FullName);
         }
 
