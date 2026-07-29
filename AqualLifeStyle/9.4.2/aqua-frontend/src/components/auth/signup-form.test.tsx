@@ -91,7 +91,7 @@ describe("SignupForm", () => {
       timeout: 2000,
     });
     expect(push).toHaveBeenCalledWith(
-      "/verify-email-sent?area=Default&email=jane%40example.com",
+      "/verify-email-sent?area=Default",
     );
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({

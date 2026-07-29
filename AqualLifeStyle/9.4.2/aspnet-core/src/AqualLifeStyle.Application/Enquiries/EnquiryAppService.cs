@@ -102,7 +102,7 @@ namespace AqualLifeStyle.Application.Enquiries
             }
 
             await _enquiryRepository.UpdateAsync(enquiry);
-            var emailKey = $"enquiry-response:{enquiry.Id}";
+            var emailKey = $"enquiry-response:{enquiry.Id}:{enquiry.ResponseVersion}";
             await _emailOutbox.EnqueueAsync(enquiry.TenantId, "EnquiryResponse", emailKey,
                 _emailTemplates.EnquiryResponse(
                     customer.Name, customer.Email.Value, enquiry.Message, enquiry.Response, emailKey));

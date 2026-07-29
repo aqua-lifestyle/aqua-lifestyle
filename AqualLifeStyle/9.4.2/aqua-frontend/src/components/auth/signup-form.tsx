@@ -166,7 +166,7 @@ export const SignupForm = ({ redirectPath, tenancyName }: SignupFormProps) => {
       type: "success",
     });
     setIsLoading(false);
-    const verification = new URLSearchParams({ area: resolvedTenant, email: formData.email });
+    const verification = new URLSearchParams({ area: resolvedTenant });
     if (redirectPath) verification.set("redirect", redirectPath);
     router.push(`/verify-email-sent?${verification.toString()}`);
   };

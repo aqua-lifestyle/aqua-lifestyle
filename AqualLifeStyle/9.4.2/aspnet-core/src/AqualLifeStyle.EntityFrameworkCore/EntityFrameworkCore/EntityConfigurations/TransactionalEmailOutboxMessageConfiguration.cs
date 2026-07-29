@@ -18,6 +18,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityConfigurations
             builder.Property(message => message.TextBody);
             builder.Property(message => message.ProviderMessageId).HasMaxLength(TransactionalEmailOutboxMessage.MaxProviderMessageIdLength);
             builder.Property(message => message.LastError).HasMaxLength(TransactionalEmailOutboxMessage.MaxErrorLength);
+            builder.Property(message => message.ProcessingToken);
             builder.HasIndex(message => message.IdempotencyKey).IsUnique();
             builder.HasIndex(message => new { message.Status, message.NextAttemptAt });
         }

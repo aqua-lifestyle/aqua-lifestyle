@@ -29,7 +29,7 @@ export const AccountEmailRequestForm = ({ areaName, initialEmail = "", purpose, 
     setIsSubmitting(true);
     const result = purpose === "verification"
       ? await resendEmailVerification(areaName, email, redirectPath)
-      : await requestPasswordReset(areaName, email);
+      : await requestPasswordReset(areaName, email, redirectPath);
     setIsSubmitting(false);
     if (!result.ok) {
       setError(result.message);

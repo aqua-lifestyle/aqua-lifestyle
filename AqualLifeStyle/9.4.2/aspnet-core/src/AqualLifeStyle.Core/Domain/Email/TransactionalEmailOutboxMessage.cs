@@ -8,7 +8,8 @@ namespace AqualLifeStyle.Domain.Email
     {
         Pending = 0,
         Processing = 1,
-        Sent = 2
+        Sent = 2,
+        Failed = 3
     }
 
     public class TransactionalEmailOutboxMessage : FullAuditedAggregateRoot<Guid>, IMayHaveTenant
@@ -19,6 +20,7 @@ namespace AqualLifeStyle.Domain.Email
         public const int MaxSubjectLength = 256;
         public const int MaxProviderMessageIdLength = 128;
         public const int MaxErrorLength = 512;
+        public const int MaxDeliveryAttempts = 8;
 
         public int? TenantId { get; set; }
         public string NotificationType { get; private set; }
@@ -31,6 +33,7 @@ namespace AqualLifeStyle.Domain.Email
         public int AttemptCount { get; private set; }
         public DateTime NextAttemptAt { get; private set; }
         public DateTime? ProcessingStartedAt { get; private set; }
+        public Guid? ProcessingToken { get; private set; }
         public string ProviderMessageId { get; private set; }
         public string LastError { get; private set; }
         public DateTime? SentAt { get; private set; }
@@ -62,20 +65,31 @@ namespace AqualLifeStyle.Domain.Email
             };
         }
 
-        public void StartAttempt(DateTime startedAt)
+        public void StartAttempt(Guid processingToken, DateTime startedAt)
         {
-            if (Status == TransactionalEmailStatus.Sent) return;
+            if (processingToken == Guid.Empty) throw new ArgumentException("A processing token is required.", nameof(processingToken));
+            if (Status == TransactionalEmailStatus.Sent || Status == TransactionalEmailStatus.Failed) return;
             Status = TransactionalEmailStatus.Processing;
             ProcessingStartedAt = startedAt;
+            ProcessingToken = processingToken;
             AttemptCount++;
         }
 
+        public bool IsClaimedBy(Guid processingToken)
+            => Status == TransactionalEmailStatus.Processing && ProcessingToken == processingToken;
+
         public void MarkSent(string providerMessageId, DateTime sentAt)
         {
-            ProviderMessageId = Required(providerMessageId, nameof(providerMessageId), MaxProviderMessageIdLength);
+            var normalizedProviderMessageId = providerMessageId?.Trim();
+            ProviderMessageId = string.IsNullOrEmpty(normalizedProviderMessageId)
+                ? null
+                : normalizedProviderMessageId.Length <= MaxProviderMessageIdLength
+                    ? normalizedProviderMessageId
+                    : throw new ArgumentException("providerMessageId is too long.", nameof(providerMessageId));
             SentAt = sentAt;
             Status = TransactionalEmailStatus.Sent;
             ProcessingStartedAt = null;
+            ProcessingToken = null;
             LastError = null;
             // Token-bearing account links are no longer needed after successful transmission.
             HtmlBody = null;
@@ -87,9 +101,15 @@ namespace AqualLifeStyle.Domain.Email
             LastError = string.IsNullOrWhiteSpace(error)
                 ? "Email delivery failed."
                 : error.Trim().Substring(0, Math.Min(error.Trim().Length, MaxErrorLength));
-            Status = TransactionalEmailStatus.Pending;
+            Status = AttemptCount >= MaxDeliveryAttempts
+                ? TransactionalEmailStatus.Failed
+                : TransactionalEmailStatus.Pending;
             ProcessingStartedAt = null;
-            NextAttemptAt = nextAttemptAt;
+            ProcessingToken = null;
+            if (Status == TransactionalEmailStatus.Pending)
+            {
+                NextAttemptAt = nextAttemptAt;
+            }
         }
 
         private static string Required(string value, string name, int maximumLength)

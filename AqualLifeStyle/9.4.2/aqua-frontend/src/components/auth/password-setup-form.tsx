@@ -19,19 +19,42 @@ const passwordSchema = z.object({
 
 type PasswordSetupFormProps = {
   areaName: string;
+  redirectPath?: string;
   resetToken: string;
   tenantId?: number;
   userId: number;
 };
 
-export const PasswordSetupForm = ({ areaName, resetToken, tenantId = 0, userId }: PasswordSetupFormProps) => {
+export const PasswordSetupForm = ({ areaName, redirectPath, resetToken, tenantId = 0, userId }: PasswordSetupFormProps) => {
   const [error, setError] = useState<string>();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const isEmailReset = Number.isSafeInteger(tenantId) && tenantId > 0;
   const hasValidLink = Boolean((isEmailReset || areaName) && resetToken && Number.isSafeInteger(userId) && userId > 0);
-  const signInUrl = areaName ? `/login?area=${encodeURIComponent(areaName)}` : "/login";
+  const safeRedirect = redirectPath?.startsWith("/") &&
+    !redirectPath.startsWith("//") &&
+    !redirectPath.includes("\\")
+    ? redirectPath
+    : undefined;
+  const signInParameters = new URLSearchParams();
+  if (areaName) signInParameters.set("area", areaName);
+  if (safeRedirect) signInParameters.set("redirect", safeRedirect);
+  const signInQuery = signInParameters.toString();
+  const signInUrl = signInQuery ? `/login?${signInQuery}` : "/login";
+  const recoveryParameters = new URLSearchParams();
+  if (areaName) recoveryParameters.set("area", areaName);
+  if (safeRedirect) recoveryParameters.set("redirect", safeRedirect);
+  const recoveryQuery = recoveryParameters.toString();
+  const forgotPasswordUrl = recoveryQuery
+    ? `/forgot-password?${recoveryQuery}`
+    : "/forgot-password";
+  const invalidLinkMessage = isEmailReset
+    ? "This password reset link is incomplete or invalid. Request a new link from the forgot-password page."
+    : "This password setup link is incomplete. Ask an administrator for a new link.";
+  const requestFailureMessage = isEmailReset
+    ? "Your password could not be reset. Request a new link from the forgot-password page."
+    : "Your password could not be set. Ask an administrator for a new setup link.";
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -65,7 +88,7 @@ export const PasswordSetupForm = ({ areaName, resetToken, tenantId = 0, userId }
       }
       setIsComplete(true);
     } catch (requestError) {
-      setError(getRequestErrorMessage(requestError, "Your password could not be set. Ask an administrator for a new setup link."));
+      setError(getRequestErrorMessage(requestError, requestFailureMessage));
     } finally {
       setIsSubmitting(false);
     }
@@ -77,7 +100,10 @@ export const PasswordSetupForm = ({ areaName, resetToken, tenantId = 0, userId }
         <h1 className="text-2xl font-bold">{isEmailReset ? "Reset your password" : "Set up your password"}</h1>
         <p className="mt-2 text-sm text-muted-foreground">Choose a private password for your Aqua Lifestyle Club account.</p>
         {!hasValidLink ? (
-          <StatusMessage className="mt-5" tone="error">This password setup link is incomplete. Ask an administrator for a new link.</StatusMessage>
+          <div className="mt-5 flex flex-col gap-4">
+            <StatusMessage tone="error">{invalidLinkMessage}</StatusMessage>
+            {isEmailReset ? <LinkButton href={forgotPasswordUrl}>Request a new reset link</LinkButton> : null}
+          </div>
         ) : isComplete ? (
           <div className="mt-5 flex flex-col gap-4">
             <StatusMessage tone="success">Your password is set and your sign-in access is ready.</StatusMessage>
@@ -89,6 +115,7 @@ export const PasswordSetupForm = ({ areaName, resetToken, tenantId = 0, userId }
             <TextField autoComplete="new-password" errorMessage={fieldErrors.confirmPassword} label="Confirm new password" name="confirmPassword" required type="password" />
             <p className="text-sm text-muted-foreground">{passwordPolicyDescription}</p>
             {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
+            {error && isEmailReset ? <LinkButton href={forgotPasswordUrl} variant="ghost">Request a new reset link</LinkButton> : null}
             <Button isLoading={isSubmitting} type="submit">Set password</Button>
           </form>
         )}

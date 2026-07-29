@@ -1,45 +1,57 @@
 using System;
-using System.Linq;
+using System.Collections.Generic;
+using System.Transactions;
 using System.Threading.Tasks;
 using Abp.Dependency;
-using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
 using AqualLifeStyle.Domain.Email;
-using Microsoft.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Email
 {
     public interface ITransactionalEmailOutbox
     {
-        Task EnqueueAsync(int? tenantId, string notificationType, string idempotencyKey, TransactionalEmail email);
+        Task<bool> EnqueueAsync(int? tenantId, string notificationType, string idempotencyKey, TransactionalEmail email);
+        Task DeleteAsync(string idempotencyKey);
     }
 
     public sealed class TransactionalEmailOutbox : ITransactionalEmailOutbox, ITransientDependency
     {
-        private readonly IRepository<TransactionalEmailOutboxMessage, Guid> _repository;
+        private readonly ITransactionalEmailOutboxRepository _repository;
 
-        public TransactionalEmailOutbox(IRepository<TransactionalEmailOutboxMessage, Guid> repository)
+        public TransactionalEmailOutbox(ITransactionalEmailOutboxRepository repository)
             => _repository = repository;
 
-        public async Task EnqueueAsync(
+        public async Task<bool> EnqueueAsync(
             int? tenantId, string notificationType, string idempotencyKey, TransactionalEmail email)
         {
             if (email == null) throw new ArgumentNullException(nameof(email));
-            if (await _repository.GetAll().AnyAsync(message => message.IdempotencyKey == idempotencyKey)) return;
-            await _repository.InsertAsync(TransactionalEmailOutboxMessage.Create(
+            if (await _repository.FirstOrDefaultAsync(message =>
+                    message.IdempotencyKey == idempotencyKey) != null)
+            {
+                return false;
+            }
+
+            return await _repository.InsertIfMissingAsync(TransactionalEmailOutboxMessage.Create(
                 tenantId, notificationType, idempotencyKey, email.Recipient, email.Subject,
                 email.HtmlBody, email.TextBody, DateTime.UtcNow));
         }
+
+        public Task DeleteAsync(string idempotencyKey)
+            => _repository.DeleteByIdempotencyKeyAsync(idempotencyKey);
     }
 
     public class TransactionalEmailOutboxProcessor : ITransientDependency
     {
-        private readonly IRepository<TransactionalEmailOutboxMessage, Guid> _repository;
+        private const int BatchSize = 20;
+        private const int CandidateScanSize = 100;
+        private static readonly TimeSpan StaleProcessingAge = TimeSpan.FromMinutes(10);
+
+        private readonly ITransactionalEmailOutboxRepository _repository;
         private readonly ITransactionalEmailDeliveryGateway _deliveryGateway;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public TransactionalEmailOutboxProcessor(
-            IRepository<TransactionalEmailOutboxMessage, Guid> repository,
+            ITransactionalEmailOutboxRepository repository,
             ITransactionalEmailDeliveryGateway deliveryGateway,
             IUnitOfWorkManager unitOfWorkManager)
         {
@@ -48,46 +60,96 @@ namespace AqualLifeStyle.Email
             _unitOfWorkManager = unitOfWorkManager;
         }
 
-        [UnitOfWork]
+        [UnitOfWork(IsDisabled = true)]
         public virtual async Task ProcessPendingAsync()
         {
             var now = DateTime.UtcNow;
-            TransactionalEmailOutboxMessage[] messages;
+            IReadOnlyList<Guid> candidateIds;
+            using (var unitOfWork = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+            {
+                IsTransactional = false
+            }))
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
             {
-                messages = await _repository.GetAll()
-                    .Where(message =>
-                        (message.Status == TransactionalEmailStatus.Pending && message.NextAttemptAt <= now) ||
-                        (message.Status == TransactionalEmailStatus.Processing && message.ProcessingStartedAt < now.AddMinutes(-10)))
-                    .OrderBy(message => message.NextAttemptAt)
-                    .Take(20)
-                    .ToArrayAsync();
+                candidateIds = await _repository.GetEligibleMessageIdsAsync(
+                    now,
+                    now.Subtract(StaleProcessingAge),
+                    CandidateScanSize);
+                await unitOfWork.CompleteAsync();
             }
 
-            foreach (var message in messages)
+            var claimedCount = 0;
+            foreach (var messageId in candidateIds)
             {
-                using (_unitOfWorkManager.Current.SetTenantId(message.TenantId))
+                if (claimedCount >= BatchSize) break;
+
+                var processingToken = Guid.NewGuid();
+                TransactionalEmailOutboxMessage claimed;
+                var claimedAt = DateTime.UtcNow;
+                using (var unitOfWork = _unitOfWorkManager.Begin(new UnitOfWorkOptions
                 {
-                    message.StartAttempt(now);
-                    await _unitOfWorkManager.Current.SaveChangesAsync();
-                    try
+                    IsTransactional = true,
+                    IsolationLevel = IsolationLevel.ReadCommitted
+                }))
+                using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
+                {
+                    claimed = await _repository.TryClaimAsync(
+                        messageId,
+                        processingToken,
+                        claimedAt,
+                        claimedAt.Subtract(StaleProcessingAge));
+                    await unitOfWork.CompleteAsync();
+                }
+
+                if (claimed == null) continue;
+                claimedCount++;
+
+                string providerId = null;
+                Exception deliveryFailure = null;
+                try
+                {
+                    providerId = await _deliveryGateway.SendAsync(new TransactionalEmail(
+                        claimed.Recipient,
+                        claimed.Subject,
+                        claimed.HtmlBody,
+                        claimed.TextBody,
+                        claimed.IdempotencyKey));
+                }
+                catch (Exception exception)
+                {
+                    deliveryFailure = exception;
+                }
+
+                using (var unitOfWork = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+                {
+                    IsTransactional = true,
+                    IsolationLevel = IsolationLevel.ReadCommitted
+                }))
+                using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
+                {
+                    var persisted = await _repository.FirstOrDefaultAsync(messageId);
+                    if (persisted != null && persisted.IsClaimedBy(processingToken))
                     {
-                        var providerId = await _deliveryGateway.SendAsync(new TransactionalEmail(
-                            message.Recipient, message.Subject, message.HtmlBody, message.TextBody,
-                            message.IdempotencyKey));
-                        message.MarkSent(providerId, DateTime.UtcNow);
+                        if (deliveryFailure == null)
+                        {
+                            persisted.MarkSent(providerId, DateTime.UtcNow);
+                        }
+                        else
+                        {
+                            // Recipient, body and provider credentials are deliberately excluded.
+                            persisted.RecordFailure(
+                                SafeError(deliveryFailure),
+                                DateTime.UtcNow.AddMinutes(BackoffMinutes(persisted.AttemptCount)));
+                        }
                     }
-                    catch (Exception exception)
-                    {
-                        // Recipient, body and provider credentials are deliberately excluded.
-                        message.RecordFailure(SafeError(exception), DateTime.UtcNow.AddMinutes(BackoffMinutes(message.AttemptCount)));
-                    }
-                    await _unitOfWorkManager.Current.SaveChangesAsync();
+
+                    await unitOfWork.CompleteAsync();
                 }
             }
         }
 
-        private static int BackoffMinutes(int attempt) => Math.Min(60, 1 << Math.Min(attempt, 5));
+        private static int BackoffMinutes(int attempt)
+            => attempt >= 6 ? 60 : 1 << Math.Max(0, attempt);
 
         private static string SafeError(Exception exception)
             => exception == null ? "Email delivery failed." : exception.GetType().Name + ": Email delivery failed.";

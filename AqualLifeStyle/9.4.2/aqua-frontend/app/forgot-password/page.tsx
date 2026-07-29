@@ -9,5 +9,6 @@ export default async function ForgotPasswordPage({ searchParams }: Props) {
   return <AccountEmailRequestForm
     areaName={first(values.area) || publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME}
     purpose="password-reset"
+    redirectPath={first(values.redirect) || undefined}
   />;
 }

@@ -73,8 +73,26 @@ namespace AqualLifeStyle.Tests
             Assert.Equal("Here is the answer", enquiry.Response);
             _enquiryRepositoryMock.Verify(r => r.UpdateAsync(enquiry), Times.Once);
             _emailOutboxMock.Verify(outbox => outbox.EnqueueAsync(
-                1, "EnquiryResponse", "enquiry-response:1", It.Is<TransactionalEmail>(email =>
+                1, "EnquiryResponse", "enquiry-response:1:1", It.Is<TransactionalEmail>(email =>
                     email.HtmlBody.Contains("Here is the answer"))), Times.Once);
+        }
+
+        [Fact]
+        public async Task RespondAsync_AfterReopen_UsesANewNotificationKey()
+        {
+            var enquiry = Enquiry.Create(1, 1, 5, "Question about product");
+            SetupEnquiry(enquiry);
+
+            await _service.RespondAsync(1, new RespondToEnquiryDto { Response = "First answer" });
+            enquiry.Close();
+            enquiry.Reopen();
+            await _service.RespondAsync(1, new RespondToEnquiryDto { Response = "Updated answer" });
+
+            enquiry.ResponseVersion.ShouldBe(2);
+            _emailOutboxMock.Verify(outbox => outbox.EnqueueAsync(
+                1, "EnquiryResponse", "enquiry-response:1:1", It.IsAny<TransactionalEmail>()), Times.Once);
+            _emailOutboxMock.Verify(outbox => outbox.EnqueueAsync(
+                1, "EnquiryResponse", "enquiry-response:1:2", It.IsAny<TransactionalEmail>()), Times.Once);
         }
 
         [Fact]

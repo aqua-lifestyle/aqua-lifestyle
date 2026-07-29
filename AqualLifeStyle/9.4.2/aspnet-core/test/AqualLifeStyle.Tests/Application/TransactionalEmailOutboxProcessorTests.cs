@@ -1,7 +1,10 @@
 using System;
+using System.Linq;
 using System.Net.Http;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Abp.Domain.Uow;
 using AqualLifeStyle.Domain.Email;
 using AqualLifeStyle.Email;
 using Microsoft.EntityFrameworkCore;
@@ -49,6 +52,30 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task SuccessfulDelivery_WithNoProviderMessageId_DoesNotRetry()
+        {
+            var messageId = await InsertPendingMessageAsync("provider-id-optional");
+            _deliveryGateway.SendAsync(Arg.Any<TransactionalEmail>(), Arg.Any<CancellationToken>())
+                .Returns((string)null);
+
+            await _processor.ProcessPendingAsync();
+            await _processor.ProcessPendingAsync();
+
+            await _deliveryGateway.Received(1).SendAsync(
+                Arg.Is<TransactionalEmail>(email => email.Reference == "provider-id-optional"),
+                Arg.Any<CancellationToken>());
+            await UsingDbContextAsync(1, async context =>
+            {
+                var persisted = await context.TransactionalEmailOutboxMessages.SingleAsync(
+                    message => message.Id == messageId);
+                persisted.Status.ShouldBe(TransactionalEmailStatus.Sent);
+                persisted.ProviderMessageId.ShouldBeNull();
+                persisted.HtmlBody.ShouldBeNull();
+                persisted.TextBody.ShouldBeNull();
+            });
+        }
+
+        [Fact]
         public async Task FailedDelivery_RetainsSafeRetryStateAndThenUsesTheSameIdempotencyKey()
         {
             var messageId = await InsertPendingMessageAsync("password-reset-retry");
@@ -85,9 +112,197 @@ namespace AqualLifeStyle.Tests.Application
             });
         }
 
-        private Task<Guid> InsertPendingMessageAsync(string idempotencyKey)
+        [Fact]
+        public void RecordFailure_StopsRetryingAtTheMaximumAttemptCount()
         {
             var message = TransactionalEmailOutboxMessage.Create(
+                1,
+                "AccountEmail",
+                "terminal-failure",
+                "recipient@example.test",
+                "Account email",
+                "<p>body</p>",
+                "body",
+                DateTime.UtcNow);
+
+            for (var attempt = 1; attempt <= TransactionalEmailOutboxMessage.MaxDeliveryAttempts; attempt++)
+            {
+                message.StartAttempt(Guid.NewGuid(), DateTime.UtcNow);
+                message.RecordFailure("Delivery failed.", DateTime.UtcNow.AddMinutes(1));
+            }
+
+            message.Status.ShouldBe(TransactionalEmailStatus.Failed);
+            message.AttemptCount.ShouldBe(TransactionalEmailOutboxMessage.MaxDeliveryAttempts);
+        }
+
+        [Fact]
+        public async Task AClaimedMessage_CannotBeClaimedAgainBeforeItBecomesStale()
+        {
+            var messageId = await InsertPendingMessageAsync("atomic-claim");
+            var repository = Resolve<ITransactionalEmailOutboxRepository>();
+            var unitOfWorkManager = Resolve<IUnitOfWorkManager>();
+            var now = DateTime.UtcNow;
+            TransactionalEmailOutboxMessage firstClaim;
+            TransactionalEmailOutboxMessage secondClaim;
+
+            using (var unitOfWork = unitOfWorkManager.Begin())
+            using (unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
+            {
+                firstClaim = await repository.TryClaimAsync(
+                    messageId, Guid.NewGuid(), now, now.AddMinutes(-10));
+                await unitOfWork.CompleteAsync();
+            }
+
+            using (var unitOfWork = unitOfWorkManager.Begin())
+            using (unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
+            {
+                secondClaim = await repository.TryClaimAsync(
+                    messageId, Guid.NewGuid(), now, now.AddMinutes(-10));
+                await unitOfWork.CompleteAsync();
+            }
+
+            firstClaim.ShouldNotBeNull();
+            secondClaim.ShouldBeNull();
+        }
+
+        [Fact]
+        public async Task EnqueueAsync_TreatsAnExistingIdempotencyKeyAsSuccessWithoutDuplicating()
+        {
+            var outbox = Resolve<ITransactionalEmailOutbox>();
+            var email = new TransactionalEmail(
+                "recipient@example.test",
+                "Subject",
+                "<p>Body</p>",
+                "Body",
+                "duplicate-enqueue");
+
+            (await outbox.EnqueueAsync(1, "AccountEmail", "duplicate-enqueue", email)).ShouldBeTrue();
+            (await outbox.EnqueueAsync(1, "AccountEmail", "duplicate-enqueue", email)).ShouldBeFalse();
+
+            await UsingDbContextAsync(1, async context =>
+                (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
+                    message.IdempotencyKey == "duplicate-enqueue")).ShouldBe(1));
+        }
+
+        [Fact]
+        public async Task RepositoryInsert_HandlesAUniqueKeyRaceWithoutMaskingTheExistingMessage()
+        {
+            var repository = Resolve<ITransactionalEmailOutboxRepository>();
+            var unitOfWorkManager = Resolve<IUnitOfWorkManager>();
+
+            using (var unitOfWork = unitOfWorkManager.Begin())
+            {
+                (await repository.InsertIfMissingAsync(CreateMessage("repository-race"))).ShouldBeTrue();
+                await unitOfWork.CompleteAsync();
+            }
+
+            using (var unitOfWork = unitOfWorkManager.Begin())
+            {
+                (await repository.InsertIfMissingAsync(CreateMessage("repository-race"))).ShouldBeFalse();
+                await unitOfWork.CompleteAsync();
+            }
+
+            await UsingDbContextAsync(1, async context =>
+                (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
+                    message.IdempotencyKey == "repository-race")).ShouldBe(1));
+        }
+
+        [Fact]
+        public async Task AStaleClaim_CanBeRecoveredWithoutGivingTheOldWorkerOwnership()
+        {
+            var messageId = await InsertPendingMessageAsync("stale-claim");
+            var repository = Resolve<ITransactionalEmailOutboxRepository>();
+            var unitOfWorkManager = Resolve<IUnitOfWorkManager>();
+            var oldToken = Guid.NewGuid();
+            var newToken = Guid.NewGuid();
+
+            using (var unitOfWork = unitOfWorkManager.Begin())
+            using (unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
+            {
+                (await repository.TryClaimAsync(
+                    messageId,
+                    oldToken,
+                    DateTime.UtcNow,
+                    DateTime.UtcNow.AddMinutes(-10))).ShouldNotBeNull();
+                await unitOfWork.CompleteAsync();
+            }
+
+            await UsingDbContextAsync(1, async context =>
+                await context.TransactionalEmailOutboxMessages
+                    .Where(message => message.Id == messageId)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(
+                        message => message.ProcessingStartedAt,
+                        DateTime.UtcNow.AddMinutes(-20))));
+
+            TransactionalEmailOutboxMessage recovered;
+            using (var unitOfWork = unitOfWorkManager.Begin())
+            using (unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
+            {
+                recovered = await repository.TryClaimAsync(
+                    messageId,
+                    newToken,
+                    DateTime.UtcNow,
+                    DateTime.UtcNow.AddMinutes(-10));
+                await unitOfWork.CompleteAsync();
+            }
+
+            recovered.ShouldNotBeNull();
+            recovered.IsClaimedBy(newToken).ShouldBeTrue();
+            recovered.IsClaimedBy(oldToken).ShouldBeFalse();
+            recovered.AttemptCount.ShouldBe(2);
+        }
+
+        [Fact]
+        public void Backoff_ReachesAndRetainsTheSixtyMinuteCeiling()
+        {
+            var method = typeof(TransactionalEmailOutboxProcessor).GetMethod(
+                "BackoffMinutes",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            method.ShouldNotBeNull();
+
+            ((int)method.Invoke(null, new object[] { 5 })).ShouldBe(32);
+            ((int)method.Invoke(null, new object[] { 6 })).ShouldBe(60);
+            ((int)method.Invoke(null, new object[] { 20 })).ShouldBe(60);
+        }
+
+        [Fact]
+        public async Task AccountEmailThrottle_AllowsOnlyOneReservationUntilExpiry()
+        {
+            var repository = Resolve<IAccountEmailThrottleRepository>();
+            var unitOfWorkManager = Resolve<IUnitOfWorkManager>();
+            var now = DateTime.UtcNow;
+
+            using (var unitOfWork = unitOfWorkManager.Begin())
+            using (unitOfWorkManager.Current.SetTenantId(1))
+            {
+                (await repository.TryAcquireAsync(
+                    "reset:1:HASH", 1, now, now.AddMinutes(5))).ShouldBeTrue();
+                await unitOfWork.CompleteAsync();
+            }
+
+            using (var unitOfWork = unitOfWorkManager.Begin())
+            using (unitOfWorkManager.Current.SetTenantId(1))
+            {
+                (await repository.TryAcquireAsync(
+                    "reset:1:HASH", 1, now.AddMinutes(1), now.AddMinutes(6))).ShouldBeFalse();
+                await unitOfWork.CompleteAsync();
+            }
+        }
+
+        private Task<Guid> InsertPendingMessageAsync(string idempotencyKey)
+        {
+            var message = CreateMessage(idempotencyKey);
+            return UsingDbContextAsync(1, async context =>
+            {
+                context.TransactionalEmailOutboxMessages.Add(message);
+                await context.SaveChangesAsync();
+                return message.Id;
+            });
+        }
+
+        private static TransactionalEmailOutboxMessage CreateMessage(string idempotencyKey)
+        {
+            return TransactionalEmailOutboxMessage.Create(
                 1,
                 "AccountEmail",
                 idempotencyKey,
@@ -96,12 +311,6 @@ namespace AqualLifeStyle.Tests.Application
                 "<p>token-bearing link</p>",
                 "token-bearing link",
                 DateTime.UtcNow);
-            return UsingDbContextAsync(1, async context =>
-            {
-                context.TransactionalEmailOutboxMessages.Add(message);
-                await context.SaveChangesAsync();
-                return message.Id;
-            });
         }
     }
 }

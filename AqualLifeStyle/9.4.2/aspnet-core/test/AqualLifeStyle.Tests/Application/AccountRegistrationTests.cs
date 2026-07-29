@@ -331,7 +331,8 @@ namespace AqualLifeStyle.Tests.Application
             var accepted = await _accountAppService.RequestPasswordReset(new RequestAccountEmailInput
             {
                 AreaName = "Default",
-                EmailAddress = email
+                EmailAddress = email,
+                RedirectPath = "/profile"
             });
             var missing = await _accountAppService.RequestPasswordReset(new RequestAccountEmailInput
             {
@@ -372,6 +373,7 @@ namespace AqualLifeStyle.Tests.Application
                 var resetMessage = await context.TransactionalEmailOutboxMessages.SingleAsync(message =>
                     message.NotificationType == "PasswordReset" && message.Recipient == email);
                 resetMessage.HtmlBody.ShouldContain("area=Default");
+                resetMessage.HtmlBody.ShouldContain("redirect=%2Fprofile");
             });
         }
     }

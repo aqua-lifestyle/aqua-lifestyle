@@ -13,6 +13,7 @@ namespace AqualLifeStyle.Domain.Enquiries
         public int ProductId { get; private set; }
         public string Message { get; private set; }
         public string Response { get; private set; }
+        public int ResponseVersion { get; private set; }
         public EnquiryStatus Status { get; private set; }
         public DateTime CreatedAt { get; private set; }
         public int? AssignedToMemberId { get; private set; }
@@ -51,6 +52,7 @@ namespace AqualLifeStyle.Domain.Enquiries
             if (Status != EnquiryStatus.Pending) throw new InvalidOperationException("Only pending enquiries can be responded to.");
             if (string.IsNullOrWhiteSpace(response)) throw new ArgumentException("Response is required.", nameof(response));
             Response = response.Trim();
+            ResponseVersion++;
             Status = EnquiryStatus.Responded;
         }
 

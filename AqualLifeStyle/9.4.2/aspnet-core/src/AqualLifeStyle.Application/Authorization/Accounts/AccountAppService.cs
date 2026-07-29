@@ -4,7 +4,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Abp.Configuration;
 using Abp.Auditing;
-using Abp.Runtime.Caching;
 using Abp.UI;
 using AqualLifeStyle.Authorization.Accounts.Dto;
 using AqualLifeStyle.Authorization.Users;
@@ -14,6 +13,7 @@ using AqualLifeStyle.Domain.Customers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using AqualLifeStyle.Email;
+using AqualLifeStyle.Domain.Email;
 
 namespace AqualLifeStyle.Authorization.Accounts
 {
@@ -26,7 +26,7 @@ namespace AqualLifeStyle.Authorization.Accounts
         private readonly ICustomerRepository _customerRepository;
         private readonly ITransactionalEmailOutbox _emailOutbox;
         private readonly TransactionalEmailTemplateBuilder _emailTemplates;
-        private readonly ITypedCache<string, AccountEmailThrottleCacheItem> _emailThrottle;
+        private readonly IAccountEmailThrottleRepository _emailThrottleRepository;
 
         public AccountAppService(
             UserRegistrationManager userRegistrationManager,
@@ -34,14 +34,14 @@ namespace AqualLifeStyle.Authorization.Accounts
             ICustomerRepository customerRepository,
             ITransactionalEmailOutbox emailOutbox,
             TransactionalEmailTemplateBuilder emailTemplates,
-            ICacheManager cacheManager)
+            IAccountEmailThrottleRepository emailThrottleRepository)
         {
             _userRegistrationManager = userRegistrationManager;
             _configuration = configuration;
             _customerRepository = customerRepository;
             _emailOutbox = emailOutbox;
             _emailTemplates = emailTemplates;
-            _emailThrottle = cacheManager.GetCache<string, AccountEmailThrottleCacheItem>("AccountEmailThrottle");
+            _emailThrottleRepository = emailThrottleRepository;
         }
 
         public async Task<IsTenantAvailableOutput> IsTenantAvailable(IsTenantAvailableInput input)
@@ -129,7 +129,10 @@ namespace AqualLifeStyle.Authorization.Accounts
             using (CurrentUnitOfWork.SetTenantId(user.TenantId))
             {
                 await UserManager.InitializeOptionsAsync(user.TenantId);
-                await EnqueueVerificationAsync(user, "registration", input.RedirectPath);
+                await EnqueueVerificationAsync(
+                    user,
+                    $"email-verification:{user.TenantId}:{user.Id}:registration",
+                    input.RedirectPath);
             }
 
             return new RegisterOutput
@@ -162,12 +165,17 @@ namespace AqualLifeStyle.Authorization.Accounts
         {
             var generic = VerificationRequestAccepted();
             var context = await FindEligibleUserAsync(input, true);
-            if (context.User == null || !await AcquireThrottleAsync("verify", context.TenantId, input?.EmailAddress)) return generic;
+            if (context.User == null) return generic;
             using (CurrentUnitOfWork.SetTenantId(context.TenantId))
-                await EnqueueVerificationAsync(
+            {
+                var key = $"email-verification:{context.TenantId}:{context.User.Id}:resend:{Guid.NewGuid():N}";
+                var enqueued = await EnqueueVerificationAsync(
                     context.User,
-                    "resend:" + DateTime.UtcNow.ToString("yyyyMMddHHmm"),
+                    key,
                     input.RedirectPath);
+                await KeepEnqueuedEmailIfAllowedAsync(
+                    "verify", context.TenantId, input.EmailAddress, key, enqueued);
+            }
             return generic;
         }
 
@@ -176,17 +184,19 @@ namespace AqualLifeStyle.Authorization.Accounts
         {
             var generic = PasswordResetRequestAccepted();
             var context = await FindEligibleUserAsync(input, false);
-            if (context.User == null || !context.User.IsEmailConfirmed ||
-                !await AcquireThrottleAsync("reset", context.TenantId, input?.EmailAddress)) return generic;
+            if (context.User == null || !context.User.IsEmailConfirmed) return generic;
             using (CurrentUnitOfWork.SetTenantId(context.TenantId))
             {
                 await UserManager.InitializeOptionsAsync(context.TenantId);
                 var token = await UserManager.GeneratePasswordResetTokenAsync(context.User);
                 var url = BuildClientUrl(
-                    "/reset-password", context.TenantId, context.User.Id, token, context.AreaName);
-                var key = $"password-reset:{context.TenantId}:{context.User.Id}:{DateTime.UtcNow:yyyyMMddHHmm}";
-                await _emailOutbox.EnqueueAsync(context.TenantId, "PasswordReset", key,
+                    "/reset-password", context.TenantId, context.User.Id, token,
+                    context.AreaName, input.RedirectPath);
+                var key = $"password-reset:{context.TenantId}:{context.User.Id}:{Guid.NewGuid():N}";
+                var enqueued = await _emailOutbox.EnqueueAsync(context.TenantId, "PasswordReset", key,
                     _emailTemplates.PasswordReset(context.User.Name, context.User.EmailAddress, url, key));
+                await KeepEnqueuedEmailIfAllowedAsync(
+                    "reset", context.TenantId, input.EmailAddress, key, enqueued);
             }
             return generic;
         }
@@ -211,7 +221,10 @@ namespace AqualLifeStyle.Authorization.Accounts
             }
         }
 
-        private async Task EnqueueVerificationAsync(User user, string purpose, string redirectPath = null)
+        private async Task<bool> EnqueueVerificationAsync(
+            User user,
+            string idempotencyKey,
+            string redirectPath = null)
         {
             await UserManager.InitializeOptionsAsync(user.TenantId);
             var token = await UserManager.GenerateEmailConfirmationTokenAsync(user);
@@ -219,9 +232,8 @@ namespace AqualLifeStyle.Authorization.Accounts
             var url = BuildClientUrl(
                 "/verify-email", user.TenantId.Value, user.Id, token,
                 tenant.TenancyName, redirectPath);
-            var key = $"email-verification:{user.TenantId}:{user.Id}:{purpose}";
-            await _emailOutbox.EnqueueAsync(user.TenantId, "EmailVerification", key,
-                _emailTemplates.VerifyEmail(user.Name, user.EmailAddress, url, key));
+            return await _emailOutbox.EnqueueAsync(user.TenantId, "EmailVerification", idempotencyKey,
+                _emailTemplates.VerifyEmail(user.Name, user.EmailAddress, url, idempotencyKey));
         }
 
         private string BuildClientUrl(
@@ -270,14 +282,26 @@ namespace AqualLifeStyle.Authorization.Accounts
             }
         }
 
-        private async Task<bool> AcquireThrottleAsync(string purpose, int tenantId, string email)
+        private async Task KeepEnqueuedEmailIfAllowedAsync(
+            string purpose,
+            int tenantId,
+            string email,
+            string idempotencyKey,
+            bool enqueued)
         {
-            if (tenantId <= 0 || string.IsNullOrWhiteSpace(email)) return false;
+            if (!enqueued || tenantId <= 0 || string.IsNullOrWhiteSpace(email)) return;
             var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(email.Trim().ToUpperInvariant())));
             var key = $"{purpose}:{tenantId}:{hash}";
-            if (await _emailThrottle.GetOrDefaultAsync(key) != null) return false;
-            await _emailThrottle.SetAsync(key, new AccountEmailThrottleCacheItem(), TimeSpan.FromMinutes(5));
-            return true;
+            var now = DateTime.UtcNow;
+            if (await _emailThrottleRepository.TryAcquireAsync(
+                    key, tenantId, now, now.AddMinutes(5)))
+            {
+                return;
+            }
+
+            // Enqueue and throttle reservation share the surrounding database transaction.
+            // Removing this newly inserted row prevents throttled requests from leaking mail.
+            await _emailOutbox.DeleteAsync(idempotencyKey);
         }
 
         private static UserFriendlyException InvalidAccountLink(string title)
@@ -322,6 +346,4 @@ namespace AqualLifeStyle.Authorization.Accounts
         }
     }
 
-    [Serializable]
-    public sealed class AccountEmailThrottleCacheItem { }
 }

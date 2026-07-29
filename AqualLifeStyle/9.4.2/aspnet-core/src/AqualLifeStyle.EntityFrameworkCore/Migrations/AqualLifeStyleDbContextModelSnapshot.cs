@@ -1846,6 +1846,9 @@ namespace AqualLifeStyle.Migrations
                     b.Property<string>("Response")
                         .HasColumnType("text");
 
+                    b.Property<int>("ResponseVersion")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -1897,6 +1900,25 @@ namespace AqualLifeStyle.Migrations
                     b.ToTable("EnquiryFollowUps", (string)null);
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.Domain.Email.AccountEmailThrottle", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.ToTable("AccountEmailThrottles", (string)null);
+                });
+
             modelBuilder.Entity("AqualLifeStyle.Domain.Email.TransactionalEmailOutboxMessage", b =>
                 {
                     b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
@@ -1914,6 +1936,7 @@ namespace AqualLifeStyle.Migrations
                     b.Property<DateTime>("NextAttemptAt").HasColumnType("timestamp with time zone");
                     b.Property<string>("NotificationType").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
                     b.Property<DateTime?>("ProcessingStartedAt").HasColumnType("timestamp with time zone");
+                    b.Property<Guid?>("ProcessingToken").HasColumnType("uuid");
                     b.Property<string>("ProviderMessageId").HasMaxLength(128).HasColumnType("character varying(128)");
                     b.Property<string>("Recipient").IsRequired().HasMaxLength(256).HasColumnType("character varying(256)");
                     b.Property<DateTime?>("SentAt").HasColumnType("timestamp with time zone");

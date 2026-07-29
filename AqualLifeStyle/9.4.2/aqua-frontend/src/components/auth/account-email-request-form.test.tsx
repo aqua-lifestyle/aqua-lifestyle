@@ -26,12 +26,12 @@ describe("AccountEmailRequestForm", () => {
 
   it("routes forgot-password requests to the password-reset endpoint", async () => {
     vi.mocked(requestPasswordReset).mockResolvedValue({ ok: true });
-    render(<AccountEmailRequestForm areaName="Johannesburg" purpose="password-reset" />);
+    render(<AccountEmailRequestForm areaName="Johannesburg" purpose="password-reset" redirectPath="/profile" />);
 
     fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "member@example.test" } });
     fireEvent.click(screen.getByRole("button", { name: "Send reset instructions" }));
 
-    await waitFor(() => expect(requestPasswordReset).toHaveBeenCalledWith("Johannesburg", "member@example.test"));
+    await waitFor(() => expect(requestPasswordReset).toHaveBeenCalledWith("Johannesburg", "member@example.test", "/profile"));
     expect(screen.getByText(/If the account is eligible/)).toBeInTheDocument();
     expect(resendEmailVerification).not.toHaveBeenCalled();
   });

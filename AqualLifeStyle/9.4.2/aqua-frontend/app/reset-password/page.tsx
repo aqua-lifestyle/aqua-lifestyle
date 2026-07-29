@@ -12,6 +12,7 @@ export default async function ResetPasswordPage({ searchParams }: ResetPasswordP
   return (
     <PasswordSetupForm
       areaName={firstValue(values.area)}
+      redirectPath={firstValue(values.redirect) || undefined}
       resetToken={firstValue(values.token)}
       tenantId={Number(firstValue(values.tenantId))}
       userId={Number(firstValue(values.userId))}

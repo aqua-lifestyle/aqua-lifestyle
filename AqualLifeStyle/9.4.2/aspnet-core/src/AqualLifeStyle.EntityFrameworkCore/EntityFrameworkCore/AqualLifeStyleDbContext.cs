@@ -37,6 +37,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<AQGreenJoiningCheckout> AQGreenJoiningCheckouts { get; set; }
         public virtual DbSet<YocoWebhookReceipt> YocoWebhookReceipts { get; set; }
         public virtual DbSet<TransactionalEmailOutboxMessage> TransactionalEmailOutboxMessages { get; set; }
+        public virtual DbSet<AccountEmailThrottle> AccountEmailThrottles { get; set; }
         public virtual DbSet<EntryParticipation> EntryParticipations { get; set; }
         public virtual DbSet<EntryRecruiterCorrection> EntryRecruiterCorrections { get; set; }
         public virtual DbSet<EntryMonthlyObligation> EntryMonthlyObligations { get; set; }

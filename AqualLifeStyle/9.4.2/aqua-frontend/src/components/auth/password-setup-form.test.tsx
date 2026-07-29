@@ -36,11 +36,33 @@ describe("PasswordSetupForm", () => {
     expect(screen.queryByRole("button", { name: "Set password" })).not.toBeInTheDocument();
   });
 
+  it("directs an invalid emailed reset link to self-service recovery", () => {
+    render(<PasswordSetupForm areaName="Default" redirectPath="/profile" resetToken="" tenantId={1} userId={42} />);
+
+    expect(screen.getByText(/Request a new link from the forgot-password page/)).toBeInTheDocument();
+    expect(screen.queryByText(/Ask an administrator/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Request a new reset link" }))
+      .toHaveAttribute("href", "/forgot-password?area=Default&redirect=%2Fprofile");
+  });
+
+  it("uses self-service recovery wording when an emailed reset request fails", async () => {
+    vi.mocked(completePasswordReset).mockRejectedValue(new Error("The request failed."));
+    render(<PasswordSetupForm areaName="Default" resetToken="token" tenantId={1} userId={42} />);
+
+    fireEvent.change(screen.getByLabelText("New password"), { target: { value: "CustomerChosen123!" } });
+    fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "CustomerChosen123!" } });
+    fireEvent.click(screen.getByRole("button", { name: "Set password" }));
+
+    expect(await screen.findByText(/Request a new link from the forgot-password page/)).toBeInTheDocument();
+    expect(screen.queryByText(/Ask an administrator/)).not.toBeInTheDocument();
+  });
+
   it("resets an emailed account password and preserves the Area for sign in", async () => {
     vi.mocked(completePasswordReset).mockResolvedValue({ ok: true });
     render(
       <PasswordSetupForm
         areaName="Johannesburg"
+        redirectPath="/profile"
         resetToken="email-reset-token"
         tenantId={7}
         userId={42}
@@ -58,6 +80,6 @@ describe("PasswordSetupForm", () => {
       "CustomerChosen123!",
     ));
     expect(screen.getByRole("link", { name: "Continue to sign in" }))
-      .toHaveAttribute("href", "/login?area=Johannesburg");
+      .toHaveAttribute("href", "/login?area=Johannesburg&redirect=%2Fprofile");
   });
 });
