@@ -31,6 +31,18 @@ namespace AqualLifeStyle.Tests.Payments
         }
 
         [Fact]
+        public async Task DetectAsync_WithNoStaleCheckouts_ReturnsAnEmptySnapshot()
+        {
+            var snapshot = await Resolve<StaleYocoCheckoutDetector>().DetectAsync(
+                CheckoutCreatedAt);
+
+            snapshot.AQGreenCount.ShouldBe(0);
+            snapshot.OnyxCount.ShouldBe(0);
+            snapshot.TotalCount.ShouldBe(0);
+            snapshot.OldestCheckoutCreatedAt.ShouldBeNull();
+        }
+
+        [Fact]
         public async Task DetectAsync_RejectsANonUtcCutoff()
         {
             await Should.ThrowAsync<ArgumentException>(() =>

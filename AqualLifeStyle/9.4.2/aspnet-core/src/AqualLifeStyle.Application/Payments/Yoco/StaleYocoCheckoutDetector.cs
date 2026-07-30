@@ -65,10 +65,10 @@ namespace AqualLifeStyle.Payments.Yoco
                 var aqGreenCount = await aqGreenQuery.CountAsync();
                 var onyxCount = await onyxQuery.CountAsync();
                 var aqGreenOldest = await aqGreenQuery
-                    .Select(checkout => checkout.CheckoutCreatedAt)
+                    .Select(checkout => (DateTime?)checkout.CheckoutCreatedAt)
                     .MinAsync();
                 var onyxOldest = await onyxQuery
-                    .Select(checkout => checkout.CheckoutCreatedAt)
+                    .Select(checkout => (DateTime?)checkout.CheckoutCreatedAt)
                     .MinAsync();
 
                 return new StaleYocoCheckoutSnapshot(
