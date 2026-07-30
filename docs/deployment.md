@@ -63,8 +63,9 @@ The API stores delivery intent in `TransactionalEmailOutboxMessages` in the same
 transaction as the business change. A worker retries pending records with capped
 backoff. Inspect pending rows by status, attempt count, next-attempt time, and the
 redacted last-error summary; never copy stored token-bearing message bodies into
-logs or support tickets. Successfully transmitted bodies are cleared. Terminally
-failed records immediately redact the recipient, subject, and bodies while retaining
+logs or support tickets. Bodies are cleared after Bird accepts a message for
+delivery; this does not prove final delivery to the recipient. Terminally failed
+records redact the recipient, subject, and bodies while retaining
 only the operational metadata needed to diagnose the failed intent. Support staff
 must create a new email intent after correcting the cause; terminal messages cannot
 be replayed from retained customer content. The worker
@@ -73,9 +74,10 @@ original response for a matching request during its documented idempotency windo
 (three hours by default), closing the normal accept-then-crash retry gap. The
 database's unique outbox key permanently prevents duplicate business intents.
 This is still not an indefinite exactly-once guarantee: a lost success followed
-by a retry after Bird's window can send again. Keep one email worker instance for
-the current deployment; add a database-backed claim/lease before horizontally
-scaling API workers.
+by a retry after Bird's window can send again. Database-backed claim tokens ensure
+that only one API worker sends an eligible row at a time, and abandoned claims are
+eligible for recovery after ten minutes. Final delivered, bounced, or rejected
+outcomes are not retained until Bird delivery webhooks are implemented.
 
 To rotate the API key, create the replacement in Bird, update
 `Bird__ApiKey` in Render, redeploy and verify delivery, then revoke the old
