@@ -158,7 +158,6 @@ namespace AqualLifeStyle.Authorization.Accounts
                 var user = await UserManager.FindByIdAsync(input.UserId.ToString());
                 if (user == null || user.TenantId != input.TenantId || !user.IsActive || user.IsDeleted)
                     throw InvalidAccountLink("Email verification failed.");
-                if (user.IsEmailConfirmed) return true;
                 var result = await UserManager.ConfirmEmailAsync(user, input.Token);
                 if (!result.Succeeded) throw InvalidAccountLink("Email verification failed.");
                 return true;

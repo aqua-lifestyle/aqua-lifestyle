@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { confirmEmail } from "@/src/shared/api/account-email-service";
@@ -17,6 +17,8 @@ describe("VerifyEmailResult", () => {
 
     render(<VerifyEmailResult tenantId={1} token="token" userId={42} />);
 
+    expect(confirmEmail).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Verify email" }));
     expect(await screen.findByText("Your email is verified. You can now sign in.")).toBeInTheDocument();
     expect(confirmEmail).toHaveBeenCalledWith(1, 42, "token");
     expect(screen.getByRole("link", { name: "Continue to sign in" })).toHaveAttribute("href", "/login");
@@ -40,6 +42,7 @@ describe("VerifyEmailResult", () => {
       userId={42}
     />);
 
+    fireEvent.click(screen.getByRole("button", { name: "Verify email" }));
     expect(await screen.findByRole("link", { name: "Continue to sign in" })).toHaveAttribute(
       "href",
       "/login?area=Johannesburg&redirect=%2Fi%2FAQ7G2X9K",

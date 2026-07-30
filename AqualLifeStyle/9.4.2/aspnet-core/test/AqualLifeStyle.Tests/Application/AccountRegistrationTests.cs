@@ -209,6 +209,14 @@ namespace AqualLifeStyle.Tests.Application
                 Token = token
             })).ShouldBeTrue();
 
+            await Should.ThrowAsync<UserFriendlyException>(() =>
+                _accountAppService.ConfirmEmail(new ConfirmEmailInput
+                {
+                    TenantId = 1,
+                    UserId = userId,
+                    Token = "invalid-token"
+                }));
+
             await UsingDbContextAsync(1, async context =>
                 (await context.Users.SingleAsync(user => user.Id == userId))
                     .IsEmailConfirmed.ShouldBeTrue());
