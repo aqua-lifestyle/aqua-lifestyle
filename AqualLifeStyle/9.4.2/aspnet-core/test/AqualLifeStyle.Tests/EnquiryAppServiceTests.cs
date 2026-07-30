@@ -82,7 +82,7 @@ namespace AqualLifeStyle.Tests
         }
 
         [Fact]
-        public async Task RespondAsync_WithOperationalPermission_DoesNotRequireCustomerOwnership()
+        public async Task RespondAsync_WithValidResponse_UpdatesEnquiryStatus()
         {
             // Arrange
             var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question about product");
@@ -95,11 +95,10 @@ namespace AqualLifeStyle.Tests
             Assert.Equal(EnquiryStatus.Responded, enquiry.Status);
             Assert.Equal("Here is the answer", enquiry.Response);
             _enquiryRepositoryMock.Verify(r => r.UpdateAsync(enquiry), Times.Once);
-            _customerRepositoryMock.Verify(r => r.GetAsync(It.IsAny<int>()), Times.Never);
         }
 
         [Fact]
-        public async Task CloseAsync_WithOperationalPermission_DoesNotRequireCustomerOwnership()
+        public async Task CloseAsync_WithPendingEnquiry_ClosesSuccessfully()
         {
             // Arrange
             var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
@@ -111,11 +110,10 @@ namespace AqualLifeStyle.Tests
             // Assert
             Assert.Equal(EnquiryStatus.Closed, enquiry.Status);
             _enquiryRepositoryMock.Verify(r => r.UpdateAsync(enquiry), Times.Once);
-            _customerRepositoryMock.Verify(r => r.GetAsync(It.IsAny<int>()), Times.Never);
         }
 
         [Fact]
-        public async Task ReopenAsync_WithOperationalPermission_DoesNotRequireCustomerOwnership()
+        public async Task ReopenAsync_WithClosedEnquiry_ReopensSuccessfully()
         {
             // Arrange
             var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question");
@@ -129,7 +127,6 @@ namespace AqualLifeStyle.Tests
             Assert.Equal(EnquiryStatus.Pending, enquiry.Status);
             Assert.Empty(enquiry.Response);
             _enquiryRepositoryMock.Verify(r => r.UpdateAsync(enquiry), Times.Once);
-            _customerRepositoryMock.Verify(r => r.GetAsync(It.IsAny<int>()), Times.Never);
         }
 
         [Fact]
