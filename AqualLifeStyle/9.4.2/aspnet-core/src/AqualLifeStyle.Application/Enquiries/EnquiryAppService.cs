@@ -86,11 +86,6 @@ namespace AqualLifeStyle.Application.Enquiries
             AqualLifeStyleValidator.NotNullOrEmpty(input.Response, nameof(input.Response));
 
             var enquiry = await GetEnquiryForCurrentTenantAsync(id);
-            var customer = await _customerRepository.GetAsync(enquiry.CustomerId);
-            if (!await CurrentUserCanAccessCustomerAsync(customer))
-            {
-                throw new UserFriendlyException("Enquiry response failed.", "You do not have permission to respond to this enquiry.");
-            }
 
             try
             {
@@ -102,6 +97,7 @@ namespace AqualLifeStyle.Application.Enquiries
             }
 
             await _enquiryRepository.UpdateAsync(enquiry);
+            var customer = await _customerRepository.GetAsync(enquiry.CustomerId);
             var emailKey = $"enquiry-response:{enquiry.Id}:{enquiry.ResponseVersion}";
             await _emailOutbox.EnqueueAsync(enquiry.TenantId, "EnquiryResponse", emailKey,
                 _emailTemplates.EnquiryResponse(
@@ -115,11 +111,6 @@ namespace AqualLifeStyle.Application.Enquiries
             AqualLifeStyleValidator.ValidId(id);
 
             var enquiry = await GetEnquiryForCurrentTenantAsync(id);
-            var customer = await _customerRepository.GetAsync(enquiry.CustomerId);
-            if (!await CurrentUserCanAccessCustomerAsync(customer))
-            {
-                throw new UserFriendlyException("Enquiry closure failed.", "You do not have permission to close this enquiry.");
-            }
 
             enquiry.Close();
             await _enquiryRepository.UpdateAsync(enquiry);
@@ -132,11 +123,6 @@ namespace AqualLifeStyle.Application.Enquiries
             AqualLifeStyleValidator.ValidId(id);
 
             var enquiry = await GetEnquiryForCurrentTenantAsync(id);
-            var customer = await _customerRepository.GetAsync(enquiry.CustomerId);
-            if (!await CurrentUserCanAccessCustomerAsync(customer))
-            {
-                throw new UserFriendlyException("Enquiry reopen failed.", "You do not have permission to reopen this enquiry.");
-            }
 
             try
             {

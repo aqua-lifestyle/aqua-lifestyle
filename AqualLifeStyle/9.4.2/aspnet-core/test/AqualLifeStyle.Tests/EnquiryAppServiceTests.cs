@@ -59,11 +59,13 @@ namespace AqualLifeStyle.Tests
         }
 
         [Fact]
-        public async Task RespondAsync_WithValidResponse_UpdatesEnquiryStatus()
+        public async Task RespondAsync_ForAnotherCustomersEnquiry_UpdatesStatusAndQueuesEmail()
         {
             // Arrange
             var enquiry = Enquiry.Create(tenantId: 1, customerId: 1, productId: 5, message: "Question about product");
             SetupEnquiry(enquiry);
+            _service.AbpSession = Mock.Of<IAbpSession>(session =>
+                session.TenantId == 1 && session.UserId == 99);
 
             // Act
             var result = await _service.RespondAsync(1, new RespondToEnquiryDto { Response = "Here is the answer" });
