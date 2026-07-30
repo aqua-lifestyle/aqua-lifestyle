@@ -20,6 +20,7 @@ export const AccountEmailRequestForm = ({ areaName, initialEmail = "", purpose, 
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setMessage(undefined);
     const email = String(new FormData(event.currentTarget).get("email") ?? "").trim();
     if (!z.string().email().safeParse(email).success) {
       setError("Enter a valid email address.");
