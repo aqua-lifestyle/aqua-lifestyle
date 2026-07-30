@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
@@ -229,12 +230,12 @@ namespace AqualLifeStyle.Tests
         }
 
         [Fact]
-        public async Task CancelAsync_WithReservedOrderIntent_CancelsSuccessfully()
+        public async Task CancelAsync_WithOperationalPermission_DoesNotRequireCustomerOwnership()
         {
             var orderIntent = OrderIntent.CreateReserved(1, 2, 3, 100m, 95m, System.DateTime.UtcNow);
-            var customer = CreateCustomer(membershipId: 1);
+            var customer = CreateCustomer(membershipId: 1, userId: 99);
             _orderIntentRepositoryMock.Setup(r => r.GetAsync(10)).ReturnsAsync(orderIntent);
-            _customerRepositoryMock.Setup(r => r.GetAsync(1)).ReturnsAsync(customer);
+            _customerRepositoryMock.Setup(r => r.FirstOrDefaultAsync(1)).ReturnsAsync(customer);
 
             var abpSessionMock = new Mock<IAbpSession>();
             abpSessionMock.Setup(s => s.TenantId).Returns(1);
@@ -247,6 +248,34 @@ namespace AqualLifeStyle.Tests
             _orderIntentRepositoryMock.Verify(r => r.UpdateAsync(orderIntent), Times.Once);
         }
 
+        [Fact]
+        public async Task CompleteAsync_WithOperationalPermission_DoesNotRequireCustomerOwnership()
+        {
+            var orderIntent = OrderIntent.CreateReserved(1, 2, 3, 100m, 95m, System.DateTime.UtcNow);
+            var customer = CreateCustomer(membershipId: 1, userId: 99);
+            _orderIntentRepositoryMock.Setup(r => r.GetAsync(10)).ReturnsAsync(orderIntent);
+            _customerRepositoryMock.Setup(r => r.FirstOrDefaultAsync(1)).ReturnsAsync(customer);
+
+            var result = await _service.CompleteAsync(10);
+
+            Assert.Equal((int)OrderIntentStatus.Completed, result.Status);
+            _orderIntentRepositoryMock.Verify(r => r.UpdateAsync(orderIntent), Times.Once);
+        }
+
+        [Fact]
+        public async Task CancelAsync_WhenOrderBelongsToAnotherArea_RejectsWithoutMutation()
+        {
+            var orderIntent = OrderIntent.CreateReserved(1, 2, 3, 100m, 95m, System.DateTime.UtcNow);
+            var customer = CreateCustomer(membershipId: 1, userId: 99, tenantId: 2);
+            _orderIntentRepositoryMock.Setup(r => r.GetAsync(10)).ReturnsAsync(orderIntent);
+            _customerRepositoryMock.Setup(r => r.FirstOrDefaultAsync(1)).ReturnsAsync(customer);
+
+            await Assert.ThrowsAsync<AqualLifeStyleNotFoundException>(() => _service.CancelAsync(10));
+
+            Assert.Equal(OrderIntentStatus.Reserved, orderIntent.Status);
+            _orderIntentRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<OrderIntent>()), Times.Never);
+        }
+
         private static Enquiry CreateConvertedEnquiry()
         {
             var enquiry = Enquiry.Create(1, 1, 2, "Question about bundle");
@@ -255,9 +284,9 @@ namespace AqualLifeStyle.Tests
             return enquiry;
         }
 
-        private static Customer CreateCustomer(int? membershipId)
+        private static Customer CreateCustomer(int? membershipId, long userId = 43, int tenantId = 1)
         {
-            var customer = Customer.Create(1, 43, "Jane Doe", new EmailAddress("jane@example.com"), membershipId);
+            var customer = Customer.Create(tenantId, userId, "Jane Doe", new EmailAddress("jane@example.com"), membershipId);
             customer.Id = 1;
             return customer;
         }
