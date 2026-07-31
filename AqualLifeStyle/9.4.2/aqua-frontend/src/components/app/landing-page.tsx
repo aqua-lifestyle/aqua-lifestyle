@@ -1,416 +1,141 @@
+import type { LucideIcon } from "lucide-react";
 import {
-  ArrowRight,
-  BadgeCheck,
-  CircleCheck,
-  Droplets,
-  HeartPulse,
-  Leaf,
-  Network,
-  Package,
-  ShieldCheck,
-  Sparkles,
-  Users,
+  ArrowRight, BadgeCheck, CircleCheck, Droplets, HeartPulse, Leaf,
+  Network, ShieldCheck, Sparkles, Users,
 } from "lucide-react";
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
 
 import { LinkButton } from "@/src/shared/ui";
-
 import { LandingAccountActions } from "./landing-account-actions";
 
-const valuePillars = [
-  {
-    description:
-      "Discover aQuathz products and see how product access connects to membership.",
-    icon: HeartPulse,
-    title: "Health",
-  },
-  {
-    description:
-      "Keep products, programme information and member activity together in one place.",
-    icon: Sparkles,
-    title: "Lifestyle",
-  },
-  {
-    description:
-      "Stay connected through the club's Area Leader and Facilitator network.",
-    icon: Users,
-    title: "Community",
-  },
-  {
-    description:
-      "Explore pathways for participation, leadership and growing a local network.",
-    icon: Network,
-    title: "Opportunity",
-  },
-];
-
-const journey = [
-  {
-    description:
-      "Learn about the club, its programmes and available products before creating an account.",
-    title: "Explore your options",
-  },
-  {
-    description:
-      "Create an account to access the member experience and information relevant to you.",
-    title: "Join the club",
-  },
-  {
-    description:
-      "Use your dashboard to follow products, orders, programmes and your club activity.",
-    title: "Manage your journey",
-  },
+const pillars = [
+  { description: "Discover aQuathz products and how access can connect to membership.", icon: HeartPulse, title: "Health" },
+  { description: "Keep products, programme information and activity in one experience.", icon: Sparkles, title: "Lifestyle" },
+  { description: "Stay connected through the Area Leader and Facilitator network.", icon: Users, title: "Community" },
+  { description: "Explore participation and leadership pathways in a local network.", icon: Network, title: "Opportunity" },
 ];
 
 const pathways = [
-  {
-    description:
-      "The starting point for club access, eligible products and ongoing member activity.",
-    eyebrow: "Membership",
-    icon: BadgeCheck,
-    title: "A connected member experience",
-  },
-  {
-    description:
-      "A programme pathway centred on participation, monthly commitments and savings activity.",
-    eyebrow: "AQGreen",
-    icon: Leaf,
-    title: "Structured participation",
-  },
-  {
-    description:
-      "A pathway that connects network participation with Facilitator and Area Leader roles.",
-    eyebrow: "Onyx",
-    icon: Network,
-    title: "Community opportunity",
-  },
+  { accent: "bg-[#f2e5d0] text-[#21122f]", description: "The starting point for club access, eligible products and ongoing member activity.", eyebrow: "Membership", icon: BadgeCheck, title: "A connected member experience" },
+  { accent: "bg-[#c9f4d8] text-[#07552f]", description: "A distinct pathway centred on participation and monthly commitments.", eyebrow: "AQGreen", icon: Leaf, title: "Structured participation" },
+  { accent: "bg-[#d9ccff] text-[#351077]", description: "A pathway connecting network participation with Facilitator and Area Leader roles.", eyebrow: "Onyx", icon: Network, title: "Community opportunity" },
+];
+
+const journey = [
+  { description: "Learn about the club, pathways and products before creating an account.", title: "Explore" },
+  { description: "Create an account to access information and actions relevant to you.", title: "Join" },
+  { description: "Follow products, orders, programmes and club activity from your dashboard.", title: "Participate" },
 ];
 
 const faqs = [
-  {
-    answer:
-      "Aqua Lifestyle Club is a membership platform that brings together aQuathz products, member programmes and an area-based community network.",
-    question: "What is Aqua Lifestyle Club?",
-  },
-  {
-    answer:
-      "No. You can learn about the club and browse the public product catalog before deciding to create an account.",
-    question: "Do I need an account to browse products?",
-  },
-  {
-    answer:
-      "Product visibility and eligibility can depend on membership. Your account shows the information and actions available to you.",
-    question: "Does every member see the same products?",
-  },
-  {
-    answer:
-      "Signed-in members use their dashboard to view the products, orders, programmes and club activity available for their role.",
-    question: "Where do I manage my membership activity?",
-  },
+  { answer: "Aqua Lifestyle Club is a membership platform bringing together aQuathz products, member programmes and an area-based community network.", question: "What is Aqua Lifestyle Club?" },
+  { answer: "No. You can learn about the club and browse the public product catalog before deciding to create an account.", question: "Do I need an account to browse products?" },
+  { answer: "Product visibility and eligibility can depend on membership. Your account shows the information and actions available to you.", question: "Does every member see the same products?" },
+  { answer: "Signed-in members use their dashboard to view the products, orders, programmes and club activity available for their role.", question: "Where do I manage my membership activity?" },
 ];
 
-type SectionHeadingProps = {
-  align?: "center" | "left";
-  description: string;
-  eyebrow: string;
-  id: string;
-  title: string;
-};
-
-const SectionHeading = ({
-  align = "left",
-  description,
-  eyebrow,
-  id,
-  title,
-}: SectionHeadingProps) => (
-  <div className={align === "center" ? "mx-auto max-w-2xl text-center" : "max-w-2xl"}>
-    <p className="text-xs font-bold uppercase tracking-[0.22em] text-teal-700">
-      {eyebrow}
-    </p>
-    <h2
-      className="mt-4 text-3xl font-bold tracking-[-0.035em] text-slate-950 sm:text-4xl"
-      id={id}
-    >
-      {title}
-    </h2>
-    <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
-      {description}
-    </p>
+const SectionHeading = ({ description, eyebrow, id, light = false, title }: {
+  description?: string; eyebrow: string; id: string; light?: boolean; title: string;
+}) => (
+  <div className="max-w-3xl">
+    <p className={`text-xs font-bold uppercase tracking-[0.24em] ${light ? "text-[#cdb8ff]" : "text-[#5921b6]"}`}>{eyebrow}</p>
+    <h2 className={`mt-4 text-3xl font-semibold leading-[1.05] tracking-[-0.045em] text-balance sm:text-5xl ${light ? "text-white" : "text-[#17111c]"}`} id={id}>{title}</h2>
+    {description ? <p className={`mt-5 max-w-2xl text-base leading-7 sm:text-lg ${light ? "text-white/60" : "text-[#655d68]"}`}>{description}</p> : null}
   </div>
 );
 
-const ValueCard = ({
-  description,
-  icon: Icon,
-  title,
-}: {
-  description: string;
-  icon: LucideIcon;
-  title: string;
-}) => (
-  <article className="group border-t border-slate-200 pt-6">
-    <div className="flex size-11 items-center justify-center rounded-full bg-teal-50 text-teal-700 transition-transform duration-300 group-hover:-translate-y-1">
-      <Icon aria-hidden="true" className="size-5" strokeWidth={1.8} />
+const Pillar = ({ description, icon: Icon, index, title }: { description: string; icon: LucideIcon; index: number; title: string }) => (
+  <article className="group flex min-h-72 flex-col justify-between border-t border-[#d8d0c6] py-7 transition-colors hover:border-[#6424d0]">
+    <div className="flex items-center justify-between">
+      <span className="font-mono text-xs text-[#837986]">0{index + 1}</span>
+      <Icon aria-hidden="true" className="size-6 text-[#6424d0] transition-transform duration-300 group-hover:-translate-y-1" strokeWidth={1.6} />
     </div>
-    <h3 className="mt-5 text-lg font-bold text-slate-950">{title}</h3>
-    <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    <div><h3 className="text-2xl font-semibold tracking-[-0.03em]">{title}</h3><p className="mt-3 max-w-xs text-sm leading-6 text-[#655d68]">{description}</p></div>
   </article>
 );
 
+const ProductVisual = () => (
+  <div aria-hidden="true" className="relative mx-auto flex h-80 w-full max-w-lg items-end justify-center sm:h-[28rem]">
+    <div className="absolute left-4 top-3 size-48 rounded-full bg-[#7130ee]/25 blur-3xl" />
+    {[
+      "h-[78%] w-[31%] from-[#7545df] via-[#34206f] to-[#120f1b]",
+      "-ml-3 h-[54%] w-[24%] from-[#d9ccff] via-[#6f35cf] to-[#181123]",
+      "-ml-2 h-[42%] w-[18%] from-[#afefc5] via-[#178d57] to-[#102219]",
+    ].map((classes, index) => (
+      <div className={`relative rounded-[2.5rem_2.5rem_1.4rem_1.4rem] border border-white/20 bg-gradient-to-b shadow-[0_35px_80px_rgba(0,0,0,0.38)] ${classes}`} key={classes}>
+        <div className="absolute -top-5 left-1/2 h-7 w-10 -translate-x-1/2 rounded-t-lg bg-[#292033]" />
+        {index === 0 ? <div className="absolute inset-x-2 top-[42%] border-y border-white/15 bg-black/25 py-4 text-center text-[9px] font-bold uppercase tracking-[0.2em] text-white/75">aQuathz</div> : null}
+      </div>
+    ))}
+  </div>
+);
+
 export const LandingPage = () => (
-  <main className="overflow-hidden bg-[#fbfcfa] text-slate-950">
-    <section
-      aria-labelledby="landing-title"
-      className="relative isolate border-b border-white/10 bg-[#082f35] text-white"
-    >
-      <div
-        aria-hidden="true"
-        className="absolute -right-48 -top-56 size-[34rem] rounded-full border border-teal-200/15 bg-teal-300/10 blur-3xl"
-      />
-      <div
-        aria-hidden="true"
-        className="absolute -bottom-52 left-1/3 size-[30rem] rounded-full bg-cyan-300/10 blur-3xl"
-      />
-      <div className="relative mx-auto grid min-h-[calc(100svh-4rem)] max-w-7xl items-center gap-14 px-4 py-20 sm:px-6 lg:grid-cols-[1.12fr_0.88fr] lg:px-8 lg:py-24">
-        <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold tracking-wide text-teal-100">
-            <ShieldCheck aria-hidden="true" className="size-4" />
-            Membership | Products | Programmes
-          </div>
-          <h1
-            className="mt-7 text-5xl font-bold leading-[0.98] tracking-[-0.055em] text-balance sm:text-6xl lg:text-7xl"
-            id="landing-title"
-          >
-            Live well. Grow together.
-          </h1>
-          <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-200 sm:text-xl">
-            Aqua Lifestyle Club brings membership, aQuathz products, community
-            programmes and area-based support into one connected experience.
-          </p>
-          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-            <LinkButton
-              className="bg-teal-300 text-slate-950 shadow-none hover:bg-teal-200"
-              href="#value"
-              size="lg"
-            >
-              Explore the club
-              <ArrowRight aria-hidden="true" className="size-4" />
-            </LinkButton>
-            <LinkButton
-              className="border-white/20 bg-white/5 text-white hover:bg-white/10"
-              href="/catalog"
-              size="lg"
-              variant="outline"
-            >
-              Browse products
-            </LinkButton>
-          </div>
-          <p className="mt-6 flex items-center gap-2 text-sm text-slate-300">
-            <CircleCheck aria-hidden="true" className="size-4 text-teal-300" />
-            Explore the value before you decide to join.
-          </p>
-        </div>
-
-        <div aria-hidden="true" className="relative mx-auto hidden w-full max-w-md lg:block">
-          <div className="aspect-square rounded-full border border-white/10 p-7">
-            <div className="relative flex size-full items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-teal-200 via-cyan-300 to-teal-600 shadow-[0_32px_90px_rgba(45,212,191,0.22)]">
-              <div className="absolute inset-8 rounded-full border border-white/30" />
-              <div className="absolute inset-16 rounded-full border border-white/25" />
-              <Droplets className="size-28 text-[#08333a]" strokeWidth={1.2} />
+  <>
+    <main className="overflow-hidden bg-[#f8f4ed] text-[#17111c]">
+      <section aria-labelledby="landing-title" className="relative isolate min-h-[calc(100svh-4rem)] overflow-hidden bg-[#09080b] text-white">
+        <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_78%_25%,rgba(106,43,220,0.34),transparent_30%),radial-gradient(circle_at_15%_85%,rgba(23,135,82,0.16),transparent_28%)]" />
+        <div aria-hidden="true" className="absolute -right-24 top-[15%] h-80 w-[52rem] -rotate-12 rounded-[100%] bg-gradient-to-r from-[#2b0b65] via-[#6120d2] to-[#8d52ff] opacity-80" />
+        <div className="relative mx-auto grid min-h-[calc(100svh-4rem)] max-w-7xl items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1.08fr_0.92fr] lg:px-8">
+          <div className="relative z-10 max-w-3xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/75 backdrop-blur-sm"><ShieldCheck aria-hidden="true" className="size-4 text-[#cdb8ff]" />Membership &nbsp; Products &nbsp; Community</div>
+            <h1 className="mt-8 text-5xl font-semibold leading-[0.93] tracking-[-0.065em] text-balance sm:text-7xl lg:text-[5.6rem]" id="landing-title">Live in health.<br /><span className="text-[#cdb8ff]">Inspire to wealth.</span></h1>
+            <p className="mt-7 max-w-xl text-lg leading-8 text-white/65 sm:text-xl">A connected club experience bringing together aQuathz products, membership pathways and area-based community support.</p>
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+              <LinkButton className="rounded-full bg-[#7540e8] px-7 text-white shadow-none hover:bg-[#8655ef]" href="#value" size="lg">Discover Aqua<ArrowRight aria-hidden="true" className="size-4" /></LinkButton>
+              <LinkButton className="rounded-full border-white/20 bg-white/5 px-7 text-white hover:bg-white/10" href="/catalog" size="lg" variant="outline">Browse products</LinkButton>
             </div>
+            <p className="mt-7 flex items-center gap-2 text-sm text-white/55"><CircleCheck aria-hidden="true" className="size-4 text-[#a9eec1]" />Explore before you decide to join.</p>
           </div>
-          <div className="absolute -bottom-3 -left-6 w-52 rounded-2xl border border-white/15 bg-[#0b3b42]/90 p-4 shadow-2xl backdrop-blur">
-            <p className="text-xs uppercase tracking-[0.18em] text-teal-200">One club</p>
-            <p className="mt-2 text-sm font-semibold leading-5 text-white">
-              Health, lifestyle, community and opportunity.
-            </p>
+          <div className="relative flex min-h-80 items-center justify-center lg:min-h-[36rem]">
+            <div className="relative z-10 grid aspect-[4/5] w-64 place-items-center rounded-[8rem] border border-white/15 bg-black/30 shadow-2xl backdrop-blur-sm sm:w-80"><div className="absolute inset-5 rounded-[7rem] border border-white/10" /><Droplets className="size-28 text-[#cdb8ff]" strokeWidth={1.05} /></div>
+            <div className="absolute bottom-6 right-0 z-20 max-w-56 rounded-2xl border border-white/15 bg-[#f2e5d0] p-5 text-[#21122f] shadow-2xl sm:right-8"><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#6b4f2f]">Always connected</p><p className="mt-2 text-sm font-semibold leading-5">Health, lifestyle, community and opportunity.</p></div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section
-      aria-labelledby="value-title"
-      className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-24 lg:px-8"
-      id="value"
-    >
-      <div className="mx-auto max-w-7xl">
-        <SectionHeading
-          description="Aqua connects the practical parts of club membership without losing sight of the people and communities behind it."
-          eyebrow="Why Aqua"
-          id="value-title"
-          title="More than a membership account"
-        />
-        <div className="mt-12 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-          {valuePillars.map((pillar) => (
-            <ValueCard key={pillar.title} {...pillar} />
-          ))}
+      <section aria-labelledby="problem-title" className="border-b border-[#ded6cc] px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.75fr_1.25fr] lg:items-end">
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#5921b6]">The everyday challenge</p>
+          <div><h2 className="max-w-4xl text-4xl font-semibold leading-[1.04] tracking-[-0.05em] text-balance sm:text-6xl" id="problem-title">Products, participation and support should not feel disconnected.</h2><p className="mt-6 max-w-2xl text-lg leading-8 text-[#655d68]">Aqua brings the practical parts of club membership into one place, while keeping every pathway distinct.</p></div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section
-      aria-labelledby="journey-title"
-      className="scroll-mt-20 bg-[#eef7f3] px-4 py-20 sm:px-6 sm:py-24 lg:px-8"
-      id="how-it-works"
-    >
-      <div className="mx-auto max-w-7xl">
-        <SectionHeading
-          align="center"
-          description="Start with the information you need, then move into a member experience shaped around your access."
-          eyebrow="How it works"
-          id="journey-title"
-          title="A clear path from discovery to participation"
-        />
-        <ol className="mt-14 grid gap-5 lg:grid-cols-3">
-          {journey.map((step, index) => (
-            <li
-              className="relative rounded-2xl border border-teal-950/10 bg-white p-7 shadow-[0_16px_45px_rgba(15,71,70,0.06)]"
-              key={step.title}
-            >
-              <span className="text-sm font-bold text-teal-700">0{index + 1}</span>
-              <h3 className="mt-8 text-xl font-bold tracking-tight text-slate-950">
-                {step.title}
-              </h3>
-              <p className="mt-3 text-sm leading-6 text-slate-600">{step.description}</p>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </section>
+      <section aria-labelledby="value-title" className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28 lg:px-8" id="value">
+        <div className="mx-auto max-w-7xl"><SectionHeading description="A membership experience designed around the things that matter to everyday club life." eyebrow="Why Aqua" id="value-title" title="One club. Four connected ideas." /><div className="mt-14 grid gap-x-8 sm:grid-cols-2 lg:grid-cols-4">{pillars.map((pillar, index) => <Pillar index={index} key={pillar.title} {...pillar} />)}</div></div>
+      </section>
 
-    <section
-      aria-labelledby="pathways-title"
-      className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-24 lg:px-8"
-      id="programmes"
-    >
-      <div className="mx-auto max-w-7xl">
-        <SectionHeading
-          description="The club brings membership and programme pathways into one platform while keeping each journey distinct."
-          eyebrow="Membership overview"
-          id="pathways-title"
-          title="Find the path that fits your journey"
-        />
-        <div className="mt-12 grid overflow-hidden rounded-3xl border border-slate-200 bg-white lg:grid-cols-3">
-          {pathways.map((pathway, index) => (
-            <article
-              className={`p-7 sm:p-9 ${index > 0 ? "border-t border-slate-200 lg:border-l lg:border-t-0" : ""}`}
-              key={pathway.eyebrow}
-            >
-              <pathway.icon aria-hidden="true" className="size-7 text-teal-700" strokeWidth={1.7} />
-              <p className="mt-8 text-xs font-bold uppercase tracking-[0.2em] text-teal-700">
-                {pathway.eyebrow}
-              </p>
-              <h3 className="mt-3 text-xl font-bold text-slate-950">{pathway.title}</h3>
-              <p className="mt-3 text-sm leading-6 text-slate-600">{pathway.description}</p>
-            </article>
-          ))}
+      <section aria-labelledby="pathways-title" className="scroll-mt-20 bg-[#0b090d] px-4 py-20 text-white sm:px-6 sm:py-28 lg:px-8" id="programmes">
+        <div className="mx-auto max-w-7xl"><SectionHeading description="Explore each pathway first. Your account shows the access and actions available to you." eyebrow="Membership overview" id="pathways-title" light title="Different pathways. One connected experience." />
+          <div className="mt-14 grid gap-4 lg:grid-cols-3">{pathways.map((pathway, index) => <article className="group relative min-h-96 overflow-hidden rounded-3xl border border-white/10 bg-[#151118] p-7 sm:p-9" key={pathway.eyebrow}><div className={`inline-flex size-12 items-center justify-center rounded-2xl ${pathway.accent}`}><pathway.icon aria-hidden="true" className="size-6" strokeWidth={1.6} /></div><p className="mt-20 text-xs font-bold uppercase tracking-[0.22em] text-white/45">{pathway.eyebrow}</p><h3 className="mt-3 max-w-xs text-2xl font-semibold tracking-[-0.03em]">{pathway.title}</h3><p className="mt-4 max-w-sm text-sm leading-6 text-white/55">{pathway.description}</p><span aria-hidden="true" className="absolute -bottom-8 right-4 font-mono text-8xl font-bold text-white/[0.035]">0{index + 1}</span></article>)}</div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section
-      aria-labelledby="products-title"
-      className="px-4 pb-20 sm:px-6 sm:pb-24 lg:px-8"
-    >
-      <div className="mx-auto grid max-w-7xl overflow-hidden rounded-3xl bg-[#0b3940] text-white lg:grid-cols-[0.88fr_1.12fr]">
-        <div className="relative min-h-72 overflow-hidden bg-teal-300 p-8 text-[#082f35] sm:p-12">
-          <div aria-hidden="true" className="absolute -bottom-24 -right-14 size-72 rounded-full border-[44px] border-white/25" />
-          <Package aria-hidden="true" className="relative size-14" strokeWidth={1.4} />
-          <p className="relative mt-20 max-w-xs text-sm font-bold uppercase tracking-[0.18em]">
-            aQuathz product catalog
-          </p>
+      <section aria-labelledby="products-title" className="bg-[#17111c] px-4 pb-20 text-white sm:px-6 sm:pb-28 lg:px-8">
+        <div className="mx-auto grid max-w-7xl overflow-hidden rounded-b-[2.5rem] bg-[#251437] lg:grid-cols-2">
+          <div className="flex items-center p-8 sm:p-12 lg:p-16"><div><p className="text-xs font-bold uppercase tracking-[0.24em] text-[#d6aa45]">Featured products</p><h2 className="mt-4 text-4xl font-semibold leading-[1.05] tracking-[-0.045em] sm:text-5xl" id="products-title">See the product world behind the club.</h2><p className="mt-5 max-w-xl leading-7 text-white/60">Explore aQuathz water products, Spraythz and health sets. Availability and eligibility can depend on membership.</p><LinkButton className="mt-8 rounded-full border-white/15 bg-[#f2e5d0] px-7 text-[#21122f] hover:bg-white" href="/catalog" size="lg" variant="outline">Explore the catalog<ArrowRight aria-hidden="true" className="size-4" /></LinkButton></div></div>
+          <div className="flex min-h-96 items-center bg-[radial-gradient(circle_at_center,rgba(116,64,232,0.22),transparent_64%)] p-6 sm:p-10"><ProductVisual /></div>
         </div>
-        <div className="p-8 sm:p-12 lg:p-14">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-teal-200">Products</p>
-          <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl" id="products-title">
-            See what is available before you join
-          </h2>
-          <p className="mt-5 max-w-xl leading-7 text-slate-200">
-            Browse the public catalog for aQuathz water products, Spraythz and health
-            sets. Product visibility and eligibility can depend on membership.
-          </p>
-          <LinkButton
-            className="mt-8 border-white/20 bg-white text-slate-950 hover:bg-teal-50"
-            href="/catalog"
-            size="lg"
-            variant="outline"
-          >
-            Explore the catalog
-            <ArrowRight aria-hidden="true" className="size-4" />
-          </LinkButton>
+      </section>
+
+      <section aria-labelledby="journey-title" className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28 lg:px-8" id="how-it-works">
+        <div className="mx-auto max-w-7xl"><SectionHeading description="Start with clear information, then move into an experience shaped around your access." eyebrow="How it works" id="journey-title" title="A considered path into the club." /><ol className="mt-14 border-y border-[#d8d0c6]">{journey.map((step, index) => <li className="grid gap-4 border-b border-[#d8d0c6] py-7 last:border-b-0 sm:grid-cols-[5rem_0.6fr_1fr] sm:items-center" key={step.title}><span className="font-mono text-sm text-[#5921b6]">0{index + 1}</span><h3 className="text-2xl font-semibold">{step.title}</h3><p className="max-w-xl text-sm leading-6 text-[#655d68]">{step.description}</p></li>)}</ol></div>
+      </section>
+
+      <section aria-labelledby="community-title" className="bg-[#e6f6e9] px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+          <div className="relative min-h-80 overflow-hidden rounded-[2.5rem] bg-[#07552f] p-8 text-white sm:min-h-[30rem] sm:p-12"><div aria-hidden="true" className="absolute -bottom-28 -right-24 size-80 rounded-full border-[55px] border-[#a9eec1]/25" /><Users aria-hidden="true" className="relative size-16 text-[#c9f4d8]" strokeWidth={1.25} /><p className="relative mt-28 max-w-sm text-3xl font-semibold leading-tight tracking-[-0.04em] sm:mt-40 sm:text-4xl">People are the heart of the experience.</p></div>
+          <div><SectionHeading description="Aqua's area-based model connects members with Area Leaders and Facilitators, bringing local support into the wider club experience." eyebrow="Community" id="community-title" title="Belong locally. Stay connected to the whole." /><div className="mt-8 flex items-start gap-4 border-t border-[#07552f]/20 pt-6"><ShieldCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-[#07552f]" /><p className="max-w-xl text-sm leading-6 text-[#315b43]">Programme participation, roles and available actions remain visible through the member dashboard.</p></div></div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section
-      aria-labelledby="faq-title"
-      className="scroll-mt-20 border-y border-slate-200 bg-white px-4 py-20 sm:px-6 sm:py-24 lg:px-8"
-      id="faq"
-    >
-      <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.75fr_1.25fr]">
-        <SectionHeading
-          description="Straightforward answers to help you understand the public and member experience."
-          eyebrow="FAQ"
-          id="faq-title"
-          title="Questions before joining"
-        />
-        <div className="divide-y divide-slate-200 border-y border-slate-200">
-          {faqs.map((faq) => (
-            <details className="group py-6" key={faq.question}>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-6 font-bold text-slate-950 marker:content-none">
-                {faq.question}
-                <span
-                  aria-hidden="true"
-                  className="flex size-7 shrink-0 items-center justify-center rounded-full border border-slate-300 text-lg font-normal transition-transform group-open:rotate-45"
-                >
-                  +
-                </span>
-              </summary>
-              <p className="max-w-2xl pt-4 text-sm leading-6 text-slate-600">{faq.answer}</p>
-            </details>
-          ))}
-        </div>
-      </div>
-    </section>
+      <section aria-labelledby="faq-title" className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28 lg:px-8" id="faq">
+        <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.75fr_1.25fr]"><SectionHeading description="Clear answers about the public and member experience." eyebrow="FAQ" id="faq-title" title="Questions before joining." /><div className="border-t border-[#d8d0c6]">{faqs.map((faq, index) => <details className="group border-b border-[#d8d0c6] py-6" key={faq.question}><summary className="flex cursor-pointer list-none items-center justify-between gap-6 font-semibold marker:content-none"><span className="flex items-center gap-4"><span className="hidden font-mono text-xs text-[#837986] sm:inline">0{index + 1}</span>{faq.question}</span><span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-full border border-[#bcb2c0] text-lg font-normal transition-transform group-open:rotate-45">+</span></summary><p className="max-w-2xl pt-4 text-sm leading-6 text-[#655d68] sm:pl-10">{faq.answer}</p></details>)}</div></div>
+      </section>
 
-    <section
-      aria-labelledby="join-title"
-      className="bg-[#082f35] px-4 py-20 text-white sm:px-6 sm:py-24 lg:px-8"
-    >
-      <div className="mx-auto max-w-3xl text-center">
-        <p className="text-xs font-bold uppercase tracking-[0.22em] text-teal-200">Your next step</p>
-        <h2 className="mt-4 text-4xl font-bold tracking-[-0.04em] sm:text-5xl" id="join-title">
-          Ready to take a closer look?
-        </h2>
-        <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-slate-200">
-          Create your account to begin your Aqua journey, or return to the dashboard if
-          you are already a member.
-        </p>
-        <LandingAccountActions />
-      </div>
-    </section>
+      <section aria-labelledby="join-title" className="relative overflow-hidden bg-[#09080b] px-4 py-20 text-white sm:px-6 sm:py-28 lg:px-8"><div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(112,46,231,0.55),transparent_48%)]" /><div className="relative mx-auto max-w-4xl text-center"><p className="text-xs font-bold uppercase tracking-[0.24em] text-[#cdb8ff]">Your next step</p><h2 className="mt-4 text-4xl font-semibold leading-[1.02] tracking-[-0.05em] text-balance sm:text-6xl" id="join-title">Take a closer look at life inside Aqua.</h2><p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-white/60">Create an account to begin your journey, or return to your dashboard if you are already a member.</p><LandingAccountActions /></div></section>
+    </main>
 
-    <footer className="bg-[#061f24] px-4 py-10 text-slate-300 sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-8 sm:flex-row sm:items-center sm:justify-between">
-        <Link className="inline-flex items-center gap-3 text-white" href="/">
-          <span className="flex size-9 items-center justify-center rounded-full bg-teal-300 text-[#082f35]">
-            <Droplets aria-hidden="true" className="size-5" />
-          </span>
-          <span className="font-bold">Aqua Lifestyle Club</span>
-        </Link>
-        <nav aria-label="Footer navigation" className="flex flex-wrap gap-x-6 gap-y-3 text-sm">
-          <Link className="hover:text-white" href="/#value">Why Aqua</Link>
-          <Link className="hover:text-white" href="/#programmes">Programmes</Link>
-          <Link className="hover:text-white" href="/catalog">Catalog</Link>
-          <Link className="hover:text-white" href="/contact">Contact</Link>
-        </nav>
-      </div>
-      <p className="mx-auto mt-8 max-w-7xl border-t border-white/10 pt-6 text-xs text-slate-400">
-        Copyright {new Date().getFullYear()} Aqua Lifestyle Club.
-      </p>
-    </footer>
-  </main>
+    <footer className="bg-[#050406] px-4 py-10 text-white/55 sm:px-6 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-8 sm:flex-row sm:items-center sm:justify-between"><Link className="inline-flex items-center gap-3 text-white" href="/"><span className="flex size-10 items-center justify-center rounded-full bg-[#f2e5d0] text-[#21122f]"><Droplets aria-hidden="true" className="size-5" /></span><span className="font-semibold">Aqua Lifestyle Club</span></Link><nav aria-label="Footer navigation" className="flex flex-wrap gap-x-6 gap-y-3 text-sm"><Link className="hover:text-white" href="/#value">Why Aqua</Link><Link className="hover:text-white" href="/#programmes">Programmes</Link><Link className="hover:text-white" href="/catalog">Catalog</Link><Link className="hover:text-white" href="/contact">Contact</Link></nav></div><p className="mx-auto mt-8 max-w-7xl border-t border-white/10 pt-6 text-xs">Aqua Lifestyle Club. Membership, products and community in one connected experience.</p></footer>
+  </>
 );

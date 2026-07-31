@@ -14,14 +14,14 @@ describe("LandingPage", () => {
     );
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Live well. Grow together." }),
+      screen.getByRole("heading", { level: 1, name: "Live in health. Inspire to wealth." }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Explore the club/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /Discover Aqua/i })).toHaveAttribute(
       "href",
       "#value",
     );
-    expect(screen.getByRole("heading", { name: "More than a membership account" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "A clear path from discovery to participation" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "One club. Four connected ideas." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "A considered path into the club." })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Create an account/i })).toHaveAttribute(
       "href",
       "/signup",

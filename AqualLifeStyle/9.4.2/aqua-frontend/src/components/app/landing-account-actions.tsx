@@ -14,7 +14,7 @@ export const LandingAccountActions = () => {
     <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
       {session?.user ? (
         <LinkButton
-          className="bg-teal-300 text-slate-950 shadow-none hover:bg-teal-200"
+          className="rounded-full bg-[#7540e8] px-7 text-white shadow-none hover:bg-[#8655ef]"
           href={home.href}
           size="lg"
         >
@@ -24,7 +24,7 @@ export const LandingAccountActions = () => {
       ) : (
         <>
           <LinkButton
-            className="bg-teal-300 text-slate-950 shadow-none hover:bg-teal-200"
+            className="rounded-full bg-[#7540e8] px-7 text-white shadow-none hover:bg-[#8655ef]"
             href="/signup"
             size="lg"
           >
@@ -32,7 +32,7 @@ export const LandingAccountActions = () => {
             <ArrowRight aria-hidden="true" className="size-4" />
           </LinkButton>
           <LinkButton
-            className="border-white/20 bg-white/5 text-white hover:bg-white/10"
+            className="rounded-full border-white/20 bg-white/5 px-7 text-white hover:bg-white/10"
             href="/login"
             size="lg"
             variant="outline"
