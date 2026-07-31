@@ -13,6 +13,7 @@ namespace AqualLifeStyle.Domain.Enquiries
         public int ProductId { get; private set; }
         public string Message { get; private set; }
         public string Response { get; private set; }
+        public int ResponseVersion { get; private set; }
         public EnquiryStatus Status { get; private set; }
         public DateTime CreatedAt { get; private set; }
         public int? AssignedToMemberId { get; private set; }
@@ -51,6 +52,7 @@ namespace AqualLifeStyle.Domain.Enquiries
             if (Status != EnquiryStatus.Pending) throw new InvalidOperationException("Only pending enquiries can be responded to.");
             if (string.IsNullOrWhiteSpace(response)) throw new ArgumentException("Response is required.", nameof(response));
             Response = response.Trim();
+            ResponseVersion++;
             Status = EnquiryStatus.Responded;
         }
 
@@ -58,6 +60,7 @@ namespace AqualLifeStyle.Domain.Enquiries
         {
             if (Status == EnquiryStatus.Closed) return;
             Status = EnquiryStatus.Closed;
+            ResponseVersion++;
         }
 
         public void MarkAsResponded(string response)
@@ -70,6 +73,7 @@ namespace AqualLifeStyle.Domain.Enquiries
             if (Status != EnquiryStatus.Closed) throw new InvalidOperationException("Only closed enquiries can be reopened.");
             Status = EnquiryStatus.Pending;
             Response = string.Empty;
+            ResponseVersion++;
         }
 
         public void AssignToMember(int memberId)
@@ -77,6 +81,7 @@ namespace AqualLifeStyle.Domain.Enquiries
             if (memberId <= 0) throw new ArgumentException("Member ID must be valid.", nameof(memberId));
             if (IsConverted) throw new InvalidOperationException("Converted enquiries cannot be re-assigned.");
             AssignedToMemberId = memberId;
+            ResponseVersion++;
         }
 
         /// <summary>
@@ -87,6 +92,7 @@ namespace AqualLifeStyle.Domain.Enquiries
             if (facilitatorId <= 0) throw new ArgumentException("Facilitator ID must be valid.", nameof(facilitatorId));
             if (IsConverted) throw new InvalidOperationException("Converted enquiries cannot be re-linked.");
             ReferredByFacilitatorId = facilitatorId;
+            ResponseVersion++;
         }
 
         public void ConvertToCustomer(int? referredByFacilitatorId = null)
@@ -109,6 +115,7 @@ namespace AqualLifeStyle.Domain.Enquiries
             ConvertedAt = DateTime.UtcNow;
             Status = EnquiryStatus.Closed;
             ConversionProbability = 100m;
+            ResponseVersion++;
             DomainEvents.Add(new EnquiryConvertedEvent(
                 Id,
                 CustomerId,
@@ -122,6 +129,7 @@ namespace AqualLifeStyle.Domain.Enquiries
         {
             if (IsConverted) throw new InvalidOperationException("Converted enquiries cannot be un-assigned.");
             AssignedToMemberId = null;
+            ResponseVersion++;
         }
 
         /// <summary>
@@ -140,6 +148,7 @@ namespace AqualLifeStyle.Domain.Enquiries
 
             // Update conversion probability based on latest follow-up
             ConversionProbability = followUp.ConversionProbability;
+            ResponseVersion++;
 
             // Auto-convert if follow-up indicates conversion
             if (outcome == EnquiryFollowUpOutcome.Converted)

@@ -13,6 +13,7 @@ using Abp.Runtime.Session;
 using Abp.UI;
 using AqualLifeStyle.Application.Admin.Customers.Dto;
 using AqualLifeStyle.Authorization;
+using AqualLifeStyle.Authorization.Accounts;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
@@ -32,6 +33,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
         private readonly IAdminCustomerProfileUpdater _customerProfileUpdater;
         private readonly IMembershipRepository _membershipRepository;
         private readonly IUserPasswordSetupLinkGenerator _passwordSetupLinkGenerator;
+        private readonly AccountEmailVerificationScheduler _emailVerificationScheduler;
 
         public AdminCustomerAppService(
             IAdminCustomerAccountManager accountManager,
@@ -40,7 +42,8 @@ namespace AqualLifeStyle.Application.Admin.Customers
             IObjectMapper objectMapper,
             IAdminCustomerProfileUpdater customerProfileUpdater,
             IMembershipRepository membershipRepository,
-            IUserPasswordSetupLinkGenerator passwordSetupLinkGenerator)
+            IUserPasswordSetupLinkGenerator passwordSetupLinkGenerator,
+            AccountEmailVerificationScheduler emailVerificationScheduler)
         {
             _accountManager = accountManager;
             _customerRepository = customerRepository;
@@ -49,6 +52,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
             _customerProfileUpdater = customerProfileUpdater;
             _membershipRepository = membershipRepository;
             _passwordSetupLinkGenerator = passwordSetupLinkGenerator;
+            _emailVerificationScheduler = emailVerificationScheduler;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Customers.View)]
@@ -147,6 +151,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
 
             await CurrentUnitOfWork.SaveChangesAsync();
             var customer = accountResult.Customer;
+            await ScheduleVerificationIfRequiredAsync(customer, "admin-created");
             LogAdminMutation("Customer", "created", customer.Id, tenantId, input.Justification);
             return new AdminCustomerOnboardingResultDto
             {
@@ -176,12 +181,25 @@ namespace AqualLifeStyle.Application.Admin.Customers
             await CurrentUnitOfWork.SaveChangesAsync();
             var tenant = await TenantManager.GetByIdAsync(tenantId);
             var passwordSetupUrl = await _passwordSetupLinkGenerator.GenerateAsync(customer.User, tenant.TenancyName);
+            await ScheduleVerificationIfRequiredAsync(
+                customer,
+                "restored:" + customer.User.SecurityStamp);
             LogAdminMutation("Customer", "restored with password setup required", customer.Id, tenantId, input.Justification);
             return new AdminCustomerOnboardingResultDto
             {
                 Customer = await MapCustomerAsync(customer),
                 PasswordSetupUrl = passwordSetupUrl
             };
+        }
+
+        private async Task ScheduleVerificationIfRequiredAsync(Customer customer, string lifecycleKey)
+        {
+            if (customer?.User == null || !customer.User.IsActive || customer.User.IsEmailConfirmed)
+                return;
+
+            await _emailVerificationScheduler.ScheduleAsync(
+                customer.User,
+                $"email-verification:{customer.TenantId}:{customer.UserId}:{lifecycleKey}");
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Customers.Edit)]
@@ -193,6 +211,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
             var tenantId = customer.TenantId.Value;
             using (CurrentUnitOfWork.SetTenantId(tenantId))
             {
+                var originalSecurityStamp = customer.User.SecurityStamp;
                 await _customerProfileUpdater.UpdateAsync(customer, new AdminCustomerProfileUpdate
                 {
                     FirstName = input.FirstName, LastName = input.LastName, Email = input.Email,
@@ -200,6 +219,14 @@ namespace AqualLifeStyle.Application.Admin.Customers
                     MembershipId = input.MembershipId, IsActive = input.IsActive
                 });
                 await CurrentUnitOfWork.SaveChangesAsync();
+                if (customer.User.IsActive &&
+                    !customer.User.IsEmailConfirmed &&
+                    !string.Equals(originalSecurityStamp, customer.User.SecurityStamp, StringComparison.Ordinal))
+                {
+                    await ScheduleVerificationIfRequiredAsync(
+                        customer,
+                        "admin-profile-change:" + customer.User.SecurityStamp);
+                }
             }
 
             LogAdminMutation("Customer", "updated", customer.Id, tenantId, input.Justification);

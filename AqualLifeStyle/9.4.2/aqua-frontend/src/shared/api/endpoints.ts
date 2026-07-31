@@ -24,9 +24,13 @@ export const apiEndpoints = {
     get: "/api/health",
   },
   account: {
+    confirmEmail: "/api/services/app/Account/ConfirmEmail",
     getTenantSelfRegistrationAvailability:
       "/api/services/app/Account/GetTenantSelfRegistrationAvailability",
     register: "/api/services/app/Account/Register",
+    requestPasswordReset: "/api/services/app/Account/RequestPasswordReset",
+    resendEmailVerification: "/api/services/app/Account/ResendEmailVerification",
+    resetPassword: "/api/services/app/Account/ResetPassword",
   },
   customers: {
     create: "/api/services/app/Customer/Create",

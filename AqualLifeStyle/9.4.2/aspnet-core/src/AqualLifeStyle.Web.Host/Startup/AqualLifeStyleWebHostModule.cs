@@ -7,6 +7,10 @@ using Abp.Threading.BackgroundWorkers;
 using AqualLifeStyle.Configuration;
 using AqualLifeStyle.Web.Host.Payments.Yoco;
 using Abp.Runtime.Caching.Redis;
+using AqualLifeStyle.Web.Host.Email;
+using Abp.Dependency;
+using Abp.Net.Mail;
+using Abp.Configuration.Startup;
 
 namespace AqualLifeStyle.Web.Host.Startup
 {
@@ -31,6 +35,7 @@ namespace AqualLifeStyle.Web.Host.Startup
 
         public override void PreInitialize()
         {
+            Configuration.ReplaceService<IEmailSender, BirdAbpEmailSender>(DependencyLifeStyle.Transient);
             var redisConfiguration = _appConfiguration["Redis:Configuration"];
             if (string.IsNullOrWhiteSpace(redisConfiguration))
             {
@@ -65,6 +70,8 @@ namespace AqualLifeStyle.Web.Host.Startup
 
             IocManager.Resolve<IBackgroundWorkerManager>().Add(
                 IocManager.Resolve<YocoPaymentOperationsMonitor>());
+            IocManager.Resolve<IBackgroundWorkerManager>().Add(
+                IocManager.Resolve<TransactionalEmailOutboxWorker>());
         }
 
         private static string NormalizeRedisConfiguration(string configuration)

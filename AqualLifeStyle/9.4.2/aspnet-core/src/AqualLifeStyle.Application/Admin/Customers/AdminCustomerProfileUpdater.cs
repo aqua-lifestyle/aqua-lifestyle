@@ -1,5 +1,8 @@
+using System;
 using System.Threading.Tasks;
 using Abp.Dependency;
+using Abp.IdentityFramework;
+using Abp.Localization;
 using Abp.UI;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Authorization.Users;
@@ -31,19 +34,25 @@ namespace AqualLifeStyle.Application.Admin.Customers
         private readonly ICustomerMembershipPlanAssignmentValidator _membershipPlanAssignmentValidator;
         private readonly IAdminUserRoleSynchronizer _userRoleSynchronizer;
         private readonly ICustomerFallbackRoleResolver _fallbackRoleResolver;
+        private readonly UserManager _userManager;
+        private readonly ILocalizationManager _localizationManager;
 
         public AdminCustomerProfileUpdater(
             ICustomerRepository customerRepository,
             ICustomerPersonalDetailsUpdater personalDetailsUpdater,
             ICustomerMembershipPlanAssignmentValidator membershipPlanAssignmentValidator,
             IAdminUserRoleSynchronizer userRoleSynchronizer,
-            ICustomerFallbackRoleResolver fallbackRoleResolver)
+            ICustomerFallbackRoleResolver fallbackRoleResolver,
+            UserManager userManager,
+            ILocalizationManager localizationManager)
         {
             _customerRepository = customerRepository;
             _personalDetailsUpdater = personalDetailsUpdater;
             _membershipPlanAssignmentValidator = membershipPlanAssignmentValidator;
             _userRoleSynchronizer = userRoleSynchronizer;
             _fallbackRoleResolver = fallbackRoleResolver;
+            _userManager = userManager;
+            _localizationManager = localizationManager;
         }
 
         public async Task UpdateAsync(Customer customer, AdminCustomerProfileUpdate update)
@@ -54,6 +63,11 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 await _membershipPlanAssignmentValidator.EnsureAvailableForAreaAsync(
                     update.MembershipId.Value, customer.TenantId.Value, "Customer update");
 
+            var emailChanged = !string.Equals(
+                customer.User.EmailAddress,
+                update.Email?.Trim(),
+                StringComparison.OrdinalIgnoreCase);
+            var activeChanged = customer.User.IsActive != update.IsActive;
             await _personalDetailsUpdater.UpdateAsync(customer, new CustomerPersonalDetailsUpdate
             {
                 FirstName = update.FirstName,
@@ -65,6 +79,11 @@ namespace AqualLifeStyle.Application.Admin.Customers
 
             var user = customer.User;
             user.IsActive = update.IsActive;
+            if (emailChanged || activeChanged)
+            {
+                if (emailChanged) user.IsEmailConfirmed = false;
+                (await _userManager.UpdateSecurityStampAsync(user)).CheckErrors(_localizationManager);
+            }
             customer.ChangeMembership(update.MembershipId);
             if (user.Role == AquaUserRole.Guest || user.Role == AquaUserRole.Member)
                 await _userRoleSynchronizer.SynchronizeAsync(

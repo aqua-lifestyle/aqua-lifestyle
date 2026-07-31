@@ -36,12 +36,96 @@ The API runtime uses the slim Debian ASP.NET image and its built-in non-root `ap
 
 Render supplies `DATABASE_URL`; the application converts it to the Npgsql keyword format without logging credentials. Redis is supplied through `Redis__Configuration` and becomes ABP's distributed cache backing implementation.
 
+### Bird transactional email
+
+Registration verification, password resets, enquiry responses, and confirmed
+AQGreen or Onyx payment notices use Bird's Email API. Before enabling the
+feature, use Bird's current [Email API send-message reference](https://bird.com/en-us/docs/api/reference/create-email-message),
+not the older Channels API documentation:
+
+1. In Bird, add `aqualifestyleclub.co.za` as the sending domain. Add every DNS
+   record Bird provides (domain verification, SPF, DKIM, bounce, and tracking)
+   in Vercel DNS, because Vercel is the domain's authoritative DNS provider.
+   Wait until Bird shows all required checks as verified.
+2. Create a least-privilege Bird API key for email sending. A current key has a
+   `bk_{region}_...` format; the API selects its regional host from that prefix.
+3. In Render's API service, enter `Bird__ApiKey`, `Bird__FromEmail`, and
+   `Bird__ReplyToEmail` directly as secret values. Set `Bird__FromName` to the
+   customer-facing sender name. No Bird workspace or channel ID is required by
+   this API.
+4. Set `Bird__Enabled=true`, sync the Blueprint, and redeploy. Production startup
+   deliberately fails if transactional email is enabled with incomplete values,
+   or if it is disabled while verification is required.
+5. Register a disposable test Club Member, confirm the verification message is
+   delivered, follow the link, sign in, and test one password-reset request.
+
+The API stores delivery intent in `TransactionalEmailOutboxMessages` in the same
+transaction as the business change. A worker retries pending records with capped
+backoff. Inspect pending rows by status, attempt count, next-attempt time, and the
+redacted last-error summary; never copy stored token-bearing message bodies into
+logs or support tickets. Bodies are cleared after Bird accepts a message for
+delivery; this does not prove final delivery to the recipient. Terminally failed
+records redact the recipient, subject, and bodies while retaining
+only the operational metadata needed to diagnose the failed intent. Support staff
+must create a new email intent after correcting the cause; terminal messages cannot
+be replayed from retained customer content. The worker
+sends the durable outbox key in Bird's `Idempotency-Key` header. Bird replays the
+original response for a matching request during its documented idempotency window
+(three hours by default), closing the normal accept-then-crash retry gap. The
+database's unique outbox key permanently prevents duplicate business intents.
+This is still not an indefinite exactly-once guarantee: a lost success followed
+by a retry after Bird's window can send again. Database-backed claim tokens ensure
+that only one API worker sends an eligible row at a time, and abandoned claims are
+eligible for recovery after ten minutes. Final delivered, bounced, or rejected
+outcomes are not retained until Bird delivery webhooks are implemented.
+
+To rotate the API key, create the replacement in Bird, update
+`Bird__ApiKey` in Render, redeploy and verify delivery, then revoke the old
+key. Never place keys in source files, Vercel variables, screenshots, commits,
+logs, or documentation. Existing confirmed users remain confirmed. Existing
+legitimate unconfirmed users must use the generic resend-verification flow; no
+bulk auto-confirm migration is performed.
+
 ### Yoco programme payments
 
 Yoco credentials belong only in the Render API service. They must never be
 added to Vercel, a `NEXT_PUBLIC_*` variable, source control, screenshots, or
 application logs. The hosted Checkout API does not require a public key in the
 frontend.
+
+Account verification and password-reset tokens use the ASP.NET Data Protection
+key ring persisted in the shared `DataProtectionKeys` database table. Its XML is
+encrypted with the server-only PKCS#12 certificate supplied through
+`DataProtection__CertificateBase64` and `DataProtection__CertificatePassword`.
+Set both secrets directly in Render before deployment and retain the certificate
+while any key encrypted by it remains in the table. The Render pre-deploy
+migrator must complete before API instances start. Preserve the table and
+certificate during rollback, backup, restore, and database replacement;
+deleting either invalidates every outstanding account email link.
+
+Rotate the certificate with an overlap deployment: move the old certificate
+and password to `DataProtection__PreviousCertificateBase64` and
+`DataProtection__PreviousCertificatePassword`, install the new certificate in
+the primary settings, then deploy. Keep the previous certificate configured
+until every key it encrypted has expired from the key ring; only then remove the
+two previous-certificate settings. Never replace the primary certificate
+without this overlap.
+
+Anonymous resend-verification and password-reset requests are limited to ten
+requests per source address in ten minutes and one accepted email per account
+and purpose every thirty minutes. Preserve Render's forwarding headers so the
+API receives the original client address rather than grouping all traffic under
+the proxy address. Unrestricted proxy trust is enabled only when Render's
+platform-provided `RENDER=true` setting confirms that the API port is isolated
+behind Render's managed ingress, and only one forwarded hop is processed.
+
+Create an immediate log alert for
+`EmailOperationsAlert AlertType=terminal_email_delivery_failed`. The event is
+emitted once when an outbox message exhausts its delivery attempts and contains
+only the outbox ID, notification type, tenant ID, and attempt count. Investigate
+the corresponding redacted outbox record without logging or exporting message
+content. Delivery is at least once so a crash cannot permanently lose the alert;
+deduplicate repeated alerts by outbox ID.
 
 Before deploying the payment branch:
 

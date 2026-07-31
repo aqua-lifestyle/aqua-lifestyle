@@ -105,6 +105,12 @@ namespace AqualLifeStyle.Controllers
             switch (loginResult.Result)
             {
                 case AbpLoginResultType.Success:
+                    if (!loginResult.User.IsEmailConfirmed)
+                    {
+                        throw new UserFriendlyException(
+                            "Email verification required.",
+                            "Verify your email address before signing in. You can request a new verification email from the sign-in page.");
+                    }
                     if (loginResult.User.RequiresPasswordReset())
                     {
                         throw new UserFriendlyException(

@@ -12,6 +12,7 @@ using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
 using AqualLifeStyle.Domain.Enums;
+using AqualLifeStyle.Email;
 
 namespace AqualLifeStyle.Application.Enquiries
 {
@@ -20,12 +21,21 @@ namespace AqualLifeStyle.Application.Enquiries
         private readonly IEnquiryRepository _enquiryRepository;
         private readonly ICustomerRepository _customerRepository;
         private readonly IObjectMapper _objectMapper;
+        private readonly ITransactionalEmailOutbox _emailOutbox;
+        private readonly TransactionalEmailTemplateBuilder _emailTemplates;
 
-        public EnquiryAppService(IEnquiryRepository enquiryRepository, ICustomerRepository customerRepository, IObjectMapper objectMapper)
+        public EnquiryAppService(
+            IEnquiryRepository enquiryRepository,
+            ICustomerRepository customerRepository,
+            IObjectMapper objectMapper,
+            ITransactionalEmailOutbox emailOutbox,
+            TransactionalEmailTemplateBuilder emailTemplates)
         {
             _enquiryRepository = enquiryRepository;
             _customerRepository = customerRepository;
             _objectMapper = objectMapper;
+            _emailOutbox = emailOutbox;
+            _emailTemplates = emailTemplates;
         }
 
         [AbpAuthorize(AquaPermissions.Enquiries.View)]
@@ -98,6 +108,11 @@ namespace AqualLifeStyle.Application.Enquiries
             }
 
             await _enquiryRepository.UpdateAsync(enquiry);
+            var customer = await _customerRepository.GetAsync(enquiry.CustomerId);
+            var emailKey = $"enquiry-response:{enquiry.Id}:{enquiry.ResponseVersion}";
+            await _emailOutbox.EnqueueAsync(enquiry.TenantId, "EnquiryResponse", emailKey,
+                _emailTemplates.EnquiryResponse(
+                    customer.Name, customer.Email.Value, enquiry.Message, enquiry.Response, emailKey));
             return _objectMapper.Map<EnquiryDto>(enquiry);
         }
 

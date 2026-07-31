@@ -14,6 +14,7 @@ using AqualLifeStyle.Tests.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Tests.Payments;
+using AqualLifeStyle.Email;
 
 namespace AqualLifeStyle.Tests
 {
@@ -64,6 +65,7 @@ namespace AqualLifeStyle.Tests
             RegisterFakeService<AbpZeroDbMigrator<AqualLifeStyleDbContext>>();
 
             Configuration.ReplaceService<IEmailSender, NullEmailSender>(DependencyLifeStyle.Transient);
+            RegisterFakeService<ITransactionalEmailDeliveryGateway>();
             IocManager.IocContainer.Register(
                 Component.For<IYocoCheckoutGateway>()
                     .ImplementedBy<FakeYocoCheckoutGateway>()

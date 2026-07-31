@@ -10,6 +10,7 @@ using Abp.Configuration;
 using Abp.MultiTenancy;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Models.TokenAuth;
+using AqualLifeStyle.Authorization.Users;
 using Shouldly;
 using Xunit;
 
@@ -57,6 +58,40 @@ namespace AqualLifeStyle.Web.Tests.Controllers
                 registrationResponse.StatusCode.ShouldBe(
                     HttpStatusCode.OK,
                     registrationBody);
+            }
+
+            var userManager = IocManager.Resolve<UserManager>();
+            await userManager.InitializeOptionsAsync(1);
+            var registeredUser = await userManager.FindByNameAsync(userName);
+            using (var unconfirmedLoginRequest = new HttpRequestMessage(
+                       HttpMethod.Post,
+                       "/api/TokenAuth/Authenticate"))
+            {
+                unconfirmedLoginRequest.Headers.Add("__tenant", AbpTenantBase.DefaultTenantName);
+                unconfirmedLoginRequest.Content = JsonContent(new
+                {
+                    password,
+                    userNameOrEmailAddress = userName
+                });
+                var unconfirmedLoginResponse = await Client.SendAsync(unconfirmedLoginRequest);
+                var unconfirmedLoginBody = await unconfirmedLoginResponse.Content.ReadAsStringAsync();
+                unconfirmedLoginResponse.StatusCode.ShouldNotBe(HttpStatusCode.OK);
+                unconfirmedLoginBody.ShouldContain("Email verification required.");
+            }
+            var confirmationToken = await userManager.GenerateEmailConfirmationTokenAsync(registeredUser);
+            using (var confirmationRequest = new HttpRequestMessage(
+                       HttpMethod.Post,
+                       "/api/services/app/Account/ConfirmEmail"))
+            {
+                confirmationRequest.Content = JsonContent(new
+                {
+                    tenantId = 1,
+                    token = confirmationToken,
+                    userId = registeredUser.Id
+                });
+                var confirmationResponse = await Client.SendAsync(confirmationRequest);
+                confirmationResponse.StatusCode.ShouldBe(HttpStatusCode.OK,
+                    await confirmationResponse.Content.ReadAsStringAsync());
             }
 
             var authentication = await AuthenticateAsync(
