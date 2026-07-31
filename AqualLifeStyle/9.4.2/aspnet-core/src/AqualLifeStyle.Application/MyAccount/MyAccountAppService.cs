@@ -37,6 +37,15 @@ namespace AqualLifeStyle.Application.MyAccount
                 throw new UserFriendlyException("Profile update failed.", "The request was empty.");
 
             var customer = await GetCurrentCustomerAsync();
+            if (!string.Equals(
+                    customer.User.EmailAddress,
+                    input.EmailAddress?.Trim(),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UserFriendlyException(
+                    "Profile update failed.",
+                    "Email changes require verification. Contact support to change your account email address.");
+            }
             await _personalDetailsUpdater.UpdateAsync(customer, new CustomerPersonalDetailsUpdate
             {
                 FirstName = input.FirstName,

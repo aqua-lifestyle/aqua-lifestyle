@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Abp.Runtime.Session;
 using Abp.Runtime.Validation;
@@ -121,7 +122,10 @@ namespace AqualLifeStyle.Tests.Application
             {
                 FirstName = "Updated",
                 Surname = "Customer",
-                EmailAddress = $"updated-{Guid.NewGuid():N}@defaulttenant.com",
+                EmailAddress = (await UsingDbContextAsync(context =>
+                    context.Users.Where(user => user.Id == userId)
+                        .Select(user => user.EmailAddress)
+                        .SingleAsync())),
                 ContactNumber = "+27 82 123 4567",
                 HomeAddress = "25 New Home Avenue, Johannesburg"
             });
@@ -139,6 +143,45 @@ namespace AqualLifeStyle.Tests.Application
                 customer.Email.Value.ShouldBe(updated.EmailAddress);
                 customer.User.PhoneNumber.ShouldBe(updated.ContactNumber);
                 customer.User.HomeAddress.ShouldBe(updated.HomeAddress);
+            });
+        }
+
+        [Fact]
+        public async Task Profile_EmailChange_IsRejectedWithoutVerification()
+        {
+            var userId = await CreateAndLoginTestUserAsync();
+            string originalEmail = null;
+            await UsingDbContextAsync(async context =>
+            {
+                var user = await context.Users.FindAsync(userId);
+                user.IsEmailConfirmed = true;
+                originalEmail = user.EmailAddress;
+                context.Customers.Add(Customer.Create(
+                    user.TenantId,
+                    user.Id,
+                    $"{user.Name} {user.Surname}",
+                    new EmailAddress(user.EmailAddress),
+                    null,
+                    user));
+                await context.SaveChangesAsync();
+            });
+
+            var error = await Should.ThrowAsync<UserFriendlyException>(() =>
+                _service.UpdateProfileAsync(new UpdateMyProfileInput
+                {
+                    FirstName = "Updated",
+                    Surname = "Customer",
+                    EmailAddress = $"unverified-{Guid.NewGuid():N}@defaulttenant.com",
+                    ContactNumber = "+27 82 123 4567",
+                    HomeAddress = "25 New Home Avenue, Johannesburg"
+                }));
+
+            error.Details.ShouldContain("require verification");
+            await UsingDbContextAsync(async context =>
+            {
+                var user = await context.Users.FindAsync(userId);
+                user.EmailAddress.ShouldBe(originalEmail);
+                user.IsEmailConfirmed.ShouldBeTrue();
             });
         }
     }

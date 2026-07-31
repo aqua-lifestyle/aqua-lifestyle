@@ -153,8 +153,9 @@ function ProfileContent() {
                     className="sm:col-span-2"
                     defaultValue={profile.emailAddress}
                     errorMessage={fieldErrors.emailAddress}
-                    label="Email address"
+                    label="Email address (contact support to change)"
                     name="emailAddress"
+                    readOnly
                     required
                     type="email"
                   />
