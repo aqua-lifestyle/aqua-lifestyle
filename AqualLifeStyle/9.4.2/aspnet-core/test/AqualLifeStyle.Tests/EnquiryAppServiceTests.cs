@@ -115,11 +115,11 @@ namespace AqualLifeStyle.Tests
             enquiry.Reopen();
             await _service.RespondAsync(1, new RespondToEnquiryDto { Response = "Updated answer" });
 
-            enquiry.ResponseVersion.ShouldBe(2);
+            enquiry.ResponseVersion.ShouldBe(4);
             _emailOutboxMock.Verify(outbox => outbox.EnqueueAsync(
                 1, "EnquiryResponse", "enquiry-response:1:1", It.IsAny<TransactionalEmail>()), Times.Once);
             _emailOutboxMock.Verify(outbox => outbox.EnqueueAsync(
-                1, "EnquiryResponse", "enquiry-response:1:2", It.IsAny<TransactionalEmail>()), Times.Once);
+                1, "EnquiryResponse", "enquiry-response:1:4", It.IsAny<TransactionalEmail>()), Times.Once);
         }
 
         [Fact]
