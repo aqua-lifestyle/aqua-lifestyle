@@ -7,6 +7,7 @@ using Abp.Authorization;
 using Abp.Domain.Uow;
 using Abp.IdentityFramework;
 using AqualLifeStyle.Application.Admin.AreaLeaders.Dto;
+using AqualLifeStyle.Application.Admin.Customers;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.AreaLeaders;
@@ -23,15 +24,18 @@ namespace AqualLifeStyle.Application.Admin.AreaLeaders
         private readonly IAreaLeaderRepository _areaLeaderRepository;
         private readonly ICustomerRepository _customerRepository;
         private readonly IAdminUserRoleSynchronizer _userRoleSynchronizer;
+        private readonly ICustomerFallbackRoleResolver _fallbackRoleResolver;
 
         public AdminAreaLeaderAppService(
             IAreaLeaderRepository areaLeaderRepository,
             ICustomerRepository customerRepository,
-            IAdminUserRoleSynchronizer userRoleSynchronizer)
+            IAdminUserRoleSynchronizer userRoleSynchronizer,
+            ICustomerFallbackRoleResolver fallbackRoleResolver)
         {
             _areaLeaderRepository = areaLeaderRepository;
             _customerRepository = customerRepository;
             _userRoleSynchronizer = userRoleSynchronizer;
+            _fallbackRoleResolver = fallbackRoleResolver;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.AreaLeaders.View)]
@@ -118,10 +122,11 @@ namespace AqualLifeStyle.Application.Admin.AreaLeaders
             ValidateMutation(input, "removal");
             var leader = await GetAreaLeaderAsync(input.Id);
             var customer = await GetCustomerAsync(leader);
-            var replacementRole = customer.MembershipId.HasValue ? AquaUserRole.Member : AquaUserRole.Guest;
             using (CurrentUnitOfWork.SetTenantId(leader.TenantId))
             {
-                await _userRoleSynchronizer.SynchronizeAsync(customer.User, replacementRole);
+                await _userRoleSynchronizer.SynchronizeAsync(
+                    customer.User,
+                    await _fallbackRoleResolver.ResolveAsync(customer));
                 await _areaLeaderRepository.DeleteAsync(leader);
             }
             LogAdminMutation("Area leader", "removed", leader.Id, leader.TenantId, input.Justification);

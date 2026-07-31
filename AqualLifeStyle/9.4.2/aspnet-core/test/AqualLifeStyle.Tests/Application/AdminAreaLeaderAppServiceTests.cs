@@ -23,6 +23,7 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task AreaLeaderLifecycle_ApprovesSynchronizesRoleAndRemoves()
         {
+            string approvedSecurityStamp = null;
             var leaderId = await UsingDbContextAsync(async context =>
             {
                 var customer = await context.Customers
@@ -45,6 +46,7 @@ namespace AqualLifeStyle.Tests.Application
                     .Select(item => item.UserId).SingleAsync();
                 var user = await context.Users.SingleAsync(item => item.Id == userId);
                 user.Role.ShouldBe(AquaUserRole.AreaLeader);
+                approvedSecurityStamp = user.SecurityStamp;
                 var roleNames = await (from assignment in context.UserRoles
                     join role in context.Roles on assignment.RoleId equals role.Id
                     where assignment.UserId == user.Id select role.Name).ToListAsync();
@@ -59,6 +61,11 @@ namespace AqualLifeStyle.Tests.Application
             {
                 var removed = await context.AreaLeaders.IgnoreQueryFilters().SingleAsync(item => item.Id == leaderId);
                 removed.IsDeleted.ShouldBeTrue();
+                var userId = await context.Customers.Where(item => item.Id == approved.CustomerId)
+                    .Select(item => item.UserId).SingleAsync();
+                var user = await context.Users.SingleAsync(item => item.Id == userId);
+                user.Role.ShouldNotBe(AquaUserRole.AreaLeader);
+                user.SecurityStamp.ShouldNotBe(approvedSecurityStamp);
             });
         }
     }

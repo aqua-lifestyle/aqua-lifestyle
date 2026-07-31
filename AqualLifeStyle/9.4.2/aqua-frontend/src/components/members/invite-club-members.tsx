@@ -111,7 +111,7 @@ export const InviteClubMembers = () => {
               <p className="mt-2 max-w-xl text-muted-foreground">
                 Invitation links become available when your AQGreen or Onyx
                 participation is active. Activation confirms that you are
-                eligible to recruit into that programme.
+                eligible to invite Club Members to that programme.
               </p>
             </div>
           </Card>

@@ -5,11 +5,17 @@ import { useEffect, useMemo } from "react";
 
 import {
   useAuthState,
+  useCustomersActions,
+  useCustomersState,
   useMembershipsActions,
   useMembershipsState,
   useOrderIntentsActions,
   useOrderIntentsState,
 } from "@/src/providers";
+import {
+  getProgrammeStatusLabel,
+} from "@/src/shared/domain/programme-participations";
+import { useMyProgrammeParticipations } from "@/src/shared/hooks/use-my-programme-participations";
 import {
   Avatar,
   Badge,
@@ -23,7 +29,8 @@ import {
 import { getOrderStatusLabel, getOrderStatusTone } from "@/src/shared/lib/order-status";
 
 export const MemberDashboard = () => {
-  const { getOrderIntents } = useOrderIntentsActions();
+  const { getMyOrderIntents } = useOrderIntentsActions();
+  const { getMyCustomer } = useCustomersActions();
   const { getMemberships, getSavingsWindowStatuses } = useMembershipsActions();
   const {
     isLoadError: isOrdersError,
@@ -40,37 +47,64 @@ export const MemberDashboard = () => {
     memberships,
     savingsWindowStatuses,
   } = useMembershipsState();
+  const {
+    isMyCustomerError,
+    isMyCustomerPending,
+    isMyCustomerSuccess,
+    myCustomer,
+    myCustomerErrorMessage,
+  } = useCustomersState();
   const { session } = useAuthState();
+  const canViewProgrammes =
+    session?.user?.permissions?.includes(
+      "Aqua.ProgrammeParticipations.ViewSelf",
+    ) ?? false;
+  const canViewSavings =
+    session?.user?.permissions?.includes("Aqua.Savings.ViewSelf") ?? false;
+  const {
+    data: programmeParticipations,
+    errorMessage: programmeErrorMessage,
+    isLoading: isProgrammesPending,
+  } = useMyProgrammeParticipations(canViewProgrammes);
 
   // ALL hooks before early returns
   useEffect(() => {
-    void getOrderIntents();
+    void getMyOrderIntents();
+    void getMyCustomer();
     void getMemberships();
     void getSavingsWindowStatuses();
-  }, [getMemberships, getOrderIntents, getSavingsWindowStatuses]);
+  }, [getMemberships, getMyCustomer, getMyOrderIntents, getSavingsWindowStatuses]);
 
-  const currentUserId = session?.user?.id ?? null;
-
-  const customerOrders = useMemo(() => {
-    if (!currentUserId) return [];
-    return orderIntents.filter((order) => order.customerId === currentUserId);
-  }, [orderIntents, currentUserId]);
-
-  const activeMembership = useMemo(() => {
-    return memberships.find((membership) => membership.isActive) ?? null;
-  }, [memberships]);
+  const assignedMembership = useMemo(
+    () =>
+      memberships.find((membership) => membership.id === myCustomer?.membershipId) ??
+      null,
+    [memberships, myCustomer?.membershipId],
+  );
+  const participationLabel = getProgrammeStatusLabel(
+    programmeParticipations,
+    assignedMembership?.name,
+    "No active participation",
+  );
 
   const openSavingsWindow = useMemo(() => {
-    if (!activeMembership) return null;
+    if (!assignedMembership) return null;
     return (
-      savingsWindowStatuses.find((s) => s.tier === activeMembership.membershipType) ??
+      savingsWindowStatuses.find((s) => s.tier === assignedMembership.membershipType) ??
       null
     );
-  }, [activeMembership, savingsWindowStatuses]);
+  }, [assignedMembership, savingsWindowStatuses]);
 
   const isLoading =
-    isOrdersPending || isMembershipsPending || !isOrdersSuccess || !isMembershipsSuccess;
-  const hasError = isOrdersError || isMembershipsError;
+    isOrdersPending ||
+    isMembershipsPending ||
+    isMyCustomerPending ||
+    isProgrammesPending ||
+    (!isOrdersSuccess && !isOrdersError) ||
+    (!isMembershipsSuccess && !isMembershipsError) ||
+    (!isMyCustomerSuccess && !isMyCustomerError);
+  const hasError =
+    isOrdersError || isMembershipsError || isMyCustomerError || Boolean(programmeErrorMessage);
 
   return (
     <main className="min-h-dvh bg-muted/30 px-4 py-6 text-foreground sm:px-6 lg:px-8">
@@ -79,10 +113,10 @@ export const MemberDashboard = () => {
           <Breadcrumb
             items={[
               { href: "/", label: "Dashboard" },
-              { label: "Member dashboard" },
+              { label: "Club Member dashboard" },
             ]}
           />
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">Member dashboard</h1>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">Club Member dashboard</h1>
           <p className="mt-2 max-w-2xl text-base text-muted-foreground">
             Overview of your orders, savings, and membership activity.
           </p>
@@ -97,7 +131,11 @@ export const MemberDashboard = () => {
           </div>
         ) : hasError ? (
           <StatusMessage tone="error">
-            {ordersErrorMessage ?? membershipsErrorMessage ?? "Unable to load dashboard data."}
+            {ordersErrorMessage ??
+              membershipsErrorMessage ??
+              myCustomerErrorMessage ??
+              programmeErrorMessage ??
+              "Unable to load dashboard data."}
           </StatusMessage>
         ) : (
           <>
@@ -108,7 +146,7 @@ export const MemberDashboard = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">My Orders</p>
-                  <p className="text-2xl font-bold">{customerOrders.length}</p>
+                  <p className="text-2xl font-bold">{orderIntents.length}</p>
                 </div>
               </Card>
               <Card className="flex items-center gap-4">
@@ -116,9 +154,9 @@ export const MemberDashboard = () => {
                   <Package className="size-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Membership</p>
+                  <p className="text-sm text-muted-foreground">Club participation</p>
                   <p className="text-2xl font-bold">
-                    {activeMembership?.name ?? "None"}
+                    {participationLabel}
                   </p>
                 </div>
               </Card>
@@ -127,9 +165,11 @@ export const MemberDashboard = () => {
                   <PiggyBank className="size-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Savings Window</p>
+                  <p className="text-sm text-muted-foreground">Savings access</p>
                   <p className="text-2xl font-bold">
-                    {openSavingsWindow ? openSavingsWindow.statusLabel : "Closed"}
+                    {canViewSavings
+                      ? (openSavingsWindow?.statusLabel ?? "Available")
+                      : "Not available"}
                   </p>
                 </div>
               </Card>
@@ -140,7 +180,7 @@ export const MemberDashboard = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Activity</p>
                   <p className="text-2xl font-bold">
-                    {customerOrders.filter((o) => o.status === 2).length} completed
+                    {orderIntents.filter((o) => o.status === 2).length} completed
                   </p>
                 </div>
               </Card>
@@ -150,7 +190,7 @@ export const MemberDashboard = () => {
               <Card>
                 <h2 className="text-lg font-semibold">Recent orders</h2>
                 <div className="mt-4">
-                  {customerOrders.length === 0 ? (
+                  {orderIntents.length === 0 ? (
                     <EmptyState
                       description="You have no orders yet."
                       icon={Package}
@@ -158,7 +198,7 @@ export const MemberDashboard = () => {
                     />
                   ) : (
                     <div className="flex flex-col gap-3">
-                      {customerOrders.slice(0, 5).map((order) => (
+                      {orderIntents.slice(0, 5).map((order) => (
                         <LinkButton
                           key={order.id}
                           href={`/member/orders`}
@@ -212,17 +252,21 @@ export const MemberDashboard = () => {
                         </span>
                       </div>
                     </div>
+                  ) : canViewSavings ? (
+                    <EmptyState
+                      description="Open your savings account to see contributions and maturity progress."
+                      icon={PiggyBank}
+                      title="Savings account available"
+                    />
                   ) : (
                     <EmptyState
-                      description="No active savings window."
+                      description="Savings becomes available with eligible Club Member access."
                       icon={PiggyBank}
-                      title="Savings closed"
+                      title="Savings not available"
                     />
                   )}
                 </div>
-                {session?.user?.permissions?.includes(
-                  "Aqua.Savings.ViewSelf",
-                ) ? (
+                {canViewSavings ? (
                   <LinkButton
                     className="mt-4 w-full"
                     href="/member/savings"

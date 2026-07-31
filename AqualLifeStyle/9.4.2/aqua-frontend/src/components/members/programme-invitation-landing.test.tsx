@@ -50,7 +50,9 @@ describe("ProgrammeInvitationLanding", () => {
 
     expect(await screen.findByText("Ada Recruiter")).toBeInTheDocument();
     expect(screen.getByText("CLB-ABCDEFGH2345")).toBeInTheDocument();
-    expect(screen.getByText(/eligible to recruit into AQGreen/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/eligible to invite Club Members to AQGreen/i),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /confirm and continue to payment/i }));
 
     await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
@@ -120,6 +122,7 @@ describe("ProgrammeInvitationLanding", () => {
       expect(
         screen.queryByRole("button", { name: /confirm and join/i }),
       ).not.toBeInTheDocument();
+      expect(screen.queryByText(/R1,200|R6,120/)).not.toBeInTheDocument();
       expect(httpClient.post).not.toHaveBeenCalled();
     },
   );

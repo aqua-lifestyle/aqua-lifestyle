@@ -1,4 +1,8 @@
-import { AxiosHeaders, type InternalAxiosRequestConfig } from "axios";
+import {
+  AxiosError,
+  AxiosHeaders,
+  type InternalAxiosRequestConfig,
+} from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createConfig = (): InternalAxiosRequestConfig => ({
@@ -65,5 +69,99 @@ describe("applyRequestContext", () => {
 
     expect(config.headers.Authorization).toBe("Bearer async-token");
     expect(config.headers.__tenant).toBe("area-space-1");
+  });
+});
+
+describe("getExpiredSessionLoginUrl", () => {
+  it("preserves a safe return path and explains why sign-in is required", async () => {
+    const { getExpiredSessionLoginUrl } = await importAxiosInstance();
+
+    expect(
+      getExpiredSessionLoginUrl("/member/programmes?payment=success&programme=aqgreen"),
+    ).toBe(
+      "/login?reason=session-ended&redirect=%2Fmember%2Fprogrammes%3Fpayment%3Dsuccess%26programme%3Daqgreen",
+    );
+  });
+
+  it("rejects an unsafe return path", async () => {
+    const { getExpiredSessionLoginUrl } = await importAxiosInstance();
+
+    expect(getExpiredSessionLoginUrl("//untrusted.example")).toBe(
+      "/login?reason=session-ended&redirect=%2Fdashboard",
+    );
+    expect(getExpiredSessionLoginUrl("/\\untrusted.example")).toBe(
+      "/login?reason=session-ended&redirect=%2Fdashboard",
+    );
+    expect(getExpiredSessionLoginUrl("/\\/untrusted.example")).toBe(
+      "/login?reason=session-ended&redirect=%2Fdashboard",
+    );
+  });
+});
+
+describe("session refresh failures", () => {
+  it("shares one refresh request across concurrent unauthorized responses", async () => {
+    const { apiClient, setRefreshTokenProvider } = await importAxiosInstance();
+    const refresh = vi.fn(async () => "renewed-token");
+    setRefreshTokenProvider(refresh);
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig & { _retry?: boolean }) => {
+      if (!config._retry) {
+        throw new AxiosError(
+          "Unauthorized",
+          "ERR_BAD_REQUEST",
+          config,
+          undefined,
+          {
+            config,
+            data: {},
+            headers: new AxiosHeaders(),
+            status: 401,
+            statusText: "Unauthorized",
+          },
+        );
+      }
+      return {
+        config,
+        data: { ok: true },
+        headers: new AxiosHeaders(),
+        status: 200,
+        statusText: "OK",
+      };
+    });
+
+    await Promise.all([
+      apiClient.request({ adapter, url: "/first" }),
+      apiClient.request({ adapter, url: "/second" }),
+    ]);
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not turn a transient refresh failure into a login redirect", async () => {
+    const { apiClient, setRefreshTokenProvider } = await importAxiosInstance();
+    const transientFailure = new Error("The authentication server is unavailable.");
+    setRefreshTokenProvider(async () => {
+      throw transientFailure;
+    });
+
+    await expect(
+      apiClient.request({
+        adapter: async (config) => {
+          throw new AxiosError(
+            "Unauthorized",
+            "ERR_BAD_REQUEST",
+            config,
+            undefined,
+            {
+              config,
+              data: {},
+              headers: new AxiosHeaders(),
+              status: 401,
+              statusText: "Unauthorized",
+            },
+          );
+        },
+        url: "/protected",
+      }),
+    ).rejects.toBe(transientFailure);
   });
 });

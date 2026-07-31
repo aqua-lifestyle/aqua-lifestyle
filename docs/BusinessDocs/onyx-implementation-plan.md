@@ -368,7 +368,10 @@ The first secured programme-participation workflow is complete:
 - the administrator screen cannot mark payments as confirmed;
 - a verified final activation payment promotes a Guest account to Club Member
   access, while Facilitator, Area Leader, and System Administrator roles are
-  never downgraded.
+  never downgraded;
+- role promotion invalidates the previous authenticated session, so the customer
+  is asked to sign in again and then returns to the programme status page with
+  current Club Member permissions.
 
 The provider-neutral confirmation processor remains private. Checkout creation,
 Yoco callback signature verification, and customer payment instructions cannot

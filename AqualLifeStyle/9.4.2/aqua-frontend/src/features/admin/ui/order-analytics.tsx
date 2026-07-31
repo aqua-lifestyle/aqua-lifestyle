@@ -12,7 +12,7 @@ export const OrderAnalytics = ({ orders }: OrderAnalyticsProps) => (
   <Card className="overflow-hidden p-0">
     <div className="border-b border-border p-5">
       <h2 className="text-lg font-semibold">Order analytics</h2>
-      <p className="text-sm text-muted-foreground">This month&apos;s volume, revenue, and latest orders.</p>
+      <p className="text-sm text-muted-foreground">This month&apos;s volume, reserved value, and latest orders.</p>
     </div>
     <div className="p-5">
       <div className="grid grid-cols-2 gap-3">
@@ -21,8 +21,8 @@ export const OrderAnalytics = ({ orders }: OrderAnalyticsProps) => (
           <p className="mt-1 text-2xl font-bold">{orders.monthVolume}</p>
         </div>
         <div className="rounded-lg bg-success/10 p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-success">Revenue this month</p>
-          <p className="mt-1 text-2xl font-bold">{formatCurrency(orders.monthRevenue)}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-success">Reserved value this month</p>
+          <p className="mt-1 text-2xl font-bold">{formatCurrency(orders.monthReservedValue)}</p>
         </div>
       </div>
       <h3 className="mt-5 text-sm font-semibold">Recent orders</h3>

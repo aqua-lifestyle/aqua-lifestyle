@@ -125,6 +125,7 @@ describe("EnquiryDetails", () => {
       convertEnquiryToCustomer: vi.fn(),
       createEnquiry: vi.fn(),
       getEnquiries: vi.fn(),
+      getMyEnquiries: vi.fn(),
       getEnquiry,
       getSalesReadyEnquiries: vi.fn(),
       recordFollowUp: vi.fn(),

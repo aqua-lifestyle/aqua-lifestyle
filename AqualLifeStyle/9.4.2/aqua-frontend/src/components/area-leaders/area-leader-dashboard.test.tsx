@@ -230,6 +230,7 @@ beforeEach(() => {
     createForCurrentCustomer: vi.fn(),
     createFromEnquiry: vi.fn(),
     getOrderIntents: vi.fn(),
+    getMyOrderIntents: vi.fn(),
   });
 });
 

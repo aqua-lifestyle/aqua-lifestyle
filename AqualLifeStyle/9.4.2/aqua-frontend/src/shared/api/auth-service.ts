@@ -102,6 +102,10 @@ export type LoginResult =
   | { ok: true; session: AuthSession }
   | { ok: false; message: string };
 
+export type RefreshTokenResult =
+  | { ok: true; session: AuthSession }
+  | { failure: "invalid" | "transient"; message: string; ok: false };
+
 export type RegisterInput = {
   contactNumber: string;
   email: string;
@@ -290,7 +294,7 @@ export const register = async (input: RegisterInput): Promise<RegisterResult> =>
 export const refreshToken = async (
   currentRefreshToken: string,
   tenant?: string | null,
-): Promise<LoginResult> => {
+): Promise<RefreshTokenResult> => {
   try {
     const params = new URLSearchParams();
     params.append("grant_type", "refresh_token");
@@ -328,12 +332,25 @@ export const refreshToken = async (
     return { ok: true, session };
   } catch (error: unknown) {
     if (axios.isAxiosError(error) && error.response) {
+      const isDefinitiveInvalidation =
+        error.response.status === 400 || error.response.status === 401;
+      const errorDescription = (
+        error.response.data as { error_description?: string } | null | undefined
+      )?.error_description;
       return {
+        failure: isDefinitiveInvalidation ? "invalid" : "transient",
         ok: false,
-        message: (error.response.data as { error_description?: string }).error_description ?? "Session expired. Please sign in again.",
+        message: errorDescription ??
+          (isDefinitiveInvalidation
+            ? "Session expired. Please sign in again."
+            : "Unable to refresh your session. Please try again."),
       };
     }
 
-    return { ok: false, message: "Unable to refresh your session." };
+    return {
+      failure: "transient",
+      message: "Unable to refresh your session. Check your connection and try again.",
+      ok: false,
+    };
   }
 };

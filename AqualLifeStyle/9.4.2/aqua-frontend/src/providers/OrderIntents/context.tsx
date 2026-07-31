@@ -35,6 +35,7 @@ export type OrderIntentsActions = {
   createFromEnquiry: (enquiryId: number) => Promise<boolean>;
   createForCurrentCustomer: (productId: number) => Promise<boolean>;
   getOrderIntents: () => Promise<void>;
+  getMyOrderIntents: () => Promise<void>;
 };
 
 export const initialOrderIntentsState: OrderIntentsState = {

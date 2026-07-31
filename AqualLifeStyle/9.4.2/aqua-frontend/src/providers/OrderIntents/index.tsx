@@ -6,6 +6,7 @@ import {
   useContext,
   useMemo,
   useReducer,
+  useRef,
 } from "react";
 
 import { apiEndpoints, getRequestErrorMessage, httpClient } from "@/src/shared/api";
@@ -40,19 +41,33 @@ export const OrderIntentsProvider = ({
     orderIntentsReducer,
     initialOrderIntentsState,
   );
+  const loadRequestIdentifier = useRef(0);
 
-  const getOrderIntents = useCallback(async () => {
+  const loadOrderIntents = useCallback(async (endpoint: string) => {
+    const requestIdentifier = ++loadRequestIdentifier.current;
     dispatch(getOrderIntentsPending());
 
     try {
-      const orderIntents = await httpClient.get<OrderIntent[]>(
-        apiEndpoints.orderIntents.getAll,
-      );
-      dispatch(getOrderIntentsSuccess(orderIntents));
+      const orderIntents = await httpClient.get<OrderIntent[]>(endpoint);
+      if (requestIdentifier === loadRequestIdentifier.current) {
+        dispatch(getOrderIntentsSuccess(orderIntents));
+      }
     } catch (error) {
-      dispatch(getOrderIntentsError(getErrorMessage(error)));
+      if (requestIdentifier === loadRequestIdentifier.current) {
+        dispatch(getOrderIntentsError(getErrorMessage(error)));
+      }
     }
   }, []);
+
+  const getOrderIntents = useCallback(
+    () => loadOrderIntents(apiEndpoints.orderIntents.getAll),
+    [loadOrderIntents],
+  );
+
+  const getMyOrderIntents = useCallback(
+    () => loadOrderIntents(apiEndpoints.orderIntents.getMine),
+    [loadOrderIntents],
+  );
 
   const createFromEnquiry = useCallback(async (enquiryId: number) => {
     dispatch(orderIntentActionPending());
@@ -125,8 +140,9 @@ export const OrderIntentsProvider = ({
       createFromEnquiry,
       createForCurrentCustomer,
       getOrderIntents,
+      getMyOrderIntents,
     }),
-    [cancelOrderIntent, completeOrderIntent, createForCurrentCustomer, createFromEnquiry, getOrderIntents],
+    [cancelOrderIntent, completeOrderIntent, createForCurrentCustomer, createFromEnquiry, getMyOrderIntents, getOrderIntents],
   );
 
   return (

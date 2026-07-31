@@ -296,7 +296,7 @@ namespace AqualLifeStyle.Domain.Onyx
             if (!recruiterParticipation.IsQualifiedForNetwork)
             {
                 throw new InvalidOperationException(
-                    "The recruiting customer must have active AQGreen participation.");
+                    "The inviting Club Member must have active AQGreen participation.");
             }
 
             EnsureValidRecruiter(customerId, recruiterParticipation.CustomerId);
@@ -311,7 +311,7 @@ namespace AqualLifeStyle.Domain.Onyx
 
             if (customerId == recruiterCustomerId)
             {
-                throw new InvalidOperationException("A customer cannot recruit themselves.");
+                throw new InvalidOperationException("A Club Member cannot invite themselves into their own network.");
             }
         }
     }

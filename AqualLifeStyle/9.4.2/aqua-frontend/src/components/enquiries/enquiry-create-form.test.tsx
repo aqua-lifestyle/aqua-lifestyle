@@ -146,6 +146,7 @@ describe("EnquiryCreateForm", () => {
       convertEnquiryToCustomer: vi.fn(),
       createEnquiry,
       getEnquiries: vi.fn(),
+      getMyEnquiries: vi.fn(),
       getEnquiry: vi.fn(),
       getSalesReadyEnquiries: vi.fn(),
       recordFollowUp: vi.fn(),

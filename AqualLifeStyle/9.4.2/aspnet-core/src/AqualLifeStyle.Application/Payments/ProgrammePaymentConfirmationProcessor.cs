@@ -199,7 +199,7 @@ namespace AqualLifeStyle.Payments
                     if (recruiter == null)
                         throw new UserFriendlyException(
                             "The Onyx payment cannot be completed.",
-                            "The selected recruiter is no longer eligible. Contact the club team for assistance.");
+                            "The inviting Club Member is no longer eligible. Contact the club team for assistance.");
 
                     participation = OnyxParticipation.StartDirectUnderRecruiter(
                         intent.TenantId,
@@ -270,7 +270,7 @@ namespace AqualLifeStyle.Payments
                 intent.TenantId);
             if (resolvedRecruiter != intent.RecruiterCustomerId)
                 throw new InvalidOperationException(
-                    "The checkout invitation no longer resolves to its recorded recruiter.");
+                    "The checkout invitation no longer resolves to its recorded network placement.");
         }
 
         private async Task ClearLegacyOnyxMembershipAssignmentAsync(int customerId)

@@ -292,7 +292,7 @@ namespace AqualLifeStyle.Tests.Application
                 resolver.Resolve(membershipType.ToString()));
 
             exception.Details.ShouldBe(
-                "Recruitment is not currently configured for this programme.");
+                "Member invitations are not currently configured for this programme.");
         }
 
         [Fact]
@@ -577,7 +577,7 @@ namespace AqualLifeStyle.Tests.Application
                     RecruiterCustomerId = recruiterCustomerId
                 }));
 
-            exception.Message.ShouldBe("The recruiter could not be accepted.");
+            exception.Message.ShouldBe("The network placement could not be accepted.");
             exception.Details.ShouldContain("not currently participating in AQGreen");
 
             await UsingDbContextAsync(1, async context =>

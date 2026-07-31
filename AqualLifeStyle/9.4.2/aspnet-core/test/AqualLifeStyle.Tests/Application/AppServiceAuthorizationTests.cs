@@ -249,7 +249,8 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public void EnquiryAppService_ShouldRequireEnquiryPermissions()
         {
-            AssertAuthorizeAttribute(typeof(EnquiryAppService), PermissionNames.Pages_Enquiries);
+            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.GetAllAsync), AquaPermissions.Enquiries.View);
+            AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.GetMineAsync), AquaPermissions.Enquiries.ViewSelf);
             AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.CreateAsync), AquaPermissions.Enquiries.Create);
             AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.RespondAsync), AquaPermissions.Enquiries.Update);
             AssertAuthorizeAttribute(typeof(EnquiryAppService), nameof(EnquiryAppService.CloseAsync), AquaPermissions.Enquiries.Resolve);
@@ -263,7 +264,9 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public void OrderIntentAppService_ShouldRequireOrderPermissions()
         {
-            AssertAuthorizeAttribute(typeof(OrderIntentAppService), PermissionNames.Pages_Orders);
+            AssertAuthorizeAttribute(typeof(OrderIntentAppService), nameof(OrderIntentAppService.GetAllAsync), AquaPermissions.Orders.View);
+            AssertAuthorizeAttribute(typeof(OrderIntentAppService), nameof(OrderIntentAppService.GetMineAsync), AquaPermissions.Orders.ViewSelf);
+            AssertAuthorizeAttribute(typeof(OrderIntentAppService), nameof(OrderIntentAppService.GetAsync), AquaPermissions.Orders.View);
             AssertAuthorizeAttribute(typeof(OrderIntentAppService), nameof(OrderIntentAppService.CreateFromEnquiryAsync), AquaPermissions.Orders.Place);
             AssertAuthorizeAttribute(typeof(OrderIntentAppService), nameof(OrderIntentAppService.CancelAsync), AquaPermissions.Orders.Process);
             AssertAuthorizeAttribute(typeof(OrderIntentAppService), nameof(OrderIntentAppService.CompleteAsync), AquaPermissions.Orders.Process);

@@ -106,7 +106,7 @@ namespace AqualLifeStyle.Domain.Onyx
             if (recruiterParticipation.Status != OnyxParticipationStatus.Active)
             {
                 throw new InvalidOperationException(
-                    "The recruiting customer must have active Onyx participation.");
+                    "The inviting Club Member must have active Onyx participation.");
             }
 
             EnsureValidRecruiter(customerId, recruiterParticipation.CustomerId);
@@ -247,7 +247,7 @@ namespace AqualLifeStyle.Domain.Onyx
             if (newRecruiterParticipation == null)
                 throw new ArgumentNullException(nameof(newRecruiterParticipation));
             if (newRecruiterParticipation.Status != OnyxParticipationStatus.Active)
-                throw new InvalidOperationException("The recruiting customer must have active Onyx participation.");
+                throw new InvalidOperationException("The inviting Club Member must have active Onyx participation.");
 
             EnsureValidRecruiter(CustomerId, newRecruiterParticipation.CustomerId);
             RecordRecruiterCorrection(
@@ -295,7 +295,7 @@ namespace AqualLifeStyle.Domain.Onyx
 
             if (customerId == recruiterCustomerId)
             {
-                throw new InvalidOperationException("A customer cannot recruit themselves.");
+                throw new InvalidOperationException("A Club Member cannot invite themselves into their own network.");
             }
         }
     }

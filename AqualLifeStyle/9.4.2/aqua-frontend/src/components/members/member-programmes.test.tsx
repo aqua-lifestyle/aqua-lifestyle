@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthState } from "@/src/providers";
-import { apiEndpoints, httpClient } from "@/src/shared/api";
+import { apiEndpoints, httpClient, refreshAccessToken } from "@/src/shared/api";
 import { MemberProgrammes } from "./member-programmes";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 
@@ -12,7 +12,11 @@ vi.mock("@/src/shared/api", async () => {
   const actual = await vi.importActual<typeof import("@/src/shared/api")>(
     "@/src/shared/api",
   );
-  return { ...actual, httpClient: { get: vi.fn(), post: vi.fn() } };
+  return {
+    ...actual,
+    httpClient: { get: vi.fn(), post: vi.fn() },
+    refreshAccessToken: vi.fn(),
+  };
 });
 
 const authState = (permissions: string[]) => ({
@@ -57,14 +61,42 @@ describe("MemberProgrammes", () => {
       checkoutUrl: "https://payments.example.test/checkout/secure",
       currency: "ZAR",
     });
+    vi.mocked(refreshAccessToken).mockResolvedValue("renewed-token");
   });
 
-  it("shows both network placements without requiring a recruiter", async () => {
+  it("refreshes account access after programme activation changes the role", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: {
+        activatedAt: "2026-07-30T00:00:00Z",
+        canRecruitForThisProgramme: true,
+        currency: "ZAR",
+        isActive: true,
+        joinedIndependently: true,
+        nextPaymentAmount: null,
+        nextPaymentDescription: null,
+        programmeName: "AQGreen",
+        recruiterClubMemberNumber: null,
+        startedAt: "2026-07-30T00:00:00Z",
+        status: "Active",
+      },
+      onyx: null,
+      travelBenefit: null,
+    });
+
+    render(<MemberProgrammes />);
+
+    await waitFor(() => expect(refreshAccessToken).toHaveBeenCalledOnce());
+  });
+
+  it("shows both network placements without requiring an invitation", async () => {
     render(<MemberProgrammes />);
 
     await screen.findByRole("button", { name: "Join AQGreen" });
     expect(screen.getByRole("button", { name: "Join Onyx" })).toBeInTheDocument();
-    expect(screen.getAllByText(/recruiter is optional/i)).toHaveLength(2);
+    expect(screen.getByText(/an invitation is optional/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/AQGreen and an invitation are not required/i),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: "Invite Club Members" }),
     ).not.toBeInTheDocument();

@@ -7,7 +7,10 @@ import { getLoginDestination } from "@/src/shared/auth/roles";
 
 import { LoginForm } from "./login-form";
 
-const { push } = vi.hoisted(() => ({ push: vi.fn() }));
+const { push, searchParams } = vi.hoisted(() => ({
+  push: vi.fn(),
+  searchParams: { current: new URLSearchParams() },
+}));
 
 vi.mock("@/src/shared/api/auth-service", () => ({
   getTenantSelfRegistrationAvailability: vi.fn(),
@@ -30,7 +33,7 @@ vi.mock("@/src/providers", async () => {
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, replace: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => "/login",
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParams.current,
 }));
 
 const submitForm = () => {
@@ -46,6 +49,7 @@ describe("LoginForm", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    searchParams.current = new URLSearchParams();
     vi.mocked(getTenantSelfRegistrationAvailability).mockResolvedValue({
       isSelfRegistrationEnabled: false,
       ok: true,
@@ -58,6 +62,32 @@ describe("LoginForm", () => {
     vi.mocked(useTenantState).mockReturnValue({ currentTenant: null, isHost: true });
     vi.mocked(useTenantActions).mockReturnValue({ clearTenant: vi.fn(), setTenant: vi.fn() });
     vi.mocked(useToast).mockReturnValue({ toast });
+  });
+
+  it("explains when access changes require a fresh sign-in", async () => {
+    searchParams.current = new URLSearchParams("reason=session-ended");
+
+    render(<LoginForm />);
+
+    expect(
+      screen.getByText(/secure session ended because your access changed or expired/i),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(getTenantSelfRegistrationAvailability).toHaveBeenCalled(),
+    );
+  });
+
+  it("does not describe a temporary refresh problem as an ended session", async () => {
+    searchParams.current = new URLSearchParams("reason=refresh-temporary");
+
+    render(<LoginForm />);
+
+    expect(
+      screen.queryByText(/secure session ended because your access changed or expired/i),
+    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(getTenantSelfRegistrationAvailability).toHaveBeenCalled(),
+    );
   });
 
   it("does not let a generic redirect override a role dashboard", () => {

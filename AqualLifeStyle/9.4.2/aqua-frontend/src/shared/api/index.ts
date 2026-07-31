@@ -1,5 +1,7 @@
 export {
   apiClient,
+  getExpiredSessionLoginUrl,
+  refreshAccessToken,
   setAccessTokenProvider,
   setRefreshTokenProvider,
   setTenantProvider,

@@ -16,6 +16,7 @@ import {
   SystemHealthProvider,
   TenantProvider,
   ToastProvider,
+  useAuthState,
   useTenantState,
 } from "@/src/providers";
 
@@ -25,18 +26,20 @@ type AppProvidersProps = {
 
 const TenantAwareProviders = ({ children }: { children: ReactNode }) => {
   const { currentTenant } = useTenantState();
+  const { session } = useAuthState();
   const tenant = currentTenant ?? "host";
+  const dataScope = getDataScopeKey(tenant, session?.user?.id);
 
   return (
-    <AreaLeadersProvider key={`area-leaders-${tenant}`}>
-      <AreaSpacesProvider key={`area-spaces-${tenant}`}>
-        <FacilitatorsProvider key={`facilitators-${tenant}`}>
-          <ReferralsProvider key={`referrals-${tenant}`}>
-            <CustomersProvider key={`customers-${tenant}`}>
-              <EnquiriesProvider key={`enquiries-${tenant}`}>
-                <MembershipsProvider key={`memberships-${tenant}`}>
-                  <ProductsProvider key={`products-${tenant}`}>
-                    <OrderIntentsProvider key={`order-intents-${tenant}`}>
+    <AreaLeadersProvider key={`area-leaders-${dataScope}`}>
+      <AreaSpacesProvider key={`area-spaces-${dataScope}`}>
+        <FacilitatorsProvider key={`facilitators-${dataScope}`}>
+          <ReferralsProvider key={`referrals-${dataScope}`}>
+            <CustomersProvider key={`customers-${dataScope}`}>
+              <EnquiriesProvider key={`enquiries-${dataScope}`}>
+                <MembershipsProvider key={`memberships-${dataScope}`}>
+                  <ProductsProvider key={`products-${dataScope}`}>
+                    <OrderIntentsProvider key={`order-intents-${dataScope}`}>
                       {children}
                     </OrderIntentsProvider>
                   </ProductsProvider>
@@ -49,6 +52,11 @@ const TenantAwareProviders = ({ children }: { children: ReactNode }) => {
     </AreaLeadersProvider>
   );
 };
+
+export const getDataScopeKey = (
+  tenant: string | null,
+  userId: number | undefined,
+) => `${tenant ?? "host"}:${userId ?? "anonymous"}`;
 
 export const AppProviders = ({ children }: AppProvidersProps) => {
   return (

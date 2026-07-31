@@ -4,9 +4,6 @@ import { MessageSquare } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  useAuthState,
-  useCustomersActions,
-  useCustomersState,
   useEnquiriesActions,
   useEnquiriesState,
 } from "@/src/providers";
@@ -44,50 +41,33 @@ const statusTone = (value: number): "success" | "warning" | "info" => {
 
 export const MemberEnquiries = () => {
   const [statusFilter, setStatusFilter] = useState<EnquiryStatusFilter>("all");
-  const { session } = useAuthState();
-  const { getEnquiries } = useEnquiriesActions();
-  const { getCustomers } = useCustomersActions();
+  const { getMyEnquiries } = useEnquiriesActions();
   const { enquiries, isLoadError, isLoadPending, loadErrorMessage } = useEnquiriesState();
-  const { customers } = useCustomersState();
 
-  // ALL hooks before early returns
   useEffect(() => {
-    void getEnquiries();
-    void getCustomers();
-  }, [getEnquiries, getCustomers]);
-
-  const currentUserId = session?.user?.id ?? null;
-
-  const myEnquiries = useMemo(() => {
-    if (!currentUserId) return [];
-    return enquiries.filter((enquiry) => enquiry.customerId === currentUserId);
-  }, [enquiries, currentUserId]);
+    void getMyEnquiries();
+  }, [getMyEnquiries]);
 
   const filteredEnquiries = useMemo(() => {
-    return myEnquiries.filter((enquiry) => {
+    return enquiries.filter((enquiry) => {
       const matchesStatus = statusFilter === "all" || enquiry.status === Number(statusFilter);
       return matchesStatus;
     });
-  }, [myEnquiries, statusFilter]);
+  }, [enquiries, statusFilter]);
 
   const tableColumns = [
     {
       header: "Enquiry",
       key: "id",
-      render: (enquiry: typeof filteredEnquiries[number]) => {
-        const customer = customers.find((c) => c.id === enquiry.customerId);
-        return (
-          <div className="flex items-center gap-3">
-            <Avatar fallback={`E ${enquiry.id}`} size="sm" />
-            <div>
-              <p className="font-semibold text-foreground">Enquiry #{enquiry.id}</p>
-              <p className="text-xs text-muted-foreground">
-                {customer?.name ?? `Customer ${enquiry.customerId}`}
-              </p>
-            </div>
+      render: (enquiry: typeof filteredEnquiries[number]) => (
+        <div className="flex items-center gap-3">
+          <Avatar fallback={`E ${enquiry.id}`} size="sm" />
+          <div>
+            <p className="font-semibold text-foreground">Enquiry #{enquiry.id}</p>
+            <p className="text-xs text-muted-foreground">Your enquiry</p>
           </div>
-        );
-      },
+        </div>
+      ),
       sortable: true,
     },
     {
@@ -127,7 +107,7 @@ export const MemberEnquiries = () => {
           <Breadcrumb
             items={[
               { href: "/", label: "Dashboard" },
-              { href: "/member", label: "Club member" },
+              { href: "/member", label: "Club Member" },
               { label: "My enquiries" },
             ]}
           />

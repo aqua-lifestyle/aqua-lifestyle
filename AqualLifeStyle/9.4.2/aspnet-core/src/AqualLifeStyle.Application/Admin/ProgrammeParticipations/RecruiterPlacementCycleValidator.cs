@@ -12,7 +12,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             int newRecruiterCustomerId)
         {
             if (targetCustomerId == newRecruiterCustomerId)
-                throw InvalidPlacement("A Club Member cannot recruit themselves.");
+                throw InvalidPlacement("A Club Member cannot invite themselves into their own network.");
 
             var byCustomer = placements.ToDictionary(item => item.CustomerId);
             var visited = new HashSet<int>();
@@ -20,16 +20,16 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             while (visited.Add(current) && byCustomer.TryGetValue(current, out var placement))
             {
                 if (current == targetCustomerId)
-                    throw InvalidPlacement("This correction would create a recruitment cycle.");
+                    throw InvalidPlacement("This correction would create a network placement cycle.");
                 if (!placement.RecruiterCustomerId.HasValue) return;
                 current = placement.RecruiterCustomerId.Value;
             }
 
             if (current == targetCustomerId)
-                throw InvalidPlacement("This correction would create a recruitment cycle.");
+                throw InvalidPlacement("This correction would create a network placement cycle.");
         }
 
         private static UserFriendlyException InvalidPlacement(string details) =>
-            new UserFriendlyException("Recruiter correction failed.", details);
+            new UserFriendlyException("Network placement correction failed.", details);
     }
 }

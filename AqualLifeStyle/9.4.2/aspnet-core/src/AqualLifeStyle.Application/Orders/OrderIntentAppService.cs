@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
 using Abp.ObjectMapping;
@@ -13,10 +14,10 @@ using AqualLifeStyle.Domain.Enquiries;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Orders;
 using AqualLifeStyle.Domain.Products;
+using Microsoft.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Application.Orders
 {
-    [AbpAuthorize(PermissionNames.Pages_Orders)]
     public class OrderIntentAppService : AqualLifeStyleAppServiceBase, IOrderIntentAppService
     {
         private readonly IOrderIntentRepository _orderIntentRepository;
@@ -43,22 +44,35 @@ namespace AqualLifeStyle.Application.Orders
             _objectMapper = objectMapper;
         }
 
+        [AbpAuthorize(AquaPermissions.Orders.View)]
         public async Task<IReadOnlyList<OrderIntentDto>> GetAllAsync()
         {
-            var orderIntents = await _orderIntentRepository.GetAllListAsync();
+            var tenantId = GetRequiredTenantId("Order lookup failed.");
+            var orderIntents = await (
+                from orderIntent in _orderIntentRepository.GetAll()
+                join customer in _customerRepository.GetAll()
+                    on orderIntent.CustomerId equals customer.Id
+                where customer.TenantId == tenantId
+                select orderIntent)
+                .ToListAsync();
             return _objectMapper.Map<List<OrderIntentDto>>(orderIntents);
         }
 
+        [AbpAuthorize(AquaPermissions.Orders.ViewSelf)]
+        public async Task<IReadOnlyList<OrderIntentDto>> GetMineAsync()
+        {
+            var customer = await GetCurrentCustomerAsync("Order lookup failed.");
+            var orderIntents = await _orderIntentRepository.GetAllListAsync(
+                orderIntent => orderIntent.CustomerId == customer.Id);
+            return _objectMapper.Map<List<OrderIntentDto>>(orderIntents);
+        }
+
+        [AbpAuthorize(AquaPermissions.Orders.View)]
         public async Task<OrderIntentDto> GetAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
 
-            var orderIntent = await _orderIntentRepository.GetAsync(id);
-            if (orderIntent == null)
-            {
-                throw new AqualLifeStyleNotFoundException("OrderIntent", id);
-            }
-
+            var orderIntent = await GetOrderIntentForCurrentTenantOrThrowAsync(id);
             return _objectMapper.Map<OrderIntentDto>(orderIntent);
         }
 
@@ -200,12 +214,7 @@ namespace AqualLifeStyle.Application.Orders
         {
             AqualLifeStyleValidator.ValidId(id);
 
-            var orderIntent = await GetOrderIntentOrThrowAsync(id);
-            var customer = await _customerRepository.GetAsync(orderIntent.CustomerId);
-            if (!await CurrentUserCanAccessCustomerAsync(customer))
-            {
-                throw new UserFriendlyException("Order intent cancellation failed.", "You do not have permission to cancel this order intent.");
-            }
+            var orderIntent = await GetOrderIntentForCurrentTenantOrThrowAsync(id);
 
             try
             {
@@ -225,12 +234,7 @@ namespace AqualLifeStyle.Application.Orders
         {
             AqualLifeStyleValidator.ValidId(id);
 
-            var orderIntent = await GetOrderIntentOrThrowAsync(id);
-            var customer = await _customerRepository.GetAsync(orderIntent.CustomerId);
-            if (!await CurrentUserCanAccessCustomerAsync(customer))
-            {
-                throw new UserFriendlyException("Order intent completion failed.", "You do not have permission to complete this order intent.");
-            }
+            var orderIntent = await GetOrderIntentForCurrentTenantOrThrowAsync(id);
 
             try
             {
@@ -245,15 +249,33 @@ namespace AqualLifeStyle.Application.Orders
             return _objectMapper.Map<OrderIntentDto>(orderIntent);
         }
 
-        private async Task<OrderIntent> GetOrderIntentOrThrowAsync(int id)
+        private async Task<OrderIntent> GetOrderIntentForCurrentTenantOrThrowAsync(int id)
         {
+            var tenantId = GetRequiredTenantId("Order lookup failed.");
             var orderIntent = await _orderIntentRepository.GetAsync(id);
-            if (orderIntent == null)
+            var customer = orderIntent == null
+                ? null
+                : await _customerRepository.FirstOrDefaultAsync(orderIntent.CustomerId);
+            if (orderIntent == null || customer?.TenantId != tenantId)
             {
                 throw new AqualLifeStyleNotFoundException("OrderIntent", id);
             }
 
             return orderIntent;
+        }
+
+        private async Task<Customer> GetCurrentCustomerAsync(string operation)
+        {
+            if (!AbpSession.UserId.HasValue)
+                throw new AqualLifeStyleAuthorizationException($"{operation} A user context is required.");
+
+            var tenantId = GetRequiredTenantId(operation);
+            var customer = await _customerRepository.FirstOrDefaultAsync(item =>
+                item.TenantId == tenantId && item.UserId == AbpSession.UserId.Value);
+            if (customer == null)
+                throw new UserFriendlyException(operation, "No customer profile is linked to this account.");
+
+            return customer;
         }
 
         private void EnsureMembershipAllowsReservation(Customer customer, Product product, Membership membership)

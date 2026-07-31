@@ -1,11 +1,9 @@
 "use client";
 
 import { Package } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 
 import {
-  useCustomersActions,
-  useCustomersState,
   useOrderIntentsActions,
   useOrderIntentsState,
 } from "@/src/providers";
@@ -22,33 +20,19 @@ import {
 import { getOrderStatusLabel, getOrderStatusTone } from "@/src/shared/lib/order-status";
 
 export const MemberOrders = () => {
-  const { getOrderIntents } = useOrderIntentsActions();
-  const { getMyCustomer } = useCustomersActions();
+  const { getMyOrderIntents } = useOrderIntentsActions();
   const { orderIntents, isLoadError, isLoadPending, loadErrorMessage } =
     useOrderIntentsState();
-  const {
-    isMyCustomerError,
-    isMyCustomerPending,
-    myCustomer,
-    myCustomerErrorMessage,
-  } = useCustomersState();
 
-  // ALL hooks before early returns
   useEffect(() => {
-    void getOrderIntents();
-    void getMyCustomer();
-  }, [getMyCustomer, getOrderIntents]);
-
-  const customerOrders = useMemo(() => {
-    if (!myCustomer?.id) return [];
-    return orderIntents.filter((order) => order.customerId === myCustomer.id);
-  }, [myCustomer, orderIntents]);
+    void getMyOrderIntents();
+  }, [getMyOrderIntents]);
 
   const tableColumns = [
     {
       header: "Order",
       key: "id",
-      render: (order: typeof customerOrders[number]) => (
+      render: (order: typeof orderIntents[number]) => (
         <div className="flex items-center gap-3">
           <Avatar fallback={`O ${order.id}`} size="sm" />
           <div>
@@ -64,7 +48,7 @@ export const MemberOrders = () => {
     {
       header: "Status",
       key: "status",
-      render: (order: typeof customerOrders[number]) => (
+      render: (order: typeof orderIntents[number]) => (
         <Badge tone={getOrderStatusTone(order.status)}>
           {getOrderStatusLabel(order.status)}
         </Badge>
@@ -74,7 +58,7 @@ export const MemberOrders = () => {
     {
       header: "Unit Price",
       key: "unitPrice",
-      render: (order: typeof customerOrders[number]) => (
+      render: (order: typeof orderIntents[number]) => (
         <span className="text-sm">{order.unitPrice.toFixed(2)}</span>
       ),
       sortable: true,
@@ -82,7 +66,7 @@ export const MemberOrders = () => {
     {
       header: "Reserved Price",
       key: "reservedPrice",
-      render: (order: typeof customerOrders[number]) => (
+      render: (order: typeof orderIntents[number]) => (
         <span className="text-sm">{order.reservedPrice.toFixed(2)}</span>
       ),
       sortable: true,
@@ -90,7 +74,7 @@ export const MemberOrders = () => {
     {
       header: "Created",
       key: "createdAt",
-      render: (order: typeof customerOrders[number]) => (
+      render: (order: typeof orderIntents[number]) => (
         <span className="text-sm">
           {new Date(order.createdAt).toLocaleDateString()}
         </span>
@@ -107,7 +91,7 @@ export const MemberOrders = () => {
             <Breadcrumb
               items={[
                 { href: "/", label: "Dashboard" },
-                { href: "/member", label: "Club member" },
+                { href: "/member", label: "Club Member" },
                 { label: "My orders" },
               ]}
             />
@@ -118,13 +102,13 @@ export const MemberOrders = () => {
           </div>
         </header>
 
-        {isLoadPending || isMyCustomerPending ? (
+        {isLoadPending ? (
           <Skeleton className="h-96" />
-        ) : isLoadError || isMyCustomerError ? (
+        ) : isLoadError ? (
           <StatusMessage tone="error">
-            {loadErrorMessage ?? myCustomerErrorMessage ?? "Unable to load orders."}
+            {loadErrorMessage ?? "Unable to load your orders."}
           </StatusMessage>
-        ) : customerOrders.length === 0 ? (
+        ) : orderIntents.length === 0 ? (
           <EmptyState
             description="You have no orders yet."
             icon={Package}
@@ -134,7 +118,7 @@ export const MemberOrders = () => {
           <Card className="flex flex-col gap-4">
             <DataTable
               columns={tableColumns}
-              data={customerOrders}
+              data={orderIntents}
               emptyState="You have no orders."
               keyExtractor={(order) => order.id}
               pageSize={10}
