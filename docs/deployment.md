@@ -105,6 +105,13 @@ and purpose every thirty minutes. Preserve Render's forwarding headers so the
 API receives the original client address rather than grouping all traffic under
 the proxy address.
 
+Create an immediate log alert for
+`EmailOperationsAlert AlertType=terminal_email_delivery_failed`. The event is
+emitted once when an outbox message exhausts its delivery attempts and contains
+only the outbox ID, notification type, tenant ID, and attempt count. Investigate
+the corresponding redacted outbox record without logging or exporting message
+content.
+
 Before deploying the payment branch:
 
 1. Rotate any key that has been pasted into chat, email, an issue, or a terminal

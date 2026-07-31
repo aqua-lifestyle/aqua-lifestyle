@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Abp.Dependency;
 using Abp.Domain.Uow;
 using AqualLifeStyle.Domain.Email;
+using Microsoft.Extensions.Logging;
 
 namespace AqualLifeStyle.Email
 {
@@ -49,15 +50,18 @@ namespace AqualLifeStyle.Email
         private readonly ITransactionalEmailOutboxRepository _repository;
         private readonly ITransactionalEmailDeliveryGateway _deliveryGateway;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        private readonly ILogger<TransactionalEmailOutboxProcessor> _logger;
 
         public TransactionalEmailOutboxProcessor(
             ITransactionalEmailOutboxRepository repository,
             ITransactionalEmailDeliveryGateway deliveryGateway,
-            IUnitOfWorkManager unitOfWorkManager)
+            IUnitOfWorkManager unitOfWorkManager,
+            ILogger<TransactionalEmailOutboxProcessor> logger)
         {
             _repository = repository;
             _deliveryGateway = deliveryGateway;
             _unitOfWorkManager = unitOfWorkManager;
+            _logger = logger;
         }
 
         [UnitOfWork(IsDisabled = true)]
@@ -86,6 +90,7 @@ namespace AqualLifeStyle.Email
                 var processingToken = Guid.NewGuid();
                 TransactionalEmailOutboxMessage claimed;
                 var claimedAt = DateTime.UtcNow;
+                TransactionalEmailOutboxMessage terminalFailure = null;
                 using (var unitOfWork = _unitOfWorkManager.Begin(new UnitOfWorkOptions
                 {
                     IsTransactional = true,
@@ -140,10 +145,22 @@ namespace AqualLifeStyle.Email
                             persisted.RecordFailure(
                                 SafeError(deliveryFailure),
                                 DateTime.UtcNow.AddMinutes(BackoffMinutes(persisted.AttemptCount)));
+                            if (persisted.Status == TransactionalEmailStatus.Failed)
+                                terminalFailure = persisted;
                         }
                     }
 
                     await unitOfWork.CompleteAsync();
+                }
+
+                if (terminalFailure != null)
+                {
+                    _logger.LogError(
+                        "EmailOperationsAlert AlertType=terminal_email_delivery_failed OutboxId={OutboxId} NotificationType={NotificationType} TenantId={TenantId} AttemptCount={AttemptCount}",
+                        terminalFailure.Id,
+                        terminalFailure.NotificationType,
+                        terminalFailure.TenantId,
+                        terminalFailure.AttemptCount);
                 }
             }
         }
