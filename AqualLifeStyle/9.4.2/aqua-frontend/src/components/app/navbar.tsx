@@ -53,11 +53,19 @@ const moreLinks = [
   { href: "/contact", icon: Mail, label: "Contact", permission: null },
 ];
 
+const publicLinks = [
+  { href: "/#value", label: "Why Aqua" },
+  { href: "/#how-it-works", label: "How it works" },
+  { href: "/#programmes", label: "Programmes" },
+  { href: "/#faq", label: "FAQ" },
+  { href: "/catalog", label: "Catalog" },
+];
+
 export const Navbar = () => {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
-  const { session } = useAuthState();
+  const { isAuthenticated, session } = useAuthState();
   const areaLeaderLinks = isAreaLeader(session?.user?.role)
     ? [
         {
@@ -136,65 +144,80 @@ export const Navbar = () => {
             </span>
           </Link>
 
-          <nav className="hidden items-center gap-1 lg:flex">
-            {primaryLinks.filter((link) => hasPermission(link.permission)).map((link) => (
-              <Link
-                key={link.href}
-                className={cn(
-                  "relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition",
-                  isActive(link.href)
-                    ? "text-accent"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-                href={link.href}
-              >
-                <link.icon className="size-4" />
-                {link.label}
-                {isActive(link.href) ? (
-                  <span className="absolute bottom-0 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-accent" />
+          <nav aria-label="Primary navigation" className="hidden items-center gap-1 lg:flex">
+            {isAuthenticated
+              ? primaryLinks.filter((link) => hasPermission(link.permission)).map((link) => (
+                  <Link
+                    key={link.href}
+                    className={cn(
+                      "relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition",
+                      isActive(link.href)
+                        ? "text-accent"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                    href={link.href}
+                  >
+                    <link.icon className="size-4" />
+                    {link.label}
+                    {isActive(link.href) ? (
+                      <span className="absolute bottom-0 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-accent" />
+                    ) : null}
+                  </Link>
+                ))
+              : publicLinks.map((link) => (
+                  <Link
+                    className="rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    href={link.href}
+                    key={link.href}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+
+            {isAuthenticated ? (
+              <div className="relative">
+                <button
+                  aria-expanded={isMoreOpen}
+                  className={cn(
+                    "flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground",
+                    isMoreOpen && "bg-muted text-foreground",
+                  )}
+                  onClick={() => setIsMoreOpen((current) => !current)}
+                  type="button"
+                >
+                  More
+                  <ChevronDown
+                    className={cn(
+                      "size-4 transition-transform",
+                      isMoreOpen && "rotate-180",
+                    )}
+                  />
+                </button>
+
+                {isMoreOpen ? (
+                  <div className="absolute left-0 top-full z-50 mt-2 w-44 rounded-xl border border-border bg-card p-1 shadow-lg animate-fade-in">
+                    {contextualMoreLinks
+                      .filter((link) => hasPermission(link.permission))
+                      .map((link) => (
+                        <Link
+                          key={link.href}
+                          className={cn(
+                            "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition",
+                            isActive(link.href)
+                              ? "bg-accent/10 text-accent"
+                              : "text-foreground hover:bg-muted",
+                          )}
+                          href={link.href}
+                          onClick={() => setIsMoreOpen(false)}
+                        >
+                          <link.icon className="size-4" />
+                          {link.label}
+                        </Link>
+                      ))}
+                  </div>
                 ) : null}
-              </Link>
-            ))}
-
-            <div className="relative">
-              <button
-                aria-expanded={isMoreOpen}
-                className={cn(
-                  "flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground",
-                  isMoreOpen && "bg-muted text-foreground",
-                )}
-                onClick={() => setIsMoreOpen((current) => !current)}
-                type="button"
-              >
-                More
-                <ChevronDown
-                  className={cn("size-4 transition-transform", isMoreOpen && "rotate-180")}
-                />
-              </button>
-
-              {isMoreOpen ? (
-                <div className="absolute left-0 top-full z-50 mt-2 w-44 rounded-xl border border-border bg-card p-1 shadow-lg animate-fade-in">
-                  {contextualMoreLinks
-                    .filter((link) => hasPermission(link.permission))
-                    .map((link) => (
-                    <Link
-                      key={link.href}
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition",
-                        isActive(link.href)
-                          ? "bg-accent/10 text-accent"
-                          : "text-foreground hover:bg-muted",
-                      )}
-                      href={link.href}
-                      onClick={() => setIsMoreOpen(false)}
-                    >
-                      <link.icon className="size-4" />
-                      {link.label}
-                    </Link>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
           </nav>
         </div>
 
@@ -209,9 +232,11 @@ export const Navbar = () => {
             </Link>
           ) : null}
 
-          <div className="hidden lg:block">
-            <TenantSwitcher />
-          </div>
+          {isAuthenticated ? (
+            <div className="hidden lg:block">
+              <TenantSwitcher />
+            </div>
+          ) : null}
 
           <UserMenu />
 
@@ -228,36 +253,51 @@ export const Navbar = () => {
 
       {isMobileOpen ? (
         <div className="border-t border-border bg-card px-4 py-4 lg:hidden animate-fade-in">
-          <nav className="flex flex-col gap-1">
-            {[...primaryLinks, ...contextualMoreLinks].filter((link) => hasPermission(link.permission)).map((link) => (
-              <Link
-                key={link.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition",
-                  isActive(link.href)
-                    ? "bg-accent/10 text-accent"
-                    : "text-foreground hover:bg-muted",
-                )}
-                href={link.href}
-                onClick={() => setIsMobileOpen(false)}
-              >
-                <link.icon className="size-5" />
-                {link.label}
-              </Link>
-            ))}
+          <nav aria-label="Mobile navigation" className="flex flex-col gap-1">
+            {isAuthenticated
+              ? [...primaryLinks, ...contextualMoreLinks]
+                  .filter((link) => hasPermission(link.permission))
+                  .map((link) => (
+                    <Link
+                      key={link.href}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition",
+                        isActive(link.href)
+                          ? "bg-accent/10 text-accent"
+                          : "text-foreground hover:bg-muted",
+                      )}
+                      href={link.href}
+                      onClick={() => setIsMobileOpen(false)}
+                    >
+                      <link.icon className="size-5" />
+                      {link.label}
+                    </Link>
+                  ))
+              : publicLinks.map((link) => (
+                  <Link
+                    className="rounded-lg px-3 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted"
+                    href={link.href}
+                    key={link.href}
+                    onClick={() => setIsMobileOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
           </nav>
-          <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
-            <TenantSwitcher />
-            {canCreateCustomer ? (
-              <Link
-                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
-                href="/customers/register"
-              >
-                <Plus className="size-4" />
-                Add customer
-              </Link>
-            ) : null}
-          </div>
+          {isAuthenticated ? (
+            <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+              <TenantSwitcher />
+              {canCreateCustomer ? (
+                <Link
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
+                  href="/customers/register"
+                >
+                  <Plus className="size-4" />
+                  Add customer
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </header>

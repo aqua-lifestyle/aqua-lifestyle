@@ -96,6 +96,27 @@ describe("Navbar", () => {
     ).toHaveAttribute("href", "/member/entry-commitments");
   });
 
+  it("shows public information instead of internal navigation to guests", () => {
+    mockPathname.mockReturnValue("/");
+
+    render(
+      <AuthProvider>
+        <Navbar />
+      </AuthProvider>,
+    );
+
+    expect(screen.getByRole("link", { name: "Why Aqua" })).toHaveAttribute(
+      "href",
+      "/#value",
+    );
+    expect(screen.getByRole("link", { name: "How it works" })).toHaveAttribute(
+      "href",
+      "/#how-it-works",
+    );
+    expect(screen.queryByRole("link", { name: "Dashboard" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tenant-switcher")).not.toBeInTheDocument();
+  });
+
   it("highlights the active link", async () => {
     render(
       <AuthProvider>
