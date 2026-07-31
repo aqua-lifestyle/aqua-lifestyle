@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Transactions;
 using System.Threading.Tasks;
 using Abp.Application.Services.Dto;
 using Abp.Auditing;
@@ -29,6 +30,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         private readonly IRepository<MemberPayment, Guid> _paymentRepository;
         private readonly IRepository<Tenant> _tenantRepository;
         private readonly IProgrammeRecruiterCorrectionPolicyResolver _correctionPolicyResolver;
+        private readonly IProgrammeRecruiterCorrectionLock _correctionLock;
+        private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public AdminProgrammeParticipationAppService(
             ICustomerRepository customerRepository,
@@ -36,7 +39,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             IRepository<OnyxParticipation, Guid> onyxParticipationRepository,
             IRepository<MemberPayment, Guid> paymentRepository,
             IRepository<Tenant> tenantRepository,
-            IProgrammeRecruiterCorrectionPolicyResolver correctionPolicyResolver)
+            IProgrammeRecruiterCorrectionPolicyResolver correctionPolicyResolver,
+            IProgrammeRecruiterCorrectionLock correctionLock,
+            IUnitOfWorkManager unitOfWorkManager)
         {
             _customerRepository = customerRepository;
             _entryParticipationRepository = entryParticipationRepository;
@@ -44,67 +49,88 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             _paymentRepository = paymentRepository;
             _tenantRepository = tenantRepository;
             _correctionPolicyResolver = correctionPolicyResolver;
+            _correctionLock = correctionLock;
+            _unitOfWorkManager = unitOfWorkManager;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.CorrectRecruiter)]
+        [UnitOfWork(IsDisabled = true)]
         public async Task CorrectRecruiterAsync(CorrectProgrammeRecruiterInput input)
         {
             if (input == null)
                 throw new Abp.UI.UserFriendlyException(
                     "Network placement correction failed.",
                     "The request was empty.");
-            if (!AbpSession.TenantId.HasValue &&
-                !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
-            {
-                throw new AbpAuthorizationException(
-                    "Cross-Area network placement correction requires permission to manage all Areas.");
-            }
-
             Customer target;
             Customer newRecruiter = null;
-            using (DisableAllTenantDataFiltersForHost())
-            using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.SoftDelete))
+            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
             {
-                var normalizedTarget = input.ClubMemberNumber.Trim().ToUpperInvariant();
-                target = await _customerRepository.GetAll()
-                    .SingleOrDefaultAsync(customer =>
-                        customer.ClubMemberNumber == normalizedTarget &&
-                        !customer.IsDeleted);
-                if (target == null)
-                    throw new Abp.UI.UserFriendlyException(
-                        "Network placement correction failed.",
-                        "The Club Member participation was not found.");
-
-                ValidateRequestedTenant(target.TenantId, "Network placement correction");
-                if (!string.IsNullOrWhiteSpace(input.NewRecruiterClubMemberNumber))
+                IsTransactional = true,
+                IsolationLevel = IsolationLevel.Serializable
+            }))
+            {
+                if (!AbpSession.TenantId.HasValue &&
+                    !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
                 {
-                    var normalizedRecruiter = input.NewRecruiterClubMemberNumber
-                        .Trim()
-                        .ToUpperInvariant();
-                    newRecruiter = await _customerRepository.GetAll()
+                    throw new AbpAuthorizationException(
+                        "Cross-Area network placement correction requires permission to manage all Areas.");
+                }
+
+                var policy = _correctionPolicyResolver.Resolve(input.Programme);
+                await _correctionLock.AcquireAsync(input.Programme switch
+                {
+                    AdminProgrammeType.Entry => ProgrammeRecruiterNetwork.AQGreen,
+                    AdminProgrammeType.Onyx => ProgrammeRecruiterNetwork.Onyx,
+                    _ => throw new Abp.UI.UserFriendlyException(
+                        "Network placement correction failed.",
+                        "The selected programme does not support network placement corrections.")
+                });
+
+                using (DisableAllTenantDataFiltersForHost())
+                using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.SoftDelete))
+                {
+                    var normalizedTarget = input.ClubMemberNumber.Trim().ToUpperInvariant();
+                    target = await _customerRepository.GetAll()
                         .SingleOrDefaultAsync(customer =>
-                            customer.ClubMemberNumber == normalizedRecruiter &&
+                            customer.ClubMemberNumber == normalizedTarget &&
                             !customer.IsDeleted);
-                    if (newRecruiter == null ||
-                        (AbpSession.TenantId.HasValue &&
-                         newRecruiter.TenantId != target.TenantId) ||
-                        !newRecruiter.IsActive)
-                    {
+                    if (target == null)
                         throw new Abp.UI.UserFriendlyException(
                             "Network placement correction failed.",
-                            "The new inviting Club Member must be active and within your management authority.");
+                            "The Club Member participation was not found.");
+
+                    ValidateRequestedTenant(target.TenantId, "Network placement correction");
+                    if (!string.IsNullOrWhiteSpace(input.NewRecruiterClubMemberNumber))
+                    {
+                        var normalizedRecruiter = input.NewRecruiterClubMemberNumber
+                            .Trim()
+                            .ToUpperInvariant();
+                        newRecruiter = await _customerRepository.GetAll()
+                            .SingleOrDefaultAsync(customer =>
+                                customer.ClubMemberNumber == normalizedRecruiter &&
+                                !customer.IsDeleted);
+                        if (newRecruiter == null ||
+                            (AbpSession.TenantId.HasValue &&
+                             newRecruiter.TenantId != target.TenantId) ||
+                            !newRecruiter.IsActive)
+                        {
+                            throw new Abp.UI.UserFriendlyException(
+                                "Network placement correction failed.",
+                                "The new inviting Club Member must be active and within your management authority.");
+                        }
                     }
                 }
-            }
 
-            await _correctionPolicyResolver.Resolve(input.Programme).CorrectAsync(
-                target.TenantId.Value,
-                target.Id,
-                newRecruiter?.Id,
-                AbpSession.GetUserId(),
-                input.Reason,
-                DateTime.UtcNow);
-            await CurrentUnitOfWork.SaveChangesAsync();
+                await policy.CorrectAsync(
+                    target.TenantId.Value,
+                    target.Id,
+                    newRecruiter?.Id,
+                    AbpSession.GetUserId(),
+                    input.Reason,
+                    DateTime.UtcNow);
+                await CurrentUnitOfWork.SaveChangesAsync();
+                await uow.CompleteAsync();
+            }
             Logger.Warn(
                 $"Programme recruiter corrected programme={input.Programme} tenant={target.TenantId} member={target.ClubMemberNumber} recruiter={newRecruiter?.ClubMemberNumber ?? "independent"}");
         }
