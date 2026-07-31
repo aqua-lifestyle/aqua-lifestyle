@@ -21,7 +21,11 @@ describe("LandingPage", () => {
       "#value",
     );
     expect(screen.getByRole("heading", { name: "One club. Four connected ideas." })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "A considered path into the club." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "A clear path into the club." })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Aqua Lifestyle Club" })).toHaveAttribute(
+      "src",
+      expect.stringContaining("aqua-lifestyle-logo.jpg"),
+    );
     expect(screen.getByRole("link", { name: /Create an account/i })).toHaveAttribute(
       "href",
       "/signup",

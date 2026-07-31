@@ -17,8 +17,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Aqua Lifestyle Club",
+  applicationName: "Aqua Lifestyle Club",
   description: "Aqua Lifestyle Club membership and product portal",
+  metadataBase: new URL("https://www.aqualifestyleclub.co.za"),
+  openGraph: {
+    description: "Aqua Lifestyle Club membership and product portal",
+    siteName: "Aqua Lifestyle Club",
+    title: "Aqua Lifestyle Club",
+    type: "website",
+  },
+  title: "Aqua Lifestyle Club",
+  twitter: {
+    card: "summary_large_image",
+    description: "Aqua Lifestyle Club membership and product portal",
+    title: "Aqua Lifestyle Club",
+  },
 };
 
 export default function RootLayout({

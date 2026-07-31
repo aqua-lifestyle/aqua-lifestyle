@@ -3,7 +3,6 @@
 import {
   Building2,
   ChevronDown,
-  Droplets,
   Home,
   LayoutDashboard,
   Menu,
@@ -20,6 +19,7 @@ import {
   PiggyBank,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
@@ -63,6 +63,7 @@ const publicLinks = [
 
 export const Navbar = () => {
   const pathname = usePathname();
+  const isLanding = pathname === "/";
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const { isAuthenticated, session } = useAuthState();
@@ -114,9 +115,14 @@ export const Navbar = () => {
       <header className="sticky top-0 z-40 w-full border-b border-border bg-card/95 backdrop-blur">
         <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link className="flex items-center gap-3 text-foreground transition hover:opacity-80" href="/admin/dashboard">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-dark text-white shadow-md">
-              <Droplets className="size-5" />
-            </div>
+            <Image
+              alt=""
+              aria-hidden="true"
+              className="size-9 rounded-lg object-cover"
+              height={36}
+              src="/aqua-lifestyle-logo.jpg"
+              width={36}
+            />
             <div>
               <p className="font-bold leading-tight">Aqua Lifestyle</p>
               <p className="text-xs text-muted-foreground">Administration</p>
@@ -129,16 +135,32 @@ export const Navbar = () => {
   }
 
   return (
-    <header className="sticky top-0 z-40 w-full glass">
+    <header
+      className={cn(
+        "sticky top-0 z-40 w-full",
+        isLanding
+          ? "border-b border-white/10 bg-[#05051f]/95 text-white backdrop-blur-xl"
+          : "glass",
+      )}
+    >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-8">
           <Link
-            className="flex items-center gap-2 text-foreground transition hover:opacity-80"
+            className={cn(
+              "flex items-center gap-3 transition hover:opacity-80",
+              isLanding ? "text-white" : "text-foreground",
+            )}
             href="/"
           >
-            <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-dark text-white shadow-md">
-              <Droplets className="size-5" />
-            </div>
+            <Image
+              alt=""
+              aria-hidden="true"
+              className="size-9 rounded-lg object-cover"
+              height={36}
+              priority={isLanding}
+              src="/aqua-lifestyle-logo.jpg"
+              width={36}
+            />
             <span className="hidden text-lg font-bold tracking-tight sm:inline">
               Aqua Lifestyle
             </span>
@@ -153,7 +175,9 @@ export const Navbar = () => {
                       "relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition",
                       isActive(link.href)
                         ? "text-accent"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        : isLanding
+                          ? "text-white/70 hover:bg-white/10 hover:text-white"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
                     )}
                     href={link.href}
                   >
@@ -166,7 +190,12 @@ export const Navbar = () => {
                 ))
               : publicLinks.map((link) => (
                   <Link
-                    className="rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    className={cn(
+                      "rounded-lg px-3 py-2 text-sm font-semibold transition",
+                      isLanding
+                        ? "text-white/70 hover:bg-white/10 hover:text-white"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
                     href={link.href}
                     key={link.href}
                   >
@@ -179,7 +208,10 @@ export const Navbar = () => {
                 <button
                   aria-expanded={isMoreOpen}
                   className={cn(
-                    "flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground",
+                    "flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold transition",
+                    isLanding
+                      ? "text-white/70 hover:bg-white/10 hover:text-white"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
                     isMoreOpen && "bg-muted text-foreground",
                   )}
                   onClick={() => setIsMoreOpen((current) => !current)}
@@ -238,11 +270,14 @@ export const Navbar = () => {
             </div>
           ) : null}
 
-          <UserMenu />
+          <UserMenu inverted={isLanding} />
 
           <button
             aria-label="Toggle menu"
-            className="inline-flex rounded-lg p-2 text-foreground transition hover:bg-muted lg:hidden"
+            className={cn(
+              "inline-flex rounded-lg p-2 transition lg:hidden",
+              isLanding ? "text-white hover:bg-white/10" : "text-foreground hover:bg-muted",
+            )}
             onClick={() => setIsMobileOpen((current) => !current)}
             type="button"
           >
@@ -252,7 +287,12 @@ export const Navbar = () => {
       </div>
 
       {isMobileOpen ? (
-        <div className="border-t border-border bg-card px-4 py-4 lg:hidden animate-fade-in">
+        <div
+          className={cn(
+            "border-t px-4 py-4 lg:hidden animate-fade-in",
+            isLanding ? "border-white/10 bg-[#080722]" : "border-border bg-card",
+          )}
+        >
           <nav aria-label="Mobile navigation" className="flex flex-col gap-1">
             {isAuthenticated
               ? [...primaryLinks, ...contextualMoreLinks]
@@ -264,7 +304,9 @@ export const Navbar = () => {
                         "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition",
                         isActive(link.href)
                           ? "bg-accent/10 text-accent"
-                          : "text-foreground hover:bg-muted",
+                          : isLanding
+                            ? "text-white/80 hover:bg-white/10 hover:text-white"
+                            : "text-foreground hover:bg-muted",
                       )}
                       href={link.href}
                       onClick={() => setIsMobileOpen(false)}
@@ -275,7 +317,12 @@ export const Navbar = () => {
                   ))
               : publicLinks.map((link) => (
                   <Link
-                    className="rounded-lg px-3 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted"
+                    className={cn(
+                      "rounded-lg px-3 py-2.5 text-sm font-semibold transition",
+                      isLanding
+                        ? "text-white/80 hover:bg-white/10 hover:text-white"
+                        : "text-foreground hover:bg-muted",
+                    )}
                     href={link.href}
                     key={link.href}
                     onClick={() => setIsMobileOpen(false)}
@@ -285,7 +332,12 @@ export const Navbar = () => {
                 ))}
           </nav>
           {isAuthenticated ? (
-            <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+            <div
+              className={cn(
+                "mt-4 flex items-center justify-between border-t pt-4",
+                isLanding ? "border-white/10" : "border-border",
+              )}
+            >
               <TenantSwitcher />
               {canCreateCustomer ? (
                 <Link

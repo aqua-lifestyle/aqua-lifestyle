@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useAuthActions, useAuthState } from "@/src/providers";
 import { Avatar } from "@/src/shared/ui";
 
-export const UserMenu = () => {
+export const UserMenu = ({ inverted = false }: { inverted?: boolean }) => {
   const router = useRouter();
   const { isAuthenticated, session } = useAuthState();
   const { clearSession } = useAuthActions();
@@ -24,13 +24,17 @@ export const UserMenu = () => {
     return (
       <div className="flex items-center gap-2">
         <Link
-          className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:text-foreground sm:inline"
+          className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition sm:inline ${
+            inverted ? "text-white/70 hover:bg-white/10 hover:text-white" : "text-muted-foreground hover:text-foreground"
+          }`}
           href="/login"
         >
           Sign in
         </Link>
         <Link
-          className="inline-flex h-8 items-center rounded-lg bg-accent px-3 text-sm font-semibold text-white transition hover:bg-accent-dark"
+          className={`inline-flex h-9 items-center rounded-full px-4 text-sm font-semibold text-white transition ${
+            inverted ? "bg-[#7540e8] hover:bg-[#8655ef]" : "bg-accent hover:bg-accent-dark"
+          }`}
           href="/signup"
         >
           Sign up
@@ -42,8 +46,8 @@ export const UserMenu = () => {
   return (
     <div className="flex items-center gap-3">
       <div className="hidden text-right sm:block">
-        <p className="text-sm font-semibold">{userLabel}</p>
-        <p className="text-xs text-muted-foreground">{session?.user?.email}</p>
+        <p className={`text-sm font-semibold ${inverted ? "text-white" : ""}`}>{userLabel}</p>
+        <p className={`text-xs ${inverted ? "text-white/60" : "text-muted-foreground"}`}>{session?.user?.email}</p>
       </div>
       <div className="group relative">
         <button
