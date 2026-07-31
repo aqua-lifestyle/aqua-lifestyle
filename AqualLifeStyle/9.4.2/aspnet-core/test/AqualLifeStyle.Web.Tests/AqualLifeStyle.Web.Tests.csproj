@@ -11,6 +11,7 @@
     <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\AqualLifeStyle.Web.Host\AqualLifeStyle.Web.Host.csproj" />
     <ProjectReference Include="..\..\src\AqualLifeStyle.Web.Mvc\AqualLifeStyle.Web.Mvc.csproj" />
     <ProjectReference Include="..\AqualLifeStyle.Tests\AqualLifeStyle.Tests.csproj" />
   </ItemGroup>

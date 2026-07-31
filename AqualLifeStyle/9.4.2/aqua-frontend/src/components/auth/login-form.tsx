@@ -31,11 +31,14 @@ type FieldErrors = Partial<Record<"email" | "password", string>>;
 const ACCOUNT_TYPE_WORKSPACE_NAMES = new Set([
   "admin", "arealeader", "customer", "facilitator", "guest", "member", "systemadmin",
 ]);
+const AREA_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
 export const getLoginAreaName = (currentArea: string | null, defaultArea: string) => {
-  const normalizedCurrentArea = currentArea?.replace(/[\s_-]/g, "").toLowerCase();
-  return currentArea && !ACCOUNT_TYPE_WORKSPACE_NAMES.has(normalizedCurrentArea ?? "")
-    ? currentArea
+  const trimmedArea = currentArea?.trim() ?? "";
+  const normalizedCurrentArea = trimmedArea.replace(/[\s_-]/g, "").toLowerCase();
+  return AREA_NAME_PATTERN.test(trimmedArea) &&
+    !ACCOUNT_TYPE_WORKSPACE_NAMES.has(normalizedCurrentArea)
+    ? trimmedArea
     : defaultArea;
 };
 
@@ -60,8 +63,14 @@ export const LoginForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const linkedAreaName = getLoginAreaName(
+    searchParams.get("area"),
+    publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME,
+  );
   const [selectedWorkspace, setSelectedWorkspace] = useState(
-    getLoginAreaName(currentTenant, publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME),
+    searchParams.has("area")
+      ? linkedAreaName
+      : getLoginAreaName(currentTenant, publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME),
   );
   const hasMounted = useHydrated();
   const currentAreaName = getLoginAreaName(
@@ -170,7 +179,8 @@ export const LoginForm = () => {
                   onChange={(event) => setSelectedWorkspace(event.target.value)}
                 >
                   <option value={publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME}>Area workspace</option>
-                  {hasMounted && currentAreaName !== publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME ? <option value={currentAreaName}>{currentAreaName}</option> : null}
+                  {hasMounted && linkedAreaName !== publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME ? <option value={linkedAreaName}>{linkedAreaName}</option> : null}
+                  {hasMounted && currentAreaName !== publicEnv.NEXT_PUBLIC_DEFAULT_TENANT_NAME && currentAreaName !== linkedAreaName ? <option value={currentAreaName}>{currentAreaName}</option> : null}
                   <option value="">Platform administration</option>
                 </SelectField>
                 <p className="-mt-2 text-xs text-muted-foreground">Choose Platform administration only when signing in with the platform administrator account.</p>
@@ -260,6 +270,26 @@ export const LoginForm = () => {
                   variant="ghost"
                 >
                   Sign up
+                </LinkButton>
+              </p>
+            ) : null}
+            <p className="mt-3 text-center text-sm">
+              <LinkButton
+                href={selectedWorkspace
+                  ? `/forgot-password?area=${encodeURIComponent(selectedWorkspace)}`
+                  : "/forgot-password"}
+                variant="ghost"
+              >
+                Forgot your password?
+              </LinkButton>
+            </p>
+            {selectedWorkspace ? (
+              <p className="mt-3 text-center text-sm">
+                <LinkButton
+                  href={`/verify-email-sent?area=${encodeURIComponent(selectedWorkspace)}`}
+                  variant="ghost"
+                >
+                  Resend verification email
                 </LinkButton>
               </p>
             ) : null}

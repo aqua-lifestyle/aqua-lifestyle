@@ -7,6 +7,8 @@ using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
 using AqualLifeStyle.Domain.Payments;
 using Microsoft.Extensions.Configuration;
+using AqualLifeStyle.Domain.Customers;
+using AqualLifeStyle.Email;
 
 namespace AqualLifeStyle.Payments.Yoco
 {
@@ -42,6 +44,10 @@ namespace AqualLifeStyle.Payments.Yoco
         private readonly IRepository<AQGreenJoiningCheckout, Guid> _aqGreenCheckoutRepository;
         private readonly IRepository<YocoWebhookReceipt, Guid> _receiptRepository;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        private readonly IRepository<MemberPayment, Guid> _paymentRepository;
+        private readonly ICustomerRepository _customerRepository;
+        private readonly ITransactionalEmailOutbox _emailOutbox;
+        private readonly TransactionalEmailTemplateBuilder _emailTemplates;
 
         public YocoPaymentNotificationProcessor(
             ProgrammePaymentConfirmationProcessor confirmationProcessor,
@@ -49,7 +55,11 @@ namespace AqualLifeStyle.Payments.Yoco
             IRepository<DirectOnyxCheckoutIntent, Guid> onyxCheckoutRepository,
             IRepository<AQGreenJoiningCheckout, Guid> aqGreenCheckoutRepository,
             IRepository<YocoWebhookReceipt, Guid> receiptRepository,
-            IUnitOfWorkManager unitOfWorkManager)
+            IUnitOfWorkManager unitOfWorkManager,
+            IRepository<MemberPayment, Guid> paymentRepository,
+            ICustomerRepository customerRepository,
+            ITransactionalEmailOutbox emailOutbox,
+            TransactionalEmailTemplateBuilder emailTemplates)
         {
             _confirmationProcessor = confirmationProcessor;
             _configuration = configuration;
@@ -57,6 +67,10 @@ namespace AqualLifeStyle.Payments.Yoco
             _aqGreenCheckoutRepository = aqGreenCheckoutRepository;
             _receiptRepository = receiptRepository;
             _unitOfWorkManager = unitOfWorkManager;
+            _paymentRepository = paymentRepository;
+            _customerRepository = customerRepository;
+            _emailOutbox = emailOutbox;
+            _emailTemplates = emailTemplates;
         }
 
         [UnitOfWork]
@@ -112,10 +126,11 @@ namespace AqualLifeStyle.Payments.Yoco
 
                 using (_unitOfWorkManager.Current.SetTenantId(checkout.TenantId))
                 {
+                    ProgrammePaymentConfirmationResult confirmation;
                     switch (checkout.Programme)
                     {
                         case YocoCheckoutProgramme.Onyx:
-                            await _confirmationProcessor.ProcessDirectOnyxCheckoutAsync(
+                            confirmation = await _confirmationProcessor.ProcessDirectOnyxCheckoutAsync(
                                 checkout.ReferenceId,
                                 "Yoco",
                                 notification.PaymentId,
@@ -125,7 +140,7 @@ namespace AqualLifeStyle.Payments.Yoco
                                 confirmedAt);
                             break;
                         case YocoCheckoutProgramme.AQGreen:
-                            await _confirmationProcessor.ProcessAQGreenJoiningCheckoutAsync(
+                            confirmation = await _confirmationProcessor.ProcessAQGreenJoiningCheckoutAsync(
                                 checkout.ReferenceId,
                                 "Yoco",
                                 notification.PaymentId,
@@ -138,6 +153,8 @@ namespace AqualLifeStyle.Payments.Yoco
                             throw new YocoWebhookValidationException(
                                 "The Yoco checkout programme is not supported.");
                     }
+
+                    await EnqueuePaymentConfirmationAsync(confirmation, checkout.Programme);
 
                     await _receiptRepository.InsertAsync(YocoWebhookReceipt.Record(
                         checkout.TenantId,
@@ -163,6 +180,25 @@ namespace AqualLifeStyle.Payments.Yoco
             {
                 throw new YocoWebhookValidationException("The Yoco webhook is invalid.", ex);
             }
+        }
+
+        private async Task EnqueuePaymentConfirmationAsync(
+            ProgrammePaymentConfirmationResult confirmation,
+            YocoCheckoutProgramme programme)
+        {
+            var payment = await _paymentRepository.GetAsync(confirmation.PaymentId);
+            var customer = await _customerRepository.GetAsync(payment.CustomerId);
+            var key = $"payment-confirmed:{payment.Id}";
+            await _emailOutbox.EnqueueAsync(payment.TenantId, "PaymentConfirmation", key,
+                _emailTemplates.PaymentConfirmation(
+                    customer.Name,
+                    customer.Email.Value,
+                    programme == YocoCheckoutProgramme.AQGreen ? "AQGreen" : "Onyx",
+                    payment.Amount,
+                    payment.Currency,
+                    payment.ExternalReference,
+                    payment.ConfirmedAt.Value,
+                    key));
         }
 
         private async Task<ResolvedYocoCheckout> ResolveCheckoutAsync(

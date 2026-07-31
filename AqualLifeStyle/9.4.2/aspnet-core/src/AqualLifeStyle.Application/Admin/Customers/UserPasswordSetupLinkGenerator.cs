@@ -33,7 +33,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
 
             await _userManager.InitializeOptionsAsync(user.TenantId);
             var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
-            return $"{clientRootAddress}/reset-password?area={Uri.EscapeDataString(areaName)}&userId={user.Id}&token={Uri.EscapeDataString(resetToken)}";
+            return $"{clientRootAddress}/reset-password?area={Uri.EscapeDataString(areaName)}&userId={user.Id}#token={Uri.EscapeDataString(resetToken)}";
         }
     }
 }

@@ -21,7 +21,6 @@ using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Facilitators;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.EntityFrameworkCore;
-using AqualLifeStyle.EntityFrameworkCore.Repositories;
 using NSubstitute;
 using Shouldly;
 using Xunit;
@@ -327,10 +326,12 @@ namespace AqualLifeStyle.Tests.Integration
 
         private async Task SetReferredByFacilitatorAsync(int enquiryId, int facilitatorId)
         {
-            var repo = Resolve<IEnquiryRepository>();
-            var enquiry = await repo.GetAsync(enquiryId);
-            enquiry.SetReferredByFacilitator(facilitatorId);
-            await repo.UpdateAsync(enquiry);
+            await UsingDbContextAsync(async context =>
+            {
+                var enquiry = await context.Enquiries.SingleAsync(item => item.Id == enquiryId);
+                enquiry.SetReferredByFacilitator(facilitatorId);
+                await context.SaveChangesAsync();
+            });
         }
 
         private async Task<(int areaLeaderId, int facilitatorId, int prospectCustomerId, int enquiryId)> CreateOrphanedReferralScenarioAsync(string namePrefix)

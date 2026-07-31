@@ -1,8 +1,10 @@
+using System;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using Abp.Configuration;
 using Abp.Auditing;
 using Abp.UI;
-using Abp.Zero.Configuration;
 using AqualLifeStyle.Authorization.Accounts.Dto;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Configuration;
@@ -10,6 +12,8 @@ using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
+using AqualLifeStyle.Email;
+using AqualLifeStyle.Domain.Email;
 
 namespace AqualLifeStyle.Authorization.Accounts
 {
@@ -20,15 +24,30 @@ namespace AqualLifeStyle.Authorization.Accounts
         private readonly UserRegistrationManager _userRegistrationManager;
         private readonly IConfiguration _configuration;
         private readonly ICustomerRepository _customerRepository;
+        private readonly ITransactionalEmailOutbox _emailOutbox;
+        private readonly TransactionalEmailTemplateBuilder _emailTemplates;
+        private readonly IAccountEmailThrottleRepository _emailThrottleRepository;
+        private readonly AccountEmailVerificationScheduler _emailVerificationScheduler;
+        private readonly AccountEmailLinkBuilder _emailLinkBuilder;
 
         public AccountAppService(
             UserRegistrationManager userRegistrationManager,
             IConfiguration configuration,
-            ICustomerRepository customerRepository)
+            ICustomerRepository customerRepository,
+            ITransactionalEmailOutbox emailOutbox,
+            TransactionalEmailTemplateBuilder emailTemplates,
+            IAccountEmailThrottleRepository emailThrottleRepository,
+            AccountEmailVerificationScheduler emailVerificationScheduler,
+            AccountEmailLinkBuilder emailLinkBuilder)
         {
             _userRegistrationManager = userRegistrationManager;
             _configuration = configuration;
             _customerRepository = customerRepository;
+            _emailOutbox = emailOutbox;
+            _emailTemplates = emailTemplates;
+            _emailThrottleRepository = emailThrottleRepository;
+            _emailVerificationScheduler = emailVerificationScheduler;
+            _emailLinkBuilder = emailLinkBuilder;
         }
 
         public async Task<IsTenantAvailableOutput> IsTenantAvailable(IsTenantAvailableInput input)
@@ -100,7 +119,7 @@ namespace AqualLifeStyle.Authorization.Accounts
                 input.EmailAddress,
                 input.UserName,
                 input.Password,
-                true // Assumed email address is always confirmed. Change this if you want to implement email confirmation.
+                false
             );
             user.UpdateContactDetails(input.ContactNumber, input.HomeAddress);
 
@@ -113,14 +132,148 @@ namespace AqualLifeStyle.Authorization.Accounts
                 membershipId: null,
                 user: user);
             await _customerRepository.InsertAsync(customer);
-
-            var isEmailConfirmationRequiredForLogin = await SettingManager.GetSettingValueAsync<bool>(AbpZeroSettingNames.UserManagement.IsEmailConfirmationRequiredForLogin);
+            using (CurrentUnitOfWork.SetTenantId(user.TenantId))
+            {
+                await _emailVerificationScheduler.ScheduleAsync(
+                    user,
+                    $"email-verification:{user.TenantId}:{user.Id}:registration",
+                    input.RedirectPath);
+            }
 
             return new RegisterOutput
             {
-                CanLogin = user.IsActive && (user.IsEmailConfirmed || !isEmailConfirmationRequiredForLogin)
+                CanLogin = false,
+                RequiresEmailVerification = true
             };
         }
+
+        [DisableAuditing]
+        public async Task<bool> ConfirmEmail(ConfirmEmailInput input)
+        {
+            if (input == null || input.TenantId <= 0 || input.UserId <= 0 || string.IsNullOrWhiteSpace(input.Token))
+                throw InvalidAccountLink("Email verification failed.");
+            using (CurrentUnitOfWork.SetTenantId(input.TenantId))
+            {
+                await UserManager.InitializeOptionsAsync(input.TenantId);
+                var user = await UserManager.FindByIdAsync(input.UserId.ToString());
+                if (user == null || user.TenantId != input.TenantId || !user.IsActive || user.IsDeleted)
+                    throw InvalidAccountLink("Email verification failed.");
+                var result = await UserManager.ConfirmEmailAsync(user, input.Token);
+                if (!result.Succeeded) throw InvalidAccountLink("Email verification failed.");
+                return true;
+            }
+        }
+
+        [DisableAuditing]
+        public async Task<AccountEmailRequestOutput> ResendEmailVerification(RequestAccountEmailInput input)
+        {
+            var generic = VerificationRequestAccepted();
+            var context = await FindEligibleUserAsync(input, true);
+            if (context.User == null) return generic;
+            using (CurrentUnitOfWork.SetTenantId(context.TenantId))
+            {
+                var key = $"email-verification:{context.TenantId}:{context.User.Id}:resend:{Guid.NewGuid():N}";
+                var enqueued = await _emailVerificationScheduler.ScheduleAsync(
+                    context.User,
+                    key,
+                    input.RedirectPath);
+                await KeepEnqueuedEmailIfAllowedAsync(
+                    "verify", context.TenantId, input.EmailAddress, key, enqueued);
+            }
+            return generic;
+        }
+
+        [DisableAuditing]
+        public async Task<AccountEmailRequestOutput> RequestPasswordReset(RequestAccountEmailInput input)
+        {
+            var generic = PasswordResetRequestAccepted();
+            var context = await FindEligibleUserAsync(input, false);
+            if (context.User == null || !context.User.IsEmailConfirmed) return generic;
+            using (CurrentUnitOfWork.SetTenantId(context.TenantId))
+            {
+                await UserManager.InitializeOptionsAsync(context.TenantId);
+                var token = await UserManager.GeneratePasswordResetTokenAsync(context.User);
+                var url = _emailLinkBuilder.Build(
+                    "/reset-password", context.TenantId, context.User.Id, token,
+                    context.AreaName, input.RedirectPath);
+                var key = $"password-reset:{context.TenantId}:{context.User.Id}:{Guid.NewGuid():N}";
+                var enqueued = await _emailOutbox.EnqueueAsync(context.TenantId, "PasswordReset", key,
+                    _emailTemplates.PasswordReset(context.User.Name, context.User.EmailAddress, url, key));
+                await KeepEnqueuedEmailIfAllowedAsync(
+                    "reset", context.TenantId, input.EmailAddress, key, enqueued);
+            }
+            return generic;
+        }
+
+        [DisableAuditing]
+        public async Task<bool> ResetPassword(CompletePasswordResetInput input)
+        {
+            if (input == null || input.TenantId <= 0 || input.UserId <= 0 || string.IsNullOrWhiteSpace(input.Token))
+                throw InvalidAccountLink("Password reset failed.");
+            using (CurrentUnitOfWork.SetTenantId(input.TenantId))
+            {
+                await UserManager.InitializeOptionsAsync(input.TenantId);
+                var user = await UserManager.FindByIdAsync(input.UserId.ToString());
+                if (user == null || user.TenantId != input.TenantId || !user.IsActive || user.IsDeleted)
+                    throw InvalidAccountLink("Password reset failed.");
+                var result = await UserManager.ResetPasswordAsync(user, input.Token, input.NewPassword);
+                if (!result.Succeeded) throw InvalidAccountLink("Password reset failed.");
+                user.CompleteRequiredPasswordReset();
+                CheckErrors(await UserManager.UpdateSecurityStampAsync(user));
+                CheckErrors(await UserManager.UpdateAsync(user));
+                return true;
+            }
+        }
+
+        private async Task<(int TenantId, string AreaName, User User)> FindEligibleUserAsync(
+            RequestAccountEmailInput input,
+            bool requireUnconfirmed)
+        {
+            if (input == null || string.IsNullOrWhiteSpace(input.AreaName) ||
+                string.IsNullOrWhiteSpace(input.EmailAddress))
+                return (0, null, null);
+            var tenant = await TenantManager.FindByTenancyNameAsync(input.AreaName.Trim());
+            if (tenant == null || !tenant.IsActive) return (0, null, null);
+            using (CurrentUnitOfWork.SetTenantId(tenant.Id))
+            {
+                await UserManager.InitializeOptionsAsync(tenant.Id);
+                var user = await UserManager.FindByEmailAsync(input.EmailAddress.Trim());
+                if (user == null || !user.IsActive || user.IsDeleted || (requireUnconfirmed && user.IsEmailConfirmed))
+                    return (tenant.Id, tenant.TenancyName, null);
+                return (tenant.Id, tenant.TenancyName, user);
+            }
+        }
+
+        private async Task KeepEnqueuedEmailIfAllowedAsync(
+            string purpose,
+            int tenantId,
+            string email,
+            string idempotencyKey,
+            bool enqueued)
+        {
+            if (!enqueued || tenantId <= 0 || string.IsNullOrWhiteSpace(email)) return;
+            var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(email.Trim().ToUpperInvariant())));
+            var key = $"{purpose}:{tenantId}:{hash}";
+            var now = DateTime.UtcNow;
+            if (await _emailThrottleRepository.TryAcquireAsync(
+                    key, tenantId, now, now.AddMinutes(30)))
+            {
+                return;
+            }
+
+            // Enqueue and throttle reservation share the surrounding database transaction.
+            // Removing this newly inserted row prevents throttled requests from leaking mail.
+            await _emailOutbox.DeleteAsync(idempotencyKey);
+        }
+
+        private static UserFriendlyException InvalidAccountLink(string title)
+            => new UserFriendlyException(title, "This link is invalid or has expired. Request a new email and try again.");
+
+        private static AccountEmailRequestOutput VerificationRequestAccepted()
+            => new AccountEmailRequestOutput { Message = "If an eligible account exists, a verification email will be sent." };
+
+        private static AccountEmailRequestOutput PasswordResetRequestAccepted()
+            => new AccountEmailRequestOutput { Message = "If an eligible account exists, a password reset email will be sent." };
 
         [DisableAuditing]
         public async Task<bool> CompletePasswordSetup(CompletePasswordSetupInput input)
@@ -154,4 +307,5 @@ namespace AqualLifeStyle.Authorization.Accounts
             }
         }
     }
+
 }

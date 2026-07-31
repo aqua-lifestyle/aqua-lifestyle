@@ -1,10 +1,15 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Abp.Configuration;
 using AngleSharp.Html.Dom;
+using AqualLifeStyle.Web.Controllers;
+using Microsoft.AspNetCore.Identity;
 using Shouldly;
 using Xunit;
 
@@ -70,6 +75,38 @@ namespace AqualLifeStyle.Web.Tests.Controllers
 
             response.StatusCode.ShouldBe(HttpStatusCode.Redirect);
             response.Headers.Location?.OriginalString.ShouldContain("/Account/Login");
+        }
+
+        [Fact]
+        public void ExternalEmailConfirmation_RequiresAVerifiedMatchingProviderAddress()
+        {
+            IsVerifiedExternalEmail(
+                "member@example.test",
+                new Claim(ClaimTypes.Email, "member@example.test"),
+                new Claim("email_verified", "true")).ShouldBeTrue();
+
+            IsVerifiedExternalEmail(
+                "other@example.test",
+                new Claim(ClaimTypes.Email, "member@example.test"),
+                new Claim("email_verified", "true")).ShouldBeFalse();
+
+            IsVerifiedExternalEmail(
+                "member@example.test",
+                new Claim(ClaimTypes.Email, "member@example.test")).ShouldBeFalse();
+        }
+
+        private static bool IsVerifiedExternalEmail(string expectedEmail, params Claim[] claims)
+        {
+            var method = typeof(AccountController).GetMethod(
+                "IsVerifiedExternalEmail",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            method.ShouldNotBeNull();
+            var login = new ExternalLoginInfo(
+                new ClaimsPrincipal(new ClaimsIdentity(claims, "External")),
+                "Provider",
+                "provider-key",
+                "Provider");
+            return (bool)method.Invoke(null, new object[] { login, expectedEmail });
         }
     }
 }

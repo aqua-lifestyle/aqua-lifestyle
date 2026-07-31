@@ -187,6 +187,7 @@ namespace AqualLifeStyle.Tests.Application
             var originalUserId = created.UserId;
             var createdUser = await Resolve<UserManager>().FindByEmailAsync(email);
             createdUser.ShouldNotBeNull();
+            createdUser.IsEmailConfirmed.ShouldBeFalse();
             var originalPasswordHash = createdUser.Password;
             var originalSecurityStamp = createdUser.SecurityStamp;
             (await Resolve<UserManager>().CheckPasswordAsync(createdUser, "Temporary123!")).ShouldBeTrue();
@@ -194,6 +195,11 @@ namespace AqualLifeStyle.Tests.Application
             {
                 var customer = await context.Customers.Include(item => item.User).SingleAsync(item => item.Id == created.Id);
                 customer.User.EmailAddress.ShouldBe(email);
+                var verification = await context.TransactionalEmailOutboxMessages.SingleAsync(message =>
+                    message.NotificationType == "EmailVerification" &&
+                    message.Recipient == email &&
+                    message.IdempotencyKey.Contains("admin-created"));
+                verification.HtmlBody.ShouldContain("/verify-email?");
                 var roles = await (from assignment in context.UserRoles
                     join role in context.Roles on assignment.RoleId equals role.Id
                     where assignment.UserId == customer.UserId
@@ -278,6 +284,10 @@ namespace AqualLifeStyle.Tests.Application
             restoredUser.Password.ShouldBe(originalPasswordHash);
             restoredUser.SecurityStamp.ShouldNotBe(removedSecurityStamp);
             restoredUser.RequiresPasswordReset().ShouldBeTrue();
+            await UsingDbContextAsync(async context =>
+                (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
+                    message.NotificationType == "EmailVerification" &&
+                    message.Recipient == email)).ShouldBe(2));
             (await Resolve<UserManager>().CheckPasswordAsync(restoredUser, "Temporary123!")).ShouldBeTrue();
             await UsingDbContextAsync(async context =>
             {
@@ -290,11 +300,12 @@ namespace AqualLifeStyle.Tests.Application
 
             var passwordSetupUri = new Uri(restorationResult.PasswordSetupUrl);
             var passwordSetupQuery = QueryHelpers.ParseQuery(passwordSetupUri.Query);
+            var passwordSetupFragment = QueryHelpers.ParseQuery(passwordSetupUri.Fragment.TrimStart('#'));
             var passwordSetupCompleted = await Resolve<IAccountAppService>().CompletePasswordSetup(new CompletePasswordSetupInput
             {
                 AreaName = passwordSetupQuery["area"],
                 UserId = long.Parse(passwordSetupQuery["userId"]),
-                ResetToken = passwordSetupQuery["token"],
+                ResetToken = passwordSetupFragment["token"],
                 NewPassword = "CustomerChosen123!"
             });
             passwordSetupCompleted.ShouldBeTrue();
@@ -307,7 +318,7 @@ namespace AqualLifeStyle.Tests.Application
                 {
                     AreaName = passwordSetupQuery["area"],
                     UserId = long.Parse(passwordSetupQuery["userId"]),
-                    ResetToken = passwordSetupQuery["token"],
+                    ResetToken = passwordSetupFragment["token"],
                     NewPassword = "AnotherPassword123!"
                 }));
         }
@@ -327,6 +338,63 @@ namespace AqualLifeStyle.Tests.Application
                 IsActive = true,
                 Justification = "Invalid cross tenant attempt"
             }));
+        }
+
+        [Fact]
+        public async Task UpdateEmail_RevokesSessionsAndRequiresVerificationBeforePasswordReset()
+        {
+            var originalEmail = $"confirmed-{Guid.NewGuid():N}@example.com";
+            var newEmail = $"changed-{Guid.NewGuid():N}@example.com";
+            var customer = (await _service.CreateAsync(new AdminCreateCustomerInput
+            {
+                TenantId = 1,
+                FirstName = "Confirmed",
+                LastName = "Customer",
+                Email = originalEmail,
+                ContactNumber = "+27 71 111 1111",
+                HomeAddress = "1 Verified Street, Johannesburg",
+                Password = "Temporary123!",
+                IsActive = true,
+                Justification = "Creating a verified customer"
+            })).Customer;
+            string originalSecurityStamp = null;
+            await UsingDbContextAsync(1, async context =>
+            {
+                var user = await context.Users.SingleAsync(item => item.Id == customer.UserId);
+                user.IsEmailConfirmed = true;
+                originalSecurityStamp = user.SecurityStamp;
+                await context.SaveChangesAsync();
+            });
+
+            await _service.UpdateAsync(new AdminUpdateCustomerInput
+            {
+                Id = customer.Id,
+                FirstName = "Confirmed",
+                LastName = "Customer",
+                Email = newEmail,
+                ContactNumber = "+27 71 111 1111",
+                HomeAddress = "1 Verified Street, Johannesburg",
+                IsActive = true,
+                Justification = "Customer requested an email change"
+            });
+            await Resolve<IAccountAppService>().RequestPasswordReset(new RequestAccountEmailInput
+            {
+                AreaName = "Default",
+                EmailAddress = newEmail
+            });
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var user = await context.Users.SingleAsync(item => item.Id == customer.UserId);
+                user.IsEmailConfirmed.ShouldBeFalse();
+                user.SecurityStamp.ShouldNotBe(originalSecurityStamp);
+                (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
+                    message.NotificationType == "EmailVerification" &&
+                    message.Recipient == newEmail)).ShouldBe(1);
+                (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
+                    message.NotificationType == "PasswordReset" &&
+                    message.Recipient == newEmail)).ShouldBe(0);
+            });
         }
 
         [Fact]

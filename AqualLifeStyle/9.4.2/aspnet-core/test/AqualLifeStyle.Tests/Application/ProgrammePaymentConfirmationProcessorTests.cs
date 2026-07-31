@@ -560,6 +560,11 @@ namespace AqualLifeStyle.Tests.Application
                 receipt.ProviderCheckoutId.ShouldBe(persisted.ProviderCheckoutId);
                 receipt.Programme.ShouldBe(YocoCheckoutProgramme.AQGreen);
                 receipt.CheckoutReferenceId.ShouldBe(persisted.CheckoutId);
+                var payment = await context.MemberPayments.SingleAsync(item =>
+                    item.ExternalReference == notification.PaymentId);
+                (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
+                    message.IdempotencyKey == $"payment-confirmed:{payment.Id}" &&
+                    message.NotificationType == "PaymentConfirmation")).ShouldBe(1);
             });
 
             var conflictingReplay = CreateNotification(
@@ -635,6 +640,11 @@ namespace AqualLifeStyle.Tests.Application
                 var receipt = await context.YocoWebhookReceipts.SingleAsync();
                 receipt.Programme.ShouldBe(YocoCheckoutProgramme.Onyx);
                 receipt.CheckoutReferenceId.ShouldBe(persisted.CheckoutId);
+                var payment = await context.MemberPayments.SingleAsync(item =>
+                    item.ExternalReference == notification.PaymentId);
+                (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
+                    message.IdempotencyKey == $"payment-confirmed:{payment.Id}" &&
+                    message.NotificationType == "PaymentConfirmation")).ShouldBe(1);
             });
         }
 

@@ -23,6 +23,8 @@ using Abp.UI;
 using Abp.Web.Models;
 using Abp.Zero.Configuration;
 using AqualLifeStyle.Authorization;
+using AqualLifeStyle.Authorization.Accounts;
+using AqualLifeStyle.Authorization.Accounts.Dto;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Configuration;
 using AqualLifeStyle.Controllers;
@@ -47,6 +49,7 @@ namespace AqualLifeStyle.Web.Controllers
         private readonly ISessionAppService _sessionAppService;
         private readonly ITenantCache _tenantCache;
         private readonly INotificationPublisher _notificationPublisher;
+        private readonly IAccountAppService _accountAppService;
 
         public AccountController(
             UserManager userManager,
@@ -59,7 +62,8 @@ namespace AqualLifeStyle.Web.Controllers
             UserRegistrationManager userRegistrationManager,
             ISessionAppService sessionAppService,
             ITenantCache tenantCache,
-            INotificationPublisher notificationPublisher)
+            INotificationPublisher notificationPublisher,
+            IAccountAppService accountAppService)
         {
             _userManager = userManager;
             _multiTenancyConfig = multiTenancyConfig;
@@ -72,6 +76,7 @@ namespace AqualLifeStyle.Web.Controllers
             _sessionAppService = sessionAppService;
             _tenantCache = tenantCache;
             _notificationPublisher = notificationPublisher;
+            _accountAppService = accountAppService;
         }
 
         #region Login / Logout
@@ -130,6 +135,7 @@ namespace AqualLifeStyle.Web.Controllers
             switch (loginResult.Result)
             {
                 case AbpLoginResultType.Success:
+                    EnsureEmailIsConfirmed(loginResult.User);
                     EnsurePasswordResetIsComplete(loginResult.User);
                     return loginResult;
                 default:
@@ -144,6 +150,16 @@ namespace AqualLifeStyle.Web.Controllers
                 throw new UserFriendlyException(
                     "Password reset required.",
                     "Your customer account was restored. Use the secure password setup link provided to you before signing in.");
+            }
+        }
+
+        private static void EnsureEmailIsConfirmed(User user)
+        {
+            if (!user.IsEmailConfirmed)
+            {
+                throw new UserFriendlyException(
+                    "Email verification required.",
+                    "Verify your email address before signing in. You can request a new verification email from the sign-in page.");
             }
         }
 
@@ -199,13 +215,15 @@ namespace AqualLifeStyle.Web.Controllers
                     }
                 }
 
+                var externalEmailIsVerified = model.IsExternalLogin &&
+                    IsVerifiedExternalEmail(externalLoginInfo, model.EmailAddress);
                 var user = await _userRegistrationManager.RegisterAsync(
                     model.Name,
                     model.Surname,
                     model.EmailAddress,
                     model.UserName,
                     model.Password,
-                    true // Assumed email address is always confirmed. Change this if you want to implement email confirmation.
+                    externalEmailIsVerified
                 );
 
                 // Getting tenant-specific settings
@@ -214,11 +232,6 @@ namespace AqualLifeStyle.Web.Controllers
                 if (model.IsExternalLogin)
                 {
                     Debug.Assert(externalLoginInfo != null);
-
-                    if (string.Equals(externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Email), model.EmailAddress, StringComparison.OrdinalIgnoreCase))
-                    {
-                        user.IsEmailConfirmed = true;
-                    }
 
                     user.Logins = new List<UserLogin>
                     {
@@ -237,8 +250,17 @@ namespace AqualLifeStyle.Web.Controllers
 
                 var tenant = await _tenantManager.GetByIdAsync(user.TenantId.Value);
 
+                if (!user.IsEmailConfirmed)
+                {
+                    await _accountAppService.ResendEmailVerification(new RequestAccountEmailInput
+                    {
+                        AreaName = tenant.TenancyName,
+                        EmailAddress = user.EmailAddress
+                    });
+                }
+
                 // Directly login if possible
-                if (user.IsActive && (user.IsEmailConfirmed || !isEmailConfirmationRequiredForLogin))
+                if (user.IsActive && user.IsEmailConfirmed)
                 {
                     AbpLoginResult<Tenant, User> loginResult;
                     if (externalLoginInfo != null)
@@ -338,6 +360,8 @@ namespace AqualLifeStyle.Web.Controllers
             switch (loginResult.Result)
             {
                 case AbpLoginResultType.Success:
+                    await ConfirmVerifiedExternalEmailAsync(loginResult.User, externalLoginInfo);
+                    EnsureEmailIsConfirmed(loginResult.User);
                     EnsurePasswordResetIsComplete(loginResult.User);
                     await _signInManager.SignInAsync(loginResult.Identity, false);
                     return Redirect(returnUrl);
@@ -374,6 +398,46 @@ namespace AqualLifeStyle.Web.Controllers
             }
 
             return RegisterView(viewModel);
+        }
+
+        private async Task ConfirmVerifiedExternalEmailAsync(
+            User user,
+            ExternalLoginInfo externalLoginInfo)
+        {
+            if (user.IsEmailConfirmed ||
+                !IsVerifiedExternalEmail(externalLoginInfo, user.EmailAddress))
+            {
+                return;
+            }
+
+            user.IsEmailConfirmed = true;
+            CheckErrors(await _userManager.UpdateAsync(user));
+            await _unitOfWorkManager.Current.SaveChangesAsync();
+        }
+
+        private static bool IsVerifiedExternalEmail(
+            ExternalLoginInfo externalLoginInfo,
+            string expectedEmail)
+        {
+            if (externalLoginInfo?.Principal == null || string.IsNullOrWhiteSpace(expectedEmail))
+            {
+                return false;
+            }
+
+            var claimedEmail = externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Email) ??
+                externalLoginInfo.Principal.FindFirstValue("email");
+            if (!string.Equals(claimedEmail, expectedEmail.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var verifiedValue = externalLoginInfo.Principal.Claims
+                .FirstOrDefault(claim =>
+                    string.Equals(claim.Type, "email_verified", StringComparison.OrdinalIgnoreCase) ||
+                    claim.Type.EndsWith("/email_verified", StringComparison.OrdinalIgnoreCase))
+                ?.Value;
+            return string.Equals(verifiedValue, "true", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(verifiedValue, "1", StringComparison.Ordinal);
         }
 
         [UnitOfWork]

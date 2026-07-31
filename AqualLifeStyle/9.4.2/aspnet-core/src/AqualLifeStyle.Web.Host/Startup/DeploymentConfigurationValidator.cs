@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using AqualLifeStyle.Web.Host.Email;
 
 namespace AqualLifeStyle.Web.Host.Startup
 {
@@ -24,6 +25,8 @@ namespace AqualLifeStyle.Web.Host.Startup
                 ["App:ClientRootAddress"] = "App__ClientRootAddress",
                 ["App:CorsOrigins"] = "App__CorsOrigins",
                 ["Authentication:JwtBearer:SecurityKey"] = "Authentication__JwtBearer__SecurityKey",
+                ["DataProtection:CertificateBase64"] = "DataProtection__CertificateBase64",
+                ["DataProtection:CertificatePassword"] = "DataProtection__CertificatePassword",
                 ["Redis:Configuration"] = "Redis__Configuration",
                 ["Yoco:SecretKey"] = "Yoco__SecretKey",
                 ["Yoco:WebhookSecret"] = "Yoco__WebhookSecret",
@@ -44,10 +47,30 @@ namespace AqualLifeStyle.Web.Host.Startup
                 }
             }
 
-            if (missing.Count > 0)
+            if (!configuration.GetValue<bool>("Bird:Enabled"))
             {
+                missing.Add("Bird__Enabled=true");
+            }
+
+            var birdSettings = new Dictionary<string, string>
+            {
+                ["Bird:ApiKey"] = "Bird__ApiKey",
+                ["Bird:FromEmail"] = "Bird__FromEmail",
+                ["Bird:FromName"] = "Bird__FromName",
+                ["Bird:ReplyToEmail"] = "Bird__ReplyToEmail"
+            };
+            foreach (var setting in birdSettings)
+            {
+                if (!IsConfigured(configuration[setting.Key])) missing.Add(setting.Value);
+            }
+            if (missing.Count > 0)
                 throw new InvalidOperationException(
                     "Production configuration is incomplete. Set: " + string.Join(", ", missing));
+
+            if (!BirdOptions.TryResolveRegion(configuration["Bird:ApiKey"], out _))
+            {
+                throw new InvalidOperationException(
+                    "Production Bird configuration is invalid. Bird__ApiKey must be a current Bird API key.");
             }
 
             var yocoMode = configuration["Yoco:Mode"]?.Trim().ToLowerInvariant();

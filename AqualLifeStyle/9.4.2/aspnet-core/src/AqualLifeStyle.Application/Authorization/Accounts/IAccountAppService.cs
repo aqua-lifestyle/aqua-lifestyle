@@ -13,6 +13,14 @@ namespace AqualLifeStyle.Authorization.Accounts
 
         Task<RegisterOutput> Register(RegisterInput input);
 
+        Task<bool> ConfirmEmail(ConfirmEmailInput input);
+
+        Task<AccountEmailRequestOutput> ResendEmailVerification(RequestAccountEmailInput input);
+
+        Task<AccountEmailRequestOutput> RequestPasswordReset(RequestAccountEmailInput input);
+
+        Task<bool> ResetPassword(CompletePasswordResetInput input);
+
         Task<bool> CompletePasswordSetup(CompletePasswordSetupInput input);
     }
 }

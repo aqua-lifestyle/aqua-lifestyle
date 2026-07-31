@@ -7,6 +7,7 @@ using Abp.Authorization;
 using AqualLifeStyle.Application.Admin.Customers;
 using AqualLifeStyle.Application.Admin.Members.Dto;
 using AqualLifeStyle.Authorization;
+using AqualLifeStyle.Authorization.Accounts;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
@@ -20,15 +21,18 @@ namespace AqualLifeStyle.Application.Admin.Members
         private readonly ICustomerRepository _customerRepository;
         private readonly IMembershipRepository _membershipRepository;
         private readonly IAdminCustomerProfileUpdater _customerProfileUpdater;
+        private readonly AccountEmailVerificationScheduler _emailVerificationScheduler;
 
         public AdminMemberAppService(
             ICustomerRepository customerRepository,
             IMembershipRepository membershipRepository,
-            IAdminCustomerProfileUpdater customerProfileUpdater)
+            IAdminCustomerProfileUpdater customerProfileUpdater,
+            AccountEmailVerificationScheduler emailVerificationScheduler)
         {
             _customerRepository = customerRepository;
             _membershipRepository = membershipRepository;
             _customerProfileUpdater = customerProfileUpdater;
+            _emailVerificationScheduler = emailVerificationScheduler;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Members.View)]
@@ -128,13 +132,24 @@ namespace AqualLifeStyle.Application.Admin.Members
             return Map(member, await GetMembershipAsync(input.MembershipId, member.TenantId.Value));
         }
 
-        private Task UpdateMemberAsync(Customer member, string firstName, string lastName, string email, string contactNumber, string homeAddress, int membershipId, bool isActive) =>
-            _customerProfileUpdater.UpdateAsync(member, new AdminCustomerProfileUpdate
+        private async Task UpdateMemberAsync(Customer member, string firstName, string lastName, string email, string contactNumber, string homeAddress, int membershipId, bool isActive)
+        {
+            var originalSecurityStamp = member.User.SecurityStamp;
+            await _customerProfileUpdater.UpdateAsync(member, new AdminCustomerProfileUpdate
             {
                 FirstName = firstName, LastName = lastName, Email = email,
                 ContactNumber = contactNumber, HomeAddress = homeAddress,
                 MembershipId = membershipId, IsActive = isActive
             });
+            if (member.User.IsActive &&
+                !member.User.IsEmailConfirmed &&
+                originalSecurityStamp != member.User.SecurityStamp)
+            {
+                await _emailVerificationScheduler.ScheduleAsync(
+                    member.User,
+                    $"email-verification:{member.TenantId}:{member.UserId}:admin-profile-change:{member.User.SecurityStamp}");
+            }
+        }
 
         private async Task<Customer> GetMemberAsync(int id)
         {
