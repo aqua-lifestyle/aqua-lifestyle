@@ -1958,6 +1958,7 @@ namespace AqualLifeStyle.Migrations
                         .HasColumnType("text");
 
                     b.Property<int>("ResponseVersion")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer");
 
                     b.Property<int>("Status")

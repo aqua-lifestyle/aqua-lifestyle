@@ -155,6 +155,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 entity.Property(e => e.CustomerId).IsRequired();
                 entity.Property(e => e.ProductId).IsRequired();
                 entity.Property(e => e.Message).IsRequired().HasMaxLength(2000);
+                entity.Property(e => e.ResponseVersion).IsConcurrencyToken();
                 entity.Property(e => e.Status).IsRequired();
                 entity.Property(e => e.CreatedAt).IsRequired();
                 entity.Property(e => e.ReferredByFacilitatorId);
