@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthActions, useTenantActions, useTenantState, useToast } from "@/src/providers";
-import { getTenantSelfRegistrationAvailability } from "@/src/shared/api/auth-service";
+import { getTenantSelfRegistrationAvailability, login } from "@/src/shared/api/auth-service";
 import { getLoginDestination } from "@/src/shared/auth/roles";
 
 import { LoginForm } from "./login-form";
@@ -212,6 +212,27 @@ describe("LoginForm", () => {
       }),
     );
     expect(push).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("uses the Area carried by an account email link", async () => {
+    searchParams.current = new URLSearchParams("area=Johannesburg");
+    vi.mocked(login).mockResolvedValue({
+      ok: false,
+      message: "Sign in rejected for test.",
+    });
+
+    render(<LoginForm />);
+    fireEvent.change(screen.getByLabelText("Username or email"), {
+      target: { value: "user@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "password123" },
+    });
+    submitForm();
+
+    await waitFor(() => expect(login).toHaveBeenCalledWith(
+      expect.objectContaining({ tenant: "Johannesburg" }),
+    ));
   });
 
   it("accepts the seeded admin username and opens the admin dashboard", async () => {
