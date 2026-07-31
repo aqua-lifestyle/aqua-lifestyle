@@ -21,6 +21,8 @@ type RequestContextProvider = () => string | null | Promise<string | null>;
 let accessTokenProvider: RequestContextProvider | null = null;
 let tenantProvider: RequestContextProvider | null = null;
 let refreshTokenProvider: (() => Promise<string | null>) | null = null;
+let activeRefreshProvider: (() => Promise<string | null>) | null = null;
+let activeRefreshRequest: Promise<string | null> | null = null;
 
 export const setAccessTokenProvider = (provider: RequestContextProvider) => {
   accessTokenProvider = provider;
@@ -32,6 +34,31 @@ export const setTenantProvider = (provider: RequestContextProvider) => {
 
 export const setRefreshTokenProvider = (provider: () => Promise<string | null>) => {
   refreshTokenProvider = provider;
+};
+
+export const refreshAccessToken = async () => {
+  const provider = refreshTokenProvider;
+  if (!provider) return null;
+  if (activeRefreshRequest && activeRefreshProvider === provider) {
+    return activeRefreshRequest;
+  }
+
+  const request = Promise.resolve().then(provider);
+  activeRefreshProvider = provider;
+  activeRefreshRequest = request;
+  try {
+    return await request;
+  } finally {
+    if (activeRefreshRequest === request) {
+      activeRefreshProvider = null;
+      activeRefreshRequest = null;
+    }
+  }
+};
+
+export const getExpiredSessionLoginUrl = (path: string) => {
+  const safePath = /^\/(?![\\/])/.test(path) ? path : "/dashboard";
+  return `/login?reason=session-ended&redirect=${encodeURIComponent(safePath)}`;
 };
 
 export const apiClient: AxiosInstance = axios.create({
@@ -78,18 +105,22 @@ apiClient.interceptors.response.use(
         originalRequest._retry = true;
 
         try {
-          const newToken = await refreshTokenProvider();
+          const newToken = await refreshAccessToken();
           if (newToken) {
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
             return apiClient(originalRequest);
           }
-        } catch {
-          // Refresh failed — will fall through to the redirect below
+        } catch (refreshError) {
+          // A temporary network or server failure must not invalidate a valid
+          // session or present it as expired. Let the caller's normal error
+          // path handle the refresh failure and allow a later retry.
+          throw refreshError;
         }
 
-        // Redirect to login if refresh fails
+        // A null result means the refresh credential was definitively rejected.
         if (typeof window !== "undefined") {
-          window.location.href = "/login";
+          const returnPath = `${window.location.pathname}${window.location.search}`;
+          window.location.href = getExpiredSessionLoginUrl(returnPath);
         }
       }
 

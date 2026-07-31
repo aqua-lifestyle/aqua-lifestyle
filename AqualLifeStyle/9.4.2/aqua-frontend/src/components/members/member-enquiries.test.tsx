@@ -130,6 +130,8 @@ const baseEnquiriesState = {
   selectedErrorMessage: null,
 };
 
+const getMyEnquiries = vi.fn();
+
 beforeEach(() => {
   vi.resetAllMocks();
 
@@ -155,6 +157,7 @@ beforeEach(() => {
     convertEnquiryToCustomer: vi.fn(),
     createEnquiry: vi.fn(),
     getEnquiries: vi.fn(),
+    getMyEnquiries,
     getEnquiry: vi.fn(),
     getSalesReadyEnquiries: vi.fn(),
     recordFollowUp: vi.fn(),
@@ -171,5 +174,6 @@ describe("MemberEnquiries", () => {
     expect(screen.getAllByText("Status").length).toBeGreaterThan(0);
     expect(screen.getByRole("combobox", { name: /Status/i })).toBeDefined();
     expect(screen.getByText("What are your hours?")).toBeDefined();
+    expect(getMyEnquiries).toHaveBeenCalledOnce();
   });
 });

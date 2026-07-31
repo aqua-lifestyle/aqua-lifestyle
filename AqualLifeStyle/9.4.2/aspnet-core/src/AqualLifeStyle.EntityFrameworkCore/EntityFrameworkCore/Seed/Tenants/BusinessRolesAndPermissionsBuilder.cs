@@ -168,8 +168,6 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
         {
             PermissionNames.Pages_Customers,
             PermissionNames.Pages_Memberships,
-            PermissionNames.Pages_Enquiries,
-            PermissionNames.Pages_Orders,
             PermissionNames.Pages_Products
         };
 

@@ -82,6 +82,7 @@ namespace AqualLifeStyle.Tests.Authorization
         [InlineData(AquaUserRole.AreaLeader, AquaPermissions.AreaSpaces.Manage)]
         [InlineData(AquaUserRole.AreaLeader, AquaPermissions.Orders.Process)]
         [InlineData(AquaUserRole.AreaLeader, AquaPermissions.Facilitators.Promote)]
+        [InlineData(AquaUserRole.AreaLeader, AquaPermissions.Enquiries.View)]
         [InlineData(AquaUserRole.Facilitator, AquaPermissions.Facilitators.Refer)]
         [InlineData(AquaUserRole.Facilitator, AquaPermissions.Referrals.Create)]
         [InlineData(AquaUserRole.Facilitator, AquaPermissions.Enquiries.Create)]
@@ -99,6 +100,8 @@ namespace AqualLifeStyle.Tests.Authorization
         [InlineData(AquaUserRole.Facilitator, AquaPermissions.AreaSpaces.Approve)]
         [InlineData(AquaUserRole.Facilitator, AquaPermissions.Orders.Approve)]
         [InlineData(AquaUserRole.Member, AquaPermissions.Members.Delete)]
+        [InlineData(AquaUserRole.Member, AquaPermissions.Enquiries.View)]
+        [InlineData(AquaUserRole.Member, AquaPermissions.Orders.View)]
         [InlineData(AquaUserRole.Member, AquaPermissions.Referrals.Confirm)]
         [InlineData(AquaUserRole.Guest, AquaPermissions.Enquiries.Create)]
         public void Role_DoesNotLeakPermission(AquaUserRole role, string permission) => AquaRolePermissions.GetFor(role).ShouldNotContain(permission);

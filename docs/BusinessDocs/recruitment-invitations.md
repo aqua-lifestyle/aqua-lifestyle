@@ -1,5 +1,15 @@
 # Programme recruitment invitations
 
+## Customer-facing language
+
+The product calls this feature **Member invitations**. Customer and
+administrator interfaces use **Inviting Club Member**, **Member network**, and
+**Network placement** instead of recruitment terminology. Existing internal
+class names, API properties, permissions, database columns, and audit records
+retain their current recruiter/recruitment names until a separately planned
+technical migration is justified. This terminology boundary avoids breaking
+contracts while keeping the customer experience clear and professional.
+
 ## Purpose
 
 The invitation experience makes programme recruitment discoverable without
@@ -84,8 +94,11 @@ Administrators with the dedicated correction permission identify Club Members
 by immutable Club Member number, select AQGreen or Onyx, enter the corrected
 recruiter (or choose an independent network), and provide a mandatory reason.
 
-The backend validates active same-programme participation, Area scope, self
-placement, and cycles. A successful change appends an immutable history record
+The backend validates active same-programme participation, administrator Area
+authority, self placement, and cycles. Cross-Area recruitment remains valid:
+an Area administrator can correct records only inside their Area, while a host
+administrator with all-Areas authority may select an eligible recruiter from
+another Area. A successful change appends an immutable history record
 containing the previous recruiter, new recruiter, reason, administrator, and
 timestamp. Repeating the already-applied correction is idempotent and does not
 create duplicate history.

@@ -6,6 +6,7 @@ import {
   useContext,
   useMemo,
   useReducer,
+  useRef,
 } from "react";
 
 import { apiEndpoints, getRequestErrorMessage, httpClient } from "@/src/shared/api";
@@ -47,19 +48,33 @@ const getErrorMessage = (error: unknown): string => {
 
 export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
   const [state, dispatch] = useReducer(enquiriesReducer, initialEnquiriesState);
+  const loadRequestIdentifier = useRef(0);
 
-  const getEnquiries = useCallback(async () => {
+  const loadEnquiries = useCallback(async (endpoint: string) => {
+    const requestIdentifier = ++loadRequestIdentifier.current;
     dispatch(getEnquiriesPending());
 
     try {
-      const enquiries = await httpClient.get<Enquiry[]>(
-        apiEndpoints.enquiries.getAll,
-      );
-      dispatch(getEnquiriesSuccess(enquiries));
+      const enquiries = await httpClient.get<Enquiry[]>(endpoint);
+      if (requestIdentifier === loadRequestIdentifier.current) {
+        dispatch(getEnquiriesSuccess(enquiries));
+      }
     } catch (error) {
-      dispatch(getEnquiriesError(getErrorMessage(error)));
+      if (requestIdentifier === loadRequestIdentifier.current) {
+        dispatch(getEnquiriesError(getErrorMessage(error)));
+      }
     }
   }, []);
+
+  const getEnquiries = useCallback(
+    () => loadEnquiries(apiEndpoints.enquiries.getAll),
+    [loadEnquiries],
+  );
+
+  const getMyEnquiries = useCallback(
+    () => loadEnquiries(apiEndpoints.enquiries.getMine),
+    [loadEnquiries],
+  );
 
   const createEnquiry = useCallback(async (input: CreateEnquiryInput) => {
     dispatch(createEnquiryPending());
@@ -198,6 +213,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       convertEnquiryToCustomer,
       createEnquiry,
       getEnquiries,
+      getMyEnquiries,
       getEnquiry,
       getSalesReadyEnquiries,
       recordFollowUp,
@@ -209,6 +225,7 @@ export const EnquiriesProvider = ({ children }: EnquiriesProviderProps) => {
       convertEnquiryToCustomer,
       createEnquiry,
       getEnquiries,
+      getMyEnquiries,
       getEnquiry,
       getSalesReadyEnquiries,
       recordFollowUp,

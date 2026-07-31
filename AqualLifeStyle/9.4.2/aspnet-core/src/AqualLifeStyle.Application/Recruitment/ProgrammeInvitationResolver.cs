@@ -59,7 +59,7 @@ namespace AqualLifeStyle.Application.Recruitment
             var source = await _policyResolver.Resolve(invitation.ProgrammeKey)
                 .FindByParticipationAsync(invitation.ProgrammeParticipationId);
             if (source == null || !source.IsEligible)
-                throw InvalidInvitation("The recruiter is not currently eligible to recruit into this programme.");
+                throw InvalidInvitation("The inviting Club Member is not currently eligible to invite members to this programme.");
             if (source.CustomerId == inviteeCustomerId)
                 throw InvalidInvitation("You cannot accept your own invitation.");
 

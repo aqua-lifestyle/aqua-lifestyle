@@ -19,8 +19,8 @@ const formatDate = (value: string | null) =>
 export const MemberAnalytics = ({ members }: MemberAnalyticsProps) => (
   <Card className="overflow-hidden p-0">
     <div className="border-b border-border p-5">
-      <h2 className="text-lg font-semibold">Club member analytics</h2>
-      <p className="text-sm text-muted-foreground">Tier distribution and newest club members.</p>
+      <h2 className="text-lg font-semibold">Customer account analytics</h2>
+      <p className="text-sm text-muted-foreground">Membership-plan distribution and newest customer accounts.</p>
     </div>
     <div className="grid gap-6 p-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
       <div>
@@ -34,7 +34,7 @@ export const MemberAnalytics = ({ members }: MemberAnalyticsProps) => (
             <p className="mt-1 text-2xl font-bold">{members.inactive}</p>
           </div>
         </div>
-        <div aria-label="Club members by plan" className="mt-3 h-56">
+        <div aria-label="Customer accounts by membership plan" className="mt-3 h-56">
           {members.byTier.length > 0 ? (
             <ResponsiveContainer height="100%" width="100%">
               <PieChart>
@@ -67,7 +67,7 @@ export const MemberAnalytics = ({ members }: MemberAnalyticsProps) => (
             ))}
           </ul>
         ) : (
-          <p className="mt-4 text-sm text-muted-foreground">No members available.</p>
+          <p className="mt-4 text-sm text-muted-foreground">No customer accounts available.</p>
         )}
       </div>
     </div>

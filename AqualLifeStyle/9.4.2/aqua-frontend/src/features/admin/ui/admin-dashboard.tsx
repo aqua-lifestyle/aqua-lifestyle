@@ -25,7 +25,6 @@ import {
 } from "@/src/providers";
 import { Badge, Button, Card, StatusMessage } from "@/src/shared/ui";
 import { buildAdminDashboard, formatCurrency } from "../model/dashboard";
-import { mockAdminDashboard } from "../model/mock-data";
 import { isSystemAdmin } from "@/src/shared/auth/roles";
 import { KpiCards } from "./kpi-cards";
 import { MemberAnalytics } from "./member-analytics";
@@ -95,15 +94,13 @@ export const AdminDashboard = () => {
     customers: customerState.customers,
     enquiries: enquiryState.enquiries,
     facilitatorCount: facilitatorState.facilitators.length,
-    failed: requiredFailed,
-    fallback: mockAdminDashboard,
     memberships: membershipState.memberships,
     orders: orderState.orderIntents,
     referrals: referralState.referrals,
   }), [
     customerState.customers, enquiryState.enquiries, facilitatorState.facilitators.length,
     leaderState.areaLeaders.length, membershipState.memberships, orderState.orderIntents,
-    referralState.referrals, requiredFailed,
+    referralState.referrals,
   ]);
   const managementLinks = [
     { href: "/admin/customers", icon: Users, label: "Customer accounts", permission: "Aqua.Admin.Customers.View", summary: "Welcome customers and manage their account details." },
@@ -159,7 +156,11 @@ export const AdminDashboard = () => {
           <Card>
             <div className="flex items-start justify-between"><p className="text-sm text-muted-foreground">Area leaders</p><UsersRound className="size-5 text-accent" /></div>
             <p className="mt-2 text-2xl font-bold">{dashboard.leaders.total}</p>
-            <p className="mt-2 text-xs text-muted-foreground">{dashboard.leaders.pendingApplications} pending <Badge className="ml-1" tone="warning">Estimate</Badge></p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {dashboard.leaders.pendingApplications === null
+                ? "Pending applications are not available here"
+                : `${dashboard.leaders.pendingApplications} pending`}
+            </p>
           </Card>
           <Card>
             <div className="flex items-start justify-between"><p className="text-sm text-muted-foreground">Facilitators</p><UserCheck className="size-5 text-accent" /></div>
@@ -168,8 +169,14 @@ export const AdminDashboard = () => {
           </Card>
           <Card>
             <div className="flex items-start justify-between"><p className="text-sm text-muted-foreground">Savings balance</p><Activity className="size-5 text-success" /></div>
-            <p className="mt-2 text-2xl font-bold">{formatCurrency(dashboard.savings.total)}</p>
-            <p className="mt-2 text-xs text-muted-foreground">{formatCurrency(dashboard.savings.interestAccrued)} interest <Badge className="ml-1" tone="warning">Estimate</Badge></p>
+            <p className="mt-2 text-2xl font-bold">
+              {dashboard.savings.total === null
+                ? "Unavailable"
+                : formatCurrency(dashboard.savings.total)}
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Open Savings accounts for confirmed balances and projected interest.
+            </p>
           </Card>
           <Card>
             <div className="flex items-start justify-between"><p className="text-sm text-muted-foreground">System status</p><Network className="size-5 text-accent" /></div>

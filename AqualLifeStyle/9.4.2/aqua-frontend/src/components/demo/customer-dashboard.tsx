@@ -29,6 +29,12 @@ import {
 } from "@/src/providers";
 import { Badge, Button, Card, LinkButton, StatusMessage } from "@/src/shared/ui";
 import { useHydrated } from "@/src/shared/lib/use-hydrated";
+import {
+  getActiveProgrammeNames,
+  getProgrammeStatusDescription,
+  getProgrammeStatusLabel,
+} from "@/src/shared/domain/programme-participations";
+import { useMyProgrammeParticipations } from "@/src/shared/hooks/use-my-programme-participations";
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("en-ZA", {
@@ -58,6 +64,15 @@ export const CustomerDashboard = () => {
   const router = useRouter();
   const { isAuthenticated, isReady, session } = useAuthState();
   const user = session?.user;
+  const canViewProgrammes =
+    user?.permissions?.includes("Aqua.ProgrammeParticipations.ViewSelf") ?? false;
+  const canViewSavings =
+    user?.permissions?.includes("Aqua.Savings.ViewSelf") ?? false;
+  const {
+    data: programmeParticipations,
+    errorMessage: programmeErrorMessage,
+    isLoading: isProgrammesPending,
+  } = useMyProgrammeParticipations(isAuthenticated && canViewProgrammes);
 
   const { changeMembership, getMyCustomer } = useCustomersActions();
   const { getActiveTiers, getSavingsWindowStatuses } = useMembershipsActions();
@@ -83,16 +98,19 @@ export const CustomerDashboard = () => {
     errorMessage: membershipsErrorMessage,
     isError: isMembershipsError,
     isPending: isMembershipsPending,
+    isSuccess: isMembershipsSuccess,
     memberships,
     savingsWindowStatuses,
     isSavingsWindowStatusesError,
     isSavingsWindowStatusesPending,
+    isSavingsWindowStatusesSuccess,
     savingsWindowStatusesErrorMessage,
   } = useMembershipsState();
   const {
     eligibleProducts,
     isEligibleError,
     isEligiblePending,
+    isEligibleSuccess,
     eligibleErrorMessage,
   } = useProductsState();
 
@@ -139,6 +157,17 @@ export const CustomerDashboard = () => {
       ? assignedMembership
       : null;
   const currentMembership = legacyProgrammeSelection ? null : assignedMembership;
+  const activeProgrammeNames = getActiveProgrammeNames(programmeParticipations);
+  const isClubMember = Boolean(currentMembership || activeProgrammeNames.length > 0);
+  const clubStatusLabel = getProgrammeStatusLabel(
+    programmeParticipations,
+    currentMembership?.name,
+    "Customer",
+  );
+  const clubStatusDescription = getProgrammeStatusDescription(
+    programmeParticipations,
+    currentMembership?.name,
+  );
 
   const availableTiers = useMemo(() => {
     if (!memberships.length) return [];
@@ -170,12 +199,18 @@ export const CustomerDashboard = () => {
     isMembershipsPending ||
     isMyCustomerPending ||
     isSavingsWindowStatusesPending ||
-    isEligiblePending;
+    isProgrammesPending ||
+    isEligiblePending ||
+    (!isMembershipsSuccess && !isMembershipsError) ||
+    (!isMyCustomerSuccess && !isMyCustomerError) ||
+    (!isSavingsWindowStatusesSuccess && !isSavingsWindowStatusesError) ||
+    (Boolean(myCustomer?.id) && !isEligibleSuccess && !isEligibleError);
   const hasError =
     isMembershipsError ||
     isMyCustomerError ||
     isChangeMembershipError ||
     isSavingsWindowStatusesError ||
+    Boolean(programmeErrorMessage) ||
     isEligibleError;
   const errorMessages = Array.from(
     new Set(
@@ -184,6 +219,7 @@ export const CustomerDashboard = () => {
         myCustomerErrorMessage,
         changeMembershipErrorMessage,
         savingsWindowStatusesErrorMessage,
+        programmeErrorMessage,
         eligibleErrorMessage,
       ].filter((message): message is string => Boolean(message)),
     ),
@@ -210,7 +246,7 @@ export const CustomerDashboard = () => {
             <div>
               <p className="text-sm font-semibold text-accent">Welcome back</p>
               <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                {user?.name ?? "Club member"}
+                {user?.name ?? "Club Member"}
               </h1>
               <p className="mt-1 text-base text-muted-foreground">
                 {user?.email}
@@ -221,7 +257,7 @@ export const CustomerDashboard = () => {
             <Calendar className="size-4" />
             <span>{hasMounted ? formatDate(new Date().toISOString()) : "Current date"}</span>
             <Badge tone="accent" className="ml-2">
-              {currentMembership ? "Club member" : "Customer"}
+              {isClubMember ? "Club Member" : "Customer"}
             </Badge>
           </div>
         </header>
@@ -239,17 +275,11 @@ export const CustomerDashboard = () => {
                 <User className="size-6" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Membership</p>
+                <p className="text-sm text-muted-foreground">Club status</p>
                 <p className="text-2xl font-bold">
-                  {currentMembership?.name ?? "None"}
+                  {clubStatusLabel}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {currentMembership
-                    ? currentMembership.membershipType >= 0
-                      ? `Tier ${currentMembership.membershipType + 1}`
-                      : "Custom tier"
-                    : "Not joined"}
-                </p>
+                <p className="text-xs text-muted-foreground">{clubStatusDescription}</p>
               </div>
             </Card>
 
@@ -258,18 +288,18 @@ export const CustomerDashboard = () => {
                 <Wallet className="size-6" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Savings account</p>
+                <p className="text-sm text-muted-foreground">Savings access</p>
                 <p className="text-2xl font-bold">
-                  {currentMembership ? "Active" : "Locked"}
+                  {canViewSavings ? "Available" : "Not available"}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {currentSavingsWindow
                     ? currentSavingsWindow.isSavingsWindowOpen
                       ? "Window open"
                       : "Window closed"
-                    : currentMembership
-                      ? "Savings status unavailable"
-                      : "No membership selected"}
+                    : canViewSavings
+                      ? "View your savings account for current activity"
+                      : "Available after eligible Club Member activation"}
                 </p>
               </div>
             </Card>
@@ -294,9 +324,15 @@ export const CustomerDashboard = () => {
                 <ShieldCheck className="size-6" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Account security</p>
-                <p className="text-2xl font-bold">Verified</p>
-                <p className="text-xs text-muted-foreground">Profile complete</p>
+                <p className="text-sm text-muted-foreground">Account</p>
+                <p className="text-2xl font-bold">
+                  {myCustomer
+                    ? myCustomer.isActive
+                      ? "Active"
+                      : "Inactive"
+                    : "Unavailable"}
+                </p>
+                <p className="text-xs text-muted-foreground">Manage details in your profile</p>
               </div>
             </Card>
           </section>
@@ -457,7 +493,7 @@ export const CustomerDashboard = () => {
               <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
                 <span>Current balance</span>
                 <span className="font-semibold text-foreground">
-                  {currentMembership ? formatCurrency(0) : "Locked"}
+                  {canViewSavings ? "View account" : "Not available"}
                 </span>
               </div>
               <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
@@ -468,17 +504,22 @@ export const CustomerDashboard = () => {
                     ? currentSavingsWindow.isSavingsWindowOpen
                       ? "Open"
                       : "Closed"
-                    : currentMembership
-                      ? "Coming soon"
-                      : "Locked"}
+                    : canViewSavings
+                      ? "See account"
+                      : "Not available"}
                 </span>
               </div>
               <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
-                <span>Membership tier</span>
+                <span>Membership plan</span>
                 <span className="font-semibold text-foreground">
-                  {currentMembership?.name ?? "None"}
+                  {currentMembership?.name ?? "No separate plan"}
                 </span>
               </div>
+              {canViewSavings ? (
+                <LinkButton className="w-full" href="/member/savings" variant="outline">
+                  View my savings account
+                </LinkButton>
+              ) : null}
             </div>
           </Card>
         </section>

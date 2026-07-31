@@ -2,7 +2,7 @@
 
 import { Droplets, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { z } from "zod";
 
 import { login } from "@/src/shared/api/auth-service";
@@ -48,6 +48,7 @@ const getSafeRedirect = () => {
 
 export const LoginForm = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setSession } = useAuthActions();
   const { currentTenant } = useTenantState();
   const { clearTenant, setTenant } = useTenantActions();
@@ -69,6 +70,7 @@ export const LoginForm = () => {
   );
   const selfRegistrationAvailability =
     useTenantSelfRegistrationAvailability(selectedWorkspace);
+  const sessionEnded = searchParams.get("reason") === "session-ended";
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -152,6 +154,12 @@ export const LoginForm = () => {
             <p className="mt-2 text-sm text-muted-foreground">
               Enter your credentials to access the dashboard.
             </p>
+            {sessionEnded ? (
+              <StatusMessage className="mt-4" tone="info">
+                Your secure session ended because your access changed or expired.
+                Sign in again to continue.
+              </StatusMessage>
+            ) : null}
 
             <Card className="mt-6">
               <form className="flex flex-col gap-4" onSubmit={handleSubmit}>

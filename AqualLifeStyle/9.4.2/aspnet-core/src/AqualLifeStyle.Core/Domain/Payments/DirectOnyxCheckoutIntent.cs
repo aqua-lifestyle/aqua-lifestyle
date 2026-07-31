@@ -35,7 +35,7 @@ namespace AqualLifeStyle.Domain.Payments
             if (tenantId <= 0) throw new ArgumentOutOfRangeException(nameof(tenantId));
             if (customerId <= 0) throw new ArgumentOutOfRangeException(nameof(customerId));
             if (recruiterCustomerId == customerId)
-                throw new ArgumentException("A customer cannot recruit themselves.", nameof(recruiterCustomerId));
+                throw new ArgumentException("A Club Member cannot invite themselves into their own network.", nameof(recruiterCustomerId));
             if (onyxMembershipId <= 0) throw new ArgumentOutOfRangeException(nameof(onyxMembershipId));
             if (terms == null) throw new ArgumentNullException(nameof(terms));
             if (createdAt == default) throw new ArgumentException("A creation time is required.", nameof(createdAt));

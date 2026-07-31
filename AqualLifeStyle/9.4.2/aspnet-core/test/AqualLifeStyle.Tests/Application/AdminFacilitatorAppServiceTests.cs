@@ -18,6 +18,7 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task FacilitatorLifecycle_ApprovesSynchronizesRoleAndRemoves()
         {
+            string approvedSecurityStamp = null;
             var facilitatorId = await UsingDbContextAsync(async context =>
             {
                 var areaLeaderId = await context.AreaLeaders.Where(item => item.TenantId == 1).Select(item => item.Id).FirstAsync();
@@ -37,7 +38,9 @@ namespace AqualLifeStyle.Tests.Application
             await UsingDbContextAsync(async context =>
             {
                 var userId = await context.Customers.Where(item => item.Id == approved.CustomerId).Select(item => item.UserId).SingleAsync();
-                (await context.Users.SingleAsync(item => item.Id == userId)).Role.ShouldBe(AquaUserRole.Facilitator);
+                var user = await context.Users.SingleAsync(item => item.Id == userId);
+                user.Role.ShouldBe(AquaUserRole.Facilitator);
+                approvedSecurityStamp = user.SecurityStamp;
             });
 
             await _facilitatorAdministration.RemoveAsync(new RemoveFacilitatorInput
@@ -45,7 +48,14 @@ namespace AqualLifeStyle.Tests.Application
                 Id = facilitatorId, Justification = "Facilitator requested removal"
             });
             await UsingDbContextAsync(async context =>
-                (await context.Facilitators.IgnoreQueryFilters().SingleAsync(item => item.Id == facilitatorId)).IsDeleted.ShouldBeTrue());
+            {
+                (await context.Facilitators.IgnoreQueryFilters().SingleAsync(item => item.Id == facilitatorId)).IsDeleted.ShouldBeTrue();
+                var userId = await context.Customers.Where(item => item.Id == approved.CustomerId)
+                    .Select(item => item.UserId).SingleAsync();
+                var user = await context.Users.SingleAsync(item => item.Id == userId);
+                user.Role.ShouldNotBe(AquaUserRole.Facilitator);
+                user.SecurityStamp.ShouldNotBe(approvedSecurityStamp);
+            });
         }
     }
 }

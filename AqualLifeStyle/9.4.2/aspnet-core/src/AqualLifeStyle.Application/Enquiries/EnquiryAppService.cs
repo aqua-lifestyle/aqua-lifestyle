@@ -16,7 +16,6 @@ using AqualLifeStyle.Email;
 
 namespace AqualLifeStyle.Application.Enquiries
 {
-    [AbpAuthorize(PermissionNames.Pages_Enquiries)]
     public class EnquiryAppService : AqualLifeStyleAppServiceBase, IEnquiryAppService
     {
         private readonly IEnquiryRepository _enquiryRepository;
@@ -39,6 +38,7 @@ namespace AqualLifeStyle.Application.Enquiries
             _emailTemplates = emailTemplates;
         }
 
+        [AbpAuthorize(AquaPermissions.Enquiries.View)]
         public async Task<IReadOnlyList<EnquiryDto>> GetAllAsync()
         {
             var tenantId = GetRequiredTenantId("Enquiry lookup failed.");
@@ -46,12 +46,23 @@ namespace AqualLifeStyle.Application.Enquiries
             return _objectMapper.Map<List<EnquiryDto>>(enquiries);
         }
 
+        [AbpAuthorize(AquaPermissions.Enquiries.ViewSelf)]
+        public async Task<IReadOnlyList<EnquiryDto>> GetMineAsync()
+        {
+            var customer = await GetCurrentCustomerAsync("Enquiry lookup failed.");
+            var enquiries = await _enquiryRepository.GetAllListAsync(enquiry =>
+                enquiry.TenantId == customer.TenantId && enquiry.CustomerId == customer.Id);
+            return _objectMapper.Map<List<EnquiryDto>>(enquiries);
+        }
+
+        [AbpAuthorize(AquaPermissions.Enquiries.View, AquaPermissions.Enquiries.ViewSelf)]
         public async Task<EnquiryDto> GetAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
             var enquiry = await GetEnquiryForCurrentTenantAsync(id);
             var customer = await _customerRepository.GetAsync(enquiry.CustomerId);
-            if (!await CurrentUserCanAccessCustomerAsync(customer))
+            if (!await PermissionChecker.IsGrantedAsync(AquaPermissions.Enquiries.View) &&
+                !await CurrentUserCanAccessCustomerAsync(customer))
             {
                 throw new UserFriendlyException("Enquiry lookup failed.", "You do not have permission to access this enquiry.");
             }
@@ -231,6 +242,7 @@ namespace AqualLifeStyle.Application.Enquiries
         /// <summary>
         /// Get all follow-ups for an enquiry.
         /// </summary>
+        [AbpAuthorize(AquaPermissions.Enquiries.View)]
         public async Task<List<EnquiryFollowUpDto>> GetFollowUpsAsync(int id)
         {
             AqualLifeStyleValidator.ValidId(id);
@@ -246,6 +258,7 @@ namespace AqualLifeStyle.Application.Enquiries
         /// <summary>
         /// Get enquiries that are ready for sales action based on conversion probability.
         /// </summary>
+        [AbpAuthorize(AquaPermissions.Enquiries.View)]
         public async Task<List<EnquiryDto>> GetSalesReadyEnquiriesAsync()
         {
             var tenantId = GetRequiredTenantId("Enquiry lookup failed.");
@@ -254,6 +267,20 @@ namespace AqualLifeStyle.Application.Enquiries
                 .Where(e => e.IsSalesReady())
                 .Select(enquiry => _objectMapper.Map<EnquiryDto>(enquiry))
                 .ToList();
+        }
+
+        private async Task<Customer> GetCurrentCustomerAsync(string operation)
+        {
+            if (!AbpSession.UserId.HasValue)
+                throw new AqualLifeStyleAuthorizationException($"{operation} A user context is required.");
+
+            var tenantId = GetRequiredTenantId(operation);
+            var customer = await _customerRepository.FirstOrDefaultAsync(item =>
+                item.TenantId == tenantId && item.UserId == AbpSession.UserId.Value);
+            if (customer == null)
+                throw new UserFriendlyException(operation, "No customer profile is linked to this account.");
+
+            return customer;
         }
 
         private async Task<Enquiry> GetEnquiryForCurrentTenantAsync(int id)

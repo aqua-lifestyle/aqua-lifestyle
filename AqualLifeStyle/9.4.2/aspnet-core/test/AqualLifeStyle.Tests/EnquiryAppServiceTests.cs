@@ -59,6 +59,33 @@ namespace AqualLifeStyle.Tests
         }
 
         [Fact]
+        public async Task GetMineAsync_FiltersEnquiriesByAreaAndAuthenticatedCustomer()
+        {
+            var customer = Customer.Create(1, 1, "Test Customer", new EmailAddress("test@example.com"));
+            customer.Id = 7;
+            Expression<Func<Enquiry, bool>> appliedFilter = null;
+            _customerRepositoryMock
+                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<Customer, bool>>>() ))
+                .ReturnsAsync(customer);
+            _enquiryRepositoryMock
+                .Setup(r => r.GetAllListAsync(It.IsAny<Expression<Func<Enquiry, bool>>>() ))
+                .Callback((Expression<Func<Enquiry, bool>> filter) => appliedFilter = filter)
+                .ReturnsAsync(new System.Collections.Generic.List<Enquiry>());
+            _objectMapperMock
+                .Setup(m => m.Map<System.Collections.Generic.List<EnquiryDto>>(
+                    It.IsAny<System.Collections.Generic.List<Enquiry>>()))
+                .Returns(new System.Collections.Generic.List<EnquiryDto>());
+
+            await _service.GetMineAsync();
+
+            appliedFilter.ShouldNotBeNull();
+            var predicate = appliedFilter.Compile();
+            predicate(Enquiry.Create(1, 7, 5, "Mine")).ShouldBeTrue();
+            predicate(Enquiry.Create(1, 8, 5, "Another customer")).ShouldBeFalse();
+            predicate(Enquiry.Create(2, 7, 5, "Another Area")).ShouldBeFalse();
+        }
+
+        [Fact]
         public async Task RespondAsync_WithValidResponse_UpdatesEnquiryStatus()
         {
             // Arrange

@@ -82,6 +82,7 @@ export type EnquiriesActions = {
   convertEnquiryToCustomer: (id: number) => Promise<boolean>;
   createEnquiry: (input: CreateEnquiryInput) => Promise<boolean>;
   getEnquiries: () => Promise<void>;
+  getMyEnquiries: () => Promise<void>;
   getEnquiry: (id: number) => Promise<void>;
   getSalesReadyEnquiries: () => Promise<void>;
   recordFollowUp: (

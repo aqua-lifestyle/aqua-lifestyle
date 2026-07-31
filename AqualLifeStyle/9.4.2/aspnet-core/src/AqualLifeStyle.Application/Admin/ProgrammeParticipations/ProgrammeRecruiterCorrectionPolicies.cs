@@ -45,8 +45,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             var policy = _policies.SingleOrDefault(item => item.Programme == programme);
             if (policy == null)
                 throw new UserFriendlyException(
-                    "Recruiter correction failed.",
-                    "The selected programme does not support recruiter corrections.");
+                    "Network placement correction failed.",
+                    "The selected programme does not support network placement corrections.");
             return policy;
         }
     }
@@ -77,10 +77,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
             {
-                var participations = await _repository.GetAll()
-                    .Where(item => item.TenantId == tenantId)
-                    .ToListAsync();
-                var target = participations.SingleOrDefault(item => item.CustomerId == customerId);
+                var target = await _repository.GetAll()
+                    .SingleOrDefaultAsync(item =>
+                        item.TenantId == tenantId && item.CustomerId == customerId);
                 if (target == null) throw NotFound();
                 if (!newRecruiterCustomerId.HasValue)
                 {
@@ -88,12 +87,18 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     return;
                 }
 
-                var recruiter = participations.SingleOrDefault(item =>
-                    item.CustomerId == newRecruiterCustomerId.Value &&
-                    item.Status == EntryParticipationStatus.Active);
-                if (recruiter == null) throw InvalidRecruiter("The new recruiter must have active AQGreen participation in the same Area.");
+                var recruiter = await _repository.GetAll()
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(item =>
+                        item.CustomerId == newRecruiterCustomerId.Value &&
+                        item.Status == EntryParticipationStatus.Active);
+                if (recruiter == null) throw InvalidRecruiter("The new inviting Club Member must have active AQGreen participation.");
+                var placements = await _repository.GetAll()
+                    .AsNoTracking()
+                    .Select(item => new { item.CustomerId, item.RecruiterCustomerId })
+                    .ToListAsync();
                 RecruiterPlacementCycleValidator.EnsureNoCycle(
-                    participations.Select(item => (item.CustomerId, item.RecruiterCustomerId)),
+                    placements.Select(item => (item.CustomerId, item.RecruiterCustomerId)),
                     customerId,
                     recruiter.CustomerId);
                 target.CorrectRecruiter(recruiter, administratorUserId, reason, correctedAt);
@@ -101,10 +106,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         }
 
         private static UserFriendlyException NotFound() =>
-            new UserFriendlyException("Recruiter correction failed.", "The AQGreen participation was not found.");
+            new UserFriendlyException("Network placement correction failed.", "The AQGreen participation was not found.");
 
         private static UserFriendlyException InvalidRecruiter(string details) =>
-            new UserFriendlyException("Recruiter correction failed.", details);
+            new UserFriendlyException("Network placement correction failed.", details);
 
     }
 
@@ -134,25 +139,30 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
             {
-                var participations = await _repository.GetAll()
-                    .Where(item => item.TenantId == tenantId)
-                    .ToListAsync();
-                var target = participations.SingleOrDefault(item => item.CustomerId == customerId);
+                var target = await _repository.GetAll()
+                    .SingleOrDefaultAsync(item =>
+                        item.TenantId == tenantId && item.CustomerId == customerId);
                 if (target == null)
-                    throw new UserFriendlyException("Recruiter correction failed.", "The Onyx participation was not found.");
+                    throw new UserFriendlyException("Network placement correction failed.", "The Onyx participation was not found.");
                 if (!newRecruiterCustomerId.HasValue)
                 {
                     target.CorrectToIndependent(administratorUserId, reason, correctedAt);
                     return;
                 }
 
-                var recruiter = participations.SingleOrDefault(item =>
-                    item.CustomerId == newRecruiterCustomerId.Value &&
-                    item.Status == OnyxParticipationStatus.Active);
+                var recruiter = await _repository.GetAll()
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(item =>
+                        item.CustomerId == newRecruiterCustomerId.Value &&
+                        item.Status == OnyxParticipationStatus.Active);
                 if (recruiter == null)
-                    throw new UserFriendlyException("Recruiter correction failed.", "The new recruiter must have active Onyx participation in the same Area.");
+                    throw new UserFriendlyException("Network placement correction failed.", "The new inviting Club Member must have active Onyx participation.");
+                var placements = await _repository.GetAll()
+                    .AsNoTracking()
+                    .Select(item => new { item.CustomerId, item.RecruiterCustomerId })
+                    .ToListAsync();
                 RecruiterPlacementCycleValidator.EnsureNoCycle(
-                    participations.Select(item => (item.CustomerId, item.RecruiterCustomerId)),
+                    placements.Select(item => (item.CustomerId, item.RecruiterCustomerId)),
                     customerId,
                     recruiter.CustomerId);
                 target.CorrectRecruiter(recruiter, administratorUserId, reason, correctedAt);

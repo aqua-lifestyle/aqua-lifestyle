@@ -96,7 +96,7 @@ namespace AqualLifeStyle.Application.Recruitment
                         item.TenantId == participation.TenantId);
             }
             if (recruiter == null)
-                throw new UserFriendlyException("Invitation unavailable.", "The recruiter account is unavailable.");
+                throw new UserFriendlyException("Invitation unavailable.", "The inviting Club Member account is unavailable.");
 
             var area = await _tenantRepository.FirstOrDefaultAsync(participation.TenantId);
             return new ProgrammeInvitationPreviewDto
