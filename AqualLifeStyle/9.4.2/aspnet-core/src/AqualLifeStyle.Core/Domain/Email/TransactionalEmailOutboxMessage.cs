@@ -37,6 +37,7 @@ namespace AqualLifeStyle.Domain.Email
         public string ProviderMessageId { get; private set; }
         public string LastError { get; private set; }
         public DateTime? SentAt { get; private set; }
+        public DateTime? TerminalAlertEmittedAt { get; private set; }
 
         protected TransactionalEmailOutboxMessage() { }
 
@@ -119,6 +120,13 @@ namespace AqualLifeStyle.Domain.Email
             {
                 NextAttemptAt = nextAttemptAt;
             }
+        }
+
+        public void MarkTerminalAlertEmitted(DateTime emittedAt)
+        {
+            if (Status != TransactionalEmailStatus.Failed)
+                throw new InvalidOperationException("Only terminal failures can acknowledge an operations alert.");
+            TerminalAlertEmittedAt = emittedAt;
         }
 
         private static string Required(string value, string name, int maximumLength)

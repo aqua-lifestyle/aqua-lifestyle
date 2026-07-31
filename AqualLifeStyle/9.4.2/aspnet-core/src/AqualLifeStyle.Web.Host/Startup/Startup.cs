@@ -20,6 +20,8 @@ using Abp.AspNetCore.SignalR.Hubs;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using System.IO;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using Castle.Services.Logging.SerilogIntegration;
 using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Email;
@@ -36,8 +38,10 @@ namespace AqualLifeStyle.Web.Host.Startup
         private const string _apiVersion = "v1";
 
         private readonly IConfigurationRoot _appConfiguration;
+        private readonly IWebHostEnvironment _environment;
         public Startup(IWebHostEnvironment env)
         {
+            _environment = env;
             _appConfiguration = env.GetAppConfiguration();
         }
 
@@ -54,9 +58,24 @@ namespace AqualLifeStyle.Web.Host.Startup
             });
 
             IdentityRegistrar.Register(services);
-            services.AddDataProtection()
+            var dataProtection = services.AddDataProtection()
                 .SetApplicationName("AqualLifeStyle")
                 .PersistKeysToDbContext<AqualLifeStyleDbContext>();
+            if (_environment.IsProduction())
+            {
+                dataProtection.ProtectKeysWithCertificate(LoadDataProtectionCertificate(
+                    "DataProtection:CertificateBase64",
+                    "DataProtection:CertificatePassword",
+                    true));
+                var previousCertificate = LoadDataProtectionCertificate(
+                    "DataProtection:PreviousCertificateBase64",
+                    "DataProtection:PreviousCertificatePassword",
+                    false);
+                if (previousCertificate != null)
+                {
+                    dataProtection.UnprotectKeysWithAnyCertificate(previousCertificate);
+                }
+            }
             AuthConfigurer.Configure(services, _appConfiguration);
 
             services.AddSignalR();
@@ -64,8 +83,13 @@ namespace AqualLifeStyle.Web.Host.Startup
             {
                 options.ForwardedHeaders = ForwardedHeaders.XForwardedFor |
                     ForwardedHeaders.XForwardedProto;
-                options.KnownNetworks.Clear();
-                options.KnownProxies.Clear();
+                options.ForwardLimit = 1;
+                if (_appConfiguration.GetValue<bool>("RENDER"))
+                {
+                    // Render's service port is reachable only through its managed ingress proxy.
+                    options.KnownNetworks.Clear();
+                    options.KnownProxies.Clear();
+                }
             });
             services.AddRateLimiter(options =>
             {
@@ -171,7 +195,50 @@ namespace AqualLifeStyle.Web.Host.Startup
         private static bool IsAccountEmailRequest(PathString path)
         {
             return path.StartsWithSegments("/api/services/app/Account/ResendEmailVerification") ||
-                   path.StartsWithSegments("/api/services/app/Account/RequestPasswordReset");
+                   path.StartsWithSegments("/api/services/app/Account/RequestPasswordReset") ||
+                   path.StartsWithSegments("/api/services/app/Account/Register");
+        }
+
+        private X509Certificate2 LoadDataProtectionCertificate(
+            string certificateKey,
+            string passwordKey,
+            bool required)
+        {
+            var encodedCertificate = _appConfiguration[certificateKey];
+            var certificatePassword = _appConfiguration[passwordKey];
+            if (string.IsNullOrWhiteSpace(encodedCertificate) &&
+                string.IsNullOrWhiteSpace(certificatePassword) && !required)
+            {
+                return null;
+            }
+            if (string.IsNullOrWhiteSpace(encodedCertificate) || string.IsNullOrWhiteSpace(certificatePassword))
+            {
+                throw new InvalidOperationException(
+                    $"Production Data Protection configuration is incomplete. Set {certificateKey.Replace(":", "__")} and {passwordKey.Replace(":", "__")}.");
+            }
+
+            try
+            {
+#pragma warning disable SYSLIB0057 // .NET 8 has no non-obsolete in-memory PKCS#12 loader.
+                var certificate = new X509Certificate2(
+                    Convert.FromBase64String(encodedCertificate),
+                    certificatePassword,
+                    X509KeyStorageFlags.EphemeralKeySet);
+#pragma warning restore SYSLIB0057
+                if (!certificate.HasPrivateKey)
+                {
+                    certificate.Dispose();
+                    throw new CryptographicException("The certificate has no private key.");
+                }
+
+                return certificate;
+            }
+            catch (Exception exception) when (exception is FormatException || exception is CryptographicException)
+            {
+                throw new InvalidOperationException(
+                    $"Production Data Protection certificate is invalid. Check {certificateKey.Replace(":", "__")} and {passwordKey.Replace(":", "__")}.",
+                    exception);
+            }
         }
 
         private void ConfigureSwagger(IServiceCollection services)

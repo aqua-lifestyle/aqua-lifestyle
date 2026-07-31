@@ -40,6 +40,8 @@ namespace AqualLifeStyle.Tests.WebHost
                 ["App:ClientRootAddress"] = "https://app.example.com/",
                 ["App:CorsOrigins"] = "https://app.example.com",
                 ["Authentication:JwtBearer:SecurityKey"] = "a-real-secret-key",
+                ["DataProtection:CertificateBase64"] = "safe-test-certificate",
+                ["DataProtection:CertificatePassword"] = "safe-test-password",
                 ["Redis:Configuration"] = "redis:6379",
                 ["Yoco:SecretKey"] = "sk_test_safe-test-placeholder",
                 ["Yoco:WebhookSecret"] = "whsec_safe-test-placeholder",
@@ -154,6 +156,8 @@ namespace AqualLifeStyle.Tests.WebHost
             ex.Message.ShouldContain("App__ClientRootAddress");
             ex.Message.ShouldContain("App__CorsOrigins");
             ex.Message.ShouldContain("Authentication__JwtBearer__SecurityKey");
+            ex.Message.ShouldContain("DataProtection__CertificateBase64");
+            ex.Message.ShouldContain("DataProtection__CertificatePassword");
             ex.Message.ShouldContain("Redis__Configuration");
             ex.Message.ShouldContain("Yoco__SecretKey");
             ex.Message.ShouldContain("Yoco__WebhookSecret");

@@ -94,23 +94,38 @@ application logs. The hosted Checkout API does not require a public key in the
 frontend.
 
 Account verification and password-reset tokens use the ASP.NET Data Protection
-key ring persisted in the shared `DataProtectionKeys` database table. The
-Render pre-deploy migrator must complete before API instances start. Preserve
-this table during rollback, backup, restore, and database replacement; deleting
-its rows invalidates every outstanding account email link.
+key ring persisted in the shared `DataProtectionKeys` database table. Its XML is
+encrypted with the server-only PKCS#12 certificate supplied through
+`DataProtection__CertificateBase64` and `DataProtection__CertificatePassword`.
+Set both secrets directly in Render before deployment and retain the certificate
+while any key encrypted by it remains in the table. The Render pre-deploy
+migrator must complete before API instances start. Preserve the table and
+certificate during rollback, backup, restore, and database replacement;
+deleting either invalidates every outstanding account email link.
+
+Rotate the certificate with an overlap deployment: move the old certificate
+and password to `DataProtection__PreviousCertificateBase64` and
+`DataProtection__PreviousCertificatePassword`, install the new certificate in
+the primary settings, then deploy. Keep the previous certificate configured
+until every key it encrypted has expired from the key ring; only then remove the
+two previous-certificate settings. Never replace the primary certificate
+without this overlap.
 
 Anonymous resend-verification and password-reset requests are limited to ten
 requests per source address in ten minutes and one accepted email per account
 and purpose every thirty minutes. Preserve Render's forwarding headers so the
 API receives the original client address rather than grouping all traffic under
-the proxy address.
+the proxy address. Unrestricted proxy trust is enabled only when Render's
+platform-provided `RENDER=true` setting confirms that the API port is isolated
+behind Render's managed ingress, and only one forwarded hop is processed.
 
 Create an immediate log alert for
 `EmailOperationsAlert AlertType=terminal_email_delivery_failed`. The event is
 emitted once when an outbox message exhausts its delivery attempts and contains
 only the outbox ID, notification type, tenant ID, and attempt count. Investigate
 the corresponding redacted outbox record without logging or exporting message
-content.
+content. Delivery is at least once so a crash cannot permanently lose the alert;
+deduplicate repeated alerts by outbox ID.
 
 Before deploying the payment branch:
 

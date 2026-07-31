@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { startTransition, type FormEvent, useEffect, useState } from "react";
 import { z } from "zod";
 
 import { httpClient } from "@/src/shared/api";
@@ -20,18 +20,26 @@ const passwordSchema = z.object({
 type PasswordSetupFormProps = {
   areaName: string;
   redirectPath?: string;
-  resetToken: string;
+  resetToken?: string;
   tenantId?: number;
   userId: number;
 };
 
 export const PasswordSetupForm = ({ areaName, redirectPath, resetToken, tenantId = 0, userId }: PasswordSetupFormProps) => {
+  const [linkToken, setLinkToken] = useState(resetToken ?? "");
   const [error, setError] = useState<string>();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const isEmailReset = Number.isSafeInteger(tenantId) && tenantId > 0;
-  const hasValidLink = Boolean((isEmailReset || areaName) && resetToken && Number.isSafeInteger(userId) && userId > 0);
+  const hasValidLink = Boolean((isEmailReset || areaName) && linkToken && Number.isSafeInteger(userId) && userId > 0);
+
+  useEffect(() => {
+    if (resetToken || !window.location.hash) return;
+    const token = new URLSearchParams(window.location.hash.slice(1)).get("token") ?? "";
+    startTransition(() => setLinkToken(token));
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  }, [resetToken]);
   const safeRedirect = redirectPath?.startsWith("/") &&
     !redirectPath.startsWith("//") &&
     !redirectPath.includes("\\")
@@ -73,7 +81,7 @@ export const PasswordSetupForm = ({ areaName, redirectPath, resetToken, tenantId
     setIsSubmitting(true);
     try {
       if (isEmailReset) {
-        const result = await completePasswordReset(tenantId, userId, resetToken, parsed.data.password);
+        const result = await completePasswordReset(tenantId, userId, linkToken, parsed.data.password);
         if (!result.ok) {
           setError(result.message);
           return;
@@ -82,7 +90,7 @@ export const PasswordSetupForm = ({ areaName, redirectPath, resetToken, tenantId
         await httpClient.post("/api/services/app/Account/CompletePasswordSetup", {
           areaName,
           newPassword: parsed.data.password,
-          resetToken,
+          resetToken: linkToken,
           userId,
         });
       }

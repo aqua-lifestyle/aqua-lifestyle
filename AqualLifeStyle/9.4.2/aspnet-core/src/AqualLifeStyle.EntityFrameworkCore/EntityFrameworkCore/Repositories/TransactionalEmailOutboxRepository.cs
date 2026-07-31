@@ -81,5 +81,26 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
                 ? await GetAll().AsNoTracking().SingleAsync(message => message.Id == messageId)
                 : null;
         }
+
+        public async Task<IReadOnlyList<TransactionalEmailOutboxMessage>> GetPendingTerminalAlertsAsync(
+            int maximumCount)
+        {
+            return await GetAll().AsNoTracking()
+                .Where(message =>
+                    message.Status == TransactionalEmailStatus.Failed &&
+                    message.TerminalAlertEmittedAt == null)
+                .OrderBy(message => message.CreationTime)
+                .Take(maximumCount)
+                .ToListAsync();
+        }
+
+        public async Task MarkTerminalAlertEmittedAsync(Guid messageId, DateTime emittedAt)
+        {
+            await GetAll()
+                .Where(message => message.Id == messageId && message.TerminalAlertEmittedAt == null)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    message => message.TerminalAlertEmittedAt,
+                    emittedAt));
+        }
     }
 }

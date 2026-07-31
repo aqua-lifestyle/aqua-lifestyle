@@ -25,6 +25,8 @@ namespace AqualLifeStyle.Web.Host.Startup
                 ["App:ClientRootAddress"] = "App__ClientRootAddress",
                 ["App:CorsOrigins"] = "App__CorsOrigins",
                 ["Authentication:JwtBearer:SecurityKey"] = "Authentication__JwtBearer__SecurityKey",
+                ["DataProtection:CertificateBase64"] = "DataProtection__CertificateBase64",
+                ["DataProtection:CertificatePassword"] = "DataProtection__CertificatePassword",
                 ["Redis:Configuration"] = "Redis__Configuration",
                 ["Yoco:SecretKey"] = "Yoco__SecretKey",
                 ["Yoco:WebhookSecret"] = "Yoco__WebhookSecret",

@@ -7,7 +7,6 @@ export default async function VerifyEmailPage({ searchParams }: Props) {
   const values = await searchParams;
   return <VerifyEmailResult
     tenantId={Number(first(values.tenantId))}
-    token={first(values.token)}
     userId={Number(first(values.userId))}
     areaName={first(values.area)}
     redirectPath={first(values.redirect)}

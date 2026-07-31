@@ -33,6 +33,14 @@ services:
         value: AqualLifeStyle
       - key: Authentication__JwtBearer__Audience
         value: AqualLifeStyle
+      - key: DataProtection__CertificateBase64
+        sync: false
+      - key: DataProtection__CertificatePassword
+        sync: false
+      - key: DataProtection__PreviousCertificateBase64
+        sync: false
+      - key: DataProtection__PreviousCertificatePassword
+        sync: false
       - key: AQUA_INITIAL_ADMIN_PASSWORD
         sync: false
       - key: App__DefaultTenantName

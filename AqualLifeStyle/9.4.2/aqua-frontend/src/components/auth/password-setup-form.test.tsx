@@ -82,4 +82,22 @@ describe("PasswordSetupForm", () => {
     expect(screen.getByRole("link", { name: "Continue to sign in" }))
       .toHaveAttribute("href", "/login?area=Johannesburg&redirect=%2Fprofile");
   });
+
+  it("reads an emailed reset token from the fragment and removes it from browser history", async () => {
+    window.history.replaceState(null, "", "/reset-password?tenantId=7&userId=42#token=fragment-token");
+    vi.mocked(completePasswordReset).mockResolvedValue({ ok: true });
+    render(<PasswordSetupForm areaName="Johannesburg" tenantId={7} userId={42} />);
+
+    expect(window.location.hash).toBe("");
+    fireEvent.change(screen.getByLabelText("New password"), { target: { value: "CustomerChosen123!" } });
+    fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "CustomerChosen123!" } });
+    fireEvent.click(screen.getByRole("button", { name: "Set password" }));
+
+    await waitFor(() => expect(completePasswordReset).toHaveBeenCalledWith(
+      7,
+      42,
+      "fragment-token",
+      "CustomerChosen123!",
+    ));
+  });
 });

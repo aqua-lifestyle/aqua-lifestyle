@@ -211,6 +211,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
             var tenantId = customer.TenantId.Value;
             using (CurrentUnitOfWork.SetTenantId(tenantId))
             {
+                var originalSecurityStamp = customer.User.SecurityStamp;
                 await _customerProfileUpdater.UpdateAsync(customer, new AdminCustomerProfileUpdate
                 {
                     FirstName = input.FirstName, LastName = input.LastName, Email = input.Email,
@@ -218,6 +219,14 @@ namespace AqualLifeStyle.Application.Admin.Customers
                     MembershipId = input.MembershipId, IsActive = input.IsActive
                 });
                 await CurrentUnitOfWork.SaveChangesAsync();
+                if (customer.User.IsActive &&
+                    !customer.User.IsEmailConfirmed &&
+                    !string.Equals(originalSecurityStamp, customer.User.SecurityStamp, StringComparison.Ordinal))
+                {
+                    await ScheduleVerificationIfRequiredAsync(
+                        customer,
+                        "admin-profile-change:" + customer.User.SecurityStamp);
+                }
             }
 
             LogAdminMutation("Customer", "updated", customer.Id, tenantId, input.Justification);

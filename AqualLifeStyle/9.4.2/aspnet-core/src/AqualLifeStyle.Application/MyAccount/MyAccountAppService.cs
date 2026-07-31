@@ -35,6 +35,8 @@ namespace AqualLifeStyle.Application.MyAccount
         {
             if (input == null)
                 throw new UserFriendlyException("Profile update failed.", "The request was empty.");
+            if (string.IsNullOrWhiteSpace(input.EmailAddress))
+                throw new UserFriendlyException("Profile update failed.", "Email address is required.");
 
             var customer = await GetCurrentCustomerAsync();
             if (!string.Equals(

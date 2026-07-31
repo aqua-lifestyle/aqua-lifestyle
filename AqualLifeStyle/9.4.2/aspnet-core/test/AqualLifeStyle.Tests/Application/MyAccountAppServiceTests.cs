@@ -184,5 +184,26 @@ namespace AqualLifeStyle.Tests.Application
                 user.IsEmailConfirmed.ShouldBeTrue();
             });
         }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        public async Task Profile_BlankEmail_IsRejectedAsMissing(string emailAddress)
+        {
+            var service = new MyAccountAppService(null, null);
+            var error = await Should.ThrowAsync<UserFriendlyException>(() =>
+                service.UpdateProfileAsync(new UpdateMyProfileInput
+                {
+                    FirstName = "Updated",
+                    Surname = "Customer",
+                    EmailAddress = emailAddress,
+                    ContactNumber = "+27 82 123 4567",
+                    HomeAddress = "25 New Home Avenue, Johannesburg"
+                }));
+
+            error.Details.ShouldContain("required");
+            error.Details.ShouldNotContain("verification");
+        }
     }
 }

@@ -257,6 +257,33 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task PendingTerminalAlert_IsRecoveredWithoutRetryingDelivery()
+        {
+            var message = CreateMessage("recover-terminal-alert");
+            for (var attempt = 0; attempt < TransactionalEmailOutboxMessage.MaxDeliveryAttempts; attempt++)
+            {
+                message.StartAttempt(Guid.NewGuid(), DateTime.UtcNow);
+                message.RecordFailure("Delivery failed.", DateTime.UtcNow.AddMinutes(-1));
+            }
+            await UsingDbContextAsync(1, async context =>
+            {
+                context.TransactionalEmailOutboxMessages.Add(message);
+                await context.SaveChangesAsync();
+            });
+
+            await _processor.ProcessPendingAsync();
+
+            await _deliveryGateway.DidNotReceive().SendAsync(
+                Arg.Any<TransactionalEmail>(), Arg.Any<CancellationToken>());
+            await UsingDbContextAsync(1, async context =>
+            {
+                var persisted = await context.TransactionalEmailOutboxMessages.SingleAsync(item => item.Id == message.Id);
+                persisted.Status.ShouldBe(TransactionalEmailStatus.Failed);
+                persisted.TerminalAlertEmittedAt.ShouldNotBeNull();
+            });
+        }
+
+        [Fact]
         public void Backoff_ReachesAndRetainsTheSixtyMinuteCeiling()
         {
             var method = typeof(TransactionalEmailOutboxProcessor).GetMethod(

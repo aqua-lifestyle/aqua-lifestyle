@@ -6,6 +6,12 @@ const projectRoot = dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   output: process.env.VERCEL ? undefined : "standalone",
+  async headers() {
+    return [{
+      source: "/(.*)",
+      headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+    }];
+  },
   turbopack: {
     root: projectRoot,
   },

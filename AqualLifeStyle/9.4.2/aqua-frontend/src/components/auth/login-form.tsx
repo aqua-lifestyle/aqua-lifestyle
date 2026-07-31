@@ -275,7 +275,9 @@ export const LoginForm = () => {
             ) : null}
             <p className="mt-3 text-center text-sm">
               <LinkButton
-                href={`/forgot-password?area=${encodeURIComponent(selectedWorkspace)}`}
+                href={selectedWorkspace
+                  ? `/forgot-password?area=${encodeURIComponent(selectedWorkspace)}`
+                  : "/forgot-password"}
                 variant="ghost"
               >
                 Forgot your password?

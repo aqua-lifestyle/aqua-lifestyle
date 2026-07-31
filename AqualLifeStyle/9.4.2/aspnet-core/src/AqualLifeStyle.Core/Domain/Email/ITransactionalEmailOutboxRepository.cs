@@ -19,5 +19,7 @@ namespace AqualLifeStyle.Domain.Email
             Guid processingToken,
             DateTime now,
             DateTime staleBefore);
+        Task<IReadOnlyList<TransactionalEmailOutboxMessage>> GetPendingTerminalAlertsAsync(int maximumCount);
+        Task MarkTerminalAlertEmittedAsync(Guid messageId, DateTime emittedAt);
     }
 }

@@ -21,6 +21,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityConfigurations
             builder.Property(message => message.ProcessingToken);
             builder.HasIndex(message => message.IdempotencyKey).IsUnique();
             builder.HasIndex(message => new { message.Status, message.NextAttemptAt });
+            builder.HasIndex(message => new { message.Status, message.TerminalAlertEmittedAt });
         }
     }
 }

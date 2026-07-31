@@ -27,6 +27,8 @@ namespace AqualLifeStyle.Web.Host.Email
         {
             if (mail.To.Count != 1)
                 throw new InvalidOperationException("Bird transactional email requires exactly one recipient.");
+            if (mail.CC.Count > 0 || mail.Bcc.Count > 0)
+                throw new InvalidOperationException("Bird transactional email does not support CC or Bcc recipients.");
             var body = mail.Body ?? string.Empty;
             await _gateway.SendAsync(new TransactionalEmail(
                 mail.To.Single().Address,

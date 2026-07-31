@@ -51,6 +51,10 @@ services:
       Authentication__JwtBearer__SecurityKey: ${JWT_SECURITY_KEY:?Set JWT_SECURITY_KEY in .env}
       Authentication__JwtBearer__Issuer: ${JWT_ISSUER:-AqualLifeStyle}
       Authentication__JwtBearer__Audience: ${JWT_AUDIENCE:-AqualLifeStyle}
+      DataProtection__CertificateBase64: ${DATA_PROTECTION_CERTIFICATE_BASE64:?Set DATA_PROTECTION_CERTIFICATE_BASE64 in .env}
+      DataProtection__CertificatePassword: ${DATA_PROTECTION_CERTIFICATE_PASSWORD:?Set DATA_PROTECTION_CERTIFICATE_PASSWORD in .env}
+      DataProtection__PreviousCertificateBase64: ${DATA_PROTECTION_PREVIOUS_CERTIFICATE_BASE64:-}
+      DataProtection__PreviousCertificatePassword: ${DATA_PROTECTION_PREVIOUS_CERTIFICATE_PASSWORD:-}
       Yoco__SecretKey: ${YOCO_SECRET_KEY:?Set YOCO_SECRET_KEY in .env}
       Yoco__WebhookSecret: ${YOCO_WEBHOOK_SECRET:?Set YOCO_WEBHOOK_SECRET in .env}
       Yoco__Mode: ${YOCO_MODE:-test}

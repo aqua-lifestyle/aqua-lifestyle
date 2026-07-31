@@ -150,6 +150,8 @@ describe("LoginForm", () => {
     expect(
       await screen.findByRole("link", { name: "Resend verification email" }),
     ).toHaveAttribute("href", "/verify-email-sent?area=Default");
+    expect(screen.getByRole("link", { name: "Forgot your password?" }))
+      .toHaveAttribute("href", "/forgot-password?area=Default");
   });
 
   it("does not offer Area verification for platform administration", async () => {
@@ -162,6 +164,8 @@ describe("LoginForm", () => {
     expect(
       screen.queryByRole("link", { name: "Resend verification email" }),
     ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Forgot your password?" }))
+      .toHaveAttribute("href", "/forgot-password");
   });
 
   it("calls login from auth-service and sets session after successful submit", async () => {

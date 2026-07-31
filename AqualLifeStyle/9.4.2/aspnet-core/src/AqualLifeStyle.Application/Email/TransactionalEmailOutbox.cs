@@ -90,7 +90,6 @@ namespace AqualLifeStyle.Email
                 var processingToken = Guid.NewGuid();
                 TransactionalEmailOutboxMessage claimed;
                 var claimedAt = DateTime.UtcNow;
-                TransactionalEmailOutboxMessage terminalFailure = null;
                 using (var unitOfWork = _unitOfWorkManager.Begin(new UnitOfWorkOptions
                 {
                     IsTransactional = true,
@@ -145,22 +144,41 @@ namespace AqualLifeStyle.Email
                             persisted.RecordFailure(
                                 SafeError(deliveryFailure),
                                 DateTime.UtcNow.AddMinutes(BackoffMinutes(persisted.AttemptCount)));
-                            if (persisted.Status == TransactionalEmailStatus.Failed)
-                                terminalFailure = persisted;
                         }
                     }
 
                     await unitOfWork.CompleteAsync();
                 }
 
-                if (terminalFailure != null)
+            }
+
+            await EmitPendingTerminalAlertsAsync();
+        }
+
+        private async Task EmitPendingTerminalAlertsAsync()
+        {
+            IReadOnlyList<TransactionalEmailOutboxMessage> pendingAlerts;
+            using (var unitOfWork = _unitOfWorkManager.Begin(new UnitOfWorkOptions { IsTransactional = false }))
+            using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
+            {
+                pendingAlerts = await _repository.GetPendingTerminalAlertsAsync(CandidateScanSize);
+                await unitOfWork.CompleteAsync();
+            }
+
+            foreach (var failure in pendingAlerts)
+            {
+                // Alert delivery is at-least-once; monitoring deduplicates by OutboxId.
+                _logger.LogError(
+                    "EmailOperationsAlert AlertType=terminal_email_delivery_failed OutboxId={OutboxId} NotificationType={NotificationType} TenantId={TenantId} AttemptCount={AttemptCount}",
+                    failure.Id,
+                    failure.NotificationType,
+                    failure.TenantId,
+                    failure.AttemptCount);
+                using var unitOfWork = _unitOfWorkManager.Begin(new UnitOfWorkOptions { IsTransactional = true });
+                using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
                 {
-                    _logger.LogError(
-                        "EmailOperationsAlert AlertType=terminal_email_delivery_failed OutboxId={OutboxId} NotificationType={NotificationType} TenantId={TenantId} AttemptCount={AttemptCount}",
-                        terminalFailure.Id,
-                        terminalFailure.NotificationType,
-                        terminalFailure.TenantId,
-                        terminalFailure.AttemptCount);
+                    await _repository.MarkTerminalAlertEmittedAsync(failure.Id, DateTime.UtcNow);
+                    await unitOfWork.CompleteAsync();
                 }
             }
         }

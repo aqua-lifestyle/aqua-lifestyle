@@ -1,22 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 
 import { confirmEmail } from "@/src/shared/api/account-email-service";
 import { Button, Card, LinkButton, StatusMessage } from "@/src/shared/ui";
 
-type Props = { areaName?: string; redirectPath?: string; tenantId: number; token: string; userId: number };
+type Props = { areaName?: string; redirectPath?: string; tenantId: number; token?: string; userId: number };
 
 export const VerifyEmailResult = ({ areaName, redirectPath, tenantId, token, userId }: Props) => {
-  const hasValidRequest = tenantId > 0 && userId > 0 && Boolean(token);
-  const [state, setState] = useState<"error" | "idle" | "loading" | "success">(
-    hasValidRequest ? "idle" : "error",
-  );
+  const [linkToken, setLinkToken] = useState(token ?? "");
+  const hasValidRequest = tenantId > 0 && userId > 0 && Boolean(linkToken);
+  const [state, setState] = useState<"error" | "idle" | "loading" | "success">("loading");
+
+  useEffect(() => {
+    const fragmentToken = token ?? new URLSearchParams(window.location.hash.slice(1)).get("token") ?? "";
+    startTransition(() => {
+      setLinkToken(fragmentToken);
+      setState(tenantId > 0 && userId > 0 && Boolean(fragmentToken) ? "idle" : "error");
+    });
+    if (window.location.hash) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  }, [tenantId, token, userId]);
 
   const verifyEmail = async () => {
     if (!hasValidRequest || state === "loading") return;
     setState("loading");
-    const result = await confirmEmail(tenantId, userId, token);
+    const result = await confirmEmail(tenantId, userId, linkToken);
     setState(result.ok ? "success" : "error");
   };
 

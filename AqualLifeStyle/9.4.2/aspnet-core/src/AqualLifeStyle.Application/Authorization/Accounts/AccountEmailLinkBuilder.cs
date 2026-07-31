@@ -23,13 +23,13 @@ namespace AqualLifeStyle.Authorization.Accounts
             if (string.IsNullOrWhiteSpace(root))
                 throw new InvalidOperationException("The client application address is not configured.");
 
-            var url = $"{root}{path}?tenantId={tenantId}&userId={userId}&token={Uri.EscapeDataString(token)}";
+            var url = $"{root}{path}?tenantId={tenantId}&userId={userId}";
             if (!string.IsNullOrWhiteSpace(areaName))
                 url += "&area=" + Uri.EscapeDataString(areaName);
             var safeRedirect = SafeClientRedirect(redirectPath);
             if (safeRedirect != null)
                 url += "&redirect=" + Uri.EscapeDataString(safeRedirect);
-            return url;
+            return url + "#token=" + Uri.EscapeDataString(token);
         }
 
         private static string SafeClientRedirect(string value)
