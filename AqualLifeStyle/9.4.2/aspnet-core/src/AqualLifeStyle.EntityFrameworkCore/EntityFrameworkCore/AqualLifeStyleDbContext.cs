@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Abp.Zero.EntityFrameworkCore;
 using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
@@ -18,7 +19,8 @@ using AqualLifeStyle.MultiTenancy;
 
 namespace AqualLifeStyle.EntityFrameworkCore
 {
-    public class AqualLifeStyleDbContext : AbpZeroDbContext<Tenant, Role, User, AqualLifeStyleDbContext>
+    public class AqualLifeStyleDbContext
+        : AbpZeroDbContext<Tenant, Role, User, AqualLifeStyleDbContext>, IDataProtectionKeyContext
     {
         public virtual DbSet<Membership> Memberships { get; set; }
         public virtual DbSet<MembershipBenefit> MembershipBenefits { get; set; }
@@ -36,6 +38,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<DirectOnyxCheckoutIntent> DirectOnyxCheckoutIntents { get; set; }
         public virtual DbSet<AQGreenJoiningCheckout> AQGreenJoiningCheckouts { get; set; }
         public virtual DbSet<YocoWebhookReceipt> YocoWebhookReceipts { get; set; }
+        public virtual DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
         public virtual DbSet<TransactionalEmailOutboxMessage> TransactionalEmailOutboxMessages { get; set; }
         public virtual DbSet<AccountEmailThrottle> AccountEmailThrottles { get; set; }
         public virtual DbSet<EntryParticipation> EntryParticipations { get; set; }

@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,7 @@ using Castle.Services.Logging.SerilogIntegration;
 using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Email;
 using AqualLifeStyle.Web.Host.Email;
+using AqualLifeStyle.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Web.Host.Startup
 {
@@ -48,6 +50,9 @@ namespace AqualLifeStyle.Web.Host.Startup
             });
 
             IdentityRegistrar.Register(services);
+            services.AddDataProtection()
+                .SetApplicationName("AqualLifeStyle")
+                .PersistKeysToDbContext<AqualLifeStyleDbContext>();
             AuthConfigurer.Configure(services, _appConfiguration);
 
             services.AddSignalR();

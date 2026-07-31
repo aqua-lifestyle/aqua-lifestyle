@@ -93,6 +93,12 @@ added to Vercel, a `NEXT_PUBLIC_*` variable, source control, screenshots, or
 application logs. The hosted Checkout API does not require a public key in the
 frontend.
 
+Account verification and password-reset tokens use the ASP.NET Data Protection
+key ring persisted in the shared `DataProtectionKeys` database table. The
+Render pre-deploy migrator must complete before API instances start. Preserve
+this table during rollback, backup, restore, and database replacement; deleting
+its rows invalidates every outstanding account email link.
+
 Before deploying the payment branch:
 
 1. Rotate any key that has been pasted into chat, email, an issue, or a terminal
