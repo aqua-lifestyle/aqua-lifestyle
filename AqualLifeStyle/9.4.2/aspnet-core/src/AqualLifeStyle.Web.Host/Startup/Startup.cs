@@ -4,6 +4,9 @@ using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -22,6 +25,7 @@ using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Email;
 using AqualLifeStyle.Web.Host.Email;
 using AqualLifeStyle.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 
 namespace AqualLifeStyle.Web.Host.Startup
 {
@@ -56,6 +60,27 @@ namespace AqualLifeStyle.Web.Host.Startup
             AuthConfigurer.Configure(services, _appConfiguration);
 
             services.AddSignalR();
+            services.Configure<ForwardedHeadersOptions>(options =>
+            {
+                options.ForwardedHeaders = ForwardedHeaders.XForwardedFor |
+                    ForwardedHeaders.XForwardedProto;
+                options.KnownNetworks.Clear();
+                options.KnownProxies.Clear();
+            });
+            services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+                options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        _ => new FixedWindowRateLimiterOptions
+                        {
+                            AutoReplenishment = true,
+                            PermitLimit = 10,
+                            QueueLimit = 0,
+                            Window = TimeSpan.FromMinutes(10)
+                        }));
+            });
 
             // Configure CORS for angular2 UI
             services.AddCors(
@@ -110,6 +135,10 @@ namespace AqualLifeStyle.Web.Host.Startup
             app.UseStaticFiles();
 
             app.UseRouting();
+            app.UseForwardedHeaders();
+            app.UseWhen(
+                context => IsAccountEmailRequest(context.Request.Path),
+                branch => branch.UseRateLimiter());
 
             app.UseAuthentication();
             app.UseAuthorization();
@@ -137,6 +166,12 @@ namespace AqualLifeStyle.Web.Host.Startup
                     .GetManifestResourceStream("AqualLifeStyle.Web.Host.wwwroot.swagger.ui.index.html");
                 options.DisplayRequestDuration(); // Controls the display of the request duration (in milliseconds) for "Try it out" requests.
             }); // URL: /swagger
+        }
+
+        private static bool IsAccountEmailRequest(PathString path)
+        {
+            return path.StartsWithSegments("/api/services/app/Account/ResendEmailVerification") ||
+                   path.StartsWithSegments("/api/services/app/Account/RequestPasswordReset");
         }
 
         private void ConfigureSwagger(IServiceCollection services)

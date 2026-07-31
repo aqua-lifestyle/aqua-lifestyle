@@ -99,6 +99,12 @@ Render pre-deploy migrator must complete before API instances start. Preserve
 this table during rollback, backup, restore, and database replacement; deleting
 its rows invalidates every outstanding account email link.
 
+Anonymous resend-verification and password-reset requests are limited to ten
+requests per source address in ten minutes and one accepted email per account
+and purpose every thirty minutes. Preserve Render's forwarding headers so the
+API receives the original client address rather than grouping all traffic under
+the proxy address.
+
 Before deploying the payment branch:
 
 1. Rotate any key that has been pasted into chat, email, an issue, or a terminal

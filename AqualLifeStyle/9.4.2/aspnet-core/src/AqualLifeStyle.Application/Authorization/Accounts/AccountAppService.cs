@@ -256,7 +256,7 @@ namespace AqualLifeStyle.Authorization.Accounts
             var key = $"{purpose}:{tenantId}:{hash}";
             var now = DateTime.UtcNow;
             if (await _emailThrottleRepository.TryAcquireAsync(
-                    key, tenantId, now, now.AddMinutes(5)))
+                    key, tenantId, now, now.AddMinutes(30)))
             {
                 return;
             }
