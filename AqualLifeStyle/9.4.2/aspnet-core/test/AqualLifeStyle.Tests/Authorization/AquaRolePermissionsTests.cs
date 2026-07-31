@@ -82,6 +82,7 @@ namespace AqualLifeStyle.Tests.Authorization
         [InlineData(AquaUserRole.AreaLeader, AquaPermissions.AreaSpaces.Manage)]
         [InlineData(AquaUserRole.AreaLeader, AquaPermissions.Orders.Process)]
         [InlineData(AquaUserRole.AreaLeader, AquaPermissions.Facilitators.Promote)]
+        [InlineData(AquaUserRole.AreaLeader, AquaPermissions.Enquiries.View)]
         [InlineData(AquaUserRole.Facilitator, AquaPermissions.Facilitators.Refer)]
         [InlineData(AquaUserRole.Facilitator, AquaPermissions.Referrals.Create)]
         [InlineData(AquaUserRole.Facilitator, AquaPermissions.Enquiries.Create)]

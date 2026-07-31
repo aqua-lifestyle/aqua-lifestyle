@@ -30,6 +30,7 @@ namespace AqualLifeStyle.Authorization
                     AquaPermissions.Orders.Place,
                     AquaPermissions.Orders.Process,
                     AquaPermissions.Orders.Approve,
+                    AquaPermissions.Enquiries.View,
                     AquaPermissions.Enquiries.Create,
                     AquaPermissions.Enquiries.Update,
                     AquaPermissions.Enquiries.Resolve,
