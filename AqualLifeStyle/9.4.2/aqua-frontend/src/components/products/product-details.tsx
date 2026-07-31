@@ -20,18 +20,6 @@ import {
 } from "@/src/shared/ui";
 import { cn } from "@/src/shared/lib/utils";
 
-type StockStatus = "in-stock" | "low-stock" | "out-of-stock";
-
-const getStockStatus = (product: { id: number; isActive: boolean }): StockStatus => {
-  if (!product.isActive) {
-    return "out-of-stock";
-  }
-  const remainder = Math.abs(product.id) % 3;
-  if (remainder === 0) return "in-stock";
-  if (remainder === 1) return "low-stock";
-  return "out-of-stock";
-};
-
 const getProductPlaceholder = (id: number) => {
   const gradients = [
     "from-blue-400 to-cyan-300",
@@ -41,29 +29,6 @@ const getProductPlaceholder = (id: number) => {
     "from-rose-400 to-pink-300",
   ];
   return gradients[id % gradients.length];
-};
-
-const stockBadgeTone = (status: StockStatus): "success" | "warning" | "error" => {
-  switch (status) {
-    case "in-stock":
-      return "success";
-    case "low-stock":
-      return "warning";
-    case "out-of-stock":
-    default:
-      return "error";
-  }
-};
-
-const stockLabel = (status: StockStatus) => {
-  switch (status) {
-    case "in-stock":
-      return "In stock";
-    case "low-stock":
-      return "Low stock";
-    case "out-of-stock":
-      return "Out of stock";
-  }
 };
 
 const formatCurrency = (amount: number) =>
@@ -83,8 +48,6 @@ const ProductOverview = ({
   membershipName: string;
   product: { id: number; isActive: boolean; name: string; price: number };
 }) => {
-  const status = getStockStatus(product);
-
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
@@ -95,11 +58,6 @@ const ProductOverview = ({
           )}
         >
           <span className="text-6xl font-bold">{product.name.charAt(0).toUpperCase()}</span>
-          <div className="absolute right-4 top-4">
-            <Badge className="bg-white/90 text-foreground" tone={stockBadgeTone(status)}>
-              {stockLabel(status)}
-            </Badge>
-          </div>
         </div>
       </div>
 
@@ -151,16 +109,9 @@ const ProductOverview = ({
   );
 };
 
-const ProductPricing = ({
-  product,
-}: {
-  product: { id: number; isActive: boolean; price: number };
-}) => {
-  const status = getStockStatus(product);
-
+const ProductPricing = ({ product }: { product: { price: number } }) => {
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card>
+      <Card className="max-w-2xl">
         <h2 className="text-lg font-semibold">Pricing</h2>
         <p className="text-sm text-muted-foreground">
           Standard list price and reserved price tracking.
@@ -172,26 +123,6 @@ const ProductPricing = ({
           </p>
         </div>
       </Card>
-
-      <Card>
-        <h2 className="text-lg font-semibold">Inventory snapshot</h2>
-        <p className="text-sm text-muted-foreground">
-          Stock status is currently derived from the product record.
-        </p>
-        <div className="mt-6 flex items-center gap-3">
-          <div className="rounded-full bg-accent/10 p-3 text-accent">
-            <span className="text-sm font-bold">SKU</span>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Reserved SKU</p>
-            <p className="font-mono text-lg font-semibold">PRD-{product.id.toString().padStart(5, "0")}</p>
-          </div>
-        </div>
-        <div className="mt-4">
-          <Badge tone={stockBadgeTone(status)}>{stockLabel(status)}</Badge>
-        </div>
-      </Card>
-    </div>
   );
 };
 
@@ -253,7 +184,7 @@ export const ProductDetails = ({ productId }: ProductDetailsProps) => {
             />
             <h1 className="mt-2 text-3xl font-bold tracking-tight">Product details</h1>
             <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-              View product information, stock status, and customer access.
+              View product information, pricing, and customer access.
             </p>
           </div>
           <LinkButton href="/products" variant="outline">
@@ -290,7 +221,7 @@ export const ProductDetails = ({ productId }: ProductDetailsProps) => {
               {
                 content: <ProductPricing product={selectedProduct} />,
                 id: "pricing",
-                label: "Pricing & inventory",
+                label: "Pricing",
               },
               {
                 content: <ProductEligibility membershipName={membershipName} />,

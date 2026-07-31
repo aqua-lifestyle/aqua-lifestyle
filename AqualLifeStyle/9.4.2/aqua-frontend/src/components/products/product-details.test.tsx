@@ -135,14 +135,15 @@ describe("ProductDetails", () => {
     expect(screen.getByText("Paddle")).toBeInTheDocument();
     expect(screen.getByText(/R\s*300[,.]00/)).toBeInTheDocument();
     expect(screen.getAllByText("Open to all").length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText(/stock|inventory/i)).not.toBeInTheDocument();
   });
 
   it("switches tabs", () => {
     render(<ProductDetails productId={3} />);
 
-    expect(screen.getByText("Pricing & inventory")).toBeInTheDocument();
+    expect(screen.getByText("Pricing")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Pricing & inventory" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
     expect(screen.getByText("List price")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Eligibility" }));

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Product } from "@/src/providers/Products/context";
@@ -107,9 +107,16 @@ describe("PublicCatalog", () => {
     expect(screen.getByText("No products available.")).toBeDefined();
   });
 
-  it("renders the stock status filter", () => {
+  it("filters by catalog availability without claiming inventory levels", () => {
     render(<PublicCatalog />);
 
-    expect(screen.getByLabelText("Stock Status")).toBeDefined();
+    expect(screen.queryByText(/stock/i)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Catalog availability"), {
+      target: { value: "available" },
+    });
+
+    expect(screen.getByText("Product A")).toBeInTheDocument();
+    expect(screen.queryByText("Product B")).not.toBeInTheDocument();
   });
 });

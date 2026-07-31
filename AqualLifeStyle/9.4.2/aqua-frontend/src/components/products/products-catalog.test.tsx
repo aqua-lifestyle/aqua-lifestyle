@@ -114,7 +114,7 @@ describe("ProductsCatalog", () => {
     expect(getMemberships).toHaveBeenCalled();
   });
 
-  it("renders product cards and stock summary", () => {
+  it("renders product cards and truthful catalog availability", () => {
     render(<ProductsCatalog />);
     const totalCard = screen.getByText("Total products").closest("article");
     expect(totalCard).toBeInTheDocument();
@@ -123,17 +123,18 @@ describe("ProductsCatalog", () => {
     expect(screen.getByText("Kayak")).toBeInTheDocument();
     expect(screen.getByText("Paddle")).toBeInTheDocument();
     expect(screen.getByText("Wetsuit")).toBeInTheDocument();
+    expect(screen.queryByText(/stock/i)).not.toBeInTheDocument();
   });
 
-  it("filters products by stock status", () => {
+  it("filters products by catalog availability", () => {
     render(<ProductsCatalog />);
 
-    fireEvent.change(screen.getByLabelText("Stock status"), {
-      target: { value: "in-stock" },
+    fireEvent.change(screen.getByLabelText("Catalog availability"), {
+      target: { value: "available" },
     });
 
+    expect(screen.getByText("Kayak")).toBeInTheDocument();
     expect(screen.getByText("Paddle")).toBeInTheDocument();
-    expect(screen.queryByText("Kayak")).not.toBeInTheDocument();
     expect(screen.queryByText("Wetsuit")).not.toBeInTheDocument();
   });
 

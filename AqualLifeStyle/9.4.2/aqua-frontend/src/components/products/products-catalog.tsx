@@ -28,21 +28,6 @@ import {
 } from "@/src/shared/ui";
 import { cn } from "@/src/shared/lib/utils";
 
-type StockStatus = "in-stock" | "low-stock" | "out-of-stock";
-
-const getStockStatus = (product: {
-  id: number;
-  isActive: boolean;
-}): StockStatus => {
-  if (!product.isActive) {
-    return "out-of-stock";
-  }
-  const remainder = Math.abs(product.id) % 3;
-  if (remainder === 0) return "in-stock";
-  if (remainder === 1) return "low-stock";
-  return "out-of-stock";
-};
-
 const getProductPlaceholder = (id: number) => {
   const gradients = [
     "from-blue-400 to-cyan-300",
@@ -52,29 +37,6 @@ const getProductPlaceholder = (id: number) => {
     "from-rose-400 to-pink-300",
   ];
   return gradients[id % gradients.length];
-};
-
-const stockBadgeTone = (status: StockStatus): "success" | "warning" | "error" => {
-  switch (status) {
-    case "in-stock":
-      return "success";
-    case "low-stock":
-      return "warning";
-    case "out-of-stock":
-    default:
-      return "error";
-  }
-};
-
-const stockLabel = (status: StockStatus) => {
-  switch (status) {
-    case "in-stock":
-      return "In stock";
-    case "low-stock":
-      return "Low stock";
-    case "out-of-stock":
-      return "Out of stock";
-  }
 };
 
 const formatCurrency = (amount: number) =>
@@ -115,12 +77,10 @@ export const ProductsCatalog = () => {
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
-      const stock = getStockStatus(product);
       const matchesStatus =
         statusFilter === "all" ||
-        (statusFilter === "in-stock" && stock === "in-stock") ||
-        (statusFilter === "low-stock" && stock === "low-stock") ||
-        (statusFilter === "out-of-stock" && stock === "out-of-stock");
+        (statusFilter === "available" && product.isActive) ||
+        (statusFilter === "unavailable" && !product.isActive);
 
       const matchesMembership =
         membershipFilter === "all" ||
@@ -131,15 +91,8 @@ export const ProductsCatalog = () => {
     });
   }, [membershipFilter, products, statusFilter]);
 
-  const inStockCount = products.filter(
-    (p) => getStockStatus(p) === "in-stock",
-  ).length;
-  const lowStockCount = products.filter(
-    (p) => getStockStatus(p) === "low-stock",
-  ).length;
-  const outOfStockCount = products.filter(
-    (p) => getStockStatus(p) === "out-of-stock",
-  ).length;
+  const availableCount = products.filter((product) => product.isActive).length;
+  const unavailableCount = products.length - availableCount;
 
   const tableColumns = [
     {
@@ -147,7 +100,6 @@ export const ProductsCatalog = () => {
       key: "name",
       render: (product: typeof filteredProducts[number]) => {
         const gradient = getProductPlaceholder(product.id);
-        const status = getStockStatus(product);
 
         return (
           <div className="flex items-center gap-3">
@@ -159,12 +111,7 @@ export const ProductsCatalog = () => {
             >
               {product.name.charAt(0).toUpperCase()}
             </div>
-            <div>
-              <p className="font-semibold text-foreground">{product.name}</p>
-              <Badge tone={stockBadgeTone(status)} className="mt-0.5">
-                {stockLabel(status)}
-              </Badge>
-            </div>
+            <p className="font-semibold text-foreground">{product.name}</p>
           </div>
         );
       },
@@ -189,11 +136,11 @@ export const ProductsCatalog = () => {
       sortable: true,
     },
     {
-      header: "Status",
+      header: "Catalog availability",
       key: "isActive",
       render: (product: typeof filteredProducts[number]) => (
         <Badge tone={product.isActive ? "success" : "neutral"}>
-          {product.isActive ? "Active" : "Inactive"}
+          {product.isActive ? "Available" : "Unavailable"}
         </Badge>
       ),
       sortable: true,
@@ -231,7 +178,7 @@ export const ProductsCatalog = () => {
           </LinkButton>
         </header>
 
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-3">
           <Card className="flex items-center gap-4">
             <div className="rounded-full bg-accent/10 p-3 text-accent">
               <Package className="size-6" />
@@ -246,8 +193,8 @@ export const ProductsCatalog = () => {
               <Package className="size-6" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">In stock</p>
-              <p className="text-2xl font-bold">{inStockCount}</p>
+              <p className="text-sm text-muted-foreground">Available</p>
+              <p className="text-2xl font-bold">{availableCount}</p>
             </div>
           </Card>
           <Card className="flex items-center gap-4">
@@ -255,17 +202,8 @@ export const ProductsCatalog = () => {
               <Package className="size-6" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Low stock</p>
-              <p className="text-2xl font-bold">{lowStockCount}</p>
-            </div>
-          </Card>
-          <Card className="flex items-center gap-4">
-            <div className="rounded-full bg-error/10 p-3 text-error">
-              <Package className="size-6" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Out of stock</p>
-              <p className="text-2xl font-bold">{outOfStockCount}</p>
+              <p className="text-sm text-muted-foreground">Unavailable</p>
+              <p className="text-2xl font-bold">{unavailableCount}</p>
             </div>
           </Card>
         </section>
@@ -287,15 +225,14 @@ export const ProductsCatalog = () => {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <SelectField
-                  label="Stock status"
+                  label="Catalog availability"
                   name="statusFilter"
                   onChange={(event) => setStatusFilter(event.target.value)}
                   value={statusFilter}
                 >
-                  <option value="all">All stock</option>
-                  <option value="in-stock">In stock</option>
-                  <option value="low-stock">Low stock</option>
-                  <option value="out-of-stock">Out of stock</option>
+                  <option value="all">All products</option>
+                  <option value="available">Available</option>
+                  <option value="unavailable">Unavailable</option>
                 </SelectField>
                 <SelectField
                   label="Access tier"
@@ -360,7 +297,6 @@ export const ProductsCatalog = () => {
                 ) : (
                   filteredProducts.map((product) => {
                     const gradient = getProductPlaceholder(product.id);
-                    const status = getStockStatus(product);
 
                     return (
                       <div
@@ -379,9 +315,9 @@ export const ProductsCatalog = () => {
                           <div className="absolute left-3 top-3">
                             <Badge
                               className="bg-white/90 text-foreground"
-                              tone={stockBadgeTone(status)}
+                              tone={product.isActive ? "success" : "neutral"}
                             >
-                              {stockLabel(status)}
+                              {product.isActive ? "Available" : "Unavailable"}
                             </Badge>
                           </div>
                         </div>

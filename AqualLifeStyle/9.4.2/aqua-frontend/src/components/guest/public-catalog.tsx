@@ -20,38 +20,12 @@ import {
   StatusMessage,
 } from "@/src/shared/ui";
 
-type StockStatus = "in-stock" | "low-stock" | "out-of-stock";
-
-const getStockStatus = (product: {
-  id: number;
-  isActive: boolean;
-}): StockStatus => {
-  if (!product.isActive) {
-    return "out-of-stock";
-  }
-  const remainder = Math.abs(product.id) % 3;
-  if (remainder === 0) return "in-stock";
-  if (remainder === 1) return "low-stock";
-  return "out-of-stock";
-};
-
-const stockStatusLabel = (value: StockStatus) => {
-  const labels = {
-    "in-stock": "In Stock",
-    "low-stock": "Low Stock",
-    "out-of-stock": "Out of Stock",
-  };
-  return labels[value];
-};
-
-const stockStatusTone = (value: StockStatus): "success" | "warning" | "error" => {
-  if (value === "in-stock") return "success";
-  if (value === "low-stock") return "warning";
-  return "error";
-};
+type CatalogAvailability = "available" | "unavailable";
 
 export const PublicCatalog = () => {
-  const [stockFilter, setStockFilter] = useState<StockStatus | "all">("all");
+  const [availabilityFilter, setAvailabilityFilter] = useState<
+    CatalogAvailability | "all"
+  >("all");
   const { getProducts } = useProductsActions();
   const { errorMessage, isError, isPending, products } =
     useProductsState();
@@ -62,11 +36,13 @@ export const PublicCatalog = () => {
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
-      const matchesStock =
-        stockFilter === "all" || getStockStatus(product) === stockFilter;
-      return matchesStock;
+      return (
+        availabilityFilter === "all" ||
+        (availabilityFilter === "available" && product.isActive) ||
+        (availabilityFilter === "unavailable" && !product.isActive)
+      );
     });
-  }, [products, stockFilter]);
+  }, [availabilityFilter, products]);
 
   const tableColumns = [
     {
@@ -86,21 +62,11 @@ export const PublicCatalog = () => {
       sortable: true,
     },
     {
-      header: "Status",
+      header: "Catalog availability",
       key: "isActive",
       render: (product: typeof filteredProducts[number]) => (
         <Badge tone={product.isActive ? "success" : "error"}>
-          {product.isActive ? "Active" : "Inactive"}
-        </Badge>
-      ),
-      sortable: true,
-    },
-    {
-      header: "Stock",
-      key: "stock",
-      render: (product: typeof filteredProducts[number]) => (
-        <Badge tone={stockStatusTone(getStockStatus(product))}>
-          {stockStatusLabel(getStockStatus(product))}
+          {product.isActive ? "Available" : "Unavailable"}
         </Badge>
       ),
       sortable: true,
@@ -149,17 +115,18 @@ export const PublicCatalog = () => {
           <Card className="flex flex-col gap-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <SelectField
-                label="Stock Status"
-                name="stockFilter"
+                label="Catalog availability"
+                name="availabilityFilter"
                 onChange={(event) =>
-                  setStockFilter(event.target.value as StockStatus | "all")
+                  setAvailabilityFilter(
+                    event.target.value as CatalogAvailability | "all",
+                  )
                 }
-                value={stockFilter}
+                value={availabilityFilter}
               >
-                <option value="all">All statuses</option>
-                <option value="in-stock">In Stock</option>
-                <option value="low-stock">Low Stock</option>
-                <option value="out-of-stock">Out of Stock</option>
+                <option value="all">All products</option>
+                <option value="available">Available</option>
+                <option value="unavailable">Unavailable</option>
               </SelectField>
             </div>
 
