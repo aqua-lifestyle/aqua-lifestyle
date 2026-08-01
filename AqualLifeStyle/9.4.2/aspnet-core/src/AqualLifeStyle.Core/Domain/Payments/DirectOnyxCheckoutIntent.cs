@@ -71,6 +71,12 @@ namespace AqualLifeStyle.Domain.Payments
             ParticipationId = participationId;
         }
 
+        public void RecordProviderFailure(DateTime failedAt, string providerEvidence) =>
+            Terminate(HostedPaymentCheckoutStatus.Failed, failedAt, providerEvidence);
+
+        public void RecordProviderExpiry(DateTime expiredAt, string providerEvidence) =>
+            Terminate(HostedPaymentCheckoutStatus.Expired, expiredAt, providerEvidence);
+
         public OnyxPlanTerms RestoreTerms() => OnyxPlanTerms.Create(
             TermsVersion,
             TermsEffectiveFrom,

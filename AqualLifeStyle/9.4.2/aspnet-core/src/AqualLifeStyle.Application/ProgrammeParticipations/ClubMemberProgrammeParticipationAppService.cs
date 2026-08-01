@@ -87,7 +87,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             var directOnyxCheckout = await _directOnyxCheckoutIntentRepository.FirstOrDefaultAsync(
                 intent =>
                     intent.CustomerId == customer.Id &&
-                    intent.Status != HostedPaymentCheckoutStatus.Completed);
+                    (intent.Status == HostedPaymentCheckoutStatus.PreparingCheckout ||
+                     intent.Status == HostedPaymentCheckoutStatus.AwaitingPayment));
             AQGreenJoiningCheckout aqGreenCheckout = null;
             if (entry != null)
             {
@@ -367,7 +368,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         "No additional Onyx payment is required through this joining flow.");
 
                 intent = await _directOnyxCheckoutIntentRepository.FirstOrDefaultAsync(
-                    checkout => checkout.CustomerId == customer.Id);
+                    checkout => checkout.CustomerId == customer.Id &&
+                                (checkout.Status == HostedPaymentCheckoutStatus.PreparingCheckout ||
+                                 checkout.Status == HostedPaymentCheckoutStatus.AwaitingPayment));
                 if (intent == null)
                 {
                     var membership = await GetCurrentOnyxMembershipAsync(customer.TenantId.Value);

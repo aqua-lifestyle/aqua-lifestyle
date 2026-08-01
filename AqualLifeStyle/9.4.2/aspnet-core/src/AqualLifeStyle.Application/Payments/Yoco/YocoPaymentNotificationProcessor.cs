@@ -142,7 +142,19 @@ namespace AqualLifeStyle.Payments.Yoco
                 {
                     if (isFailed)
                     {
-                        if (checkout.Programme == YocoCheckoutProgramme.AQGreen)
+                        if (checkout.Programme == YocoCheckoutProgramme.Onyx)
+                        {
+                            var onyxCheckout = await _onyxCheckoutRepository.GetAsync(
+                                checkout.ReferenceId);
+                            if (onyxCheckout.Status == HostedPaymentCheckoutStatus.PreparingCheckout)
+                                throw new YocoWebhookTransientException(
+                                    "The Onyx checkout is not yet ready for terminal provider evidence.");
+                            if (onyxCheckout.Status == HostedPaymentCheckoutStatus.AwaitingPayment)
+                                onyxCheckout.RecordProviderFailure(
+                                    confirmedAt,
+                                    $"Signed Yoco payment.failed event {notification.EventId.Trim()}");
+                        }
+                        else if (checkout.Programme == YocoCheckoutProgramme.AQGreen)
                         {
                             var aqGreenCheckout = await _aqGreenCheckoutRepository.GetAsync(
                                 checkout.ReferenceId);

@@ -92,5 +92,33 @@ namespace AqualLifeStyle.Tests.Domain
             Should.Throw<InvalidOperationException>(() =>
                 intent.Complete(paymentId, participationId2, completedAt));
         }
+
+        [Fact]
+        public void ProviderFailure_IsTerminalAndRejectsLateCompletion()
+        {
+            var intent = DirectOnyxCheckoutIntent.Create(
+                tenantId: 1,
+                customerId: 10,
+                recruiterCustomerId: null,
+                inviteCode: null,
+                onyxMembershipId: 5,
+                OnyxPlanTerms.Create("2026-07", new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc), 6120m),
+                new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc));
+            intent.RecordCheckout(
+                "checkout_failed",
+                "https://payments.example.test/checkout_failed",
+                new DateTime(2026, 7, 1, 1, 0, 0, DateTimeKind.Utc));
+
+            intent.RecordProviderFailure(
+                new DateTime(2026, 7, 1, 2, 0, 0, DateTimeKind.Utc),
+                "Signed provider failure");
+
+            intent.Status.ShouldBe(HostedPaymentCheckoutStatus.Failed);
+            intent.TerminalEvidence.ShouldBe("Signed provider failure");
+            Should.Throw<InvalidOperationException>(() => intent.Complete(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                new DateTime(2026, 7, 1, 3, 0, 0, DateTimeKind.Utc)));
+        }
     }
 }

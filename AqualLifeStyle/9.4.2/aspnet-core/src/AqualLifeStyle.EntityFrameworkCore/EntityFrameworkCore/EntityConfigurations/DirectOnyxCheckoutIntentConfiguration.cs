@@ -29,7 +29,9 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
                 .HasMaxLength(DirectOnyxCheckoutIntent.MaxCheckoutUrlLength);
             builder.Property(intent => intent.CreatedAt).IsRequired();
 
-            builder.HasIndex(intent => new { intent.TenantId, intent.CustomerId }).IsUnique();
+            builder.HasIndex(intent => new { intent.TenantId, intent.CustomerId })
+                .IsUnique()
+                .HasFilter("\"Status\" IN (0, 1, 2)");
             builder.HasIndex(intent => intent.ProviderCheckoutId).IsUnique();
             builder.HasIndex(intent => intent.PaymentId).IsUnique();
             builder.HasIndex(intent => intent.ParticipationId).IsUnique();

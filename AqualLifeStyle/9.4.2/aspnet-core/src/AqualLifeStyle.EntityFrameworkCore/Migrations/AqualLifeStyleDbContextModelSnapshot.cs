@@ -3575,7 +3575,8 @@ namespace AqualLifeStyle.Migrations
                     b.HasIndex("RecruiterCustomerId");
 
                     b.HasIndex("TenantId", "CustomerId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"Status\" IN (0, 1, 2)");
 
                     b.ToTable("DirectOnyxCheckoutIntents", (string)null);
                 });

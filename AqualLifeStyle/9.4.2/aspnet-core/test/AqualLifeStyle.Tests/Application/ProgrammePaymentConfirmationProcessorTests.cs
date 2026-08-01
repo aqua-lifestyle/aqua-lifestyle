@@ -736,6 +736,80 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task SignedFailedYocoNotification_TerminatesDirectOnyxCheckoutWithoutPayment()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"onyx-failed-{suffix}",
+                $"onyx-failed-{suffix}@example.com");
+            var checkoutId = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "Onyx Failed Payment Test",
+                    new EmailAddress($"onyx-failed-customer-{suffix}@example.com"));
+                var membership = Membership.Create(
+                    1,
+                    $"Onyx-failed-{suffix}",
+                    "Onyx failed payment test plan",
+                    MembershipType.Onyx);
+                context.Customers.Add(customer);
+                context.Memberships.Add(membership);
+                await context.SaveChangesAsync();
+
+                var checkout = DirectOnyxCheckoutIntent.Create(
+                    1,
+                    customer.Id,
+                    null,
+                    null,
+                    membership.Id,
+                    OnyxPlanTerms.Create("2026-07", EffectiveFrom, 6120m),
+                    EffectiveFrom);
+                checkout.RecordCheckout(
+                    $"ch_onyx_failed_{suffix}",
+                    $"https://payments.example.test/ch_onyx_failed_{suffix}",
+                    EffectiveFrom);
+                context.DirectOnyxCheckoutIntents.Add(checkout);
+                await context.SaveChangesAsync();
+                return checkout.Id;
+            });
+
+            var persistedCheckout = await UsingDbContextAsync(1, context =>
+                context.DirectOnyxCheckoutIntents.SingleAsync(item => item.Id == checkoutId));
+            var notification = CreateNotification(
+                $"evt_onyx_failed_{suffix}",
+                $"pay_onyx_failed_{suffix}",
+                persistedCheckout.ProviderCheckoutId,
+                612000);
+            notification.EventType = "payment.failed";
+
+            var processor = Resolve<YocoPaymentNotificationProcessor>();
+            await processor.ProcessAsync(notification);
+            await processor.ProcessAsync(notification);
+
+            var lateSuccess = CreateNotification(
+                $"evt_onyx_late_success_{suffix}",
+                $"pay_onyx_late_success_{suffix}",
+                persistedCheckout.ProviderCheckoutId,
+                612000);
+            await Should.ThrowAsync<YocoWebhookValidationException>(() =>
+                processor.ProcessAsync(lateSuccess));
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var checkout = await context.DirectOnyxCheckoutIntents.SingleAsync(
+                    item => item.Id == checkoutId);
+                checkout.Status.ShouldBe(HostedPaymentCheckoutStatus.Failed);
+                checkout.TerminalEvidence.ShouldContain(notification.EventId);
+                (await context.MemberPayments.AnyAsync()).ShouldBeFalse();
+                (await context.OnyxParticipations.AnyAsync()).ShouldBeFalse();
+                (await context.YocoWebhookReceipts.CountAsync()).ShouldBe(1);
+            });
+        }
+
+        [Fact]
         public async Task YocoNotification_UnknownCheckoutRemainsRetryableWithoutReceipt()
         {
             var suffix = Guid.NewGuid().ToString("N");

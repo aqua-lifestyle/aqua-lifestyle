@@ -585,6 +585,44 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task DirectOnyxCheckout_AuthoritativeFailureAllowsOneNewCheckout()
+        {
+            var customerId = await RegisterAndSignInCustomerAsync();
+            await _participationService.CreateDirectOnyxCheckoutAsync(
+                new CreateDirectOnyxCheckoutInput());
+
+            var failedCheckoutId = await UsingDbContextAsync(1, async context =>
+            {
+                var checkout = await context.DirectOnyxCheckoutIntents.SingleAsync(item =>
+                    item.CustomerId == customerId);
+                checkout.RecordProviderFailure(
+                    DateTime.UtcNow,
+                    "Authoritative provider failure for retry test");
+                await context.SaveChangesAsync();
+                return checkout.Id;
+            });
+
+            await _participationService.CreateDirectOnyxCheckoutAsync(
+                new CreateDirectOnyxCheckoutInput());
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var attempts = await context.DirectOnyxCheckoutIntents
+                    .Where(item => item.CustomerId == customerId)
+                    .ToListAsync();
+                attempts.Count.ShouldBe(2);
+                attempts.Single(item => item.Id == failedCheckoutId).Status.ShouldBe(
+                    HostedPaymentCheckoutStatus.Failed);
+                attempts.Count(item =>
+                    item.Status == HostedPaymentCheckoutStatus.AwaitingPayment).ShouldBe(1);
+                (await context.OnyxParticipations.AnyAsync(item =>
+                    item.CustomerId == customerId)).ShouldBeFalse();
+                (await context.MemberPayments.AnyAsync(item =>
+                    item.CustomerId == customerId)).ShouldBeFalse();
+            });
+        }
+
+        [Fact]
         public async Task AQGreenCheckout_ActivatesOnlyAfterTwoDistinctVerifiedInstalments()
         {
             var customerId = await RegisterAndSignInCustomerAsync();

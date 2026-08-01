@@ -12,6 +12,10 @@ namespace AqualLifeStyle.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
+                name: "IX_DirectOnyxCheckoutIntents_TenantId_CustomerId",
+                table: "DirectOnyxCheckoutIntents");
+
+            migrationBuilder.DropIndex(
                 name: "IX_AQGreenJoiningCheckouts_ParticipationId",
                 table: "AQGreenJoiningCheckouts");
 
@@ -182,6 +186,13 @@ namespace AqualLifeStyle.Migrations
                 """);
 
             migrationBuilder.CreateIndex(
+                name: "IX_DirectOnyxCheckoutIntents_TenantId_CustomerId",
+                table: "DirectOnyxCheckoutIntents",
+                columns: new[] { "TenantId", "CustomerId" },
+                unique: true,
+                filter: "\"Status\" IN (0, 1, 2)");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_OnyxGraduationDecisions_EntryParticipationId",
                 table: "OnyxGraduationDecisions",
                 column: "EntryParticipationId",
@@ -265,6 +276,16 @@ namespace AqualLifeStyle.Migrations
             migrationBuilder.DropColumn(
                 name: "TerminatedByAdministratorUserId",
                 table: "AQGreenJoiningCheckouts");
+
+            migrationBuilder.DropIndex(
+                name: "IX_DirectOnyxCheckoutIntents_TenantId_CustomerId",
+                table: "DirectOnyxCheckoutIntents");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_DirectOnyxCheckoutIntents_TenantId_CustomerId",
+                table: "DirectOnyxCheckoutIntents",
+                columns: new[] { "TenantId", "CustomerId" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_AQGreenJoiningCheckouts_ParticipationId",

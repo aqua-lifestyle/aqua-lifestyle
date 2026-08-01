@@ -4,6 +4,8 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using AqualLifeStyle.Domain.Enums;
+using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.EntityFrameworkCore;
@@ -257,6 +259,68 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 .Where(c => c.TenantId == 1)
                 .Select(c => c.Id)
                 .FirstAsync();
+        }
+
+        [Fact]
+        public async Task Database_AllowsDirectOnyxRetryOnlyAfterTerminalFailure()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToLatestAsync();
+            var customerId = await GetTenantOneCustomerIdAsync();
+            var createdAt = DateTime.UtcNow;
+
+            await using var context = CreateDbContext();
+            var membership = Membership.Create(
+                1,
+                "Onyx retry index test",
+                "Onyx retry index test plan",
+                MembershipType.Onyx);
+            context.Memberships.Add(membership);
+            await context.SaveChangesAsync();
+
+            var failedAttempt = DirectOnyxCheckoutIntent.Create(
+                1,
+                customerId,
+                null,
+                null,
+                membership.Id,
+                OnyxPlanTerms.Create("retry-index-2026-08", createdAt, 6120m),
+                createdAt);
+            failedAttempt.RecordCheckout(
+                "ch_onyx_retry_failed",
+                "https://payments.example.test/ch_onyx_retry_failed",
+                createdAt.AddSeconds(1));
+            failedAttempt.RecordProviderFailure(
+                createdAt.AddSeconds(2),
+                "Signed provider failure");
+            context.DirectOnyxCheckoutIntents.Add(failedAttempt);
+            await context.SaveChangesAsync();
+
+            var retry = DirectOnyxCheckoutIntent.Create(
+                1,
+                customerId,
+                null,
+                null,
+                membership.Id,
+                OnyxPlanTerms.Create("retry-index-2026-08", createdAt, 6120m),
+                createdAt.AddSeconds(3));
+            context.DirectOnyxCheckoutIntents.Add(retry);
+            await context.SaveChangesAsync();
+
+            var competingAttempt = DirectOnyxCheckoutIntent.Create(
+                1,
+                customerId,
+                null,
+                null,
+                membership.Id,
+                OnyxPlanTerms.Create("retry-index-2026-08", createdAt, 6120m),
+                createdAt.AddSeconds(4));
+            context.DirectOnyxCheckoutIntents.Add(competingAttempt);
+
+            var exception = await Should.ThrowAsync<DbUpdateException>(
+                () => context.SaveChangesAsync());
+            exception.InnerException.ShouldBeOfType<PostgresException>()
+                .SqlState.ShouldBe(PostgresErrorCodes.UniqueViolation);
         }
 
         [Fact]
