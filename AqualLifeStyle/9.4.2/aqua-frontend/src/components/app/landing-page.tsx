@@ -117,7 +117,11 @@ const ChapterMarker = ({
 
 export const LandingPage = () => (
   <>
-    <main className="overflow-x-clip bg-aqua-canvas text-aqua-ink">
+    <main
+      className="scroll-mt-16 overflow-x-clip bg-aqua-canvas text-aqua-ink focus:outline-none"
+      id="main-content"
+      tabIndex={-1}
+    >
       <section
         aria-labelledby="landing-title"
         className="relative min-h-[calc(100svh-4rem)] overflow-hidden bg-aqua-canvas"
@@ -134,7 +138,7 @@ export const LandingPage = () => (
 
           <div className="my-auto py-16 sm:py-20">
             <h1
-              className="font-serif text-5xl font-normal leading-[0.92] tracking-[-0.045em] sm:text-[clamp(4rem,8.6vw,8.5rem)] sm:leading-[0.86]"
+              className="font-aqua-display text-5xl font-normal leading-[0.92] tracking-[-0.045em] sm:text-[clamp(4rem,8.6vw,8.5rem)] sm:leading-[0.86]"
               id="landing-title"
             >
               <span className="block">Live in health.</span>
@@ -144,7 +148,7 @@ export const LandingPage = () => (
             </h1>
           </div>
 
-          <div className="grid gap-8 border-t border-aqua-line pt-8 lg:grid-cols-12 lg:items-end">
+          <div className="grid gap-8 border-t border-aqua-line pt-8 lg:grid-cols-12 lg:items-center lg:gap-10">
             <div className="lg:col-span-5">
               <p className="max-w-lg text-lg leading-8 text-aqua-muted">
                 A place where wellbeing, participation and local connection belong
@@ -186,7 +190,7 @@ export const LandingPage = () => (
             ["03", "Possibility", "Distinct paths let every next step remain clear."],
           ].map(([number, title, body]) => (
             <div
-              className="group border-b border-aqua-line py-10 last:border-b-0 md:border-b-0 md:border-r md:px-8 md:first:pl-0 md:last:border-r-0 md:last:pr-0"
+              className="group border-b border-aqua-line py-8 transition-colors last:border-b-0 hover:bg-aqua-canvas/60 md:border-b-0 md:border-r md:px-8 md:py-10 md:first:pl-0 md:last:border-r-0 md:last:pr-0"
               key={number}
             >
               <div className="flex items-start justify-between gap-6">
@@ -203,7 +207,7 @@ export const LandingPage = () => (
         </div>
       </section>
 
-      <section aria-labelledby="welcome-title" className="relative overflow-hidden bg-aqua-cream" id="welcome">
+      <section aria-labelledby="welcome-title" className="relative scroll-mt-16 overflow-hidden bg-aqua-cream" id="welcome">
         <svg
           aria-hidden="true"
           className="absolute inset-x-0 bottom-0 h-44 w-full text-aqua-violet/10 sm:h-56"
@@ -214,11 +218,11 @@ export const LandingPage = () => (
           <path d="M-120 170 Q 240 70 600 170 T 1320 170 T 2040 170" fill="none" stroke="currentColor" strokeWidth="1" />
           <path d="M-40 220 Q 320 120 680 220 T 1400 220 T 2120 220" fill="none" stroke="currentColor" strokeWidth="1" />
         </svg>
-        <div className={`${landingContainerClassName} relative grid gap-16 py-24 sm:py-32 lg:grid-cols-12 lg:items-end lg:py-40`}>
+        <div className={`${landingContainerClassName} relative grid gap-12 py-20 sm:gap-16 sm:py-24 lg:grid-cols-12 lg:items-end lg:py-32`}>
           <div className="lg:col-span-8">
-            <ChapterMarker index="00">Welcome</ChapterMarker>
+            <ChapterMarker index="01">Welcome</ChapterMarker>
             <h2
-              className="mt-10 max-w-5xl font-serif text-5xl font-normal leading-[0.98] tracking-[-0.04em] text-balance sm:text-6xl lg:text-7xl"
+              className="font-aqua-display mt-10 max-w-5xl text-5xl font-normal leading-[0.98] tracking-[-0.04em] text-balance sm:text-6xl lg:text-7xl"
               id="welcome-title"
             >
               Wellbeing begins with space.
@@ -233,12 +237,12 @@ export const LandingPage = () => (
         </div>
       </section>
 
-      <section aria-labelledby="problem-title" className="bg-aqua-navy text-white" id="story">
-        <div className={`${landingContainerClassName} relative py-24 sm:py-32 lg:py-40`}>
+      <section aria-labelledby="problem-title" className="scroll-mt-16 bg-aqua-navy text-white" id="story">
+        <div className={`${landingContainerClassName} relative py-20 sm:py-24 lg:py-32`}>
           <span aria-hidden="true" className="absolute right-8 top-8 font-mono text-[11rem] leading-none text-white/[0.025] sm:text-[18rem]">
-            01
+            02
           </span>
-          <ChapterMarker index="01" light>A better welcome</ChapterMarker>
+          <ChapterMarker index="02" light>A better welcome</ChapterMarker>
           <div className="relative mt-16 grid gap-12 lg:grid-cols-12 lg:items-end">
             <h2
               className="text-5xl font-semibold leading-[0.98] tracking-[-0.05em] text-balance sm:text-6xl lg:col-span-8 lg:text-7xl"
@@ -259,9 +263,9 @@ export const LandingPage = () => (
         className="scroll-mt-24 bg-aqua-canvas"
         id="solution"
       >
-        <div className={`${landingContainerClassName} grid gap-16 py-24 sm:py-32 lg:grid-cols-12 lg:py-40`}>
+        <div className={`${landingContainerClassName} grid gap-12 py-20 sm:gap-16 sm:py-24 lg:grid-cols-12 lg:py-32`}>
           <div className="self-start lg:sticky lg:top-28 lg:col-span-5">
-            <ChapterMarker index="02">The experience</ChapterMarker>
+            <ChapterMarker index="03">The experience</ChapterMarker>
             <h2
               className="mt-8 text-4xl font-semibold leading-[1.02] tracking-[-0.045em] text-balance sm:text-5xl lg:text-6xl"
               id="solution-title"
@@ -277,7 +281,7 @@ export const LandingPage = () => (
           <div className="lg:col-span-6 lg:col-start-7">
             {discoveryMoments.map((moment, index) => (
               <article
-                className="flex min-h-[24rem] flex-col justify-between border-t border-aqua-line py-10 first:border-t-0 first:pt-0 lg:min-h-[30rem] lg:py-16"
+                className="flex min-h-[18rem] flex-col justify-between border-t border-aqua-line py-10 first:border-t-0 first:pt-0 sm:min-h-[20rem] lg:min-h-[24rem] lg:py-12"
                 key={moment.title}
               >
                 <div className="flex items-start justify-between gap-8">
@@ -305,10 +309,10 @@ export const LandingPage = () => (
         className="scroll-mt-24 border-y border-aqua-line bg-aqua-surface"
         id="products"
       >
-        <div className={`${landingContainerClassName} py-24 sm:py-32 lg:py-40`}>
+        <div className={`${landingContainerClassName} py-20 sm:py-24 lg:py-32`}>
           <div className="grid gap-12 lg:grid-cols-12">
             <div className="lg:col-span-4">
-              <ChapterMarker index="03">Products</ChapterMarker>
+              <ChapterMarker index="04">Products</ChapterMarker>
               <h2
                 className="mt-8 text-4xl font-semibold leading-[1.04] tracking-[-0.045em] sm:text-5xl"
                 id="products-title"
@@ -328,7 +332,7 @@ export const LandingPage = () => (
             <div className="lg:col-span-7 lg:col-start-6">
               {["Water products", "Spraythz", "Health sets"].map((product, index) => (
                 <Link
-                  className="group flex min-h-36 items-center justify-between gap-6 border-b border-aqua-line py-8 first:border-t sm:min-h-44"
+                  className="group flex min-h-32 items-center justify-between gap-6 border-b border-aqua-line px-4 py-7 transition-colors first:border-t hover:bg-aqua-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aqua-violet sm:min-h-40"
                   href="/catalog"
                   key={product}
                 >
@@ -338,7 +342,7 @@ export const LandingPage = () => (
                       {product}
                     </h3>
                   </div>
-                  <PackageSearch aria-hidden="true" className="size-5 shrink-0 text-aqua-violet" strokeWidth={1.75} />
+                  <PackageSearch aria-hidden="true" className="size-5 shrink-0 text-aqua-violet transition-transform duration-200 motion-safe:group-hover:translate-x-1" strokeWidth={1.75} />
                 </Link>
               ))}
             </div>
@@ -351,8 +355,8 @@ export const LandingPage = () => (
         className="scroll-mt-24 bg-aqua-navy text-white"
         id="programmes"
       >
-        <div className={`${landingContainerClassName} pt-24 sm:pt-32 lg:pt-40`}>
-          <ChapterMarker index="04" light>Participation</ChapterMarker>
+        <div className={`${landingContainerClassName} pt-20 sm:pt-24 lg:pt-32`}>
+          <ChapterMarker index="05" light>Participation</ChapterMarker>
           <div className="mt-8 grid gap-8 pb-16 lg:grid-cols-12 lg:items-end lg:pb-20">
             <h2
               className="text-4xl font-semibold leading-[1.04] tracking-[-0.045em] sm:text-5xl lg:col-span-7 lg:text-6xl"
@@ -371,11 +375,11 @@ export const LandingPage = () => (
           <div className={`${landingContainerClassName} grid lg:grid-cols-3`}>
             {participationOptions.map((option, index) => (
               <article
-                className="flex min-h-80 flex-col justify-between border-b border-white/10 py-10 last:border-b-0 sm:min-h-96 lg:min-h-[34rem] lg:border-b-0 lg:border-r lg:px-10 lg:first:pl-0 lg:last:border-r-0 lg:last:pr-0"
+                className="group flex min-h-72 flex-col justify-between border-b border-white/10 py-10 transition-colors last:border-b-0 hover:bg-white/[0.025] sm:min-h-80 lg:min-h-[28rem] lg:border-b-0 lg:border-r lg:px-10 lg:first:pl-0 lg:last:border-r-0 lg:last:pr-0"
                 key={option.title}
               >
                 <div className="flex items-start justify-between">
-                  <option.icon aria-hidden="true" className="size-8 text-aqua-gold" strokeWidth={1.5} />
+                  <option.icon aria-hidden="true" className="size-8 text-aqua-gold transition-transform duration-200 motion-safe:group-hover:-translate-y-0.5" strokeWidth={1.5} />
                   <span className="font-mono text-xs text-white/65">0{index + 1}</span>
                 </div>
                 <div>
@@ -394,8 +398,8 @@ export const LandingPage = () => (
       </section>
 
       <section aria-labelledby="benefits-title" className="bg-aqua-cream">
-        <div className={`${landingContainerClassName} py-24 sm:py-32 lg:py-40`}>
-          <ChapterMarker index="05">What clarity changes</ChapterMarker>
+        <div className={`${landingContainerClassName} py-20 sm:py-24 lg:py-32`}>
+          <ChapterMarker index="06">What clarity changes</ChapterMarker>
           <h2 className="sr-only" id="benefits-title">Benefits of a clearer experience</h2>
           <div className="mt-16 space-y-2 text-[clamp(2.3rem,6vw,6.5rem)] font-semibold leading-[0.98] tracking-[-0.055em]">
             <p className="text-aqua-ink">Room to breathe.</p>
@@ -415,10 +419,10 @@ export const LandingPage = () => (
         className="scroll-mt-24 bg-aqua-surface"
         id="how-it-works"
       >
-        <div className={`${landingContainerClassName} py-24 sm:py-32 lg:py-40`}>
+        <div className={`${landingContainerClassName} py-20 sm:py-24 lg:py-32`}>
           <div className="grid gap-12 lg:grid-cols-12 lg:items-end">
             <div className="lg:col-span-5">
-              <ChapterMarker index="06">The route</ChapterMarker>
+              <ChapterMarker index="07">The route</ChapterMarker>
               <h2
                 className="mt-8 text-4xl font-semibold leading-[1.04] tracking-[-0.045em] sm:text-5xl"
                 id="journey-title"
@@ -447,13 +451,13 @@ export const LandingPage = () => (
       </section>
 
       <section aria-labelledby="community-title" className="scroll-mt-24 overflow-hidden bg-aqua-lavender" id="community">
-        <div className={`${landingContainerClassName} relative py-24 sm:py-32 lg:py-40`}>
+        <div className={`${landingContainerClassName} relative py-20 sm:py-24 lg:py-32`}>
           <span aria-hidden="true" className="absolute -right-4 top-10 text-[10rem] font-semibold leading-none tracking-[-0.08em] text-aqua-violet/[0.055] sm:text-[17rem] lg:text-[24rem]">
             LOCAL
           </span>
           <div className="relative grid gap-16 lg:grid-cols-12 lg:items-end">
             <div className="lg:col-span-7">
-              <ChapterMarker index="07">Community</ChapterMarker>
+              <ChapterMarker index="08">Community</ChapterMarker>
               <h2
                 className="mt-8 text-5xl font-semibold leading-[0.98] tracking-[-0.05em] text-balance sm:text-6xl lg:text-7xl"
                 id="community-title"
@@ -479,10 +483,10 @@ export const LandingPage = () => (
         </div>
       </section>
 
-      <section aria-labelledby="faq-title" className="bg-aqua-canvas" id="faq">
-        <div className={`${landingContainerClassName} grid gap-16 py-24 sm:py-32 lg:grid-cols-12 lg:py-40`}>
+      <section aria-labelledby="faq-title" className="scroll-mt-16 bg-aqua-canvas" id="faq">
+        <div className={`${landingContainerClassName} grid gap-12 py-20 sm:gap-16 sm:py-24 lg:grid-cols-12 lg:py-32`}>
           <div className="lg:col-span-4">
-            <ChapterMarker index="08">Questions</ChapterMarker>
+            <ChapterMarker index="09">Questions</ChapterMarker>
             <h2
               className="mt-8 text-4xl font-semibold leading-[1.04] tracking-[-0.045em] sm:text-5xl"
               id="faq-title"
@@ -498,7 +502,7 @@ export const LandingPage = () => (
           <div className="border-t border-aqua-line lg:col-span-7 lg:col-start-6">
             {faqs.map((faq, index) => (
               <details className="group border-b border-aqua-line" key={faq.question}>
-                <summary className="flex min-h-24 cursor-pointer list-none items-center justify-between gap-6 py-6 font-semibold marker:content-none">
+                <summary className="flex min-h-24 cursor-pointer list-none items-center justify-between gap-6 py-6 font-semibold transition-colors marker:content-none hover:text-aqua-violet-dark">
                   <span className="flex items-start gap-5">
                     <span className="hidden font-mono text-xs text-aqua-muted sm:inline">0{index + 1}</span>
                     {faq.question}
@@ -517,7 +521,7 @@ export const LandingPage = () => (
       </section>
 
       <section aria-labelledby="join-title" className="bg-aqua-navy text-white">
-        <div className={`${landingContainerClassName} py-24 sm:py-32 lg:py-40`}>
+        <div className={`${landingContainerClassName} py-20 sm:py-24 lg:py-32`}>
           <div className="grid gap-12 lg:grid-cols-12 lg:items-end">
             <div className="lg:col-span-8">
               <LandingEyebrow light>The next chapter</LandingEyebrow>

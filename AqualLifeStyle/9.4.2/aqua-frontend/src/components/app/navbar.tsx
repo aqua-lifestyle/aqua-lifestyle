@@ -149,7 +149,7 @@ export const Navbar = () => {
       {isLanding ? (
         <a
           className="sr-only z-50 rounded-aqua-control bg-aqua-surface px-4 py-3 font-semibold text-aqua-ink focus:not-sr-only focus:absolute focus:left-4 focus:top-3"
-          href="#landing-title"
+          href="#main-content"
         >
           Skip to main content
         </a>
