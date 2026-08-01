@@ -7,7 +7,6 @@ import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import type { ProgrammeCheckout } from "@/src/shared/domain/programme-participations";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 import { Button, Dialog, StatusMessage } from "@/src/shared/ui";
-import { AQGreenPaymentSchedule } from "./aqgreen-payment-schedule";
 
 type Programme = "AQGreen" | "Onyx";
 
@@ -23,7 +22,6 @@ export const JoinProgrammeDialog = ({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
-  const [aqGreenSchedule, setAQGreenSchedule] = useState<0 | 1>(0);
 
   const close = () => {
     if (submitting) return;
@@ -46,7 +44,7 @@ export const JoinProgrammeDialog = ({
           { schedule: 0 | 1 }
         >(
           apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
-          { schedule: aqGreenSchedule },
+          { schedule: 0 },
         );
         navigateToExternalUrl(checkout.checkoutUrl);
       } else {
@@ -80,17 +78,9 @@ export const JoinProgrammeDialog = ({
         <form className="flex flex-col gap-5" onSubmit={submit}>
           <div className="rounded-lg bg-muted/60 p-4 text-sm text-muted-foreground">
             {programme === "AQGreen"
-              ? "AQGreen joining costs R1,200. Choose one full payment or two R600 instalments. Participation activates only after the full joining fee is verified."
+              ? "AQGreen joining requires one full payment of R1,200. Participation activates only after Yoco verifies the payment."
               : "Joining Onyx directly requires one full payment of R6,120. AQGreen participation is not required."}
           </div>
-
-          {programme === "AQGreen" ? (
-            <AQGreenPaymentSchedule
-              disabled={submitting}
-              onChange={setAQGreenSchedule}
-              value={aqGreenSchedule}
-            />
-          ) : null}
 
           <div className="rounded-lg border border-border p-4">
             <p className="font-medium">Start my own network</p>

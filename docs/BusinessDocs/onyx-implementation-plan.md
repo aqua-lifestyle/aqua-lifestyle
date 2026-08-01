@@ -18,8 +18,8 @@ rules below.
 - Direct entrants create an Onyx participation only after a confirmed R6,120
   payment.
 - AQGreen entrants create a separate AQGreen participation and activate only after
-  either one verified R1,200 joining payment or two distinct verified R600 joining
-  instalments.
+  one verified R1,200 joining payment. The R600 monthly commitment is separate
+  from the joining payment.
 - AQGreen Level 2 makes the loan agreement available. Member acceptance followed
   by administrator approval makes the agreement effective. Creation of the
   separate Onyx participation uses independent placement: the graduate has no
@@ -53,8 +53,7 @@ administrator correction.
 
 The current AQGreen terms are:
 
-- joining obligation: R1,200, paid either in full or as two distinct R600 joining
-  instalments;
+- joining obligation: one R1,200 payment;
 - monthly commitment: R600;
 - grace period: seven days;
 - complete Level 1 component: R150;
@@ -165,8 +164,9 @@ The persistence and provider-neutral confirmation foundation is complete:
   recruiter eligibility, and provider-reference idempotency before atomically
   creating or activating programme state. AQGreen placement exists before payment,
   but it becomes active only after the verified R1,200 joining total. An active
-  hosted checkout temporarily locks its full-payment or two-instalment schedule;
-  the first verified payment locks that schedule permanently.
+  hosted checkout locks the full-payment schedule. A historical participant with
+  one verified R600 joining instalment may complete that preserved obligation;
+  the verified payment history is not rewritten.
 
 ### Phase 3 obligation status
 

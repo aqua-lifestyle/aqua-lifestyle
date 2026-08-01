@@ -11,9 +11,9 @@ describe("parseSystemHealth", () => {
       version: "1.0.0",
       buildId: "abc123",
       imageId: "image-1",
-      paymentContractVersion: "aqua-payments-2026-08-01",
+      paymentContractVersion: "aqua-payments-2026-08-01-single-payment",
       contractCapabilities: [
-        "aqgreen-joining-schedules-v1",
+        "aqgreen-single-payment-v1",
         "direct-onyx-checkout-v1",
       ],
       releaseDate: "2026-07-09T00:00:00Z",

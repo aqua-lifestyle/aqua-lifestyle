@@ -9,11 +9,11 @@ namespace AqualLifeStyle.Web.Host.Models
     /// </summary>
     public static class DeploymentMetadata
     {
-        public const string PaymentContractVersion = "aqua-payments-2026-08-01";
+        public const string PaymentContractVersion = "aqua-payments-2026-08-01-single-payment";
 
         public static readonly IReadOnlyList<string> ContractCapabilities = new[]
         {
-            "aqgreen-joining-schedules-v1",
+            "aqgreen-single-payment-v1",
             "direct-onyx-checkout-v1",
             "admin-onyx-graduation-v1",
             "admin-checkout-recovery-v1"

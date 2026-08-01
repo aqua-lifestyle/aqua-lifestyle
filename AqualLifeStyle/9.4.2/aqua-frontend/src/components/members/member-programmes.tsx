@@ -31,7 +31,6 @@ import {
   StatusMessage,
 } from "@/src/shared/ui";
 import { JoinProgrammeDialog } from "./join-programme-dialog";
-import { AQGreenPaymentSchedule } from "./aqgreen-payment-schedule";
 
 const VIEW_PERMISSION = "Aqua.ProgrammeParticipations.ViewSelf";
 
@@ -184,7 +183,6 @@ export const MemberProgrammes = () => {
   const [actionError, setActionError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [startingAQGreenPayment, setStartingAQGreenPayment] = useState(false);
-  const [aqGreenSchedule, setAQGreenSchedule] = useState<0 | 1>(0);
   const [accessRefreshFinished, setAccessRefreshFinished] = useState(false);
   const accessRefreshAttempted = useRef(false);
   const contractCheckAttempted = useRef(false);
@@ -266,8 +264,13 @@ export const MemberProgrammes = () => {
     return () => window.clearTimeout(task);
   }, []);
 
-  const startAQGreenPayment = async (schedule: 0 | 1) => {
+  const startAQGreenPayment = async () => {
     if (paymentActionsUnavailable) return;
+    const schedule =
+      participations?.entry?.joiningSchedule === 1 &&
+      (participations.entry.joiningPaidAmount ?? 0) > 0
+        ? 1
+        : 0;
     setStartingAQGreenPayment(true);
     setActionError(undefined);
     try {
@@ -381,19 +384,10 @@ export const MemberProgrammes = () => {
                     )
                   ) : (
                     <div className="flex flex-col gap-4">
-                      {participations.entry.joiningSchedule == null ? (
-                        <AQGreenPaymentSchedule
-                          disabled={startingAQGreenPayment}
-                          onChange={setAQGreenSchedule}
-                          value={aqGreenSchedule}
-                        />
-                      ) : null}
                       <Button
                         disabled={paymentActionsUnavailable}
                         isLoading={startingAQGreenPayment}
-                        onClick={() => void startAQGreenPayment(
-                          participations.entry?.joiningSchedule ?? aqGreenSchedule,
-                        )}
+                        onClick={() => void startAQGreenPayment()}
                       >
                         Pay {formatCurrency(
                           participations.entry.nextPaymentAmount ??

@@ -61,11 +61,10 @@ shown as an operational error instead of an unusable payment journey.
 6. Create fresh test customers and programme records.
 7. Verify checkout creation for:
    - one R1,200 AQGreen joining payment;
-   - the first R600 AQGreen joining instalment;
    - one full R6,120 direct-Onyx joining payment.
 8. Verify a repeated request reuses the persisted checkout URL, an in-progress
-   request cannot start another provider checkout, and a competing AQGreen
-   schedule remains blocked.
+   request cannot start another provider checkout, and an unsupported AQGreen
+   instalment request is rejected without creating payment state.
 9. Follow each hosted checkout return route and confirm the UI still says that
    secure confirmation is pending and programme state has not advanced.
 10. With fresh AQGreen data, test administrator recovery as described below.
@@ -128,7 +127,7 @@ not be rewritten or charged automatically.
 A real Yoco test webhook secret and a separately authorised test webhook are
 required before claiming end-to-end verification of signatures, successful or
 failed provider events, provider delivery duplication, payment allocation,
-schedule locking after verified payment, AQGreen or Onyx activation,
+AQGreen or Onyx activation,
 commission/entitlement release, or payment-driven progression.
 
 The exact real `payment.failed` payload remains unverified until Yoco supplies a
