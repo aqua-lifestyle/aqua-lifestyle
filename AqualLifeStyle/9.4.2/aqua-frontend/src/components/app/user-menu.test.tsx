@@ -46,7 +46,7 @@ describe("UserMenu", () => {
     );
 
     expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
-    expect(screen.getByRole("link", { name: "Sign up" })).toHaveAttribute("href", "/signup");
+    expect(screen.getByRole("link", { name: "Create account" })).toHaveAttribute("href", "/signup");
   });
 
   it("renders the user name and a sign-out button when authenticated", () => {
@@ -61,6 +61,7 @@ describe("UserMenu", () => {
 
     expect(screen.getByText("Jane Doe")).toBeInTheDocument();
     expect(screen.getByText("jane@example.com")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open user menu" }));
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
   });
 
@@ -73,9 +74,29 @@ describe("UserMenu", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open user menu" }));
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
     expect(screen.getByRole("link", { name: "Sign in" })).toBeInTheDocument();
     expect(replace).toHaveBeenCalledWith("/login");
+  });
+
+  it("closes the user menu with Escape", () => {
+    render(
+      <AuthProvider>
+        <SetSession />
+        <UserMenu />
+      </AuthProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    const trigger = screen.getByRole("button", { name: "Open user menu" });
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveFocus();
+    expect(screen.queryByLabelText("User menu")).not.toBeInTheDocument();
   });
 });
