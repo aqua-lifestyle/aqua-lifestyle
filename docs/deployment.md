@@ -137,6 +137,9 @@ Before deploying the payment branch:
    `https://aqualifestyle-api.onrender.com/api/payments/yoco/webhook`. The Yoco
    registration response returns a `whsec_` verification secret only once;
    save it directly into the secret store.
+   TEMPORARY: test-mode checkout creation may proceed before this step is complete,
+   but every webhook is rejected and no payment is confirmed automatically.
+   TODO: Remove this exception once webhook registration is complete.
 4. In the Render service Environment page, set `Yoco__SecretKey` to the test
    secret, `Yoco__WebhookSecret` to the returned webhook secret, and
    `Yoco__Mode` to `test`. The Blueprint marks both secret values `sync: false`,

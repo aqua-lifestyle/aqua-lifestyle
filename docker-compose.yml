@@ -56,7 +56,8 @@ services:
       DataProtection__PreviousCertificateBase64: ${DATA_PROTECTION_PREVIOUS_CERTIFICATE_BASE64:-}
       DataProtection__PreviousCertificatePassword: ${DATA_PROTECTION_PREVIOUS_CERTIFICATE_PASSWORD:-}
       Yoco__SecretKey: ${YOCO_SECRET_KEY:?Set YOCO_SECRET_KEY in .env}
-      Yoco__WebhookSecret: ${YOCO_WEBHOOK_SECRET:?Set YOCO_WEBHOOK_SECRET in .env}
+      # TODO: Make YOCO_WEBHOOK_SECRET required again once webhook registration is complete.
+      Yoco__WebhookSecret: ${YOCO_WEBHOOK_SECRET:-}
       Yoco__Mode: ${YOCO_MODE:-test}
       Bird__Enabled: ${BIRD_ENABLED:-false}
       Bird__ApiKey: ${BIRD_API_KEY:-}
