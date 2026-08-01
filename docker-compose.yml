@@ -56,9 +56,12 @@ services:
       DataProtection__PreviousCertificateBase64: ${DATA_PROTECTION_PREVIOUS_CERTIFICATE_BASE64:-}
       DataProtection__PreviousCertificatePassword: ${DATA_PROTECTION_PREVIOUS_CERTIFICATE_PASSWORD:-}
       Yoco__SecretKey: ${YOCO_SECRET_KEY:?Set YOCO_SECRET_KEY in .env}
-      # TODO: Make YOCO_WEBHOOK_SECRET required again once webhook registration is complete.
+      # Test mode may omit this; webhook requests then fail closed with 503.
       Yoco__WebhookSecret: ${YOCO_WEBHOOK_SECRET:-}
       Yoco__Mode: ${YOCO_MODE:-test}
+      Deployment__BuildId: ${DEPLOYMENT_BUILD_ID:-local-compose}
+      Deployment__ImageId: ${DEPLOYMENT_IMAGE_ID:-}
+      Deployment__EnvironmentId: ${DEPLOYMENT_ENVIRONMENT_ID:-local-disposable}
       Bird__Enabled: ${BIRD_ENABLED:-false}
       Bird__ApiKey: ${BIRD_API_KEY:-}
       Bird__FromEmail: ${BIRD_FROM_EMAIL:-}

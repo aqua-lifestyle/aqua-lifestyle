@@ -133,20 +133,17 @@ Before deploying the payment branch:
    transcript shared with another person.
 2. In the Yoco App, open the Checkout API integration and copy a new **Test
    secret key**. Test keys begin with `sk_test_`.
-3. Register one test webhook for
+3. For checkout-only testing, set `Yoco__SecretKey` to the test secret and
+   `Yoco__Mode` to `test`. `Yoco__WebhookSecret` may remain absent; every webhook
+   is then rejected before its body is read and no payment is confirmed.
+4. Under separate authorisation, register one test webhook for
    `https://aqualifestyle-api.onrender.com/api/payments/yoco/webhook`. The Yoco
-   registration response returns a `whsec_` verification secret only once;
-   save it directly into the secret store.
-   TEMPORARY: test-mode checkout creation may proceed before this step is complete,
-   but every webhook is rejected and no payment is confirmed automatically.
-   TODO: Remove this exception once webhook registration is complete.
-4. In the Render service Environment page, set `Yoco__SecretKey` to the test
-   secret, `Yoco__WebhookSecret` to the returned webhook secret, and
-   `Yoco__Mode` to `test`. The Blueprint marks both secret values `sync: false`,
-   so Git never contains them.
-5. Sync the Blueprint and deploy. Complete a payment with Yoco's published test
-   card details, then verify that exactly one active Onyx participation, one
-   payment ledger entry, and one completed checkout intent exist.
+   registration response returns a `whsec_` verification secret only once; save
+   it directly into the secret store and set `Yoco__WebhookSecret`.
+5. Sync the Blueprint and deploy only when authorised. A hosted checkout and
+   success return do not prove payment confirmation. With a real signed webhook,
+   verify that exactly one participation transition, one payment ledger entry,
+   and one completed checkout exist.
 
 The API rejects a mode/key mismatch: `test` requires `sk_test_`, while `live`
 requires `sk_live_`. A successful browser redirect is not proof of payment;
@@ -154,6 +151,9 @@ only a valid Yoco webhook activates AQGreen or creates and activates the Onyx
 participation and network placement.
 The webhook signature uses the raw body, `webhook-id`, and
 `webhook-timestamp`, and rejects notifications more than three minutes old.
+See `docs/development/payment-testing.md` for the disposable-data test order,
+contract diagnostics, administrator recovery permissions, and the boundary of
+what can be verified without a webhook secret.
 
 For live payments, first verify `https://www.aqualifestyleclub.co.za` in Yoco.
 Create a live webhook, then update all three Render values together to the live
