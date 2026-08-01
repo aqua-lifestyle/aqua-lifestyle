@@ -70,6 +70,22 @@ namespace AqualLifeStyle.Tests.WebHost
             Should.NotThrow(() => DeploymentConfigurationValidator.Validate(services));
         }
 
+        // TODO: Keep live mode fail-closed when removing the temporary test-mode exception.
+        [Fact]
+        public void Validate_InDevelopment_WithLiveModeAndMissingWebhookSecret_ThrowsWithDescriptiveMessage()
+        {
+            var services = BuildServiceProvider("Development", new Dictionary<string, string>
+            {
+                ["Yoco:Mode"] = "live"
+            });
+
+            var ex = Should.Throw<InvalidOperationException>(
+                () => DeploymentConfigurationValidator.Validate(services));
+
+            ex.Message.ShouldContain("Yoco__WebhookSecret");
+            ex.Message.ShouldContain("live");
+        }
+
         [Fact]
         public void Validate_InProduction_WithAllSettingsPresent_DoesNotThrow()
         {
@@ -143,6 +159,34 @@ namespace AqualLifeStyle.Tests.WebHost
             ex.Message.ShouldContain("prefix");
         }
 
+        // TODO: Remove this temporary test-mode exception once webhook registration is complete.
+        [Fact]
+        public void Validate_InProduction_WithTestModeAndMissingWebhookSecret_DoesNotThrow()
+        {
+            var settings = CompleteProductionSettings();
+            settings.Remove("Yoco:WebhookSecret");
+            var services = BuildServiceProvider("Production", settings);
+
+            Should.NotThrow(() => DeploymentConfigurationValidator.Validate(services));
+        }
+
+        // TODO: Keep live mode fail-closed when removing the temporary test-mode exception.
+        [Fact]
+        public void Validate_InProduction_WithLiveModeAndMissingWebhookSecret_ThrowsWithDescriptiveMessage()
+        {
+            var settings = CompleteProductionSettings();
+            settings["Yoco:Mode"] = "live";
+            settings["Yoco:SecretKey"] = "sk_live_safe-test-placeholder";
+            settings.Remove("Yoco:WebhookSecret");
+            var services = BuildServiceProvider("Production", settings);
+
+            var ex = Should.Throw<InvalidOperationException>(
+                () => DeploymentConfigurationValidator.Validate(services));
+
+            ex.Message.ShouldContain("Yoco__WebhookSecret");
+            ex.Message.ShouldContain("live");
+        }
+
         [Fact]
         public void Validate_InProduction_WithNothingConfigured_ListsEveryMissingSetting()
         {
@@ -160,7 +204,6 @@ namespace AqualLifeStyle.Tests.WebHost
             ex.Message.ShouldContain("DataProtection__CertificatePassword");
             ex.Message.ShouldContain("Redis__Configuration");
             ex.Message.ShouldContain("Yoco__SecretKey");
-            ex.Message.ShouldContain("Yoco__WebhookSecret");
             ex.Message.ShouldContain("Yoco__Mode");
             ex.Message.ShouldContain("Bird__Enabled=true");
             ex.Message.ShouldContain("Bird__ApiKey");

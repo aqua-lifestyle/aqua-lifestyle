@@ -13,12 +13,21 @@ namespace AqualLifeStyle.Web.Host.Startup
         public static void Validate(IServiceProvider services)
         {
             var environment = services.GetRequiredService<IWebHostEnvironment>();
+            var configuration = services.GetRequiredService<IConfiguration>();
+
+            // TODO: Require Yoco__WebhookSecret in every mode once webhook registration is complete.
+            if (string.Equals(configuration["Yoco:Mode"]?.Trim(), "live", StringComparison.OrdinalIgnoreCase) &&
+                !IsConfigured(configuration["Yoco:WebhookSecret"]))
+            {
+                throw new InvalidOperationException(
+                    "Yoco configuration is incomplete. Yoco__WebhookSecret is required when Yoco__Mode=live.");
+            }
+
             if (!environment.IsProduction())
             {
                 return;
             }
 
-            var configuration = services.GetRequiredService<IConfiguration>();
             var requiredSettings = new Dictionary<string, string>
             {
                 ["App:ServerRootAddress"] = "App__ServerRootAddress",
@@ -29,7 +38,6 @@ namespace AqualLifeStyle.Web.Host.Startup
                 ["DataProtection:CertificatePassword"] = "DataProtection__CertificatePassword",
                 ["Redis:Configuration"] = "Redis__Configuration",
                 ["Yoco:SecretKey"] = "Yoco__SecretKey",
-                ["Yoco:WebhookSecret"] = "Yoco__WebhookSecret",
                 ["Yoco:Mode"] = "Yoco__Mode"
             };
             var missing = new List<string>();
