@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using AqualLifeStyle.EntityFrameworkCore;
+using AqualLifeStyle.Web.Host.Health;
 using AqualLifeStyle.Web.Host.Models;
 using Abp.Dependency;
 using Abp.EntityFrameworkCore;
@@ -31,6 +32,7 @@ namespace AqualLifeStyle.Web.Host.Controllers
         private readonly IWebHostEnvironment _environment;
         private readonly IConfiguration _configuration;
         private readonly IAbpRedisCacheDatabaseProvider _redisDatabaseProvider;
+        private readonly IDataProtectionKeyStoreReadinessProbe _dataProtectionKeyStoreProbe;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="HealthController"/> class.
@@ -39,16 +41,19 @@ namespace AqualLifeStyle.Web.Host.Controllers
         /// <param name="environment">The current web host environment.</param>
         /// <param name="configuration">The application configuration.</param>
         /// <param name="redisDatabaseProvider">The ABP Redis database provider.</param>
+        /// <param name="dataProtectionKeyStoreProbe">The Data Protection key-store readiness probe.</param>
         public HealthController(
             IDbContextProvider<AqualLifeStyleDbContext> dbContextProvider,
             IWebHostEnvironment environment,
             IConfiguration configuration,
-            IAbpRedisCacheDatabaseProvider redisDatabaseProvider)
+            IAbpRedisCacheDatabaseProvider redisDatabaseProvider,
+            IDataProtectionKeyStoreReadinessProbe dataProtectionKeyStoreProbe)
         {
             _dbContextProvider = dbContextProvider;
             _environment = environment;
             _configuration = configuration;
             _redisDatabaseProvider = redisDatabaseProvider;
+            _dataProtectionKeyStoreProbe = dataProtectionKeyStoreProbe;
         }
 
         /// <summary>
@@ -59,15 +64,23 @@ namespace AqualLifeStyle.Web.Host.Controllers
         public async Task<ActionResult<HealthCheckResponse>> Get()
         {
             var isDatabaseReachable = await IsDatabaseReachable();
+            var isDataProtectionKeyStoreReachable =
+                await _dataProtectionKeyStoreProbe.IsReadyAsync();
             var isRedisConfigured = !string.IsNullOrWhiteSpace(_configuration["Redis:Configuration"]);
             var isRedisReachable = !isRedisConfigured || await IsRedisReachable();
-            var isHealthy = isDatabaseReachable && isRedisReachable;
+            var isHealthy = isDatabaseReachable &&
+                isDataProtectionKeyStoreReachable &&
+                isRedisReachable;
 
             var response = new HealthCheckResponse
             {
                 Status = isHealthy ? HealthyStatus : DegradedStatus,
                 IsDatabaseReachable = isDatabaseReachable,
                 DatabaseStatus = isDatabaseReachable ? HealthyStatus : "Unavailable",
+                IsDataProtectionKeyStoreReachable = isDataProtectionKeyStoreReachable,
+                DataProtectionKeyStoreStatus = isDataProtectionKeyStoreReachable
+                    ? HealthyStatus
+                    : "Unavailable",
                 IsRedisReachable = isRedisReachable,
                 RedisStatus = !isRedisConfigured ? "NotConfigured" : isRedisReachable ? HealthyStatus : "Unavailable",
                 Version = AppVersionHelper.Version,

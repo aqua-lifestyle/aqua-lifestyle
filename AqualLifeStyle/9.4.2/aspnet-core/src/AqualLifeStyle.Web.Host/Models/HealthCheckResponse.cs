@@ -23,6 +23,16 @@ namespace AqualLifeStyle.Web.Host.Models
         public string DatabaseStatus { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether the Data Protection key table is queryable.
+        /// </summary>
+        public bool IsDataProtectionKeyStoreReachable { get; set; }
+
+        /// <summary>
+        /// Gets or sets the Data Protection key-store dependency status.
+        /// </summary>
+        public string DataProtectionKeyStoreStatus { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether the configured Redis cache is reachable.
         /// </summary>
         public bool IsRedisReachable { get; set; }
