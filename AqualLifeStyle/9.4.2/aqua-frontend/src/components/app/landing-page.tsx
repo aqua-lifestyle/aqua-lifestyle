@@ -1,17 +1,10 @@
-import type { LucideIcon } from "lucide-react";
 import {
-  ArrowRight,
+  ArrowDownRight,
   BadgeCheck,
-  CircleCheck,
-  Eye,
-  LayoutDashboard,
   Leaf,
-  ListChecks,
   Network,
   PackageSearch,
-  Search,
   ShieldCheck,
-  SlidersHorizontal,
   Users,
 } from "lucide-react";
 import Image from "next/image";
@@ -19,113 +12,62 @@ import Link from "next/link";
 
 import { LandingAccountActions } from "./landing-account-actions";
 import {
-  LandingBadge,
-  LandingCard,
   LandingEyebrow,
   LandingLinkButton,
-  LandingSectionHeading,
   landingContainerClassName,
-  landingSectionClassName,
 } from "./landing-primitives";
 
-const trustItems = [
+const discoveryMoments = [
   {
-    description: "Browse the public product catalog before signing in.",
-    icon: PackageSearch,
-    title: "Public product discovery",
+    body: "Public information gives you time to understand Aqua before choosing a next step.",
+    label: "Arrive",
+    title: "Take it in at your own pace.",
   },
   {
-    description: "Product visibility and eligibility can reflect membership.",
-    icon: ShieldCheck,
-    title: "Relevant access",
+    body: "See how wellbeing, participation and an area-based community belong to one club without becoming the same thing.",
+    label: "Discover",
+    title: "Notice what connects.",
   },
   {
-    description: "Signed-in customers see information and actions available to their account.",
-    icon: LayoutDashboard,
-    title: "Account-aware portal",
-  },
-];
-
-const solutionItems = [
-  {
-    description:
-      "Start with public information and the product catalog without creating an account.",
-    icon: Search,
-    title: "Explore openly",
-  },
-  {
-    description:
-      "Understand that product access and available actions can depend on membership and account status.",
-    icon: BadgeCheck,
-    title: "See what applies",
-  },
-  {
-    description:
-      "Use the portal to view orders, programme information and account actions available to you.",
-    icon: ListChecks,
-    title: "Continue with context",
+    body: "When you are ready, move toward the products, programmes and account information that apply to you.",
+    label: "Find your place",
+    title: "Move forward with clarity.",
   },
 ];
 
 const participationOptions = [
   {
-    description:
-      "Membership status helps determine eligible products and the account actions available to a customer.",
-    eyebrow: "Club access",
+    body: "Membership status helps determine eligible products and the account actions available to a customer.",
     icon: BadgeCheck,
+    label: "Club access",
     title: "Membership",
-    tone: "warm",
   },
   {
-    description:
-      "AQGreen is a distinct programme with its own participation record and monthly commitments.",
-    eyebrow: "Programme",
+    body: "AQGreen is a distinct programme with its own participation record and monthly commitments.",
     icon: Leaf,
+    label: "Programme",
     title: "AQGreen",
-    tone: "gold",
   },
   {
-    description:
-      "Onyx is a separate programme with its own participation and network placement records.",
-    eyebrow: "Programme",
+    body: "Onyx is a separate programme with its own participation and network placement records.",
     icon: Network,
+    label: "Programme",
     title: "Onyx",
-    tone: "violet",
-  },
-] as const;
-
-const benefits = [
-  {
-    description: "Learn about the club and its products before deciding whether to create an account.",
-    icon: Eye,
-    title: "Clarity before commitment",
-  },
-  {
-    description: "Account information and actions reflect the access available to each customer.",
-    icon: SlidersHorizontal,
-    title: "A more relevant view",
-  },
-  {
-    description: "AQGreen and Onyx remain distinct programmes with their own participation records.",
-    icon: ListChecks,
-    title: "Clear programme boundaries",
   },
 ];
 
 const journey = [
   {
-    description: "Review the club, public information and available products.",
+    body: "Review the club and browse available products.",
     title: "Explore",
   },
   {
-    description:
-      "Where self-registration is available, create an account to access information relevant to you.",
-    title: "Create an account",
+    body: "Where self-registration is available, create an account.",
+    title: "Create",
   },
   {
-    description:
-      "Sign in to view products, orders, programmes and actions available to your account.",
-    title: "Use your portal",
+    body: "Sign in to see information and actions available to you.",
+    title: "Continue",
   },
 ];
 
@@ -157,46 +99,19 @@ const faqs = [
   },
 ];
 
-const iconToneClassNames = {
-  gold: "bg-aqua-gold-soft text-aqua-gold-ink",
-  violet: "bg-aqua-lavender-strong text-aqua-violet-ink",
-  warm: "bg-aqua-cream text-aqua-navy",
-} as const;
-
-const IconTile = ({
-  icon: Icon,
-  tone = "violet",
+const ChapterMarker = ({
+  children,
+  index,
+  light = false,
 }: {
-  icon: LucideIcon;
-  tone?: keyof typeof iconToneClassNames;
+  children: string;
+  index: string;
+  light?: boolean;
 }) => (
-  <span
-    className={`flex size-10 shrink-0 items-center justify-center rounded-aqua-control ${iconToneClassNames[tone]}`}
-  >
-    <Icon aria-hidden="true" className="size-5" strokeWidth={1.75} />
-  </span>
-);
-
-const ProductIndex = () => (
-  <div
-    aria-hidden="true"
-    className="rounded-aqua-card border border-white/10 bg-aqua-navy p-6 sm:p-8"
-  >
-    <div className="flex items-start justify-between border-b border-white/10 pb-6">
-      <div>
-        <LandingEyebrow light>Product catalog</LandingEyebrow>
-        <p className="mt-3 text-2xl font-semibold tracking-[-0.025em] text-white">aQuathz</p>
-      </div>
-      <span className="font-mono text-xs text-white/65">01 / 03</span>
-    </div>
-    <div className="mt-6 divide-y divide-white/10 border-y border-white/10">
-      {["Water products", "Spraythz", "Health sets"].map((label, index) => (
-        <div className="flex items-center justify-between py-4" key={label}>
-          <span className="text-sm font-medium text-white">{label}</span>
-          <span className="font-mono text-xs text-aqua-lavender-strong">0{index + 1}</span>
-        </div>
-      ))}
-    </div>
+  <div className={`flex items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] ${light ? "text-aqua-lavender-strong" : "text-aqua-violet-dark"}`}>
+    <span className={`font-mono ${light ? "text-white/65" : "text-aqua-muted"}`}>{index}</span>
+    <span className={`h-px w-8 ${light ? "bg-white/20" : "bg-aqua-line"}`} />
+    {children}
   </div>
 );
 
@@ -205,91 +120,135 @@ export const LandingPage = () => (
     <main className="overflow-x-clip bg-aqua-canvas text-aqua-ink">
       <section
         aria-labelledby="landing-title"
-        className="relative isolate overflow-hidden bg-aqua-navy text-white"
+        className="relative min-h-[calc(100svh-4rem)] overflow-hidden bg-aqua-canvas"
       >
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 bg-[radial-gradient(circle_at_82%_16%,rgba(108,59,216,0.24),transparent_34%),radial-gradient(circle_at_8%_92%,rgba(227,189,101,0.08),transparent_28%)]"
-        />
-        <div
-          className={`${landingContainerClassName} relative grid gap-14 py-20 sm:py-24 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:py-28`}
-        >
-          <div className="max-w-3xl">
-            <LandingBadge>
-              <ShieldCheck aria-hidden="true" className="size-4 text-aqua-gold" />
-              Products, programmes and member access
-            </LandingBadge>
-            <h1
-              className="mt-7 text-5xl font-semibold leading-[0.98] tracking-[-0.05em] text-balance sm:text-6xl lg:text-7xl"
-              id="landing-title"
-            >
-              Live in health.
-              <span className="block text-aqua-lavender-strong">Inspire to wealth.</span>
-            </h1>
-            <p className="mt-6 max-w-xl text-lg leading-8 text-aqua-dark-muted sm:text-xl">
-              Explore aQuathz products, understand Aqua&apos;s participation programmes
-              and access the information available to your account.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <LandingLinkButton href="/catalog">
-                Browse products
-                <ArrowRight aria-hidden="true" className="size-4" />
-              </LandingLinkButton>
-              <LandingLinkButton href="#solution" tone="secondary-dark">
-                How Aqua works
-              </LandingLinkButton>
-            </div>
-            <p className="mt-6 flex items-center gap-2 text-sm text-white/75">
-              <CircleCheck aria-hidden="true" className="size-4 text-aqua-gold" />
-              Browse the catalog before creating an account.
+        <div aria-hidden="true" className="absolute inset-y-0 left-[11%] hidden w-px bg-aqua-line/65 lg:block" />
+        <div aria-hidden="true" className="absolute inset-y-0 right-[11%] hidden w-px bg-aqua-line/65 lg:block" />
+        <div className={`${landingContainerClassName} flex min-h-[calc(100svh-4rem)] flex-col py-10 sm:py-14 lg:py-16`}>
+          <div className="flex items-center justify-between">
+            <ChapterMarker index="00">Aqua Lifestyle Club</ChapterMarker>
+            <p className="hidden text-xs font-semibold uppercase tracking-[0.14em] text-aqua-muted sm:block">
+              Always connected
             </p>
           </div>
 
-          <div className="mx-auto w-full max-w-md">
-            <div className="rounded-aqua-feature border border-white/15 bg-aqua-navy-raised p-5 shadow-aqua-raised sm:p-7">
+          <div className="my-auto py-16 sm:py-20">
+            <h1
+              className="font-serif text-5xl font-normal leading-[0.92] tracking-[-0.045em] sm:text-[clamp(4rem,8.6vw,8.5rem)] sm:leading-[0.86]"
+              id="landing-title"
+            >
+              <span className="block">Live in health.</span>
+              <span className="mt-4 block text-right text-aqua-violet sm:mt-6">
+                Inspire to wealth.
+              </span>
+            </h1>
+          </div>
+
+          <div className="grid gap-8 border-t border-aqua-line pt-8 lg:grid-cols-12 lg:items-end">
+            <div className="lg:col-span-5">
+              <p className="max-w-lg text-lg leading-8 text-aqua-muted">
+                A place where wellbeing, participation and local connection belong
+                to the same story.
+              </p>
+            </div>
+            <div className="flex items-center gap-4 lg:col-span-3 lg:justify-center">
               <Image
                 alt="Aqua Lifestyle Club"
-                className="aspect-square w-full rounded-aqua-card object-cover"
-                height={640}
+                className="size-28 rounded-aqua-control object-cover shadow-sm sm:size-36"
+                height={144}
                 priority
-                sizes="(min-width: 1024px) 390px, (min-width: 640px) 420px, calc(100vw - 80px)"
                 src="/aqua-lifestyle-logo.jpg"
-                width={640}
+                width={144}
               />
+              <p className="max-w-28 text-xs font-semibold uppercase leading-5 tracking-[0.12em] text-aqua-muted">
+                Products. Programmes. Connection.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row lg:col-span-4 lg:justify-end">
+              <LandingLinkButton href="#welcome">
+                Enter the experience
+                <ArrowDownRight aria-hidden="true" className="size-4" />
+              </LandingLinkButton>
+              <LandingLinkButton href="#story" tone="secondary-light">
+                Meet Aqua
+              </LandingLinkButton>
             </div>
           </div>
         </div>
       </section>
 
-      <section aria-labelledby="trust-title" className="border-b border-aqua-line bg-aqua-surface">
+      <section aria-labelledby="trust-title" className="border-y border-aqua-line bg-aqua-surface">
         <h2 className="sr-only" id="trust-title">What visitors can expect</h2>
-        <div className={`${landingContainerClassName} grid divide-y divide-aqua-line md:grid-cols-3 md:divide-x md:divide-y-0`}>
-          {trustItems.map((item) => (
-            <div className="flex gap-4 py-7 md:px-6 md:first:pl-0 md:last:pr-0" key={item.title}>
-              <item.icon aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-aqua-violet-dark" strokeWidth={1.75} />
-              <div>
-                <h3 className="text-sm font-semibold text-aqua-ink">{item.title}</h3>
-                <p className="mt-1 text-sm leading-6 text-aqua-muted">{item.description}</p>
+        <div className={`${landingContainerClassName} grid md:grid-cols-3`}>
+          {[
+            ["01", "Wellbeing", "Space to explore what living well can mean for you."],
+            ["02", "Belonging", "An area-based model keeps community connected locally."],
+            ["03", "Possibility", "Distinct paths let every next step remain clear."],
+          ].map(([number, title, body]) => (
+            <div
+              className="group border-b border-aqua-line py-10 last:border-b-0 md:border-b-0 md:border-r md:px-8 md:first:pl-0 md:last:border-r-0 md:last:pr-0"
+              key={number}
+            >
+              <div className="flex items-start justify-between gap-6">
+                <div>
+                  <h3 className="text-2xl font-semibold tracking-[-0.03em]">{title}.</h3>
+                  <p className="mt-3 text-sm leading-6 text-aqua-muted">{body}</p>
+                </div>
+                <span className="font-mono text-xs text-aqua-muted transition-transform group-hover:translate-x-1">
+                  {number}
+                </span>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      <section aria-labelledby="problem-title">
-        <div className={`${landingContainerClassName} ${landingSectionClassName} grid gap-8 lg:grid-cols-[0.65fr_1.35fr] lg:items-start`}>
-          <LandingEyebrow>The challenge</LandingEyebrow>
-          <div>
+      <section aria-labelledby="welcome-title" className="relative overflow-hidden bg-aqua-cream" id="welcome">
+        <svg
+          aria-hidden="true"
+          className="absolute inset-x-0 bottom-0 h-44 w-full text-aqua-violet/10 sm:h-56"
+          preserveAspectRatio="none"
+          viewBox="0 0 1440 240"
+        >
+          <path d="M-80 120 Q 280 20 640 120 T 1360 120 T 2080 120" fill="none" stroke="currentColor" strokeWidth="2" />
+          <path d="M-120 170 Q 240 70 600 170 T 1320 170 T 2040 170" fill="none" stroke="currentColor" strokeWidth="1" />
+          <path d="M-40 220 Q 320 120 680 220 T 1400 220 T 2120 220" fill="none" stroke="currentColor" strokeWidth="1" />
+        </svg>
+        <div className={`${landingContainerClassName} relative grid gap-16 py-24 sm:py-32 lg:grid-cols-12 lg:items-end lg:py-40`}>
+          <div className="lg:col-span-8">
+            <ChapterMarker index="00">Welcome</ChapterMarker>
             <h2
-              className="max-w-4xl text-4xl font-semibold leading-[1.08] tracking-[-0.04em] text-balance sm:text-5xl lg:text-6xl"
+              className="mt-10 max-w-5xl font-serif text-5xl font-normal leading-[0.98] tracking-[-0.04em] text-balance sm:text-6xl lg:text-7xl"
+              id="welcome-title"
+            >
+              Wellbeing begins with space.
+            </h2>
+          </div>
+          <div className="lg:col-span-3 lg:col-start-10">
+            <p className="text-lg leading-8 text-aqua-muted">
+              Space to discover. Space to belong. Space to move forward without being rushed.
+            </p>
+            <div className="mt-8 h-px w-full bg-aqua-ink/15" />
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="problem-title" className="bg-aqua-navy text-white" id="story">
+        <div className={`${landingContainerClassName} relative py-24 sm:py-32 lg:py-40`}>
+          <span aria-hidden="true" className="absolute right-8 top-8 font-mono text-[11rem] leading-none text-white/[0.025] sm:text-[18rem]">
+            01
+          </span>
+          <ChapterMarker index="01" light>A better welcome</ChapterMarker>
+          <div className="relative mt-16 grid gap-12 lg:grid-cols-12 lg:items-end">
+            <h2
+              className="text-5xl font-semibold leading-[0.98] tracking-[-0.05em] text-balance sm:text-6xl lg:col-span-8 lg:text-7xl"
               id="problem-title"
             >
-              Finding the right product, programme or next step should not require guesswork.
+              A club should open possibilities, not rush you into choices.
             </h2>
-            <p className="mt-6 max-w-2xl text-base leading-7 text-aqua-muted sm:text-lg">
-              Public product discovery, account access and programme participation serve
-              different needs. Aqua gives each one a clear place without treating them as
-              the same thing.
+            <p className="max-w-md text-base leading-7 text-aqua-dark-muted lg:col-span-4">
+              Aqua gives visitors room to understand its wellbeing products,
+              participation programmes and community model in their own time.
             </p>
           </div>
         </div>
@@ -297,26 +256,45 @@ export const LandingPage = () => (
 
       <section
         aria-labelledby="solution-title"
-        className="scroll-mt-24 border-y border-aqua-line bg-aqua-surface"
+        className="scroll-mt-24 bg-aqua-canvas"
         id="solution"
       >
-        <div className={`${landingContainerClassName} ${landingSectionClassName}`}>
-          <LandingSectionHeading
-            description="A straightforward experience that starts in public and becomes more relevant when you sign in."
-            eyebrow="The Aqua experience"
-            id="solution-title"
-            title="Clear information at every stage."
-          />
-          <div className="mt-12 grid gap-5 lg:mt-14 lg:grid-cols-3">
-            {solutionItems.map((item, index) => (
-              <LandingCard className="flex h-full flex-col" key={item.title}>
-                <div className="flex items-center justify-between">
-                  <IconTile icon={item.icon} />
-                  <span className="font-mono text-xs font-semibold text-aqua-muted">0{index + 1}</span>
+        <div className={`${landingContainerClassName} grid gap-16 py-24 sm:py-32 lg:grid-cols-12 lg:py-40`}>
+          <div className="self-start lg:sticky lg:top-28 lg:col-span-5">
+            <ChapterMarker index="02">The experience</ChapterMarker>
+            <h2
+              className="mt-8 text-4xl font-semibold leading-[1.02] tracking-[-0.045em] text-balance sm:text-5xl lg:text-6xl"
+              id="solution-title"
+            >
+              The experience unfolds with you.
+            </h2>
+            <p className="mt-6 max-w-md text-base leading-7 text-aqua-muted">
+              Begin with welcome, discover what connects and move toward the parts of
+              Aqua that are relevant to you.
+            </p>
+          </div>
+
+          <div className="lg:col-span-6 lg:col-start-7">
+            {discoveryMoments.map((moment, index) => (
+              <article
+                className="flex min-h-[24rem] flex-col justify-between border-t border-aqua-line py-10 first:border-t-0 first:pt-0 lg:min-h-[30rem] lg:py-16"
+                key={moment.title}
+              >
+                <div className="flex items-start justify-between gap-8">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-aqua-violet-dark">
+                    {moment.label}
+                  </p>
+                  <span className="font-mono text-sm text-aqua-muted">0{index + 1}</span>
                 </div>
-                <h3 className="mt-10 text-xl font-semibold tracking-[-0.02em]">{item.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-aqua-muted">{item.description}</p>
-              </LandingCard>
+                <div>
+                  <h3 className="text-4xl font-semibold leading-[1.04] tracking-[-0.04em] sm:text-5xl">
+                    {moment.title}
+                  </h3>
+                  <p className="mt-6 max-w-lg text-base leading-7 text-aqua-muted">
+                    {moment.body}
+                  </p>
+                </div>
+              </article>
             ))}
           </div>
         </div>
@@ -324,170 +302,212 @@ export const LandingPage = () => (
 
       <section
         aria-labelledby="products-title"
-        className="scroll-mt-24 bg-aqua-navy text-white"
+        className="scroll-mt-24 border-y border-aqua-line bg-aqua-surface"
         id="products"
       >
-        <div className={`${landingContainerClassName} ${landingSectionClassName}`}>
-          <div className="grid gap-10 rounded-aqua-feature border border-white/10 bg-aqua-navy-raised p-6 sm:p-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:p-10">
-            <div className="lg:p-4">
-              <LandingEyebrow light>Products</LandingEyebrow>
+        <div className={`${landingContainerClassName} py-24 sm:py-32 lg:py-40`}>
+          <div className="grid gap-12 lg:grid-cols-12">
+            <div className="lg:col-span-4">
+              <ChapterMarker index="03">Products</ChapterMarker>
               <h2
-                className="mt-4 max-w-xl text-3xl font-semibold leading-[1.1] tracking-[-0.035em] sm:text-4xl lg:text-5xl"
+                className="mt-8 text-4xl font-semibold leading-[1.04] tracking-[-0.045em] sm:text-5xl"
                 id="products-title"
               >
-                Explore the aQuathz product catalog.
+                Wellbeing, made tangible.
               </h2>
-              <p className="mt-5 max-w-xl text-base leading-7 text-aqua-dark-muted sm:text-lg">
-                Browse water products, Spraythz and health sets. Product visibility and
-                eligibility can depend on membership.
+              <p className="mt-6 max-w-sm text-base leading-7 text-aqua-muted">
+                Aqua&apos;s product world includes aQuathz water products, Spraythz and
+                health sets. The public catalog lets curiosity come first.
               </p>
-              <LandingLinkButton className="mt-8" href="/catalog" tone="warm">
-                Explore the catalog
-                <ArrowRight aria-hidden="true" className="size-4" />
+              <LandingLinkButton className="mt-8" href="/catalog">
+                Open the catalog
+                <ArrowDownRight aria-hidden="true" className="size-4" />
               </LandingLinkButton>
             </div>
-            <ProductIndex />
+
+            <div className="lg:col-span-7 lg:col-start-6">
+              {["Water products", "Spraythz", "Health sets"].map((product, index) => (
+                <Link
+                  className="group flex min-h-36 items-center justify-between gap-6 border-b border-aqua-line py-8 first:border-t sm:min-h-44"
+                  href="/catalog"
+                  key={product}
+                >
+                  <div className="flex items-baseline gap-6 transition-transform duration-300 group-hover:translate-x-2 sm:gap-10">
+                    <span className="font-mono text-xs text-aqua-muted">0{index + 1}</span>
+                    <h3 className="text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
+                      {product}
+                    </h3>
+                  </div>
+                  <PackageSearch aria-hidden="true" className="size-5 shrink-0 text-aqua-violet" strokeWidth={1.75} />
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       <section
         aria-labelledby="participation-title"
-        className="scroll-mt-24 border-t border-white/10 bg-aqua-navy text-white"
+        className="scroll-mt-24 bg-aqua-navy text-white"
         id="programmes"
       >
-        <div className={`${landingContainerClassName} ${landingSectionClassName}`}>
-          <LandingSectionHeading
-            description="Membership, AQGreen and Onyx affect the customer experience in different ways. Programme participation remains separate from membership selection."
-            eyebrow="Ways to participate"
-            id="participation-title"
-            light
-            title="Distinct paths, clearly explained."
-          />
-          <div className="mt-12 grid gap-5 lg:mt-14 lg:grid-cols-3">
+        <div className={`${landingContainerClassName} pt-24 sm:pt-32 lg:pt-40`}>
+          <ChapterMarker index="04" light>Participation</ChapterMarker>
+          <div className="mt-8 grid gap-8 pb-16 lg:grid-cols-12 lg:items-end lg:pb-20">
+            <h2
+              className="text-4xl font-semibold leading-[1.04] tracking-[-0.045em] sm:text-5xl lg:col-span-7 lg:text-6xl"
+              id="participation-title"
+            >
+              Different ways to take part. Clearly held.
+            </h2>
+            <p className="max-w-md text-base leading-7 text-aqua-dark-muted lg:col-span-4 lg:col-start-9">
+              Membership shapes access, while AQGreen and Onyx remain distinct
+              programmes with separate participation records.
+            </p>
+          </div>
+        </div>
+
+        <div className="border-t border-white/10">
+          <div className={`${landingContainerClassName} grid lg:grid-cols-3`}>
             {participationOptions.map((option, index) => (
               <article
-                className="flex h-full flex-col rounded-aqua-card border border-white/10 bg-aqua-navy-raised p-6 sm:p-8"
+                className="flex min-h-80 flex-col justify-between border-b border-white/10 py-10 last:border-b-0 sm:min-h-96 lg:min-h-[34rem] lg:border-b-0 lg:border-r lg:px-10 lg:first:pl-0 lg:last:border-r-0 lg:last:pr-0"
                 key={option.title}
               >
-                <div className="flex items-center justify-between">
-                  <IconTile icon={option.icon} tone={option.tone} />
-                  <span className="font-mono text-xs font-semibold text-white/65">0{index + 1}</span>
+                <div className="flex items-start justify-between">
+                  <option.icon aria-hidden="true" className="size-8 text-aqua-gold" strokeWidth={1.5} />
+                  <span className="font-mono text-xs text-white/65">0{index + 1}</span>
                 </div>
-                <p className="mt-10 text-xs font-bold uppercase tracking-[0.16em] text-aqua-lavender-strong">
-                  {option.eyebrow}
-                </p>
-                <h3 className="mt-3 text-xl font-semibold tracking-[-0.02em]">{option.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-aqua-dark-muted">{option.description}</p>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-aqua-lavender-strong">
+                    {option.label}
+                  </p>
+                  <h3 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">{option.title}</h3>
+                  <p className="mt-6 max-w-sm text-sm leading-6 text-aqua-dark-muted">
+                    {option.body}
+                  </p>
+                </div>
               </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section aria-labelledby="benefits-title">
-        <div className={`${landingContainerClassName} ${landingSectionClassName}`}>
-          <LandingSectionHeading
-            description="The value of the portal is not more information. It is clearer information in the right context."
-            eyebrow="Practical benefits"
-            id="benefits-title"
-            title="Designed to reduce uncertainty."
-          />
-          <div className="mt-12 grid gap-5 lg:mt-14 lg:grid-cols-3">
-            {benefits.map((benefit) => (
-              <LandingCard className="h-full" key={benefit.title}>
-                <IconTile icon={benefit.icon} />
-                <h3 className="mt-8 text-xl font-semibold tracking-[-0.02em]">{benefit.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-aqua-muted">{benefit.description}</p>
-              </LandingCard>
-            ))}
+      <section aria-labelledby="benefits-title" className="bg-aqua-cream">
+        <div className={`${landingContainerClassName} py-24 sm:py-32 lg:py-40`}>
+          <ChapterMarker index="05">What clarity changes</ChapterMarker>
+          <h2 className="sr-only" id="benefits-title">Benefits of a clearer experience</h2>
+          <div className="mt-16 space-y-2 text-[clamp(2.3rem,6vw,6.5rem)] font-semibold leading-[0.98] tracking-[-0.055em]">
+            <p className="text-aqua-ink">Room to breathe.</p>
+            <p className="text-center text-aqua-violet">Confidence to choose.</p>
+            <p className="text-right text-aqua-ink">A place to belong.</p>
+          </div>
+          <div className="mt-16 grid gap-8 border-t border-aqua-ink/15 pt-8 md:grid-cols-3">
+            <p className="text-sm leading-6 text-aqua-muted">Discover Aqua at your own pace before choosing a next step.</p>
+            <p className="text-sm leading-6 text-aqua-muted">See information and actions that reflect the access available to you.</p>
+            <p className="text-sm leading-6 text-aqua-muted">Connect with a club built around distinct roles and participation paths.</p>
           </div>
         </div>
       </section>
 
       <section
         aria-labelledby="journey-title"
-        className="scroll-mt-24 border-y border-aqua-line bg-aqua-surface"
+        className="scroll-mt-24 bg-aqua-surface"
         id="how-it-works"
       >
-        <div className={`${landingContainerClassName} ${landingSectionClassName}`}>
-          <LandingSectionHeading
-            description="Move from public discovery to account-specific information without losing context."
-            eyebrow="How it works"
-            id="journey-title"
-            title="A clear route into Aqua."
-          />
-          <ol className="mt-12 overflow-hidden rounded-aqua-card border border-aqua-line lg:mt-14">
-            {journey.map((step, index) => (
-              <li
-                className="grid gap-4 border-b border-aqua-line bg-aqua-surface p-6 last:border-b-0 sm:grid-cols-[4rem_0.6fr_1fr] sm:items-center sm:p-8"
-                key={step.title}
+        <div className={`${landingContainerClassName} py-24 sm:py-32 lg:py-40`}>
+          <div className="grid gap-12 lg:grid-cols-12 lg:items-end">
+            <div className="lg:col-span-5">
+              <ChapterMarker index="06">The route</ChapterMarker>
+              <h2
+                className="mt-8 text-4xl font-semibold leading-[1.04] tracking-[-0.045em] sm:text-5xl"
+                id="journey-title"
               >
-                <span className="font-mono text-sm font-semibold text-aqua-violet-dark">0{index + 1}</span>
-                <h3 className="text-lg font-semibold tracking-[-0.015em]">{step.title}</h3>
-                <p className="text-sm leading-6 text-aqua-muted">{step.description}</p>
+                Three steps, without losing context.
+              </h2>
+            </div>
+            <p className="max-w-md text-base leading-7 text-aqua-muted lg:col-span-4 lg:col-start-9">
+              Move from public discovery to account-specific information at a pace that
+              matches your needs.
+            </p>
+          </div>
+
+          <ol className="relative mt-20 grid gap-12 before:absolute before:left-4 before:top-4 before:h-[calc(100%-2rem)] before:w-px before:bg-aqua-line md:grid-cols-3 md:gap-0 md:before:left-0 md:before:right-0 md:before:top-4 md:before:h-px md:before:w-full">
+            {journey.map((step, index) => (
+              <li className="relative pl-12 md:px-8 md:pt-16 md:first:pl-0 md:last:pr-0" key={step.title}>
+                <span className="absolute left-0 top-0 flex size-8 items-center justify-center rounded-full border border-aqua-violet bg-aqua-surface font-mono text-xs font-semibold text-aqua-violet-dark md:left-8 md:first:left-0">
+                  {index + 1}
+                </span>
+                <h3 className="text-2xl font-semibold tracking-[-0.025em]">{step.title}</h3>
+                <p className="mt-3 max-w-xs text-sm leading-6 text-aqua-muted">{step.body}</p>
               </li>
             ))}
           </ol>
         </div>
       </section>
 
-      <section aria-labelledby="community-title" className="bg-aqua-lavender">
-        <div className={`${landingContainerClassName} ${landingSectionClassName} grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center lg:gap-16`}>
-          <div className="flex min-h-80 flex-col justify-between rounded-aqua-feature bg-aqua-navy-raised p-8 text-white sm:min-h-96 sm:p-10">
-            <Users aria-hidden="true" className="size-10 text-aqua-gold" strokeWidth={1.75} />
-            <p className="max-w-sm text-3xl font-semibold leading-[1.1] tracking-[-0.03em] sm:text-4xl">
-              A model designed for local connection.
-            </p>
-          </div>
-          <div>
-            <LandingSectionHeading
-              description="Aqua's area-based business model includes Area Leaders and Facilitators alongside customer membership and programme participation. These roles and programmes remain distinct."
-              eyebrow="Community model"
-              id="community-title"
-              title="Local roles within a wider club."
-            />
-            <div className="mt-8 flex items-start gap-4 border-t border-aqua-violet/20 pt-6">
-              <ShieldCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-aqua-violet-dark" />
-              <p className="max-w-xl text-sm leading-6 text-aqua-muted">
-                Account access reflects the customer&apos;s status and role without merging
-                separate programme records or responsibilities.
+      <section aria-labelledby="community-title" className="scroll-mt-24 overflow-hidden bg-aqua-lavender" id="community">
+        <div className={`${landingContainerClassName} relative py-24 sm:py-32 lg:py-40`}>
+          <span aria-hidden="true" className="absolute -right-4 top-10 text-[10rem] font-semibold leading-none tracking-[-0.08em] text-aqua-violet/[0.055] sm:text-[17rem] lg:text-[24rem]">
+            LOCAL
+          </span>
+          <div className="relative grid gap-16 lg:grid-cols-12 lg:items-end">
+            <div className="lg:col-span-7">
+              <ChapterMarker index="07">Community</ChapterMarker>
+              <h2
+                className="mt-8 text-5xl font-semibold leading-[0.98] tracking-[-0.05em] text-balance sm:text-6xl lg:text-7xl"
+                id="community-title"
+              >
+                Connection has a place.
+              </h2>
+            </div>
+            <div className="lg:col-span-4 lg:col-start-9">
+              <Users aria-hidden="true" className="size-9 text-aqua-violet-dark" strokeWidth={1.5} />
+              <p className="mt-8 text-base leading-7 text-aqua-muted">
+                Aqua&apos;s area-based business model includes Area Leaders and Facilitators
+                alongside customer membership and programme participation. These roles
+                remain distinct.
               </p>
+              <div className="mt-8 flex items-start gap-3 border-t border-aqua-violet/20 pt-6">
+                <ShieldCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-aqua-violet-dark" />
+                <p className="text-sm leading-6 text-aqua-muted">
+                  Account access reflects customer status and role.
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section
-        aria-labelledby="faq-title"
-        className="scroll-mt-24"
-        id="faq"
-      >
-        <div className={`${landingContainerClassName} ${landingSectionClassName} grid gap-12 lg:grid-cols-[0.7fr_1.3fr] lg:gap-20`}>
-          <LandingSectionHeading
-            description="The essentials about public browsing, accounts and programme participation."
-            eyebrow="FAQ"
-            id="faq-title"
-            title="Questions before joining."
-          />
-          <div className="border-t border-aqua-line">
+      <section aria-labelledby="faq-title" className="bg-aqua-canvas" id="faq">
+        <div className={`${landingContainerClassName} grid gap-16 py-24 sm:py-32 lg:grid-cols-12 lg:py-40`}>
+          <div className="lg:col-span-4">
+            <ChapterMarker index="08">Questions</ChapterMarker>
+            <h2
+              className="mt-8 text-4xl font-semibold leading-[1.04] tracking-[-0.045em] sm:text-5xl"
+              id="faq-title"
+            >
+              Pause here.
+              <span className="block text-aqua-violet">Ask anything.</span>
+            </h2>
+            <p className="mt-6 max-w-sm text-base leading-7 text-aqua-muted">
+              The essentials about public browsing, accounts and programme participation.
+            </p>
+          </div>
+
+          <div className="border-t border-aqua-line lg:col-span-7 lg:col-start-6">
             {faqs.map((faq, index) => (
               <details className="group border-b border-aqua-line" key={faq.question}>
-                <summary className="flex min-h-20 cursor-pointer list-none items-center justify-between gap-5 py-5 font-semibold marker:content-none">
-                  <span className="flex items-start gap-4">
-                    <span className="mt-0.5 hidden font-mono text-xs font-semibold text-aqua-muted sm:inline">
-                      0{index + 1}
-                    </span>
+                <summary className="flex min-h-24 cursor-pointer list-none items-center justify-between gap-6 py-6 font-semibold marker:content-none">
+                  <span className="flex items-start gap-5">
+                    <span className="hidden font-mono text-xs text-aqua-muted sm:inline">0{index + 1}</span>
                     {faq.question}
                   </span>
-                  <span
-                    aria-hidden="true"
-                    className="flex size-8 shrink-0 items-center justify-center rounded-full border border-aqua-line text-lg font-normal transition-transform group-open:rotate-45"
-                  >
+                  <span aria-hidden="true" className="text-2xl font-light text-aqua-violet transition-transform group-open:rotate-45">
                     +
                   </span>
                 </summary>
-                <p className="max-w-2xl pb-6 text-sm leading-6 text-aqua-muted sm:pl-10">
+                <p className="max-w-2xl pb-8 text-sm leading-6 text-aqua-muted sm:pl-10">
                   {faq.answer}
                 </p>
               </details>
@@ -497,50 +517,51 @@ export const LandingPage = () => (
       </section>
 
       <section aria-labelledby="join-title" className="bg-aqua-navy text-white">
-        <div className={`${landingContainerClassName} ${landingSectionClassName}`}>
-          <div className="mx-auto max-w-4xl text-center">
-            <LandingEyebrow light>Your next step</LandingEyebrow>
-            <h2
-              className="mt-4 text-4xl font-semibold leading-[1.08] tracking-[-0.04em] text-balance sm:text-5xl lg:text-6xl"
-              id="join-title"
-            >
-              Explore what is available to you.
-            </h2>
-            <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-aqua-dark-muted sm:text-lg">
-              Browse the public catalog, create an account where registration is
-              available, or sign in to continue.
-            </p>
-            <LandingAccountActions />
+        <div className={`${landingContainerClassName} py-24 sm:py-32 lg:py-40`}>
+          <div className="grid gap-12 lg:grid-cols-12 lg:items-end">
+            <div className="lg:col-span-8">
+              <LandingEyebrow light>The next chapter</LandingEyebrow>
+              <h2
+                className="mt-8 text-5xl font-semibold leading-[0.96] tracking-[-0.05em] text-balance sm:text-6xl lg:text-7xl"
+                id="join-title"
+              >
+                Start with curiosity.
+                <span className="block text-aqua-lavender-strong">Continue with clarity.</span>
+              </h2>
+            </div>
+            <div className="lg:col-span-4">
+              <p className="text-base leading-7 text-aqua-dark-muted">
+                Explore the public catalog or enter member access to continue with the
+                Area and account options available to you.
+              </p>
+              <LandingAccountActions />
+            </div>
           </div>
         </div>
       </section>
     </main>
 
     <footer className="bg-aqua-navy text-aqua-dark-muted">
-      <div className={`${landingContainerClassName} grid gap-10 py-12 sm:grid-cols-[1fr_auto] sm:items-end`}>
-        <div>
-          <Link className="inline-flex items-center gap-4 text-white" href="/">
-            <Image
-              alt=""
-              aria-hidden="true"
-              className="size-14 rounded-aqua-control object-cover"
-              height={56}
-              src="/aqua-lifestyle-logo.jpg"
-              width={56}
-            />
-            <span>
-              <span className="block text-base font-semibold">Aqua Lifestyle Club</span>
-              <span className="mt-1 block text-xs text-white/65">Always connected</span>
-            </span>
-          </Link>
-          <p className="mt-6 max-w-md text-sm leading-6 text-white/65">
-            Products, programmes and member access in one considered experience.
-          </p>
-        </div>
+      <div className={`${landingContainerClassName} grid gap-10 border-t border-white/10 py-12 sm:grid-cols-[1fr_auto] sm:items-end`}>
+        <Link className="inline-flex items-center gap-4 text-white" href="/">
+          <Image
+            alt=""
+            aria-hidden="true"
+            className="size-12 rounded-aqua-control object-cover"
+            height={48}
+            src="/aqua-lifestyle-logo.jpg"
+            width={48}
+          />
+          <span>
+            <span className="block text-sm font-semibold">Aqua Lifestyle Club</span>
+            <span className="mt-1 block text-xs text-white/65">Always connected</span>
+          </span>
+        </Link>
         <nav aria-label="Footer navigation" className="flex flex-wrap gap-x-6 gap-y-3 text-sm">
-          <Link className="transition-colors hover:text-white" href="/#solution">Why Aqua</Link>
-          <Link className="transition-colors hover:text-white" href="/#products">Products</Link>
-          <Link className="transition-colors hover:text-white" href="/#programmes">Programmes</Link>
+          <Link className="transition-colors hover:text-white" href="/#welcome">Welcome</Link>
+          <Link className="transition-colors hover:text-white" href="/#products">Wellbeing</Link>
+          <Link className="transition-colors hover:text-white" href="/#programmes">Participation</Link>
+          <Link className="transition-colors hover:text-white" href="/#community">Belong</Link>
           <Link className="transition-colors hover:text-white" href="/contact">Contact</Link>
         </nav>
       </div>

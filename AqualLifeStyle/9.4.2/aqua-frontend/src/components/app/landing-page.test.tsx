@@ -20,15 +20,19 @@ describe("LandingPage", () => {
       "href",
       "/catalog",
     );
-    expect(screen.getByRole("heading", { name: "Clear information at every stage." })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "A clear route into Aqua." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "The experience unfolds with you." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Three steps, without losing context." })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Aqua Lifestyle Club" })).toHaveAttribute(
       "src",
       expect.stringContaining("aqua-lifestyle-logo.jpg"),
     );
-    expect(screen.getByRole("link", { name: /Create an account/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /Water products/ })).toHaveAttribute(
       "href",
-      "/signup",
+      "/catalog",
+    );
+    expect(screen.getByRole("link", { name: /Member access/i })).toHaveAttribute(
+      "href",
+      "/login",
     );
   });
 

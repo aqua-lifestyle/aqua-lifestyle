@@ -28,11 +28,8 @@ export const LandingAccountActions = () => {
             Browse products
             <ArrowRight aria-hidden="true" className="size-4" />
           </LandingLinkButton>
-          <LandingLinkButton href="/signup" tone="secondary-dark">
-            Create an account
-          </LandingLinkButton>
-          <LandingLinkButton className="border-transparent" href="/login" tone="secondary-dark">
-            Sign in
+          <LandingLinkButton href="/login" tone="secondary-dark">
+            Member access
           </LandingLinkButton>
         </>
       )}

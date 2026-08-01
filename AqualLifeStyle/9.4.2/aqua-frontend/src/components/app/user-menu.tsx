@@ -47,22 +47,14 @@ export const UserMenu = ({ inverted = false }: { inverted?: boolean }) => {
 
   if (!isAuthenticated) {
     return (
-      <div className="flex items-center gap-2">
-        <Link
-          className={`hidden rounded-lg px-3 py-2 text-sm font-semibold transition sm:inline ${
-            inverted ? "text-white/70 hover:bg-white/10 hover:text-white" : "text-muted-foreground hover:text-foreground"
-          }`}
-          href="/login"
-        >
-          Sign in
-        </Link>
+      <div className="flex items-center">
         <Link
           className={`inline-flex h-10 items-center rounded-aqua-control px-4 text-sm font-semibold text-white transition-colors ${
             inverted ? "bg-aqua-violet hover:bg-aqua-violet-dark" : "bg-accent-dark hover:bg-accent"
           }`}
-          href="/signup"
+          href="/login"
         >
-          Create account
+          Member access
         </Link>
       </div>
     );
