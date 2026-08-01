@@ -244,7 +244,7 @@ namespace AqualLifeStyle.Tests.WebHost
             response.PaymentContractVersion.ShouldBe(
                 DeploymentMetadata.PaymentContractVersion);
             response.ContractCapabilities.ShouldContain(
-                "aqgreen-joining-schedules-v1");
+                "aqgreen-single-payment-v1");
             response.TraceId.ShouldNotBeNull();
         }
 

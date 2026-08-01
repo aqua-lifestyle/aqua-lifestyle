@@ -15,16 +15,15 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         private static readonly DateTime OnyxEffectiveFrom =
             new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        private static readonly DateTime AQGreenFlexiblePaymentEffectiveFrom =
+        private static readonly DateTime AQGreenSinglePaymentEffectiveFrom =
             new DateTime(2026, 7, 26, 0, 0, 0, DateTimeKind.Utc);
 
         public EntryProgrammeTerms GetEntryTerms()
         {
-            return EntryProgrammeTerms.CreateFlexibleJoiningPayment(
-                version: "2026-08-flexible-1200",
-                effectiveFrom: AQGreenFlexiblePaymentEffectiveFrom,
+            return EntryProgrammeTerms.CreateSingleJoiningPayment(
+                version: "2026-08-single-1200",
+                effectiveFrom: AQGreenSinglePaymentEffectiveFrom,
                 joiningPaymentAmount: 1200m,
-                joiningInstallmentAmount: 600m,
                 monthlyCommitmentAmount: 600m,
                 gracePeriodDays: 7);
         }

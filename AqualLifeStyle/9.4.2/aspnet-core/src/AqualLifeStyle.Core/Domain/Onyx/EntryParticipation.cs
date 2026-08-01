@@ -183,8 +183,18 @@ namespace AqualLifeStyle.Domain.Onyx
         {
             if (Status == EntryParticipationStatus.Active)
                 throw new InvalidOperationException("AQGreen joining is already complete.");
-            if (JoiningPaymentAmount <= 0m || JoiningInstallmentAmount <= 0m)
+            if (schedule != AQGreenJoiningPaymentSchedule.Full &&
+                schedule != AQGreenJoiningPaymentSchedule.TwoInstallments)
+                throw new ArgumentOutOfRangeException(
+                    nameof(schedule),
+                    schedule,
+                    "The AQGreen joining payment schedule is unsupported.");
+            if (JoiningPaymentAmount <= 0m)
                 throw new InvalidOperationException("This AQGreen record does not support selectable joining schedules.");
+            if (schedule == AQGreenJoiningPaymentSchedule.TwoInstallments &&
+                JoiningInstallmentAmount <= 0m)
+                throw new InvalidOperationException(
+                    "This AQGreen record does not support joining instalments.");
             if (JoiningPaymentId.HasValue || RegistrationPaymentId.HasValue || ActivationPaymentId.HasValue)
             {
                 if (JoiningPaymentSchedule == schedule) return;

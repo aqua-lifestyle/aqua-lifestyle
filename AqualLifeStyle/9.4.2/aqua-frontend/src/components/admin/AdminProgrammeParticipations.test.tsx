@@ -198,7 +198,11 @@ describe("AdminProgrammeParticipations", () => {
 
     expect(await screen.findByText("AQGreen checkout recovery"))
       .toBeInTheDocument();
-    expect(screen.getByText("ch_safe_reference")).toBeInTheDocument();
+    expect(await screen.findByText(
+      "ch_safe_reference",
+      undefined,
+      { timeout: 5_000 },
+    )).toBeInTheDocument();
     expect(screen.getByText("Instalment 1 of 2", { exact: false }))
       .toBeInTheDocument();
     expect(screen.getByText(/read-only checkout access/i)).toBeInTheDocument();

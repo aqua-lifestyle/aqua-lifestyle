@@ -68,14 +68,14 @@ describe("MemberProgrammes", () => {
         buildId: "test-build",
         checkedAtUtc: "2026-08-01T10:00:00Z",
         contractCapabilities: [
-          "aqgreen-joining-schedules-v1",
+          "aqgreen-single-payment-v1",
           "direct-onyx-checkout-v1",
         ],
         databaseStatus: "Healthy",
         environment: "Test",
         imageId: "unavailable",
         isDatabaseReachable: true,
-        paymentContractVersion: "aqua-payments-2026-08-01",
+        paymentContractVersion: "aqua-payments-2026-08-01-single-payment",
         releaseDate: "2026-08-01T00:00:00Z",
         status: "Healthy",
         traceId: "test-trace",
@@ -179,16 +179,17 @@ describe("MemberProgrammes", () => {
     );
   });
 
-  it("offers and submits the two-instalment AQGreen schedule", async () => {
+  it("offers only the full AQGreen joining payment", async () => {
     render(<MemberProgrammes />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Join AQGreen" }));
-    fireEvent.click(screen.getByRole("radio", { name: /two R600 instalments/i }));
+    expect(screen.getByText(/one full payment of R1,200/i)).toBeInTheDocument();
+    expect(screen.queryByText(/two R600 instalments/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continue to secure payment" }));
 
     await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
       apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
-      { schedule: 1 },
+      { schedule: 0 },
     ));
   });
 
@@ -280,6 +281,37 @@ describe("MemberProgrammes", () => {
       );
     expect(screen.queryByRole("button", { name: "Pay R1,200 securely" }))
       .not.toBeInTheDocument();
+  });
+
+  it("preserves completion of a verified historical AQGreen instalment", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: {
+        activatedAt: null,
+        canRecruitForThisProgramme: false,
+        currency: "ZAR",
+        isActive: false,
+        joinedIndependently: true,
+        joiningPaidAmount: 600,
+        joiningSchedule: 1,
+        nextPaymentAmount: 600,
+        nextPaymentDescription: "Second AQGreen joining instalment",
+        programmeName: "AQGreen",
+        recruiterClubMemberNumber: null,
+        startedAt: "2026-07-26T10:00:00Z",
+        status: "Awaiting activation payment",
+      },
+      onyx: null,
+      pendingAQGreenCheckout: null,
+      travelBenefit: null,
+    });
+
+    render(<MemberProgrammes />);
+    fireEvent.click(await screen.findByRole("button", { name: /Pay.*600.*securely/i }));
+
+    await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
+      apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+      { schedule: 1 },
+    ));
   });
 
   it("does not load participation without the dedicated permission", () => {

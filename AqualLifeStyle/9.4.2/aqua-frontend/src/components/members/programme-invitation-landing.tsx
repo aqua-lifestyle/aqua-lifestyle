@@ -15,7 +15,6 @@ import type { ProgrammeInvitationPreview } from "@/src/shared/domain/programme-i
 import type { ProgrammeCheckout } from "@/src/shared/domain/programme-participations";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 import { Button, Card, LinkButton, Skeleton, StatusMessage } from "@/src/shared/ui";
-import { AQGreenPaymentSchedule } from "./aqgreen-payment-schedule";
 
 const unsupportedProgrammeMessage =
   "Invitations are not currently supported for this programme.";
@@ -51,7 +50,6 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string>();
-  const [aqGreenSchedule, setAQGreenSchedule] = useState<0 | 1>(0);
   const paymentApiCompatible = isPaymentApiCompatible(healthState.health);
   const paymentActionsUnavailable =
     healthState.isPending || !paymentApiCompatible;
@@ -106,7 +104,7 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
           { schedule: 0 | 1 }
         >(
           apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
-          { schedule: aqGreenSchedule },
+          { schedule: 0 },
         );
         navigateToExternalUrl(checkout.checkoutUrl);
       }
@@ -178,14 +176,6 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
                 Payment is unavailable because this frontend cannot verify a
                 compatible payment API deployment. No payment has been taken.
               </StatusMessage>
-            ) : null}
-
-            {preview.programmeKey === "AQGREEN" && session ? (
-              <AQGreenPaymentSchedule
-                disabled={joining || paymentActionsUnavailable}
-                onChange={setAQGreenSchedule}
-                value={aqGreenSchedule}
-              />
             ) : null}
 
             {!programmeJoinEndpoint ? (

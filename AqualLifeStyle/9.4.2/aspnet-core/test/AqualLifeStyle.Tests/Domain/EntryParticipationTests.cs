@@ -178,6 +178,42 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
+        public void AQGreenSinglePayment_AllowsTheFullPaymentSchedule()
+        {
+            var participation = EntryParticipation.StartIndependently(
+                tenantId: 1,
+                customerId: 10,
+                SinglePaymentTerms,
+                EffectiveFrom);
+
+            participation.SelectJoiningPaymentSchedule(
+                AQGreenJoiningPaymentSchedule.Full);
+
+            Assert.Equal(
+                AQGreenJoiningPaymentSchedule.Full,
+                participation.JoiningPaymentSchedule);
+            Assert.Equal(1200m, participation.GetNextJoiningPaymentAmount());
+            Assert.Equal(
+                AQGreenJoiningPaymentStage.Full,
+                participation.GetNextJoiningPaymentStage());
+        }
+
+        [Fact]
+        public void AQGreenSinglePayment_RejectsTheInstallmentSchedule()
+        {
+            var participation = EntryParticipation.StartIndependently(
+                tenantId: 1,
+                customerId: 10,
+                SinglePaymentTerms,
+                EffectiveFrom);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                participation.SelectJoiningPaymentSchedule(
+                    AQGreenJoiningPaymentSchedule.TwoInstallments));
+            Assert.Null(participation.JoiningPaymentSchedule);
+        }
+
+        [Fact]
         public void FlexibleAQGreen_ActivatesAfterOneVerifiedFullPayment()
         {
             var participation = StartFlexibleParticipation();
