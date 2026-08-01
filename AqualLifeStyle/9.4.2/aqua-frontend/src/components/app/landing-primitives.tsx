@@ -10,7 +10,7 @@ type LandingButtonTone = "primary" | "secondary-dark" | "secondary-light" | "war
 
 const buttonToneClassNames: Record<LandingButtonTone, string> = {
   primary:
-    "border-aqua-violet bg-aqua-violet text-white hover:border-aqua-violet-dark hover:bg-aqua-violet-dark",
+    "border-aqua-violet bg-aqua-violet text-white shadow-[0_8px_24px_rgba(108,59,216,0.18)] hover:border-aqua-violet-dark hover:bg-aqua-violet-dark hover:shadow-[0_10px_28px_rgba(108,59,216,0.24)]",
   "secondary-dark":
     "border-white/20 bg-transparent text-white hover:border-white/35 hover:bg-white/10",
   "secondary-light":
@@ -31,7 +31,7 @@ export const LandingLinkButton = ({
 }: LandingLinkButtonProps) => (
   <Link
     className={cn(
-      "inline-flex min-h-12 items-center justify-center gap-2 rounded-aqua-control border px-6 text-sm font-semibold transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:shadow-sm motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0 motion-reduce:transform-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aqua-violet",
+      "inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-aqua-control border px-6 text-sm font-semibold transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:shadow-sm motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0 motion-reduce:transform-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aqua-violet",
       buttonToneClassNames[tone],
       className,
     )}

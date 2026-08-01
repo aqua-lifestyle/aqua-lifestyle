@@ -117,7 +117,11 @@ const ChapterMarker = ({
 
 export const LandingPage = () => (
   <>
-    <main className="overflow-x-clip bg-aqua-canvas text-aqua-ink">
+    <main
+      className="scroll-mt-16 overflow-x-clip bg-aqua-canvas text-aqua-ink focus:outline-none"
+      id="main-content"
+      tabIndex={-1}
+    >
       <section
         aria-labelledby="landing-title"
         className="relative min-h-[calc(100svh-4rem)] overflow-hidden bg-aqua-canvas"
@@ -144,7 +148,7 @@ export const LandingPage = () => (
             </h1>
           </div>
 
-          <div className="grid gap-8 border-t border-aqua-line pt-8 lg:grid-cols-12 lg:items-end">
+          <div className="grid gap-8 border-t border-aqua-line pt-8 lg:grid-cols-12 lg:items-center lg:gap-10">
             <div className="lg:col-span-5">
               <p className="max-w-lg text-lg leading-8 text-aqua-muted">
                 A place where wellbeing, participation and local connection belong
@@ -203,7 +207,7 @@ export const LandingPage = () => (
         </div>
       </section>
 
-      <section aria-labelledby="welcome-title" className="relative overflow-hidden bg-aqua-cream" id="welcome">
+      <section aria-labelledby="welcome-title" className="relative scroll-mt-16 overflow-hidden bg-aqua-cream" id="welcome">
         <svg
           aria-hidden="true"
           className="absolute inset-x-0 bottom-0 h-44 w-full text-aqua-violet/10 sm:h-56"
@@ -233,7 +237,7 @@ export const LandingPage = () => (
         </div>
       </section>
 
-      <section aria-labelledby="problem-title" className="bg-aqua-navy text-white" id="story">
+      <section aria-labelledby="problem-title" className="scroll-mt-16 bg-aqua-navy text-white" id="story">
         <div className={`${landingContainerClassName} relative py-20 sm:py-24 lg:py-32`}>
           <span aria-hidden="true" className="absolute right-8 top-8 font-mono text-[11rem] leading-none text-white/[0.025] sm:text-[18rem]">
             02
@@ -338,7 +342,7 @@ export const LandingPage = () => (
                       {product}
                     </h3>
                   </div>
-                  <PackageSearch aria-hidden="true" className="size-5 shrink-0 text-aqua-violet" strokeWidth={1.75} />
+                  <PackageSearch aria-hidden="true" className="size-5 shrink-0 text-aqua-violet transition-transform duration-200 motion-safe:group-hover:translate-x-1" strokeWidth={1.75} />
                 </Link>
               ))}
             </div>
@@ -371,11 +375,11 @@ export const LandingPage = () => (
           <div className={`${landingContainerClassName} grid lg:grid-cols-3`}>
             {participationOptions.map((option, index) => (
               <article
-                className="flex min-h-72 flex-col justify-between border-b border-white/10 py-10 transition-colors last:border-b-0 hover:bg-white/[0.025] sm:min-h-80 lg:min-h-[28rem] lg:border-b-0 lg:border-r lg:px-10 lg:first:pl-0 lg:last:border-r-0 lg:last:pr-0"
+                className="group flex min-h-72 flex-col justify-between border-b border-white/10 py-10 transition-colors last:border-b-0 hover:bg-white/[0.025] sm:min-h-80 lg:min-h-[28rem] lg:border-b-0 lg:border-r lg:px-10 lg:first:pl-0 lg:last:border-r-0 lg:last:pr-0"
                 key={option.title}
               >
                 <div className="flex items-start justify-between">
-                  <option.icon aria-hidden="true" className="size-8 text-aqua-gold" strokeWidth={1.5} />
+                  <option.icon aria-hidden="true" className="size-8 text-aqua-gold transition-transform duration-200 motion-safe:group-hover:-translate-y-0.5" strokeWidth={1.5} />
                   <span className="font-mono text-xs text-white/65">0{index + 1}</span>
                 </div>
                 <div>
@@ -479,7 +483,7 @@ export const LandingPage = () => (
         </div>
       </section>
 
-      <section aria-labelledby="faq-title" className="bg-aqua-canvas" id="faq">
+      <section aria-labelledby="faq-title" className="scroll-mt-16 bg-aqua-canvas" id="faq">
         <div className={`${landingContainerClassName} grid gap-12 py-20 sm:gap-16 sm:py-24 lg:grid-cols-12 lg:py-32`}>
           <div className="lg:col-span-4">
             <ChapterMarker index="09">Questions</ChapterMarker>
