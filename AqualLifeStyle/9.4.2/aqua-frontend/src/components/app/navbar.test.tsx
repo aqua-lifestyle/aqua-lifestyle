@@ -105,16 +105,20 @@ describe("Navbar", () => {
       </AuthProvider>,
     );
 
-    expect(screen.getByRole("link", { name: "Why Aqua" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Welcome" })).toHaveAttribute(
       "href",
-      "/#solution",
+      "/#welcome",
     );
-    expect(screen.getByRole("link", { name: "How it works" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Participation" })).toHaveAttribute(
       "href",
-      "/#how-it-works",
+      "/#programmes",
     );
     expect(screen.queryByRole("link", { name: "Dashboard" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("tenant-switcher")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Skip to main content" })).toHaveAttribute(
+      "href",
+      "#landing-title",
+    );
 
     const menuButton = screen.getByRole("button", { name: "Open navigation" });
     expect(menuButton).toHaveAttribute("aria-expanded", "false");

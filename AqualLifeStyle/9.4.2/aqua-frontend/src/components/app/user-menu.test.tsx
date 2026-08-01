@@ -38,15 +38,14 @@ const SetSession = () => {
 describe("UserMenu", () => {
   beforeEach(() => vi.resetAllMocks());
 
-  it("renders sign-in and sign-up links when unauthenticated", () => {
+  it("routes guests through member access when unauthenticated", () => {
     render(
       <AuthProvider>
         <UserMenu />
       </AuthProvider>,
     );
 
-    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
-    expect(screen.getByRole("link", { name: "Create account" })).toHaveAttribute("href", "/signup");
+    expect(screen.getByRole("link", { name: "Member access" })).toHaveAttribute("href", "/login");
   });
 
   it("renders the user name and a sign-out button when authenticated", () => {
@@ -77,7 +76,7 @@ describe("UserMenu", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open user menu" }));
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
-    expect(screen.getByRole("link", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Member access" })).toBeInTheDocument();
     expect(replace).toHaveBeenCalledWith("/login");
   });
 

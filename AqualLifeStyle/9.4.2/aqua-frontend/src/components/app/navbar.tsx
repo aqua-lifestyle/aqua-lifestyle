@@ -55,11 +55,11 @@ const moreLinks = [
 ];
 
 const publicLinks = [
-  { href: "/#solution", label: "Why Aqua" },
-  { href: "/#products", label: "Products" },
-  { href: "/#programmes", label: "Programmes" },
-  { href: "/#how-it-works", label: "How it works" },
-  { href: "/#faq", label: "FAQ" },
+  { href: "/#welcome", label: "Welcome" },
+  { href: "/#products", label: "Wellbeing" },
+  { href: "/#programmes", label: "Participation" },
+  { href: "/#community", label: "Belong" },
+  { href: "/#faq", label: "Questions" },
 ];
 
 export const Navbar = () => {
@@ -146,6 +146,14 @@ export const Navbar = () => {
           : "glass",
       )}
     >
+      {isLanding ? (
+        <a
+          className="sr-only z-50 rounded-aqua-control bg-aqua-surface px-4 py-3 font-semibold text-aqua-ink focus:not-sr-only focus:absolute focus:left-4 focus:top-3"
+          href="#landing-title"
+        >
+          Skip to main content
+        </a>
+      ) : null}
       <div
         className={cn(
           "flex h-16 items-center justify-between",
