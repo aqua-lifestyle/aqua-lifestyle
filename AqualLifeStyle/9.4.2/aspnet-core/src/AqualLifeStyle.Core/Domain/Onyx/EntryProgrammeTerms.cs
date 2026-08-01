@@ -7,6 +7,7 @@ namespace AqualLifeStyle.Domain.Onyx
         public string Version { get; }
         public DateTime EffectiveFrom { get; }
         public decimal JoiningPaymentAmount { get; }
+        public decimal JoiningInstallmentAmount { get; }
         public decimal RegistrationPaymentAmount { get; }
         public decimal ActivationPaymentAmount { get; }
         public decimal MonthlyCommitmentAmount { get; }
@@ -17,6 +18,7 @@ namespace AqualLifeStyle.Domain.Onyx
             string version,
             DateTime effectiveFrom,
             decimal joiningPaymentAmount,
+            decimal joiningInstallmentAmount,
             decimal registrationPaymentAmount,
             decimal activationPaymentAmount,
             decimal monthlyCommitmentAmount,
@@ -36,10 +38,13 @@ namespace AqualLifeStyle.Domain.Onyx
             if (joiningPaymentAmount > 0m)
             {
                 EnsurePositive(joiningPaymentAmount, nameof(joiningPaymentAmount));
-                if (registrationPaymentAmount != 0m || activationPaymentAmount != 0m)
+                if (joiningInstallmentAmount < 0m)
                 {
-                    throw new ArgumentException(
-                        "Single-payment terms cannot also define legacy split payments.");
+                    throw new ArgumentOutOfRangeException(nameof(joiningInstallmentAmount));
+                }
+                if (joiningInstallmentAmount > 0m && joiningInstallmentAmount * 2m != joiningPaymentAmount)
+                {
+                    throw new ArgumentException("Two joining instalments must equal the joining total.");
                 }
             }
             else
@@ -56,6 +61,7 @@ namespace AqualLifeStyle.Domain.Onyx
             Version = version.Trim();
             EffectiveFrom = effectiveFrom;
             JoiningPaymentAmount = joiningPaymentAmount;
+            JoiningInstallmentAmount = joiningInstallmentAmount;
             RegistrationPaymentAmount = registrationPaymentAmount;
             ActivationPaymentAmount = activationPaymentAmount;
             MonthlyCommitmentAmount = monthlyCommitmentAmount;
@@ -76,6 +82,7 @@ namespace AqualLifeStyle.Domain.Onyx
                 version,
                 effectiveFrom,
                 joiningPaymentAmount: 0m,
+                joiningInstallmentAmount: 0m,
                 registrationPaymentAmount,
                 activationPaymentAmount,
                 monthlyCommitmentAmount,
@@ -95,6 +102,28 @@ namespace AqualLifeStyle.Domain.Onyx
                 version,
                 effectiveFrom,
                 joiningPaymentAmount,
+                joiningInstallmentAmount: 0m,
+                registrationPaymentAmount: 0m,
+                activationPaymentAmount: 0m,
+                monthlyCommitmentAmount,
+                gracePeriodDays,
+                currency);
+        }
+
+        public static EntryProgrammeTerms CreateFlexibleJoiningPayment(
+            string version,
+            DateTime effectiveFrom,
+            decimal joiningPaymentAmount,
+            decimal joiningInstallmentAmount,
+            decimal monthlyCommitmentAmount,
+            int gracePeriodDays,
+            string currency = "ZAR")
+        {
+            return new EntryProgrammeTerms(
+                version,
+                effectiveFrom,
+                joiningPaymentAmount,
+                joiningInstallmentAmount,
                 registrationPaymentAmount: 0m,
                 activationPaymentAmount: 0m,
                 monthlyCommitmentAmount,

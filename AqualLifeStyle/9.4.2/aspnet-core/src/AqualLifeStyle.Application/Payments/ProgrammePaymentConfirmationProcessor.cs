@@ -327,10 +327,13 @@ namespace AqualLifeStyle.Payments
             string currency,
             string programmeName)
         {
-            if (checkout.Status != HostedPaymentCheckoutStatus.AwaitingPayment ||
+            if (checkout.Status == HostedPaymentCheckoutStatus.PreparingCheckout ||
                 string.IsNullOrWhiteSpace(checkout.ProviderCheckoutId))
                 throw new YocoWebhookTransientException(
                     $"The {programmeName} checkout is not yet ready for payment confirmation.");
+            if (checkout.Status != HostedPaymentCheckoutStatus.AwaitingPayment)
+                throw new YocoWebhookValidationException(
+                    $"The {programmeName} checkout is no longer payable.");
             EnsureProviderCheckoutMatches(checkout, providerCheckoutId, programmeName);
             if (checkout.Amount != amount ||
                 !string.Equals(checkout.Currency, currency?.Trim(), StringComparison.OrdinalIgnoreCase))
@@ -450,7 +453,12 @@ namespace AqualLifeStyle.Payments
                     existingPayment.Confirm(confirmedAt);
                 }
 
-                participation.ApplyConfirmedJoiningPayment(payment);
+                if (!participation.JoiningPaymentSchedule.HasValue &&
+                    participation.JoiningInstallmentAmount <= 0m &&
+                    checkout.Stage == AQGreenJoiningPaymentStage.Full)
+                    participation.ApplyConfirmedJoiningPayment(payment);
+                else
+                    participation.ApplyConfirmedJoiningPayment(payment, checkout.Stage);
                 checkout.Complete(payment.Id, confirmedAt);
                 await _participantRoleSynchronizer.PromoteGuestToMemberAsync(checkout.CustomerId);
                 await _unitOfWorkManager.Current.SaveChangesAsync();

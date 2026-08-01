@@ -9,7 +9,10 @@ namespace AqualLifeStyle.Domain.Payments
     {
         PreparingCheckout = 0,
         AwaitingPayment = 1,
-        Completed = 2
+        Completed = 2,
+        Failed = 3,
+        Expired = 4,
+        AdministrativelyTerminated = 5
     }
 
     /// <summary>
@@ -34,6 +37,9 @@ namespace AqualLifeStyle.Domain.Payments
         public DateTime? CheckoutCreatedAt { get; protected set; }
         public Guid? PaymentId { get; protected set; }
         public DateTime? CompletedAt { get; protected set; }
+        public DateTime? TerminatedAt { get; protected set; }
+        public long? TerminatedByAdministratorUserId { get; protected set; }
+        public string TerminalEvidence { get; protected set; }
 
         protected void Initialize(
             int tenantId,
@@ -87,6 +93,10 @@ namespace AqualLifeStyle.Domain.Payments
             if (PaymentId == paymentId) return false;
             if (Status == HostedPaymentCheckoutStatus.Completed)
                 throw new InvalidOperationException("This payment checkout has already been completed.");
+            if (Status != HostedPaymentCheckoutStatus.PreparingCheckout &&
+                Status != HostedPaymentCheckoutStatus.AwaitingPayment)
+                throw new InvalidOperationException(
+                    "Only a payable checkout can be completed.");
             if (paymentId == Guid.Empty) throw new ArgumentException("A payment is required.", nameof(paymentId));
             if (completedAt == default || completedAt < CreatedAt)
                 throw new ArgumentException("Completion cannot precede the payment request.", nameof(completedAt));
@@ -95,6 +105,41 @@ namespace AqualLifeStyle.Domain.Payments
             CompletedAt = completedAt;
             Status = HostedPaymentCheckoutStatus.Completed;
             return true;
+        }
+
+        protected void Terminate(
+            HostedPaymentCheckoutStatus terminalStatus,
+            DateTime terminatedAt,
+            string evidence,
+            long? administratorUserId = null)
+        {
+            if (terminalStatus != HostedPaymentCheckoutStatus.Failed &&
+                terminalStatus != HostedPaymentCheckoutStatus.Expired &&
+                terminalStatus != HostedPaymentCheckoutStatus.AdministrativelyTerminated)
+                throw new ArgumentOutOfRangeException(nameof(terminalStatus));
+            var normalizedEvidence = RequireText(evidence, nameof(evidence), 1000);
+            if (Status == HostedPaymentCheckoutStatus.Completed)
+                throw new InvalidOperationException("A completed checkout cannot be terminated.");
+            if (Status == terminalStatus)
+            {
+                if (!string.Equals(TerminalEvidence, normalizedEvidence, StringComparison.Ordinal) ||
+                    TerminatedByAdministratorUserId != administratorUserId)
+                    throw new InvalidOperationException(
+                        "This checkout was already terminated using different evidence.");
+                return;
+            }
+            if (Status != HostedPaymentCheckoutStatus.AwaitingPayment)
+                throw new InvalidOperationException("Only an awaiting checkout can be terminated.");
+            if (terminatedAt == default || terminatedAt < CreatedAt)
+                throw new ArgumentException("A valid terminal time is required.", nameof(terminatedAt));
+            if (terminalStatus == HostedPaymentCheckoutStatus.AdministrativelyTerminated &&
+                (!administratorUserId.HasValue || administratorUserId.Value <= 0))
+                throw new ArgumentException("An administrator is required.", nameof(administratorUserId));
+
+            Status = terminalStatus;
+            TerminatedAt = terminatedAt;
+            TerminalEvidence = normalizedEvidence;
+            TerminatedByAdministratorUserId = administratorUserId;
         }
 
         private static string RequireText(string value, string parameterName, int maxLength)

@@ -144,7 +144,9 @@ namespace AqualLifeStyle.Authorization
                 programmeParticipations,
                 sides,
                 AquaPermissions.Admin.ProgrammeParticipations.View,
-                AquaPermissions.Admin.ProgrammeParticipations.CorrectRecruiter);
+                AquaPermissions.Admin.ProgrammeParticipations.CorrectRecruiter,
+                AquaPermissions.Admin.ProgrammeParticipations.GraduateToOnyx,
+                AquaPermissions.Admin.ProgrammeParticipations.ManagePaymentCheckouts);
 
             var host = MultiTenancySides.Host;
             var commissions = admin.CreateChildPermission(

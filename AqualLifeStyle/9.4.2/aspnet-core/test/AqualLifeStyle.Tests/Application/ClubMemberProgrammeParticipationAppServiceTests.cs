@@ -421,9 +421,15 @@ namespace AqualLifeStyle.Tests.Application
             await _participationService.StartEntryAsync(
                 new StartEntryParticipationInput());
             var checkoutResult = await _participationService
-                .CreateAQGreenJoiningCheckoutAsync();
+                .CreateAQGreenJoiningCheckoutAsync(new CreateAQGreenJoiningCheckoutInput
+                {
+                    Schedule = AQGreenJoiningPaymentSchedule.Full
+                });
             var repeatedCheckout = await _participationService
-                .CreateAQGreenJoiningCheckoutAsync();
+                .CreateAQGreenJoiningCheckoutAsync(new CreateAQGreenJoiningCheckoutInput
+                {
+                    Schedule = AQGreenJoiningPaymentSchedule.Full
+                });
 
             repeatedCheckout.CheckoutUrl.ShouldBe(checkoutResult.CheckoutUrl);
             checkoutResult.Amount.ShouldBe(1200m);
@@ -506,6 +512,86 @@ namespace AqualLifeStyle.Tests.Application
                 (await context.MemberPayments.CountAsync(item =>
                     item.CustomerId == customerId &&
                     item.Purpose == MemberPaymentPurpose.AQGreenJoining)).ShouldBe(1);
+            });
+        }
+
+        [Fact]
+        public async Task AQGreenCheckout_ActivatesOnlyAfterTwoDistinctVerifiedInstalments()
+        {
+            var customerId = await RegisterAndSignInCustomerAsync();
+            await _participationService.StartEntryAsync(
+                new StartEntryParticipationInput());
+            var schedule = new CreateAQGreenJoiningCheckoutInput
+            {
+                Schedule = AQGreenJoiningPaymentSchedule.TwoInstallments
+            };
+            var firstResult = await _participationService
+                .CreateAQGreenJoiningCheckoutAsync(schedule);
+            firstResult.Amount.ShouldBe(600m);
+            var firstCheckout = await UsingDbContextAsync(1, context =>
+                context.AQGreenJoiningCheckouts.SingleAsync(item =>
+                    item.CustomerId == customerId));
+
+            var processor = Resolve<ProgrammePaymentConfirmationProcessor>();
+            await processor.ProcessAQGreenJoiningCheckoutAsync(
+                firstCheckout.Id,
+                "Yoco",
+                $"aqgreen-first-{Guid.NewGuid():N}",
+                firstCheckout.ProviderCheckoutId,
+                600m,
+                "ZAR",
+                DateTime.UtcNow);
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations.SingleAsync(
+                    item => item.CustomerId == customerId);
+                participation.Status.ShouldBe(
+                    EntryParticipationStatus.AwaitingActivationPayment);
+                participation.RegistrationPaymentId.ShouldNotBeNull();
+                participation.ActivationPaymentId.ShouldBeNull();
+            });
+
+            await Should.ThrowAsync<InvalidOperationException>(() =>
+                _participationService.CreateAQGreenJoiningCheckoutAsync(
+                    new CreateAQGreenJoiningCheckoutInput
+                    {
+                        Schedule = AQGreenJoiningPaymentSchedule.Full
+                    }));
+
+            var secondResult = await _participationService
+                .CreateAQGreenJoiningCheckoutAsync(schedule);
+            secondResult.Amount.ShouldBe(600m);
+            var secondCheckout = await UsingDbContextAsync(1, context =>
+                context.AQGreenJoiningCheckouts.SingleAsync(item =>
+                    item.CustomerId == customerId &&
+                    item.Status == HostedPaymentCheckoutStatus.AwaitingPayment));
+            secondCheckout.Id.ShouldNotBe(firstCheckout.Id);
+            secondCheckout.Stage.ShouldBe(
+                AQGreenJoiningPaymentStage.SecondInstallment);
+
+            await processor.ProcessAQGreenJoiningCheckoutAsync(
+                secondCheckout.Id,
+                "Yoco",
+                $"aqgreen-second-{Guid.NewGuid():N}",
+                secondCheckout.ProviderCheckoutId,
+                600m,
+                "ZAR",
+                DateTime.UtcNow);
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations.SingleAsync(
+                    item => item.CustomerId == customerId);
+                participation.Status.ShouldBe(EntryParticipationStatus.Active);
+                participation.RegistrationPaymentId.ShouldNotBeNull();
+                participation.ActivationPaymentId.ShouldNotBeNull();
+                participation.RegistrationPaymentId.ShouldNotBe(
+                    participation.ActivationPaymentId);
+                (await context.MemberPayments.CountAsync(item =>
+                    item.CustomerId == customerId &&
+                    item.Purpose == MemberPaymentPurpose.AQGreenJoining))
+                    .ShouldBe(2);
             });
         }
 
@@ -683,7 +769,11 @@ namespace AqualLifeStyle.Tests.Application
         private async Task ActivateCurrentAQGreenParticipationAsync(int customerId)
         {
             await _participationService.StartEntryAsync(new StartEntryParticipationInput());
-            await _participationService.CreateAQGreenJoiningCheckoutAsync();
+            await _participationService.CreateAQGreenJoiningCheckoutAsync(
+                new CreateAQGreenJoiningCheckoutInput
+                {
+                    Schedule = AQGreenJoiningPaymentSchedule.Full
+                });
             var checkout = await UsingDbContextAsync(1, context =>
                 context.AQGreenJoiningCheckouts.SingleAsync(
                     item => item.CustomerId == customerId));

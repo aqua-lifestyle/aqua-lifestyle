@@ -132,8 +132,8 @@ Status legend: ✅ Implemented in codebase · 🔧 Domain/persistence foundation
 | BR-12 | Withdrawals are blocked until 12 months after account opening; every accepted contribution receives the full 20% interest at maturity | Current confirmed rule |
 | BR-13 | Pooled savings may finance AQGreen customer loans, but Club Member savings and borrower loan ledgers remain separate | Current confirmed rule |
 | BR-14 | AQGreen replaces the earlier working name “Entry”; all existing Entry participation, payment, network, obligation, commission, and ledger behavior remains AQGreen behavior | Current confirmed rule |
-| BR-15 | The customer-facing Onyx joining action is direct entry only; AQGreen-to-Onyx graduation creates a separate Onyx participation without a recruiter, starts a new independent Onyx network, and does not rewrite AQGreen history | Current confirmed rule |
-| BR-16 | New AQGreen participation activates after one provider-confirmed R1,200 joining payment; the R600 monthly commitment remains separate | Current confirmed rule |
+| BR-15 | The customer-facing Onyx joining action is direct entry only; AQGreen-to-Onyx graduation is an explicit authorised administrator decision after the active, member-accepted and administrator-approved R6,120 loan and current Level 2 eligibility are revalidated. It creates a separate independent Onyx participation and does not rewrite or terminate AQGreen | Current confirmed rule |
+| BR-16 | AQGreen joining totals R1,200 and activates after either one verified R1,200 payment or two distinct verified R600 joining instalments. The selected schedule becomes permanent after the first verified payment; the separate R600 monthly commitment remains unchanged | Current confirmed rule |
 
 ## 5. Assumptions
 

@@ -83,6 +83,8 @@ namespace AqualLifeStyle.Tests.Payments
                     1,
                     participation.Id,
                     customer.Id,
+                    AQGreenJoiningPaymentSchedule.Full,
+                    AQGreenJoiningPaymentStage.Full,
                     1200m,
                     "ZAR",
                     createdAt);

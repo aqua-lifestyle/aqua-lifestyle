@@ -13,6 +13,8 @@ using AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto;
 using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Customers;
+using AqualLifeStyle.Domain.Enums;
+using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.MultiTenancy;
@@ -27,30 +29,213 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         private readonly ICustomerRepository _customerRepository;
         private readonly IRepository<EntryParticipation, Guid> _entryParticipationRepository;
         private readonly IRepository<OnyxParticipation, Guid> _onyxParticipationRepository;
+        private readonly IRepository<OnyxLoanAgreement, Guid> _onyxLoanAgreementRepository;
+        private readonly IRepository<OnyxGraduationDecision, Guid> _graduationDecisionRepository;
+        private readonly IRepository<Membership> _membershipRepository;
         private readonly IRepository<MemberPayment, Guid> _paymentRepository;
+        private readonly IRepository<AQGreenJoiningCheckout, Guid> _aqGreenJoiningCheckoutRepository;
         private readonly IRepository<Tenant> _tenantRepository;
         private readonly IProgrammeRecruiterCorrectionPolicyResolver _correctionPolicyResolver;
         private readonly IProgrammeRecruiterCorrectionLock _correctionLock;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        private readonly ICurrentProgrammeTermsProvider _termsProvider;
 
         public AdminProgrammeParticipationAppService(
             ICustomerRepository customerRepository,
             IRepository<EntryParticipation, Guid> entryParticipationRepository,
             IRepository<OnyxParticipation, Guid> onyxParticipationRepository,
+            IRepository<OnyxLoanAgreement, Guid> onyxLoanAgreementRepository,
+            IRepository<OnyxGraduationDecision, Guid> graduationDecisionRepository,
+            IRepository<Membership> membershipRepository,
             IRepository<MemberPayment, Guid> paymentRepository,
+            IRepository<AQGreenJoiningCheckout, Guid> aqGreenJoiningCheckoutRepository,
             IRepository<Tenant> tenantRepository,
             IProgrammeRecruiterCorrectionPolicyResolver correctionPolicyResolver,
             IProgrammeRecruiterCorrectionLock correctionLock,
-            IUnitOfWorkManager unitOfWorkManager)
+            IUnitOfWorkManager unitOfWorkManager,
+            ICurrentProgrammeTermsProvider termsProvider)
         {
             _customerRepository = customerRepository;
             _entryParticipationRepository = entryParticipationRepository;
             _onyxParticipationRepository = onyxParticipationRepository;
+            _onyxLoanAgreementRepository = onyxLoanAgreementRepository;
+            _graduationDecisionRepository = graduationDecisionRepository;
+            _membershipRepository = membershipRepository;
             _paymentRepository = paymentRepository;
+            _aqGreenJoiningCheckoutRepository = aqGreenJoiningCheckoutRepository;
             _tenantRepository = tenantRepository;
             _correctionPolicyResolver = correctionPolicyResolver;
             _correctionLock = correctionLock;
             _unitOfWorkManager = unitOfWorkManager;
+            _termsProvider = termsProvider;
+        }
+
+        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.ManagePaymentCheckouts)]
+        [UnitOfWork(IsDisabled = true)]
+        public async Task TerminateAQGreenJoiningCheckoutAsync(
+            TerminateAQGreenJoiningCheckoutInput input)
+        {
+            if (input == null || input.CheckoutId == Guid.Empty)
+                throw new Abp.UI.UserFriendlyException(
+                    "AQGreen checkout termination failed.",
+                    "Select a valid AQGreen joining checkout.");
+            if (!AbpSession.TenantId.HasValue &&
+                !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
+                throw new AbpAuthorizationException(
+                    "Cross-Area checkout management requires permission to manage all Areas.");
+
+            AQGreenJoiningCheckout checkout;
+            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+            {
+                IsTransactional = true,
+                IsolationLevel = IsolationLevel.Serializable
+            }))
+            using (DisableAllTenantDataFiltersForHost())
+            {
+                checkout = await _aqGreenJoiningCheckoutRepository.FirstOrDefaultAsync(
+                    item => item.Id == input.CheckoutId);
+                if (checkout == null)
+                    throw new Abp.UI.UserFriendlyException(
+                        "AQGreen checkout termination failed.",
+                        "The checkout was not found in your Area.");
+                ValidateRequestedTenant(checkout.TenantId, "AQGreen checkout termination");
+                checkout.TerminateByAdministrator(
+                    AbpSession.GetUserId(),
+                    DateTime.UtcNow,
+                    input.Evidence);
+                await CurrentUnitOfWork.SaveChangesAsync();
+                await uow.CompleteAsync();
+            }
+
+            Logger.Warn(
+                $"AQGreen checkout administratively terminated tenant={checkout.TenantId} checkout={checkout.Id} administrator={AbpSession.GetUserId()}");
+        }
+
+        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.GraduateToOnyx)]
+        [UnitOfWork(IsDisabled = true)]
+        public async Task<OnyxGraduationDecisionDto> GraduateAQGreenToOnyxAsync(
+            GraduateAQGreenToOnyxInput input)
+        {
+            if (input == null || input.LoanAgreementId == Guid.Empty)
+                throw new Abp.UI.UserFriendlyException(
+                    "Onyx graduation failed.",
+                    "Select a valid approved loan agreement.");
+            if (!AbpSession.TenantId.HasValue &&
+                !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
+                throw new AbpAuthorizationException(
+                    "Cross-Area Onyx graduation requires permission to manage all Areas.");
+
+            OnyxGraduationDecision decision;
+            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+            {
+                IsTransactional = true,
+                IsolationLevel = IsolationLevel.Serializable
+            }))
+            using (DisableAllTenantDataFiltersForHost())
+            {
+                await _correctionLock.AcquireAsync(ProgrammeRecruiterNetwork.Onyx);
+                decision = await _graduationDecisionRepository.FirstOrDefaultAsync(
+                    item => item.LoanAgreementId == input.LoanAgreementId);
+                if (decision != null)
+                {
+                    ValidateRequestedTenant(decision.TenantId, "Onyx graduation");
+                    return Map(decision);
+                }
+
+                var loan = await _onyxLoanAgreementRepository.FirstOrDefaultAsync(
+                    item => item.Id == input.LoanAgreementId);
+                if (loan == null)
+                    throw new Abp.UI.UserFriendlyException(
+                        "Onyx graduation failed.",
+                        "The approved loan agreement was not found in your Area.");
+                ValidateRequestedTenant(loan.TenantId, "Onyx graduation");
+
+                using (_unitOfWorkManager.Current.SetTenantId(loan.TenantId))
+                {
+                    var aqGreen = await _entryParticipationRepository.FirstOrDefaultAsync(
+                        item => item.Id == loan.EntryParticipationId &&
+                                item.CustomerId == loan.CustomerId &&
+                                item.TenantId == loan.TenantId);
+                    if (aqGreen == null || aqGreen.Status != EntryParticipationStatus.Active)
+                        throw new Abp.UI.UserFriendlyException(
+                            "Onyx graduation failed.",
+                            "The linked AQGreen participation is no longer active.");
+                    if (loan.Status != OnyxLoanAgreementStatus.Active ||
+                        !loan.EffectiveAt.HasValue ||
+                        !loan.MemberAcceptedAt.HasValue ||
+                        !loan.MemberAcceptedByUserId.HasValue ||
+                        !loan.ApprovedAt.HasValue ||
+                        !loan.ApprovedByAdministratorUserId.HasValue)
+                        throw new Abp.UI.UserFriendlyException(
+                            "Onyx graduation failed.",
+                            "The loan must be active, member-accepted, and administrator-approved.");
+
+                    var existingOnyx = await _onyxParticipationRepository.FirstOrDefaultAsync(
+                        item => item.TenantId == loan.TenantId &&
+                                item.CustomerId == loan.CustomerId);
+                    if (existingOnyx != null)
+                        throw new Abp.UI.UserFriendlyException(
+                            "Onyx graduation requires reconciliation.",
+                            "An Onyx participation already exists without this graduation decision.");
+
+                    var network = await _entryParticipationRepository.GetAll()
+                        .Where(item => item.TenantId == loan.TenantId &&
+                                       item.Status == EntryParticipationStatus.Active)
+                        .ToListAsync();
+                    var evaluatedLevel = new EntryNetworkQualificationEvaluator()
+                        .Evaluate(aqGreen.CustomerId, network);
+                    if (evaluatedLevel < EntryNetworkLevel.Level2)
+                        throw new Abp.UI.UserFriendlyException(
+                            "Onyx graduation failed.",
+                            "The member no longer satisfies AQGreen Level 2 qualification.");
+
+                    var terms = _termsProvider.GetDirectOnyxTerms();
+                    if (loan.PrincipalAmount != terms.DirectEntryAmount ||
+                        !string.Equals(loan.Currency, terms.Currency, StringComparison.Ordinal))
+                        throw new Abp.UI.UserFriendlyException(
+                            "Onyx graduation failed.",
+                            $"The approved funding must be {terms.Currency} {terms.DirectEntryAmount:0.00}.");
+
+                    Membership membership;
+                    using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
+                    {
+                        membership = await _membershipRepository.GetAll()
+                            .Where(item => item.IsActive &&
+                                           item.MembershipType == MembershipType.Onyx &&
+                                           (!item.TenantId.HasValue || item.TenantId == loan.TenantId))
+                            .OrderByDescending(item => item.TenantId.HasValue)
+                            .FirstOrDefaultAsync();
+                    }
+                    if (membership == null)
+                        throw new Abp.UI.UserFriendlyException(
+                            "Onyx graduation failed.",
+                            "The Onyx programme has not been configured for this Area.");
+
+                    var decidedAt = DateTime.UtcNow;
+                    var onyx = OnyxParticipation.GraduateFromAQGreenIndependently(
+                        aqGreen,
+                        loan,
+                        membership.Id,
+                        terms,
+                        decidedAt);
+                    decision = OnyxGraduationDecision.RecordApproval(
+                        aqGreen,
+                        loan,
+                        onyx,
+                        evaluatedLevel,
+                        AbpSession.GetUserId(),
+                        input.Justification,
+                        decidedAt);
+                    await _onyxParticipationRepository.InsertAsync(onyx);
+                    await _graduationDecisionRepository.InsertAsync(decision);
+                    await CurrentUnitOfWork.SaveChangesAsync();
+                }
+                await uow.CompleteAsync();
+            }
+
+            Logger.Info(
+                $"Onyx graduation approved tenant={decision.TenantId} decision={decision.Id} participation={decision.OnyxParticipationId}");
+            return Map(decision);
         }
 
         [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.CorrectRecruiter)]
@@ -153,6 +338,108 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 return input.Programme == AdminProgrammeType.Onyx
                     ? await GetOnyxParticipationsAsync(input)
                     : await GetEntryParticipationsAsync(input);
+            }
+        }
+
+        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.View)]
+        public async Task<PagedResultDto<LegacyAQGreenReconciliationDto>>
+            GetLegacyAQGreenReconciliationAsync(
+                LegacyAQGreenReconciliationListInput input)
+        {
+            input ??= new LegacyAQGreenReconciliationListInput();
+            ValidateRequestedTenant(input.TenantId, "Legacy AQGreen reconciliation");
+            if (!AbpSession.TenantId.HasValue &&
+                !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
+                throw new AbpAuthorizationException(
+                    "Host-wide legacy reconciliation access requires permission to view all Areas.");
+
+            using (DisableAllTenantDataFiltersForHost())
+            {
+                var query =
+                    from participation in _entryParticipationRepository.GetAll()
+                    join customer in _customerRepository.GetAll()
+                        on participation.CustomerId equals customer.Id
+                    where participation.JoiningInstallmentAmount == 0m
+                    select new EntryParticipationQueryRow
+                    {
+                        Participation = participation,
+                        Customer = customer
+                    };
+                if (AbpSession.TenantId.HasValue)
+                {
+                    var tenantId = AbpSession.TenantId.Value;
+                    query = query.Where(row => row.Participation.TenantId == tenantId);
+                }
+                else if (input.TenantId.HasValue)
+                {
+                    var tenantId = input.TenantId.Value;
+                    query = query.Where(row => row.Participation.TenantId == tenantId);
+                }
+
+                var total = await query.CountAsync();
+                var rows = await query
+                    .OrderBy(row => row.Participation.StartedAt)
+                    .Skip(input.SkipCount)
+                    .Take(input.MaxResultCount)
+                    .ToListAsync();
+                var participationIds = rows.Select(row => row.Participation.Id).ToArray();
+                var customerIds = rows.Select(row => row.Participation.CustomerId)
+                    .Distinct()
+                    .ToArray();
+                var payments = await _paymentRepository.GetAll()
+                    .Where(payment => customerIds.Contains(payment.CustomerId) &&
+                                      payment.Status == MemberPaymentStatus.Confirmed &&
+                                      (payment.Purpose == MemberPaymentPurpose.AQGreenJoining ||
+                                       payment.Purpose == MemberPaymentPurpose.EntryRegistration ||
+                                       payment.Purpose == MemberPaymentPurpose.EntryActivation ||
+                                       payment.Purpose == MemberPaymentPurpose.EntryMonthlyCommitment))
+                    .ToListAsync();
+                var checkouts = await _aqGreenJoiningCheckoutRepository.GetAll()
+                    .Where(checkout => participationIds.Contains(checkout.ParticipationId))
+                    .OrderBy(checkout => checkout.CreatedAt)
+                    .ToListAsync();
+
+                return new PagedResultDto<LegacyAQGreenReconciliationDto>(
+                    total,
+                    rows.Select(row => new LegacyAQGreenReconciliationDto
+                    {
+                        TenantId = row.Participation.TenantId,
+                        ParticipationId = row.Participation.Id,
+                        ClubMemberNumber = row.Customer.ClubMemberNumber,
+                        TermsVersion = row.Participation.TermsVersion,
+                        JoiningAmount = row.Participation.JoiningPaymentAmount,
+                        RegistrationAmount = row.Participation.RegistrationPaymentAmount,
+                        ActivationAmount = row.Participation.ActivationPaymentAmount,
+                        MonthlySubscriptionAmount = row.Participation.MonthlyCommitmentAmount,
+                        JoiningPaymentId = row.Participation.JoiningPaymentId,
+                        RegistrationPaymentId = row.Participation.RegistrationPaymentId,
+                        ActivationPaymentId = row.Participation.ActivationPaymentId,
+                        VerifiedPayments = payments
+                            .Where(payment => payment.CustomerId == row.Participation.CustomerId)
+                            .Select(payment => new LegacyAQGreenPaymentFactDto
+                            {
+                                PaymentId = payment.Id,
+                                Purpose = payment.Purpose,
+                                Amount = payment.Amount,
+                                Currency = payment.Currency,
+                                Provider = payment.Provider,
+                                ProviderReference = payment.ExternalReference,
+                                ConfirmedAt = payment.ConfirmedAt.Value
+                            })
+                            .ToList(),
+                        CheckoutAttempts = checkouts
+                            .Where(checkout => checkout.ParticipationId == row.Participation.Id)
+                            .Select(checkout => new LegacyAQGreenCheckoutFactDto
+                            {
+                                CheckoutId = checkout.Id,
+                                Amount = checkout.Amount,
+                                Currency = checkout.Currency,
+                                Status = checkout.Status,
+                                ProviderCheckoutId = checkout.ProviderCheckoutId,
+                                PaymentId = checkout.PaymentId
+                            })
+                            .ToList()
+                    }).ToList());
             }
         }
 
@@ -432,6 +719,19 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 ConfirmedAt = payment.ConfirmedAt.Value
             };
         }
+
+        private static OnyxGraduationDecisionDto Map(OnyxGraduationDecision decision) =>
+            new OnyxGraduationDecisionDto
+            {
+                DecisionId = decision.Id,
+                AQGreenParticipationId = decision.EntryParticipationId,
+                LoanAgreementId = decision.LoanAgreementId,
+                OnyxParticipationId = decision.OnyxParticipationId,
+                AdministratorUserId = decision.AdministratorUserId,
+                DecidedAt = decision.DecidedAt,
+                Justification = decision.Justification,
+                EvaluatedNetworkLevel = decision.EvaluatedNetworkLevel
+            };
 
         private sealed class EntryParticipationQueryRow
         {

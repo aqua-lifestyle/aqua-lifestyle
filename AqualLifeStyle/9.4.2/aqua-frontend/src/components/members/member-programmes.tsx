@@ -26,6 +26,7 @@ import {
   StatusMessage,
 } from "@/src/shared/ui";
 import { JoinProgrammeDialog } from "./join-programme-dialog";
+import { AQGreenPaymentSchedule } from "./aqgreen-payment-schedule";
 
 const VIEW_PERMISSION = "Aqua.ProgrammeParticipations.ViewSelf";
 
@@ -176,6 +177,7 @@ export const MemberProgrammes = () => {
   const [actionError, setActionError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [startingAQGreenPayment, setStartingAQGreenPayment] = useState(false);
+  const [aqGreenSchedule, setAQGreenSchedule] = useState<0 | 1>(0);
   const [accessRefreshFinished, setAccessRefreshFinished] = useState(false);
   const accessRefreshAttempted = useRef(false);
   const hasActiveInvitationAccess = Boolean(
@@ -242,12 +244,16 @@ export const MemberProgrammes = () => {
     return () => window.clearTimeout(task);
   }, []);
 
-  const startAQGreenPayment = async () => {
+  const startAQGreenPayment = async (schedule: 0 | 1) => {
     setStartingAQGreenPayment(true);
     setActionError(undefined);
     try {
-      const checkout = await httpClient.post<{ checkoutUrl: string }>(
+      const checkout = await httpClient.post<
+        { checkoutUrl: string },
+        { schedule: 0 | 1 }
+      >(
         apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+        { schedule },
       );
       navigateToExternalUrl(checkout.checkoutUrl);
     } catch (requestError) {
@@ -337,18 +343,28 @@ export const MemberProgrammes = () => {
                     >
                       Continue secure payment
                     </a>
-                  ) : participations.entry.nextPaymentAmount === 1200 ? (
-                    <Button
-                      isLoading={startingAQGreenPayment}
-                      onClick={() => void startAQGreenPayment()}
-                    >
-                      Pay R1,200 securely
-                    </Button>
                   ) : (
-                    <StatusMessage tone="info">
-                      Contact the club team to complete your previous AQGreen
-                      payment arrangement without being charged again.
-                    </StatusMessage>
+                    <div className="flex flex-col gap-4">
+                      {participations.entry.joiningSchedule == null ? (
+                        <AQGreenPaymentSchedule
+                          disabled={startingAQGreenPayment}
+                          onChange={setAQGreenSchedule}
+                          value={aqGreenSchedule}
+                        />
+                      ) : null}
+                      <Button
+                        isLoading={startingAQGreenPayment}
+                        onClick={() => void startAQGreenPayment(
+                          participations.entry?.joiningSchedule ?? aqGreenSchedule,
+                        )}
+                      >
+                        Pay {formatCurrency(
+                          participations.entry.nextPaymentAmount ??
+                            participations.entry.joiningOutstandingAmount ?? 1200,
+                          participations.entry.currency,
+                        )} securely
+                      </Button>
+                    </div>
                   )
                 }
               />

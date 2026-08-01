@@ -22,6 +22,14 @@ namespace AqualLifeStyle.Tests.Domain
                 joiningPaymentAmount: 1200m,
                 monthlyCommitmentAmount: 600m,
                 gracePeriodDays: 7);
+        private static readonly EntryProgrammeTerms FlexiblePaymentTerms =
+            EntryProgrammeTerms.CreateFlexibleJoiningPayment(
+                "aqgreen-2026-08-flexible-1200",
+                EffectiveFrom,
+                joiningPaymentAmount: 1200m,
+                joiningInstallmentAmount: 600m,
+                monthlyCommitmentAmount: 600m,
+                gracePeriodDays: 7);
 
         [Fact]
         public void Customer_CanStartEntryIndependently()
@@ -170,6 +178,81 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
+        public void FlexibleAQGreen_ActivatesAfterOneVerifiedFullPayment()
+        {
+            var participation = StartFlexibleParticipation();
+            participation.SelectJoiningPaymentSchedule(AQGreenJoiningPaymentSchedule.Full);
+            var payment = CreateAQGreenJoiningPayment(1200m, "aqgreen-full");
+            payment.Confirm(EffectiveFrom.AddMinutes(1));
+
+            participation.ApplyConfirmedJoiningPayment(
+                payment,
+                AQGreenJoiningPaymentStage.Full);
+            participation.ApplyConfirmedJoiningPayment(
+                payment,
+                AQGreenJoiningPaymentStage.Full);
+
+            Assert.Equal(EntryParticipationStatus.Active, participation.Status);
+            Assert.Equal(1200m, participation.GetConfirmedJoiningAmount());
+            Assert.Equal(0m, participation.GetOutstandingJoiningAmount());
+            Assert.Equal(payment.Id, participation.JoiningPaymentId);
+        }
+
+        [Fact]
+        public void FlexibleAQGreen_RequiresTwoDistinctVerifiedInstalments()
+        {
+            var participation = StartFlexibleParticipation();
+            participation.SelectJoiningPaymentSchedule(
+                AQGreenJoiningPaymentSchedule.TwoInstallments);
+            var first = CreateAQGreenJoiningPayment(600m, "aqgreen-first");
+            first.Confirm(EffectiveFrom.AddMinutes(1));
+
+            participation.ApplyConfirmedJoiningPayment(
+                first,
+                AQGreenJoiningPaymentStage.FirstInstallment);
+
+            Assert.Equal(
+                EntryParticipationStatus.AwaitingActivationPayment,
+                participation.Status);
+            Assert.False(participation.IsQualifiedForNetwork);
+            Assert.Equal(600m, participation.GetConfirmedJoiningAmount());
+            Assert.Throws<InvalidOperationException>(() =>
+                participation.SelectJoiningPaymentSchedule(
+                    AQGreenJoiningPaymentSchedule.Full));
+
+            var second = CreateAQGreenJoiningPayment(600m, "aqgreen-second");
+            second.Confirm(EffectiveFrom.AddMinutes(2));
+            participation.ApplyConfirmedJoiningPayment(
+                second,
+                AQGreenJoiningPaymentStage.SecondInstallment);
+
+            Assert.Equal(EntryParticipationStatus.Active, participation.Status);
+            Assert.Equal(1200m, participation.GetConfirmedJoiningAmount());
+            Assert.NotEqual(
+                participation.RegistrationPaymentId,
+                participation.ActivationPaymentId);
+        }
+
+        [Fact]
+        public void FlexibleAQGreen_DoesNotAcceptMonthlyPaymentForJoining()
+        {
+            var participation = StartFlexibleParticipation();
+            participation.SelectJoiningPaymentSchedule(AQGreenJoiningPaymentSchedule.Full);
+            var monthly = CreatePayment(
+                participation.TenantId,
+                participation.CustomerId,
+                MemberPaymentPurpose.EntryMonthlyCommitment,
+                "monthly-not-joining");
+            monthly.Confirm(EffectiveFrom.AddMinutes(1));
+
+            Assert.Throws<InvalidOperationException>(() =>
+                participation.ApplyConfirmedJoiningPayment(
+                    monthly,
+                    AQGreenJoiningPaymentStage.Full));
+            Assert.Equal(0m, participation.GetConfirmedJoiningAmount());
+        }
+
+        [Fact]
         public void ReapplyingTheSameConfirmedPayment_IsIdempotent()
         {
             var participation = StartParticipation();
@@ -223,6 +306,25 @@ namespace AqualLifeStyle.Tests.Domain
                 Terms,
                 EffectiveFrom);
         }
+
+        private static EntryParticipation StartFlexibleParticipation() =>
+            EntryParticipation.StartIndependently(
+                tenantId: 1,
+                customerId: 10,
+                FlexiblePaymentTerms,
+                EffectiveFrom);
+
+        private static MemberPayment CreateAQGreenJoiningPayment(
+            decimal amount,
+            string externalReference) =>
+            MemberPayment.CreatePending(
+                tenantId: 1,
+                customerId: 10,
+                MemberPaymentPurpose.AQGreenJoining,
+                amount,
+                "Yoco",
+                externalReference,
+                EffectiveFrom);
 
         private static void ApplyBothActivationPayments(EntryParticipation participation)
         {

@@ -10,6 +10,7 @@ import type { ProgrammeInvitationPreview } from "@/src/shared/domain/programme-i
 import type { ProgrammeCheckout } from "@/src/shared/domain/programme-participations";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 import { Button, Card, LinkButton, Skeleton, StatusMessage } from "@/src/shared/ui";
+import { AQGreenPaymentSchedule } from "./aqgreen-payment-schedule";
 
 const unsupportedProgrammeMessage =
   "Invitations are not currently supported for this programme.";
@@ -28,7 +29,7 @@ const getProgrammeJoinEndpoint = (programmeKey: string) => {
 const getProgrammePaymentExplanation = (programmeKey: string) => {
   switch (programmeKey) {
     case "AQGREEN":
-      return "Confirming records your AQGreen place under this inviting Club Member and continues to Yoco for one full R1,200 payment. Participation activates only after Yoco confirms payment.";
+      return "Confirming records your AQGreen place under this inviting Club Member. AQGreen joining costs R1,200 and activates only after the full amount is verified.";
     case "ONYX":
       return "Confirming continues to Yoco for the full R6,120 payment. Your Onyx participation and network place are created only after Yoco confirms payment.";
     default:
@@ -42,6 +43,7 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string>();
+  const [aqGreenSchedule, setAQGreenSchedule] = useState<0 | 1>(0);
 
   useEffect(() => {
     void httpClient
@@ -77,8 +79,12 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
         navigateToExternalUrl(checkout.checkoutUrl);
       } else {
         await httpClient.post(endpoint, { inviteCode: preview.inviteCode });
-        const checkout = await httpClient.post<ProgrammeCheckout>(
+        const checkout = await httpClient.post<
+          ProgrammeCheckout,
+          { schedule: 0 | 1 }
+        >(
           apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+          { schedule: aqGreenSchedule },
         );
         navigateToExternalUrl(checkout.checkoutUrl);
       }
@@ -143,6 +149,14 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
               <StatusMessage tone="info">
                 {programmePaymentExplanation}
               </StatusMessage>
+            ) : null}
+
+            {preview.programmeKey === "AQGREEN" && session ? (
+              <AQGreenPaymentSchedule
+                disabled={joining}
+                onChange={setAQGreenSchedule}
+                value={aqGreenSchedule}
+              />
             ) : null}
 
             {!programmeJoinEndpoint ? (

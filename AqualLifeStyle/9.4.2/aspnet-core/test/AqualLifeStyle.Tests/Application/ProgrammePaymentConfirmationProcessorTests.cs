@@ -61,6 +61,8 @@ namespace AqualLifeStyle.Tests.Application
                     1,
                     participation.Id,
                     customer.Id,
+                    AQGreenJoiningPaymentSchedule.Full,
+                    AQGreenJoiningPaymentStage.Full,
                     participation.JoiningPaymentAmount,
                     participation.Currency,
                     AQGreenSinglePaymentEffectiveFrom);
@@ -369,6 +371,8 @@ namespace AqualLifeStyle.Tests.Application
                     1,
                     participation.Id,
                     customer.Id,
+                    AQGreenJoiningPaymentSchedule.Full,
+                    AQGreenJoiningPaymentStage.Full,
                     1200m,
                     "ZAR",
                     AQGreenSinglePaymentEffectiveFrom);
@@ -519,6 +523,8 @@ namespace AqualLifeStyle.Tests.Application
                     1,
                     participation.Id,
                     customer.Id,
+                    AQGreenJoiningPaymentSchedule.Full,
+                    AQGreenJoiningPaymentStage.Full,
                     1200m,
                     "ZAR",
                     AQGreenSinglePaymentEffectiveFrom);
@@ -645,6 +651,87 @@ namespace AqualLifeStyle.Tests.Application
                 (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
                     message.IdempotencyKey == $"payment-confirmed:{payment.Id}" &&
                     message.NotificationType == "PaymentConfirmation")).ShouldBe(1);
+            });
+        }
+
+        [Fact]
+        public async Task SignedFailedYocoNotification_TerminatesAQGreenCheckoutWithoutPayment()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"aqgreen-failed-{suffix}",
+                $"aqgreen-failed-{suffix}@example.com");
+            var checkoutId = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "AQGreen Failed Payment Test",
+                    new EmailAddress($"aqgreen-failed-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    EntryProgrammeTerms.CreateFlexibleJoiningPayment(
+                        "aqgreen-failed-2026-08",
+                        AQGreenSinglePaymentEffectiveFrom,
+                        1200m,
+                        600m,
+                        600m,
+                        7),
+                    AQGreenSinglePaymentEffectiveFrom);
+                participation.SelectJoiningPaymentSchedule(
+                    AQGreenJoiningPaymentSchedule.Full);
+                var checkout = AQGreenJoiningCheckout.Create(
+                    1,
+                    participation.Id,
+                    customer.Id,
+                    AQGreenJoiningPaymentSchedule.Full,
+                    AQGreenJoiningPaymentStage.Full,
+                    1200m,
+                    "ZAR",
+                    AQGreenSinglePaymentEffectiveFrom);
+                checkout.RecordCheckout(
+                    $"ch_failed_{suffix}",
+                    $"https://payments.example.test/ch_failed_{suffix}",
+                    AQGreenSinglePaymentEffectiveFrom);
+                context.EntryParticipations.Add(participation);
+                context.AQGreenJoiningCheckouts.Add(checkout);
+                await context.SaveChangesAsync();
+                return checkout.Id;
+            });
+
+            var persistedCheckout = await UsingDbContextAsync(1, context =>
+                context.AQGreenJoiningCheckouts.SingleAsync(item => item.Id == checkoutId));
+            var notification = CreateNotification(
+                $"evt_failed_{suffix}",
+                $"pay_failed_{suffix}",
+                persistedCheckout.ProviderCheckoutId,
+                120000);
+            notification.EventType = "payment.failed";
+
+            var processor = Resolve<YocoPaymentNotificationProcessor>();
+            await processor.ProcessAsync(notification);
+            await processor.ProcessAsync(notification);
+
+            var lateSuccess = CreateNotification(
+                $"evt_late_success_{suffix}",
+                $"pay_late_success_{suffix}",
+                persistedCheckout.ProviderCheckoutId,
+                120000);
+            await Should.ThrowAsync<YocoWebhookValidationException>(() =>
+                processor.ProcessAsync(lateSuccess));
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var checkout = await context.AQGreenJoiningCheckouts.SingleAsync(
+                    item => item.Id == checkoutId);
+                checkout.Status.ShouldBe(HostedPaymentCheckoutStatus.Failed);
+                checkout.TerminalEvidence.ShouldContain(notification.EventId);
+                (await context.MemberPayments.AnyAsync()).ShouldBeFalse();
+                (await context.YocoWebhookReceipts.CountAsync()).ShouldBe(1);
             });
         }
 

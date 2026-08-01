@@ -103,6 +103,25 @@ namespace AqualLifeStyle.Tests.Domain
             Assert.Equal(600m, obligation.OutstandingAmount);
         }
 
+        [Fact]
+        public void JoiningPayment_CannotSettleMonthlyObligation()
+        {
+            var obligation = CreateObligation();
+            var joiningPayment = MemberPayment.CreatePending(
+                1,
+                10,
+                MemberPaymentPurpose.AQGreenJoining,
+                600m,
+                "Yoco",
+                $"joining-{Guid.NewGuid():N}",
+                DueAt);
+            joiningPayment.Confirm(DueAt.AddMinutes(1));
+
+            Assert.Throws<InvalidOperationException>(() =>
+                obligation.ApplyConfirmedPayment(joiningPayment));
+            Assert.Equal(600m, obligation.OutstandingAmount);
+        }
+
         private static EntryMonthlyObligation CreateObligation()
         {
             return EntryMonthlyObligation.Create(

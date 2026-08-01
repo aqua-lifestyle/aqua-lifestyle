@@ -57,6 +57,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<OnyxLoanAgreement> OnyxLoanAgreements { get; set; }
         public virtual DbSet<OnyxLoanWeeklyRequirement> OnyxLoanWeeklyRequirements { get; set; }
         public virtual DbSet<OnyxLoanRepaymentAllocation> OnyxLoanRepaymentAllocations { get; set; }
+        public virtual DbSet<OnyxGraduationDecision> OnyxGraduationDecisions { get; set; }
         public virtual DbSet<SavingsAccount> SavingsAccounts { get; set; }
         public virtual DbSet<SavingsContribution> SavingsContributions { get; set; }
 

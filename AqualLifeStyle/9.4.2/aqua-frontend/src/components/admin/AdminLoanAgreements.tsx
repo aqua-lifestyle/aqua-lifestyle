@@ -15,10 +15,13 @@ import {
   Skeleton,
   StatusMessage,
 } from "@/src/shared/ui";
+import { AdminJustificationDialog } from "./AdminJustificationDialog";
 import { TruncatedResultsWarning } from "./TruncatedResultsWarning";
 
 type PagedLoans = { items: OnyxLoanAgreement[]; totalCount: number };
 const VIEW_PERMISSION = "Aqua.Admin.Loans.View";
+const GRADUATE_PERMISSION =
+  "Aqua.Admin.ProgrammeParticipations.GraduateToOnyx";
 
 const formatCurrency = (amount: number, currency: string) =>
   new Intl.NumberFormat("en-ZA", { currency, style: "currency" }).format(amount);
@@ -30,10 +33,13 @@ export const AdminLoanAgreements = () => {
   const { session } = useAuthState();
   const canView =
     session?.user?.permissions?.includes(VIEW_PERMISSION) ?? false;
+  const canGraduate =
+    session?.user?.permissions?.includes(GRADUATE_PERMISSION) ?? false;
   const [loans, setLoans] = useState<OnyxLoanAgreement[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
+  const [success, setSuccess] = useState<string>();
 
   const loadLoans = useCallback(async () => {
     if (!canView) {
@@ -141,6 +147,37 @@ export const AdminLoanAgreements = () => {
           ? formatDate(loan.repaymentDeadlineAt)
           : "Starts after Club approval",
     },
+    ...(canGraduate
+      ? [{
+          header: "Graduation",
+          key: "graduation",
+          render: (loan: OnyxLoanAgreement) =>
+            loan.status === "Active" &&
+            loan.memberAcceptedAt &&
+            loan.approvedAt ? (
+              <AdminJustificationDialog
+                confirmLabel="Approve graduation"
+                description="The server will revalidate active AQGreen participation, current Level 2 qualification, Area ownership, agreement approval, and R6,120 funding before adding a separate Onyx participation."
+                onConfirm={async (justification) => {
+                  await httpClient.post(
+                    apiEndpoints.programmeParticipations.graduateAQGreenToOnyx,
+                    { justification, loanAgreementId: loan.id },
+                  );
+                  setSuccess(
+                    "Onyx graduation was approved. The member's AQGreen participation remains active.",
+                  );
+                  await loadLoans();
+                }}
+                title={`Graduate ${loan.customerName} to Onyx`}
+                triggerLabel="Review graduation"
+              />
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                Agreement is not active and approved
+              </span>
+            ),
+        }]
+      : []),
   ];
 
   return (
@@ -160,6 +197,7 @@ export const AdminLoanAgreements = () => {
           </p>
         </header>
         {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
+        {success ? <StatusMessage tone="success">{success}</StatusMessage> : null}
         <TruncatedResultsWarning
           loadedCount={loans.length}
           totalCount={totalCount}

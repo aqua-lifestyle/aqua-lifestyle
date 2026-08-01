@@ -124,6 +124,7 @@ namespace AqualLifeStyle.Tests.Application
                     }));
         }
 
+
         [Fact]
         public async Task HostReviewerWithoutAllAreas_CannotRequestAreaCommitments()
         {

@@ -1,4 +1,5 @@
 using System;
+using AqualLifeStyle.Domain.Onyx;
 
 namespace AqualLifeStyle.Domain.Payments
 {
@@ -9,6 +10,8 @@ namespace AqualLifeStyle.Domain.Payments
     public class AQGreenJoiningCheckout : HostedPaymentCheckout
     {
         public Guid ParticipationId { get; private set; }
+        public AQGreenJoiningPaymentSchedule Schedule { get; private set; }
+        public AQGreenJoiningPaymentStage Stage { get; private set; }
 
         protected AQGreenJoiningCheckout()
         {
@@ -18,6 +21,8 @@ namespace AqualLifeStyle.Domain.Payments
             int tenantId,
             Guid participationId,
             int customerId,
+            AQGreenJoiningPaymentSchedule schedule,
+            AQGreenJoiningPaymentStage stage,
             decimal amount,
             string currency,
             DateTime createdAt)
@@ -25,7 +30,9 @@ namespace AqualLifeStyle.Domain.Payments
             if (participationId == Guid.Empty) throw new ArgumentException("A participation is required.", nameof(participationId));
             var checkout = new AQGreenJoiningCheckout
             {
-                ParticipationId = participationId
+                ParticipationId = participationId,
+                Schedule = schedule,
+                Stage = stage
             };
             checkout.Initialize(tenantId, customerId, amount, currency, createdAt);
             return checkout;
@@ -35,5 +42,21 @@ namespace AqualLifeStyle.Domain.Payments
         {
             CompletePayment(paymentId, completedAt);
         }
+
+        public void RecordProviderFailure(DateTime failedAt, string providerEvidence) =>
+            Terminate(HostedPaymentCheckoutStatus.Failed, failedAt, providerEvidence);
+
+        public void RecordProviderExpiry(DateTime expiredAt, string providerEvidence) =>
+            Terminate(HostedPaymentCheckoutStatus.Expired, expiredAt, providerEvidence);
+
+        public void TerminateByAdministrator(
+            long administratorUserId,
+            DateTime terminatedAt,
+            string evidence) =>
+            Terminate(
+                HostedPaymentCheckoutStatus.AdministrativelyTerminated,
+                terminatedAt,
+                evidence,
+                administratorUserId);
     }
 }

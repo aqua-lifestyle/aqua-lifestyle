@@ -399,6 +399,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     tenantId: 1,
                     participationId: participation.Id,
                     customerId: customerId,
+                    schedule: AQGreenJoiningPaymentSchedule.Full,
+                    stage: AQGreenJoiningPaymentStage.Full,
                     amount: 1200m,
                     currency: "ZAR",
                     createdAt: DateTime.UtcNow);

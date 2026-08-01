@@ -113,6 +113,8 @@ export const apiEndpoints = {
       "/api/services/app/ClubMemberProgrammeParticipation/CreateDirectOnyxCheckout",
     createAQGreenJoiningCheckout:
       "/api/services/app/ClubMemberProgrammeParticipation/CreateAQGreenJoiningCheckout",
+    graduateAQGreenToOnyx:
+      "/api/services/app/AdminProgrammeParticipation/GraduateAQGreenToOnyx",
     startEntry:
       "/api/services/app/ClubMemberProgrammeParticipation/StartEntry",
   },

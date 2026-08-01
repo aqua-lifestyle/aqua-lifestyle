@@ -151,10 +151,14 @@ namespace AqualLifeStyle.Domain.Onyx
             }
 
             if (loanAgreement.Status != OnyxLoanAgreementStatus.Active ||
-                !loanAgreement.EffectiveAt.HasValue)
+                !loanAgreement.EffectiveAt.HasValue ||
+                !loanAgreement.MemberAcceptedAt.HasValue ||
+                !loanAgreement.MemberAcceptedByUserId.HasValue ||
+                !loanAgreement.ApprovedAt.HasValue ||
+                !loanAgreement.ApprovedByAdministratorUserId.HasValue)
             {
                 throw new InvalidOperationException(
-                    "The Onyx loan agreement must be active before AQGreen graduation.");
+                    "The Onyx loan agreement must be active, accepted, and administrator-approved before AQGreen graduation.");
             }
 
             if (loanAgreement.TenantId != aqGreenParticipation.TenantId ||

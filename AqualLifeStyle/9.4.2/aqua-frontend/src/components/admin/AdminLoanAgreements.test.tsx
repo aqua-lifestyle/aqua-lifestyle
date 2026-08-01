@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthState } from "@/src/providers";
@@ -11,7 +11,7 @@ vi.mock("@/src/shared/api", async () => {
   const actual = await vi.importActual<typeof import("@/src/shared/api")>(
     "@/src/shared/api",
   );
-  return { ...actual, httpClient: { get: vi.fn() } };
+  return { ...actual, httpClient: { get: vi.fn(), post: vi.fn() } };
 });
 
 const authState = (permissions: string[]) => ({
@@ -33,6 +33,12 @@ const authState = (permissions: string[]) => ({
 describe("AdminLoanAgreements", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    HTMLDialogElement.prototype.showModal = vi.fn(function (
+      this: HTMLDialogElement,
+    ) { this.setAttribute("open", ""); });
+    HTMLDialogElement.prototype.close = vi.fn(function (
+      this: HTMLDialogElement,
+    ) { this.removeAttribute("open"); });
     vi.mocked(useAuthState).mockReturnValue(
       authState(["Aqua.Admin.Loans.View"]),
     );
@@ -40,6 +46,31 @@ describe("AdminLoanAgreements", () => {
       items: [activeLoanAgreement],
       totalCount: 1,
     });
+  });
+
+  it("requires an explicit justified administrator graduation decision", async () => {
+    vi.mocked(useAuthState).mockReturnValue(
+      authState([
+        "Aqua.Admin.Loans.View",
+        "Aqua.Admin.ProgrammeParticipations.GraduateToOnyx",
+      ]),
+    );
+
+    render(<AdminLoanAgreements />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Review graduation" }));
+    fireEvent.change(screen.getByLabelText("Reason for action"), {
+      target: { value: "Level 2 and approved funding evidence reviewed." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Approve graduation" }));
+
+    await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
+      apiEndpoints.programmeParticipations.graduateAQGreenToOnyx,
+      {
+        justification: "Level 2 and approved funding evidence reviewed.",
+        loanAgreementId: activeLoanAgreement.id,
+      },
+    ));
   });
 
   it("reconciles persisted loans without exposing financial actions", async () => {

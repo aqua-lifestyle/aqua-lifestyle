@@ -88,10 +88,13 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             AQGreenJoiningCheckout aqGreenCheckout = null;
             if (entry != null)
             {
-                aqGreenCheckout = await _aqGreenJoiningCheckoutRepository.FirstOrDefaultAsync(
-                    checkout =>
+                aqGreenCheckout = await _aqGreenJoiningCheckoutRepository.GetAll()
+                    .Where(checkout =>
                         checkout.ParticipationId == entry.Id &&
-                        checkout.Status != HostedPaymentCheckoutStatus.Completed);
+                        (checkout.Status == HostedPaymentCheckoutStatus.PreparingCheckout ||
+                         checkout.Status == HostedPaymentCheckoutStatus.AwaitingPayment))
+                    .OrderByDescending(checkout => checkout.CreatedAt)
+                    .FirstOrDefaultAsync();
             }
             var travelBenefit =
                 await _travelBenefitRepository.FirstOrDefaultAsync(
@@ -132,7 +135,13 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                     Amount = checkout.Amount,
                     Currency = checkout.Currency,
                     CheckoutUrl = checkout.CheckoutUrl,
-                    Status = "Awaiting payment"
+                    Status = "Awaiting payment",
+                    JoiningSchedule = checkout is AQGreenJoiningCheckout aqGreen
+                        ? aqGreen.Schedule
+                        : null,
+                    JoiningStage = checkout is AQGreenJoiningCheckout joining
+                        ? joining.Stage
+                        : null
                 };
 
         private static OnyxTravelBenefitDto Map(
@@ -204,8 +213,12 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
         [AbpAuthorize(AquaPermissions.ProgrammeParticipations.Join)]
         [UnitOfWork(IsDisabled = true)]
-        public async Task<ProgrammeCheckoutDto> CreateAQGreenJoiningCheckoutAsync()
+        public async Task<ProgrammeCheckoutDto> CreateAQGreenJoiningCheckoutAsync(
+            CreateAQGreenJoiningCheckoutInput input)
         {
+            if (input?.Schedule == null)
+                throw new UserFriendlyException(
+                    "Select an AQGreen joining payment schedule.");
             var tenantId = GetRequiredTenantId("AQGreen payment is unavailable.");
             AQGreenJoiningCheckout paymentCheckout;
 
@@ -228,21 +241,43 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         "Your AQGreen participation is already active.",
                         "No additional joining payment is required.");
                 if (participation.JoiningPaymentAmount <= 0m ||
-                    participation.RegistrationPaymentId.HasValue ||
-                    participation.ActivationPaymentId.HasValue)
+                    participation.JoiningInstallmentAmount <= 0m ||
+                    (!participation.JoiningPaymentSchedule.HasValue &&
+                     (participation.RegistrationPaymentId.HasValue ||
+                      participation.ActivationPaymentId.HasValue)))
                     throw new UserFriendlyException(
                         "Online payment is unavailable for this historical AQGreen record.",
                         "Contact the club team so an existing payment is not charged again.");
 
-                paymentCheckout = await _aqGreenJoiningCheckoutRepository.FirstOrDefaultAsync(
-                    checkout => checkout.ParticipationId == participation.Id);
+                var activeCheckouts = await _aqGreenJoiningCheckoutRepository.GetAll()
+                    .Where(checkout =>
+                        checkout.ParticipationId == participation.Id &&
+                        (checkout.Status == HostedPaymentCheckoutStatus.PreparingCheckout ||
+                         checkout.Status == HostedPaymentCheckoutStatus.AwaitingPayment))
+                    .ToListAsync();
+                if (activeCheckouts.Count > 1)
+                    throw new InvalidOperationException(
+                        "More than one active AQGreen joining checkout exists.");
+
+                participation.SelectJoiningPaymentSchedule(input.Schedule.Value);
+                var stage = participation.GetNextJoiningPaymentStage();
+                var amount = participation.GetNextJoiningPaymentAmount();
+                paymentCheckout = activeCheckouts.SingleOrDefault();
+                if (paymentCheckout != null &&
+                    (paymentCheckout.Schedule != input.Schedule.Value ||
+                     paymentCheckout.Stage != stage))
+                    throw new UserFriendlyException(
+                        "Another AQGreen payment checkout is still active.",
+                        "A competing checkout requires authoritative terminal evidence before another schedule can be selected.");
                 if (paymentCheckout == null)
                 {
                     paymentCheckout = AQGreenJoiningCheckout.Create(
                         tenantId,
                         participation.Id,
                         customer.Id,
-                        participation.JoiningPaymentAmount,
+                        input.Schedule.Value,
+                        stage,
+                        amount,
                         participation.Currency,
                         UtcNow);
                     await _aqGreenJoiningCheckoutRepository.InsertAsync(paymentCheckout);
@@ -619,7 +654,42 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             var details = ProgrammeParticipationStatusPresenter.Describe(participation);
             return new ProgrammeParticipationDto
             {
+                ProgrammeCode = RecruitmentProgrammeKeys.AQGreen,
                 ProgrammeName = "AQGreen",
+                Status = details.Status,
+                IsActive = details.IsActive,
+                JoinedIndependently = participation.JoinedIndependently,
+                RecruiterClubMemberNumber = recruiterClubMemberNumber,
+                StartedAt = participation.StartedAt,
+                ActivatedAt = participation.ActivatedAt,
+                NextPaymentAmount = details.NextPaymentAmount,
+                NextPaymentDescription = details.NextPaymentDescription,
+                Currency = participation.Currency,
+                CanRecruitForThisProgramme = details.CanRecruit,
+                JoiningSchedule = participation.JoiningPaymentSchedule,
+                JoiningTotalAmount = participation.JoiningPaymentAmount > 0m
+                    ? participation.JoiningPaymentAmount
+                    : participation.RegistrationPaymentAmount +
+                      participation.ActivationPaymentAmount,
+                JoiningPaidAmount = GetJoiningPaidAmount(participation),
+                JoiningOutstandingAmount = details.IsActive
+                    ? 0m
+                    : GetJoiningOutstandingAmount(participation),
+                JoiningCompletedAt = participation.ActivatedAt,
+                MonthlySubscriptionAmount = participation.MonthlyCommitmentAmount,
+                MonthlyGracePeriodDays = participation.GracePeriodDays
+            };
+        }
+
+        private static ProgrammeParticipationDto Map(
+            OnyxParticipation participation,
+            string recruiterClubMemberNumber)
+        {
+            var details = ProgrammeParticipationStatusPresenter.Describe(participation);
+            return new ProgrammeParticipationDto
+            {
+                ProgrammeCode = RecruitmentProgrammeKeys.Onyx,
+                ProgrammeName = "Onyx",
                 Status = details.Status,
                 IsActive = details.IsActive,
                 JoinedIndependently = participation.JoinedIndependently,
@@ -633,25 +703,29 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             };
         }
 
-        private static ProgrammeParticipationDto Map(
-            OnyxParticipation participation,
-            string recruiterClubMemberNumber)
+        private static decimal GetJoiningPaidAmount(EntryParticipation participation)
         {
-            var details = ProgrammeParticipationStatusPresenter.Describe(participation);
-            return new ProgrammeParticipationDto
-            {
-                ProgrammeName = "Onyx",
-                Status = details.Status,
-                IsActive = details.IsActive,
-                JoinedIndependently = participation.JoinedIndependently,
-                RecruiterClubMemberNumber = recruiterClubMemberNumber,
-                StartedAt = participation.StartedAt,
-                ActivatedAt = participation.ActivatedAt,
-                NextPaymentAmount = details.NextPaymentAmount,
-                NextPaymentDescription = details.NextPaymentDescription,
-                Currency = participation.Currency,
-                CanRecruitForThisProgramme = details.CanRecruit
-            };
+            if (participation.JoiningPaymentSchedule.HasValue)
+                return participation.GetConfirmedJoiningAmount();
+            return (participation.RegistrationPaymentId.HasValue
+                    ? participation.RegistrationPaymentAmount
+                    : 0m) +
+                (participation.ActivationPaymentId.HasValue
+                    ? participation.ActivationPaymentAmount
+                    : 0m) +
+                (participation.JoiningPaymentId.HasValue
+                    ? participation.JoiningPaymentAmount
+                    : 0m);
+        }
+
+        private static decimal GetJoiningOutstandingAmount(
+            EntryParticipation participation)
+        {
+            var total = participation.JoiningPaymentAmount > 0m
+                ? participation.JoiningPaymentAmount
+                : participation.RegistrationPaymentAmount +
+                  participation.ActivationPaymentAmount;
+            return Math.Max(0m, total - GetJoiningPaidAmount(participation));
         }
     }
 }

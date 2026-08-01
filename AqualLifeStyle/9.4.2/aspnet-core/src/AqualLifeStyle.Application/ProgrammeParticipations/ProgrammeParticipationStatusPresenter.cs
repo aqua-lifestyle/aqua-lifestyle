@@ -43,14 +43,20 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         ? participation.JoiningPaymentAmount
                         : participation.RegistrationPaymentAmount
                     : awaitingActivation
-                        ? participation.ActivationPaymentAmount
+                        ? participation.JoiningPaymentSchedule ==
+                          AQGreenJoiningPaymentSchedule.TwoInstallments
+                            ? participation.JoiningInstallmentAmount
+                            : participation.ActivationPaymentAmount
                         : null,
                 NextPaymentDescription = awaitingRegistration
                     ? participation.JoiningPaymentAmount > 0m
                         ? "Full AQGreen joining payment"
                         : "Registration payment"
                     : awaitingActivation
-                        ? "Activation payment"
+                        ? participation.JoiningPaymentSchedule ==
+                          AQGreenJoiningPaymentSchedule.TwoInstallments
+                            ? "Second AQGreen joining instalment"
+                            : "Activation payment"
                         : null,
                 CanRecruit = participation.IsQualifiedForNetwork
             };

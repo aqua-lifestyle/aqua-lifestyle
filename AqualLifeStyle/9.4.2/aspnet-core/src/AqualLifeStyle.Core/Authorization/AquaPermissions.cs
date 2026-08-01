@@ -189,6 +189,8 @@ namespace AqualLifeStyle.Authorization
                 public const string Default = Admin.Default + ".ProgrammeParticipations";
                 public const string View = Default + ".View";
                 public const string CorrectRecruiter = Default + ".CorrectRecruiter";
+                public const string GraduateToOnyx = Default + ".GraduateToOnyx";
+                public const string ManagePaymentCheckouts = Default + ".ManagePaymentCheckouts";
             }
 
             public static class Commissions

@@ -23,6 +23,8 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
             builder.Property(participation => participation.TermsVersion).HasMaxLength(32).IsRequired();
             builder.Property(participation => participation.TermsEffectiveFrom).IsRequired();
             builder.Property(participation => participation.JoiningPaymentAmount).HasPrecision(18, 2).IsRequired();
+            builder.Property(participation => participation.JoiningInstallmentAmount).HasPrecision(18, 2).IsRequired();
+            builder.Property(participation => participation.JoiningPaymentSchedule);
             builder.Property(participation => participation.RegistrationPaymentAmount).HasPrecision(18, 2).IsRequired();
             builder.Property(participation => participation.ActivationPaymentAmount).HasPrecision(18, 2).IsRequired();
             builder.Property(participation => participation.MonthlyCommitmentAmount).HasPrecision(18, 2).IsRequired();

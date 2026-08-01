@@ -18,13 +18,18 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
             builder.Property(checkout => checkout.Amount).HasPrecision(18, 2).IsRequired();
             builder.Property(checkout => checkout.Currency).HasMaxLength(3).IsRequired();
             builder.Property(checkout => checkout.Status).IsRequired();
+            builder.Property(checkout => checkout.Schedule).IsRequired();
+            builder.Property(checkout => checkout.Stage).IsRequired();
             builder.Property(checkout => checkout.ProviderCheckoutId)
                 .HasMaxLength(HostedPaymentCheckout.MaxProviderCheckoutIdLength);
             builder.Property(checkout => checkout.CheckoutUrl)
                 .HasMaxLength(HostedPaymentCheckout.MaxCheckoutUrlLength);
             builder.Property(checkout => checkout.CreatedAt).IsRequired();
+            builder.Property(checkout => checkout.TerminalEvidence).HasMaxLength(1000);
 
-            builder.HasIndex(checkout => checkout.ParticipationId).IsUnique();
+            builder.HasIndex(checkout => checkout.ParticipationId)
+                .IsUnique()
+                .HasFilter("\"Status\" IN (0, 1)");
             builder.HasIndex(checkout => checkout.ProviderCheckoutId).IsUnique();
             builder.HasIndex(checkout => checkout.PaymentId).IsUnique();
 

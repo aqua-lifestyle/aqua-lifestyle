@@ -120,10 +120,24 @@ describe("MemberProgrammes", () => {
     );
     expect(httpClient.post).toHaveBeenCalledWith(
       apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+      { schedule: 0 },
     );
     expect(navigateToExternalUrl).toHaveBeenCalledWith(
       "https://payments.example.test/checkout/secure",
     );
+  });
+
+  it("offers and submits the two-instalment AQGreen schedule", async () => {
+    render(<MemberProgrammes />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Join AQGreen" }));
+    fireEvent.click(screen.getByRole("radio", { name: /two R600 instalments/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue to secure payment" }));
+
+    await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
+      apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+      { schedule: 1 },
+    ));
   });
 
   it("creates an Onyx checkout without claiming participation has started", async () => {

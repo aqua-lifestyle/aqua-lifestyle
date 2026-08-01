@@ -61,6 +61,7 @@ describe("ProgrammeInvitationLanding", () => {
     ));
     expect(httpClient.post).toHaveBeenCalledWith(
       apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+      { schedule: 0 },
     );
     expect(httpClient.post).not.toHaveBeenCalledWith(
       apiEndpoints.programmeParticipations.createDirectOnyxCheckout,

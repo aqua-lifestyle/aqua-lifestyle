@@ -77,7 +77,15 @@ namespace AqualLifeStyle.Payments.Yoco
         public virtual async Task ProcessAsync(VerifiedYocoPaymentNotification notification)
         {
             if (notification == null) throw new ArgumentNullException(nameof(notification));
-            if (!string.Equals(notification.EventType, "payment.succeeded", StringComparison.Ordinal))
+            var isSucceeded = string.Equals(
+                notification.EventType,
+                "payment.succeeded",
+                StringComparison.Ordinal);
+            var isFailed = string.Equals(
+                notification.EventType,
+                "payment.failed",
+                StringComparison.Ordinal);
+            if (!isSucceeded && !isFailed)
                 return;
 
             var configuredMode = _configuration["Yoco:Mode"]?.Trim();
@@ -126,6 +134,34 @@ namespace AqualLifeStyle.Payments.Yoco
 
                 using (_unitOfWorkManager.Current.SetTenantId(checkout.TenantId))
                 {
+                    if (isFailed)
+                    {
+                        if (checkout.Programme == YocoCheckoutProgramme.AQGreen)
+                        {
+                            var aqGreenCheckout = await _aqGreenCheckoutRepository.GetAsync(
+                                checkout.ReferenceId);
+                            if (aqGreenCheckout.Status == HostedPaymentCheckoutStatus.PreparingCheckout)
+                                throw new YocoWebhookTransientException(
+                                    "The AQGreen checkout is not yet ready for terminal provider evidence.");
+                            if (aqGreenCheckout.Status == HostedPaymentCheckoutStatus.AwaitingPayment)
+                                aqGreenCheckout.RecordProviderFailure(
+                                    confirmedAt,
+                                    $"Signed Yoco payment.failed event {notification.EventId.Trim()}");
+                        }
+
+                        await _receiptRepository.InsertAsync(YocoWebhookReceipt.Record(
+                            checkout.TenantId,
+                            notification.EventId,
+                            notification.PaymentId,
+                            providerCheckoutId,
+                            notification.PayloadHash,
+                            checkout.Programme,
+                            checkout.ReferenceId,
+                            DateTime.UtcNow));
+                        await _unitOfWorkManager.Current.SaveChangesAsync();
+                        return;
+                    }
+
                     ProgrammePaymentConfirmationResult confirmation;
                     switch (checkout.Programme)
                     {

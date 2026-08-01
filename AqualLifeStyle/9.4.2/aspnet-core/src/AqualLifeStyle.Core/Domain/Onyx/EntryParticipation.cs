@@ -6,6 +6,19 @@ using AqualLifeStyle.Domain.Payments;
 
 namespace AqualLifeStyle.Domain.Onyx
 {
+    public enum AQGreenJoiningPaymentSchedule
+    {
+        Full = 0,
+        TwoInstallments = 1
+    }
+
+    public enum AQGreenJoiningPaymentStage
+    {
+        Full = 0,
+        FirstInstallment = 1,
+        SecondInstallment = 2
+    }
+
     public enum EntryParticipationStatus
     {
         AwaitingJoiningPayment = 0,
@@ -31,6 +44,8 @@ namespace AqualLifeStyle.Domain.Onyx
         public string TermsVersion { get; private set; }
         public DateTime TermsEffectiveFrom { get; private set; }
         public decimal JoiningPaymentAmount { get; private set; }
+        public decimal JoiningInstallmentAmount { get; private set; }
+        public AQGreenJoiningPaymentSchedule? JoiningPaymentSchedule { get; private set; }
         public decimal RegistrationPaymentAmount { get; private set; }
         public decimal ActivationPaymentAmount { get; private set; }
         public decimal MonthlyCommitmentAmount { get; private set; }
@@ -67,6 +82,7 @@ namespace AqualLifeStyle.Domain.Onyx
             TermsVersion = terms.Version;
             TermsEffectiveFrom = terms.EffectiveFrom;
             JoiningPaymentAmount = terms.JoiningPaymentAmount;
+            JoiningInstallmentAmount = terms.JoiningInstallmentAmount;
             RegistrationPaymentAmount = terms.RegistrationPaymentAmount;
             ActivationPaymentAmount = terms.ActivationPaymentAmount;
             MonthlyCommitmentAmount = terms.MonthlyCommitmentAmount;
@@ -159,6 +175,97 @@ namespace AqualLifeStyle.Domain.Onyx
 
             EnsureExactAmount(payment, JoiningPaymentAmount);
             JoiningPaymentId = payment.Id;
+            ActivatedAt = payment.ConfirmedAt;
+            Status = EntryParticipationStatus.Active;
+        }
+
+        public void SelectJoiningPaymentSchedule(AQGreenJoiningPaymentSchedule schedule)
+        {
+            if (Status == EntryParticipationStatus.Active)
+                throw new InvalidOperationException("AQGreen joining is already complete.");
+            if (JoiningPaymentAmount <= 0m || JoiningInstallmentAmount <= 0m)
+                throw new InvalidOperationException("This AQGreen record does not support selectable joining schedules.");
+            if (JoiningPaymentId.HasValue || RegistrationPaymentId.HasValue || ActivationPaymentId.HasValue)
+            {
+                if (JoiningPaymentSchedule == schedule) return;
+                throw new InvalidOperationException(
+                    "The AQGreen joining schedule cannot change after a verified payment.");
+            }
+
+            JoiningPaymentSchedule = schedule;
+            Status = EntryParticipationStatus.AwaitingJoiningPayment;
+        }
+
+        public decimal GetConfirmedJoiningAmount()
+        {
+            if (JoiningPaymentId.HasValue) return JoiningPaymentAmount;
+            var confirmed = 0m;
+            if (RegistrationPaymentId.HasValue) confirmed += JoiningInstallmentAmount;
+            if (ActivationPaymentId.HasValue) confirmed += JoiningInstallmentAmount;
+            return confirmed;
+        }
+
+        public decimal GetOutstandingJoiningAmount() =>
+            Math.Max(0m, JoiningPaymentAmount - GetConfirmedJoiningAmount());
+
+        public AQGreenJoiningPaymentStage GetNextJoiningPaymentStage()
+        {
+            if (!JoiningPaymentSchedule.HasValue)
+                throw new InvalidOperationException("Select an AQGreen joining schedule first.");
+            if (Status == EntryParticipationStatus.Active)
+                throw new InvalidOperationException("AQGreen joining is already complete.");
+            if (JoiningPaymentSchedule == AQGreenJoiningPaymentSchedule.Full)
+                return AQGreenJoiningPaymentStage.Full;
+            return RegistrationPaymentId.HasValue
+                ? AQGreenJoiningPaymentStage.SecondInstallment
+                : AQGreenJoiningPaymentStage.FirstInstallment;
+        }
+
+        public decimal GetNextJoiningPaymentAmount() =>
+            GetNextJoiningPaymentStage() == AQGreenJoiningPaymentStage.Full
+                ? JoiningPaymentAmount
+                : JoiningInstallmentAmount;
+
+        public void ApplyConfirmedJoiningPayment(
+            MemberPayment payment,
+            AQGreenJoiningPaymentStage stage)
+        {
+            EnsurePaymentBelongsToParticipation(payment);
+            if (payment.Purpose != MemberPaymentPurpose.AQGreenJoining)
+                throw new InvalidOperationException("The payment is not an AQGreen joining payment.");
+            if (JoiningPaymentId == payment.Id ||
+                RegistrationPaymentId == payment.Id ||
+                ActivationPaymentId == payment.Id)
+                return;
+            if (!JoiningPaymentSchedule.HasValue)
+                throw new InvalidOperationException("The AQGreen joining schedule is missing.");
+
+            var expectedStage = GetNextJoiningPaymentStage();
+            if (stage != expectedStage)
+                throw new InvalidOperationException("The payment does not match the next AQGreen joining instalment.");
+
+            if (stage == AQGreenJoiningPaymentStage.Full)
+            {
+                EnsureExactAmount(payment, JoiningPaymentAmount);
+                JoiningPaymentId = payment.Id;
+                ActivatedAt = payment.ConfirmedAt;
+                Status = EntryParticipationStatus.Active;
+                return;
+            }
+
+            EnsureExactAmount(payment, JoiningInstallmentAmount);
+            if (stage == AQGreenJoiningPaymentStage.FirstInstallment)
+            {
+                RegistrationPaymentId = payment.Id;
+                Status = EntryParticipationStatus.AwaitingActivationPayment;
+                return;
+            }
+
+            if (!RegistrationPaymentId.HasValue || payment.Id == RegistrationPaymentId.Value)
+                throw new InvalidOperationException("A distinct first AQGreen joining instalment is required.");
+            ActivationPaymentId = payment.Id;
+            if (GetConfirmedJoiningAmount() != JoiningPaymentAmount)
+                throw new InvalidOperationException("The AQGreen joining total is incomplete.");
             ActivatedAt = payment.ConfirmedAt;
             Status = EntryParticipationStatus.Active;
         }

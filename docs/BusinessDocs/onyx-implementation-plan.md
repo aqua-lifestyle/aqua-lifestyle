@@ -1,7 +1,7 @@
 # Confirmed Onyx Model and Implementation Plan
 
-Status: approved business direction, including the AQGreen naming clarification,
-as of 2026-07-26.
+Status: approved business direction, including the AQGreen naming clarification
+and confirmed joining/graduation rules, as of 2026-08-01.
 
 This document is the source of truth for the current Onyx feature phase. Older
 membership documents remain useful historical material but do not override the
@@ -17,8 +17,9 @@ rules below.
   must not be treated as a separate programme.
 - Direct entrants create an Onyx participation only after a confirmed R6,120
   payment.
-- AQGreen entrants create a separate AQGreen participation and qualify only after one
-  confirmed R1,200 joining payment.
+- AQGreen entrants create a separate AQGreen participation and activate only after
+  either one verified R1,200 joining payment or two distinct verified R600 joining
+  instalments.
 - AQGreen Level 2 makes the loan agreement available. Member acceptance followed
   by administrator approval makes the agreement effective. Creation of the
   separate Onyx participation uses independent placement: the graduate has no
@@ -30,10 +31,11 @@ rules below.
   after graduation.
 
 The customer-facing Onyx joining action has one path: direct Onyx entry. AQGreen
-graduation is a separate system-managed transition after the graduation rules
-are satisfied; it is not a second choice in the Onyx joining form. The eventual
-graduation transition must create a separate Onyx participation while preserving
-the complete AQGreen record.
+graduation is a separate, explicit administrator decision after the current
+eligibility and the active, member-accepted, administrator-approved R6,120 loan
+are revalidated; it is not a second choice in the Onyx joining form and is never
+triggered merely because a loan becomes active. Graduation creates a separate
+Onyx participation while preserving the complete active AQGreen record.
 
 Customers may join AQGreen or Onyx independently without a recruiter. When a
 recruiter exists, the recruiter is another customer with active participation in
@@ -51,7 +53,8 @@ administrator correction.
 
 The current AQGreen terms are:
 
-- joining payment: R1,200;
+- joining obligation: R1,200, paid either in full or as two distinct R600 joining
+  instalments;
 - monthly commitment: R600;
 - grace period: seven days;
 - complete Level 1 component: R150;
@@ -161,7 +164,9 @@ The persistence and provider-neutral confirmation foundation is complete:
   timestamp freshness, deployment mode, exact amount/currency, invitation and
   recruiter eligibility, and provider-reference idempotency before atomically
   creating or activating programme state. AQGreen placement exists before payment,
-  but it becomes active only after the verified full R1,200 payment.
+  but it becomes active only after the verified R1,200 joining total. An active
+  hosted checkout temporarily locks its full-payment or two-instalment schedule;
+  the first verified payment locks that schedule permanently.
 
 ### Phase 3 obligation status
 

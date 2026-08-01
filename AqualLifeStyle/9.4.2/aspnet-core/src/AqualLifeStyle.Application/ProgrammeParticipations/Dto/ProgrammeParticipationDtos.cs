@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel.DataAnnotations;
+using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Recruitment;
 
 namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
@@ -20,6 +21,12 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
         public string InviteCode { get; set; }
     }
 
+    public class CreateAQGreenJoiningCheckoutInput
+    {
+        [Required]
+        public AQGreenJoiningPaymentSchedule? Schedule { get; set; }
+    }
+
     public class ProgrammeCheckoutDto
     {
         public decimal Amount { get; set; }
@@ -33,10 +40,13 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
         public string Currency { get; set; }
         public string CheckoutUrl { get; set; }
         public string Status { get; set; }
+        public AQGreenJoiningPaymentSchedule? JoiningSchedule { get; set; }
+        public AQGreenJoiningPaymentStage? JoiningStage { get; set; }
     }
 
     public class ProgrammeParticipationDto
     {
+        public string ProgrammeCode { get; set; }
         public string ProgrammeName { get; set; }
         public string Status { get; set; }
         public bool IsActive { get; set; }
@@ -48,6 +58,13 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
         public string NextPaymentDescription { get; set; }
         public string Currency { get; set; }
         public bool CanRecruitForThisProgramme { get; set; }
+        public AQGreenJoiningPaymentSchedule? JoiningSchedule { get; set; }
+        public decimal? JoiningTotalAmount { get; set; }
+        public decimal JoiningPaidAmount { get; set; }
+        public decimal? JoiningOutstandingAmount { get; set; }
+        public DateTime? JoiningCompletedAt { get; set; }
+        public decimal? MonthlySubscriptionAmount { get; set; }
+        public int? MonthlyGracePeriodDays { get; set; }
     }
 
     public class MyProgrammeParticipationsDto
