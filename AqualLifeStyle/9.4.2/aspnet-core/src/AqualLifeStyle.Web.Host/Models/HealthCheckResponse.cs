@@ -38,6 +38,26 @@ namespace AqualLifeStyle.Web.Host.Models
         public string Version { get; set; }
 
         /// <summary>
+        /// Gets or sets the immutable commit or build identifier supplied by the deployment.
+        /// </summary>
+        public string BuildId { get; set; }
+
+        /// <summary>
+        /// Gets or sets an optional non-sensitive container image identifier.
+        /// </summary>
+        public string ImageId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the payment API contract expected by matching frontends.
+        /// </summary>
+        public string PaymentContractVersion { get; set; }
+
+        /// <summary>
+        /// Gets or sets the explicitly supported API capabilities.
+        /// </summary>
+        public string[] ContractCapabilities { get; set; }
+
+        /// <summary>
         /// Gets or sets the configured release date for this application version.
         /// </summary>
         public DateTime ReleaseDate { get; set; }

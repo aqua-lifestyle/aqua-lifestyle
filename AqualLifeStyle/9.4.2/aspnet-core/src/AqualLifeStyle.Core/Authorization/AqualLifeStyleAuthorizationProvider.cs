@@ -148,6 +148,15 @@ namespace AqualLifeStyle.Authorization
                 AquaPermissions.Admin.ProgrammeParticipations.GraduateToOnyx,
                 AquaPermissions.Admin.ProgrammeParticipations.ManagePaymentCheckouts);
 
+            var diagnostics = admin.CreateChildPermission(
+                AquaPermissions.Admin.Diagnostics.Default,
+                L(AquaPermissions.Admin.Diagnostics.Default),
+                multiTenancySides: MultiTenancySides.Host);
+            CreateChildren(
+                diagnostics,
+                MultiTenancySides.Host,
+                AquaPermissions.Admin.Diagnostics.View);
+
             var host = MultiTenancySides.Host;
             var commissions = admin.CreateChildPermission(
                 AquaPermissions.Admin.Commissions.Default,

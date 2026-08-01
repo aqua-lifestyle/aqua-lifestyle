@@ -1,12 +1,20 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useAuthState } from "@/src/providers";
+import {
+  useAuthState,
+  useSystemHealthActions,
+  useSystemHealthState,
+} from "@/src/providers";
 import { apiEndpoints, httpClient, refreshAccessToken } from "@/src/shared/api";
 import { MemberProgrammes } from "./member-programmes";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 
-vi.mock("@/src/providers", () => ({ useAuthState: vi.fn() }));
+vi.mock("@/src/providers", () => ({
+  useAuthState: vi.fn(),
+  useSystemHealthActions: vi.fn(),
+  useSystemHealthState: vi.fn(),
+}));
 vi.mock("@/src/shared/browser/navigation", () => ({ navigateToExternalUrl: vi.fn() }));
 vi.mock("@/src/shared/api", async () => {
   const actual = await vi.importActual<typeof import("@/src/shared/api")>(
@@ -51,6 +59,32 @@ describe("MemberProgrammes", () => {
     vi.mocked(useAuthState).mockReturnValue(
       authState(["Aqua.ProgrammeParticipations.ViewSelf"]),
     );
+    vi.mocked(useSystemHealthActions).mockReturnValue({
+      checkHealth: vi.fn().mockResolvedValue(undefined),
+    });
+    vi.mocked(useSystemHealthState).mockReturnValue({
+      errorMessage: null,
+      health: {
+        buildId: "test-build",
+        checkedAtUtc: "2026-08-01T10:00:00Z",
+        contractCapabilities: [
+          "aqgreen-joining-schedules-v1",
+          "direct-onyx-checkout-v1",
+        ],
+        databaseStatus: "Healthy",
+        environment: "Test",
+        imageId: "unavailable",
+        isDatabaseReachable: true,
+        paymentContractVersion: "aqua-payments-2026-08-01",
+        releaseDate: "2026-08-01T00:00:00Z",
+        status: "Healthy",
+        traceId: "test-trace",
+        version: "1.0.0",
+      },
+      isError: false,
+      isPending: false,
+      isSuccess: true,
+    });
     vi.mocked(httpClient.get).mockResolvedValue({
       entry: null,
       onyx: null,
@@ -62,6 +96,24 @@ describe("MemberProgrammes", () => {
       currency: "ZAR",
     });
     vi.mocked(refreshAccessToken).mockResolvedValue("renewed-token");
+  });
+
+  it("blocks payment actions when the API payment contract is incompatible", async () => {
+    vi.mocked(useSystemHealthState).mockReturnValue({
+      errorMessage: "Backend health response did not match the expected contract.",
+      health: null,
+      isError: true,
+      isPending: false,
+      isSuccess: false,
+    });
+
+    render(<MemberProgrammes />);
+
+    expect(await screen.findByText(/cannot verify a compatible payment API/i))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Join AQGreen" }))
+      .toBeDisabled();
+    expect(screen.getByRole("button", { name: "Join Onyx" })).toBeDisabled();
   });
 
   it("refreshes account access after programme activation changes the role", async () => {

@@ -71,6 +71,11 @@ namespace AqualLifeStyle.Web.Host.Controllers
                 IsRedisReachable = isRedisReachable,
                 RedisStatus = !isRedisConfigured ? "NotConfigured" : isRedisReachable ? HealthyStatus : "Unavailable",
                 Version = AppVersionHelper.Version,
+                BuildId = DeploymentMetadata.ResolveBuildId(_configuration),
+                ImageId = DeploymentMetadata.ResolveImageId(_configuration),
+                PaymentContractVersion = DeploymentMetadata.PaymentContractVersion,
+                ContractCapabilities = System.Linq.Enumerable.ToArray(
+                    DeploymentMetadata.ContractCapabilities),
                 ReleaseDate = AppVersionHelper.ReleaseDate,
                 CheckedAtUtc = DateTime.UtcNow,
                 Environment = _environment.EnvironmentName,

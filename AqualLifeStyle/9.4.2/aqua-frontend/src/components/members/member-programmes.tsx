@@ -3,7 +3,12 @@
 import { CircleDollarSign, Network, Plane, Route } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { useAuthState } from "@/src/providers";
+import {
+  useAuthState,
+  useSystemHealthActions,
+  useSystemHealthState,
+} from "@/src/providers";
+import { isPaymentApiCompatible } from "@/src/providers/SystemHealth/contract";
 import {
   apiEndpoints,
   getExpiredSessionLoginUrl,
@@ -167,6 +172,8 @@ const TravelBenefitCard = ({
 
 export const MemberProgrammes = () => {
   const { session } = useAuthState();
+  const healthActions = useSystemHealthActions();
+  const healthState = useSystemHealthState();
   const canView =
     session?.user?.permissions?.includes(VIEW_PERMISSION) ?? false;
   const {
@@ -180,6 +187,7 @@ export const MemberProgrammes = () => {
   const [aqGreenSchedule, setAQGreenSchedule] = useState<0 | 1>(0);
   const [accessRefreshFinished, setAccessRefreshFinished] = useState(false);
   const accessRefreshAttempted = useRef(false);
+  const contractCheckAttempted = useRef(false);
   const hasActiveInvitationAccess = Boolean(
     participations?.entry?.canRecruitForThisProgramme ||
       participations?.onyx?.canRecruitForThisProgramme,
@@ -188,6 +196,20 @@ export const MemberProgrammes = () => {
     session?.user?.permissions?.includes(
       "Aqua.ProgrammeParticipations.Invite",
     ) ?? false;
+  const paymentApiCompatible = isPaymentApiCompatible(healthState.health);
+  const paymentActionsUnavailable =
+    healthState.isPending || !paymentApiCompatible;
+
+  useEffect(() => {
+    if (
+      !contractCheckAttempted.current &&
+      !healthState.isPending &&
+      !healthState.isSuccess
+    ) {
+      contractCheckAttempted.current = true;
+      void healthActions.checkHealth();
+    }
+  }, [healthActions, healthState.isPending, healthState.isSuccess]);
 
   useEffect(() => {
     if (
@@ -224,20 +246,20 @@ export const MemberProgrammes = () => {
       if (paymentResult === "success") {
         setSuccess(
           programme === "aqgreen"
-            ? "Payment completed. We are waiting for Yoco's secure confirmation before activating your AQGreen participation."
-            : "Payment completed. We are waiting for Yoco's secure confirmation before creating your Onyx participation.",
+            ? "Payment submitted. Awaiting secure confirmation before your AQGreen participation can activate."
+            : "Payment submitted. Awaiting secure confirmation before your Onyx participation can be created.",
         );
       } else if (paymentResult === "cancelled") {
         setActionError(
           programme === "aqgreen"
-            ? "Payment was cancelled. Your AQGreen place remains recorded, but it is not active."
-            : "Payment was cancelled. No Onyx participation was created.",
+            ? "You returned without payment confirmation. Your checkout remains locked until Yoco reports a terminal result or an authorised administrator reviews it."
+            : "You returned without payment confirmation. No Onyx participation was created; the existing checkout remains pending.",
         );
       } else if (paymentResult === "failed") {
         setActionError(
           programme === "aqgreen"
-            ? "Payment was not completed. Your AQGreen participation is not active. You can try again below."
-            : "Payment was not completed. No Onyx participation was created. You can try again below.",
+            ? "The browser returned from payment, but this does not confirm failure. Your AQGreen checkout remains locked while the provider result is verified."
+            : "The browser returned from payment, but this does not confirm failure. No Onyx participation was created and the checkout remains pending.",
         );
       }
     }, 0);
@@ -245,6 +267,7 @@ export const MemberProgrammes = () => {
   }, []);
 
   const startAQGreenPayment = async (schedule: 0 | 1) => {
+    if (paymentActionsUnavailable) return;
     setStartingAQGreenPayment(true);
     setActionError(undefined);
     try {
@@ -299,7 +322,16 @@ export const MemberProgrammes = () => {
           <StatusMessage tone="error">{loadError ?? actionError}</StatusMessage>
         ) : null}
         {success ? (
-          <StatusMessage tone="success">{success}</StatusMessage>
+          <StatusMessage tone="info">{success}</StatusMessage>
+        ) : null}
+
+        {!healthState.isPending && !paymentApiCompatible ? (
+          <StatusMessage tone="error">
+            Payments are unavailable because this frontend cannot verify a
+            compatible payment API deployment. No payment has been taken. Ask
+            an operator to deploy and verify the matching database, API, and
+            frontend versions.
+          </StatusMessage>
         ) : null}
 
         {hasActiveInvitationAccess ? (
@@ -337,12 +369,16 @@ export const MemberProgrammes = () => {
                 participation={participations.entry}
                 paymentAction={
                   participations.entry.isActive ? undefined : participations.pendingAQGreenCheckout ? (
-                    <a
-                      className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
-                      href={participations.pendingAQGreenCheckout.checkoutUrl}
-                    >
-                      Continue secure payment
-                    </a>
+                    paymentActionsUnavailable ? (
+                      <Button disabled>Continue secure payment</Button>
+                    ) : (
+                      <a
+                        className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
+                        href={participations.pendingAQGreenCheckout.checkoutUrl}
+                      >
+                        Continue secure payment
+                      </a>
+                    )
                   ) : (
                     <div className="flex flex-col gap-4">
                       {participations.entry.joiningSchedule == null ? (
@@ -353,6 +389,7 @@ export const MemberProgrammes = () => {
                         />
                       ) : null}
                       <Button
+                        disabled={paymentActionsUnavailable}
                         isLoading={startingAQGreenPayment}
                         onClick={() => void startAQGreenPayment(
                           participations.entry?.joiningSchedule ?? aqGreenSchedule,
@@ -378,7 +415,10 @@ export const MemberProgrammes = () => {
                     Onyx participation later. An invitation is optional.
                   </p>
                 </div>
-                <JoinProgrammeDialog programme="AQGreen" />
+                <JoinProgrammeDialog
+                  disabled={paymentActionsUnavailable}
+                  programme="AQGreen"
+                />
               </Card>
             )}
 
@@ -405,12 +445,16 @@ export const MemberProgrammes = () => {
                     )}
                   </p>
                 </div>
-                <a
-                  className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
-                  href={participations.pendingDirectOnyxCheckout.checkoutUrl}
-                >
-                  Continue secure payment
-                </a>
+                {paymentActionsUnavailable ? (
+                  <Button disabled>Continue secure payment</Button>
+                ) : (
+                  <a
+                    className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
+                    href={participations.pendingDirectOnyxCheckout.checkoutUrl}
+                  >
+                    Continue secure payment
+                  </a>
+                )}
               </Card>
             ) : (
               <Card className="flex flex-col items-start gap-4">
@@ -422,7 +466,10 @@ export const MemberProgrammes = () => {
                     R6,120 payment. AQGreen and an invitation are not required.
                   </p>
                 </div>
-                <JoinProgrammeDialog programme="Onyx" />
+                <JoinProgrammeDialog
+                  disabled={paymentActionsUnavailable}
+                  programme="Onyx"
+                />
               </Card>
             )}
             {participations.travelBenefit ? (

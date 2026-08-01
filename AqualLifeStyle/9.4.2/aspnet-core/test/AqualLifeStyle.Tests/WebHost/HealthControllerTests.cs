@@ -34,12 +34,19 @@ namespace AqualLifeStyle.Tests.WebHost
             return new AqualLifeStyleDbContext(options);
         }
 
-        private static IConfiguration BuildConfiguration(string redisConfiguration)
+        private static IConfiguration BuildConfiguration(
+            string redisConfiguration,
+            IDictionary<string, string> additionalSettings = null)
         {
             var settings = new Dictionary<string, string>();
             if (redisConfiguration != null)
             {
                 settings["Redis:Configuration"] = redisConfiguration;
+            }
+            if (additionalSettings != null)
+            {
+                foreach (var setting in additionalSettings)
+                    settings[setting.Key] = setting.Value;
             }
 
             return new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
@@ -175,7 +182,14 @@ namespace AqualLifeStyle.Tests.WebHost
             var redisDatabaseProvider = Substitute.For<IAbpRedisCacheDatabaseProvider>();
 
             var controller = CreateController(
-                dbContextProvider, BuildConfiguration(null), redisDatabaseProvider, "Staging");
+                dbContextProvider,
+                BuildConfiguration(null, new Dictionary<string, string>
+                {
+                    ["Deployment:BuildId"] = "commit-abc123",
+                    ["Deployment:ImageId"] = "image-456"
+                }),
+                redisDatabaseProvider,
+                "Staging");
 
             var actionResult = await controller.Get();
 
@@ -183,7 +197,28 @@ namespace AqualLifeStyle.Tests.WebHost
             var response = okResult.Value.ShouldBeOfType<HealthCheckResponse>();
             response.Environment.ShouldBe("Staging");
             response.Version.ShouldBe(AppVersionHelper.Version);
+            response.BuildId.ShouldBe("commit-abc123");
+            response.ImageId.ShouldBe("image-456");
+            response.PaymentContractVersion.ShouldBe(
+                DeploymentMetadata.PaymentContractVersion);
+            response.ContractCapabilities.ShouldContain(
+                "aqgreen-joining-schedules-v1");
             response.TraceId.ShouldNotBeNull();
+        }
+
+        [Fact]
+        public void DeploymentMetadata_DoesNotExposeUnsafeConfiguredValues()
+        {
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string>
+                {
+                    ["Deployment:BuildId"] = "contains/a/path",
+                    ["Deployment:ImageId"] = "contains a secret-like value"
+                })
+                .Build();
+
+            DeploymentMetadata.ResolveBuildId(configuration).ShouldBe("unavailable");
+            DeploymentMetadata.ResolveImageId(configuration).ShouldBe("unavailable");
         }
     }
 }

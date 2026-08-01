@@ -1,9 +1,14 @@
 "use client";
 
 import { Network, ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { useAuthState } from "@/src/providers";
+import {
+  useAuthState,
+  useSystemHealthActions,
+  useSystemHealthState,
+} from "@/src/providers";
+import { isPaymentApiCompatible } from "@/src/providers/SystemHealth/contract";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import type { ProgrammeInvitationPreview } from "@/src/shared/domain/programme-invitations";
@@ -39,11 +44,28 @@ const getProgrammePaymentExplanation = (programmeKey: string) => {
 
 export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string }) => {
   const { session } = useAuthState();
+  const healthActions = useSystemHealthActions();
+  const healthState = useSystemHealthState();
+  const contractCheckAttempted = useRef(false);
   const [preview, setPreview] = useState<ProgrammeInvitationPreview>();
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string>();
   const [aqGreenSchedule, setAQGreenSchedule] = useState<0 | 1>(0);
+  const paymentApiCompatible = isPaymentApiCompatible(healthState.health);
+  const paymentActionsUnavailable =
+    healthState.isPending || !paymentApiCompatible;
+
+  useEffect(() => {
+    if (
+      !contractCheckAttempted.current &&
+      !healthState.isPending &&
+      !healthState.isSuccess
+    ) {
+      contractCheckAttempted.current = true;
+      void healthActions.checkHealth();
+    }
+  }, [healthActions, healthState.isPending, healthState.isSuccess]);
 
   useEffect(() => {
     void httpClient
@@ -60,7 +82,7 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
   }, [inviteCode]);
 
   const confirm = async () => {
-    if (!preview) return;
+    if (!preview || paymentActionsUnavailable) return;
     const endpoint = getProgrammeJoinEndpoint(preview.programmeKey);
     if (!endpoint) {
       setError(unsupportedProgrammeMessage);
@@ -151,9 +173,16 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
               </StatusMessage>
             ) : null}
 
+            {!healthState.isPending && !paymentApiCompatible && session ? (
+              <StatusMessage tone="error">
+                Payment is unavailable because this frontend cannot verify a
+                compatible payment API deployment. No payment has been taken.
+              </StatusMessage>
+            ) : null}
+
             {preview.programmeKey === "AQGREEN" && session ? (
               <AQGreenPaymentSchedule
-                disabled={joining}
+                disabled={joining || paymentActionsUnavailable}
                 onChange={setAQGreenSchedule}
                 value={aqGreenSchedule}
               />
@@ -165,7 +194,9 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
               </StatusMessage>
             ) : session ? (
               <Button
-                disabled={!preview.recruiterEligible}
+                disabled={
+                  !preview.recruiterEligible || paymentActionsUnavailable
+                }
                 isLoading={joining}
                 onClick={() => void confirm()}
               >

@@ -124,6 +124,12 @@ namespace AqualLifeStyle.Authorization
             public const string Settings = Default + ".Settings";
             public const string AllTenants = Default + ".AllTenants";
 
+            public static class Diagnostics
+            {
+                public const string Default = Admin.Default + ".Diagnostics";
+                public const string View = Default + ".View";
+            }
+
             public static class Users
             {
                 public const string Default = Admin.Default + ".Users";

@@ -12,10 +12,12 @@ import { AQGreenPaymentSchedule } from "./aqgreen-payment-schedule";
 type Programme = "AQGreen" | "Onyx";
 
 type JoinProgrammeDialogProps = {
+  disabled?: boolean;
   programme: Programme;
 };
 
 export const JoinProgrammeDialog = ({
+  disabled = false,
   programme,
 }: JoinProgrammeDialogProps) => {
   const [open, setOpen] = useState(false);
@@ -31,6 +33,7 @@ export const JoinProgrammeDialog = ({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (disabled) return;
     setSubmitting(true);
     setError(undefined);
     try {
@@ -70,7 +73,9 @@ export const JoinProgrammeDialog = ({
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>Join {programme}</Button>
+      <Button disabled={disabled} onClick={() => setOpen(true)}>
+        Join {programme}
+      </Button>
       <Dialog onClose={close} open={open} title={`Join ${programme}`}>
         <form className="flex flex-col gap-5" onSubmit={submit}>
           <div className="rounded-lg bg-muted/60 p-4 text-sm text-muted-foreground">
@@ -101,7 +106,7 @@ export const JoinProgrammeDialog = ({
             <Button disabled={submitting} onClick={close} variant="outline">
               Cancel
             </Button>
-            <Button isLoading={submitting} type="submit">
+            <Button disabled={disabled} isLoading={submitting} type="submit">
               Continue to secure payment
             </Button>
           </div>
