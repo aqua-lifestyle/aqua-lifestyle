@@ -117,7 +117,7 @@ describe("Navbar", () => {
     expect(screen.queryByTestId("tenant-switcher")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Skip to main content" })).toHaveAttribute(
       "href",
-      "#landing-title",
+      "#main-content",
     );
 
     const menuButton = screen.getByRole("button", { name: "Open navigation" });

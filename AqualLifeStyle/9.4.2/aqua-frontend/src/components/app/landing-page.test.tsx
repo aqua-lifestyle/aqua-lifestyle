@@ -16,6 +16,8 @@ describe("LandingPage", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Live in health. Inspire to wealth." }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
+    expect(screen.getByRole("main")).toHaveAttribute("tabindex", "-1");
     expect(screen.getAllByRole("link", { name: /Browse products/i })[0]).toHaveAttribute(
       "href",
       "/catalog",
