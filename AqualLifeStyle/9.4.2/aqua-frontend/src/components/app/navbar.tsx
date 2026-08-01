@@ -29,6 +29,7 @@ import { useAuthState } from "@/src/providers";
 import { isAreaLeader, isFacilitator, isSystemAdmin } from "@/src/shared/auth/roles";
 import { TenantSwitcher } from "./tenant-switcher";
 import { UserMenu } from "./user-menu";
+import { landingContainerClassName } from "./landing-primitives";
 
 const mainLinks = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard", permission: null },
@@ -54,11 +55,11 @@ const moreLinks = [
 ];
 
 const publicLinks = [
-  { href: "/#value", label: "Why Aqua" },
-  { href: "/#how-it-works", label: "How it works" },
+  { href: "/#solution", label: "Why Aqua" },
+  { href: "/#products", label: "Products" },
   { href: "/#programmes", label: "Programmes" },
+  { href: "/#how-it-works", label: "How it works" },
   { href: "/#faq", label: "FAQ" },
-  { href: "/catalog", label: "Catalog" },
 ];
 
 export const Navbar = () => {
@@ -87,7 +88,9 @@ export const Navbar = () => {
         },
       ]
     : [];
-  const contextualMoreLinks = [...areaLeaderLinks, ...facilitatorLinks, ...moreLinks];
+  const contextualMoreLinks = [...areaLeaderLinks, ...facilitatorLinks, ...moreLinks].filter(
+    (link, index, links) => links.findIndex((candidate) => candidate.href === link.href) === index,
+  );
   const primaryLinks = isSystemAdmin(session?.user?.role)
     ? [
         { href: "/admin/dashboard", icon: LayoutDashboard, label: "Admin", permission: null },
@@ -139,11 +142,18 @@ export const Navbar = () => {
       className={cn(
         "sticky top-0 z-40 w-full",
         isLanding
-          ? "border-b border-white/10 bg-[#05051f]/95 text-white backdrop-blur-xl"
+          ? "border-b border-white/10 bg-aqua-navy/95 text-white backdrop-blur-xl"
           : "glass",
       )}
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div
+        className={cn(
+          "flex h-16 items-center justify-between",
+          isLanding
+            ? landingContainerClassName
+            : "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8",
+        )}
+      >
         <div className="flex items-center gap-8">
           <Link
             className={cn(
@@ -162,11 +172,17 @@ export const Navbar = () => {
               width={36}
             />
             <span className="hidden text-lg font-bold tracking-tight sm:inline">
-              Aqua Lifestyle
+              Aqua Lifestyle Club
             </span>
           </Link>
 
-          <nav aria-label="Primary navigation" className="hidden items-center gap-1 lg:flex">
+          <nav
+            aria-label="Primary navigation"
+            className={cn(
+              "items-center gap-1",
+              isAuthenticated ? "hidden xl:flex" : "hidden lg:flex",
+            )}
+          >
             {isAuthenticated
               ? primaryLinks.filter((link) => hasPermission(link.permission)).map((link) => (
                   <Link
@@ -212,7 +228,8 @@ export const Navbar = () => {
                     isLanding
                       ? "text-white/70 hover:bg-white/10 hover:text-white"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                    isMoreOpen && "bg-muted text-foreground",
+                    isMoreOpen &&
+                      (isLanding ? "bg-white/10 text-white" : "bg-muted text-foreground"),
                   )}
                   onClick={() => setIsMoreOpen((current) => !current)}
                   type="button"
@@ -256,7 +273,12 @@ export const Navbar = () => {
         <div className="flex items-center gap-3">
           {canCreateCustomer ? (
             <Link
-              className="hidden items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-dark sm:inline-flex"
+              className={cn(
+                "hidden items-center gap-1.5 rounded-aqua-control px-3 py-2 text-sm font-semibold text-white shadow-sm transition sm:inline-flex",
+                isLanding
+                  ? "bg-aqua-violet hover:bg-aqua-violet-dark"
+                  : "bg-accent hover:bg-accent-dark",
+              )}
               href="/customers/register"
             >
               <Plus className="size-4" />
@@ -273,9 +295,12 @@ export const Navbar = () => {
           <UserMenu inverted={isLanding} />
 
           <button
-            aria-label="Toggle menu"
+            aria-controls="mobile-navigation"
+            aria-expanded={isMobileOpen}
+            aria-label={isMobileOpen ? "Close navigation" : "Open navigation"}
             className={cn(
-              "inline-flex rounded-lg p-2 transition lg:hidden",
+              "inline-flex rounded-aqua-control p-2 transition",
+              isAuthenticated ? "xl:hidden" : "lg:hidden",
               isLanding ? "text-white hover:bg-white/10" : "text-foreground hover:bg-muted",
             )}
             onClick={() => setIsMobileOpen((current) => !current)}
@@ -288,9 +313,11 @@ export const Navbar = () => {
 
       {isMobileOpen ? (
         <div
+          id="mobile-navigation"
           className={cn(
-            "border-t px-4 py-4 lg:hidden animate-fade-in",
-            isLanding ? "border-white/10 bg-[#080722]" : "border-border bg-card",
+            "max-h-[calc(100dvh-4rem)] overflow-y-auto border-t px-4 py-4 animate-fade-in",
+            isAuthenticated ? "xl:hidden" : "lg:hidden",
+            isLanding ? "border-white/10 bg-aqua-navy" : "border-border bg-card",
           )}
         >
           <nav aria-label="Mobile navigation" className="flex flex-col gap-1">

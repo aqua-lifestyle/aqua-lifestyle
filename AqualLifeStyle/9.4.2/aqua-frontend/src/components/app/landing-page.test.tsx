@@ -6,7 +6,7 @@ import { AuthProvider } from "@/src/providers";
 import { LandingPage } from "./landing-page";
 
 describe("LandingPage", () => {
-  it("explains the club before presenting account actions", () => {
+  it("guides visitors from public discovery to account actions", () => {
     render(
       <AuthProvider>
         <LandingPage />
@@ -16,12 +16,12 @@ describe("LandingPage", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Live in health. Inspire to wealth." }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Discover Aqua/i })).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: /Browse products/i })[0]).toHaveAttribute(
       "href",
-      "#value",
+      "/catalog",
     );
-    expect(screen.getByRole("heading", { name: "One club. Four connected ideas." })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "A clear path into the club." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Clear information at every stage." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "A clear route into Aqua." })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Aqua Lifestyle Club" })).toHaveAttribute(
       "src",
       expect.stringContaining("aqua-lifestyle-logo.jpg"),

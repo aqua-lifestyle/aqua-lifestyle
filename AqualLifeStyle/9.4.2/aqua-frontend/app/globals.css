@@ -23,6 +23,27 @@
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
+  --color-aqua-canvas: var(--aqua-canvas);
+  --color-aqua-surface: var(--aqua-surface);
+  --color-aqua-ink: var(--aqua-ink);
+  --color-aqua-muted: var(--aqua-muted);
+  --color-aqua-line: var(--aqua-line);
+  --color-aqua-navy: var(--aqua-navy);
+  --color-aqua-navy-raised: var(--aqua-navy-raised);
+  --color-aqua-dark-muted: var(--aqua-dark-muted);
+  --color-aqua-violet: var(--aqua-violet);
+  --color-aqua-violet-dark: var(--aqua-violet-dark);
+  --color-aqua-lavender: var(--aqua-lavender);
+  --color-aqua-lavender-strong: var(--aqua-lavender-strong);
+  --color-aqua-cream: var(--aqua-cream);
+  --color-aqua-gold: var(--aqua-gold);
+  --color-aqua-gold-soft: var(--aqua-gold-soft);
+  --color-aqua-gold-ink: var(--aqua-gold-ink);
+  --color-aqua-violet-ink: var(--aqua-violet-ink);
+  --radius-aqua-control: 0.75rem;
+  --radius-aqua-card: 1.25rem;
+  --radius-aqua-feature: 1.5rem;
+  --shadow-aqua-raised: 0 24px 64px rgb(7 7 36 / 0.18);
 }
 
 :root {
@@ -48,6 +69,23 @@
   --shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.06), 0 2px 4px -2px rgb(15 23 42 / 0.06);
   --shadow-lg: 0 10px 15px -3px rgb(15 23 42 / 0.08), 0 4px 6px -4px rgb(15 23 42 / 0.08);
   --shadow-glass: 0 8px 32px 0 rgb(15 23 42 / 0.08);
+  --aqua-canvas: #faf7f2;
+  --aqua-surface: #ffffff;
+  --aqua-ink: #181426;
+  --aqua-muted: #5d5765;
+  --aqua-line: #d9d2c9;
+  --aqua-navy: #070724;
+  --aqua-navy-raised: #121031;
+  --aqua-dark-muted: #cfccda;
+  --aqua-violet: #6c3bd8;
+  --aqua-violet-dark: #5426b6;
+  --aqua-lavender: #f0ecf7;
+  --aqua-lavender-strong: #d9ccff;
+  --aqua-cream: #f7e3ca;
+  --aqua-gold: #e3bd65;
+  --aqua-gold-soft: #f4e4b8;
+  --aqua-gold-ink: #594000;
+  --aqua-violet-ink: #351077;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -166,6 +204,10 @@ body {
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   *,
   *::before,
   *::after {
