@@ -516,6 +516,75 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task AQGreenCheckout_PreparingRequestCannotCreateASecondProviderCheckout()
+        {
+            var customerId = await RegisterAndSignInCustomerAsync();
+            await _participationService.StartEntryAsync(
+                new StartEntryParticipationInput());
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations.SingleAsync(item =>
+                    item.CustomerId == customerId);
+                participation.SelectJoiningPaymentSchedule(
+                    AQGreenJoiningPaymentSchedule.Full);
+                context.AQGreenJoiningCheckouts.Add(AQGreenJoiningCheckout.Create(
+                    1,
+                    participation.Id,
+                    customerId,
+                    AQGreenJoiningPaymentSchedule.Full,
+                    AQGreenJoiningPaymentStage.Full,
+                    1200m,
+                    "ZAR",
+                    DateTime.UtcNow));
+                await context.SaveChangesAsync();
+            });
+
+            var exception = await Should.ThrowAsync<UserFriendlyException>(() =>
+                _participationService.CreateAQGreenJoiningCheckoutAsync(
+                    new CreateAQGreenJoiningCheckoutInput
+                    {
+                        Schedule = AQGreenJoiningPaymentSchedule.Full
+                    }));
+
+            exception.Message.ShouldContain("still being prepared");
+            await UsingDbContextAsync(1, async context =>
+                (await context.AQGreenJoiningCheckouts.CountAsync(item =>
+                    item.CustomerId == customerId)).ShouldBe(1));
+        }
+
+        [Fact]
+        public async Task DirectOnyxCheckout_PreparingRequestCannotCreateASecondProviderCheckout()
+        {
+            var customerId = await RegisterAndSignInCustomerAsync();
+            await UsingDbContextAsync(1, async context =>
+            {
+                var membership = await context.Memberships.SingleAsync(item =>
+                    item.MembershipType == MembershipType.Onyx);
+                context.DirectOnyxCheckoutIntents.Add(DirectOnyxCheckoutIntent.Create(
+                    1,
+                    customerId,
+                    null,
+                    null,
+                    membership.Id,
+                    OnyxPlanTerms.Create(
+                        "preparing-test",
+                        new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc),
+                        6120m),
+                    DateTime.UtcNow));
+                await context.SaveChangesAsync();
+            });
+
+            var exception = await Should.ThrowAsync<UserFriendlyException>(() =>
+                _participationService.CreateDirectOnyxCheckoutAsync(
+                    new CreateDirectOnyxCheckoutInput()));
+
+            exception.Message.ShouldContain("still being prepared");
+            await UsingDbContextAsync(1, async context =>
+                (await context.DirectOnyxCheckoutIntents.CountAsync(item =>
+                    item.CustomerId == customerId)).ShouldBe(1));
+        }
+
+        [Fact]
         public async Task AQGreenCheckout_ActivatesOnlyAfterTwoDistinctVerifiedInstalments()
         {
             var customerId = await RegisterAndSignInCustomerAsync();

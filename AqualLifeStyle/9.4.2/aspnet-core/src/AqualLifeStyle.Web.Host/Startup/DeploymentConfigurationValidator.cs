@@ -15,12 +15,31 @@ namespace AqualLifeStyle.Web.Host.Startup
             var environment = services.GetRequiredService<IWebHostEnvironment>();
             var configuration = services.GetRequiredService<IConfiguration>();
 
-            // TODO: Require Yoco__WebhookSecret in every mode once webhook registration is complete.
-            if (string.Equals(configuration["Yoco:Mode"]?.Trim(), "live", StringComparison.OrdinalIgnoreCase) &&
+            var yocoMode = configuration["Yoco:Mode"]?.Trim().ToLowerInvariant();
+            var yocoSecretKey = configuration["Yoco:SecretKey"]?.Trim();
+            var hasYocoMode = IsConfigured(yocoMode);
+            var hasYocoSecretKey = IsConfigured(yocoSecretKey);
+            if (string.Equals(yocoMode, "live", StringComparison.Ordinal) &&
                 !IsConfigured(configuration["Yoco:WebhookSecret"]))
             {
                 throw new InvalidOperationException(
                     "Yoco configuration is incomplete. Yoco__WebhookSecret is required when Yoco__Mode=live.");
+            }
+
+            if (hasYocoMode || hasYocoSecretKey)
+            {
+                var expectedConfiguredKeyPrefix = yocoMode == "live"
+                    ? "sk_live_"
+                    : yocoMode == "test"
+                        ? "sk_test_"
+                        : null;
+                if (expectedConfiguredKeyPrefix == null ||
+                    !hasYocoSecretKey ||
+                    !yocoSecretKey.StartsWith(expectedConfiguredKeyPrefix, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        "Yoco configuration is invalid. Yoco__Mode must be test or live and must match the Yoco__SecretKey prefix.");
+                }
             }
 
             if (!environment.IsProduction())
@@ -81,8 +100,6 @@ namespace AqualLifeStyle.Web.Host.Startup
                     "Production Bird configuration is invalid. Bird__ApiKey must be a current Bird API key.");
             }
 
-            var yocoMode = configuration["Yoco:Mode"]?.Trim().ToLowerInvariant();
-            var yocoSecretKey = configuration["Yoco:SecretKey"]?.Trim();
             var expectedYocoKeyPrefix = yocoMode == "live"
                 ? "sk_live_"
                 : yocoMode == "test"
@@ -93,6 +110,22 @@ namespace AqualLifeStyle.Web.Host.Startup
             {
                 throw new InvalidOperationException(
                     "Production Yoco configuration is invalid. Yoco__Mode must be test or live and must match the Yoco__SecretKey prefix.");
+            }
+
+            ValidateSecurePublicAddress(configuration, "App:ServerRootAddress", "App__ServerRootAddress");
+            ValidateSecurePublicAddress(configuration, "App:ClientRootAddress", "App__ClientRootAddress");
+        }
+
+        private static void ValidateSecurePublicAddress(
+            IConfiguration configuration,
+            string key,
+            string environmentName)
+        {
+            if (!Uri.TryCreate(configuration[key], UriKind.Absolute, out var uri) ||
+                uri.Scheme != Uri.UriSchemeHttps)
+            {
+                throw new InvalidOperationException(
+                    $"Production configuration is invalid. {environmentName} must be a secure HTTPS URL.");
             }
         }
 

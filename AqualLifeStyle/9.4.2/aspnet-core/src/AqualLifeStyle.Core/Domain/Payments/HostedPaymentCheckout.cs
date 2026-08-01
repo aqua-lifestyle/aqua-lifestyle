@@ -67,8 +67,9 @@ namespace AqualLifeStyle.Domain.Payments
 
         public void RecordCheckout(string providerCheckoutId, string checkoutUrl, DateTime createdAt)
         {
-            if (Status == HostedPaymentCheckoutStatus.Completed)
-                throw new InvalidOperationException("A completed payment checkout cannot be replaced.");
+            if (Status != HostedPaymentCheckoutStatus.PreparingCheckout)
+                throw new InvalidOperationException(
+                    "Only a checkout being prepared can receive provider details.");
 
             var normalizedId = RequireText(providerCheckoutId, nameof(providerCheckoutId), MaxProviderCheckoutIdLength);
             var normalizedUrl = RequireText(checkoutUrl, nameof(checkoutUrl), MaxCheckoutUrlLength);
@@ -128,8 +129,9 @@ namespace AqualLifeStyle.Domain.Payments
                         "This checkout was already terminated using different evidence.");
                 return;
             }
-            if (Status != HostedPaymentCheckoutStatus.AwaitingPayment)
-                throw new InvalidOperationException("Only an awaiting checkout can be terminated.");
+            if (Status != HostedPaymentCheckoutStatus.PreparingCheckout &&
+                Status != HostedPaymentCheckoutStatus.AwaitingPayment)
+                throw new InvalidOperationException("Only a payable checkout can be terminated.");
             if (terminatedAt == default || terminatedAt < CreatedAt)
                 throw new ArgumentException("A valid terminal time is required.", nameof(terminatedAt));
             if (terminalStatus == HostedPaymentCheckoutStatus.AdministrativelyTerminated &&

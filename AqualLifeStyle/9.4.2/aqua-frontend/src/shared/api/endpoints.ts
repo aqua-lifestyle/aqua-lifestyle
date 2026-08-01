@@ -103,6 +103,12 @@ export const apiEndpoints = {
       "/api/services/app/AdminProgrammeParticipation/CorrectRecruiter",
     getAdminParticipations:
       "/api/services/app/AdminProgrammeParticipation/GetAll",
+    getAQGreenJoiningCheckouts:
+      "/api/services/app/AdminProgrammeParticipation/GetAQGreenJoiningCheckouts",
+    terminateAQGreenJoiningCheckout:
+      "/api/services/app/AdminProgrammeParticipation/TerminateAQGreenJoiningCheckout",
+    getLegacyAQGreenReconciliation:
+      "/api/services/app/AdminProgrammeParticipation/GetLegacyAQGreenReconciliation",
     getMyParticipations:
       "/api/services/app/ClubMemberProgrammeParticipation/GetMyParticipations",
     getMyInvitations:

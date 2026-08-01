@@ -37,6 +37,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         private readonly IRepository<Tenant> _tenantRepository;
         private readonly IProgrammeRecruiterCorrectionPolicyResolver _correctionPolicyResolver;
         private readonly IProgrammeRecruiterCorrectionLock _correctionLock;
+        private readonly IHostedPaymentCheckoutLock _hostedPaymentCheckoutLock;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
         private readonly ICurrentProgrammeTermsProvider _termsProvider;
 
@@ -52,6 +53,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             IRepository<Tenant> tenantRepository,
             IProgrammeRecruiterCorrectionPolicyResolver correctionPolicyResolver,
             IProgrammeRecruiterCorrectionLock correctionLock,
+            IHostedPaymentCheckoutLock hostedPaymentCheckoutLock,
             IUnitOfWorkManager unitOfWorkManager,
             ICurrentProgrammeTermsProvider termsProvider)
         {
@@ -66,11 +68,12 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             _tenantRepository = tenantRepository;
             _correctionPolicyResolver = correctionPolicyResolver;
             _correctionLock = correctionLock;
+            _hostedPaymentCheckoutLock = hostedPaymentCheckoutLock;
             _unitOfWorkManager = unitOfWorkManager;
             _termsProvider = termsProvider;
         }
 
-        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.ManagePaymentCheckouts)]
+        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.TerminatePaymentCheckouts)]
         [UnitOfWork(IsDisabled = true)]
         public async Task TerminateAQGreenJoiningCheckoutAsync(
             TerminateAQGreenJoiningCheckoutInput input)
@@ -92,6 +95,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             }))
             using (DisableAllTenantDataFiltersForHost())
             {
+                await _hostedPaymentCheckoutLock.AcquireCheckoutAsync(input.CheckoutId);
                 checkout = await _aqGreenJoiningCheckoutRepository.FirstOrDefaultAsync(
                     item => item.Id == input.CheckoutId);
                 if (checkout == null)
@@ -109,6 +113,84 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 
             Logger.Warn(
                 $"AQGreen checkout administratively terminated tenant={checkout.TenantId} checkout={checkout.Id} administrator={AbpSession.GetUserId()}");
+        }
+
+        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.ViewPaymentCheckouts)]
+        public async Task<PagedResultDto<AQGreenJoiningCheckoutRecoveryDto>>
+            GetAQGreenJoiningCheckoutsAsync(AQGreenJoiningCheckoutListInput input)
+        {
+            input ??= new AQGreenJoiningCheckoutListInput();
+            ValidateRequestedTenant(input.TenantId, "AQGreen checkout");
+            if (!AbpSession.TenantId.HasValue &&
+                !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
+                throw new AbpAuthorizationException(
+                    "Host-wide checkout access requires permission to view all Areas.");
+
+            using (DisableAllTenantDataFiltersForHost())
+            {
+                var query =
+                    from checkout in _aqGreenJoiningCheckoutRepository.GetAll()
+                    join customer in _customerRepository.GetAll()
+                        on checkout.CustomerId equals customer.Id
+                    join tenant in _tenantRepository.GetAll()
+                        on checkout.TenantId equals tenant.Id
+                    where checkout.Status == HostedPaymentCheckoutStatus.PreparingCheckout ||
+                          checkout.Status == HostedPaymentCheckoutStatus.AwaitingPayment
+                    select new
+                    {
+                        Checkout = checkout,
+                        Customer = customer,
+                        AreaName = tenant.TenancyName
+                    };
+                if (AbpSession.TenantId.HasValue)
+                {
+                    var tenantId = AbpSession.TenantId.Value;
+                    query = query.Where(row => row.Checkout.TenantId == tenantId);
+                }
+                else if (input.TenantId.HasValue)
+                {
+                    var tenantId = input.TenantId.Value;
+                    query = query.Where(row => row.Checkout.TenantId == tenantId);
+                }
+                if (!string.IsNullOrWhiteSpace(input.Keyword))
+                {
+                    var keyword = input.Keyword.Trim();
+                    query = query.Where(row =>
+                        row.Customer.ClubMemberNumber.Contains(keyword) ||
+                        row.Customer.Name.Contains(keyword) ||
+                        row.Checkout.ProviderCheckoutId.Contains(keyword));
+                }
+
+                var total = await query.CountAsync();
+                var rows = await query
+                    .OrderBy(row => row.Checkout.CheckoutCreatedAt)
+                    .Skip(input.SkipCount)
+                    .Take(input.MaxResultCount)
+                    .ToListAsync();
+                return new PagedResultDto<AQGreenJoiningCheckoutRecoveryDto>(
+                    total,
+                    rows.Select(row => new AQGreenJoiningCheckoutRecoveryDto
+                    {
+                        CheckoutId = row.Checkout.Id,
+                        TenantId = row.Checkout.TenantId,
+                        AreaName = row.AreaName,
+                        ClubMemberNumber = row.Customer.ClubMemberNumber,
+                        CustomerName = row.Customer.Name,
+                        Amount = row.Checkout.Amount,
+                        Currency = row.Checkout.Currency,
+                        Status = row.Checkout.Status,
+                        Schedule = row.Checkout.Schedule,
+                        Stage = row.Checkout.Stage,
+                        CreatedAt = row.Checkout.CreatedAt,
+                        CheckoutCreatedAt = row.Checkout.CheckoutCreatedAt,
+                        ProviderCheckoutId = row.Checkout.ProviderCheckoutId,
+                        PaymentId = row.Checkout.PaymentId,
+                        LockReason = row.Checkout.Status ==
+                                     HostedPaymentCheckoutStatus.PreparingCheckout
+                            ? "Checkout creation is still being finalised."
+                            : "Awaiting authoritative provider confirmation or authorised termination."
+                    }).ToList());
+            }
         }
 
         [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.GraduateToOnyx)]
@@ -341,7 +423,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             }
         }
 
-        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.View)]
+        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation)]
         public async Task<PagedResultDto<LegacyAQGreenReconciliationDto>>
             GetLegacyAQGreenReconciliationAsync(
                 LegacyAQGreenReconciliationListInput input)

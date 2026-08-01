@@ -70,6 +70,23 @@ namespace AqualLifeStyle.Tests.WebHost
             Should.NotThrow(() => DeploymentConfigurationValidator.Validate(services));
         }
 
+        [Fact]
+        public void Validate_InStaging_WithMismatchedYocoModeAndKey_Throws()
+        {
+            var services = BuildServiceProvider("Staging", new Dictionary<string, string>
+            {
+                ["Yoco:Mode"] = "test",
+                ["Yoco:SecretKey"] = "sk_live_safe-test-placeholder"
+            });
+
+            var exception = Should.Throw<InvalidOperationException>(
+                () => DeploymentConfigurationValidator.Validate(services));
+
+            exception.Message.ShouldContain("mode");
+            exception.Message.ShouldContain("prefix");
+            exception.Message.ShouldNotContain("safe-test-placeholder");
+        }
+
         // TODO: Keep live mode fail-closed when removing the temporary test-mode exception.
         [Fact]
         public void Validate_InDevelopment_WithLiveModeAndMissingWebhookSecret_ThrowsWithDescriptiveMessage()
@@ -92,6 +109,20 @@ namespace AqualLifeStyle.Tests.WebHost
             var services = BuildServiceProvider("Production", CompleteProductionSettings());
 
             Should.NotThrow(() => DeploymentConfigurationValidator.Validate(services));
+        }
+
+        [Fact]
+        public void Validate_InProduction_WithInsecureClientAddress_Throws()
+        {
+            var settings = CompleteProductionSettings();
+            settings["App:ClientRootAddress"] = "http://app.example.com/";
+            var services = BuildServiceProvider("Production", settings);
+
+            var exception = Should.Throw<InvalidOperationException>(
+                () => DeploymentConfigurationValidator.Validate(services));
+
+            exception.Message.ShouldContain("App__ClientRootAddress");
+            exception.Message.ShouldContain("HTTPS");
         }
 
         [Fact]

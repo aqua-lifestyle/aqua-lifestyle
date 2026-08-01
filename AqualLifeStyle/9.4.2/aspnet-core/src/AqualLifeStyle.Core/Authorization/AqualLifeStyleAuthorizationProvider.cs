@@ -146,7 +146,9 @@ namespace AqualLifeStyle.Authorization
                 AquaPermissions.Admin.ProgrammeParticipations.View,
                 AquaPermissions.Admin.ProgrammeParticipations.CorrectRecruiter,
                 AquaPermissions.Admin.ProgrammeParticipations.GraduateToOnyx,
-                AquaPermissions.Admin.ProgrammeParticipations.ManagePaymentCheckouts);
+                AquaPermissions.Admin.ProgrammeParticipations.ViewPaymentCheckouts,
+                AquaPermissions.Admin.ProgrammeParticipations.TerminatePaymentCheckouts,
+                AquaPermissions.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation);
 
             var diagnostics = admin.CreateChildPermission(
                 AquaPermissions.Admin.Diagnostics.Default,

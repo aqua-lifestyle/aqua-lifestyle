@@ -13,6 +13,7 @@ using AqualLifeStyle.Application.Admin.Commissions;
 using AqualLifeStyle.Application.Admin.Savings;
 using AqualLifeStyle.Application.Admin.Loans;
 using AqualLifeStyle.Application.Admin.EntryMonthlyObligations;
+using AqualLifeStyle.Application.Admin.ProgrammeParticipations;
 using AqualLifeStyle.Application.AreaLeaders;
 using AqualLifeStyle.Application.Customers;
 using AqualLifeStyle.Application.Enquiries;
@@ -223,6 +224,25 @@ namespace AqualLifeStyle.Tests.Application
                 typeof(AdminEntryMonthlyObligationAppService),
                 nameof(AdminEntryMonthlyObligationAppService.GetAllAsync),
                 AquaPermissions.Admin.EntryMonthlyObligations.View);
+        }
+
+        [Fact]
+        public void ProgrammePaymentOperations_ShouldUseDedicatedPermissions()
+        {
+            AssertAuthorizeAttribute(
+                typeof(AdminProgrammeParticipationAppService),
+                nameof(AdminProgrammeParticipationAppService.GetAQGreenJoiningCheckoutsAsync),
+                AquaPermissions.Admin.ProgrammeParticipations.ViewPaymentCheckouts);
+            AssertAuthorizeAttribute(
+                typeof(AdminProgrammeParticipationAppService),
+                nameof(AdminProgrammeParticipationAppService.TerminateAQGreenJoiningCheckoutAsync),
+                AquaPermissions.Admin.ProgrammeParticipations.TerminatePaymentCheckouts);
+            AssertAuthorizeAttribute(
+                typeof(AdminProgrammeParticipationAppService),
+                nameof(AdminProgrammeParticipationAppService.GetLegacyAQGreenReconciliationAsync),
+                AquaPermissions.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation);
+            AquaPermissions.Admin.ProgrammeParticipations.ViewPaymentCheckouts
+                .ShouldNotBe(AquaPermissions.Admin.ProgrammeParticipations.TerminatePaymentCheckouts);
         }
 
         [Fact]

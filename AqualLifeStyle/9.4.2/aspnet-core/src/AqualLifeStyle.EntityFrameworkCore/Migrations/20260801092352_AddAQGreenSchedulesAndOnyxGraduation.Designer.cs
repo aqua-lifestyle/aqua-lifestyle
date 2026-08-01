@@ -3452,6 +3452,10 @@ namespace AqualLifeStyle.Migrations
                         .IsUnique()
                         .HasFilter("\"Status\" IN (0, 1)");
 
+                    b.HasIndex("ParticipationId", "Stage")
+                        .IsUnique()
+                        .HasFilter("\"Status\" = 2");
+
                     b.HasIndex("PaymentId")
                         .IsUnique();
 

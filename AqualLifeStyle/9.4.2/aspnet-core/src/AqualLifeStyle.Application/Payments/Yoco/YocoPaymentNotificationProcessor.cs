@@ -48,6 +48,7 @@ namespace AqualLifeStyle.Payments.Yoco
         private readonly ICustomerRepository _customerRepository;
         private readonly ITransactionalEmailOutbox _emailOutbox;
         private readonly TransactionalEmailTemplateBuilder _emailTemplates;
+        private readonly IHostedPaymentCheckoutLock _hostedPaymentCheckoutLock;
 
         public YocoPaymentNotificationProcessor(
             ProgrammePaymentConfirmationProcessor confirmationProcessor,
@@ -59,7 +60,8 @@ namespace AqualLifeStyle.Payments.Yoco
             IRepository<MemberPayment, Guid> paymentRepository,
             ICustomerRepository customerRepository,
             ITransactionalEmailOutbox emailOutbox,
-            TransactionalEmailTemplateBuilder emailTemplates)
+            TransactionalEmailTemplateBuilder emailTemplates,
+            IHostedPaymentCheckoutLock hostedPaymentCheckoutLock)
         {
             _confirmationProcessor = confirmationProcessor;
             _configuration = configuration;
@@ -71,6 +73,7 @@ namespace AqualLifeStyle.Payments.Yoco
             _customerRepository = customerRepository;
             _emailOutbox = emailOutbox;
             _emailTemplates = emailTemplates;
+            _hostedPaymentCheckoutLock = hostedPaymentCheckoutLock;
         }
 
         [UnitOfWork]
@@ -113,6 +116,9 @@ namespace AqualLifeStyle.Payments.Yoco
             try
             {
                 var checkout = await ResolveCheckoutAsync(providerCheckoutId);
+                await _hostedPaymentCheckoutLock.AcquireCheckoutAsync(
+                    checkout.ReferenceId);
+                checkout = await ResolveCheckoutAsync(providerCheckoutId);
                 YocoWebhookReceipt existingReceipt;
                 using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
                 {

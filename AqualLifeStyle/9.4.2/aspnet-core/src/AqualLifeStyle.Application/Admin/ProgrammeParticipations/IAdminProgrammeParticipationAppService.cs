@@ -14,6 +14,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             GraduateAQGreenToOnyxInput input);
         Task TerminateAQGreenJoiningCheckoutAsync(
             TerminateAQGreenJoiningCheckoutInput input);
+        Task<PagedResultDto<AQGreenJoiningCheckoutRecoveryDto>>
+            GetAQGreenJoiningCheckoutsAsync(AQGreenJoiningCheckoutListInput input);
         Task<PagedResultDto<LegacyAQGreenReconciliationDto>>
             GetLegacyAQGreenReconciliationAsync(
                 LegacyAQGreenReconciliationListInput input);

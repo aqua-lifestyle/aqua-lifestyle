@@ -45,6 +45,15 @@ namespace AqualLifeStyle.Web.Host.Controllers
         [RequestSizeLimit(64 * 1024)]
         public async Task<IActionResult> WebhookAsync()
         {
+            if (!_signatureVerifier.IsConfigured)
+            {
+                _logger.LogWarning(
+                    "PaymentOperationsAlert {AlertType}: Yoco webhook processing is not configured; TraceId={TraceId}",
+                    "yoco_webhook_unavailable",
+                    HttpContext.TraceIdentifier);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
             string rawBody;
             using (var reader = new StreamReader(
                        Request.Body,
@@ -93,6 +102,15 @@ namespace AqualLifeStyle.Web.Host.Controllers
                     HttpContext.TraceIdentifier);
                 return BadRequest();
             }
+            if (!HasConsistentPaymentStatus(webhookEvent))
+            {
+                _logger.LogWarning(
+                    "PaymentOperationsAlert {AlertType}: Yoco webhook payment status was inconsistent; EventId={EventId}; TraceId={TraceId}",
+                    "yoco_webhook_payload_rejected",
+                    webhookEvent.Id,
+                    HttpContext.TraceIdentifier);
+                return BadRequest();
+            }
 
             try
             {
@@ -133,6 +151,20 @@ namespace AqualLifeStyle.Web.Host.Controllers
             }
         }
 
+        private static bool HasConsistentPaymentStatus(
+            YocoPaymentWebhookEvent webhookEvent)
+        {
+            if (!string.Equals(webhookEvent.Type, "payment.succeeded", StringComparison.Ordinal) &&
+                !string.Equals(webhookEvent.Type, "payment.failed", StringComparison.Ordinal))
+                return true;
+            if (!string.Equals(webhookEvent.Payload.Type, "payment", StringComparison.Ordinal))
+                return false;
+            return string.Equals(
+                webhookEvent.Payload.Status,
+                webhookEvent.Type == "payment.succeeded" ? "succeeded" : "failed",
+                StringComparison.Ordinal);
+        }
+
         private sealed class YocoPaymentWebhookEvent
         {
             public string Id { get; set; }
@@ -147,6 +179,8 @@ namespace AqualLifeStyle.Web.Host.Controllers
             public string Currency { get; set; }
             public string Id { get; set; }
             public string Mode { get; set; }
+            public string Status { get; set; }
+            public string Type { get; set; }
             public Dictionary<string, JsonElement> Metadata { get; set; }
         }
     }

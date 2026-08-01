@@ -47,6 +47,25 @@ const participation = {
   status: "Awaiting first payment",
 };
 
+const lockedCheckout = {
+  amount: 600,
+  areaName: "Johannesburg",
+  checkoutCreatedAt: "2026-08-01T09:00:00Z",
+  checkoutId: "59a8bce4-e916-4f65-8102-2e4efc23cad1",
+  clubMemberNumber: "CLB-DORA23456789",
+  createdAt: "2026-08-01T08:59:00Z",
+  currency: "ZAR",
+  customerName: "Dora Shongwe",
+  lockReason:
+    "Awaiting authoritative provider confirmation or authorised termination.",
+  paymentId: null,
+  providerCheckoutId: "ch_safe_reference",
+  schedule: 1,
+  stage: 1,
+  status: 1,
+  tenantId: 1,
+};
+
 describe("AdminProgrammeParticipations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -121,9 +140,7 @@ describe("AdminProgrammeParticipations", () => {
     render(<AdminProgrammeParticipations />);
 
     expect(
-      screen.getByText(
-        "You do not have permission to view programme participation.",
-      ),
+      screen.getByText(/do not have permission to view programme participation/i),
     ).toBeInTheDocument();
     expect(httpClient.get).not.toHaveBeenCalled();
   });
@@ -164,5 +181,65 @@ describe("AdminProgrammeParticipations", () => {
     expect(
       await screen.findByText(/change was added to the audit history/i),
     ).toBeInTheDocument();
+  });
+
+  it("shows safe locked-checkout evidence with read-only permission", async () => {
+    vi.mocked(useAuthState).mockReturnValue(
+      authState([
+        "Aqua.Admin.ProgrammeParticipations.ViewPaymentCheckouts",
+      ]),
+    );
+    vi.mocked(httpClient.get).mockResolvedValue({
+      items: [lockedCheckout],
+      totalCount: 1,
+    });
+
+    render(<AdminProgrammeParticipations />);
+
+    expect(await screen.findByText("AQGreen checkout recovery"))
+      .toBeInTheDocument();
+    expect(screen.getByText("ch_safe_reference")).toBeInTheDocument();
+    expect(screen.getByText("Instalment 1 of 2", { exact: false }))
+      .toBeInTheDocument();
+    expect(screen.getByText(/read-only checkout access/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Review termination" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("requires justification before an authorised checkout termination", async () => {
+    vi.mocked(useAuthState).mockReturnValue(
+      authState([
+        "Aqua.Admin.ProgrammeParticipations.ViewPaymentCheckouts",
+        "Aqua.Admin.ProgrammeParticipations.TerminatePaymentCheckouts",
+      ]),
+    );
+    vi.mocked(httpClient.get).mockResolvedValue({
+      items: [lockedCheckout],
+      totalCount: 1,
+    });
+    vi.mocked(httpClient.post).mockResolvedValue(undefined);
+
+    render(<AdminProgrammeParticipations />);
+
+    fireEvent.click(await screen.findByRole("button", {
+      name: "Review termination",
+    }));
+    expect(screen.getByRole("button", { name: "Terminate checkout" }))
+      .toBeDisabled();
+    fireEvent.change(
+      screen.getByLabelText(
+        "Authorised termination evidence and justification",
+      ),
+      { target: { value: "Yoco support confirmed checkout is no longer payable" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Terminate checkout" }));
+
+    await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
+      apiEndpoints.programmeParticipations.terminateAQGreenJoiningCheckout,
+      {
+        checkoutId: lockedCheckout.checkoutId,
+        evidence: "Yoco support confirmed checkout is no longer payable",
+      },
+    ));
   });
 });

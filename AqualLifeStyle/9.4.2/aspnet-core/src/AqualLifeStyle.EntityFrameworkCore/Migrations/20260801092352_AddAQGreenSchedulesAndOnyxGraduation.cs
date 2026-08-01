@@ -135,6 +135,53 @@ namespace AqualLifeStyle.Migrations
                 filter: "\"Status\" IN (0, 1)");
 
             migrationBuilder.CreateIndex(
+                name: "IX_AQGreenJoiningCheckouts_ParticipationId_Stage",
+                table: "AQGreenJoiningCheckouts",
+                columns: new[] { "ParticipationId", "Stage" },
+                unique: true,
+                filter: "\"Status\" = 2");
+
+            migrationBuilder.Sql(
+                """
+                CREATE OR REPLACE FUNCTION enforce_aqgreen_joining_checkout_cap()
+                RETURNS trigger AS $$
+                DECLARE
+                    joining_cap numeric(18,2);
+                    applied_total numeric(18,2);
+                BEGIN
+                    IF NEW."Status" <> 2 THEN
+                        RETURN NEW;
+                    END IF;
+
+                    SELECT "JoiningPaymentAmount"
+                    INTO joining_cap
+                    FROM "EntryParticipations"
+                    WHERE "Id" = NEW."ParticipationId"
+                    FOR UPDATE;
+
+                    SELECT COALESCE(SUM("Amount"), 0)
+                    INTO applied_total
+                    FROM "AQGreenJoiningCheckouts"
+                    WHERE "ParticipationId" = NEW."ParticipationId"
+                      AND "Status" = 2
+                      AND "Id" <> NEW."Id";
+
+                    IF joining_cap IS NULL OR applied_total + NEW."Amount" > joining_cap THEN
+                        RAISE EXCEPTION 'AQGreen joining checkout total exceeds the participation joining obligation.';
+                    END IF;
+
+                    RETURN NEW;
+                END;
+                $$ LANGUAGE plpgsql;
+
+                CREATE TRIGGER "TR_AQGreenJoiningCheckouts_EnforceJoiningCap"
+                BEFORE INSERT OR UPDATE OF "Status", "Amount", "ParticipationId"
+                ON "AQGreenJoiningCheckouts"
+                FOR EACH ROW
+                EXECUTE FUNCTION enforce_aqgreen_joining_checkout_cap();
+                """);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_OnyxGraduationDecisions_EntryParticipationId",
                 table: "OnyxGraduationDecisions",
                 column: "EntryParticipationId",
@@ -161,11 +208,22 @@ namespace AqualLifeStyle.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(
+                """
+                DROP TRIGGER IF EXISTS "TR_AQGreenJoiningCheckouts_EnforceJoiningCap"
+                ON "AQGreenJoiningCheckouts";
+                DROP FUNCTION IF EXISTS enforce_aqgreen_joining_checkout_cap();
+                """);
+
             migrationBuilder.DropTable(
                 name: "OnyxGraduationDecisions");
 
             migrationBuilder.DropIndex(
                 name: "IX_AQGreenJoiningCheckouts_ParticipationId",
+                table: "AQGreenJoiningCheckouts");
+
+            migrationBuilder.DropIndex(
+                name: "IX_AQGreenJoiningCheckouts_ParticipationId_Stage",
                 table: "AQGreenJoiningCheckouts");
 
             migrationBuilder.DropColumn(

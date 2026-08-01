@@ -30,6 +30,13 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
             builder.HasIndex(checkout => checkout.ParticipationId)
                 .IsUnique()
                 .HasFilter("\"Status\" IN (0, 1)");
+            builder.HasIndex(checkout => new
+                {
+                    checkout.ParticipationId,
+                    checkout.Stage
+                })
+                .IsUnique()
+                .HasFilter("\"Status\" = 2");
             builder.HasIndex(checkout => checkout.ProviderCheckoutId).IsUnique();
             builder.HasIndex(checkout => checkout.PaymentId).IsUnique();
 

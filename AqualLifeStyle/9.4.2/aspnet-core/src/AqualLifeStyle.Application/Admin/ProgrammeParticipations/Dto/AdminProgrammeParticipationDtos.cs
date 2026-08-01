@@ -95,6 +95,34 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
         public string Evidence { get; set; }
     }
 
+    public class AQGreenJoiningCheckoutListInput : PagedResultRequestDto
+    {
+        [StringLength(256)]
+        public string Keyword { get; set; }
+
+        [Range(1, int.MaxValue)]
+        public int? TenantId { get; set; }
+    }
+
+    public class AQGreenJoiningCheckoutRecoveryDto
+    {
+        public Guid CheckoutId { get; set; }
+        public int TenantId { get; set; }
+        public string AreaName { get; set; }
+        public string ClubMemberNumber { get; set; }
+        public string CustomerName { get; set; }
+        public decimal Amount { get; set; }
+        public string Currency { get; set; }
+        public HostedPaymentCheckoutStatus Status { get; set; }
+        public AQGreenJoiningPaymentSchedule Schedule { get; set; }
+        public AQGreenJoiningPaymentStage Stage { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? CheckoutCreatedAt { get; set; }
+        public string ProviderCheckoutId { get; set; }
+        public Guid? PaymentId { get; set; }
+        public string LockReason { get; set; }
+    }
+
     public class LegacyAQGreenReconciliationListInput : PagedResultRequestDto
     {
         [Range(1, int.MaxValue)]

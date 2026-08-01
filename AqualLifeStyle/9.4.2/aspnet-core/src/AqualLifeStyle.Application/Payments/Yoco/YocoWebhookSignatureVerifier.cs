@@ -9,6 +9,7 @@ namespace AqualLifeStyle.Payments.Yoco
 {
     public interface IYocoWebhookSignatureVerifier
     {
+        bool IsConfigured { get; }
         bool IsValid(string webhookId, string timestamp, string signature, string rawBody);
     }
 
@@ -22,6 +23,12 @@ namespace AqualLifeStyle.Payments.Yoco
         {
             _configuration = configuration;
         }
+
+        public bool IsConfigured =>
+            !string.IsNullOrWhiteSpace(_configuration["Yoco:WebhookSecret"]) &&
+            _configuration["Yoco:WebhookSecret"]
+                .Trim()
+                .StartsWith("whsec_", StringComparison.Ordinal);
 
         public bool IsValid(string webhookId, string timestamp, string signature, string rawBody) =>
             IsValid(

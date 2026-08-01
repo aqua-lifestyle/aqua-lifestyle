@@ -23,7 +23,7 @@ namespace AqualLifeStyle.Tests.Payments
         private sealed class TestYocoPaymentNotificationProcessor : YocoPaymentNotificationProcessor
         {
             public TestYocoPaymentNotificationProcessor()
-                : base(null!, null!, null!, null!, null!, null!, null!, null!, null!, null!)
+                : base(null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!)
             {
             }
 
@@ -55,6 +55,7 @@ namespace AqualLifeStyle.Tests.Payments
             TestLogger<YocoPaymentsController>? logger = null)
         {
             verifierMock = new Mock<IYocoWebhookSignatureVerifier>();
+            verifierMock.SetupGet(v => v.IsConfigured).Returns(true);
             verifierMock.Setup(v => v.IsValid(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
                 .Returns((string webhookId, string timestamp, string signature, string rawBody) =>
                 {
@@ -78,6 +79,46 @@ namespace AqualLifeStyle.Tests.Payments
             }
 
             return controller;
+        }
+
+        [Fact]
+        public async Task WebhookAsync_WhenSigningSecretIsUnavailable_RejectsBeforeReadingBody()
+        {
+            var verifier = new Mock<IYocoWebhookSignatureVerifier>();
+            verifier.SetupGet(item => item.IsConfigured).Returns(false);
+            var processor = new TestYocoPaymentNotificationProcessor();
+            var logger = new TestLogger<YocoPaymentsController>();
+            var controller = new YocoPaymentsController(
+                verifier.Object,
+                processor,
+                new OptionsWrapper<Microsoft.AspNetCore.Mvc.JsonOptions>(
+                    new Microsoft.AspNetCore.Mvc.JsonOptions()),
+                logger);
+            var body = new MemoryStream(Encoding.UTF8.GetBytes(
+                "{\"type\":\"payment.succeeded\",\"sensitive\":\"must-not-be-read\"}"));
+            controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            };
+            controller.Request.Body = body;
+
+            var result = await controller.WebhookAsync();
+
+            result.ShouldBeOfType<StatusCodeResult>()
+                .StatusCode.ShouldBe(StatusCodes.Status503ServiceUnavailable);
+            body.Position.ShouldBe(0);
+            verifier.Verify(
+                item => item.IsValid(
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>()),
+                Times.Never);
+            processor.LastNotification.ShouldBeNull();
+            logger.Entries.ShouldContain(entry =>
+                entry.Level == LogLevel.Warning &&
+                entry.Message.Contains("yoco_webhook_unavailable") &&
+                !entry.Message.Contains("must-not-be-read"));
         }
 
         private static DefaultHttpContext CreateHttpContext(string rawBody, string webhookId, string timestamp, string signature)
@@ -106,6 +147,8 @@ namespace AqualLifeStyle.Tests.Payments
                     amount = 1200,
                     currency = "ZAR",
                     mode = "test",
+                    status = "succeeded",
+                    type = "payment",
                     createdDate = DateTimeOffset.UtcNow,
                     metadata = new Dictionary<string, JsonElement>()
                 }
@@ -177,6 +220,45 @@ namespace AqualLifeStyle.Tests.Payments
         }
 
         [Fact]
+        public async Task WebhookAsync_InconsistentSignedPaymentStatus_ReturnsBadRequest()
+        {
+            var secret = "whsec_" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+            var webhookId = "event_" + Guid.NewGuid().ToString("N");
+            var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+            var rawBody = JsonSerializer.Serialize(new
+            {
+                id = webhookId,
+                type = "payment.succeeded",
+                payload = new
+                {
+                    id = "pay_" + Guid.NewGuid().ToString("N"),
+                    amount = 120000,
+                    currency = "ZAR",
+                    mode = "test",
+                    status = "failed",
+                    type = "payment",
+                    createdDate = DateTimeOffset.UtcNow,
+                    metadata = new { checkoutId = "ch_test" }
+                }
+            });
+            var signature = $"v1,{Sign(secret, $"{webhookId}.{timestamp}.{rawBody}")}";
+            var controller = CreateController(
+                secret,
+                out _,
+                out var processor,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = CreateHttpContext(rawBody, webhookId, timestamp, signature)
+            };
+
+            var result = await controller.WebhookAsync();
+
+            result.ShouldBeOfType<BadRequestResult>();
+            processor.LastNotification.ShouldBeNull();
+        }
+
+        [Fact]
         public async Task WebhookAsync_TransientProcessingFailure_Returns500()
         {
             var secret = "whsec_" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
@@ -192,6 +274,8 @@ namespace AqualLifeStyle.Tests.Payments
                     amount = 1200,
                     currency = "ZAR",
                     mode = "test",
+                    status = "succeeded",
+                    type = "payment",
                     createdDate = DateTimeOffset.UtcNow,
                     metadata = new Dictionary<string, JsonElement>()
                 }
@@ -240,6 +324,8 @@ namespace AqualLifeStyle.Tests.Payments
                     amount = 1200,
                     currency = "ZAR",
                     mode = "test",
+                    status = "succeeded",
+                    type = "payment",
                     createdDate = DateTimeOffset.UtcNow,
                     metadata = new Dictionary<string, JsonElement>()
                 }

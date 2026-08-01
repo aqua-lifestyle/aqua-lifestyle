@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleCheck, PencilLine, Route } from "lucide-react";
+import { CircleCheck, PencilLine, Route, ShieldAlert } from "lucide-react";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -56,9 +56,36 @@ type PagedParticipations = {
   totalCount: number;
 };
 
+type AQGreenCheckoutRecovery = {
+  amount: number;
+  areaName: string;
+  checkoutCreatedAt: string | null;
+  checkoutId: string;
+  clubMemberNumber: string;
+  createdAt: string;
+  currency: string;
+  customerName: string;
+  lockReason: string;
+  paymentId: string | null;
+  providerCheckoutId: string | null;
+  schedule: number;
+  stage: number;
+  status: number;
+  tenantId: number;
+};
+
+type PagedCheckouts = {
+  items: AQGreenCheckoutRecovery[];
+  totalCount: number;
+};
+
 const VIEW_PERMISSION = "Aqua.Admin.ProgrammeParticipations.View";
 const CORRECT_PERMISSION =
   "Aqua.Admin.ProgrammeParticipations.CorrectRecruiter";
+const VIEW_CHECKOUTS_PERMISSION =
+  "Aqua.Admin.ProgrammeParticipations.ViewPaymentCheckouts";
+const TERMINATE_CHECKOUTS_PERMISSION =
+  "Aqua.Admin.ProgrammeParticipations.TerminatePaymentCheckouts";
 
 const formatCurrency = (amount: number, currency: string) =>
   new Intl.NumberFormat("en-ZA", { currency, style: "currency" }).format(amount);
@@ -69,6 +96,10 @@ export const AdminProgrammeParticipations = () => {
     session?.user?.permissions?.includes(VIEW_PERMISSION) ?? false;
   const canCorrect =
     session?.user?.permissions?.includes(CORRECT_PERMISSION) ?? false;
+  const canViewCheckouts =
+    session?.user?.permissions?.includes(VIEW_CHECKOUTS_PERMISSION) ?? false;
+  const canTerminateCheckouts =
+    session?.user?.permissions?.includes(TERMINATE_CHECKOUTS_PERMISSION) ?? false;
   const [programme, setProgramme] = useState<ProgrammeType>("entry");
   const [participations, setParticipations] = useState<
     AdminProgrammeParticipation[]
@@ -80,6 +111,12 @@ export const AdminProgrammeParticipations = () => {
   const [newRecruiterNumber, setNewRecruiterNumber] = useState("");
   const [reason, setReason] = useState("");
   const [savingCorrection, setSavingCorrection] = useState(false);
+  const [checkouts, setCheckouts] = useState<AQGreenCheckoutRecovery[]>([]);
+  const [loadingCheckouts, setLoadingCheckouts] = useState(canViewCheckouts);
+  const [selectedCheckout, setSelectedCheckout] =
+    useState<AQGreenCheckoutRecovery>();
+  const [terminationEvidence, setTerminationEvidence] = useState("");
+  const [terminatingCheckout, setTerminatingCheckout] = useState(false);
 
   const loadParticipations = useCallback(async () => {
     if (!canView) {
@@ -115,16 +152,44 @@ export const AdminProgrammeParticipations = () => {
     }
   }, [canView, programme]);
 
+  const loadCheckouts = useCallback(async () => {
+    if (!canViewCheckouts) {
+      setLoadingCheckouts(false);
+      return;
+    }
+    setLoadingCheckouts(true);
+    setError(undefined);
+    try {
+      const result = await httpClient.get<PagedCheckouts>(
+        `${apiEndpoints.programmeParticipations.getAQGreenJoiningCheckouts}?MaxResultCount=100`,
+      );
+      setCheckouts(result.items);
+    } catch (requestError) {
+      setError(getRequestErrorMessage(
+        requestError,
+        "Locked AQGreen checkouts could not be loaded.",
+      ));
+    } finally {
+      setLoadingCheckouts(false);
+    }
+  }, [canViewCheckouts]);
+
   useEffect(() => {
     const task = window.setTimeout(() => void loadParticipations(), 0);
     return () => window.clearTimeout(task);
   }, [loadParticipations]);
 
-  if (!canView) {
+  useEffect(() => {
+    const task = window.setTimeout(() => void loadCheckouts(), 0);
+    return () => window.clearTimeout(task);
+  }, [loadCheckouts]);
+
+  if (!canView && !canViewCheckouts) {
     return (
       <main className="p-6">
         <StatusMessage tone="error">
-          You do not have permission to view programme participation.
+          You do not have permission to view programme participation or payment
+          checkout recovery.
         </StatusMessage>
       </main>
     );
@@ -165,6 +230,35 @@ export const AdminProgrammeParticipations = () => {
       );
     } finally {
       setSavingCorrection(false);
+    }
+  };
+
+  const submitTermination = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedCheckout || terminationEvidence.trim().length < 3) return;
+    setTerminatingCheckout(true);
+    setError(undefined);
+    try {
+      await httpClient.post(
+        apiEndpoints.programmeParticipations.terminateAQGreenJoiningCheckout,
+        {
+          checkoutId: selectedCheckout.checkoutId,
+          evidence: terminationEvidence.trim(),
+        },
+      );
+      setSelectedCheckout(undefined);
+      setTerminationEvidence("");
+      setSuccess(
+        "The checkout was terminated with an audited administrator decision. The member may create a new checkout.",
+      );
+      await loadCheckouts();
+    } catch (requestError) {
+      setError(getRequestErrorMessage(
+        requestError,
+        "The checkout could not be terminated. No payment state was changed.",
+      ));
+    } finally {
+      setTerminatingCheckout(false);
     }
   };
 
@@ -277,6 +371,76 @@ export const AdminProgrammeParticipations = () => {
     />
   );
 
+  const checkoutColumns = [
+    {
+      header: "Club Member",
+      key: "customerName",
+      render: (item: AQGreenCheckoutRecovery) => (
+        <div>
+          <p className="font-semibold">{item.customerName}</p>
+          <p className="font-mono text-xs text-muted-foreground">
+            {item.clubMemberNumber}
+          </p>
+          <p className="text-xs text-muted-foreground">{item.areaName}</p>
+        </div>
+      ),
+    },
+    {
+      header: "Checkout",
+      key: "providerCheckoutId",
+      render: (item: AQGreenCheckoutRecovery) => (
+        <div className="max-w-xs">
+          <p className="font-medium">
+            {formatCurrency(item.amount, item.currency)} · {item.schedule === 0
+              ? "Full payment"
+              : item.stage === 1
+                ? "Instalment 1 of 2"
+                : "Instalment 2 of 2"}
+          </p>
+          <p className="break-all font-mono text-xs text-muted-foreground">
+            {item.providerCheckoutId ?? "Provider checkout not yet recorded"}
+          </p>
+        </div>
+      ),
+    },
+    {
+      header: "Why locked",
+      key: "lockReason",
+      render: (item: AQGreenCheckoutRecovery) => (
+        <div className="max-w-sm">
+          <Badge tone="warning">
+            {item.status === 0 ? "Preparing checkout" : "Awaiting payment"}
+          </Badge>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {item.lockReason}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Created {new Date(item.checkoutCreatedAt ?? item.createdAt).toLocaleString()}
+          </p>
+        </div>
+      ),
+    },
+    ...(canTerminateCheckouts
+      ? [{
+          header: "Recovery",
+          key: "recovery",
+          render: (item: AQGreenCheckoutRecovery) => (
+            <Button
+              onClick={() => {
+                setSelectedCheckout(item);
+                setTerminationEvidence("");
+                setError(undefined);
+              }}
+              size="sm"
+              variant="outline"
+            >
+              Review termination
+            </Button>
+          ),
+        }]
+      : []),
+  ];
+
   return (
     <main className="min-h-dvh px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -308,14 +472,53 @@ export const AdminProgrammeParticipations = () => {
         {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
         {success ? <StatusMessage tone="success">{success}</StatusMessage> : null}
 
-        <Tabs
-          onChange={(value) => setProgramme(value as ProgrammeType)}
-          tabs={[
-            { content: table, id: "entry", label: "AQGreen" },
-            { content: table, id: "onyx", label: "Onyx" },
-          ]}
-          value={programme}
-        />
+        {canView ? (
+          <Tabs
+            onChange={(value) => setProgramme(value as ProgrammeType)}
+            tabs={[
+              { content: table, id: "entry", label: "AQGreen" },
+              { content: table, id: "onyx", label: "Onyx" },
+            ]}
+            value={programme}
+          />
+        ) : null}
+
+        {canViewCheckouts ? (
+          <Card className="flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <ShieldAlert className="mt-1 size-6 text-warning" />
+              <div>
+                <h2 className="text-xl font-bold">AQGreen checkout recovery</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Review locally locked checkouts. Browser returns and elapsed
+                  time do not prove that a Yoco checkout is no longer payable.
+                </p>
+              </div>
+            </div>
+            {loadingCheckouts ? (
+              <Skeleton className="h-64" />
+            ) : (
+              <DataTable
+                columns={checkoutColumns}
+                data={checkouts}
+                emptyState="No locked AQGreen joining checkouts found."
+                keyExtractor={(item) => item.checkoutId}
+                searchFn={(item, query) =>
+                  `${item.customerName} ${item.clubMemberNumber} ${item.areaName} ${item.providerCheckoutId ?? ""}`
+                    .toLowerCase()
+                    .includes(query.toLowerCase())
+                }
+              />
+            )}
+            {!canTerminateCheckouts ? (
+              <StatusMessage tone="info">
+                You have read-only checkout access. A separately authorised
+                operator must perform any termination. Sign out and in again
+                after a permission assignment so refreshed claims are loaded.
+              </StatusMessage>
+            ) : null}
+          </Card>
+        ) : null}
         <Dialog
           onClose={() => !savingCorrection && setSelected(undefined)}
           open={Boolean(selected)}
@@ -357,6 +560,65 @@ export const AdminProgrammeParticipations = () => {
                   type="submit"
                 >
                   Confirm correction
+                </Button>
+              </div>
+            </form>
+          ) : null}
+        </Dialog>
+        <Dialog
+          onClose={() =>
+            !terminatingCheckout && setSelectedCheckout(undefined)
+          }
+          open={Boolean(selectedCheckout)}
+          title="Terminate locked AQGreen checkout"
+        >
+          {selectedCheckout ? (
+            <form className="flex flex-col gap-4" onSubmit={submitTermination}>
+              <StatusMessage tone="warning">
+                Confirm with authorised provider evidence that this checkout
+                may be abandoned. This action does not confirm, refund, or
+                reverse a payment, and cannot be used after verified payment.
+              </StatusMessage>
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-muted-foreground">Club Member</dt>
+                  <dd className="font-semibold">
+                    {selectedCheckout.clubMemberNumber}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Amount</dt>
+                  <dd className="font-semibold">
+                    {formatCurrency(
+                      selectedCheckout.amount,
+                      selectedCheckout.currency,
+                    )}
+                  </dd>
+                </div>
+              </dl>
+              <TextAreaField
+                label="Authorised termination evidence and justification"
+                name="terminationEvidence"
+                onChange={(event) => setTerminationEvidence(event.target.value)}
+                required
+                rows={5}
+                value={terminationEvidence}
+              />
+              <div className="flex justify-end gap-3">
+                <Button
+                  disabled={terminatingCheckout}
+                  onClick={() => setSelectedCheckout(undefined)}
+                  variant="outline"
+                >
+                  Keep checkout locked
+                </Button>
+                <Button
+                  disabled={terminationEvidence.trim().length < 3}
+                  isLoading={terminatingCheckout}
+                  type="submit"
+                  variant="danger"
+                >
+                  Terminate checkout
                 </Button>
               </div>
             </form>

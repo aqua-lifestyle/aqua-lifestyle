@@ -260,6 +260,98 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         }
 
         [Fact]
+        public async Task Database_RejectsJoiningCheckoutTotalAboveParticipationObligation()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToLatestAsync();
+            var customerId = await GetTenantOneCustomerIdAsync();
+            var startedAt = DateTime.UtcNow;
+
+            await using var context = CreateDbContext();
+            var participation = EntryParticipation.StartIndependently(
+                1,
+                customerId,
+                EntryProgrammeTerms.CreateFlexibleJoiningPayment(
+                    "cap-test-2026-08",
+                    new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc),
+                    1200m,
+                    600m,
+                    600m,
+                    7),
+                startedAt);
+            participation.SelectJoiningPaymentSchedule(
+                AQGreenJoiningPaymentSchedule.Full);
+            context.EntryParticipations.Add(participation);
+            await context.SaveChangesAsync();
+
+            var firstCheckout = AQGreenJoiningCheckout.Create(
+                1,
+                participation.Id,
+                customerId,
+                AQGreenJoiningPaymentSchedule.Full,
+                AQGreenJoiningPaymentStage.Full,
+                1200m,
+                "ZAR",
+                startedAt);
+            firstCheckout.RecordCheckout(
+                "ch_cap_full",
+                "https://payments.example.test/ch_cap_full",
+                startedAt.AddSeconds(1));
+            var firstPayment = MemberPayment.CreatePending(
+                1,
+                customerId,
+                MemberPaymentPurpose.AQGreenJoining,
+                1200m,
+                "Yoco",
+                "pay_cap_full",
+                startedAt,
+                "ZAR");
+            firstPayment.Confirm(startedAt.AddSeconds(2));
+            context.MemberPayments.Add(firstPayment);
+            context.AQGreenJoiningCheckouts.Add(firstCheckout);
+            await context.SaveChangesAsync();
+            firstCheckout.Complete(firstPayment.Id, startedAt.AddSeconds(2));
+            await context.SaveChangesAsync();
+
+            var excessCheckout = AQGreenJoiningCheckout.Create(
+                1,
+                participation.Id,
+                customerId,
+                AQGreenJoiningPaymentSchedule.TwoInstallments,
+                AQGreenJoiningPaymentStage.FirstInstallment,
+                600m,
+                "ZAR",
+                startedAt.AddSeconds(3));
+            excessCheckout.RecordCheckout(
+                "ch_cap_excess",
+                "https://payments.example.test/ch_cap_excess",
+                startedAt.AddSeconds(4));
+            var excessPayment = MemberPayment.CreatePending(
+                1,
+                customerId,
+                MemberPaymentPurpose.AQGreenJoining,
+                600m,
+                "Yoco",
+                "pay_cap_excess",
+                startedAt.AddSeconds(3),
+                "ZAR");
+            excessPayment.Confirm(startedAt.AddSeconds(5));
+            context.MemberPayments.Add(excessPayment);
+            context.AQGreenJoiningCheckouts.Add(excessCheckout);
+            await context.SaveChangesAsync();
+            excessCheckout.Complete(excessPayment.Id, startedAt.AddSeconds(5));
+
+            var exception = await Should.ThrowAsync<DbUpdateException>(
+                () => context.SaveChangesAsync());
+            var providerException = exception.InnerException
+                .ShouldBeOfType<PostgresException>();
+
+            providerException.SqlState.ShouldBe(PostgresErrorCodes.RaiseException);
+            providerException.MessageText.ShouldContain(
+                "exceeds the participation joining obligation");
+        }
+
+        [Fact]
         public async Task Down_BlockedByConfirmedJoiningPayment_PostgreSQL()
         {
             await ResetDatabaseAsync();

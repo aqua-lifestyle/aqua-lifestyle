@@ -46,6 +46,21 @@ namespace AqualLifeStyle.Tests.Payments
             exception.Details.ShouldContain("different payment mode");
         }
 
+        [Fact]
+        public async Task Checkout_WithInsecureReturnUrl_IsRejectedBeforeCallingProvider()
+        {
+            var handler = new RecordingHandler(
+                "{\"id\":\"checkout-safe\",\"redirectUrl\":\"https://payments.example.test/checkout\",\"processingMode\":\"test\"}");
+            var gateway = CreateGateway(handler, "test", "sk_test_not-a-real-key");
+            var request = CreateRequest(Guid.NewGuid());
+            request.SuccessUrl = "http://club.example.test/member/programmes?payment=success";
+
+            await Should.ThrowAsync<ArgumentException>(
+                () => gateway.CreateAsync(request));
+
+            handler.Body.ShouldBeNull();
+        }
+
         private static YocoCheckoutGateway CreateGateway(
             HttpMessageHandler handler,
             string mode,

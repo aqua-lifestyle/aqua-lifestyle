@@ -70,6 +70,9 @@ namespace AqualLifeStyle.Payments.Yoco
                 throw new UserFriendlyException(
                     "Online payment is temporarily unavailable.",
                     "The club's payment mode and secure key do not match.");
+            ValidateCallbackUrl(checkout.SuccessUrl, nameof(checkout.SuccessUrl), mode);
+            ValidateCallbackUrl(checkout.CancelUrl, nameof(checkout.CancelUrl), mode);
+            ValidateCallbackUrl(checkout.FailureUrl, nameof(checkout.FailureUrl), mode);
 
             var amountInCents = ToCents(checkout.Amount);
             var reference = checkout.ReferenceId.ToString("N");
@@ -135,6 +138,28 @@ namespace AqualLifeStyle.Payments.Yoco
             if (amount <= 0 || cents != decimal.Truncate(cents) || cents > int.MaxValue)
                 throw new ArgumentOutOfRangeException(nameof(amount), "The payment amount cannot be represented in cents.");
             return decimal.ToInt32(cents);
+        }
+
+        private static void ValidateCallbackUrl(
+            string value,
+            string parameterName,
+            string mode)
+        {
+            if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+                throw new ArgumentException(
+                    "Yoco checkout return URLs must be absolute URLs.",
+                    parameterName);
+
+            var isSecure = uri.Scheme == Uri.UriSchemeHttps;
+            var isTestLoopback = mode == "test" &&
+                                 uri.Scheme == Uri.UriSchemeHttp &&
+                                 uri.IsLoopback;
+            if (!isSecure && !isTestLoopback)
+            {
+                throw new ArgumentException(
+                    "Yoco checkout return URLs must use HTTPS except for test-mode loopback URLs.",
+                    parameterName);
+            }
         }
 
         private sealed class YocoCheckoutResponse

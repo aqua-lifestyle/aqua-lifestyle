@@ -41,6 +41,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         private readonly IProgrammeInvitationResolver _invitationResolver;
         private readonly IYocoCheckoutGateway _yocoCheckoutGateway;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        private readonly IHostedPaymentCheckoutLock _hostedPaymentCheckoutLock;
         private readonly IConfiguration _configuration;
 
         protected virtual DateTime UtcNow => DateTime.UtcNow;
@@ -56,6 +57,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             ICurrentProgrammeTermsProvider termsProvider,
             IProgrammeInvitationResolver invitationResolver,
             IYocoCheckoutGateway yocoCheckoutGateway,
+            IHostedPaymentCheckoutLock hostedPaymentCheckoutLock,
             IUnitOfWorkManager unitOfWorkManager,
             IConfiguration configuration)
         {
@@ -69,6 +71,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             _termsProvider = termsProvider;
             _invitationResolver = invitationResolver;
             _yocoCheckoutGateway = yocoCheckoutGateway;
+            _hostedPaymentCheckoutLock = hostedPaymentCheckoutLock;
             _unitOfWorkManager = unitOfWorkManager;
             _configuration = configuration;
         }
@@ -221,6 +224,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                     "Select an AQGreen joining payment schedule.");
             var tenantId = GetRequiredTenantId("AQGreen payment is unavailable.");
             AQGreenJoiningCheckout paymentCheckout;
+            var ownsCheckoutPreparation = false;
 
             using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
             {
@@ -248,6 +252,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                     throw new UserFriendlyException(
                         "Online payment is unavailable for this historical AQGreen record.",
                         "Contact the club team so an existing payment is not charged again.");
+
+                await _hostedPaymentCheckoutLock.AcquireAQGreenParticipationAsync(
+                    participation.Id);
 
                 var activeCheckouts = await _aqGreenJoiningCheckoutRepository.GetAll()
                     .Where(checkout =>
@@ -282,6 +289,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         UtcNow);
                     await _aqGreenJoiningCheckoutRepository.InsertAsync(paymentCheckout);
                     await _unitOfWorkManager.Current.SaveChangesAsync();
+                    ownsCheckoutPreparation = true;
                 }
 
                 await uow.CompleteAsync();
@@ -289,6 +297,10 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
             if (!string.IsNullOrWhiteSpace(paymentCheckout.CheckoutUrl))
                 return MapCheckout(paymentCheckout);
+            if (!ownsCheckoutPreparation)
+                throw new UserFriendlyException(
+                    "Your AQGreen payment checkout is still being prepared.",
+                    "Try again shortly. Contact the club team if it remains unavailable; do not start a competing payment.");
 
             var checkout = await CreateYocoCheckoutAsync(
                 paymentCheckout,
@@ -303,6 +315,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             }))
             using (_unitOfWorkManager.Current.SetTenantId(tenantId))
             {
+                await _hostedPaymentCheckoutLock.AcquireCheckoutAsync(paymentCheckout.Id);
                 paymentCheckout = await _aqGreenJoiningCheckoutRepository.GetAsync(paymentCheckout.Id);
                 paymentCheckout.RecordCheckout(checkout.Id, checkout.RedirectUrl, UtcNow);
                 await _unitOfWorkManager.Current.SaveChangesAsync();
@@ -322,6 +335,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             input ??= new CreateDirectOnyxCheckoutInput();
             var tenantId = GetRequiredTenantId("Onyx checkout is unavailable.");
             DirectOnyxCheckoutIntent intent;
+            var ownsCheckoutPreparation = false;
 
             using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
             {
@@ -331,6 +345,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             using (_unitOfWorkManager.Current.SetTenantId(tenantId))
             {
                 var customer = await GetCurrentActiveCustomerAsync();
+                await _hostedPaymentCheckoutLock.AcquireDirectOnyxCustomerAsync(
+                    customer.Id);
                 var recruiterCustomerId = await ResolveRequestedRecruiterAsync(
                     input.RecruiterCustomerId,
                     input.InviteCode,
@@ -365,6 +381,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         UtcNow);
                     await _directOnyxCheckoutIntentRepository.InsertAsync(intent);
                     await _unitOfWorkManager.Current.SaveChangesAsync();
+                    ownsCheckoutPreparation = true;
                 }
                 else
                 {
@@ -376,6 +393,10 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
             if (!string.IsNullOrWhiteSpace(intent.CheckoutUrl))
                 return MapCheckout(intent);
+            if (!ownsCheckoutPreparation)
+                throw new UserFriendlyException(
+                    "Your Onyx payment checkout is still being prepared.",
+                    "Try again shortly. Contact the club team if it remains unavailable; do not start another payment.");
 
             var checkout = await CreateYocoCheckoutAsync(
                 intent,
@@ -390,6 +411,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             }))
             using (_unitOfWorkManager.Current.SetTenantId(tenantId))
             {
+                await _hostedPaymentCheckoutLock.AcquireCheckoutAsync(intent.Id);
                 intent = await _directOnyxCheckoutIntentRepository.GetAsync(intent.Id);
                 intent.RecordCheckout(checkout.Id, checkout.RedirectUrl, UtcNow);
                 await _unitOfWorkManager.Current.SaveChangesAsync();

@@ -362,6 +362,97 @@ namespace AqualLifeStyle.Tests.Application
             });
         }
 
+        [Fact]
+        public async Task Administrator_CanInspectAndIdempotentlyTerminateLockedAQGreenCheckout()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var checkoutId = await CreateLockedAQGreenCheckoutAsync(suffix);
+
+            var locked = await _service.GetAQGreenJoiningCheckoutsAsync(
+                new AQGreenJoiningCheckoutListInput
+                {
+                    Keyword = suffix,
+                    MaxResultCount = 20
+                });
+
+            locked.TotalCount.ShouldBe(1);
+            var evidence = locked.Items.Single();
+            evidence.CheckoutId.ShouldBe(checkoutId);
+            evidence.Amount.ShouldBe(600m);
+            evidence.PaymentId.ShouldBeNull();
+            evidence.ProviderCheckoutId.ShouldContain(suffix);
+            evidence.LockReason.ShouldContain("authoritative provider confirmation");
+
+            var input = new TerminateAQGreenJoiningCheckoutInput
+            {
+                CheckoutId = checkoutId,
+                Evidence = "Authorised Yoco support review confirmed the checkout is no longer payable"
+            };
+            await _service.TerminateAQGreenJoiningCheckoutAsync(input);
+            await _service.TerminateAQGreenJoiningCheckoutAsync(input);
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var checkout = await context.AQGreenJoiningCheckouts.SingleAsync(
+                    item => item.Id == checkoutId);
+                checkout.Status.ShouldBe(
+                    HostedPaymentCheckoutStatus.AdministrativelyTerminated);
+                checkout.TerminatedByAdministratorUserId.ShouldNotBeNull();
+                checkout.TerminatedAt.ShouldNotBeNull();
+                checkout.TerminalEvidence.ShouldBe(input.Evidence);
+                (await context.MemberPayments.AnyAsync()).ShouldBeFalse();
+            });
+        }
+
+        private async Task<Guid> CreateLockedAQGreenCheckoutAsync(string suffix)
+        {
+            var userId = await CreateTestUserAsync(
+                1,
+                $"checkout-recovery-{suffix}",
+                $"checkout-recovery-{suffix}@example.com");
+            return await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    $"Checkout Recovery {suffix}",
+                    new EmailAddress($"checkout-recovery-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+                var terms = EntryProgrammeTerms.CreateFlexibleJoiningPayment(
+                    $"checkout-recovery-{suffix}",
+                    EffectiveFrom,
+                    1200m,
+                    600m,
+                    600m,
+                    7);
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    terms,
+                    EffectiveFrom);
+                participation.SelectJoiningPaymentSchedule(
+                    AQGreenJoiningPaymentSchedule.TwoInstallments);
+                var checkout = AQGreenJoiningCheckout.Create(
+                    1,
+                    participation.Id,
+                    customer.Id,
+                    AQGreenJoiningPaymentSchedule.TwoInstallments,
+                    AQGreenJoiningPaymentStage.FirstInstallment,
+                    600m,
+                    "ZAR",
+                    EffectiveFrom);
+                checkout.RecordCheckout(
+                    $"ch_recovery_{suffix}",
+                    $"https://payments.example.test/ch_recovery_{suffix}",
+                    EffectiveFrom.AddMinutes(1));
+                context.EntryParticipations.Add(participation);
+                context.AQGreenJoiningCheckouts.Add(checkout);
+                await context.SaveChangesAsync();
+                return checkout.Id;
+            });
+        }
+
         private async Task<int> CreateEntryParticipantAsync(string suffix)
         {
             var userId = await CreateTestUserAsync(
