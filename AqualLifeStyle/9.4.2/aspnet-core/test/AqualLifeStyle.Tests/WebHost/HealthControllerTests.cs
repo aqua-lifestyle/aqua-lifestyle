@@ -6,6 +6,7 @@ using Abp.Runtime.Caching.Redis;
 using AqualLifeStyle;
 using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.Web.Host.Controllers;
+using AqualLifeStyle.Web.Host.Health;
 using AqualLifeStyle.Web.Host.Models;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -56,12 +57,23 @@ namespace AqualLifeStyle.Tests.WebHost
             IDbContextProvider<AqualLifeStyleDbContext> dbContextProvider,
             IConfiguration configuration,
             IAbpRedisCacheDatabaseProvider redisDatabaseProvider,
+            IDataProtectionKeyStoreReadinessProbe dataProtectionKeyStoreProbe = null,
             string environmentName = "Production")
         {
             var environment = Substitute.For<IWebHostEnvironment>();
             environment.EnvironmentName.Returns(environmentName);
 
-            var controller = new HealthController(dbContextProvider, environment, configuration, redisDatabaseProvider);
+            if (dataProtectionKeyStoreProbe == null)
+            {
+                dataProtectionKeyStoreProbe = Substitute.For<IDataProtectionKeyStoreReadinessProbe>();
+                dataProtectionKeyStoreProbe.IsReadyAsync().Returns(Task.FromResult(true));
+            }
+            var controller = new HealthController(
+                dbContextProvider,
+                environment,
+                configuration,
+                redisDatabaseProvider,
+                dataProtectionKeyStoreProbe);
             controller.ControllerContext = new ControllerContext
             {
                 HttpContext = new DefaultHttpContext()
@@ -90,8 +102,38 @@ namespace AqualLifeStyle.Tests.WebHost
             response.Status.ShouldBe("Healthy");
             response.IsDatabaseReachable.ShouldBeTrue();
             response.DatabaseStatus.ShouldBe("Healthy");
+            response.IsDataProtectionKeyStoreReachable.ShouldBeTrue();
+            response.DataProtectionKeyStoreStatus.ShouldBe("Healthy");
             response.IsRedisReachable.ShouldBeTrue();
             response.RedisStatus.ShouldBe("NotConfigured");
+        }
+
+        [Fact]
+        public async Task Get_WhenDataProtectionKeyStoreUnavailable_ReturnsNoSensitiveDetails()
+        {
+            using var connection = new SqliteConnection("DataSource=:memory:");
+            connection.Open();
+            using var dbContext = CreateOpenSqliteContext(connection);
+            var dbContextProvider = Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>();
+            dbContextProvider.GetDbContextAsync().Returns(Task.FromResult(dbContext));
+            var redisDatabaseProvider = Substitute.For<IAbpRedisCacheDatabaseProvider>();
+            var keyStoreProbe = Substitute.For<IDataProtectionKeyStoreReadinessProbe>();
+            keyStoreProbe.IsReadyAsync().Returns(Task.FromResult(false));
+            var controller = CreateController(
+                dbContextProvider,
+                BuildConfiguration(null),
+                redisDatabaseProvider,
+                keyStoreProbe);
+
+            var actionResult = await controller.Get();
+
+            var objectResult = actionResult.Result.ShouldBeOfType<ObjectResult>();
+            objectResult.StatusCode.ShouldBe(503);
+            var response = objectResult.Value.ShouldBeOfType<HealthCheckResponse>();
+            response.Status.ShouldBe("Degraded");
+            response.IsDatabaseReachable.ShouldBeTrue();
+            response.IsDataProtectionKeyStoreReachable.ShouldBeFalse();
+            response.DataProtectionKeyStoreStatus.ShouldBe("Unavailable");
         }
 
         [Fact]
@@ -189,7 +231,7 @@ namespace AqualLifeStyle.Tests.WebHost
                     ["Deployment:ImageId"] = "image-456"
                 }),
                 redisDatabaseProvider,
-                "Staging");
+                environmentName: "Staging");
 
             var actionResult = await controller.Get();
 

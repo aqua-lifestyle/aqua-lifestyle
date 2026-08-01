@@ -26,7 +26,6 @@ using Castle.Services.Logging.SerilogIntegration;
 using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Email;
 using AqualLifeStyle.Web.Host.Email;
-using AqualLifeStyle.EntityFrameworkCore;
 using System.Threading.RateLimiting;
 
 namespace AqualLifeStyle.Web.Host.Startup
@@ -58,9 +57,7 @@ namespace AqualLifeStyle.Web.Host.Startup
             });
 
             IdentityRegistrar.Register(services);
-            var dataProtection = services.AddDataProtection()
-                .SetApplicationName("AqualLifeStyle")
-                .PersistKeysToDbContext<AqualLifeStyleDbContext>();
+            var dataProtection = services.AddAqualLifeStyleDataProtection(_appConfiguration);
             if (_environment.IsProduction())
             {
                 dataProtection.ProtectKeysWithCertificate(LoadDataProtectionCertificate(

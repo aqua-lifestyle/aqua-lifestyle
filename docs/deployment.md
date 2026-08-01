@@ -97,6 +97,15 @@ Account verification and password-reset tokens use the ASP.NET Data Protection
 key ring persisted in the shared `DataProtectionKeys` database table. Its XML is
 encrypted with the server-only PKCS#12 certificate supplied through
 `DataProtection__CertificateBase64` and `DataProtection__CertificatePassword`.
+The API accesses this table through its dedicated, non-tenant
+`DataProtectionKeyDbContext`; schema ownership remains in the existing
+`AqualLifeStyleDbContext` migration stream. Do not create a separate migration
+history or run migrations from the dedicated runtime context. The dedicated
+context resolves the host `ConnectionStrings:Default` value from the same Web
+Host configuration root used to configure ABP's default host database; it does
+not follow tenant-specific connection overrides.
+The API health response reports Data Protection key-store readiness separately
+from general database connectivity without reading key XML or creating keys.
 Set both secrets directly in Render before deployment and retain the certificate
 while any key encrypted by it remains in the table. The Render pre-deploy
 migrator must complete before API instances start. Preserve the table and
