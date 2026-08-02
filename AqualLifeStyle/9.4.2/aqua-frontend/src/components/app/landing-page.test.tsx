@@ -16,14 +16,19 @@ describe("LandingPage", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Live in health. Inspire to wealth." }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/combines aQuathz wellbeing products, membership/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What Aqua offers" })).toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
     expect(screen.getByRole("main")).toHaveAttribute("tabindex", "-1");
     expect(screen.getAllByRole("link", { name: /Browse products/i })[0]).toHaveAttribute(
       "href",
       "/catalog",
     );
-    expect(screen.getByRole("heading", { name: "The experience unfolds with you." })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Three steps, without losing context." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Understand Aqua before choosing a path." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "From public browsing to account access." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "A club organised through local Areas." })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Aqua Lifestyle Club" })).toHaveAttribute(
       "src",
       expect.stringContaining("aqua-lifestyle-logo.jpg"),
