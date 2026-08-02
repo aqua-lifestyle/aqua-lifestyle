@@ -55,10 +55,10 @@ const moreLinks = [
 ];
 
 const publicLinks = [
-  { href: "/#welcome", label: "Welcome" },
-  { href: "/#products", label: "Wellbeing" },
-  { href: "/#programmes", label: "Participation" },
-  { href: "/#community", label: "Belong" },
+  { href: "/#welcome", label: "About" },
+  { href: "/#products", label: "Products" },
+  { href: "/#programmes", label: "Programmes" },
+  { href: "/#community", label: "Community" },
   { href: "/#faq", label: "Questions" },
 ];
 
@@ -215,10 +215,10 @@ export const Navbar = () => {
               : publicLinks.map((link) => (
                   <Link
                     className={cn(
-                      "rounded-lg px-3 py-2 text-sm font-semibold transition",
+                      "rounded-lg px-3 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
                       isLanding
-                        ? "text-white/70 hover:bg-white/10 hover:text-white"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        ? "text-white/70 hover:bg-white/10 hover:text-white focus-visible:outline-aqua-lavender-strong"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-accent",
                     )}
                     href={link.href}
                     key={link.href}
@@ -307,9 +307,11 @@ export const Navbar = () => {
             aria-expanded={isMobileOpen}
             aria-label={isMobileOpen ? "Close navigation" : "Open navigation"}
             className={cn(
-              "inline-flex rounded-aqua-control p-2 transition",
+              "inline-flex size-11 items-center justify-center rounded-aqua-control transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
               isAuthenticated ? "xl:hidden" : "lg:hidden",
-              isLanding ? "text-white hover:bg-white/10" : "text-foreground hover:bg-muted",
+              isLanding
+                ? "text-white hover:bg-white/10 focus-visible:outline-aqua-lavender-strong"
+                : "text-foreground hover:bg-muted focus-visible:outline-accent",
             )}
             onClick={() => setIsMobileOpen((current) => !current)}
             type="button"
@@ -336,12 +338,12 @@ export const Navbar = () => {
                     <Link
                       key={link.href}
                       className={cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition",
+                        "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
                         isActive(link.href)
                           ? "bg-accent/10 text-accent"
                           : isLanding
-                            ? "text-white/80 hover:bg-white/10 hover:text-white"
-                            : "text-foreground hover:bg-muted",
+                            ? "text-white/80 hover:bg-white/10 hover:text-white focus-visible:outline-aqua-lavender-strong"
+                            : "text-foreground hover:bg-muted focus-visible:outline-accent",
                       )}
                       href={link.href}
                       onClick={() => setIsMobileOpen(false)}
@@ -353,10 +355,10 @@ export const Navbar = () => {
               : publicLinks.map((link) => (
                   <Link
                     className={cn(
-                      "rounded-lg px-3 py-2.5 text-sm font-semibold transition",
+                      "flex min-h-11 items-center rounded-lg px-3 py-2.5 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
                       isLanding
-                        ? "text-white/80 hover:bg-white/10 hover:text-white"
-                        : "text-foreground hover:bg-muted",
+                        ? "text-white/80 hover:bg-white/10 hover:text-white focus-visible:outline-aqua-lavender-strong"
+                        : "text-foreground hover:bg-muted focus-visible:outline-accent",
                     )}
                     href={link.href}
                     key={link.href}

@@ -49,8 +49,10 @@ export const UserMenu = ({ inverted = false }: { inverted?: boolean }) => {
     return (
       <div className="flex items-center">
         <Link
-          className={`inline-flex h-10 items-center rounded-aqua-control px-4 text-sm font-semibold text-white transition-colors ${
-            inverted ? "bg-aqua-violet hover:bg-aqua-violet-dark" : "bg-accent-dark hover:bg-accent"
+          className={`inline-flex h-11 items-center rounded-aqua-control px-4 text-sm font-semibold text-white transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
+            inverted
+              ? "bg-aqua-violet hover:bg-aqua-violet-dark focus-visible:outline-aqua-lavender-strong"
+              : "bg-accent-dark hover:bg-accent focus-visible:outline-accent"
           }`}
           href="/login"
         >
@@ -71,7 +73,9 @@ export const UserMenu = ({ inverted = false }: { inverted?: boolean }) => {
           aria-controls="user-menu-panel"
           aria-expanded={isOpen}
           aria-label="Open user menu"
-          className="flex items-center gap-1.5 rounded-full transition hover:ring-2 hover:ring-accent/30"
+          className={`flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full transition hover:ring-2 hover:ring-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
+            inverted ? "focus-visible:outline-aqua-lavender-strong" : "focus-visible:outline-accent"
+          }`}
           onClick={() => setIsOpen((current) => !current)}
           ref={triggerRef}
           type="button"
@@ -90,7 +94,7 @@ export const UserMenu = ({ inverted = false }: { inverted?: boolean }) => {
             id="user-menu-panel"
           >
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+              className="flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               href="/profile"
               onClick={() => setIsOpen(false)}
             >
@@ -98,7 +102,7 @@ export const UserMenu = ({ inverted = false }: { inverted?: boolean }) => {
               Profile
             </Link>
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+              className="flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               href="/settings"
               onClick={() => setIsOpen(false)}
             >
@@ -106,7 +110,7 @@ export const UserMenu = ({ inverted = false }: { inverted?: boolean }) => {
               Settings
             </Link>
             <button
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-error transition hover:bg-error/10"
+              className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-error transition hover:bg-error/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-error"
               onClick={handleSignOut}
               type="button"
             >
