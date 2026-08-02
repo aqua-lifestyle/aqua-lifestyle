@@ -19,19 +19,19 @@ import {
 
 const discoveryMoments = [
   {
-    body: "Public information gives you time to understand Aqua before choosing a next step.",
-    label: "Arrive",
-    title: "Take it in at your own pace.",
+    body: "Learn what Aqua offers and browse public information without creating an account.",
+    label: "Understand",
+    title: "Start with the club.",
   },
   {
-    body: "See how wellbeing, participation and an area-based community belong to one club without becoming the same thing.",
-    label: "Discover",
-    title: "Notice what connects.",
+    body: "Browse wellbeing products, see how membership shapes access, and compare AQGreen and Onyx as distinct programmes.",
+    label: "Explore",
+    title: "See what Aqua offers.",
   },
   {
-    body: "When you are ready, move toward the products, programmes and account information that apply to you.",
-    label: "Find your place",
-    title: "Move forward with clarity.",
+    body: "Continue to the public catalog or sign in for information and actions tied to your account.",
+    label: "Continue",
+    title: "Choose your next step.",
   },
 ];
 
@@ -151,8 +151,8 @@ export const LandingPage = () => (
           <div className="grid gap-8 border-t border-aqua-line pt-8 lg:grid-cols-12 lg:items-center lg:gap-10">
             <div className="lg:col-span-5">
               <p className="max-w-lg text-lg leading-8 text-aqua-muted">
-                A place where wellbeing, participation and local connection belong
-                to the same story.
+                Aqua Lifestyle Club combines aQuathz wellbeing products, membership,
+                and participation in the distinct AQGreen and Onyx programmes.
               </p>
             </div>
             <div className="flex items-center gap-4 lg:col-span-3 lg:justify-center">
@@ -165,16 +165,16 @@ export const LandingPage = () => (
                 width={144}
               />
               <p className="max-w-28 text-xs font-semibold uppercase leading-5 tracking-[0.12em] text-aqua-muted">
-                Products. Programmes. Connection.
+                Products. Membership. Programmes.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row lg:col-span-4 lg:justify-end">
               <LandingLinkButton href="#welcome">
-                Enter the experience
+                See what Aqua offers
                 <ArrowDownRight aria-hidden="true" className="size-4" />
               </LandingLinkButton>
-              <LandingLinkButton href="#story" tone="secondary-light">
-                Meet Aqua
+              <LandingLinkButton href="/catalog" tone="secondary-light">
+                Browse products
               </LandingLinkButton>
             </div>
           </div>
@@ -182,26 +182,19 @@ export const LandingPage = () => (
       </section>
 
       <section aria-labelledby="trust-title" className="border-y border-aqua-line bg-aqua-surface">
-        <h2 className="sr-only" id="trust-title">What visitors can expect</h2>
+        <h2 className="sr-only" id="trust-title">What Aqua offers</h2>
         <div className={`${landingContainerClassName} grid md:grid-cols-3`}>
           {[
-            ["01", "Wellbeing", "Space to explore what living well can mean for you."],
-            ["02", "Belonging", "An area-based model keeps community connected locally."],
-            ["03", "Possibility", "Distinct paths let every next step remain clear."],
-          ].map(([number, title, body]) => (
+            ["Products", "Browse water products, Spraythz and health sets in the public catalog."],
+            ["Membership", "Membership helps determine product eligibility and account access."],
+            ["Programmes", "AQGreen and Onyx are separate participation programmes with different paths."],
+          ].map(([title, body]) => (
             <div
-              className="group border-b border-aqua-line py-8 transition-colors last:border-b-0 hover:bg-aqua-canvas/60 md:border-b-0 md:border-r md:px-8 md:py-10 md:first:pl-0 md:last:border-r-0 md:last:pr-0"
-              key={number}
+              className="border-b border-aqua-line py-8 transition-colors last:border-b-0 hover:bg-aqua-canvas/60 md:border-b-0 md:border-r md:px-8 md:py-10 md:first:pl-0 md:last:border-r-0 md:last:pr-0"
+              key={title}
             >
-              <div className="flex items-start justify-between gap-6">
-                <div>
-                  <h3 className="text-2xl font-semibold tracking-[-0.03em]">{title}.</h3>
-                  <p className="mt-3 text-sm leading-6 text-aqua-muted">{body}</p>
-                </div>
-                <span className="font-mono text-xs text-aqua-muted transition-transform group-hover:translate-x-1">
-                  {number}
-                </span>
-              </div>
+              <h3 className="text-2xl font-semibold tracking-[-0.03em]">{title}.</h3>
+              <p className="mt-3 max-w-sm text-sm leading-6 text-aqua-muted">{body}</p>
             </div>
           ))}
         </div>
@@ -220,17 +213,18 @@ export const LandingPage = () => (
         </svg>
         <div className={`${landingContainerClassName} relative grid gap-12 py-20 sm:gap-16 sm:py-24 lg:grid-cols-12 lg:items-end lg:py-32`}>
           <div className="lg:col-span-8">
-            <ChapterMarker index="01">Welcome</ChapterMarker>
+            <ChapterMarker index="01">What Aqua is</ChapterMarker>
             <h2
               className="font-aqua-display mt-10 max-w-5xl text-5xl font-normal leading-[0.98] tracking-[-0.04em] text-balance sm:text-6xl lg:text-7xl"
               id="welcome-title"
             >
-              Wellbeing begins with space.
+              A lifestyle club built around practical wellbeing.
             </h2>
           </div>
           <div className="lg:col-span-3 lg:col-start-10">
             <p className="text-lg leading-8 text-aqua-muted">
-              Space to discover. Space to belong. Space to move forward without being rushed.
+              Explore products, understand membership and learn how AQGreen and Onyx
+              participation works before choosing your next step.
             </p>
             <div className="mt-8 h-px w-full bg-aqua-ink/15" />
           </div>
@@ -242,17 +236,17 @@ export const LandingPage = () => (
           <span aria-hidden="true" className="absolute right-8 top-8 font-mono text-[11rem] leading-none text-white/[0.025] sm:text-[18rem]">
             02
           </span>
-          <ChapterMarker index="02" light>A better welcome</ChapterMarker>
+          <ChapterMarker index="02" light>Why Aqua</ChapterMarker>
           <div className="relative mt-16 grid gap-12 lg:grid-cols-12 lg:items-end">
             <h2
               className="text-5xl font-semibold leading-[0.98] tracking-[-0.05em] text-balance sm:text-6xl lg:col-span-8 lg:text-7xl"
               id="problem-title"
             >
-              A club should open possibilities, not rush you into choices.
+              A club should make every path clear.
             </h2>
             <p className="max-w-md text-base leading-7 text-aqua-dark-muted lg:col-span-4">
-              Aqua gives visitors room to understand its wellbeing products,
-              participation programmes and community model in their own time.
+              Browse the public catalog first. Learn how membership affects access.
+              Then explore AQGreen and Onyx as separate programmes when you are ready.
             </p>
           </div>
         </div>
@@ -270,26 +264,23 @@ export const LandingPage = () => (
               className="mt-8 text-4xl font-semibold leading-[1.02] tracking-[-0.045em] text-balance sm:text-5xl lg:text-6xl"
               id="solution-title"
             >
-              The experience unfolds with you.
+              Understand Aqua before choosing a path.
             </h2>
             <p className="mt-6 max-w-md text-base leading-7 text-aqua-muted">
-              Begin with welcome, discover what connects and move toward the parts of
-              Aqua that are relevant to you.
+              The public experience introduces the club, its products and ways to
+              participate before you need to sign in.
             </p>
           </div>
 
           <div className="lg:col-span-6 lg:col-start-7">
-            {discoveryMoments.map((moment, index) => (
+            {discoveryMoments.map((moment) => (
               <article
                 className="flex min-h-[18rem] flex-col justify-between border-t border-aqua-line py-10 first:border-t-0 first:pt-0 sm:min-h-[20rem] lg:min-h-[24rem] lg:py-12"
                 key={moment.title}
               >
-                <div className="flex items-start justify-between gap-8">
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-aqua-violet-dark">
-                    {moment.label}
-                  </p>
-                  <span className="font-mono text-sm text-aqua-muted">0{index + 1}</span>
-                </div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-aqua-violet-dark">
+                  {moment.label}
+                </p>
                 <div>
                   <h3 className="text-4xl font-semibold leading-[1.04] tracking-[-0.04em] sm:text-5xl">
                     {moment.title}
@@ -330,18 +321,15 @@ export const LandingPage = () => (
             </div>
 
             <div className="lg:col-span-7 lg:col-start-6">
-              {["Water products", "Spraythz", "Health sets"].map((product, index) => (
+              {["Water products", "Spraythz", "Health sets"].map((product) => (
                 <Link
                   className="group flex min-h-32 items-center justify-between gap-6 border-b border-aqua-line px-4 py-7 transition-colors first:border-t hover:bg-aqua-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aqua-violet sm:min-h-40"
                   href="/catalog"
                   key={product}
                 >
-                  <div className="flex items-baseline gap-6 transition-transform duration-300 group-hover:translate-x-2 sm:gap-10">
-                    <span className="font-mono text-xs text-aqua-muted">0{index + 1}</span>
-                    <h3 className="text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
-                      {product}
-                    </h3>
-                  </div>
+                  <h3 className="text-3xl font-semibold tracking-[-0.035em] transition-transform duration-300 motion-safe:group-hover:translate-x-2 sm:text-4xl">
+                    {product}
+                  </h3>
                   <PackageSearch aria-hidden="true" className="size-5 shrink-0 text-aqua-violet transition-transform duration-200 motion-safe:group-hover:translate-x-1" strokeWidth={1.75} />
                 </Link>
               ))}
@@ -373,15 +361,12 @@ export const LandingPage = () => (
 
         <div className="border-t border-white/10">
           <div className={`${landingContainerClassName} grid lg:grid-cols-3`}>
-            {participationOptions.map((option, index) => (
+            {participationOptions.map((option) => (
               <article
                 className="group flex min-h-72 flex-col justify-between border-b border-white/10 py-10 transition-colors last:border-b-0 hover:bg-white/[0.025] sm:min-h-80 lg:min-h-[28rem] lg:border-b-0 lg:border-r lg:px-10 lg:first:pl-0 lg:last:border-r-0 lg:last:pr-0"
                 key={option.title}
               >
-                <div className="flex items-start justify-between">
-                  <option.icon aria-hidden="true" className="size-8 text-aqua-gold transition-transform duration-200 motion-safe:group-hover:-translate-y-0.5" strokeWidth={1.5} />
-                  <span className="font-mono text-xs text-white/65">0{index + 1}</span>
-                </div>
+                <option.icon aria-hidden="true" className="size-8 text-aqua-gold transition-transform duration-200 motion-safe:group-hover:-translate-y-0.5" strokeWidth={1.5} />
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-aqua-lavender-strong">
                     {option.label}
@@ -399,17 +384,17 @@ export const LandingPage = () => (
 
       <section aria-labelledby="benefits-title" className="bg-aqua-cream">
         <div className={`${landingContainerClassName} py-20 sm:py-24 lg:py-32`}>
-          <ChapterMarker index="06">What clarity changes</ChapterMarker>
+          <ChapterMarker index="06">Why clarity matters</ChapterMarker>
           <h2 className="sr-only" id="benefits-title">Benefits of a clearer experience</h2>
           <div className="mt-16 space-y-2 text-[clamp(2.3rem,6vw,6.5rem)] font-semibold leading-[0.98] tracking-[-0.055em]">
-            <p className="text-aqua-ink">Room to breathe.</p>
-            <p className="text-center text-aqua-violet">Confidence to choose.</p>
-            <p className="text-right text-aqua-ink">A place to belong.</p>
+            <p className="text-aqua-ink">Understand the offer.</p>
+            <p className="text-center text-aqua-violet">Choose with confidence.</p>
+            <p className="text-right text-aqua-ink">Continue when ready.</p>
           </div>
           <div className="mt-16 grid gap-8 border-t border-aqua-ink/15 pt-8 md:grid-cols-3">
-            <p className="text-sm leading-6 text-aqua-muted">Discover Aqua at your own pace before choosing a next step.</p>
-            <p className="text-sm leading-6 text-aqua-muted">See information and actions that reflect the access available to you.</p>
-            <p className="text-sm leading-6 text-aqua-muted">Connect with a club built around distinct roles and participation paths.</p>
+            <p className="text-sm leading-6 text-aqua-muted">Browse the public catalog without creating an account.</p>
+            <p className="text-sm leading-6 text-aqua-muted">See how membership, AQGreen and Onyx differ before choosing a path.</p>
+            <p className="text-sm leading-6 text-aqua-muted">Sign in when you need information and actions specific to your account.</p>
           </div>
         </div>
       </section>
@@ -427,7 +412,7 @@ export const LandingPage = () => (
                 className="mt-8 text-4xl font-semibold leading-[1.04] tracking-[-0.045em] sm:text-5xl"
                 id="journey-title"
               >
-                Three steps, without losing context.
+                From public browsing to account access.
               </h2>
             </div>
             <p className="max-w-md text-base leading-7 text-aqua-muted lg:col-span-4 lg:col-start-9">
@@ -462,20 +447,20 @@ export const LandingPage = () => (
                 className="mt-8 text-5xl font-semibold leading-[0.98] tracking-[-0.05em] text-balance sm:text-6xl lg:text-7xl"
                 id="community-title"
               >
-                Connection has a place.
+                A club organised through local Areas.
               </h2>
             </div>
             <div className="lg:col-span-4 lg:col-start-9">
               <Users aria-hidden="true" className="size-9 text-aqua-violet-dark" strokeWidth={1.5} />
               <p className="mt-8 text-base leading-7 text-aqua-muted">
-                Aqua&apos;s area-based business model includes Area Leaders and Facilitators
-                alongside customer membership and programme participation. These roles
-                remain distinct.
+                Aqua uses Areas to organise the customer experience, including whether
+                self-registration is available. Area Leader and Facilitator roles are a
+                separate part of Aqua&apos;s developing local model.
               </p>
               <div className="mt-8 flex items-start gap-3 border-t border-aqua-violet/20 pt-6">
                 <ShieldCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-aqua-violet-dark" />
                 <p className="text-sm leading-6 text-aqua-muted">
-                  Account access reflects customer status and role.
+                  Account access reflects Area settings, customer status and role.
                 </p>
               </div>
             </div>
@@ -500,18 +485,15 @@ export const LandingPage = () => (
           </div>
 
           <div className="border-t border-aqua-line lg:col-span-7 lg:col-start-6">
-            {faqs.map((faq, index) => (
+            {faqs.map((faq) => (
               <details className="group border-b border-aqua-line" key={faq.question}>
                 <summary className="flex min-h-24 cursor-pointer list-none items-center justify-between gap-6 py-6 font-semibold transition-colors marker:content-none hover:text-aqua-violet-dark">
-                  <span className="flex items-start gap-5">
-                    <span className="hidden font-mono text-xs text-aqua-muted sm:inline">0{index + 1}</span>
-                    {faq.question}
-                  </span>
+                  <span>{faq.question}</span>
                   <span aria-hidden="true" className="text-2xl font-light text-aqua-violet transition-transform group-open:rotate-45">
                     +
                   </span>
                 </summary>
-                <p className="max-w-2xl pb-8 text-sm leading-6 text-aqua-muted sm:pl-10">
+                <p className="max-w-2xl pb-8 text-sm leading-6 text-aqua-muted">
                   {faq.answer}
                 </p>
               </details>
@@ -562,10 +544,10 @@ export const LandingPage = () => (
           </span>
         </Link>
         <nav aria-label="Footer navigation" className="flex flex-wrap gap-x-6 gap-y-3 text-sm">
-          <Link className="transition-colors hover:text-white" href="/#welcome">Welcome</Link>
-          <Link className="transition-colors hover:text-white" href="/#products">Wellbeing</Link>
-          <Link className="transition-colors hover:text-white" href="/#programmes">Participation</Link>
-          <Link className="transition-colors hover:text-white" href="/#community">Belong</Link>
+          <Link className="transition-colors hover:text-white" href="/#welcome">About</Link>
+          <Link className="transition-colors hover:text-white" href="/#products">Products</Link>
+          <Link className="transition-colors hover:text-white" href="/#programmes">Programmes</Link>
+          <Link className="transition-colors hover:text-white" href="/#community">Community</Link>
           <Link className="transition-colors hover:text-white" href="/contact">Contact</Link>
         </nav>
       </div>
