@@ -105,11 +105,11 @@ describe("Navbar", () => {
       </AuthProvider>,
     );
 
-    expect(screen.getByRole("link", { name: "Welcome" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "About" })).toHaveAttribute(
       "href",
       "/#welcome",
     );
-    expect(screen.getByRole("link", { name: "Participation" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Programmes" })).toHaveAttribute(
       "href",
       "/#programmes",
     );

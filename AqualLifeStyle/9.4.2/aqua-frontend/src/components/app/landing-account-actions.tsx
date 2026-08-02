@@ -11,7 +11,7 @@ export const LandingAccountActions = () => {
   const home = getRoleHome(session?.user?.role);
 
   return (
-    <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row sm:flex-wrap">
+    <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row sm:flex-wrap md:flex-col xl:flex-row">
       {session?.user ? (
         <>
           <LandingLinkButton href={home.href}>
