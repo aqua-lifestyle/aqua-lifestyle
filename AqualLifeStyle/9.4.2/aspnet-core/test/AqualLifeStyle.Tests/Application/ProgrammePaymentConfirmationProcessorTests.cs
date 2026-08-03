@@ -549,6 +549,11 @@ namespace AqualLifeStyle.Tests.Application
                 $"pay_{suffix}",
                 persisted.ProviderCheckoutId,
                 120000);
+            notification.Metadata = new Dictionary<string, JsonElement>
+            {
+                [YocoCheckoutMetadata.ProviderCheckoutId] =
+                    JsonSerializer.SerializeToElement(persisted.ProviderCheckoutId)
+            };
             var processor = Resolve<YocoPaymentNotificationProcessor>();
 
             await processor.ProcessAsync(notification);
@@ -713,6 +718,42 @@ namespace AqualLifeStyle.Tests.Application
             notification.EventType = "payment.failed";
 
             var processor = Resolve<YocoPaymentNotificationProcessor>();
+
+            var mismatchedAmount = CreateNotification(
+                $"evt_wrong_amount_{suffix}",
+                $"pay_wrong_amount_{suffix}",
+                persistedCheckout.ProviderCheckoutId,
+                119900);
+            mismatchedAmount.EventType = "payment.failed";
+            await Should.ThrowAsync<YocoWebhookValidationException>(() =>
+                processor.ProcessAsync(mismatchedAmount));
+
+            var mismatchedCurrency = CreateNotification(
+                $"evt_wrong_currency_{suffix}",
+                $"pay_wrong_currency_{suffix}",
+                persistedCheckout.ProviderCheckoutId,
+                120000);
+            mismatchedCurrency.EventType = "payment.failed";
+            mismatchedCurrency.Currency = "USD";
+            await Should.ThrowAsync<YocoWebhookValidationException>(() =>
+                processor.ProcessAsync(mismatchedCurrency));
+
+            var mismatchedPurpose = CreateNotification(
+                $"evt_wrong_purpose_{suffix}",
+                $"pay_wrong_purpose_{suffix}",
+                persistedCheckout.ProviderCheckoutId,
+                120000);
+            mismatchedPurpose.EventType = "payment.failed";
+            mismatchedPurpose.Metadata = new Dictionary<string, JsonElement>
+            {
+                [YocoCheckoutMetadata.ProviderCheckoutId] =
+                    JsonSerializer.SerializeToElement(persistedCheckout.ProviderCheckoutId),
+                [YocoCheckoutMetadata.Purpose] =
+                    JsonSerializer.SerializeToElement(YocoCheckoutMetadata.DirectOnyxPurpose)
+            };
+            await Should.ThrowAsync<YocoWebhookValidationException>(() =>
+                processor.ProcessAsync(mismatchedPurpose));
+
             await processor.ProcessAsync(notification);
             await processor.ProcessAsync(notification);
 
@@ -845,7 +886,11 @@ namespace AqualLifeStyle.Tests.Application
                 Metadata = new Dictionary<string, JsonElement>
                 {
                     [YocoCheckoutMetadata.ProviderCheckoutId] =
-                        JsonSerializer.SerializeToElement(providerCheckoutId)
+                        JsonSerializer.SerializeToElement(providerCheckoutId),
+                    [YocoCheckoutMetadata.Purpose] = JsonSerializer.SerializeToElement(
+                        amountInCents == 612000
+                            ? YocoCheckoutMetadata.DirectOnyxPurpose
+                            : YocoCheckoutMetadata.AQGreenJoiningPurpose)
                 }
             };
 

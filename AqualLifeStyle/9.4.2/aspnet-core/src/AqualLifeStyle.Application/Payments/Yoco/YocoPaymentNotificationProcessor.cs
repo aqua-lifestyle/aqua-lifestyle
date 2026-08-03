@@ -111,6 +111,9 @@ namespace AqualLifeStyle.Payments.Yoco
                 notification.Metadata,
                 YocoCheckoutMetadata.ProviderCheckoutId,
                 "The Yoco payment is missing its provider checkout reference.");
+            var paymentPurpose = GetMetadataText(
+                notification.Metadata,
+                YocoCheckoutMetadata.Purpose);
             var confirmedAt = notification.ConfirmedAt.UtcDateTime;
 
             try
@@ -119,6 +122,7 @@ namespace AqualLifeStyle.Payments.Yoco
                 await _hostedPaymentCheckoutLock.AcquireCheckoutAsync(
                     checkout.ReferenceId);
                 checkout = await ResolveCheckoutAsync(providerCheckoutId);
+                EnsureNotificationMatchesCheckout(notification, checkout, paymentPurpose);
                 YocoWebhookReceipt existingReceipt;
                 using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
                 {
@@ -275,12 +279,18 @@ namespace AqualLifeStyle.Payments.Yoco
                 return new ResolvedYocoCheckout(
                     onyxCheckout.TenantId,
                     onyxCheckout.Id,
-                    YocoCheckoutProgramme.Onyx);
+                    YocoCheckoutProgramme.Onyx,
+                    onyxCheckout.Amount,
+                    onyxCheckout.Currency,
+                    YocoCheckoutMetadata.DirectOnyxPurpose);
             if (aqGreenCheckout != null)
                 return new ResolvedYocoCheckout(
                     aqGreenCheckout.TenantId,
                     aqGreenCheckout.Id,
-                    YocoCheckoutProgramme.AQGreen);
+                    YocoCheckoutProgramme.AQGreen,
+                    aqGreenCheckout.Amount,
+                    aqGreenCheckout.Currency,
+                    YocoCheckoutMetadata.AQGreenJoiningPurpose);
 
             throw new YocoWebhookTransientException(
                 "The Yoco checkout has not been recorded locally yet.");
@@ -301,6 +311,39 @@ namespace AqualLifeStyle.Payments.Yoco
             return true;
         }
 
+        private static void EnsureNotificationMatchesCheckout(
+            VerifiedYocoPaymentNotification notification,
+            ResolvedYocoCheckout checkout,
+            string paymentPurpose)
+        {
+            if (checkout.Amount != notification.AmountInCents / 100m ||
+                !string.Equals(
+                    checkout.Currency,
+                    notification.Currency?.Trim(),
+                    StringComparison.OrdinalIgnoreCase))
+                throw new YocoWebhookValidationException(
+                    "The Yoco payment amount or currency does not match the recorded checkout.");
+            if (paymentPurpose != null &&
+                !string.Equals(
+                    checkout.ExpectedPurpose,
+                    paymentPurpose,
+                    StringComparison.Ordinal))
+                throw new YocoWebhookValidationException(
+                    "The Yoco payment purpose does not match the recorded checkout.");
+        }
+
+        private static string GetMetadataText(
+            IReadOnlyDictionary<string, JsonElement> metadata,
+            string key)
+        {
+            if (metadata != null &&
+                metadata.TryGetValue(key, out var value) &&
+                value.ValueKind == JsonValueKind.String &&
+                !string.IsNullOrWhiteSpace(value.GetString()))
+                return value.GetString().Trim();
+            return null;
+        }
+
         private static string GetRequiredMetadataText(
             IReadOnlyDictionary<string, JsonElement> metadata,
             string key,
@@ -319,15 +362,24 @@ namespace AqualLifeStyle.Payments.Yoco
             public int TenantId { get; }
             public Guid ReferenceId { get; }
             public YocoCheckoutProgramme Programme { get; }
+            public decimal Amount { get; }
+            public string Currency { get; }
+            public string ExpectedPurpose { get; }
 
             public ResolvedYocoCheckout(
                 int tenantId,
                 Guid referenceId,
-                YocoCheckoutProgramme programme)
+                YocoCheckoutProgramme programme,
+                decimal amount,
+                string currency,
+                string expectedPurpose)
             {
                 TenantId = tenantId;
                 ReferenceId = referenceId;
                 Programme = programme;
+                Amount = amount;
+                Currency = currency;
+                ExpectedPurpose = expectedPurpose;
             }
         }
     }

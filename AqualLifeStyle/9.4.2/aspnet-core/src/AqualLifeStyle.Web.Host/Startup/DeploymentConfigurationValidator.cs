@@ -17,13 +17,20 @@ namespace AqualLifeStyle.Web.Host.Startup
 
             var yocoMode = configuration["Yoco:Mode"]?.Trim().ToLowerInvariant();
             var yocoSecretKey = configuration["Yoco:SecretKey"]?.Trim();
+            var yocoWebhookSecret = configuration["Yoco:WebhookSecret"]?.Trim();
             var hasYocoMode = IsConfigured(yocoMode);
             var hasYocoSecretKey = IsConfigured(yocoSecretKey);
+            var hasYocoWebhookSecret = IsConfigured(yocoWebhookSecret);
             if (string.Equals(yocoMode, "live", StringComparison.Ordinal) &&
-                !IsConfigured(configuration["Yoco:WebhookSecret"]))
+                !hasYocoWebhookSecret)
             {
                 throw new InvalidOperationException(
                     "Yoco configuration is incomplete. Yoco__WebhookSecret is required when Yoco__Mode=live.");
+            }
+            if (hasYocoWebhookSecret && !IsValidYocoWebhookSecret(yocoWebhookSecret))
+            {
+                throw new InvalidOperationException(
+                    "Yoco configuration is invalid. Yoco__WebhookSecret must be a valid whsec_ signing secret.");
             }
 
             if (hasYocoMode || hasYocoSecretKey)
@@ -133,6 +140,19 @@ namespace AqualLifeStyle.Web.Host.Startup
         {
             return !string.IsNullOrWhiteSpace(value) &&
                    !value.StartsWith("<set-via-", StringComparison.Ordinal);
+        }
+
+        private static bool IsValidYocoWebhookSecret(string value)
+        {
+            if (!value.StartsWith("whsec_", StringComparison.Ordinal)) return false;
+            try
+            {
+                return Convert.FromBase64String(value.Substring("whsec_".Length)).Length > 0;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
         }
     }
 }

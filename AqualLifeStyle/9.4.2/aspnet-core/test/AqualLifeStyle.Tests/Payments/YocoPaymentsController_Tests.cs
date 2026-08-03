@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -56,10 +57,11 @@ namespace AqualLifeStyle.Tests.Payments
         {
             verifierMock = new Mock<IYocoWebhookSignatureVerifier>();
             verifierMock.SetupGet(v => v.IsConfigured).Returns(true);
-            verifierMock.Setup(v => v.IsValid(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
-                .Returns((string webhookId, string timestamp, string signature, string rawBody) =>
+            verifierMock.Setup(v => v.IsValid(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]>()))
+                .Returns((string webhookId, string timestamp, string signature, byte[] rawBody) =>
                 {
-                    var expectedSignature = $"v1,{Sign(secret, $"{webhookId}.{timestamp}.{rawBody}")}";
+                    var body = Encoding.UTF8.GetString(rawBody);
+                    var expectedSignature = $"v1,{Sign(secret, $"{webhookId}.{timestamp}.{body}")}";
                     return signature == expectedSignature;
                 });
 
@@ -112,7 +114,7 @@ namespace AqualLifeStyle.Tests.Payments
                     It.IsAny<string>(),
                     It.IsAny<string>(),
                     It.IsAny<string>(),
-                    It.IsAny<string>()),
+                    It.IsAny<byte[]>()),
                 Times.Never);
             processor.LastNotification.ShouldBeNull();
             logger.Entries.ShouldContain(entry =>
@@ -172,7 +174,11 @@ namespace AqualLifeStyle.Tests.Payments
             var result = await controller.WebhookAsync();
 
             result.ShouldBeOfType<OkResult>();
-            verifierMock.Verify(v => v.IsValid(webhookId, timestamp, signature, rawBody), Times.Once);
+            verifierMock.Verify(v => v.IsValid(
+                webhookId,
+                timestamp,
+                signature,
+                It.Is<byte[]>(value => value.SequenceEqual(Encoding.UTF8.GetBytes(rawBody)))), Times.Once);
             testProcessor.LastNotification.ShouldNotBeNull();
             testProcessor.LastNotification.EventId.ShouldBe(webhookId);
             testProcessor.LastNotification.EventType.ShouldBe("payment.succeeded");
@@ -212,11 +218,55 @@ namespace AqualLifeStyle.Tests.Payments
             result.ShouldBeOfType<StatusCodeResult>();
             var statusResult = result as StatusCodeResult;
             statusResult.StatusCode.ShouldBe((int)HttpStatusCode.Forbidden);
-            verifierMock.Verify(v => v.IsValid(webhookId, timestamp, signature, tamperedBody), Times.Once);
+            verifierMock.Verify(v => v.IsValid(
+                webhookId,
+                timestamp,
+                signature,
+                It.Is<byte[]>(value => value.SequenceEqual(Encoding.UTF8.GetBytes(tamperedBody)))), Times.Once);
             testProcessor.LastNotification.ShouldBeNull();
             logger.Entries.ShouldContain(entry =>
                 entry.Level == LogLevel.Warning &&
                 entry.Message.Contains("yoco_webhook_signature_rejected"));
+        }
+
+        [Fact]
+        public async Task WebhookAsync_UsesVerifiedPayloadEventIdForIdempotency()
+        {
+            var secret = "whsec_" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+            var webhookId = "event_" + Guid.NewGuid().ToString("N");
+            var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+            var rawBody = JsonSerializer.Serialize(new
+            {
+                id = "different_" + webhookId,
+                type = "payment.succeeded",
+                payload = new
+                {
+                    id = "pay_" + Guid.NewGuid().ToString("N"),
+                    amount = 120000,
+                    currency = "ZAR",
+                    mode = "test",
+                    status = "succeeded",
+                    type = "payment",
+                    createdDate = DateTimeOffset.UtcNow,
+                    metadata = new { checkoutId = "ch_test", purpose = "AQGreenJoining" }
+                }
+            });
+            var signature = $"v1,{Sign(secret, $"{webhookId}.{timestamp}.{rawBody}")}";
+            var controller = CreateController(
+                secret,
+                out _,
+                out var processor,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = CreateHttpContext(rawBody, webhookId, timestamp, signature)
+            };
+
+            var result = await controller.WebhookAsync();
+
+            result.ShouldBeOfType<OkResult>();
+            processor.LastNotification.ShouldNotBeNull();
+            processor.LastNotification.EventId.ShouldBe("different_" + webhookId);
         }
 
         [Fact]

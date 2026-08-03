@@ -10,7 +10,7 @@ namespace AqualLifeStyle.Payments.Yoco
     public interface IYocoWebhookSignatureVerifier
     {
         bool IsConfigured { get; }
-        bool IsValid(string webhookId, string timestamp, string signature, string rawBody);
+        bool IsValid(string webhookId, string timestamp, string signature, byte[] rawBody);
     }
 
     public sealed class YocoWebhookSignatureVerifier
@@ -30,7 +30,7 @@ namespace AqualLifeStyle.Payments.Yoco
                 .Trim()
                 .StartsWith("whsec_", StringComparison.Ordinal);
 
-        public bool IsValid(string webhookId, string timestamp, string signature, string rawBody) =>
+        public bool IsValid(string webhookId, string timestamp, string signature, byte[] rawBody) =>
             IsValid(
                 _configuration["Yoco:WebhookSecret"],
                 webhookId,
@@ -44,9 +44,10 @@ namespace AqualLifeStyle.Payments.Yoco
             string webhookId,
             string timestamp,
             string signature,
-            string rawBody,
+            byte[] rawBody,
             DateTimeOffset now)
         {
+            secret = secret?.Trim();
             if (string.IsNullOrWhiteSpace(secret) ||
                 !secret.StartsWith("whsec_", StringComparison.Ordinal) ||
                 string.IsNullOrWhiteSpace(webhookId) ||
@@ -79,11 +80,14 @@ namespace AqualLifeStyle.Payments.Yoco
                 return false;
             }
 
-            var signedContent = $"{webhookId}.{timestamp}.{rawBody}";
+            var signedPrefix = Encoding.UTF8.GetBytes($"{webhookId}.{timestamp}.");
+            var signedContent = new byte[signedPrefix.Length + rawBody.Length];
+            Buffer.BlockCopy(signedPrefix, 0, signedContent, 0, signedPrefix.Length);
+            Buffer.BlockCopy(rawBody, 0, signedContent, signedPrefix.Length, rawBody.Length);
             byte[] expected;
             using (var hmac = new HMACSHA256(secretBytes))
             {
-                expected = hmac.ComputeHash(Encoding.UTF8.GetBytes(signedContent));
+                expected = hmac.ComputeHash(signedContent);
             }
 
             return signature.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)

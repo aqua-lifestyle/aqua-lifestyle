@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Abp.Dependency;
@@ -54,18 +53,16 @@ namespace AqualLifeStyle.Web.Host.Controllers
                 return StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
 
-            string rawBody;
-            using (var reader = new StreamReader(
-                       Request.Body,
-                       Encoding.UTF8,
-                       detectEncodingFromByteOrderMarks: false,
-                       leaveOpen: true))
+            byte[] rawBody;
+            using (var buffer = new MemoryStream())
             {
-                rawBody = await reader.ReadToEndAsync();
+                await Request.Body.CopyToAsync(buffer);
+                rawBody = buffer.ToArray();
             }
 
+            var webhookId = Request.Headers["webhook-id"].ToString();
             if (!_signatureVerifier.IsValid(
-                    Request.Headers["webhook-id"],
+                    webhookId,
                     Request.Headers["webhook-timestamp"],
                     Request.Headers["webhook-signature"],
                     rawBody))
@@ -123,8 +120,7 @@ namespace AqualLifeStyle.Web.Host.Controllers
                     Currency = webhookEvent.Payload.Currency,
                     Mode = webhookEvent.Payload.Mode,
                     ConfirmedAt = webhookEvent.Payload.CreatedDate,
-                    PayloadHash = Convert.ToHexString(
-                        SHA256.HashData(Encoding.UTF8.GetBytes(rawBody))),
+                    PayloadHash = Convert.ToHexString(SHA256.HashData(rawBody)),
                     Metadata = webhookEvent.Payload.Metadata
                 });
                 return Ok();
