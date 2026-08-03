@@ -230,7 +230,7 @@ namespace AqualLifeStyle.Tests.Payments
         }
 
         [Fact]
-        public async Task WebhookAsync_UsesVerifiedPayloadEventIdForIdempotency()
+        public async Task WebhookAsync_UsesSignedWebhookIdForIdempotency()
         {
             var secret = "whsec_" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
             var webhookId = "event_" + Guid.NewGuid().ToString("N");
@@ -266,7 +266,7 @@ namespace AqualLifeStyle.Tests.Payments
 
             result.ShouldBeOfType<OkResult>();
             processor.LastNotification.ShouldNotBeNull();
-            processor.LastNotification.EventId.ShouldBe("different_" + webhookId);
+            processor.LastNotification.EventId.ShouldBe(webhookId);
         }
 
         [Fact]

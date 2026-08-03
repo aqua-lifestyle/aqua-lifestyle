@@ -162,7 +162,7 @@ The webhook signature uses the raw body, `webhook-id`, and
 `webhook-timestamp`, and rejects notifications more than three minutes old.
 See `docs/development/payment-testing.md` for the disposable-data test order,
 contract diagnostics, administrator recovery permissions, and the boundary of
-what can be verified without a webhook secret.
+what can be verified with a registered test webhook.
 
 For live payments, first verify `https://www.aqualifestyleclub.co.za` in Yoco.
 Create a live webhook, then update all three Render values together to the live

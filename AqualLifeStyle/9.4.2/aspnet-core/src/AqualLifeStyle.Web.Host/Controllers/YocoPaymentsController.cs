@@ -113,7 +113,7 @@ namespace AqualLifeStyle.Web.Host.Controllers
             {
                 await _notificationProcessor.ProcessAsync(new VerifiedYocoPaymentNotification
                 {
-                    EventId = webhookEvent.Id,
+                    EventId = webhookId,
                     EventType = webhookEvent.Type,
                     PaymentId = webhookEvent.Payload.Id,
                     AmountInCents = webhookEvent.Payload.Amount,

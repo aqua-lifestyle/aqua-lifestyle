@@ -44,7 +44,7 @@ namespace AqualLifeStyle.Tests.WebHost
                 ["DataProtection:CertificatePassword"] = "safe-test-password",
                 ["Redis:Configuration"] = "redis:6379",
                 ["Yoco:SecretKey"] = "sk_test_safe-test-placeholder",
-                ["Yoco:WebhookSecret"] = "whsec_c2FmZS10ZXN0LXBsYWNlaG9sZGVy",
+                ["Yoco:WebhookSecret"] = "whsec_" + Convert.ToBase64String(new byte[32]),
                 ["Yoco:Mode"] = "test",
                 ["Bird:Enabled"] = "true",
                 ["Bird:ApiKey"] = "bk_eu1_safe-test-placeholder",
@@ -105,7 +105,24 @@ namespace AqualLifeStyle.Tests.WebHost
             exception.Message.ShouldNotContain(secret);
         }
 
-        // TODO: Keep live mode fail-closed when removing the temporary test-mode exception.
+        [Fact]
+        public void Validate_InStaging_WithTruncatedWebhookSecret_ThrowsWithoutLeakingSecret()
+        {
+            var secret = "whsec_" + Convert.ToBase64String(new byte[16]);
+            var services = BuildServiceProvider("Staging", new Dictionary<string, string>
+            {
+                ["Yoco:Mode"] = "test",
+                ["Yoco:SecretKey"] = "sk_test_safe-test-placeholder",
+                ["Yoco:WebhookSecret"] = secret
+            });
+
+            var exception = Should.Throw<InvalidOperationException>(
+                () => DeploymentConfigurationValidator.Validate(services));
+
+            exception.Message.ShouldContain("Yoco__WebhookSecret");
+            exception.Message.ShouldNotContain(secret);
+        }
+
         [Fact]
         public void Validate_InDevelopment_WithLiveModeAndMissingWebhookSecret_ThrowsWithDescriptiveMessage()
         {
@@ -208,7 +225,6 @@ namespace AqualLifeStyle.Tests.WebHost
             ex.Message.ShouldContain("prefix");
         }
 
-        // TODO: Remove this temporary test-mode exception once webhook registration is complete.
         [Fact]
         public void Validate_InProduction_WithTestModeAndMissingWebhookSecret_DoesNotThrow()
         {
@@ -219,7 +235,6 @@ namespace AqualLifeStyle.Tests.WebHost
             Should.NotThrow(() => DeploymentConfigurationValidator.Validate(services));
         }
 
-        // TODO: Keep live mode fail-closed when removing the temporary test-mode exception.
         [Fact]
         public void Validate_InProduction_WithLiveModeAndMissingWebhookSecret_ThrowsWithDescriptiveMessage()
         {

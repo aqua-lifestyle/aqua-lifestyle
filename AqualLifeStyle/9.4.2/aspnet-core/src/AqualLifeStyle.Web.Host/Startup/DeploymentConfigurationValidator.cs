@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Web.Host.Email;
 
 namespace AqualLifeStyle.Web.Host.Startup
@@ -27,7 +28,8 @@ namespace AqualLifeStyle.Web.Host.Startup
                 throw new InvalidOperationException(
                     "Yoco configuration is incomplete. Yoco__WebhookSecret is required when Yoco__Mode=live.");
             }
-            if (hasYocoWebhookSecret && !IsValidYocoWebhookSecret(yocoWebhookSecret))
+            if (hasYocoWebhookSecret &&
+                !YocoWebhookSignatureVerifier.HasValidSecretFormat(yocoWebhookSecret))
             {
                 throw new InvalidOperationException(
                     "Yoco configuration is invalid. Yoco__WebhookSecret must be a valid whsec_ signing secret.");
@@ -140,19 +142,6 @@ namespace AqualLifeStyle.Web.Host.Startup
         {
             return !string.IsNullOrWhiteSpace(value) &&
                    !value.StartsWith("<set-via-", StringComparison.Ordinal);
-        }
-
-        private static bool IsValidYocoWebhookSecret(string value)
-        {
-            if (!value.StartsWith("whsec_", StringComparison.Ordinal)) return false;
-            try
-            {
-                return Convert.FromBase64String(value.Substring("whsec_".Length)).Length > 0;
-            }
-            catch (FormatException)
-            {
-                return false;
-            }
         }
     }
 }

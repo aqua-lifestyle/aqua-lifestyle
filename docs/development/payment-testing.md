@@ -4,21 +4,21 @@ Use this procedure only with a disposable database and fresh test customers. Do
 not use the ambiguous 31 July R600 record, production data, or production
 provider credentials.
 
-## Current test-mode limitation
+## Test-mode configuration
 
-The currently approved configuration intentionally has no Yoco webhook signing
-secret:
+Use only the separately stored Yoco test credentials and the signing secret
+returned by the registered test webhook:
 
 ```text
 Yoco__Mode=test
 Yoco__SecretKey=sk_test_<obtain-from-Yoco-secret-store>
-Yoco__WebhookSecret=<absent>
+Yoco__WebhookSecret=whsec_<obtain-from-Yoco-secret-store>
 ```
 
-The API starts and can create hosted test checkouts in this configuration. The
-webhook endpoint returns `503 Service Unavailable` before reading the request
-body, and cannot confirm a payment. Never add a placeholder webhook secret or a
-runtime signature bypass.
+The API rejects a missing or malformed signing secret and never accepts an
+unsigned request. Test mode uses the same signature, payment-fact, checkout,
+purpose, and idempotency checks as live mode. Never add a placeholder webhook
+secret or a runtime signature bypass.
 
 A hosted checkout redirect proves only that the browser returned. Success,
 cancellation, and failure returns leave local payment and participation state
@@ -48,13 +48,13 @@ The member payment and invitation screens compare the API payment contract and
 required capabilities before exposing checkout actions. An incompatible API is
 shown as an operational error instead of an unusable payment journey.
 
-## Test sequence without a webhook secret
+## Test sequence with the registered webhook
 
 1. Create or select a disposable PostgreSQL database.
 2. Apply all migrations and confirm migration history through the protected
    diagnostics endpoint.
-3. Start the API in test mode with a real Yoco test secret key and no webhook
-   secret.
+3. Start the API in test mode with the stored Yoco test secret key and test
+   webhook signing secret.
 4. Confirm the public health response identifies the intended API build and
    payment contract.
 5. Start the matching frontend.
@@ -67,8 +67,12 @@ shown as an operational error instead of an unusable payment journey.
    instalment request is rejected without creating payment state.
 9. Follow each hosted checkout return route and confirm the UI still says that
    secure confirmation is pending and programme state has not advanced.
-10. With fresh AQGreen data, test administrator recovery as described below.
-11. Confirm AQGreen and direct-Onyx payment purposes cannot settle one another.
+10. Complete one Yoco test payment and confirm exactly one signed success event,
+    receipt, payment record, checkout completion, and programme transition.
+11. Repeat or redeliver the event and confirm no duplicate payment or state
+    transition is created.
+12. With fresh AQGreen data, test administrator recovery as described below.
+13. Confirm AQGreen and direct-Onyx payment purposes cannot settle one another.
 
 Do not represent locally generated signing fixtures in automated tests as Yoco
 integration evidence.
@@ -111,9 +115,11 @@ not be rewritten or charged automatically.
 
 ## Validation boundary
 
-### Verified without a webhook secret
+### Verified by repository tests
 
-- server startup in Yoco test mode without a signing secret;
+- fail-closed request handling for missing signing secrets and startup rejection
+  of malformed configured secrets;
+- exact-body signature verification with valid, invalid, and stale fixtures;
 - checkout request amounts, purposes, and hosted redirect handling;
 - payment-contract compatibility gating;
 - competing-checkout prevention and local idempotency boundaries;
@@ -124,13 +130,15 @@ not be rewritten or charged automatically.
 
 ### Not yet verified
 
-A real Yoco test webhook secret and a separately authorised test webhook are
-required before claiming end-to-end verification of signatures, successful or
-failed provider events, provider delivery duplication, payment allocation,
-AQGreen or Onyx activation,
-commission/entitlement release, or payment-driven progression.
+Registration and local fixtures do not prove end-to-end provider delivery. A
+real Yoco test payment against the matching deployed API is required before
+claiming successful or failed provider-event delivery, provider duplication,
+payment allocation, AQGreen or Onyx activation, commission/entitlement release,
+or payment-driven progression.
 
-The exact real `payment.failed` payload remains unverified until Yoco supplies a
-documented example or an authorised tester captures and sanitises a signed test
-delivery. Do not weaken the current event, status, amount, currency, mode,
-checkout-reference, and replay checks to accommodate an assumed payload.
+The exact real `payment.failed` payload and checkout retry semantics remain
+unverified until an authorised tester captures and sanitises a signed test
+delivery. A valid, matching failure is retained as idempotent provider evidence
+but does not terminally close the checkout or block a later authoritative
+success. Do not weaken the event, status, amount, currency, mode,
+checkout-reference, purpose, or replay checks to accommodate an assumed payload.

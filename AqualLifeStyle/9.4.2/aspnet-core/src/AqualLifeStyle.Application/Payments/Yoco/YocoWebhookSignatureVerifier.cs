@@ -16,6 +16,8 @@ namespace AqualLifeStyle.Payments.Yoco
     public sealed class YocoWebhookSignatureVerifier
         : IYocoWebhookSignatureVerifier, ITransientDependency
     {
+        private const int MinimumSigningSecretByteLength = 24;
+        private const int MaximumSigningSecretByteLength = 64;
         internal static readonly TimeSpan MaximumTimestampDifference = TimeSpan.FromMinutes(3);
         private readonly IConfiguration _configuration;
 
@@ -24,11 +26,30 @@ namespace AqualLifeStyle.Payments.Yoco
             _configuration = configuration;
         }
 
-        public bool IsConfigured =>
-            !string.IsNullOrWhiteSpace(_configuration["Yoco:WebhookSecret"]) &&
-            _configuration["Yoco:WebhookSecret"]
-                .Trim()
-                .StartsWith("whsec_", StringComparison.Ordinal);
+        public bool IsConfigured => HasValidSecretFormat(
+            _configuration["Yoco:WebhookSecret"]);
+
+        /// <summary>
+        /// Checks the prefix, encoding, and key length of a Standard Webhooks signing secret.
+        /// </summary>
+        public static bool HasValidSecretFormat(string secret)
+        {
+            secret = secret?.Trim();
+            if (string.IsNullOrWhiteSpace(secret) ||
+                !secret.StartsWith("whsec_", StringComparison.Ordinal))
+                return false;
+            try
+            {
+                var secretLength = Convert.FromBase64String(
+                    secret.Substring("whsec_".Length)).Length;
+                return secretLength >= MinimumSigningSecretByteLength &&
+                       secretLength <= MaximumSigningSecretByteLength;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+        }
 
         public bool IsValid(string webhookId, string timestamp, string signature, byte[] rawBody) =>
             IsValid(
@@ -48,8 +69,7 @@ namespace AqualLifeStyle.Payments.Yoco
             DateTimeOffset now)
         {
             secret = secret?.Trim();
-            if (string.IsNullOrWhiteSpace(secret) ||
-                !secret.StartsWith("whsec_", StringComparison.Ordinal) ||
+            if (!HasValidSecretFormat(secret) ||
                 string.IsNullOrWhiteSpace(webhookId) ||
                 string.IsNullOrWhiteSpace(timestamp) ||
                 string.IsNullOrWhiteSpace(signature) ||
@@ -70,15 +90,8 @@ namespace AqualLifeStyle.Payments.Yoco
             if ((now - signedAt).Duration() > MaximumTimestampDifference)
                 return false;
 
-            byte[] secretBytes;
-            try
-            {
-                secretBytes = Convert.FromBase64String(secret.Substring("whsec_".Length));
-            }
-            catch (FormatException)
-            {
-                return false;
-            }
+            var secretBytes = Convert.FromBase64String(
+                secret.Substring("whsec_".Length));
 
             var signedPrefix = Encoding.UTF8.GetBytes($"{webhookId}.{timestamp}.");
             var signedContent = new byte[signedPrefix.Length + rawBody.Length];

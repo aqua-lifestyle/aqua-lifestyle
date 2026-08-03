@@ -552,7 +552,9 @@ namespace AqualLifeStyle.Tests.Application
             notification.Metadata = new Dictionary<string, JsonElement>
             {
                 [YocoCheckoutMetadata.ProviderCheckoutId] =
-                    JsonSerializer.SerializeToElement(persisted.ProviderCheckoutId)
+                    JsonSerializer.SerializeToElement(persisted.ProviderCheckoutId),
+                [YocoCheckoutMetadata.Purpose] =
+                    JsonSerializer.SerializeToElement(YocoCheckoutMetadata.AQGreenJoiningPurpose)
             };
             var processor = Resolve<YocoPaymentNotificationProcessor>();
 
@@ -640,6 +642,13 @@ namespace AqualLifeStyle.Tests.Application
                 $"pay_{suffix}",
                 persisted.ProviderCheckoutId,
                 612000);
+            notification.Metadata = new Dictionary<string, JsonElement>
+            {
+                [YocoCheckoutMetadata.ProviderCheckoutId] =
+                    JsonSerializer.SerializeToElement(persisted.ProviderCheckoutId),
+                [YocoCheckoutMetadata.Purpose] =
+                    JsonSerializer.SerializeToElement(YocoCheckoutMetadata.DirectOnyxPurpose)
+            };
 
             await Resolve<YocoPaymentNotificationProcessor>().ProcessAsync(notification);
 
@@ -660,7 +669,7 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task SignedFailedYocoNotification_TerminatesAQGreenCheckoutWithoutPayment()
+        public async Task SignedFailedYocoNotification_RecordsAQGreenEvidenceWithoutBlockingLaterSuccess()
         {
             var suffix = Guid.NewGuid().ToString("N");
             var userId = await CreateTestUserAsync(
@@ -719,6 +728,20 @@ namespace AqualLifeStyle.Tests.Application
 
             var processor = Resolve<YocoPaymentNotificationProcessor>();
 
+            var missingPurpose = CreateNotification(
+                $"evt_missing_purpose_{suffix}",
+                $"pay_missing_purpose_{suffix}",
+                persistedCheckout.ProviderCheckoutId,
+                120000);
+            missingPurpose.EventType = "payment.failed";
+            missingPurpose.Metadata = new Dictionary<string, JsonElement>
+            {
+                [YocoCheckoutMetadata.ProviderCheckoutId] =
+                    JsonSerializer.SerializeToElement(persistedCheckout.ProviderCheckoutId)
+            };
+            await Should.ThrowAsync<YocoWebhookValidationException>(() =>
+                processor.ProcessAsync(missingPurpose));
+
             var mismatchedAmount = CreateNotification(
                 $"evt_wrong_amount_{suffix}",
                 $"pay_wrong_amount_{suffix}",
@@ -762,22 +785,20 @@ namespace AqualLifeStyle.Tests.Application
                 $"pay_late_success_{suffix}",
                 persistedCheckout.ProviderCheckoutId,
                 120000);
-            await Should.ThrowAsync<YocoWebhookValidationException>(() =>
-                processor.ProcessAsync(lateSuccess));
+            await processor.ProcessAsync(lateSuccess);
 
             await UsingDbContextAsync(1, async context =>
             {
                 var checkout = await context.AQGreenJoiningCheckouts.SingleAsync(
                     item => item.Id == checkoutId);
-                checkout.Status.ShouldBe(HostedPaymentCheckoutStatus.Failed);
-                checkout.TerminalEvidence.ShouldContain(notification.EventId);
-                (await context.MemberPayments.AnyAsync()).ShouldBeFalse();
-                (await context.YocoWebhookReceipts.CountAsync()).ShouldBe(1);
+                checkout.Status.ShouldBe(HostedPaymentCheckoutStatus.Completed);
+                (await context.MemberPayments.CountAsync()).ShouldBe(1);
+                (await context.YocoWebhookReceipts.CountAsync()).ShouldBe(2);
             });
         }
 
         [Fact]
-        public async Task SignedFailedYocoNotification_TerminatesDirectOnyxCheckoutWithoutPayment()
+        public async Task SignedFailedYocoNotification_RecordsOnyxEvidenceWithoutBlockingLaterSuccess()
         {
             var suffix = Guid.NewGuid().ToString("N");
             var userId = await CreateTestUserAsync(
@@ -835,18 +856,16 @@ namespace AqualLifeStyle.Tests.Application
                 $"pay_onyx_late_success_{suffix}",
                 persistedCheckout.ProviderCheckoutId,
                 612000);
-            await Should.ThrowAsync<YocoWebhookValidationException>(() =>
-                processor.ProcessAsync(lateSuccess));
+            await processor.ProcessAsync(lateSuccess);
 
             await UsingDbContextAsync(1, async context =>
             {
                 var checkout = await context.DirectOnyxCheckoutIntents.SingleAsync(
                     item => item.Id == checkoutId);
-                checkout.Status.ShouldBe(HostedPaymentCheckoutStatus.Failed);
-                checkout.TerminalEvidence.ShouldContain(notification.EventId);
-                (await context.MemberPayments.AnyAsync()).ShouldBeFalse();
-                (await context.OnyxParticipations.AnyAsync()).ShouldBeFalse();
-                (await context.YocoWebhookReceipts.CountAsync()).ShouldBe(1);
+                checkout.Status.ShouldBe(HostedPaymentCheckoutStatus.Completed);
+                (await context.MemberPayments.CountAsync()).ShouldBe(1);
+                (await context.OnyxParticipations.CountAsync()).ShouldBe(1);
+                (await context.YocoWebhookReceipts.CountAsync()).ShouldBe(2);
             });
         }
 
@@ -861,6 +880,31 @@ namespace AqualLifeStyle.Tests.Application
                 120000);
 
             await Should.ThrowAsync<YocoWebhookTransientException>(() =>
+                Resolve<YocoPaymentNotificationProcessor>().ProcessAsync(notification));
+
+            await UsingDbContextAsync(1, async context =>
+                (await context.YocoWebhookReceipts.AnyAsync()).ShouldBeFalse());
+        }
+
+        [Fact]
+        public async Task YocoNotification_OversizedReferencesAreRejectedWithoutReceipt()
+        {
+            var notification = CreateNotification(
+                "evt_oversized",
+                new string('p', YocoWebhookReceipt.MaxPaymentIdLength + 1),
+                "ch_test",
+                120000);
+
+            await Should.ThrowAsync<YocoWebhookValidationException>(() =>
+                Resolve<YocoPaymentNotificationProcessor>().ProcessAsync(notification));
+
+            notification.PaymentId = "pay_test";
+            notification.Metadata = new Dictionary<string, JsonElement>
+            {
+                [YocoCheckoutMetadata.ProviderCheckoutId] = JsonSerializer.SerializeToElement(
+                    new string('c', HostedPaymentCheckout.MaxProviderCheckoutIdLength + 1))
+            };
+            await Should.ThrowAsync<YocoWebhookValidationException>(() =>
                 Resolve<YocoPaymentNotificationProcessor>().ProcessAsync(notification));
 
             await UsingDbContextAsync(1, async context =>

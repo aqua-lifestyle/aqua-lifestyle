@@ -10,13 +10,34 @@ namespace AqualLifeStyle.Tests.Payments
 {
     public class YocoWebhookSignatureVerifierTests
     {
-        // TODO: Remove this temporary missing-secret case once webhook registration is complete.
         [Fact]
         public void MissingWebhookSecret_RejectsWebhook()
         {
             var configuration = new ConfigurationBuilder().Build();
             var verifier = new YocoWebhookSignatureVerifier(configuration);
 
+            Assert.False(verifier.IsValid(
+                "event_123",
+                "1",
+                "v1,unsigned",
+                Encoding.UTF8.GetBytes("{}")));
+        }
+
+        [Theory]
+        [InlineData(16)]
+        [InlineData(65)]
+        public void OutOfRangeWebhookSecret_IsNotConfiguredAndRejectsWebhook(int byteLength)
+        {
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string>
+                {
+                    ["Yoco:WebhookSecret"] =
+                        "whsec_" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(byteLength))
+                })
+                .Build();
+            var verifier = new YocoWebhookSignatureVerifier(configuration);
+
+            Assert.False(verifier.IsConfigured);
             Assert.False(verifier.IsValid(
                 "event_123",
                 "1",
