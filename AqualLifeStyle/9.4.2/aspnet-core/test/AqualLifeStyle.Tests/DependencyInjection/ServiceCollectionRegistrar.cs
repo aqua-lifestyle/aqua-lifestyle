@@ -6,6 +6,7 @@ using Castle.Windsor.MsDependencyInjection;
 using Abp.Dependency;
 using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.Identity;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace AqualLifeStyle.Tests.DependencyInjection
 {
@@ -16,6 +17,7 @@ namespace AqualLifeStyle.Tests.DependencyInjection
             var services = new ServiceCollection();
 
             IdentityRegistrar.Register(services);
+            services.AddDataProtection().SetApplicationName("AqualLifeStyle.Tests");
 
             services.AddEntityFrameworkSqlite();
 

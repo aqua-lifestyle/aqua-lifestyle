@@ -11,6 +11,7 @@ using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Accounts;
 using AqualLifeStyle.Authorization.Accounts.Dto;
+using AqualLifeStyle.Email;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
@@ -69,7 +70,8 @@ namespace AqualLifeStyle.Tests.Application
                 user.IsEmailConfirmed.ShouldBeFalse();
                 var verification = await context.TransactionalEmailOutboxMessages.SingleAsync(message =>
                     message.NotificationType == "EmailVerification" && message.Recipient == email);
-                verification.HtmlBody.ShouldContain("redirect=%2Fi%2FAQ7G2X9K");
+                Resolve<ITransactionalEmailBodyProtector>().Unprotect(verification.HtmlBody)
+                    .ShouldContain("redirect=%2Fi%2FAQ7G2X9K");
                 var roleNames = await (
                     from userRole in context.UserRoles
                     join role in context.Roles on userRole.RoleId equals role.Id
@@ -124,9 +126,10 @@ namespace AqualLifeStyle.Tests.Application
                     user.PhoneNumber.ShouldBe("+27 72 345 6789");
                     user.HomeAddress.ShouldBe("20 Club Road, Johannesburg");
                     user.IsEmailConfirmed.ShouldBeFalse();
-                    (await context.TransactionalEmailOutboxMessages.SingleAsync(message =>
-                        message.NotificationType == "EmailVerification" && message.Recipient == email))
-                        .HtmlBody.ShouldNotContain("evil.example.test");
+                    var verification = await context.TransactionalEmailOutboxMessages.SingleAsync(message =>
+                        message.NotificationType == "EmailVerification" && message.Recipient == email);
+                    Resolve<ITransactionalEmailBodyProtector>().Unprotect(verification.HtmlBody)
+                        .ShouldNotContain("evil.example.test");
                     var customer = await context.Customers.SingleAsync(item => item.UserId == user.Id);
                     var roleNames = await (
                         from userRole in context.UserRoles
@@ -380,8 +383,9 @@ namespace AqualLifeStyle.Tests.Application
             {
                 var resetMessage = await context.TransactionalEmailOutboxMessages.SingleAsync(message =>
                     message.NotificationType == "PasswordReset" && message.Recipient == email);
-                resetMessage.HtmlBody.ShouldContain("area=Default");
-                resetMessage.HtmlBody.ShouldContain("redirect=%2Fprofile");
+                var htmlBody = Resolve<ITransactionalEmailBodyProtector>().Unprotect(resetMessage.HtmlBody);
+                htmlBody.ShouldContain("area=Default");
+                htmlBody.ShouldContain("redirect=%2Fprofile");
             });
         }
     }

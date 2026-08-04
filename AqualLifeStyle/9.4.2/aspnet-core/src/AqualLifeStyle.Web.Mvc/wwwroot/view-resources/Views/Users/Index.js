@@ -1,8 +1,6 @@
 ﻿(function ($) {
     var _userService = abp.services.app.user,
         l = abp.localization.getSource('AqualLifeStyle'),
-        _$modal = $('#UserCreateModal'),
-        _$form = _$modal.find('form'),
         _$table = $('#UsersTable');
 
     var _$usersTable = _$table.DataTable({
@@ -73,43 +71,6 @@
         ]
     });
 
-    _$form.validate({
-        rules: {
-            Password: "required",
-            ConfirmPassword: {
-                equalTo: "#Password"
-            }
-        }
-    });
-
-    _$form.find('.save-button').on('click', (e) => {
-        e.preventDefault();
-
-        if (!_$form.valid()) {
-            return;
-        }
-
-        var user = _$form.serializeFormToObject();
-        user.roleNames = [];
-        var _$roleCheckboxes = _$form[0].querySelectorAll("input[name='role']:checked");
-        if (_$roleCheckboxes) {
-            for (var roleIndex = 0; roleIndex < _$roleCheckboxes.length; roleIndex++) {
-                var _$roleCheckbox = $(_$roleCheckboxes[roleIndex]);
-                user.roleNames.push(_$roleCheckbox.val());
-            }
-        }
-
-        abp.ui.setBusy(_$modal);
-        _userService.create(user).done(function () {
-            _$modal.modal('hide');
-            _$form[0].reset();
-            abp.notify.info(l('SavedSuccessfully'));
-            _$usersTable.ajax.reload();
-        }).always(function () {
-            abp.ui.clearBusy(_$modal);
-        });
-    });
-
     $(document).on('click', '.delete-user', function () {
         var userId = $(this).attr("data-user-id");
         var userName = $(this).attr('data-user-name');
@@ -152,18 +113,8 @@
         });
     });
 
-    $(document).on('click', 'a[data-target="#UserCreateModal"]', (e) => {
-        $('.nav-tabs a[href="#user-details"]').tab('show')
-    });
-
     abp.event.on('user.edited', (data) => {
         _$usersTable.ajax.reload();
-    });
-
-    _$modal.on('shown.bs.modal', () => {
-        _$modal.find('input:not([type=hidden]):first').focus();
-    }).on('hidden.bs.modal', () => {
-        _$form.clearForm();
     });
 
     $('.btn-search').on('click', (e) => {

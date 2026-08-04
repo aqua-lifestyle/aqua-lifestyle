@@ -29,7 +29,7 @@ There is no frontend registration feature flag. `Abp.Account.IsSelfRegistrationE
 
 ## Administrator account creation
 
-Administrators create internal staff through the protected administrator workspace. The server checks the caller's granular user-management permission before accepting a role assignment. A caller cannot become an administrator by changing a browser request or registration payload.
+Administrators create internal staff through the protected administrator workspace. The server requires both the granular user-creation and role-assignment permissions because every new internal account receives a role. A caller cannot become an administrator by changing a browser request or registration payload.
 
 The administrator does not choose or receive the new user's password. Creation stores an inactive, email-unconfirmed, setup-required Identity account with a system-generated unusable credential, then commits a 24-hour one-time invitation and its Bird email to the transactional outbox. The link identifies the invitation with a random public code and keeps the ASP.NET Identity setup token in the URL fragment so it is absent from the initial page request and referrer headers. The frontend removes the fragment from browser history before submitting the token to the invitation API.
 
@@ -113,7 +113,7 @@ Important behavior:
 
 Use this sequence for the current Render and Vercel deployment:
 
-1. Deploy the reviewed migrator and run it before the application version that writes invitations. The migration creates `InternalAccountInvitations` and grants `Aqua.Admin.Users.Invite` to active `Admin` and `SystemAdmin` roles unless an explicit denial already exists.
+1. Deploy the reviewed migrator and run it before the application version that writes invitations. The migration creates `InternalAccountInvitations` and grants `Aqua.Admin.Users.Invite` to non-deleted `Admin` and `SystemAdmin` roles unless a permission row already exists.
 2. Deploy the reviewed application and confirm the Render API is healthy at `https://aqualifestyle-api.onrender.com/api/health`.
 3. Confirm Bird delivery and the transactional email worker are healthy before inviting staff. Invitation creation can commit while delivery is temporarily unavailable, so operations must monitor terminal outbox alerts and resend only after investigating the failure.
 4. Confirm `Abp.Account.IsSelfRegistrationEnabled` is `true` for Areas that accept customer signup and explicitly `false` only for managed-registration Areas.
@@ -122,9 +122,9 @@ Use this sequence for the current Render and Vercel deployment:
 7. Confirm the browser returns to sign-in and the old password no longer works.
 8. Sign in to **Platform administration** with the host administrator and rotate that password separately if the account is in use.
 9. Confirm a previously issued token receives an unauthorised response after its security stamp changes.
-10. Create a non-production internal account, confirm only the intended recipient receives the invitation, accept it once, and confirm replay does not expose account details or change the password.
+10. Create a non-production internal account, confirm only the intended recipient receives the invitation, accept it once, and confirm replay returns `WasAlreadyAccepted` plus the Area tenancy name needed for sign-in without exposing account details or changing the password.
 11. Confirm `/signup` creates only a customer with Guest access in an enabled Area, while disabled Areas show the managed-registration message and reject direct registration requests.
-12. Review Render logs and audit records for invitation and password events without passwords, hashes, raw tokens, setup URLs, or recipient data.
+12. Review Render logs and audit records for invitation and password events without passwords, hashes, raw tokens, setup URLs, or recipient/name request data. `AdminCreateUserInput` request auditing is disabled; the administrator mutation log still records the operation, actor, Area, target ID, outcome, and justification.
 
 An existing database does not need the bootstrap secret to redeploy because both administrator records already exist. Set the secret before a fresh database or disaster-recovery bootstrap.
 

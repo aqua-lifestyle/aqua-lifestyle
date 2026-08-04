@@ -30,6 +30,8 @@ namespace AqualLifeStyle.Tests.Application
             typeof(AdminCreateUserInput).GetProperty("Password").ShouldBeNull();
             typeof(AdminCreateUserInput).GetProperty("IsActive").ShouldBeNull();
             typeof(AdminResetUserPasswordInput).GetProperty("NewPassword").ShouldBeNull();
+            typeof(AdminCreateUserInput).GetCustomAttributes(typeof(Abp.Auditing.DisableAuditingAttribute), true)
+                .ShouldHaveSingleItem();
         }
 
         [Fact]

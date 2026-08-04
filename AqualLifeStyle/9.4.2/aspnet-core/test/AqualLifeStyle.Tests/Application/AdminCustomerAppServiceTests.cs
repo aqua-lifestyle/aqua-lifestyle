@@ -14,6 +14,7 @@ using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
+using AqualLifeStyle.Email;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.WebUtilities;
 using Shouldly;
@@ -199,7 +200,8 @@ namespace AqualLifeStyle.Tests.Application
                     message.NotificationType == "EmailVerification" &&
                     message.Recipient == email &&
                     message.IdempotencyKey.Contains("admin-created"));
-                verification.HtmlBody.ShouldContain("/verify-email?");
+                Resolve<ITransactionalEmailBodyProtector>().Unprotect(verification.HtmlBody)
+                    .ShouldContain("/verify-email?");
                 var roles = await (from assignment in context.UserRoles
                     join role in context.Roles on assignment.RoleId equals role.Id
                     where assignment.UserId == customer.UserId

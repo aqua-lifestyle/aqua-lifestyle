@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using Abp.Application.Services.Dto;
+using Abp.Auditing;
 using Abp.Authorization.Users;
 using AqualLifeStyle.Domain.Enums;
 
@@ -29,6 +30,7 @@ namespace AqualLifeStyle.Application.Admin.Users.Dto
         public bool RequiresPasswordSetup { get; set; }
     }
 
+    [DisableAuditing]
     public class AdminCreateUserInput
     {
         [Range(1, int.MaxValue)] public int TenantId { get; set; }

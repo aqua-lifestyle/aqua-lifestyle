@@ -15,6 +15,7 @@ using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Accounts;
 using AqualLifeStyle.Domain.Enums;
+using AqualLifeStyle.Email;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
@@ -61,6 +62,7 @@ namespace AqualLifeStyle.Tests.Application
                 NewPassword = "IgnoredPass2!"
             });
             replay.WasAlreadyAccepted.ShouldBeTrue();
+            replay.AreaName.ShouldBe("Default");
             await Should.ThrowAsync<UserFriendlyException>(() => _invitations.ValidateAsync(link));
 
             using (UsingTenantId(1))
@@ -98,6 +100,26 @@ namespace AqualLifeStyle.Tests.Application
             login.Result.ShouldBe(AbpLoginResultType.UserIsNotActive);
 
             await AssertPendingUserAsync(account.Id, emailConfirmed: false);
+        }
+
+        [Fact]
+        public async Task PendingInvitation_PersistsOnlyProtectedEmailBodies()
+        {
+            var account = await CreateInvitedAccountAsync();
+            var protector = Resolve<ITransactionalEmailBodyProtector>();
+            await UsingDbContextAsync(1, async context =>
+            {
+                var message = await context.TransactionalEmailOutboxMessages.SingleAsync(item =>
+                    item.NotificationType == "InternalAccountInvitation" && item.Recipient == account.Email);
+                var plaintext = protector.Unprotect(message.TextBody);
+                var match = Regex.Match(plaintext, @"[?&]invitation=([^#\s]+)#token=([^\s]+)");
+                match.Success.ShouldBeTrue();
+                message.HtmlBody.ShouldStartWith(TransactionalEmailBodyProtector.EnvelopePrefix);
+                message.TextBody.ShouldStartWith(TransactionalEmailBodyProtector.EnvelopePrefix);
+                message.TextBody.ShouldNotContain(match.Groups[1].Value);
+                message.TextBody.ShouldNotContain(match.Groups[2].Value);
+                message.TextBody.ShouldNotContain(plaintext);
+            });
         }
 
         [Fact]
@@ -216,11 +238,12 @@ namespace AqualLifeStyle.Tests.Application
 
         private async Task<ValidateInternalAccountInvitationInput> GetLatestLinkAsync(string email)
         {
-            var text = await UsingDbContextAsync(1, context => context.TransactionalEmailOutboxMessages
+            var protectedText = await UsingDbContextAsync(1, context => context.TransactionalEmailOutboxMessages
                 .Where(message => message.NotificationType == "InternalAccountInvitation" && message.Recipient == email)
                 .OrderByDescending(message => message.CreationTime)
                 .Select(message => message.TextBody)
                 .FirstAsync());
+            var text = Resolve<ITransactionalEmailBodyProtector>().Unprotect(protectedText);
             var match = Regex.Match(text, @"[?&]invitation=([^#\s]+)#token=([^\s]+)");
             match.Success.ShouldBeTrue(text);
             return new ValidateInternalAccountInvitationInput

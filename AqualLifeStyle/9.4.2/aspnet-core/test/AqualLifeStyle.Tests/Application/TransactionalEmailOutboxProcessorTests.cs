@@ -37,7 +37,10 @@ namespace AqualLifeStyle.Tests.Application
             await _processor.ProcessPendingAsync();
 
             await _deliveryGateway.Received(1).SendAsync(
-                Arg.Is<TransactionalEmail>(email => email.Reference == "verification-success"),
+                Arg.Is<TransactionalEmail>(email =>
+                    email.Reference == "verification-success" &&
+                    email.HtmlBody == "<p>token-bearing link</p>" &&
+                    email.TextBody == "token-bearing link"),
                 Arg.Any<CancellationToken>());
             await UsingDbContextAsync(1, async context =>
             {
@@ -48,6 +51,38 @@ namespace AqualLifeStyle.Tests.Application
                 persisted.HtmlBody.ShouldBeNull();
                 persisted.TextBody.ShouldBeNull();
                 persisted.AttemptCount.ShouldBe(1);
+            });
+        }
+
+        [Fact]
+        public async Task Enqueue_ProtectsPendingBodiesBeforePersistence()
+        {
+            const string invitationCode = "INVITATION-CODE-SECRET";
+            const string setupToken = "SETUP-TOKEN-SECRET";
+            var htmlBody = $"<p>https://example.test/setup?invitation={invitationCode}#token={setupToken}</p>";
+            var textBody = $"https://example.test/setup?invitation={invitationCode}#token={setupToken}";
+            var outbox = Resolve<ITransactionalEmailOutbox>();
+
+            (await outbox.EnqueueAsync(1, "InternalAccountInvitation", "protected-invitation",
+                new TransactionalEmail(
+                    "recipient@example.test",
+                    "Set up your account",
+                    htmlBody,
+                    textBody,
+                    "protected-invitation"))).ShouldBeTrue();
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var persisted = await context.TransactionalEmailOutboxMessages.SingleAsync(message =>
+                    message.IdempotencyKey == "protected-invitation");
+                persisted.HtmlBody.ShouldStartWith(TransactionalEmailBodyProtector.EnvelopePrefix);
+                persisted.TextBody.ShouldStartWith(TransactionalEmailBodyProtector.EnvelopePrefix);
+                persisted.HtmlBody.ShouldNotContain(invitationCode);
+                persisted.HtmlBody.ShouldNotContain(setupToken);
+                persisted.HtmlBody.ShouldNotContain(htmlBody);
+                persisted.TextBody.ShouldNotContain(invitationCode);
+                persisted.TextBody.ShouldNotContain(setupToken);
+                persisted.TextBody.ShouldNotContain(textBody);
             });
         }
 
@@ -109,6 +144,39 @@ namespace AqualLifeStyle.Tests.Application
                 sent.Status.ShouldBe(TransactionalEmailStatus.Sent);
                 sent.AttemptCount.ShouldBe(2);
                 sent.ProviderMessageId.ShouldBe("bird-message-2");
+            });
+        }
+
+        [Fact]
+        public async Task MalformedProtectedBody_IsRetriedWithoutSendingOrLeakingContent()
+        {
+            const string sensitiveContent = "MALFORMED-SETUP-TOKEN";
+            var message = TransactionalEmailOutboxMessage.Create(
+                1,
+                "InternalAccountInvitation",
+                "malformed-protected-body",
+                "recipient@example.test",
+                "Set up your account",
+                TransactionalEmailBodyProtector.EnvelopePrefix + sensitiveContent,
+                TransactionalEmailBodyProtector.EnvelopePrefix + sensitiveContent,
+                DateTime.UtcNow);
+            await UsingDbContextAsync(1, async context =>
+            {
+                context.TransactionalEmailOutboxMessages.Add(message);
+                await context.SaveChangesAsync();
+            });
+
+            await _processor.ProcessPendingAsync();
+
+            await _deliveryGateway.DidNotReceive().SendAsync(
+                Arg.Any<TransactionalEmail>(), Arg.Any<CancellationToken>());
+            await UsingDbContextAsync(1, async context =>
+            {
+                var persisted = await context.TransactionalEmailOutboxMessages.SingleAsync(item => item.Id == message.Id);
+                persisted.Status.ShouldBe(TransactionalEmailStatus.Pending);
+                persisted.AttemptCount.ShouldBe(1);
+                persisted.LastError.ShouldNotContain(sensitiveContent);
+                persisted.HtmlBody.ShouldContain(sensitiveContent);
             });
         }
 
@@ -320,15 +388,19 @@ namespace AqualLifeStyle.Tests.Application
             }
         }
 
-        private Task<Guid> InsertPendingMessageAsync(string idempotencyKey)
+        private async Task<Guid> InsertPendingMessageAsync(string idempotencyKey)
         {
-            var message = CreateMessage(idempotencyKey);
-            return UsingDbContextAsync(1, async context =>
-            {
-                context.TransactionalEmailOutboxMessages.Add(message);
-                await context.SaveChangesAsync();
-                return message.Id;
-            });
+            var outbox = Resolve<ITransactionalEmailOutbox>();
+            (await outbox.EnqueueAsync(1, "AccountEmail", idempotencyKey, new TransactionalEmail(
+                "recipient@example.test",
+                "Account email",
+                "<p>token-bearing link</p>",
+                "token-bearing link",
+                idempotencyKey))).ShouldBeTrue();
+            return await UsingDbContextAsync(1, context => context.TransactionalEmailOutboxMessages
+                .Where(message => message.IdempotencyKey == idempotencyKey)
+                .Select(message => message.Id)
+                .SingleAsync());
         }
 
         private static TransactionalEmailOutboxMessage CreateMessage(string idempotencyKey)

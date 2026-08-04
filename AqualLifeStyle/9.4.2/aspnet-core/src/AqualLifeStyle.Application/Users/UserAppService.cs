@@ -61,14 +61,17 @@ namespace AqualLifeStyle.Users
                     "Account update failed.",
                     "This account must complete its secure setup invitation before it can be changed in legacy user management.");
 
+            var persistedRoleNames = await _userManager.GetRolesAsync(user);
+            if (input.RoleNames == null ||
+                !new HashSet<string>(input.RoleNames, StringComparer.OrdinalIgnoreCase)
+                    .SetEquals(persistedRoleNames))
+                throw new UserFriendlyException(
+                    "Role update failed.",
+                    "Use administrator user management to change access roles.");
+
             MapToEntity(input, user);
 
             CheckErrors(await _userManager.UpdateAsync(user));
-
-            if (input.RoleNames != null)
-            {
-                CheckErrors(await _userManager.SetRolesAsync(user, input.RoleNames));
-            }
 
             return await GetAsync(input);
         }
@@ -196,11 +199,5 @@ namespace AqualLifeStyle.Users
             return true;
         }
 
-        public Task<bool> ResetPassword(ResetPasswordDto input)
-        {
-            throw new UserFriendlyException(
-                "Administrator password assignment is disabled.",
-                "Use administrator user management to send a secure password reset email.");
-        }
     }
 }

@@ -86,7 +86,10 @@ namespace AqualLifeStyle.Application.Admin.Users
             return Map(user, await _invitationManager.GetLatestAsync(user.Id));
         }
 
-        [AbpAuthorize(AquaPermissions.Admin.Users.Create)]
+        [AbpAuthorize(
+            AquaPermissions.Admin.Users.Create,
+            AquaPermissions.Admin.Users.AssignRole,
+            RequireAllPermissions = true)]
         public async Task<AdminUserDto> CreateAsync(AdminCreateUserInput input)
         {
             if (input == null) throw Failed("User creation", "The request body was empty.");
