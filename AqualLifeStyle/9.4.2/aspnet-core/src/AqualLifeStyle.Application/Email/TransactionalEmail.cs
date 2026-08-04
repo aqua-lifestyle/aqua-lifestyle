@@ -44,6 +44,41 @@ namespace AqualLifeStyle.Email
                 "A password reset was requested for your account. If this was not you, you can ignore this message.",
                 "Reset password", resetUrl, reference);
 
+        public TransactionalEmail InternalAccountInvitation(
+            string name,
+            string email,
+            string areaName,
+            string accessLevel,
+            string setupUrl,
+            string signInUrl,
+            DateTime expiresAt,
+            string reference)
+        {
+            var expiry = expiresAt.ToUniversalTime().ToString(
+                "yyyy-MM-dd HH:mm 'UTC'",
+                CultureInfo.InvariantCulture);
+            var safeName = E(name);
+            var safeArea = E(areaName);
+            var safeAccessLevel = E(accessLevel);
+            var safeEmail = E(email);
+            var safeSetupUrl = E(setupUrl);
+            var safeSignInUrl = E(signInUrl);
+            return new TransactionalEmail(
+                email,
+                $"Set up your {Brand} account",
+                $"<p>Hello {safeName},</p>" +
+                $"<p>You have been invited to join <strong>{safeArea}</strong> as <strong>{safeAccessLevel}</strong>.</p>" +
+                $"<p>Your username is {safeEmail}. Choose your own private password using this one-time link:</p>" +
+                $"<p><a href=\"{safeSetupUrl}\">Set up your account</a></p>" +
+                $"<p>This invitation expires at {E(expiry)}. After setup, sign in at <a href=\"{safeSignInUrl}\">{safeSignInUrl}</a>.</p>" +
+                $"<p>If you did not expect this invitation, do not use the link and contact the club team.</p><p>{Brand}</p>",
+                $"Hello {name},\n\nYou have been invited to join {areaName} as {accessLevel}.\n" +
+                $"Your username is {email}. Choose your own private password using this one-time link:\n{setupUrl}\n\n" +
+                $"This invitation expires at {expiry}. After setup, sign in at {signInUrl}.\n\n" +
+                $"If you did not expect this invitation, do not use the link and contact the club team.\n\n{Brand}",
+                reference);
+        }
+
         public TransactionalEmail EnquiryResponse(
             string name, string email, string originalEnquiry, string response, string reference)
         {

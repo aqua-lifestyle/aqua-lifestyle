@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Abp.Application.Services;
 using Abp.Application.Services.Dto;
@@ -15,7 +14,6 @@ using Abp.Localization;
 using Abp.Runtime.Session;
 using Abp.UI;
 using AqualLifeStyle.Authorization;
-using AqualLifeStyle.Authorization.Accounts;
 using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Roles.Dto;
@@ -31,49 +29,25 @@ namespace AqualLifeStyle.Users
         private readonly UserManager _userManager;
         private readonly RoleManager _roleManager;
         private readonly IRepository<Role> _roleRepository;
-        private readonly IPasswordHasher<User> _passwordHasher;
-        private readonly IAbpSession _abpSession;
-        private readonly LogInManager _logInManager;
 
         public UserAppService(
             IRepository<User, long> repository,
             UserManager userManager,
             RoleManager roleManager,
-            IRepository<Role> roleRepository,
-            IPasswordHasher<User> passwordHasher,
-            IAbpSession abpSession,
-            LogInManager logInManager)
+            IRepository<Role> roleRepository)
             : base(repository)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _roleRepository = roleRepository;
-            _passwordHasher = passwordHasher;
-            _abpSession = abpSession;
-            _logInManager = logInManager;
         }
 
-        public override async Task<UserDto> CreateAsync(CreateUserDto input)
+        public override Task<UserDto> CreateAsync(CreateUserDto input)
         {
             CheckCreatePermission();
-
-            var user = ObjectMapper.Map<User>(input);
-
-            user.TenantId = AbpSession.TenantId;
-            user.IsEmailConfirmed = true;
-
-            await _userManager.InitializeOptionsAsync(AbpSession.TenantId);
-
-            CheckErrors(await _userManager.CreateAsync(user, input.Password));
-
-            if (input.RoleNames != null)
-            {
-                CheckErrors(await _userManager.SetRolesAsync(user, input.RoleNames));
-            }
-
-            CurrentUnitOfWork.SaveChanges();
-
-            return MapToEntityDto(user);
+            throw new UserFriendlyException(
+                "User creation has moved.",
+                "Use administrator user management so the account owner can choose a password from a one-time invitation.");
         }
 
         public override async Task<UserDto> UpdateAsync(UserDto input)
@@ -81,6 +55,11 @@ namespace AqualLifeStyle.Users
             CheckUpdatePermission();
 
             var user = await _userManager.GetUserByIdAsync(input.Id);
+
+            if (user.RequiresPasswordReset())
+                throw new UserFriendlyException(
+                    "Account update failed.",
+                    "This account must complete its secure setup invitation before it can be changed in legacy user management.");
 
             MapToEntity(input, user);
 
@@ -103,6 +82,11 @@ namespace AqualLifeStyle.Users
         [AbpAuthorize(PermissionNames.Pages_Users_Activation)]
         public async Task Activate(EntityDto<long> user)
         {
+            var target = await _userManager.GetUserByIdAsync(user.Id);
+            if (target.RequiresPasswordReset())
+                throw new UserFriendlyException(
+                    "Account activation failed.",
+                    "This account must complete its secure setup invitation before activation.");
             await Repository.UpdateAsync(user.Id, async (entity) =>
             {
                 entity.IsActive = true;
@@ -212,40 +196,11 @@ namespace AqualLifeStyle.Users
             return true;
         }
 
-        public async Task<bool> ResetPassword(ResetPasswordDto input)
+        public Task<bool> ResetPassword(ResetPasswordDto input)
         {
-            if (_abpSession.UserId == null)
-            {
-                throw new UserFriendlyException("Please log in before attempting to reset password.");
-            }
-            
-            var currentUser = await _userManager.GetUserByIdAsync(_abpSession.GetUserId());
-            var loginAsync = await _logInManager.LoginAsync(currentUser.UserName, input.AdminPassword, shouldLockout: false);
-            if (loginAsync.Result != AbpLoginResultType.Success)
-            {
-                throw new UserFriendlyException("Your 'Admin Password' did not match the one on record.  Please try again.");
-            }
-            
-            if (currentUser.IsDeleted || !currentUser.IsActive)
-            {
-                return false;
-            }
-            
-            var roles = await _userManager.GetRolesAsync(currentUser);
-            if (!roles.Contains(StaticRoleNames.Tenants.Admin))
-            {
-                throw new UserFriendlyException("Only administrators may reset passwords.");
-            }
-
-            var user = await _userManager.GetUserByIdAsync(input.UserId);
-            if (user != null)
-            {
-                user.Password = _passwordHasher.HashPassword(user, input.NewPassword);
-                await CurrentUnitOfWork.SaveChangesAsync();
-            }
-
-            return true;
+            throw new UserFriendlyException(
+                "Administrator password assignment is disabled.",
+                "Use administrator user management to send a secure password reset email.");
         }
     }
 }
-

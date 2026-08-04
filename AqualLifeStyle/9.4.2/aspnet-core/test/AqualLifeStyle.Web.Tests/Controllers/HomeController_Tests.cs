@@ -112,7 +112,7 @@ namespace AqualLifeStyle.Web.Tests.Controllers
         }
 
         [Fact]
-        public async Task Authentication_RequiresRestoredCustomerToCompletePasswordReset()
+        public async Task Authentication_RequiresSetupRequiredAccountToCompletePasswordSetup()
         {
             EnsureAdminPassword(1, User.DefaultPassword);
 
@@ -135,7 +135,7 @@ namespace AqualLifeStyle.Web.Tests.Controllers
 
                 var response = await Client.SendAsync(request);
                 var responseBody = await response.Content.ReadAsStringAsync();
-                responseBody.ShouldContain("Password reset required.");
+                responseBody.ShouldContain("Account setup required.");
                 responseBody.ShouldNotContain("accessToken");
             }
             finally

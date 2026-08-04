@@ -113,6 +113,8 @@ namespace AqualLifeStyle.Tests.Application
             AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.UpdateAsync), AquaPermissions.Admin.Users.Edit);
             AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.AssignRoleAsync), AquaPermissions.Admin.Users.AssignRole);
             AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.ResetPasswordAsync), AquaPermissions.Admin.Users.ResetPassword);
+            AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.ResendInvitationAsync), AquaPermissions.Admin.Users.Invite);
+            AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.RevokeInvitationAsync), AquaPermissions.Admin.Users.Invite);
             AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.DeleteAsync), AquaPermissions.Admin.Users.Delete);
         }
 

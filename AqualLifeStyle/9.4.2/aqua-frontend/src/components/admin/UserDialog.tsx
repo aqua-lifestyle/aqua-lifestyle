@@ -13,10 +13,8 @@ import { AdminAreaSelectionField } from "./AdminAreaSelectionField";
 const schema = z.object({
   email: z.string().trim().email("Enter a valid email address.").max(256),
   firstName: z.string().trim().min(1, "First name is required.").max(64),
-  isActive: z.boolean(),
   justification: z.string().trim().min(3, "Explain why this user is being created.").max(500),
   lastName: z.string().trim().min(1, "Last name is required.").max(64),
-  password: z.string().min(8, "Use at least 8 characters.").max(128),
   role: z.coerce.number().int().min(0).max(4),
   tenantId: z.coerce.number().int().positive("Select a valid area."),
 });
@@ -39,8 +37,8 @@ export const UserDialog = ({ onCreated }: UserDialogProps) => {
     const form = event.currentTarget;
     const data = new FormData(form);
     const parsed = schema.safeParse({
-      email: data.get("email"), firstName: data.get("firstName"), isActive: data.get("isActive") === "on",
-      justification: data.get("justification"), lastName: data.get("lastName"), password: data.get("password"),
+      email: data.get("email"), firstName: data.get("firstName"),
+      justification: data.get("justification"), lastName: data.get("lastName"),
       role: data.get("role"), tenantId: data.get("tenantId"),
     });
     if (!parsed.success) {
@@ -51,7 +49,7 @@ export const UserDialog = ({ onCreated }: UserDialogProps) => {
     try {
       await httpClient.post("/api/services/app/AdminUser/Create", parsed.data);
       await onCreated?.();
-      toast({ message: "User account created successfully.", title: "Success", type: "success" });
+      toast({ message: "The account was created and an invitation email was queued.", title: "Invitation sent", type: "success" });
       form.reset(); close();
     } catch (requestError) {
       setError(getRequestErrorMessage(requestError, "The user could not be created."));
@@ -71,11 +69,10 @@ export const UserDialog = ({ onCreated }: UserDialogProps) => {
         <TextField errorMessage={fieldErrors.firstName} label="First name" name="firstName" required />
         <TextField errorMessage={fieldErrors.lastName} label="Last name" name="lastName" required />
         <TextField className="sm:col-span-2" errorMessage={fieldErrors.email} label="Email address" name="email" required type="email" />
-        <TextField className="sm:col-span-2" errorMessage={fieldErrors.password} label="Temporary password" minLength={8} name="password" required type="password" />
+        <p className="sm:col-span-2 text-sm text-muted-foreground">We will email this person a secure invitation. They will confirm their details and choose their own password before the account becomes active.</p>
         <TextAreaField className="sm:col-span-2" errorMessage={fieldErrors.justification} label="Reason for creating this account" maxLength={500} name="justification" required rows={3} />
-        <label className="flex items-center gap-2 text-sm font-medium"><input defaultChecked name="isActive" type="checkbox" /> Active account</label>
         {error ? <StatusMessage className="sm:col-span-2" tone="error">{error}</StatusMessage> : null}
-        <div className="flex justify-end gap-3 sm:col-span-2"><Button onClick={close} variant="ghost">Cancel</Button><Button isLoading={isSubmitting} type="submit">Create user</Button></div>
+        <div className="flex justify-end gap-3 sm:col-span-2"><Button onClick={close} variant="ghost">Cancel</Button><Button isLoading={isSubmitting} type="submit">Create and invite</Button></div>
       </form>
     </Dialog>
   </>;

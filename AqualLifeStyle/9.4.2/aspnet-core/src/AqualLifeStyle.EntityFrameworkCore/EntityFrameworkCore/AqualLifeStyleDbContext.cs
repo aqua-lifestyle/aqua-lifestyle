@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Abp.Zero.EntityFrameworkCore;
 using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.Domain.Accounts;
 using AqualLifeStyle.Domain.AreaLeaders;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Email;
@@ -41,6 +42,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
         public virtual DbSet<TransactionalEmailOutboxMessage> TransactionalEmailOutboxMessages { get; set; }
         public virtual DbSet<AccountEmailThrottle> AccountEmailThrottles { get; set; }
+        public virtual DbSet<InternalAccountInvitation> InternalAccountInvitations { get; set; }
         public virtual DbSet<EntryParticipation> EntryParticipations { get; set; }
         public virtual DbSet<EntryRecruiterCorrection> EntryRecruiterCorrections { get; set; }
         public virtual DbSet<EntryMonthlyObligation> EntryMonthlyObligations { get; set; }

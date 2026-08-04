@@ -13,6 +13,8 @@ namespace AqualLifeStyle.Application.Admin.Users
         Task<AdminUserDto> UpdateAsync(AdminUpdateUserInput input);
         Task<AdminUserDto> AssignRoleAsync(AdminAssignUserRoleInput input);
         Task ResetPasswordAsync(AdminResetUserPasswordInput input);
+        Task<AdminUserDto> ResendInvitationAsync(AdminUserInvitationActionInput input);
+        Task<AdminUserDto> RevokeInvitationAsync(AdminUserInvitationActionInput input);
         Task DeleteAsync(AdminDeleteUserInput input);
     }
 }

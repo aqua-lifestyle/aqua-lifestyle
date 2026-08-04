@@ -5,6 +5,7 @@ using Xunit;
 using Abp.Application.Services.Dto;
 using AqualLifeStyle.Users;
 using AqualLifeStyle.Users.Dto;
+using Abp.UI;
 
 namespace AqualLifeStyle.Tests.Users
 {
@@ -28,10 +29,9 @@ namespace AqualLifeStyle.Tests.Users
         }
 
         [Fact]
-        public async Task CreateUser_Test()
+        public async Task CreateUser_RejectsAdministratorKnownPasswordBypass()
         {
-            // Act
-            await _userAppService.CreateAsync(
+            await Should.ThrowAsync<UserFriendlyException>(() => _userAppService.CreateAsync(
                 new CreateUserDto
                 {
                     EmailAddress = "john@volosoft.com",
@@ -40,13 +40,7 @@ namespace AqualLifeStyle.Tests.Users
                     Surname = "Nash",
                     Password = "123qwe",
                     UserName = "john.nash"
-                });
-
-            await UsingDbContextAsync(async context =>
-            {
-                var johnNashUser = await context.Users.FirstOrDefaultAsync(u => u.UserName == "john.nash");
-                johnNashUser.ShouldNotBeNull();
-            });
+                }));
         }
     }
 }

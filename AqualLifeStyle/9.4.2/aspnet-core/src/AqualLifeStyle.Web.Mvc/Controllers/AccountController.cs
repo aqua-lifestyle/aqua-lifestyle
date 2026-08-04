@@ -148,8 +148,8 @@ namespace AqualLifeStyle.Web.Controllers
             if (user.RequiresPasswordReset())
             {
                 throw new UserFriendlyException(
-                    "Password reset required.",
-                    "Your customer account was restored. Use the secure password setup link provided to you before signing in.");
+                    "Account setup required.",
+                    "Use the secure setup or password reset link sent to your email address before signing in.");
             }
         }
 

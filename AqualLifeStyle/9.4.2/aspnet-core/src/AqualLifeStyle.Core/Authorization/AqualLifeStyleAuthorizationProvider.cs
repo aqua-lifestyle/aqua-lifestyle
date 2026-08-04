@@ -91,7 +91,8 @@ namespace AqualLifeStyle.Authorization
                 AquaPermissions.Admin.Users.Edit,
                 AquaPermissions.Admin.Users.Delete,
                 AquaPermissions.Admin.Users.AssignRole,
-                AquaPermissions.Admin.Users.ResetPassword);
+                AquaPermissions.Admin.Users.ResetPassword,
+                AquaPermissions.Admin.Users.Invite);
 
             var customers = admin.CreateChildPermission(
                 AquaPermissions.Admin.Customers.Default,

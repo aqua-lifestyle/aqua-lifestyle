@@ -6,6 +6,8 @@ using AqualLifeStyle.Domain.AreaLeaders;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
+using Abp.Authorization.Users;
+using AqualLifeStyle.Authorization.Users;
 
 namespace AqualLifeStyle.Tests.Application
 {
@@ -17,6 +19,35 @@ namespace AqualLifeStyle.Tests.Application
         {
             LoginAsHostAdmin();
             _tenantAdministration = Resolve<IAdminTenantAppService>();
+        }
+
+        [Fact]
+        public async Task Create_ProvisionsInitialAdministratorThroughInvitationWorkflow()
+        {
+            var suffix = System.Guid.NewGuid().ToString("N").Substring(0, 8);
+            var email = $"area-admin-{suffix}@example.com";
+            var tenant = await _tenantAdministration.CreateAsync(new CreateAdminTenantInput
+            {
+                TenancyName = $"Area{suffix}",
+                Name = $"Area {suffix}",
+                AdminEmailAddress = email,
+                IsActive = true,
+                Justification = "Initial administrator invitation test"
+            });
+
+            await UsingDbContextAsync(null, async context =>
+            {
+                var administrator = await context.Users.IgnoreQueryFilters().SingleAsync(user =>
+                    user.TenantId == tenant.Id && user.UserName == AbpUserBase.AdminUserName);
+                administrator.IsActive.ShouldBeFalse();
+                administrator.IsEmailConfirmed.ShouldBeFalse();
+                administrator.RequiresPasswordReset().ShouldBeTrue();
+                (await context.InternalAccountInvitations.IgnoreQueryFilters().CountAsync(invitation =>
+                    invitation.TenantId == tenant.Id && invitation.UserId == administrator.Id)).ShouldBe(1);
+                (await context.TransactionalEmailOutboxMessages.IgnoreQueryFilters().CountAsync(message =>
+                    message.TenantId == tenant.Id && message.NotificationType == "InternalAccountInvitation" &&
+                    message.Recipient == email)).ShouldBe(1);
+            });
         }
 
         [Fact]

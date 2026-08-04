@@ -139,6 +139,7 @@ namespace AqualLifeStyle.Authorization
                 public const string Delete = Default + ".Delete";
                 public const string AssignRole = Default + ".AssignRole";
                 public const string ResetPassword = Default + ".ResetPassword";
+                public const string Invite = Default + ".Invite";
             }
 
             public static class Tenants

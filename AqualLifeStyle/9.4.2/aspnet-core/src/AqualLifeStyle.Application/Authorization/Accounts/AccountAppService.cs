@@ -25,29 +25,26 @@ namespace AqualLifeStyle.Authorization.Accounts
         private readonly IConfiguration _configuration;
         private readonly ICustomerRepository _customerRepository;
         private readonly ITransactionalEmailOutbox _emailOutbox;
-        private readonly TransactionalEmailTemplateBuilder _emailTemplates;
         private readonly IAccountEmailThrottleRepository _emailThrottleRepository;
         private readonly AccountEmailVerificationScheduler _emailVerificationScheduler;
-        private readonly AccountEmailLinkBuilder _emailLinkBuilder;
+        private readonly AccountPasswordResetScheduler _passwordResetScheduler;
 
         public AccountAppService(
             UserRegistrationManager userRegistrationManager,
             IConfiguration configuration,
             ICustomerRepository customerRepository,
             ITransactionalEmailOutbox emailOutbox,
-            TransactionalEmailTemplateBuilder emailTemplates,
             IAccountEmailThrottleRepository emailThrottleRepository,
             AccountEmailVerificationScheduler emailVerificationScheduler,
-            AccountEmailLinkBuilder emailLinkBuilder)
+            AccountPasswordResetScheduler passwordResetScheduler)
         {
             _userRegistrationManager = userRegistrationManager;
             _configuration = configuration;
             _customerRepository = customerRepository;
             _emailOutbox = emailOutbox;
-            _emailTemplates = emailTemplates;
             _emailThrottleRepository = emailThrottleRepository;
             _emailVerificationScheduler = emailVerificationScheduler;
-            _emailLinkBuilder = emailLinkBuilder;
+            _passwordResetScheduler = passwordResetScheduler;
         }
 
         public async Task<IsTenantAvailableOutput> IsTenantAvailable(IsTenantAvailableInput input)
@@ -188,17 +185,15 @@ namespace AqualLifeStyle.Authorization.Accounts
         {
             var generic = PasswordResetRequestAccepted();
             var context = await FindEligibleUserAsync(input, false);
-            if (context.User == null || !context.User.IsEmailConfirmed) return generic;
+            if (context.User == null || !context.User.IsEmailConfirmed || context.User.RequiresPasswordReset())
+                return generic;
             using (CurrentUnitOfWork.SetTenantId(context.TenantId))
             {
-                await UserManager.InitializeOptionsAsync(context.TenantId);
-                var token = await UserManager.GeneratePasswordResetTokenAsync(context.User);
-                var url = _emailLinkBuilder.Build(
-                    "/reset-password", context.TenantId, context.User.Id, token,
-                    context.AreaName, input.RedirectPath);
                 var key = $"password-reset:{context.TenantId}:{context.User.Id}:{Guid.NewGuid():N}";
-                var enqueued = await _emailOutbox.EnqueueAsync(context.TenantId, "PasswordReset", key,
-                    _emailTemplates.PasswordReset(context.User.Name, context.User.EmailAddress, url, key));
+                var enqueued = await _passwordResetScheduler.ScheduleAsync(
+                    context.User,
+                    key,
+                    input.RedirectPath);
                 await KeepEnqueuedEmailIfAllowedAsync(
                     "reset", context.TenantId, input.EmailAddress, key, enqueued);
             }
@@ -214,7 +209,8 @@ namespace AqualLifeStyle.Authorization.Accounts
             {
                 await UserManager.InitializeOptionsAsync(input.TenantId);
                 var user = await UserManager.FindByIdAsync(input.UserId.ToString());
-                if (user == null || user.TenantId != input.TenantId || !user.IsActive || user.IsDeleted)
+                if (user == null || user.TenantId != input.TenantId || !user.IsActive || user.IsDeleted ||
+                    user.RequiresPasswordReset())
                     throw InvalidAccountLink("Password reset failed.");
                 var result = await UserManager.ResetPasswordAsync(user, input.Token, input.NewPassword);
                 if (!result.Succeeded) throw InvalidAccountLink("Password reset failed.");

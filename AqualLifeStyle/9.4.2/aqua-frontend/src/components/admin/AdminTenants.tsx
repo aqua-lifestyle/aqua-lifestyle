@@ -41,7 +41,7 @@ const TenantProfileDialog = ({ onSaved, tenant }: { onSaved: () => Promise<void>
     <Dialog onClose={close} open={open} size="lg" title={tenant ? "Edit area" : "Add area"}><form className="grid gap-4 sm:grid-cols-2" noValidate onSubmit={submit}>
       <TextField defaultValue={tenant?.tenancyName} errorMessage={fieldErrors.tenancyName} label="Area sign-in name" name="tenancyName" required />
       <TextField defaultValue={tenant?.name} errorMessage={fieldErrors.name} label="Display name" name="name" required />
-      {!tenant ? <TextField className="sm:col-span-2" errorMessage={fieldErrors.adminEmailAddress} label="Area administrator email" name="adminEmailAddress" required type="email" /> : null}
+      {!tenant ? <><TextField className="sm:col-span-2" errorMessage={fieldErrors.adminEmailAddress} label="Initial Area administrator email" name="adminEmailAddress" required type="email" /><p className="sm:col-span-2 text-sm text-muted-foreground">The initial administrator will be invited by email to choose their password and activate their account.</p></> : null}
       <TextAreaField className="sm:col-span-2" errorMessage={fieldErrors.justification} label="Reason for action" maxLength={500} name="justification" required rows={3} />
       {error ? <StatusMessage className="sm:col-span-2" tone="error">{error}</StatusMessage> : null}
       <div className="flex justify-end gap-3 sm:col-span-2"><Button onClick={close} variant="ghost">Cancel</Button><Button isLoading={submitting} type="submit">{tenant ? "Save area" : "Create area"}</Button></div>
