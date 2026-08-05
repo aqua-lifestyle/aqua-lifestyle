@@ -10,12 +10,14 @@ namespace AqualLifeStyle.Payments.Yoco
     public interface IYocoWebhookSignatureVerifier
     {
         bool IsConfigured { get; }
-        bool IsValid(string webhookId, string timestamp, string signature, string rawBody);
+        bool IsValid(string webhookId, string timestamp, string signature, byte[] rawBody);
     }
 
     public sealed class YocoWebhookSignatureVerifier
         : IYocoWebhookSignatureVerifier, ITransientDependency
     {
+        private const int MinimumSigningSecretByteLength = 24;
+        private const int MaximumSigningSecretByteLength = 64;
         internal static readonly TimeSpan MaximumTimestampDifference = TimeSpan.FromMinutes(3);
         private readonly IConfiguration _configuration;
 
@@ -24,13 +26,32 @@ namespace AqualLifeStyle.Payments.Yoco
             _configuration = configuration;
         }
 
-        public bool IsConfigured =>
-            !string.IsNullOrWhiteSpace(_configuration["Yoco:WebhookSecret"]) &&
-            _configuration["Yoco:WebhookSecret"]
-                .Trim()
-                .StartsWith("whsec_", StringComparison.Ordinal);
+        public bool IsConfigured => HasValidSecretFormat(
+            _configuration["Yoco:WebhookSecret"]);
 
-        public bool IsValid(string webhookId, string timestamp, string signature, string rawBody) =>
+        /// <summary>
+        /// Checks the prefix, encoding, and key length of a Standard Webhooks signing secret.
+        /// </summary>
+        public static bool HasValidSecretFormat(string secret)
+        {
+            secret = secret?.Trim();
+            if (string.IsNullOrWhiteSpace(secret) ||
+                !secret.StartsWith("whsec_", StringComparison.Ordinal))
+                return false;
+            try
+            {
+                var secretLength = Convert.FromBase64String(
+                    secret.Substring("whsec_".Length)).Length;
+                return secretLength >= MinimumSigningSecretByteLength &&
+                       secretLength <= MaximumSigningSecretByteLength;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+        }
+
+        public bool IsValid(string webhookId, string timestamp, string signature, byte[] rawBody) =>
             IsValid(
                 _configuration["Yoco:WebhookSecret"],
                 webhookId,
@@ -44,11 +65,11 @@ namespace AqualLifeStyle.Payments.Yoco
             string webhookId,
             string timestamp,
             string signature,
-            string rawBody,
+            byte[] rawBody,
             DateTimeOffset now)
         {
-            if (string.IsNullOrWhiteSpace(secret) ||
-                !secret.StartsWith("whsec_", StringComparison.Ordinal) ||
+            secret = secret?.Trim();
+            if (!HasValidSecretFormat(secret) ||
                 string.IsNullOrWhiteSpace(webhookId) ||
                 string.IsNullOrWhiteSpace(timestamp) ||
                 string.IsNullOrWhiteSpace(signature) ||
@@ -69,21 +90,17 @@ namespace AqualLifeStyle.Payments.Yoco
             if ((now - signedAt).Duration() > MaximumTimestampDifference)
                 return false;
 
-            byte[] secretBytes;
-            try
-            {
-                secretBytes = Convert.FromBase64String(secret.Substring("whsec_".Length));
-            }
-            catch (FormatException)
-            {
-                return false;
-            }
+            var secretBytes = Convert.FromBase64String(
+                secret.Substring("whsec_".Length));
 
-            var signedContent = $"{webhookId}.{timestamp}.{rawBody}";
+            var signedPrefix = Encoding.UTF8.GetBytes($"{webhookId}.{timestamp}.");
+            var signedContent = new byte[signedPrefix.Length + rawBody.Length];
+            Buffer.BlockCopy(signedPrefix, 0, signedContent, 0, signedPrefix.Length);
+            Buffer.BlockCopy(rawBody, 0, signedContent, signedPrefix.Length, rawBody.Length);
             byte[] expected;
             using (var hmac = new HMACSHA256(secretBytes))
             {
-                expected = hmac.ComputeHash(Encoding.UTF8.GetBytes(signedContent));
+                expected = hmac.ComputeHash(signedContent);
             }
 
             return signature.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)

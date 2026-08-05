@@ -317,7 +317,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             var checkout = await CreateYocoCheckoutAsync(
                 paymentCheckout,
                 YocoCheckoutMetadata.AQGreenJoiningCheckoutId,
-                "AQGreenJoining",
+                YocoCheckoutMetadata.AQGreenJoiningPurpose,
                 "AQGreen joining payment",
                 "aqgreen");
 
@@ -415,7 +415,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             var checkout = await CreateYocoCheckoutAsync(
                 intent,
                 YocoCheckoutMetadata.DirectOnyxCheckoutIntentId,
-                "OnyxDirectEntry",
+                YocoCheckoutMetadata.DirectOnyxPurpose,
                 "Direct Onyx participation",
                 "onyx");
 

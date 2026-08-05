@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Web.Host.Email;
 
 namespace AqualLifeStyle.Web.Host.Startup
@@ -17,13 +18,21 @@ namespace AqualLifeStyle.Web.Host.Startup
 
             var yocoMode = configuration["Yoco:Mode"]?.Trim().ToLowerInvariant();
             var yocoSecretKey = configuration["Yoco:SecretKey"]?.Trim();
+            var yocoWebhookSecret = configuration["Yoco:WebhookSecret"]?.Trim();
             var hasYocoMode = IsConfigured(yocoMode);
             var hasYocoSecretKey = IsConfigured(yocoSecretKey);
+            var hasYocoWebhookSecret = IsConfigured(yocoWebhookSecret);
             if (string.Equals(yocoMode, "live", StringComparison.Ordinal) &&
-                !IsConfigured(configuration["Yoco:WebhookSecret"]))
+                !hasYocoWebhookSecret)
             {
                 throw new InvalidOperationException(
                     "Yoco configuration is incomplete. Yoco__WebhookSecret is required when Yoco__Mode=live.");
+            }
+            if (hasYocoWebhookSecret &&
+                !YocoWebhookSignatureVerifier.HasValidSecretFormat(yocoWebhookSecret))
+            {
+                throw new InvalidOperationException(
+                    "Yoco configuration is invalid. Yoco__WebhookSecret must be a valid whsec_ signing secret.");
             }
 
             if (hasYocoMode || hasYocoSecretKey)
