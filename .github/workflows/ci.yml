@@ -176,3 +176,28 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+
+  deploy:
+    name: Trigger Render deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [backend, frontend, containers, postgres-transactional-regression]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Fail when the Render deploy hook secret is not configured
+        if: ${{ secrets.RENDER_DEPLOY_HOOK == '' }}
+        run: |
+          echo "::error::RENDER_DEPLOY_HOOK secret is not configured; the Render deployment gate is not usable. Configure the secret before merging."
+          exit 1
+      - name: Trigger Render deployment
+        if: ${{ secrets.RENDER_DEPLOY_HOOK != '' }}
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          set -euo pipefail
+          http_code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$RENDER_DEPLOY_HOOK")
+          echo "Render deploy hook accepted the request (HTTP $http_code). This only confirms the request was accepted, not that the deploy completed."
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::error::Render deploy hook rejected the request (HTTP $http_code)"
+            exit 1
+          fi
