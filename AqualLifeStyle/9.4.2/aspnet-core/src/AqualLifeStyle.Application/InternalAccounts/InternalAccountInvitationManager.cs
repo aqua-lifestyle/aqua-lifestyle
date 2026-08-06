@@ -220,7 +220,6 @@ namespace AqualLifeStyle.Application.InternalAccounts
             user.IsEmailConfirmed = false;
             user.RequirePasswordReset();
             (await _userManager.UpdateSecurityStampAsync(user)).CheckErrors(_localizationManager);
-            (await _userManager.UpdateAsync(user)).CheckErrors(_localizationManager);
 
             var setupToken = await _userManager.GeneratePasswordResetTokenAsync(user);
             var publicCode = GeneratePublicCode();

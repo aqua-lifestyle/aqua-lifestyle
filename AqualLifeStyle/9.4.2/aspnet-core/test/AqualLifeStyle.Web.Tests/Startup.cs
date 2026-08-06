@@ -75,6 +75,36 @@ namespace AqualLifeStyle.Web.Tests
 
         private void UseInMemoryDb(IServiceProvider serviceProvider)
         {
+            // Production-equivalent regression mode: run against a real PostgreSQL database when
+            // REPRO_PG=true. PostgreSQL is required to reproduce the transactional visibility
+            // semantics (suppressed reads cannot see uncommitted rows) that the default SQLite
+            // shared-connection test database cannot emulate.
+            var usePostgres = string.Equals(Environment.GetEnvironmentVariable("REPRO_PG"), "true", StringComparison.OrdinalIgnoreCase);
+            if (usePostgres)
+            {
+                var conn = Environment.GetEnvironmentVariable("REPRO_PG_CONNECTION")
+                    ?? throw new InvalidOperationException(
+                        "REPRO_PG=true requires REPRO_PG_CONNECTION to point at the configured PostgreSQL test database.");
+                var builder = new DbContextOptionsBuilder<AqualLifeStyleDbContext>();
+                builder.UseNpgsql(conn);
+                var options = builder.Options;
+
+                using (var context = new AqualLifeStyleDbContext(options))
+                {
+                    context.Database.Migrate();
+                }
+
+                var iocManager = serviceProvider.GetRequiredService<IIocManager>();
+                iocManager.IocContainer
+                    .Register(
+                        Component.For<DbContextOptions<AqualLifeStyleDbContext>>()
+                            .Instance(options)
+                            .LifestyleSingleton()
+                    );
+
+                return;
+            }
+
             // A SQLite in-memory database only lives while its connection is open, so keep a single
             // shared connection alive for the lifetime of the test server. Using a real relational
             // provider (instead of the EF InMemory provider) keeps the web tests consistent with
@@ -82,27 +112,27 @@ namespace AqualLifeStyle.Web.Tests
             var connection = new SqliteConnection("DataSource=:memory:");
             connection.Open();
 
-            var builder = new DbContextOptionsBuilder<AqualLifeStyleDbContext>();
-            builder.UseSqlite(connection).UseInternalServiceProvider(serviceProvider);
-            var options = builder.Options;
+            var builderSqlite = new DbContextOptionsBuilder<AqualLifeStyleDbContext>();
+            builderSqlite.UseSqlite(connection).UseInternalServiceProvider(serviceProvider);
+            var optionsSqlite = builderSqlite.Options;
 
             // The database starts empty; create the schema before ABP runs its data seeders.
-            using (var context = new AqualLifeStyleDbContext(options))
+            using (var context = new AqualLifeStyleDbContext(optionsSqlite))
             {
                 context.Database.EnsureCreated();
             }
 
-            var iocManager = serviceProvider.GetRequiredService<IIocManager>();
-            iocManager.IocContainer
+            var iocManager2 = serviceProvider.GetRequiredService<IIocManager>();
+            iocManager2.IocContainer
                 .Register(
                     Component.For<SqliteConnection>()
                         .Instance(connection)
                         .LifestyleSingleton()
                 );
-            iocManager.IocContainer
+            iocManager2.IocContainer
                 .Register(
                     Component.For<DbContextOptions<AqualLifeStyleDbContext>>()
-                        .Instance(options)
+                        .Instance(optionsSqlite)
                         .LifestyleSingleton()
                 );
         }
