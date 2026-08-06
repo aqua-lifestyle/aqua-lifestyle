@@ -25,8 +25,8 @@ namespace AqualLifeStyle.Web.Tests
         {
             AdministratorBootstrapTestEnvironment.Configure();
             // Allow enabling transactional UnitOfWork for reproduction via environment variable to avoid impacting other tests.
-            var enableTransactional = Environment.GetEnvironmentVariable("REPRO_TRANSACTIONAL") == "true";
-            Configuration.UnitOfWork.IsTransactional = enableTransactional ? true : false;
+            var enableTransactional = string.Equals(Environment.GetEnvironmentVariable("REPRO_TRANSACTIONAL"), "true", StringComparison.OrdinalIgnoreCase);
+            Configuration.UnitOfWork.IsTransactional = enableTransactional;
         }
 
         public override void Initialize()

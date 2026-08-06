@@ -158,7 +158,9 @@ namespace AqualLifeStyle.Web.Tests.Integration
             // the UnitOfWork being transactional (the production default); the default SQLite test
             // harness runs non-transactionally, so this regression runs in the transactional (PG)
             // reproduction mode.
-            if (!string.Equals(Environment.GetEnvironmentVariable("REPRO_TRANSACTIONAL"), "true", StringComparison.OrdinalIgnoreCase))
+            var transactionalEnabled = string.Equals(Environment.GetEnvironmentVariable("REPRO_TRANSACTIONAL"), "true", StringComparison.OrdinalIgnoreCase);
+            var postgresEnabled = string.Equals(Environment.GetEnvironmentVariable("REPRO_PG"), "true", StringComparison.OrdinalIgnoreCase);
+            if (!transactionalEnabled || !postgresEnabled)
             {
                 return;
             }
