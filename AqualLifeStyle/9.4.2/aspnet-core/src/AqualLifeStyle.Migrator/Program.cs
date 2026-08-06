@@ -18,7 +18,6 @@ namespace AqualLifeStyle.Migrator
 
         public static int Main(string[] args)
         {
-            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
             LoadEnvFile();
             ParseArgs(args);
             var isProduction = string.Equals(

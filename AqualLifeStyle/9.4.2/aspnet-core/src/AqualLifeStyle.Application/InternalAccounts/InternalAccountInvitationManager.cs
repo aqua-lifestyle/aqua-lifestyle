@@ -71,17 +71,29 @@ namespace AqualLifeStyle.Application.InternalAccounts
             Tenant area,
             DateTime now)
         {
-            ValidateUserAndArea(user, area);
-            var pending = await GetPendingAsync(user.Id);
-            if (pending != null)
+            var unitOfWork = BeginUnitOfWorkIfNeeded();
+            var tenantScope = BeginTenantScopeIfNeeded(area?.Id);
+            try
             {
-                pending.MarkExpired(now);
-                if (pending.Status == InternalAccountInvitationStatus.Pending)
-                    throw new InvalidOperationException("This account already has a pending invitation.");
-                await _unitOfWorkManager.Current.SaveChangesAsync();
-            }
+                ValidateUserAndArea(user, area);
+                var pending = await GetPendingAsync(user.Id);
+                if (pending != null)
+                {
+                    pending.MarkExpired(now);
+                    if (pending.Status == InternalAccountInvitationStatus.Pending)
+                        throw new InvalidOperationException("This account already has a pending invitation.");
+                    await _unitOfWorkManager.Current.SaveChangesAsync();
+                }
 
-            return await IssueAsync(user, area, null, now);
+                var result = await IssueAsync(user, area, null, now);
+                await CompleteUnitOfWorkIfNeeded(unitOfWork);
+                return result;
+            }
+            finally
+            {
+                tenantScope?.Dispose();
+                unitOfWork?.Dispose();
+            }
         }
 
         public async Task<InternalAccountInvitationIssueResult> ResendAsync(
@@ -91,23 +103,35 @@ namespace AqualLifeStyle.Application.InternalAccounts
             long administratorUserId,
             DateTime now)
         {
-            ValidateUserAndArea(user, area);
-            if (previousInvitation == null)
-                throw new ArgumentNullException(nameof(previousInvitation));
-            if (previousInvitation.UserId != user.Id || previousInvitation.TenantId != area.Id)
-                throw new InvalidOperationException("The invitation does not belong to this account.");
-            previousInvitation.MarkExpired(now);
-            if (previousInvitation.Status == InternalAccountInvitationStatus.Accepted)
-                throw new InvalidOperationException("An accepted invitation cannot be resent.");
-            if (previousInvitation.Status == InternalAccountInvitationStatus.Pending)
+            var unitOfWork = BeginUnitOfWorkIfNeeded();
+            var tenantScope = BeginTenantScopeIfNeeded(area?.Id);
+            try
             {
-                previousInvitation.Revoke(
-                    now,
-                    administratorUserId,
-                    "Superseded by a resent invitation.");
+                ValidateUserAndArea(user, area);
+                if (previousInvitation == null)
+                    throw new ArgumentNullException(nameof(previousInvitation));
+                if (previousInvitation.UserId != user.Id || previousInvitation.TenantId != area.Id)
+                    throw new InvalidOperationException("The invitation does not belong to this account.");
+                previousInvitation.MarkExpired(now);
+                if (previousInvitation.Status == InternalAccountInvitationStatus.Accepted)
+                    throw new InvalidOperationException("An accepted invitation cannot be resent.");
+                if (previousInvitation.Status == InternalAccountInvitationStatus.Pending)
+                {
+                    previousInvitation.Revoke(
+                        now,
+                        administratorUserId,
+                        "Superseded by a resent invitation.");
+                }
+                await _unitOfWorkManager.Current.SaveChangesAsync();
+                var result = await IssueAsync(user, area, previousInvitation.Id, now);
+                await CompleteUnitOfWorkIfNeeded(unitOfWork);
+                return result;
             }
-            await _unitOfWorkManager.Current.SaveChangesAsync();
-            return await IssueAsync(user, area, previousInvitation.Id, now);
+            finally
+            {
+                tenantScope?.Dispose();
+                unitOfWork?.Dispose();
+            }
         }
 
         public async Task RevokeAsync(
@@ -117,34 +141,55 @@ namespace AqualLifeStyle.Application.InternalAccounts
             string reason,
             DateTime now)
         {
-            if (user == null) throw new ArgumentNullException(nameof(user));
-            if (invitation == null) throw new ArgumentNullException(nameof(invitation));
-            if (invitation.UserId != user.Id || invitation.TenantId != user.TenantId)
-                throw new InvalidOperationException("The invitation does not belong to this account.");
-            if (invitation.Status == InternalAccountInvitationStatus.Revoked)
-                return;
-            invitation.MarkExpired(now);
-            if (invitation.Status == InternalAccountInvitationStatus.Accepted)
-                throw new InvalidOperationException("An accepted invitation cannot be revoked.");
-            if (invitation.Status == InternalAccountInvitationStatus.Expired)
-                throw new InvalidOperationException("An expired invitation cannot be revoked.");
-            invitation.Revoke(now, administratorUserId, reason);
-            await _userManager.InitializeOptionsAsync(user.TenantId);
-            (await _userManager.UpdateSecurityStampAsync(user)).CheckErrors(_localizationManager);
-            user.IsActive = false;
-            user.RequirePasswordReset();
-            (await _userManager.UpdateAsync(user)).CheckErrors(_localizationManager);
+            var unitOfWork = BeginUnitOfWorkIfNeeded();
+            var tenantScope = BeginTenantScopeIfNeeded(user?.TenantId);
+            try
+            {
+                if (user == null) throw new ArgumentNullException(nameof(user));
+                if (invitation == null) throw new ArgumentNullException(nameof(invitation));
+                if (invitation.UserId != user.Id || invitation.TenantId != user.TenantId)
+                    throw new InvalidOperationException("The invitation does not belong to this account.");
+                if (invitation.Status == InternalAccountInvitationStatus.Revoked)
+                    return;
+                invitation.MarkExpired(now);
+                if (invitation.Status == InternalAccountInvitationStatus.Accepted)
+                    throw new InvalidOperationException("An accepted invitation cannot be revoked.");
+                if (invitation.Status == InternalAccountInvitationStatus.Expired)
+                    throw new InvalidOperationException("An expired invitation cannot be revoked.");
+                invitation.Revoke(now, administratorUserId, reason);
+                await _userManager.InitializeOptionsAsync(user.TenantId);
+                (await _userManager.UpdateSecurityStampAsync(user)).CheckErrors(_localizationManager);
+                user.IsActive = false;
+                user.RequirePasswordReset();
+                (await _userManager.UpdateAsync(user)).CheckErrors(_localizationManager);
+                await CompleteUnitOfWorkIfNeeded(unitOfWork);
+            }
+            finally
+            {
+                tenantScope?.Dispose();
+                unitOfWork?.Dispose();
+            }
         }
 
         public async Task<InternalAccountInvitation> GetLatestAsync(long userId)
         {
             if (userId <= 0) throw new ArgumentOutOfRangeException(nameof(userId));
-            using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
+            var unitOfWork = BeginUnitOfWorkIfNeeded();
+            var tenantScope = BeginTenantScopeIfNeeded(null);
+            try
             {
-                return await _invitationRepository.GetAll()
-                    .Where(invitation => invitation.UserId == userId)
-                    .OrderByDescending(invitation => invitation.CreationTime)
-                    .FirstOrDefaultAsync();
+                using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
+                {
+                    return await _invitationRepository.GetAll()
+                        .Where(invitation => invitation.UserId == userId)
+                        .OrderByDescending(invitation => invitation.CreationTime)
+                        .FirstOrDefaultAsync();
+                }
+            }
+            finally
+            {
+                tenantScope?.Dispose();
+                unitOfWork?.Dispose();
             }
         }
 
@@ -224,6 +269,23 @@ namespace AqualLifeStyle.Application.InternalAccounts
                     invitation.UserId == userId &&
                     invitation.Status == InternalAccountInvitationStatus.Pending);
             }
+        }
+
+        private IUnitOfWorkCompleteHandle BeginUnitOfWorkIfNeeded()
+            => _unitOfWorkManager.Current == null ? _unitOfWorkManager.Begin() : null;
+
+        private IDisposable BeginTenantScopeIfNeeded(int? tenantId)
+        {
+            if (!tenantId.HasValue || _unitOfWorkManager.Current == null)
+                return null;
+
+            return _unitOfWorkManager.Current.SetTenantId(tenantId.Value);
+        }
+
+        private static async Task CompleteUnitOfWorkIfNeeded(IUnitOfWorkCompleteHandle unitOfWork)
+        {
+            if (unitOfWork != null)
+                await unitOfWork.CompleteAsync();
         }
 
         private static string GeneratePublicCode()

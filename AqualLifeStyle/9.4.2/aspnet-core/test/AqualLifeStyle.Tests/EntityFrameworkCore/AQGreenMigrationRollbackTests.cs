@@ -20,11 +20,6 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
 {
     public class AQGreenMigrationRollbackPostgreSqlTests : IAsyncLifetime
     {
-        static AQGreenMigrationRollbackPostgreSqlTests()
-        {
-            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
-        }
-
         private const string PostgresImage = "postgres:16-alpine";
         private readonly string _containerName = $"aqgreen-migration-test-pg-{Guid.NewGuid():N}";
         private readonly string _databaseName = $"aqgreen_test_{Guid.NewGuid():N}";

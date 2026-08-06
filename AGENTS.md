@@ -44,3 +44,407 @@ These instructions apply repository-wide. A nested `AGENTS.md` may add stricter 
 - Report successful, failed, skipped, stale, partial, and unavailable checks accurately; distinguish introduced warnings from pre-existing ones.
 - Re-review the final diff after fixes for inconsistent call sites, weakened boundaries, accidental edits, debug artifacts, generated output, and secret exposure.
 - At handoff, report changed files, architectural/security decisions, validation evidence, operational or migration requirements, risks, unresolved business decisions, and validation gaps.
+
+## Engineering Review Standard
+
+This repository values **correctness over completion**.
+
+Passing tests, successful builds, and green CI are evidence—not proof.
+
+Before declaring any task complete, follow this review framework.
+
+---
+
+# 1. Reconstruct the purpose
+Do not begin by reviewing the implementation.
+First determine:
+
+- the original problem;
+- the intended business outcome;
+- the architectural intent;
+- the security invariants;
+- the operational requirements;
+- what success actually means.
+If the branch purpose is unclear, reconstruct it from commits, PR description, issue, documentation and implementation.
+
+State the branch purpose explicitly before reviewing.
+
+---
+
+# 2. Separate implementation from evidence
+Never answer only:
+
+> Is the implementation correct?
+Instead answer two independent questions:
+
+## Implementation
+Does the implementation satisfy its intended purpose?
+
+Status:
+
+- Meets purpose
+- Partially meets purpose
+- Does not meet purpose
+
+## Evidence
+How strong is the evidence supporting that conclusion?
+
+Evidence levels:
+
+- Proven by end-to-end execution
+- Proven by integration tests
+- Proven by automated tests
+- Verified by inspection
+- Inferred
+- Assumed
+- Unknown
+Never promote inspection into proof.
+
+---
+
+# 3. Establish causality
+When failures occur:
+
+Do not ask:
+
+> How do we make CI green?
+Instead ask:
+
+> What system behaviour produced this outcome?
+Determine:
+
+- root cause;
+- trigger;
+- enabling conditions;
+- whether the issue pre-existed;
+- whether the branch introduced it;
+- whether the branch merely exposed it;
+- ownership.
+Never fix a symptom before proving the cause.
+
+---
+
+# 4. Challenge assumptions
+Treat every assumption as a hypothesis.
+
+Explicitly distinguish:
+
+Fact
+
+Observation
+
+Inference
+
+Assumption
+
+Opinion
+
+State confidence for important conclusions.
+
+---
+
+# 5. Security review
+Do not trust the UI.
+
+Treat the backend as authoritative.
+
+Attempt to identify:
+
+- bypasses;
+- privilege escalation;
+- stale endpoints;
+- legacy paths;
+- direct API access;
+- replay attacks;
+- race conditions;
+- concurrency issues;
+- information leakage;
+- secret persistence;
+- logging leakage;
+- transaction failures;
+- rollback failures.
+For every security claim identify the evidence supporting it.
+
+---
+
+# 6. Regression review
+Every change must answer:
+
+What existing behaviour could this have broken?
+
+Review:
+
+- authentication;
+- authorization;
+- persistence;
+- migrations;
+- API contracts;
+- frontend contracts;
+- concurrency;
+- background jobs;
+- messaging;
+- caching;
+- deployment;
+- monitoring.
+Do not stop after reviewing the changed files.
+
+---
+
+# 7. Time and state
+Treat time as a domain concept.
+
+Do not hide invalid state.
+
+Prefer:
+
+- fixing timestamp sources;
+- explicit invariants;
+- deterministic clocks.
+Avoid:
+
+- silent conversions;
+- global normalizers;
+- compatibility switches used as permanent solutions.
+
+---
+
+# 8. Verification
+Evidence must be proportional to risk.
+
+Authentication, authorization, money movement, onboarding, permissions and data integrity require stronger evidence than UI changes.
+Where possible verify with:
+
+- end-to-end tests;
+- integration tests;
+- repeated deterministic runs;
+- migration validation;
+- concurrency tests;
+- rollback tests.
+One successful run is not sufficient for intermittent failures.
+
+---
+
+# 9. Review conclusions
+Every conclusion must contain:
+
+- conclusion;
+- supporting evidence;
+- evidence type;
+- confidence.
+If evidence is missing, downgrade the conclusion.
+Do not strengthen wording.
+
+---
+
+# 10. Remaining work
+Separate findings into:
+
+## Blocking
+Must be resolved before merge.
+
+## Accepted debt
+Safe to merge with documented follow-up.
+
+## Improvements
+Useful but unrelated to the branch purpose.
+Do not allow unrelated improvements to delay delivery.
+
+---
+
+# 11. Final verdict
+Provide two independent verdicts.
+
+## Implementation
+
+- Meets purpose
+- Partially meets purpose
+- Does not meet purpose
+
+## Evidence
+
+- Sufficient for merge
+- Additional verification required
+- Insufficient evidence
+A correct implementation with insufficient evidence is **not** merge-ready.
+Likewise, green CI alone does not make a branch ready.
+
+---
+
+# Core principles
+
+- Solve root causes, not symptoms.
+- Optimise for understanding before fixing.
+- Preserve architectural intent.
+- Prefer deterministic systems over workarounds.
+- Minimise assumptions.
+- Keep changes within branch scope.
+- Every fix should reduce long-term complexity.
+- Every report should make it easier—not harder—for another engineer to independently reach the same conclusion.
+
+# Engineering Verification Standard
+
+## 1. Establish branch purpose
+Before reviewing code, state:
+
+- problem being solved;
+- confirmed scope;
+- business outcome;
+- security and data invariants;
+- explicit exclusions.
+Do not infer unresolved business rules.
+
+## 2. Define acceptance criteria
+Create the smallest complete set of observable, testable criteria required for the branch purpose.
+
+Do not add criteria merely because additional testing is possible.
+
+## 3. Evaluate each criterion
+For every criterion report:
+
+- Requirement status:
+
+- Met
+- Partially met
+- Not met
+- Out of scope
+- Unresolved decision
+- Evidence strength:
+
+- End-to-end
+- Integration
+- Automated component test
+- Inspection
+- Inference
+- Unknown
+- Confidence
+- Merge impact
+- Owner
+
+## 4. Match evidence to risk
+High-risk behaviour normally requires integration or end-to-end evidence:
+
+- authentication;
+- authorization;
+- permissions;
+- money movement;
+- irreversible data changes;
+- external integrations;
+- migrations.
+Lower-risk presentation behaviour may rely on component tests and inspection.
+
+## 5. Test prohibited behaviour
+For every critical invariant, test both:
+
+- intended success;
+- realistic bypass or failure.
+Green happy-path tests are insufficient for security-sensitive features.
+
+## 6. Establish causality
+For every failure determine:
+
+- branch-introduced;
+- branch-exposed;
+- pre-existing;
+- unrelated;
+- inconclusive.
+Do not fix symptoms before causality is established.
+
+## 7. Classify findings
+Use:
+
+### Blocking
+Branch purpose or safety cannot be established.
+
+### Required confidence
+Evidence needed because failure impact is high.
+
+### Accepted debt
+Real issue that does not prevent branch purpose.
+
+### Outside scope
+The branch does not own the issue.
+
+### Unresolved decision
+A business or operational rule is missing.
+
+## 8. Change policy
+Only modify the branch when:
+
+- a verified branch-owned defect exists;
+- the smallest complete correction is clear;
+- regression evidence can be added.
+Do not add speculative hardening or unrelated cleanup.
+
+## 9. Stopping rule
+Verification stops when:
+
+1. All predefined acceptance criteria are Met.
+2. Evidence strength is appropriate to risk.
+3. No verified branch-introduced blocker remains.
+4. Remaining findings have owners and follow-up actions.
+5. No new evidence invalidates an earlier conclusion.
+Do not create new merge criteria after this point unless new evidence reveals a material risk.
+
+## 10. Final verdict
+Report separately:
+
+### Implementation
+
+- Meets purpose
+- Partially meets purpose
+- Does not meet purpose
+
+### Evidence
+
+- Sufficient for merge
+- Additional verification required
+- Insufficient evidence
+
+### Operational state
+
+- CI green
+- CI blocked
+- CI flaky
+- External dependency blocked
+Do not merge automatically unless explicitly authorised.
+
+## Infrastructure verification
+
+Never require a branch to re-prove infrastructure that already has established evidence.
+
+Instead determine:
+
+1. Is the branch introducing new infrastructure?
+
+or
+
+2. Is it consuming existing infrastructure?
+
+If consuming existing infrastructure:
+
+Only verify correct integration.
+
+Do not require the branch to re-validate the infrastructure itself unless its assumptions changed.
+
+When classifying verification work:
+
+Do not ask:
+
+"How important is this?"
+
+Instead ask:
+
+"If this branch disappeared tomorrow,
+which team would still own this problem?"
+
+Ownership takes precedence over desirability.
+
+A feature branch should verify:
+
+- behaviour it introduces;
+- behaviour it changes;
+- behaviour it integrates with.
+
+It should not re-validate infrastructure merely because it depends on it.
+
+Infrastructure verification belongs to the infrastructure owner unless the feature changes its assumptions.
