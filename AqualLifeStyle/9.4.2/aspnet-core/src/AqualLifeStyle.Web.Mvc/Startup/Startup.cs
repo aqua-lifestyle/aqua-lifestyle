@@ -17,6 +17,7 @@ using AqualLifeStyle.Web.Resources;
 using Abp.AspNetCore.SignalR.Hubs;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.WebEncoders;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace AqualLifeStyle.Web.Startup
 {
@@ -43,6 +44,7 @@ namespace AqualLifeStyle.Web.Startup
                 );
 
             IdentityRegistrar.Register(services);
+            services.AddDataProtection().SetApplicationName("AqualLifeStyle");
             AuthConfigurer.Configure(services, _appConfiguration);
 
             services.Configure<WebEncoderOptions>(options =>

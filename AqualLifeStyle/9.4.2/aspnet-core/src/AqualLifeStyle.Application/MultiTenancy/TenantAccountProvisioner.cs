@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Dependency;
@@ -9,6 +10,7 @@ using Abp.MultiTenancy;
 using Abp.Runtime.Security;
 using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.Application.InternalAccounts;
 using AqualLifeStyle.Editions;
 
 namespace AqualLifeStyle.MultiTenancy
@@ -36,10 +38,12 @@ namespace AqualLifeStyle.MultiTenancy
         private readonly IAbpZeroDbMigrator _databaseMigrator;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
         private readonly ILocalizationManager _localizationManager;
+        private readonly InternalAccountInvitationManager _invitationManager;
 
         public TenantAccountProvisioner(TenantManager tenantManager, EditionManager editionManager,
             UserManager userManager, RoleManager roleManager, IAbpZeroDbMigrator databaseMigrator,
-            IUnitOfWorkManager unitOfWorkManager, ILocalizationManager localizationManager)
+            IUnitOfWorkManager unitOfWorkManager, ILocalizationManager localizationManager,
+            InternalAccountInvitationManager invitationManager)
         {
             _tenantManager = tenantManager;
             _editionManager = editionManager;
@@ -48,6 +52,7 @@ namespace AqualLifeStyle.MultiTenancy
             _databaseMigrator = databaseMigrator;
             _unitOfWorkManager = unitOfWorkManager;
             _localizationManager = localizationManager;
+            _invitationManager = invitationManager;
         }
 
         public async Task<Tenant> ProvisionAsync(TenantProvisioningRequest request)
@@ -73,12 +78,16 @@ namespace AqualLifeStyle.MultiTenancy
                 await _roleManager.GrantAllPermissionsAsync(adminRole);
                 var adminUser = User.CreateTenantAdminUser(tenant.Id, request.AdminEmailAddress.Trim());
                 await _userManager.InitializeOptionsAsync(tenant.Id);
-                (await _userManager.CreateAsync(adminUser, User.DefaultPassword)).CheckErrors(_localizationManager);
+                (await _userManager.CreateAsync(adminUser, CreateSystemGeneratedPassword())).CheckErrors(_localizationManager);
                 await _unitOfWorkManager.Current.SaveChangesAsync();
                 (await _userManager.AddToRoleAsync(adminUser, adminRole.Name)).CheckErrors(_localizationManager);
+                await _invitationManager.CreateAsync(adminUser, tenant, DateTime.UtcNow);
                 await _unitOfWorkManager.Current.SaveChangesAsync();
             }
             return tenant;
         }
+
+        private static string CreateSystemGeneratedPassword()
+            => $"Aa1!{Guid.NewGuid():N}";
     }
 }

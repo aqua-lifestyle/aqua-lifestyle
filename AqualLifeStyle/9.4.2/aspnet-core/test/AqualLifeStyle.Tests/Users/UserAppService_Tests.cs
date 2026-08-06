@@ -1,10 +1,13 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
 using Abp.Application.Services.Dto;
 using AqualLifeStyle.Users;
 using AqualLifeStyle.Users.Dto;
+using Abp.UI;
 
 namespace AqualLifeStyle.Tests.Users
 {
@@ -28,10 +31,9 @@ namespace AqualLifeStyle.Tests.Users
         }
 
         [Fact]
-        public async Task CreateUser_Test()
+        public async Task CreateUser_RejectsAdministratorKnownPasswordBypass()
         {
-            // Act
-            await _userAppService.CreateAsync(
+            await Should.ThrowAsync<UserFriendlyException>(() => _userAppService.CreateAsync(
                 new CreateUserDto
                 {
                     EmailAddress = "john@volosoft.com",
@@ -40,13 +42,42 @@ namespace AqualLifeStyle.Tests.Users
                     Surname = "Nash",
                     Password = "123qwe",
                     UserName = "john.nash"
-                });
+                }));
+        }
 
-            await UsingDbContextAsync(async context =>
-            {
-                var johnNashUser = await context.Users.FirstOrDefaultAsync(u => u.UserName == "john.nash");
-                johnNashUser.ShouldNotBeNull();
-            });
+        [Fact]
+        public async Task UpdateUser_AllowsProfileEditWhenRequestedRolesMatchPersistedRoles()
+        {
+            var user = (await _userAppService.GetAllAsync(
+                new PagedUserResultRequestDto { MaxResultCount = 20 }))
+                .Items.First(item => item.UserName == "admin");
+            var updatedName = $"Updated-{Guid.NewGuid():N}";
+            user.Name = updatedName;
+
+            var updated = await _userAppService.UpdateAsync(user);
+
+            updated.Name.ShouldBe(updatedName);
+            updated.RoleNames.ToHashSet(StringComparer.OrdinalIgnoreCase)
+                .SetEquals(user.RoleNames).ShouldBeTrue();
+        }
+
+        [Fact]
+        public async Task UpdateUser_RejectsRoleChangesThroughLegacyUsersPermission()
+        {
+            var user = (await _userAppService.GetAllAsync(
+                new PagedUserResultRequestDto { MaxResultCount = 20 }))
+                .Items.First(item => item.UserName == "admin");
+            var persistedName = user.Name;
+            var persistedRoles = user.RoleNames.ToArray();
+            user.Name = "MustNotBePersisted";
+            user.RoleNames = new[] { "User" };
+
+            await Should.ThrowAsync<UserFriendlyException>(() => _userAppService.UpdateAsync(user));
+
+            var unchanged = await _userAppService.GetAsync(new EntityDto<long>(user.Id));
+            unchanged.Name.ShouldBe(persistedName);
+            unchanged.RoleNames.ToHashSet(StringComparer.OrdinalIgnoreCase)
+                .SetEquals(persistedRoles).ShouldBeTrue();
         }
     }
 }

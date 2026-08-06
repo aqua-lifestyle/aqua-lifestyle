@@ -60,10 +60,18 @@ not the older Channels API documentation:
    delivered, follow the link, sign in, and test one password-reset request.
 
 The API stores delivery intent in `TransactionalEmailOutboxMessages` in the same
-transaction as the business change. A worker retries pending records with capped
+transaction as the business change. Pending message bodies use ASP.NET Core Data
+Protection with the shared persisted key ring described below; the worker
+unprotects them only when constructing the provider request. Rows created before
+this protection was deployed retain their unprefixed plaintext format and remain
+deliverable during rollout, while new rows use an explicit versioned envelope.
+A worker retries pending records with capped
 backoff. Inspect pending rows by status, attempt count, next-attempt time, and the
 redacted last-error summary; never copy stored token-bearing message bodies into
-logs or support tickets. Bodies are cleared after Bird accepts a message for
+logs or support tickets. Loss of the Data Protection key ring makes protected
+pending messages undeliverable, so database and key-encryption certificate backup
+and rotation procedures must preserve all keys until no pending retries use them.
+Bodies are cleared after Bird accepts a message for
 delivery; this does not prove final delivery to the recipient. Terminally failed
 records redact the recipient, subject, and bodies while retaining
 only the operational metadata needed to diagnose the failed intent. Support staff

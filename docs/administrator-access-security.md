@@ -29,14 +29,28 @@ There is no frontend registration feature flag. `Abp.Account.IsSelfRegistrationE
 
 ## Administrator account creation
 
-Administrators create users through the protected administrator workspace. The server checks the caller's granular user-management permission before accepting a role assignment. A caller cannot become an administrator by changing a browser request or registration payload.
+Administrators create internal staff through the protected administrator workspace. The server requires both the granular user-creation and role-assignment permissions because every new internal account receives a role. A caller cannot become an administrator by changing a browser request or registration payload.
+
+The administrator does not choose or receive the new user's password. Creation stores an inactive, email-unconfirmed, setup-required Identity account with a system-generated unusable credential, then commits a 24-hour one-time invitation and its Bird email to the transactional outbox. The link identifies the invitation with a random public code and keeps the ASP.NET Identity setup token in the URL fragment so it is absent from the initial page request and referrer headers. The frontend removes the fragment from browser history before submitting the token to the invitation API.
+
+Invitation states are `Pending`, `Accepted`, `Expired`, and `Revoked`:
+
+- accepting a pending invitation verifies both secrets and the current account identity, then atomically sets the user's chosen password, confirms email, clears setup-required state, activates the account, rotates the security stamp, and consumes the invitation;
+- resending revokes the prior pending invitation and issues a new token and link;
+- revoking invalidates the link, rotates the security stamp, and leaves the account inactive and setup-required;
+- expired, revoked, and already-used links do not disclose account details; and
+- normal JWT and MVC authentication reject inactive or setup-required accounts.
+
+Only users with `Aqua.Admin.Users.Invite` can resend or revoke invitations. Area administrators remain restricted to their own Area. A newly created Area's initial administrator follows this invitation workflow. Existing seeded/bootstrap administrators are not automatically disabled or reset, and customer registration/restoration remains a separate workflow.
 
 Relevant automated coverage verifies that:
 
 - a non-administrator cannot create a System Administrator;
 - an authorised administrator can create one;
 - the business role and persisted Identity role agree; and
-- cross-Area account creation is rejected for an Area administrator.
+- cross-Area account creation is rejected for an Area administrator;
+- inactive accounts cannot be sent a password-reset link that the completion endpoint would reject; and
+- invitation acceptance, expiry, revocation, replay, and resend invalidation preserve the one-time setup boundary.
 
 ## Changing a password
 
@@ -99,16 +113,18 @@ Important behavior:
 
 Use this sequence for the current Render and Vercel deployment:
 
-1. Merge and deploy the reviewed branch.
-2. Confirm `Abp.Account.IsSelfRegistrationEnabled` is `true` for Areas that accept customer signup and explicitly `false` only for managed-registration Areas.
-3. Confirm the Render API is healthy at `https://aqualifestyle-api.onrender.com/api/health`.
-4. Sign in to the Default Area as its administrator.
-5. Open **Settings → Account security** and replace `123qwe` with a unique password stored in a password manager.
-6. Confirm the browser returns to sign-in and the old password no longer works.
-7. Sign in to **Platform administration** with the host administrator and rotate that password separately if the account is in use.
-8. Confirm a previously issued token receives an unauthorised response after its security stamp changes.
-9. Confirm `/signup` creates only a customer with Guest access in an enabled Area, while disabled Areas show the managed-registration message and reject direct registration requests.
-10. Review Render logs for successful startup and the expected password-change audit event without credential values.
+1. Deploy the reviewed migrator and run it before the application version that writes invitations. The migration creates `InternalAccountInvitations` and grants `Aqua.Admin.Users.Invite` to non-deleted `Admin` and `SystemAdmin` roles unless a permission row already exists.
+2. Deploy the reviewed application and confirm the Render API is healthy at `https://aqualifestyle-api.onrender.com/api/health`.
+3. Confirm Bird delivery and the transactional email worker are healthy before inviting staff. Invitation creation can commit while delivery is temporarily unavailable, so operations must monitor terminal outbox alerts and resend only after investigating the failure.
+4. Confirm `Abp.Account.IsSelfRegistrationEnabled` is `true` for Areas that accept customer signup and explicitly `false` only for managed-registration Areas.
+5. Sign in to the Default Area as its administrator.
+6. Open **Settings → Account security** and replace `123qwe` with a unique password stored in a password manager.
+7. Confirm the browser returns to sign-in and the old password no longer works.
+8. Sign in to **Platform administration** with the host administrator and rotate that password separately if the account is in use.
+9. Confirm a previously issued token receives an unauthorised response after its security stamp changes.
+10. Create a non-production internal account, confirm only the intended recipient receives the invitation, accept it once, and confirm replay returns `WasAlreadyAccepted` plus the Area tenancy name needed for sign-in without exposing account details or changing the password.
+11. Confirm `/signup` creates only a customer with Guest access in an enabled Area, while disabled Areas show the managed-registration message and reject direct registration requests.
+12. Review Render logs and audit records for invitation and password events without passwords, hashes, raw tokens, setup URLs, or recipient/name request data. `AdminCreateUserInput` request auditing is disabled; the administrator mutation log still records the operation, actor, Area, target ID, outcome, and justification.
 
 An existing database does not need the bootstrap secret to redeploy because both administrator records already exist. Set the secret before a fresh database or disaster-recovery bootstrap.
 
@@ -156,6 +172,10 @@ Manual checks:
 - Host administrator is not a default role.
 - Fresh production bootstrap fails when its secret is missing or weak.
 - No logs contain bootstrap passwords, user passwords, hashes, or reset tokens.
+- Internal staff creation does not accept or return an administrator-selected password.
+- Invitation links expire after 24 hours; resend invalidates the previous link and revoke blocks acceptance.
+- Acceptance activates exactly the invited account in the invited Area and a second use does not change credentials.
+- Inactive accounts are not offered administrator-triggered password-reset email.
 
 ## Rollback and recovery
 
@@ -164,7 +184,7 @@ Application rollback does not restore a previous password or security stamp. If 
 1. Roll back the application image or Git revision.
 2. Keep the rotated administrator credentials; do not restore `123qwe`.
 3. Verify sign-in and permission checks on the rolled-back version.
-4. If the administrator cannot sign in, use a reviewed out-of-band database recovery procedure or a future email-based password-reset workflow. Never place a password or reset token in logs.
+4. If the administrator cannot sign in, use the implemented email-based password-reset action for an active, setup-complete account or a reviewed out-of-band database recovery procedure. Never place a password or reset token in logs.
 5. Rotate the JWT signing key if token material may have been exposed. This invalidates every outstanding JWT.
 
 ## Remaining recommended controls
@@ -172,7 +192,6 @@ Application rollback does not restore a previous password or security stamp. If 
 These controls are not completed by the current change and should be planned explicitly:
 
 - administrator MFA, preferably phishing-resistant WebAuthn/passkeys;
-- email delivery for one-time invitations and password recovery;
 - explicit refresh-token storage and revocation if refresh tokens are introduced;
 - rate limiting at Render/reverse-proxy and application levels;
 - verified email addresses instead of automatic confirmation for public registration;
@@ -181,4 +200,4 @@ These controls are not completed by the current change and should be planned exp
 - periodic access reviews and removal of unused administrator accounts; and
 - recovery codes and a documented two-person administrator recovery process.
 
-Do not extend public customer registration to staff or administrator roles. Administrator onboarding should become invitation-based, permission-gated, time-limited, and fully audited.
+Do not extend public customer registration to staff or administrator roles. Internal staff onboarding remains invitation-based, permission-gated, time-limited, and audited.

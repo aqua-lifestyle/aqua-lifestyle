@@ -5,8 +5,6 @@ using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.EntityFrameworkCore.Seed.Tenants;
-using AqualLifeStyle.Users;
-using AqualLifeStyle.Users.Dto;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
@@ -15,13 +13,6 @@ namespace AqualLifeStyle.Tests.Application
 {
     public class DefaultUserRoleAssignerTests : AqualLifeStyleTestBase
     {
-        private readonly IUserAppService _userAppService;
-
-        public DefaultUserRoleAssignerTests()
-        {
-            _userAppService = Resolve<IUserAppService>();
-        }
-
         [Fact]
         public async Task AssignRoles_SetsSystemAdmin_ForAdminRole()
         {
@@ -188,17 +179,24 @@ namespace AqualLifeStyle.Tests.Application
 
         private async Task<User> CreateUserAsync(string userName)
         {
-            await _userAppService.CreateAsync(new CreateUserDto
+            return await UsingDbContextAsync(async context =>
             {
-                EmailAddress = $"{userName}@test.com",
-                IsActive = true,
-                Name = userName,
-                Surname = "User",
-                Password = "123qwe",
-                UserName = userName
+                var user = new User
+                {
+                    TenantId = 1,
+                    EmailAddress = $"{userName}@test.com",
+                    IsActive = true,
+                    IsEmailConfirmed = true,
+                    Name = userName,
+                    Surname = "User",
+                    Password = "not-used-test-password-hash",
+                    UserName = userName
+                };
+                user.SetNormalizedNames();
+                context.Users.Add(user);
+                await context.SaveChangesAsync();
+                return user;
             });
-
-            return await UsingDbContextAsync(ctx => ctx.Users.SingleAsync(u => u.UserName == userName));
         }
 
         private async Task RemoveAllUserRolesAsync(long userId)

@@ -32,6 +32,10 @@ export const apiEndpoints = {
     resendEmailVerification: "/api/services/app/Account/ResendEmailVerification",
     resetPassword: "/api/services/app/Account/ResetPassword",
   },
+  internalAccountInvitation: {
+    accept: "/api/services/app/InternalAccountInvitation/Accept",
+    validate: "/api/services/app/InternalAccountInvitation/Validate",
+  },
   customers: {
     create: "/api/services/app/Customer/Create",
     getAll: "/api/services/app/Customer/GetAll",

@@ -1587,6 +1587,92 @@ namespace AqualLifeStyle.Migrations
                     b.ToTable("AbpUsers");
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.Domain.Accounts.InternalAccountInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("EmailConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("InvitedEmailAddress")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid?>("PreviousInvitationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PublicCodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<string>("RevocationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("RevokedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SetupTokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PreviousInvitationId");
+
+                    b.HasIndex("PublicCodeHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" = 0");
+
+                    b.HasIndex("TenantId", "UserId", "CreationTime")
+                        .IsDescending(false, false, true);
+
+                    b.ToTable("InternalAccountInvitations", (string)null);
+                });
+
             modelBuilder.Entity("AqualLifeStyle.Domain.AreaLeaders.AreaLeader", b =>
                 {
                     b.Property<int>("Id")
@@ -3449,15 +3535,15 @@ namespace AqualLifeStyle.Migrations
                         .IsUnique()
                         .HasFilter("\"Status\" IN (0, 1)");
 
-                    b.HasIndex("ParticipationId", "Stage")
-                        .IsUnique()
-                        .HasFilter("\"Status\" = 2");
-
                     b.HasIndex("PaymentId")
                         .IsUnique();
 
                     b.HasIndex("ProviderCheckoutId")
                         .IsUnique();
+
+                    b.HasIndex("ParticipationId", "Stage")
+                        .IsUnique()
+                        .HasFilter("\"Status\" = 2");
 
                     b.ToTable("AQGreenJoiningCheckouts", (string)null);
                 });
@@ -4247,6 +4333,20 @@ namespace AqualLifeStyle.Migrations
                     b.Navigation("DeleterUser");
 
                     b.Navigation("LastModifierUser");
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Accounts.InternalAccountInvitation", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Accounts.InternalAccountInvitation", null)
+                        .WithMany()
+                        .HasForeignKey("PreviousInvitationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("AqualLifeStyle.Authorization.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("AqualLifeStyle.Domain.AreaLeaders.AreaLeader", b =>

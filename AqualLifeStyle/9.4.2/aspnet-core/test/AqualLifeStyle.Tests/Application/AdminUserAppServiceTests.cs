@@ -11,6 +11,7 @@ using Xunit;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using AqualLifeStyle.Authorization.Users;
+using Abp.UI;
 
 namespace AqualLifeStyle.Tests.Application
 {
@@ -24,51 +25,39 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task UserLifecycle_CreatesUpdatesAssignsRoleResetsPasswordAndSoftDeletes()
+        public void CreateDto_DoesNotExposePasswordOrActivation()
+        {
+            typeof(AdminCreateUserInput).GetProperty("Password").ShouldBeNull();
+            typeof(AdminCreateUserInput).GetProperty("IsActive").ShouldBeNull();
+            typeof(AdminResetUserPasswordInput).GetProperty("NewPassword").ShouldBeNull();
+            typeof(AdminCreateUserInput).GetCustomAttributes(typeof(Abp.Auditing.DisableAuditingAttribute), true)
+                .ShouldHaveSingleItem();
+        }
+
+        [Fact]
+        public async Task Create_IssuesInactiveSetupRequiredInvitationWithoutAdministratorPassword()
         {
             var email = $"managed-{Guid.NewGuid():N}@example.com";
             var created = await _service.CreateAsync(new AdminCreateUserInput
             {
                 TenantId = 1, FirstName = "Grace", LastName = "Hopper", Email = email,
-                Password = "SafePassword123!", Role = AquaUserRole.Guest, IsActive = true,
+                Role = AquaUserRole.Guest,
                 Justification = "Approved support account"
             });
             created.TenantId.ShouldBe(1);
             created.Role.ShouldBe(AquaUserRole.Guest);
-
-            var updated = await _service.UpdateAsync(new AdminUpdateUserInput
-            {
-                Id = created.Id, FirstName = "Rear Admiral Grace", LastName = "Hopper", Email = email,
-                IsActive = true, Justification = "Corrected display name"
-            });
-            updated.FirstName.ShouldBe("Rear Admiral Grace");
-
-            var assigned = await _service.AssignRoleAsync(new AdminAssignUserRoleInput
-            {
-                Id = created.Id, Role = AquaUserRole.Member, Justification = "Membership approved"
-            });
-            assigned.Role.ShouldBe(AquaUserRole.Member);
+            created.IsActive.ShouldBeFalse();
+            created.InvitationStatus.ShouldBe("Pending");
+            created.RequiresPasswordSetup.ShouldBeTrue();
             await UsingDbContextAsync(async context =>
             {
-                var roles = await (from assignment in context.UserRoles
-                    join role in context.Roles on assignment.RoleId equals role.Id
-                    where assignment.UserId == created.Id select role.Name).ToListAsync();
-                roles.ShouldContain("Member");
-            });
-            await _service.ResetPasswordAsync(new AdminResetUserPasswordInput
-            {
-                Id = created.Id, NewPassword = "Replacement123!", Justification = "Verified support request"
-            });
-            await _service.DeleteAsync(new AdminDeleteUserInput
-            {
-                Id = created.Id, Justification = "Temporary support account expired"
-            });
-
-            await UsingDbContextAsync(async context =>
-            {
-                var user = await context.Users.IgnoreQueryFilters().SingleAsync(item => item.Id == created.Id);
-                user.IsDeleted.ShouldBeTrue();
+                var user = await context.Users.SingleAsync(item => item.Id == created.Id);
                 user.IsActive.ShouldBeFalse();
+                user.IsEmailConfirmed.ShouldBeFalse();
+                user.RequiresPasswordReset().ShouldBeTrue();
+                (await context.InternalAccountInvitations.CountAsync(item => item.UserId == created.Id)).ShouldBe(1);
+                (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
+                    message.NotificationType == "InternalAccountInvitation" && message.Recipient == email)).ShouldBe(1);
             });
         }
 
@@ -78,8 +67,8 @@ namespace AqualLifeStyle.Tests.Application
             await Should.ThrowAsync<AbpAuthorizationException>(() => _service.CreateAsync(new AdminCreateUserInput
             {
                 TenantId = 2, FirstName = "Cross", LastName = "Tenant",
-                Email = $"cross-user-{Guid.NewGuid():N}@example.com", Password = "SafePassword123!",
-                Role = AquaUserRole.Guest, IsActive = true, Justification = "Invalid cross tenant attempt"
+                Email = $"cross-user-{Guid.NewGuid():N}@example.com",
+                Role = AquaUserRole.Guest, Justification = "Invalid cross tenant attempt"
             }));
         }
 
@@ -118,9 +107,7 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Attempt",
                 LastName = "Fail",
                 Email = $"attempt-{Guid.NewGuid():N}@example.com",
-                Password = "SafePassword123!",
                 Role = AquaUserRole.SystemAdmin,
-                IsActive = true,
                 Justification = "Should be denied"
             }));
         }
@@ -139,9 +126,7 @@ namespace AqualLifeStyle.Tests.Application
                 FirstName = "Creator",
                 LastName = "Admin",
                 Email = email,
-                Password = "SafePassword123!",
                 Role = AquaUserRole.SystemAdmin,
-                IsActive = true,
                 Justification = "Test admin creation"
             });
 
@@ -155,9 +140,56 @@ namespace AqualLifeStyle.Tests.Application
                 var user = await context.Users.SingleOrDefaultAsync(u => u.Id == created.Id && u.TenantId == 1);
                 user.ShouldNotBeNull();
                 user.EmailAddress.ShouldBe(email);
-                user.IsActive.ShouldBeTrue();
+                user.IsActive.ShouldBeFalse();
+                user.IsEmailConfirmed.ShouldBeFalse();
+                user.RequiresPasswordReset().ShouldBeTrue();
                 user.Role.ShouldBe(AquaUserRole.SystemAdmin);
             });
+        }
+
+        [Fact]
+        public async Task HostList_IncludesInvitationStatusAcrossTenantFilter()
+        {
+            var created = await _service.CreateAsync(new AdminCreateUserInput
+            {
+                TenantId = 1,
+                FirstName = "Host",
+                LastName = "Visible",
+                Email = $"host-visible-{Guid.NewGuid():N}@example.com",
+                Role = AquaUserRole.Guest,
+                Justification = "Host list regression"
+            });
+
+            LoginAsHostAdmin();
+            var listed = await _service.GetAllAsync(new AdminUserListInput { TenantId = 1 });
+            listed.Items.Single(item => item.Id == created.Id).InvitationStatus.ShouldBe("Pending");
+            listed.Items.Single(item => item.Id == created.Id).RequiresPasswordSetup.ShouldBeTrue();
+        }
+
+        [Fact]
+        public async Task ResetPassword_RejectsInactiveAccountWithoutQueuingEmail()
+        {
+            LoginAsDefaultTenantAdmin();
+            var listed = await _service.GetAllAsync(new AdminUserListInput { IsActive = true });
+            var target = listed.Items.First(item => !item.RequiresPasswordSetup);
+            var outboxCount = 0;
+            await UsingDbContextAsync(async context =>
+            {
+                var user = await context.Users.SingleAsync(item => item.Id == target.Id);
+                user.IsActive = false;
+                outboxCount = await context.TransactionalEmailOutboxMessages.CountAsync();
+                await context.SaveChangesAsync();
+            });
+
+            await Should.ThrowAsync<UserFriendlyException>(() => _service.ResetPasswordAsync(
+                new AdminResetUserPasswordInput
+                {
+                    Id = target.Id,
+                    Justification = "Inactive account must not receive an unusable link"
+                }));
+
+            await UsingDbContextAsync(async context =>
+                (await context.TransactionalEmailOutboxMessages.CountAsync()).ShouldBe(outboxCount));
         }
     }
 }

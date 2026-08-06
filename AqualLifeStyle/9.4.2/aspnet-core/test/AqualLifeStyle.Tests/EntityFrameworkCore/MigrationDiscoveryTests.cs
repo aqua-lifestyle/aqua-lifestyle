@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Reflection;
 using AqualLifeStyle.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Shouldly;
@@ -28,6 +29,18 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 migrationType.GetCustomAttribute<DbContextAttribute>()
                     .ShouldNotBeNull($"{migrationType.Name} must declare its database context");
             }
+        }
+
+        [Fact]
+        public void InternalAccountInvitationMigrationShouldBeDiscoverable()
+        {
+            using var context = new AqualLifeStyleDbContext(
+                new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<AqualLifeStyleDbContext>()
+                    .UseNpgsql("Host=localhost;Database=discovery;Username=discovery;Password=discovery")
+                    .Options);
+
+            context.Database.GetMigrations()
+                .ShouldContain("20260804040549_AddInternalAccountInvitations");
         }
     }
 }

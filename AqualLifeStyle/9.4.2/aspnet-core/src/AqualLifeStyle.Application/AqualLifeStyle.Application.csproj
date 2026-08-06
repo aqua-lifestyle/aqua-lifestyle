@@ -15,6 +15,9 @@
     <ProjectReference Include="..\AqualLifeStyle.Core\AqualLifeStyle.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Magicodes.IE.Csv" Version="2.9.0" />
     <PackageReference Include="Magicodes.IE.Excel" Version="2.9.0" />
   </ItemGroup>

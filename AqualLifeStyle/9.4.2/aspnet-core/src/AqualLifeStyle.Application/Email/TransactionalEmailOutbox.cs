@@ -18,9 +18,15 @@ namespace AqualLifeStyle.Email
     public sealed class TransactionalEmailOutbox : ITransactionalEmailOutbox, ITransientDependency
     {
         private readonly ITransactionalEmailOutboxRepository _repository;
+        private readonly ITransactionalEmailBodyProtector _bodyProtector;
 
-        public TransactionalEmailOutbox(ITransactionalEmailOutboxRepository repository)
-            => _repository = repository;
+        public TransactionalEmailOutbox(
+            ITransactionalEmailOutboxRepository repository,
+            ITransactionalEmailBodyProtector bodyProtector)
+        {
+            _repository = repository;
+            _bodyProtector = bodyProtector;
+        }
 
         public async Task<bool> EnqueueAsync(
             int? tenantId, string notificationType, string idempotencyKey, TransactionalEmail email)
@@ -34,7 +40,9 @@ namespace AqualLifeStyle.Email
 
             return await _repository.InsertIfMissingAsync(TransactionalEmailOutboxMessage.Create(
                 tenantId, notificationType, idempotencyKey, email.Recipient, email.Subject,
-                email.HtmlBody, email.TextBody, DateTime.UtcNow));
+                _bodyProtector.Protect(email.HtmlBody),
+                _bodyProtector.Protect(email.TextBody),
+                DateTime.UtcNow));
         }
 
         public Task DeleteAsync(string idempotencyKey)
@@ -50,17 +58,20 @@ namespace AqualLifeStyle.Email
         private readonly ITransactionalEmailOutboxRepository _repository;
         private readonly ITransactionalEmailDeliveryGateway _deliveryGateway;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        private readonly ITransactionalEmailBodyProtector _bodyProtector;
         private readonly ILogger<TransactionalEmailOutboxProcessor> _logger;
 
         public TransactionalEmailOutboxProcessor(
             ITransactionalEmailOutboxRepository repository,
             ITransactionalEmailDeliveryGateway deliveryGateway,
             IUnitOfWorkManager unitOfWorkManager,
+            ITransactionalEmailBodyProtector bodyProtector,
             ILogger<TransactionalEmailOutboxProcessor> logger)
         {
             _repository = repository;
             _deliveryGateway = deliveryGateway;
             _unitOfWorkManager = unitOfWorkManager;
+            _bodyProtector = bodyProtector;
             _logger = logger;
         }
 
@@ -115,8 +126,8 @@ namespace AqualLifeStyle.Email
                     providerId = await _deliveryGateway.SendAsync(new TransactionalEmail(
                         claimed.Recipient,
                         claimed.Subject,
-                        claimed.HtmlBody,
-                        claimed.TextBody,
+                        _bodyProtector.Unprotect(claimed.HtmlBody),
+                        _bodyProtector.Unprotect(claimed.TextBody),
                         claimed.IdempotencyKey));
                 }
                 catch (Exception exception)

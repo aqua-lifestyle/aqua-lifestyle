@@ -7,13 +7,7 @@
 }
 @section scripts
 {
-    <environment names="Development">
-        <script src="~/view-resources/Views/Users/Index.js" asp-append-version="true"></script>
-    </environment>
-
-    <environment names="Staging,Production">
-        <script src="~/view-resources/Views/Users/Index.min.js" asp-append-version="true"></script>
-    </environment>
+    <script src="~/view-resources/Views/Users/Index.js" asp-append-version="true"></script>
 }
 <section class="content-header">
     <div class="container-fluid">
@@ -21,11 +15,8 @@
             <div class="col-sm-6">
                 <h1>@L("Users")</h1>
             </div>
-            <div class="col-sm-6">
-                <a href="javascript:;" data-toggle="modal" data-target="#UserCreateModal" class="btn bg-blue float-sm-right">
-                    <i class="fa fa-plus-square"></i>
-                    @L("Create")
-                </a>
+            <div class="col-sm-6 text-sm-right text-muted">
+                Create internal accounts from the current administrator portal so each user receives a secure setup invitation.
             </div>
         </div>
     </div>
@@ -67,8 +58,6 @@
         </div>
     </div>
 </section>
-
-@await Html.PartialAsync("~/Views/Users/_CreateModal.cshtml", Model)
 
 <div class="modal fade" id="UserEditModal" tabindex="-1" role="dialog" aria-labelledby="UserEditModalLabel" data-backdrop="static">
     <div class="modal-dialog modal-lg" role="document">

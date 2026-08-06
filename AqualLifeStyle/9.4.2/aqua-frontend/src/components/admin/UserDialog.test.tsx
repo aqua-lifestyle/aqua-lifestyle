@@ -37,14 +37,16 @@ describe("UserDialog", () => {
     fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Grace" } });
     fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Hopper" } });
     fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "grace@example.com" } });
-    fireEvent.change(screen.getByLabelText("Temporary password"), { target: { value: "SafePassword123!" } });
     fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "1" } });
     fireEvent.change(screen.getByLabelText("Reason for creating this account"), { target: { value: "Approved account" } });
-    fireEvent.click(screen.getByRole("button", { name: /create user/i }));
+    fireEvent.click(screen.getByRole("button", { name: /create and invite/i }));
     await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
       "/api/services/app/AdminUser/Create",
       expect.objectContaining({ email: "grace@example.com", role: 1, tenantId: 1, justification: "Approved account" }),
     ));
+    const createPayload = vi.mocked(httpClient.post).mock.calls[0][1];
+    expect(createPayload).not.toHaveProperty("password");
+    expect(createPayload).not.toHaveProperty("isActive");
     expect(onCreated).toHaveBeenCalled();
   });
 });

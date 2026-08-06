@@ -17,6 +17,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace AqualLifeStyle.Web.Tests
 {
@@ -36,6 +37,7 @@ namespace AqualLifeStyle.Web.Tests
             services.AddMvc();
             
             IdentityRegistrar.Register(services);
+            services.AddDataProtection().SetApplicationName("AqualLifeStyle.Web.Tests");
             AuthConfigurer.Configure(services, _appConfiguration);
             
             services.AddScoped<IWebResourceManager, WebResourceManager>();

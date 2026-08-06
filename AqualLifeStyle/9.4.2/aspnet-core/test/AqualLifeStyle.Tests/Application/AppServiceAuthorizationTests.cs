@@ -110,9 +110,14 @@ namespace AqualLifeStyle.Tests.Application
             AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.GetAllAsync), AquaPermissions.Admin.Users.View);
             AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.GetAsync), AquaPermissions.Admin.Users.View);
             AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.CreateAsync), AquaPermissions.Admin.Users.Create);
+            AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.CreateAsync), AquaPermissions.Admin.Users.AssignRole);
+            GetAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.CreateAsync))
+                .RequireAllPermissions.ShouldBeTrue();
             AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.UpdateAsync), AquaPermissions.Admin.Users.Edit);
             AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.AssignRoleAsync), AquaPermissions.Admin.Users.AssignRole);
             AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.ResetPasswordAsync), AquaPermissions.Admin.Users.ResetPassword);
+            AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.ResendInvitationAsync), AquaPermissions.Admin.Users.Invite);
+            AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.RevokeInvitationAsync), AquaPermissions.Admin.Users.Invite);
             AssertAuthorizeAttribute(typeof(AdminUserAppService), nameof(AdminUserAppService.DeleteAsync), AquaPermissions.Admin.Users.Delete);
         }
 

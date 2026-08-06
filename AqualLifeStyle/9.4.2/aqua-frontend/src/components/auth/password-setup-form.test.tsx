@@ -1,14 +1,21 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { httpClient } from "@/src/shared/api";
 import { completePasswordReset } from "@/src/shared/api/account-email-service";
+import { AbpHttpError } from "@/src/shared/api/abp-error";
+import { acceptInternalAccountInvitation, validateInternalAccountInvitation } from "@/src/shared/api/internal-account-invitation-service";
 import { PasswordSetupForm } from "./password-setup-form";
 
 vi.mock("@/src/shared/api", () => ({ httpClient: { post: vi.fn() } }));
 vi.mock("@/src/shared/api/account-email-service", () => ({ completePasswordReset: vi.fn() }));
+vi.mock("@/src/shared/api/internal-account-invitation-service", () => ({ acceptInternalAccountInvitation: vi.fn(), validateInternalAccountInvitation: vi.fn() }));
 
 describe("PasswordSetupForm", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.history.replaceState(null, "", "/reset-password");
+  });
   it("lets the customer choose a private password using the one-time link", async () => {
     vi.mocked(httpClient.post).mockResolvedValue(true);
     render(<PasswordSetupForm areaName="Default" resetToken="one-time-token" userId={42} />);
@@ -99,5 +106,48 @@ describe("PasswordSetupForm", () => {
       "fragment-token",
       "CustomerChosen123!",
     ));
+  });
+
+  it("validates and accepts an invitation token from the fragment", async () => {
+    window.history.replaceState(null, "", "/reset-password?invitation=invite-code#token=setup-token");
+    vi.mocked(validateInternalAccountInvitation).mockResolvedValue({ accessLevel: "Area Administrator", areaDisplayName: "Johannesburg Central", areaName: "Joburg", expiresAt: "2026-08-10T10:00:00Z", inviteeName: "New Admin", status: "Pending", username: "admin@example.com" });
+    vi.mocked(acceptInternalAccountInvitation).mockResolvedValue({ areaName: "Joburg", wasAlreadyAccepted: false });
+    render(<PasswordSetupForm areaName="" invitationCode="invite-code" userId={0} />);
+
+    expect(window.location.hash).toBe("");
+    expect(await screen.findByText("Johannesburg Central")).toBeInTheDocument();
+    expect(screen.getByText("Area Administrator")).toBeInTheDocument();
+    expect(screen.getByText("admin@example.com")).toBeInTheDocument();
+    expect(validateInternalAccountInvitation).toHaveBeenCalledWith("invite-code", "setup-token");
+
+    fireEvent.change(screen.getByLabelText("New password"), { target: { value: "CustomerChosen123!" } });
+    fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "CustomerChosen123!" } });
+    fireEvent.click(screen.getByRole("button", { name: "Set password" }));
+
+    await waitFor(() => expect(acceptInternalAccountInvitation).toHaveBeenCalledWith("invite-code", "setup-token", "CustomerChosen123!"));
+    expect(screen.getByRole("link", { name: "Continue to sign in" })).toHaveAttribute("href", "/login?area=Joburg");
+  });
+
+  it("rejects an already accepted invitation without returning account details", async () => {
+    vi.mocked(validateInternalAccountInvitation).mockRejectedValue(new AbpHttpError(400, { message: "Invitation already accepted.", details: "This one-time invitation has already been used. Continue to the normal sign-in page." }));
+    render(<PasswordSetupForm areaName="" invitationCode="accepted-code" resetToken="accepted-token" userId={0} />);
+
+    expect(await screen.findByText("This one-time invitation has already been used. Continue to the normal sign-in page.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Continue to sign in" })).toHaveAttribute("href", "/login");
+    expect(screen.queryByLabelText("New password")).not.toBeInTheDocument();
+    expect(acceptInternalAccountInvitation).not.toHaveBeenCalled();
+    expect(screen.queryByText("existing@example.com")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["Invitation expired.", "Ask a Platform Administrator to send a new invitation."],
+    ["Invitation revoked.", "Ask a Platform Administrator if you still require access."],
+  ])("shows a safe terminal invitation error for %s", async (message, details) => {
+    vi.mocked(validateInternalAccountInvitation).mockRejectedValue(Object.assign(new Error(message), { details }));
+    render(<PasswordSetupForm areaName="" invitationCode="unavailable-code" resetToken="unavailable-token" userId={0} />);
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByLabelText("New password")).not.toBeInTheDocument();
+    expect(acceptInternalAccountInvitation).not.toHaveBeenCalled();
   });
 });

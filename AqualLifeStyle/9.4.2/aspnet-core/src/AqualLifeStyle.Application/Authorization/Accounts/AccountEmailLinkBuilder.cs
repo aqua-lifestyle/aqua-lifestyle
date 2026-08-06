@@ -32,6 +32,29 @@ namespace AqualLifeStyle.Authorization.Accounts
             return url + "#token=" + Uri.EscapeDataString(token);
         }
 
+        public string BuildInternalAccountInvitation(string invitationCode, string token)
+        {
+            if (string.IsNullOrWhiteSpace(invitationCode))
+                throw new ArgumentException("The invitation code is required.", nameof(invitationCode));
+            if (string.IsNullOrWhiteSpace(token))
+                throw new ArgumentException("The invitation token is required.", nameof(token));
+            var root = _configuration["App:ClientRootAddress"]?.TrimEnd('/');
+            if (string.IsNullOrWhiteSpace(root))
+                throw new InvalidOperationException("The client application address is not configured.");
+            return $"{root}/reset-password?invitation={Uri.EscapeDataString(invitationCode)}" +
+                   $"#token={Uri.EscapeDataString(token)}";
+        }
+
+        public string BuildSignIn(string areaName)
+        {
+            if (string.IsNullOrWhiteSpace(areaName))
+                throw new ArgumentException("The Area sign-in name is required.", nameof(areaName));
+            var root = _configuration["App:ClientRootAddress"]?.TrimEnd('/');
+            if (string.IsNullOrWhiteSpace(root))
+                throw new InvalidOperationException("The client application address is not configured.");
+            return $"{root}/login?area={Uri.EscapeDataString(areaName.Trim())}";
+        }
+
         private static string SafeClientRedirect(string value)
         {
             var candidate = value?.Trim();

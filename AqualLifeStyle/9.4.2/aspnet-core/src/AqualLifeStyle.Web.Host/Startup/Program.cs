@@ -19,7 +19,6 @@ namespace AqualLifeStyle.Web.Host.Startup
     {
         public static async Task<int> Main(string[] args)
         {
-            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
             LoadEnvFile();
             if (args.Contains("--health-check"))
             {

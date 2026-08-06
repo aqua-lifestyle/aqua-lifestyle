@@ -120,7 +120,7 @@ namespace AqualLifeStyle.Tests.Integration
             await _enquiryAppService.ConvertToCustomerAsync(enquiryId, new AqualLifeStyle.Application.Enquiries.Dto.ConvertEnquiryToCustomerDto());
 
             await HandleConvertedEventAsync(
-                new EnquiryConvertedEvent(enquiryId, prospectCustomerId, 1, facilitator.Id, System.DateTime.UtcNow, tenantId: 1));
+                new EnquiryConvertedEvent(enquiryId, prospectCustomerId, 1, facilitator.Id, DateTime.UtcNow, tenantId: 1));
 
             await UsingDbContextAsync(async ctx =>
             {
