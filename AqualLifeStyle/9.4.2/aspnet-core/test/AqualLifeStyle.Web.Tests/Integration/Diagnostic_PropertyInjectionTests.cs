@@ -16,6 +16,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
         public void PropertyInjection_IsConsistentAcrossResolutions()
         {
             var results = new List<string>();
+            var snapshots = new List<(string AdminTM, string AdminUM, string InviteTM, string InviteUM)>();
 
             for (var i = 0; i < 10; i++)
             {
@@ -31,7 +32,14 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 var inviteTm = GetPublicProperty(inviteService, "TenantManager");
                 var inviteUm = GetPublicProperty(inviteService, "UserManager");
 
-                var line = $"Iteration={i} AdminType={adminType.FullName} Admin.TM={(adminTm==null?"<null>":adminTm.GetType().FullName)} Admin.UM={(adminUm==null?"<null>":adminUm.GetType().FullName)} | InviteType={inviteType.FullName} Invite.TM={(inviteTm==null?"<null>":inviteTm.GetType().FullName)} Invite.UM={(inviteUm==null?"<null>":inviteUm.GetType().FullName)}";
+                var adminTmStr = adminTm == null ? "<null>" : adminTm.GetType().FullName;
+                var adminUmStr = adminUm == null ? "<null>" : adminUm.GetType().FullName;
+                var inviteTmStr = inviteTm == null ? "<null>" : inviteTm.GetType().FullName;
+                var inviteUmStr = inviteUm == null ? "<null>" : inviteUm.GetType().FullName;
+
+                snapshots.Add((adminTmStr, adminUmStr, inviteTmStr, inviteUmStr));
+
+                var line = $"Iteration={i} AdminType={adminType.FullName} Admin.TM={adminTmStr} Admin.UM={adminUmStr} | InviteType={inviteType.FullName} Invite.TM={inviteTmStr} Invite.UM={inviteUmStr}";
                 Console.WriteLine(line);
                 results.Add(line);
 
@@ -39,16 +47,31 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 System.Threading.Thread.Sleep(20);
             }
 
-            // If any iteration found a null TenantManager on the admin service, fail with full diagnostic output
-            foreach (var r in results)
+            // Build a concise diagnostic if something is wrong
+            string diagnostic = string.Join("\n", results);
+
+            // Ensure none of the resolved dependencies are null
+            for (var i = 0; i < snapshots.Count; i++)
             {
-                if (r.Contains("Admin.TM=<null>"))
+                var s = snapshots[i];
+                if (s.AdminTM == "<null>" || s.AdminUM == "<null>" || s.InviteTM == "<null>" || s.InviteUM == "<null>")
                 {
-                    Assert.False(true, "Detected AdminUserAppService without TenantManager injection:\n" + string.Join("\n", results));
+                    Assert.False(true, "Detected null injected dependency on iteration " + i + ":\n" + diagnostic);
                 }
             }
 
-            // Otherwise pass
+            // Ensure consistency across iterations by comparing to the first snapshot
+            var baseline = snapshots.First();
+            for (var i = 1; i < snapshots.Count; i++)
+            {
+                var s = snapshots[i];
+                if (s.AdminTM != baseline.AdminTM || s.AdminUM != baseline.AdminUM || s.InviteTM != baseline.InviteTM || s.InviteUM != baseline.InviteUM)
+                {
+                    Assert.False(true, "Detected inconsistent injected dependency across resolutions (baseline vs iteration " + i + "):\n" + diagnostic);
+                }
+            }
+
+            // If we reach here, all checks passed
             Assert.True(true);
         }
 
@@ -65,14 +88,26 @@ namespace AqualLifeStyle.Web.Tests.Integration
             var tenantManager = IocManager.Resolve<AqualLifeStyle.MultiTenancy.TenantManager>();
             tenantManager.ShouldNotBeNull();
 
-            var tenant = await tenantManager.GetByIdAsync(1);
-            Console.WriteLine($"Tenant from TenantManager: {(tenant==null?"<null>":tenant.Name)}");
+            // Create a dedicated tenant fixture for this test to avoid relying on seeded data or execution order
+            var tenantId = UsingDbContext(ctx =>
+            {
+                var t = new AqualLifeStyle.MultiTenancy.Tenant("tn" + Guid.NewGuid().ToString("n").Substring(0, 8), "Test Tenant " + Guid.NewGuid().ToString("n").Substring(0, 6));
+                ctx.Tenants.Add(t);
+                ctx.SaveChanges();
+                return t.Id;
+            });
+
+            var tenant = await tenantManager.GetByIdAsync(tenantId);
+            Console.WriteLine($"Tenant from TenantManager: {(tenant==null?"<null>":tenant.Name)} (id={tenantId})");
 
             var count = UsingDbContext(ctx => ctx.Tenants.ToList().Count);
             Console.WriteLine($"Tenants in DB: {count}");
 
             // Assert that tenant exists
-            tenant.ShouldNotBeNull("TenantManager failed to locate tenant with id=1 in the test DB");
+            tenant.ShouldNotBeNull($"TenantManager failed to locate tenant with id={tenantId} in the test DB");
+
+            // Then assert the resolved tenant has the expected id
+            tenant.Id.ShouldBe(tenantId);
         }
     }
 }
