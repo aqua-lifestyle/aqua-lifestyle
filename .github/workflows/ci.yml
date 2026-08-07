@@ -134,6 +134,7 @@ jobs:
       REPRO_PG: "true"
       REPRO_TRANSACTIONAL: "true"
       REPRO_PG_CONNECTION: "Host=localhost;Port=5432;Database=aqual_ci;Username=aqual_ci;Password=aqual_ci_tests_only"
+      REPRO_MARKER_DIR: ${{ github.workspace }}/AqualLifeStyle/9.4.2/aspnet-core/TestResults
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-dotnet@v5
@@ -162,7 +163,13 @@ jobs:
             || { echo "::error::InvitationAcceptance_AllowsTokenAuthentication did not run and pass"; exit 1; }
           grep -qE '<UnitTestResult[^>]*testName="[^"]*CreateAndInvite_TransactionalRollback_LeavesNoPartialAdministrator"[^>]*outcome="Passed"' "$trx" \
             || { echo "::error::CreateAndInvite_TransactionalRollback_LeavesNoPartialAdministrator did not run and pass (skipped / non-transactional / non-PG path taken)"; exit 1; }
-          if grep -qE 'outcome="(Failed|Error|Aborted)"' "$trx"; then
+          # Provenance proof: the rollback test only writes this marker when its transactional+PG body
+          # actually executes (i.e. the guard did NOT short-circuit). Its absence means the regression
+          # silently took the default non-transactional path and must fail the job.
+          test -n "$REPRO_MARKER_DIR"
+          test -f "$REPRO_MARKER_DIR/rollback-transactional-pg.ran" \
+            || { echo "::error::transactional rollback regression did not execute its PostgreSQL body (default non-transactional path taken - missing marker)"; exit 1; }
+          if grep -qE 'outcome="(Failed|Error|Aborted|Skipped|NotExecuted)"' "$trx"; then
             echo "::error::test failures present in the PostgreSQL regression results"
             exit 1
           fi

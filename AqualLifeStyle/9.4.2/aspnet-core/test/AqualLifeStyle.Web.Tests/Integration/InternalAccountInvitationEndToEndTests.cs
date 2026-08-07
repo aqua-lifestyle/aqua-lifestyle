@@ -162,8 +162,22 @@ namespace AqualLifeStyle.Web.Tests.Integration
             var postgresEnabled = string.Equals(Environment.GetEnvironmentVariable("REPRO_PG"), "true", StringComparison.OrdinalIgnoreCase);
             if (!transactionalEnabled || !postgresEnabled)
             {
+                // Never silently claim the regression passed here: the CI verification step fails
+                // unless the marker below is present, so a short-circuit back to the default
+                // non-transactional path is detectable instead of a green false pass.
                 return;
             }
+            // Provenance marker: written BEFORE the guarded body so the PostgreSQL job can prove
+            // this test really executed its transactional+PG path and did not early-return. The
+            // location is pinned by REPRO_MARKER_DIR because the test host's working directory is
+            // the build output directory, not the repository root.
+            var markerDir = Environment.GetEnvironmentVariable("REPRO_MARKER_DIR");
+            if (string.IsNullOrWhiteSpace(markerDir))
+            {
+                markerDir = "TestResults";
+            }
+            System.IO.Directory.CreateDirectory(markerDir);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(markerDir, "rollback-transactional-pg.ran"), DateTime.UtcNow.ToString("o"));
 
             var passwordHasher = new Microsoft.AspNetCore.Identity.PasswordHasher<AqualLifeStyle.Authorization.Users.User>(new Microsoft.Extensions.Options.OptionsWrapper<Microsoft.AspNetCore.Identity.PasswordHasherOptions>(new Microsoft.AspNetCore.Identity.PasswordHasherOptions()));
             UsingDbContext(context =>
