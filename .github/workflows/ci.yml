@@ -1,6 +1,7 @@
 name: Continuous integration
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches: [main, develop, "feature/**"]
@@ -103,3 +104,81 @@ jobs:
             NEXT_PUBLIC_DEFAULT_TENANT_NAME=Default
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
+
+  # Production-equivalent regression: runs the Create-and-Invite flow (invitation lifecycle,
+  # accept + JWT auth, and transactional rollback atomicity) on a real PostgreSQL service container
+  # under a transactional Unit of Work. The default SQLite harness cannot reproduce the
+  # transactional visibility defect this guards against, so this job is the authoritative check.
+  postgres-transactional-regression:
+    name: PostgreSQL transactional invitation regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: AqualLifeStyle/9.4.2/aspnet-core
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: aqual_ci
+          POSTGRES_PASSWORD: aqual_ci_tests_only
+          POSTGRES_DB: aqual_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aqual_ci -d aqual_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 6
+    env:
+      REPRO_PG: "true"
+      REPRO_TRANSACTIONAL: "true"
+      REPRO_PG_CONNECTION: "Host=localhost;Port=5432;Database=aqual_ci;Username=aqual_ci;Password=aqual_ci_tests_only"
+      REPRO_MARKER_DIR: ${{ github.workspace }}/AqualLifeStyle/9.4.2/aspnet-core/TestResults
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+      - name: Confirm reproduction mode is active
+        shell: bash
+        run: |
+          test "$REPRO_PG" = "true"
+          test "$REPRO_TRANSACTIONAL" = "true"
+          test -n "$REPRO_PG_CONNECTION"
+          echo "Reproduction mode active: REPRO_PG=$REPRO_PG REPRO_TRANSACTIONAL=$REPRO_TRANSACTIONAL"
+      - name: Restore web tests
+        run: dotnet restore test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj
+      - name: Build web tests
+        run: dotnet build test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --no-restore
+      - name: Run transactional regressions on PostgreSQL
+        run: dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~InternalAccountInvitation" --logger "trx;LogFileName=pg-regressions.trx" --results-directory TestResults
+      - name: Verify the regressions really ran under PostgreSQL and were not skipped
+        shell: bash
+        run: |
+          set -euo pipefail
+          trx="TestResults/pg-regressions.trx"
+          test -f "$trx" || { echo "::error::TRX results file not found"; exit 1; }
+          grep -qE '<UnitTestResult[^>]*testName="[^"]*InvitationAcceptance_AllowsTokenAuthentication"[^>]*outcome="Passed"' "$trx" \
+            || { echo "::error::InvitationAcceptance_AllowsTokenAuthentication did not run and pass"; exit 1; }
+          grep -qE '<UnitTestResult[^>]*testName="[^"]*CreateAndInvite_TransactionalRollback_LeavesNoPartialAdministrator"[^>]*outcome="Passed"' "$trx" \
+            || { echo "::error::CreateAndInvite_TransactionalRollback_LeavesNoPartialAdministrator did not run and pass (skipped / non-transactional / non-PG path taken)"; exit 1; }
+          # Provenance proof: the rollback test only writes this marker when its transactional+PG body
+          # actually executes (i.e. the guard did NOT short-circuit). Its absence means the regression
+          # silently took the default non-transactional path and must fail the job.
+          test -n "$REPRO_MARKER_DIR"
+          test -f "$REPRO_MARKER_DIR/rollback-transactional-pg.ran" \
+            || { echo "::error::transactional rollback regression did not execute its PostgreSQL body (default non-transactional path taken - missing marker)"; exit 1; }
+          if grep -qE 'outcome="(Failed|Error|Aborted|Skipped|NotExecuted)"' "$trx"; then
+            echo "::error::test failures present in the PostgreSQL regression results"
+            exit 1
+          fi
+          echo "PostgreSQL transactional regressions ran and passed (neither skipped); visibility + rollback guarded."
+      - name: Upload PostgreSQL regression results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: pg-regression-test-results
+          path: AqualLifeStyle/9.4.2/aspnet-core/TestResults
+          if-no-files-found: ignore
+          retention-days: 7
