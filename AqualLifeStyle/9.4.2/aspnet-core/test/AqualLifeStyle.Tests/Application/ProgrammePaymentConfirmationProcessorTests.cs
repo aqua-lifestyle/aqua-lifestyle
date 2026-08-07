@@ -158,6 +158,17 @@ namespace AqualLifeStyle.Tests.Application
                 payments.Count.ShouldBe(1);
                 payments.Single().Purpose.ShouldBe(MemberPaymentPurpose.AQGreenJoining);
                 payments.Single().Status.ShouldBe(MemberPaymentStatus.Confirmed);
+
+                var funeralCover = await context.AQGreenFuneralCoverEntitlements
+                    .Where(item => item.EntryParticipationId == persisted.ParticipationId)
+                    .ToListAsync();
+                funeralCover.Count.ShouldBe(1);
+                funeralCover.Single().Status.ShouldBe(AQGreenFuneralCoverStatus.Included);
+                funeralCover.Single().FuneralCoverAmount.ShouldBe(30000m);
+                funeralCover.Single().Currency.ShouldBe("ZAR");
+                funeralCover.Single().TermsVersion.ShouldBe("2026-08-funeral-30000");
+                funeralCover.Single().IncludedAt.ShouldBe(
+                    AQGreenSinglePaymentEffectiveFrom.AddMinutes(1));
             });
         }
 

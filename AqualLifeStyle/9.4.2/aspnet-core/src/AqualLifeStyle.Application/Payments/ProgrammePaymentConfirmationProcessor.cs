@@ -5,6 +5,7 @@ using Abp.Domain.Repositories;
 using Abp.UI;
 using Abp.Domain.Uow;
 using AqualLifeStyle.Application.Recruitment;
+using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
@@ -63,6 +64,7 @@ namespace AqualLifeStyle.Payments
         private readonly ICustomerRepository _customerRepository;
         private readonly IMembershipRepository _membershipRepository;
         private readonly IProgrammeInvitationResolver _invitationResolver;
+        private readonly AQGreenFuneralCoverInclusionProcessor _funeralCoverInclusionProcessor;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public ProgrammePaymentConfirmationProcessor(
@@ -74,6 +76,7 @@ namespace AqualLifeStyle.Payments
             ICustomerRepository customerRepository,
             IMembershipRepository membershipRepository,
             IProgrammeInvitationResolver invitationResolver,
+            AQGreenFuneralCoverInclusionProcessor funeralCoverInclusionProcessor,
             IUnitOfWorkManager unitOfWorkManager)
         {
             _paymentRepository = paymentRepository;
@@ -84,6 +87,7 @@ namespace AqualLifeStyle.Payments
             _customerRepository = customerRepository;
             _membershipRepository = membershipRepository;
             _invitationResolver = invitationResolver;
+            _funeralCoverInclusionProcessor = funeralCoverInclusionProcessor;
             _unitOfWorkManager = unitOfWorkManager;
         }
 
@@ -459,6 +463,9 @@ namespace AqualLifeStyle.Payments
                     participation.ApplyConfirmedJoiningPayment(payment);
                 else
                     participation.ApplyConfirmedJoiningPayment(payment, checkout.Stage);
+                await ApplyFuneralCoverInclusionIfCompletedAsync(
+                    participation,
+                    confirmedAt);
                 checkout.Complete(payment.Id, confirmedAt);
                 await _unitOfWorkManager.Current.SaveChangesAsync();
 
@@ -557,13 +564,34 @@ namespace AqualLifeStyle.Payments
             }
 
             if (payment.Purpose == MemberPaymentPurpose.AQGreenJoining)
+            {
                 entryParticipation.ApplyConfirmedJoiningPayment(payment);
+                await ApplyFuneralCoverInclusionIfCompletedAsync(
+                    entryParticipation,
+                    payment.ConfirmedAt ?? DateTime.UtcNow);
+            }
             else
+            {
                 entryParticipation.ApplyConfirmedActivationPayment(payment);
+            }
             return (
                 entryParticipation.Id,
                 ProgrammeParticipationKind.Entry,
                 entryParticipation.IsAwaitingAdministrativeApproval);
+        }
+
+        private async Task ApplyFuneralCoverInclusionIfCompletedAsync(
+            EntryParticipation participation,
+            DateTime processedAt)
+        {
+            if (!participation.IsJoiningObligationSatisfied)
+            {
+                return;
+            }
+
+            await _funeralCoverInclusionProcessor.EnsureIncludedAsync(
+                participation,
+                processedAt);
         }
 
         private static void EnsureSupportedPurpose(MemberPaymentPurpose purpose)
