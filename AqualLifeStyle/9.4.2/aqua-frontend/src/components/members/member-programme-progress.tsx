@@ -150,7 +150,13 @@ export const MemberProgrammeProgress = () => {
                     </p>
                   </div>
                   {data.funeralCoverIncluded ? (
-                    <Badge tone="success">R30,000 funeral cover included</Badge>
+                    <Badge tone="success">
+                      {formatCurrency(
+                        data.funeralCoverBenefitAmount,
+                        data.currency,
+                      )}{" "}
+                      funeral cover included
+                    </Badge>
                   ) : null}
                 </div>
 

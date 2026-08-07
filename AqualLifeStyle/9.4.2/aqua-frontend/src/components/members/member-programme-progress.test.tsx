@@ -48,7 +48,9 @@ describe("MemberProgrammeProgress", () => {
     expect(httpClient.get).toHaveBeenCalledWith(
       apiEndpoints.programmeParticipations.getMyProgress,
     );
-    expect(screen.getByText("R30,000 funeral cover included")).toBeInTheDocument();
+    expect(
+      screen.getByText(/R\s*30[,.]000[,.]00 funeral cover included/),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("Weekly earnings").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/R\s*150[,.]00/).length).toBeGreaterThan(0);
     expect(
