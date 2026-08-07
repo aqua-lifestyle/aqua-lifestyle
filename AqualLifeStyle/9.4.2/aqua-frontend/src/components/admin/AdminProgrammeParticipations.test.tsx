@@ -267,9 +267,12 @@ describe("AdminProgrammeParticipations", () => {
 
     render(<AdminProgrammeParticipations />);
 
-    expect(await screen.findByText("Awaiting Area approval"))
+    const approveButton = await screen.findByRole("button", {
+      name: "Approve",
+    });
+    expect(screen.getByText("Awaiting Area approval", { selector: "span" }))
       .toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled();
+    expect(approveButton).toBeEnabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Approve" }));
 
