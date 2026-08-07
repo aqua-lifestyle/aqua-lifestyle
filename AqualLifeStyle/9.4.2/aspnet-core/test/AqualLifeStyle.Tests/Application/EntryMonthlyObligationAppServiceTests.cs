@@ -76,6 +76,7 @@ namespace AqualLifeStyle.Tests.Application
                     MemberPaymentPurpose.EntryActivation,
                     "activation-" + suffix);
                 participation.ApplyConfirmedActivationPayment(activation);
+                participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
                 var obligation = EntryMonthlyObligation.Create(
                     participation,
                     2026,

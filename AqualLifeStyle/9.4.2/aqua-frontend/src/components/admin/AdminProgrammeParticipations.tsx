@@ -45,6 +45,7 @@ type AdminProgrammeParticipation = {
   joinedIndependently: boolean;
   nextPaymentAmount: number | null;
   nextPaymentDescription: string | null;
+  participationId: string;
   programmeName: string;
   recruiterClubMemberNumber: string | null;
   startedAt: string;
@@ -82,10 +83,14 @@ type PagedCheckouts = {
 const VIEW_PERMISSION = "Aqua.Admin.ProgrammeParticipations.View";
 const CORRECT_PERMISSION =
   "Aqua.Admin.ProgrammeParticipations.CorrectRecruiter";
+const APPROVE_PERMISSION =
+  "Aqua.Admin.ProgrammeParticipations.Approve";
 const VIEW_CHECKOUTS_PERMISSION =
   "Aqua.Admin.ProgrammeParticipations.ViewPaymentCheckouts";
 const TERMINATE_CHECKOUTS_PERMISSION =
   "Aqua.Admin.ProgrammeParticipations.TerminatePaymentCheckouts";
+
+const AWAITING_APPROVAL_STATUS = "Awaiting Area approval";
 
 const formatCurrency = (amount: number, currency: string) =>
   new Intl.NumberFormat("en-ZA", { currency, style: "currency" }).format(amount);
@@ -96,6 +101,8 @@ export const AdminProgrammeParticipations = () => {
     session?.user?.permissions?.includes(VIEW_PERMISSION) ?? false;
   const canCorrect =
     session?.user?.permissions?.includes(CORRECT_PERMISSION) ?? false;
+  const canApprove =
+    session?.user?.permissions?.includes(APPROVE_PERMISSION) ?? false;
   const canViewCheckouts =
     session?.user?.permissions?.includes(VIEW_CHECKOUTS_PERMISSION) ?? false;
   const canTerminateCheckouts =
@@ -117,6 +124,12 @@ export const AdminProgrammeParticipations = () => {
     useState<AQGreenCheckoutRecovery>();
   const [terminationEvidence, setTerminationEvidence] = useState("");
   const [terminatingCheckout, setTerminatingCheckout] = useState(false);
+  const [queue, setQueue] = useState<"all" | "awaiting">("all");
+  const [approvingId, setApprovingId] = useState<string>();
+  const [rejecting, setRejecting] =
+    useState<AdminProgrammeParticipation>();
+  const [rejectReason, setRejectReason] = useState("");
+  const [savingRejection, setSavingRejection] = useState(false);
 
   const loadParticipations = useCallback(async () => {
     if (!canView) {
@@ -262,6 +275,75 @@ export const AdminProgrammeParticipations = () => {
     }
   };
 
+  const approvalKey = (item: AdminProgrammeParticipation) =>
+    `${item.programmeName}:${item.participationId}`;
+
+  const approveParticipation = async (item: AdminProgrammeParticipation) => {
+    const key = approvalKey(item);
+    setApprovingId(key);
+    setError(undefined);
+    try {
+      await httpClient.post(
+        apiEndpoints.programmeParticipations.approveParticipation,
+        {
+          programme: programme === "entry" ? 0 : 1,
+          participationId: item.participationId,
+        },
+      );
+      setSuccess(
+        `${item.customerName}'s ${item.programmeName} participation was approved and activated.`,
+      );
+      await loadParticipations();
+    } catch (requestError) {
+      setError(
+        getRequestErrorMessage(
+          requestError,
+          "The participation could not be approved. No participation state was changed.",
+        ),
+      );
+    } finally {
+      setApprovingId(undefined);
+    }
+  };
+
+  const openRejection = (item: AdminProgrammeParticipation) => {
+    setRejecting(item);
+    setRejectReason("");
+    setError(undefined);
+  };
+
+  const submitRejection = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!rejecting || rejectReason.trim().length < 3) return;
+    setSavingRejection(true);
+    setError(undefined);
+    try {
+      await httpClient.post(
+        apiEndpoints.programmeParticipations.rejectParticipation,
+        {
+          programme: programme === "entry" ? 0 : 1,
+          participationId: rejecting.participationId,
+          reason: rejectReason.trim(),
+        },
+      );
+      setRejecting(undefined);
+      setRejectReason("");
+      setSuccess(
+        `${rejecting.customerName}'s ${rejecting.programmeName} participation was declined and the decision was recorded.`,
+      );
+      await loadParticipations();
+    } catch (requestError) {
+      setError(
+        getRequestErrorMessage(
+          requestError,
+          "The participation could not be declined. No participation state was changed.",
+        ),
+      );
+    } finally {
+      setSavingRejection(false);
+    }
+  };
+
   const columns = [
     {
       header: "Club Member",
@@ -289,7 +371,17 @@ export const AdminProgrammeParticipations = () => {
       key: "status",
       render: (item: AdminProgrammeParticipation) => (
         <div className="flex flex-col items-start gap-1">
-          <Badge tone={item.isActive ? "success" : "warning"}>{item.status}</Badge>
+          <Badge
+            tone={
+              item.isActive
+                ? "success"
+                : item.status === "Declined"
+                  ? "error"
+                  : "warning"
+            }
+          >
+            {item.status}
+          </Badge>
           <span className="text-xs text-muted-foreground">
             {item.joinedIndependently
               ? "Independent network"
@@ -342,25 +434,56 @@ export const AdminProgrammeParticipations = () => {
           </div>
         ),
     },
-    ...(canCorrect
+    ...(canCorrect || canApprove
       ? [{
           header: "Actions",
           key: "actions",
           render: (item: AdminProgrammeParticipation) => (
-            <Button onClick={() => openCorrection(item)} size="sm" variant="outline">
-              <PencilLine className="size-4" /> Correct network placement
-            </Button>
+            <div className="flex flex-col items-start gap-2">
+              {canCorrect ? (
+                <Button onClick={() => openCorrection(item)} size="sm" variant="outline">
+                  <PencilLine className="size-4" /> Correct network placement
+                </Button>
+              ) : null}
+              {canApprove && item.status === AWAITING_APPROVAL_STATUS ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    disabled={approvingId === approvalKey(item)}
+                    isLoading={approvingId === approvalKey(item)}
+                    onClick={() => void approveParticipation(item)}
+                    size="sm"
+                  >
+                    <CircleCheck className="size-4" /> Approve
+                  </Button>
+                  <Button
+                    disabled={approvingId === approvalKey(item)}
+                    onClick={() => openRejection(item)}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Reject
+                  </Button>
+                </div>
+              ) : null}
+            </div>
           ),
         }]
       : []),
   ];
+
+  const visibleParticipations =
+    queue === "awaiting"
+      ? participations.filter(
+          (item) => item.status === AWAITING_APPROVAL_STATUS,
+        )
+      : participations;
 
   const table = loading ? (
     <Skeleton className="h-80" />
   ) : (
     <DataTable
       columns={columns}
-      data={participations}
+      data={visibleParticipations}
       emptyState={`No ${programme === "entry" ? "AQGreen" : "Onyx"} participation records found.`}
       keyExtractor={(item) => `${item.programmeName}:${item.clubMemberNumber}`}
       searchFn={(item, query) =>
@@ -454,23 +577,65 @@ export const AdminProgrammeParticipations = () => {
           <h1 className="mt-2 text-3xl font-bold">Programme participation</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
             Review AQGreen and Onyx activation progress, network placement, and
-            provider-confirmed payments. Payments cannot be confirmed from this
-            screen.
+            provider-confirmed payments awaiting Area approval. Payments cannot
+            be confirmed from this screen.
           </p>
         </header>
 
-        <Card className="flex items-center gap-3">
-          <Route className="size-6 text-accent" />
-          <div>
-            <p className="text-sm text-muted-foreground">
-              {programme === "entry" ? "AQGreen" : "Onyx"} records
-            </p>
-            <p className="text-2xl font-bold">{participations.length}</p>
-          </div>
-        </Card>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Card className="flex items-center gap-3">
+            <Route className="size-6 text-accent" />
+            <div>
+              <p className="text-sm text-muted-foreground">
+                {programme === "entry" ? "AQGreen" : "Onyx"} records
+              </p>
+              <p className="text-2xl font-bold">{participations.length}</p>
+            </div>
+          </Card>
+          <Card className="flex items-center gap-3">
+            <CircleCheck className="size-6 text-warning" />
+            <div>
+              <p className="text-sm text-muted-foreground">
+                Awaiting Area approval
+              </p>
+              <p className="text-2xl font-bold">
+                {participations.filter(
+                  (item) => item.status === AWAITING_APPROVAL_STATUS,
+                ).length}
+              </p>
+            </div>
+          </Card>
+        </div>
 
         {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
         {success ? <StatusMessage tone="success">{success}</StatusMessage> : null}
+
+        {canView ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setQueue("all")}
+                size="sm"
+                variant={queue === "all" ? "primary" : "outline"}
+              >
+                All records
+              </Button>
+              <Button
+                onClick={() => setQueue("awaiting")}
+                size="sm"
+                variant={queue === "awaiting" ? "primary" : "outline"}
+              >
+                Awaiting approval
+              </Button>
+            </div>
+            {queue === "awaiting" && !canApprove ? (
+              <StatusMessage tone="info">
+                You have read-only access. A separately authorised operator must
+                approve or decline participations awaiting approval.
+              </StatusMessage>
+            ) : null}
+          </div>
+        ) : null}
 
         {canView ? (
           <Tabs
@@ -619,6 +784,61 @@ export const AdminProgrammeParticipations = () => {
                   variant="danger"
                 >
                   Terminate checkout
+                </Button>
+              </div>
+            </form>
+          ) : null}
+        </Dialog>
+        <Dialog
+          onClose={() =>
+            !savingRejection && setRejecting(undefined)
+          }
+          open={Boolean(rejecting)}
+          title="Decline programme participation"
+        >
+          {rejecting ? (
+            <form className="flex flex-col gap-4" onSubmit={submitRejection}>
+              <StatusMessage tone="warning">
+                Declining {rejecting.customerName}&apos;s {rejecting.programmeName}
+                participation keeps the confirmed payment received but does not
+                activate the participation. The decision and reason are recorded
+                in the audit history.
+              </StatusMessage>
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-muted-foreground">Club Member</dt>
+                  <dd className="font-semibold">
+                    {rejecting.clubMemberNumber}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Area</dt>
+                  <dd className="font-semibold">{rejecting.areaName}</dd>
+                </div>
+              </dl>
+              <TextAreaField
+                label="Reason for declining"
+                name="reason"
+                onChange={(event) => setRejectReason(event.target.value)}
+                required
+                rows={4}
+                value={rejectReason}
+              />
+              <div className="flex justify-end gap-3">
+                <Button
+                  disabled={savingRejection}
+                  onClick={() => setRejecting(undefined)}
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={rejectReason.trim().length < 3}
+                  isLoading={savingRejection}
+                  type="submit"
+                  variant="danger"
+                >
+                  Decline participation
                 </Button>
               </div>
             </form>

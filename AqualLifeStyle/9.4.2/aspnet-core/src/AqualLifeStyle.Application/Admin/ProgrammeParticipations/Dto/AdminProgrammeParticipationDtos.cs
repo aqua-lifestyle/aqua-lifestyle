@@ -36,6 +36,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
 
     public class AdminProgrammeParticipationDto
     {
+        public Guid ParticipationId { get; set; }
         public string AreaName { get; set; }
         public string ClubMemberNumber { get; set; }
         public string CustomerName { get; set; }
@@ -73,6 +74,23 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
 
         [Required, StringLength(2000, MinimumLength = 3)]
         public string Justification { get; set; }
+    }
+
+    public class ApproveProgrammeParticipationInput
+    {
+        public AdminProgrammeType Programme { get; set; }
+
+        public Guid ParticipationId { get; set; }
+    }
+
+    public class RejectProgrammeParticipationInput
+    {
+        public AdminProgrammeType Programme { get; set; }
+
+        public Guid ParticipationId { get; set; }
+
+        [Required, StringLength(1000, MinimumLength = 3)]
+        public string Reason { get; set; }
     }
 
     public class OnyxGraduationDecisionDto

@@ -167,6 +167,7 @@ namespace AqualLifeStyle.Tests.Domain
                 EffectiveFrom);
             activation.Confirm(EffectiveFrom.AddMinutes(2));
             participation.ApplyConfirmedActivationPayment(activation);
+            participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
 
             return participation;
         }

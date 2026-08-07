@@ -105,6 +105,10 @@ export const apiEndpoints = {
   programmeParticipations: {
     correctRecruiter:
       "/api/services/app/AdminProgrammeParticipation/CorrectRecruiter",
+    approveParticipation:
+      "/api/services/app/AdminProgrammeParticipation/ApproveProgrammeParticipation",
+    rejectParticipation:
+      "/api/services/app/AdminProgrammeParticipation/RejectProgrammeParticipation",
     getAdminParticipations:
       "/api/services/app/AdminProgrammeParticipation/GetAll",
     getAQGreenJoiningCheckouts:

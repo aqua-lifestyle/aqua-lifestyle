@@ -17,7 +17,9 @@ using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
+using AqualLifeStyle.Email;
 using AqualLifeStyle.MultiTenancy;
+using AqualLifeStyle.Payments;
 using Microsoft.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
@@ -40,6 +42,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         private readonly IHostedPaymentCheckoutLock _hostedPaymentCheckoutLock;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
         private readonly ICurrentProgrammeTermsProvider _termsProvider;
+        private readonly ActiveProgrammeParticipantRoleSynchronizer _participantRoleSynchronizer;
+        private readonly ITransactionalEmailOutbox _emailOutbox;
+        private readonly TransactionalEmailTemplateBuilder _emailTemplates;
 
         public AdminProgrammeParticipationAppService(
             ICustomerRepository customerRepository,
@@ -55,7 +60,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             IProgrammeRecruiterCorrectionLock correctionLock,
             IHostedPaymentCheckoutLock hostedPaymentCheckoutLock,
             IUnitOfWorkManager unitOfWorkManager,
-            ICurrentProgrammeTermsProvider termsProvider)
+            ICurrentProgrammeTermsProvider termsProvider,
+            ActiveProgrammeParticipantRoleSynchronizer participantRoleSynchronizer,
+            ITransactionalEmailOutbox emailOutbox,
+            TransactionalEmailTemplateBuilder emailTemplates)
         {
             _customerRepository = customerRepository;
             _entryParticipationRepository = entryParticipationRepository;
@@ -71,6 +79,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             _hostedPaymentCheckoutLock = hostedPaymentCheckoutLock;
             _unitOfWorkManager = unitOfWorkManager;
             _termsProvider = termsProvider;
+            _participantRoleSynchronizer = participantRoleSynchronizer;
+            _emailOutbox = emailOutbox;
+            _emailTemplates = emailTemplates;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.TerminatePaymentCheckouts)]
@@ -318,6 +329,142 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             Logger.Info(
                 $"Onyx graduation approved tenant={decision.TenantId} decision={decision.Id} participation={decision.OnyxParticipationId}");
             return Map(decision);
+        }
+
+        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.Approve)]
+        [UnitOfWork(IsDisabled = true)]
+        public async Task ApproveProgrammeParticipationAsync(
+            ApproveProgrammeParticipationInput input)
+        {
+            if (input == null || input.ParticipationId == Guid.Empty)
+                throw Failed("Participation approval", "Select a valid participation awaiting approval.");
+            if (!AbpSession.TenantId.HasValue &&
+                !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
+                throw new AbpAuthorizationException(
+                    "Cross-Area participation approval requires permission to manage all Areas.");
+
+            Customer customer;
+            Guid participationId;
+            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+            {
+                IsTransactional = true,
+                IsolationLevel = IsolationLevel.Serializable
+            }))
+            using (DisableAllTenantDataFiltersForHost())
+            {
+                (customer, participationId) = await ApplyDecisionAsync(
+                    input.Programme,
+                    input.ParticipationId,
+                    approve: true,
+                    reason: null);
+                await _participantRoleSynchronizer.PromoteGuestToMemberAsync(customer.Id);
+                await EnqueueDecisionEmailAsync(
+                    customer,
+                    input.Programme,
+                    participationId,
+                    approved: true,
+                    reason: null);
+                await CurrentUnitOfWork.SaveChangesAsync();
+                await uow.CompleteAsync();
+            }
+
+            Logger.Info(
+                $"Programme participation approved programme={input.Programme} participation={participationId} administrator={AbpSession.GetUserId()}");
+        }
+
+        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.Approve)]
+        [UnitOfWork(IsDisabled = true)]
+        public async Task RejectProgrammeParticipationAsync(
+            RejectProgrammeParticipationInput input)
+        {
+            if (input == null || input.ParticipationId == Guid.Empty)
+                throw Failed("Participation rejection", "Select a valid participation awaiting approval.");
+            if (!AbpSession.TenantId.HasValue &&
+                !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
+                throw new AbpAuthorizationException(
+                    "Cross-Area participation rejection requires permission to manage all Areas.");
+
+            Customer customer;
+            Guid participationId;
+            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+            {
+                IsTransactional = true,
+                IsolationLevel = IsolationLevel.Serializable
+            }))
+            using (DisableAllTenantDataFiltersForHost())
+            {
+                (customer, participationId) = await ApplyDecisionAsync(
+                    input.Programme,
+                    input.ParticipationId,
+                    approve: false,
+                    reason: input?.Reason);
+                await EnqueueDecisionEmailAsync(
+                    customer,
+                    input.Programme,
+                    participationId,
+                    approved: false,
+                    reason: input.Reason);
+                await CurrentUnitOfWork.SaveChangesAsync();
+                await uow.CompleteAsync();
+            }
+
+            Logger.Warn(
+                $"Programme participation rejected programme={input.Programme} participation={participationId} administrator={AbpSession.GetUserId()}");
+        }
+
+        private async Task<(Customer Customer, Guid ParticipationId)> ApplyDecisionAsync(
+            AdminProgrammeType programme,
+            Guid participationId,
+            bool approve,
+            string reason)
+        {
+            var decidedAt = DateTime.UtcNow;
+            if (programme == AdminProgrammeType.Onyx)
+            {
+                var onyx = await _onyxParticipationRepository.FirstOrDefaultAsync(
+                    item => item.Id == participationId);
+                if (onyx == null)
+                    throw Failed("Participation decision", "The participation was not found in your Area.");
+                if (approve)
+                    onyx.ApproveByAdministrator(AbpSession.GetUserId(), decidedAt);
+                else
+                    onyx.RejectByAdministrator(AbpSession.GetUserId(), reason, decidedAt);
+                return (await _customerRepository.GetAsync(onyx.CustomerId), onyx.Id);
+            }
+
+            var entry = await _entryParticipationRepository.FirstOrDefaultAsync(
+                item => item.Id == participationId);
+            if (entry == null)
+                throw Failed("Participation decision", "The participation was not found in your Area.");
+            if (approve)
+                entry.ApproveByAdministrator(AbpSession.GetUserId(), decidedAt);
+            else
+                entry.RejectByAdministrator(AbpSession.GetUserId(), reason, decidedAt);
+            return (await _customerRepository.GetAsync(entry.CustomerId), entry.Id);
+        }
+
+        private async Task EnqueueDecisionEmailAsync(
+            Customer customer,
+            AdminProgrammeType programme,
+            Guid participationId,
+            bool approved,
+            string reason)
+        {
+            var programmeName = programme == AdminProgrammeType.Onyx ? "Onyx" : "AQGreen";
+            var key = $"{programme}:{participationId}:{(approved ? "approved" : "declined")}";
+            var email = approved
+                ? _emailTemplates.ParticipationApproved(
+                    customer.Name,
+                    customer.Email.Value,
+                    programmeName,
+                    key)
+                : _emailTemplates.ParticipationDeclined(
+                    customer.Name,
+                    customer.Email.Value,
+                    programmeName,
+                    reason,
+                    key);
+            await _emailOutbox.EnqueueAsync(customer.TenantId, "ParticipationDecision", key, email);
         }
 
         [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.CorrectRecruiter)]
@@ -696,6 +843,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             var details = ProgrammeParticipationStatusPresenter.Describe(participation);
             return MapCommon(
+                participation.Id,
                 participation.TenantId,
                 customer,
                 "AQGreen",
@@ -725,6 +873,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             var details = ProgrammeParticipationStatusPresenter.Describe(participation);
             return MapCommon(
+                participation.Id,
                 participation.TenantId,
                 customer,
                 "Onyx",
@@ -741,6 +890,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         }
 
         private static AdminProgrammeParticipationDto MapCommon(
+            Guid participationId,
             int tenantId,
             Customer customer,
             string programmeName,
@@ -757,6 +907,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             return new AdminProgrammeParticipationDto
             {
+                ParticipationId = participationId,
                 AreaName = areaNames.TryGetValue(tenantId, out var areaName)
                     ? areaName
                     : "Area",

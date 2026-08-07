@@ -201,6 +201,7 @@ namespace AqualLifeStyle.Authorization
                 public const string TerminatePaymentCheckouts = Default + ".TerminatePaymentCheckouts";
                 public const string ViewLegacyPaymentReconciliation =
                     Default + ".ViewLegacyPaymentReconciliation";
+                public const string Approve = Default + ".Approve";
             }
 
             public static class Commissions

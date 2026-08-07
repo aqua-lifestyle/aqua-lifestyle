@@ -140,6 +140,7 @@ namespace AqualLifeStyle.Tests.Application
                 confirmedAt.AddMinutes(-1));
             payment.Confirm(confirmedAt);
             participation.ApplyConfirmedDirectEntryPayment(payment);
+            participation.ApproveByAdministrator(1L, confirmedAt);
             return participation;
         }
     }

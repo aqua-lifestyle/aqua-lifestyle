@@ -103,6 +103,7 @@ namespace AqualLifeStyle.Tests.Application
                 1200m,
                 "aqgreen-fallback-role");
             participation.ApplyConfirmedJoiningPayment(payment);
+            participation.ApproveByAdministrator(1L, StartedAt.AddMinutes(1));
             return participation;
         }
 
@@ -120,6 +121,7 @@ namespace AqualLifeStyle.Tests.Application
                 6120m,
                 "onyx-fallback-role");
             participation.ApplyConfirmedDirectEntryPayment(payment);
+            participation.ApproveByAdministrator(1L, StartedAt.AddMinutes(1));
             return participation;
         }
 

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
+using Abp.Runtime.Session;
 using AqualLifeStyle.Application.Admin.ProgrammeParticipations;
 using AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto;
 using AqualLifeStyle.Application.ProgrammeParticipations;
@@ -404,6 +405,188 @@ namespace AqualLifeStyle.Tests.Application
             });
         }
 
+        [Fact]
+        public async Task Administrator_CanApproveAwaitingAQGreenParticipation()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var fixture = await CreateAwaitingApprovalEntryAsync(suffix);
+
+            await _service.ApproveProgrammeParticipationAsync(
+                new ApproveProgrammeParticipationInput
+                {
+                    Programme = AdminProgrammeType.Entry,
+                    ParticipationId = fixture.ParticipationId
+                });
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations
+                    .SingleAsync(item => item.Id == fixture.ParticipationId);
+                participation.Status.ShouldBe(EntryParticipationStatus.Active);
+                participation.ActivatedAt.ShouldNotBeNull();
+
+                var decision = await context.EntryParticipationApprovalDecisions
+                    .SingleAsync(item =>
+                        EF.Property<Guid>(item, "EntryParticipationId") ==
+                        fixture.ParticipationId);
+                decision.Approved.ShouldBeTrue();
+                decision.Reason.ShouldBeNull();
+                decision.AdministratorUserId.ShouldBe(AbpSession.GetUserId());
+
+                var user = await context.Users.SingleAsync(candidate => candidate.Id == fixture.UserId);
+                user.Role.ShouldBe(AquaUserRole.Member);
+
+                (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
+                    message.NotificationType == "ParticipationDecision" &&
+                    message.IdempotencyKey ==
+                        $"Entry:{fixture.ParticipationId}:approved")).ShouldBe(1);
+            });
+        }
+
+        [Fact]
+        public async Task Administrator_CanRejectAwaitingOnyxParticipationWithReason()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var fixture = await CreateAwaitingApprovalOnyxAsync(suffix);
+
+            await _service.RejectProgrammeParticipationAsync(
+                new RejectProgrammeParticipationInput
+                {
+                    Programme = AdminProgrammeType.Onyx,
+                    ParticipationId = fixture.ParticipationId,
+                    Reason = "Signed joining form does not match the payer"
+                });
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.OnyxParticipations
+                    .SingleAsync(item => item.Id == fixture.ParticipationId);
+                participation.Status.ShouldBe(OnyxParticipationStatus.Rejected);
+                participation.ActivatedAt.ShouldBeNull();
+
+                var decision = await context.OnyxParticipationApprovalDecisions
+                    .SingleAsync(item =>
+                        EF.Property<Guid>(item, "OnyxParticipationId") ==
+                        fixture.ParticipationId);
+                decision.Approved.ShouldBeFalse();
+                decision.Reason.ShouldBe("Signed joining form does not match the payer");
+
+                var user = await context.Users.SingleAsync(candidate => candidate.Id == fixture.UserId);
+                user.Role.ShouldBe(AquaUserRole.Guest);
+
+                (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
+                    message.NotificationType == "ParticipationDecision" &&
+                    message.IdempotencyKey ==
+                        $"Onyx:{fixture.ParticipationId}:declined")).ShouldBe(1);
+            });
+        }
+
+        [Fact]
+        public async Task Administrator_CannotRejectAnAlreadyActiveParticipation()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"approval-active-{suffix}",
+                $"approval-active-{suffix}@example.com");
+            var participationId = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    $"Approval Active {suffix}",
+                    new EmailAddress($"approval-active-customer-{suffix}@example.com"));
+                var membership = Membership.Create(
+                    1,
+                    $"Onyx-active-{suffix}",
+                    "Onyx active test",
+                    MembershipType.Onyx);
+                context.Customers.Add(customer);
+                context.Memberships.Add(membership);
+                await context.SaveChangesAsync();
+
+                var onyx = OnyxParticipation.StartDirectIndependently(
+                    1,
+                    customer.Id,
+                    membership.Id,
+                    OnyxPlanTerms.Create("2026-07", EffectiveFrom, 6120m),
+                    EffectiveFrom);
+                context.OnyxParticipations.Add(onyx);
+                await context.SaveChangesAsync();
+
+                var payment = MemberPayment.CreatePending(
+                    1,
+                    customer.Id,
+                    MemberPaymentPurpose.OnyxDirectEntry,
+                    6120m,
+                    "Test",
+                    $"onyx-active-{suffix}",
+                    EffectiveFrom);
+                payment.Confirm(EffectiveFrom.AddMinutes(1));
+                onyx.ApplyConfirmedDirectEntryPayment(payment);
+                onyx.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(2));
+                context.MemberPayments.Add(payment);
+                await context.SaveChangesAsync();
+                return onyx.Id;
+            });
+
+            await Should.ThrowAsync<InvalidOperationException>(() =>
+                _service.RejectProgrammeParticipationAsync(
+                    new RejectProgrammeParticipationInput
+                    {
+                        Programme = AdminProgrammeType.Onyx,
+                        ParticipationId = participationId,
+                        Reason = "Unexpected decline"
+                    }));
+        }
+
+        [Fact]
+        public async Task HostReviewerWithoutAllAreasPermission_CannotApproveAnotherAreasParticipation()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userName = $"host-approval-reviewer-{suffix}";
+            var userId = await CreateTestUserAsync(
+                null,
+                userName,
+                $"{userName}@example.com");
+            await UsingDbContextAsync(null, async context =>
+            {
+                var role = new Role(
+                    null,
+                    $"ApprovalReviewer-{suffix}",
+                    $"Approval Reviewer {suffix}");
+                context.Roles.Add(role);
+                await context.SaveChangesAsync();
+                context.UserRoles.RemoveRange(
+                    context.UserRoles.Where(userRole => userRole.UserId == userId));
+                context.UserRoles.Add(new UserRole(null, userId, role.Id));
+                context.Permissions.AddRange(new[]
+                {
+                    new RolePermissionSetting
+                    {
+                        TenantId = null,
+                        Name = AquaPermissions.Admin.ProgrammeParticipations.Approve,
+                        IsGranted = true,
+                        RoleId = role.Id
+                    }
+                });
+                await context.SaveChangesAsync();
+            });
+
+            var fixture = await CreateAwaitingApprovalEntryAsync(suffix);
+
+            AbpSession.TenantId = null;
+            AbpSession.UserId = userId;
+
+            await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                _service.ApproveProgrammeParticipationAsync(
+                    new ApproveProgrammeParticipationInput
+                    {
+                        Programme = AdminProgrammeType.Entry,
+                        ParticipationId = fixture.ParticipationId
+                    }));
+        }
+
         private async Task<Guid> CreateLockedAQGreenCheckoutAsync(string suffix)
         {
             var userId = await CreateTestUserAsync(
@@ -725,6 +908,7 @@ namespace AqualLifeStyle.Tests.Application
             var activation = MemberPayment.CreatePending(tenantId, customerId, MemberPaymentPurpose.EntryActivation, 600m, "Test", $"{reference}-activation", EffectiveFrom);
             activation.Confirm(EffectiveFrom.AddMinutes(2));
             participation.ApplyConfirmedActivationPayment(activation);
+            participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
             return new[] { registration, activation };
         }
 
@@ -744,7 +928,115 @@ namespace AqualLifeStyle.Tests.Application
                 EffectiveFrom);
             payment.Confirm(EffectiveFrom.AddMinutes(1));
             participation.ApplyConfirmedDirectEntryPayment(payment);
+            participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(2));
             return payment;
+        }
+
+        private async Task<ApprovalFixture> CreateAwaitingApprovalEntryAsync(string suffix)
+        {
+            var userId = await CreateTestUserAsync(
+                1,
+                $"approval-entry-{suffix}",
+                $"approval-entry-{suffix}@example.com");
+            return await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    $"Approval Entry {suffix}",
+                    new EmailAddress($"approval-entry-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    LegacySplitPaymentTerms,
+                    EffectiveFrom);
+                context.EntryParticipations.Add(participation);
+                await context.SaveChangesAsync();
+
+                var registration = MemberPayment.CreatePending(
+                    1,
+                    customer.Id,
+                    MemberPaymentPurpose.EntryRegistration,
+                    600m,
+                    "Test",
+                    $"approval-entry-registration-{suffix}",
+                    EffectiveFrom);
+                registration.Confirm(EffectiveFrom.AddMinutes(1));
+                participation.ApplyConfirmedActivationPayment(registration);
+                var activation = MemberPayment.CreatePending(
+                    1,
+                    customer.Id,
+                    MemberPaymentPurpose.EntryActivation,
+                    600m,
+                    "Test",
+                    $"approval-entry-activation-{suffix}",
+                    EffectiveFrom);
+                activation.Confirm(EffectiveFrom.AddMinutes(2));
+                participation.ApplyConfirmedActivationPayment(activation);
+                context.MemberPayments.AddRange(registration, activation);
+                await context.SaveChangesAsync();
+
+                return new ApprovalFixture
+                {
+                    UserId = userId,
+                    ParticipationId = participation.Id
+                };
+            });
+        }
+
+        private async Task<ApprovalFixture> CreateAwaitingApprovalOnyxAsync(string suffix)
+        {
+            var userId = await CreateTestUserAsync(
+                1,
+                $"approval-onyx-{suffix}",
+                $"approval-onyx-{suffix}@example.com");
+            return await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    $"Approval Onyx {suffix}",
+                    new EmailAddress($"approval-onyx-customer-{suffix}@example.com"));
+                var membership = Membership.Create(
+                    1,
+                    $"Onyx-approval-{suffix}",
+                    "Onyx approval test",
+                    MembershipType.Onyx);
+                context.Customers.Add(customer);
+                context.Memberships.Add(membership);
+                await context.SaveChangesAsync();
+
+                var onyx = OnyxParticipation.StartDirectIndependently(
+                    1,
+                    customer.Id,
+                    membership.Id,
+                    OnyxPlanTerms.Create("2026-07", EffectiveFrom, 6120m),
+                    EffectiveFrom);
+                context.OnyxParticipations.Add(onyx);
+                await context.SaveChangesAsync();
+
+                var payment = MemberPayment.CreatePending(
+                    1,
+                    customer.Id,
+                    MemberPaymentPurpose.OnyxDirectEntry,
+                    6120m,
+                    "Test",
+                    $"onyx-approval-{suffix}",
+                    EffectiveFrom);
+                payment.Confirm(EffectiveFrom.AddMinutes(1));
+                onyx.ApplyConfirmedDirectEntryPayment(payment);
+                context.MemberPayments.Add(payment);
+                await context.SaveChangesAsync();
+
+                return new ApprovalFixture
+                {
+                    UserId = userId,
+                    ParticipationId = onyx.Id
+                };
+            });
         }
 
         private sealed class RecruitmentNetworkFixture
@@ -754,6 +1046,12 @@ namespace AqualLifeStyle.Tests.Application
             public int TargetCustomerId { get; init; }
             public string TargetNumber { get; init; }
             public string DescendantNumber { get; init; }
+        }
+
+        private sealed class ApprovalFixture
+        {
+            public long UserId { get; init; }
+            public Guid ParticipationId { get; init; }
         }
     }
 }
