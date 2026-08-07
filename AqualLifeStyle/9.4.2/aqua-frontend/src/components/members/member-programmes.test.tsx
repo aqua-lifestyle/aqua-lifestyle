@@ -140,6 +140,43 @@ describe("MemberProgrammes", () => {
     await waitFor(() => expect(refreshAccessToken).toHaveBeenCalledOnce());
   });
 
+  it("keeps a recruitable member signed in when no refresh token is available", async () => {
+    vi.mocked(useAuthState).mockReturnValue(
+      authState([
+        "Aqua.ProgrammeParticipations.ViewSelf",
+        "Aqua.ProgrammeParticipations.Join",
+      ]),
+    );
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: {
+        activatedAt: "2026-07-30T00:00:00Z",
+        canRecruitForThisProgramme: true,
+        currency: "ZAR",
+        isActive: true,
+        joinedIndependently: true,
+        nextPaymentAmount: null,
+        nextPaymentDescription: null,
+        programmeName: "AQGreen",
+        recruiterClubMemberNumber: null,
+        startedAt: "2026-07-30T00:00:00Z",
+        status: "Active",
+      },
+      onyx: null,
+      travelBenefit: null,
+    });
+    vi.mocked(refreshAccessToken).mockResolvedValue(null);
+
+    render(<MemberProgrammes />);
+
+    await waitFor(() => expect(refreshAccessToken).toHaveBeenCalledOnce());
+    expect(
+      await screen.findByText(
+        /sign out and sign in again to load your updated club member access/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/session-ended/i)).not.toBeInTheDocument();
+  });
+
   it("shows both network placements without requiring an invitation", async () => {
     render(<MemberProgrammes />);
 
