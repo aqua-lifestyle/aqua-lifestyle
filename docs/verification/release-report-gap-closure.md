@@ -1,9 +1,9 @@
 # Release Report — Programme Engine Gap Closure (`feat/programme-engine-gap-closure`)
 
 Release role: Release Engineer — final validation pass
-Branch: `feat/programme-engine-gap-closure` (HEAD `4e15a28`)
-Base: merge-base `e371f85` (origin/main has since advanced 9 commits)
-Date: 2026-08-07
+Branch: `feat/programme-engine-gap-closure` (HEAD `43d968d` — post-integration)
+Base: merge-base `e371f85`; merged against `origin/main` at `32f02a4` (merge commit `43d968d`)
+Date: 2026-08-07 (updated after integrating current `origin/main`)
 Companion docs: `docs/verification/business-rule-matrix.md`, `docs/verification/verification-report.md`
 
 ---
@@ -34,10 +34,11 @@ A member can see a truthful, read-only explanation of their AQGreen position (ne
 
 ## 2. Branch state
 
-- Working tree **clean**; nothing staged.
+- **Integrated with current `origin/main`** via merge commit `43d968d` (parents `724c9fc` branch, `32f02a4` origin/main). Working tree **clean**; nothing staged.
 - No upstream configured (`git push --dry-run`/PR not performed; not requested).
-- Branch commits (`origin/main..HEAD`, 7): `4e15a28` feat(member): expose commission progress and payout explanations; `9fb1baf` feat(aqgreen): implement funeral-cover inclusion; `e17f3c6` feat(aqgreen): implement recurring obligation model; `e6b6302` docs: record programme-engine gap closure baseline; `34e38d6` docs: add programme-engine business rule matrix and verification report; `4abcdc1` test(frontend): de-flake awaiting-approval admin test; `655b7f9` test(programmes): add deterministic 3,906-participant Onyx simulation.
-- Diff vs merge-base: 40 files, +9024/−4.
+- Pre-merge commits (`origin/main..HEAD`, 8): `724c9fc` docs: finalize release readiness documentation; `4e15a28` feat(member): expose commission progress and payout explanations; `9fb1baf` feat(aqgreen): implement funeral-cover inclusion; `e17f3c6` feat(aqgreen): implement recurring obligation model; `e6b6302` docs: record programme-engine gap closure baseline; `34e38d6` docs: add programme-engine business rule matrix and verification report; `4abcdc1` test(frontend): de-flake awaiting-approval admin test; `655b7f9` test(programmes): add deterministic 3,906-participant Onyx simulation.
+- Commits integrated from `origin/main` (9): CI workflow additions (PostgreSQL transactional gate, Render deploy gate, manual dispatch), and `b4f0de7` frontend admin-approval async-race fix.
+- Pre-merge diff vs merge-base: 40 files, +9024/−4. Merge changed only: `.github/workflows/ci.yml`, `AdminProgrammeParticipations.test.tsx` (conflict resolved, see §4a), `InternalAccountInvitationEndToEndTests.cs`. **No production Programme Engine file was altered by integration.**
 
 ---
 
@@ -88,6 +89,32 @@ A member can see a truthful, read-only explanation of their AQGreen position (ne
 
 ---
 
+## 4a. Post-integration: `origin/main` merge and conflict resolution
+
+### Merge performed
+- Fetched `origin/main` (`git fetch --prune origin`) and merged into the branch (**not** rebased; no commits rewritten).
+- Merge commit `43d968d` with parents `724c9fc` (branch) and `32f02a4` (origin/main).
+- Merge brought in 9 `origin/main` commits: CI workflow additions (PostgreSQL transactional gate `98e2c31`, Render deploy gate `d599627`/`0c2e0e4`, manual dispatch `61eeb6f`, PR merges `32f02a4`/`dadc1fa`) and the frontend admin-approval async-race fix `b4f0de7`.
+
+### Conflict
+- Single content conflict in `aqua-frontend/src/components/admin/AdminProgrammeParticipations.test.tsx`.
+- Both sides had independently de-flaked the same test (`lists confirmed payments awaiting Area approval and approves one`):
+  - Branch `4abcdc1`: `findByRole("button", { name: "Approve" })` + `getAllByText("Awaiting Area approval").length > 0`.
+  - Main `b4f0de7`: `findByRole("button", { name: "Approve" })` + `getByText("Awaiting Area approval", { selector: "span" })`.
+
+### Resolution rationale
+Adopted main's version (the merged tree is byte-identical to `origin/main` for this file):
+- **Synchronization**: both fixes await the `Approve` button via `findByRole` — the element that only appears after the async participation table renders. This removes the original race where the always-rendered stat-card heading satisfied the wait early.
+- **Status assertion**: main's `getByText("Awaiting Area approval", { selector: "span" })` is strictly stronger than the branch's `getAllByText(...).length > 0`. The always-rendered heading is a `<p>` (AdminProgrammeParticipations.tsx:598); the table status badge is a `<span>` (badge.tsx:30). `selector: "span"` therefore targets only the rendered row badge, so the assertion cannot be satisfied by the always-rendered heading.
+- **Enabled assertion**: `expect(approveButton).toBeEnabled()` retained on both sides.
+- **No sleeps/timeouts, no weakened assertions**, no production code changed to resolve the conflict.
+
+### Verification of the resolution
+- Focused test `AdminProgrammeParticipations.test.tsx` ran **10/10 consecutive times, 8/8 tests passed each run**.
+- Full frontend suite passed (107 files, 377 tests) with the resolution in place.
+
+---
+
 ## 5. Security review
 
 - **Backend authoritative; frontend not trusted**: the progress page never renders anything not returned by `GetMyProgressAsync`; permission checks happen server-side via `[AbpAuthorize]`.
@@ -115,7 +142,7 @@ Every change reviewed for breakage of existing behaviour:
 - **Messaging/email**: untouched.
 - **Caching**: untouched.
 - **Deployment**: appsettings addition is additive; worker requires `Enabled=true` to run.
-- **Full suites re-run**: backend 704 passed, frontend 377 passed (1 pre-existing flaky test discussed in §9). No regression introduced.
+- **Full suites re-run (post-merge, on the integrated tree)**: backend 704 passed (Application 664 + Web.Tests 40), frontend 377 passed (including the previously flaky `member-programmes.test.tsx` in this run). No regression introduced.
 
 ---
 
@@ -177,7 +204,7 @@ A full-suite run reported `1 failed / 376 passed`. The failing test was `src/com
 ## 11. Documentation review
 
 - `docs/verification/business-rule-matrix.md`: M-15/M-28/M-44/M-45/M-46 statuses accurately reflect implementation; PD-06/PD-07 correctly recorded as unresolved; PD-01/03/04 correctly reclassified as branch-purpose gaps. Source references are `file:line` accurate.
-- `docs/verification/verification-report.md`: accurate for its baseline; evidence numbers there predate this final re-run (680 vs 704 now), which this report supersedes.
+- `docs/verification/verification-report.md`: accurate for its baseline; evidence numbers there predate the post-integration re-run, which this report supersedes.
 - Appsettings now documents the obligation worker config block with defaults (`Enabled=false`), matching operational reality.
 - No stale "not implemented" statements remain about M-15/M-46/M-28/44/45.
 
@@ -216,20 +243,22 @@ Overall: the member journey is coherent, truthful, permission-gated, and does no
 
 ## 14. Causality of observed failures
 
-- Frontend full-suite single failure: **pre-existing flaky test**, root cause = `setTimeout(0)` race between the health-incompatibility message (synchronous render) and the load-triggered "Join AQGreen" button; branch-independent (verified no diff to the test, component, or hook). Classification: pre-existing / unrelated-to-branch; not fixed here (out of change policy scope).
-- No other failure observed in any suite or build across the validation pass.
+- Frontend full-suite single failure (pre-merge): **pre-existing flaky test**, root cause = `setTimeout(0)` race between the health-incompatibility message (synchronous render) and the load-triggered "Join AQGreen" button; branch-independent (verified no diff to the test, component, or hook). Classification: pre-existing / unrelated-to-branch; not fixed here (out of change policy scope). Post-merge, the same file passed the full frontend run and 6/6 isolated re-runs — consistent with intermittent flake, not a regression.
+- The single merge conflict (admin approval test) was a **test-only** overlap of two independent de-flake fixes; resolved to the strictly stronger assertion (§4a). No production behaviour involved.
+- No other failure observed in any suite or build across the validation pass, pre- or post-merge.
 
 ---
 
-## 15. Evidence baseline (final)
+## 15. Evidence baseline (final — post-integration, on the merged tree)
 
 - Backend Release build: **0 errors**, 2035 warnings (pre-existing categories; no new categories).
-- Full backend suite (Application + Web.Tests TRX files): **704 passed, 0 failed, 0 skipped** (Application `backend-tests.trx`: 664 passed; Web.Tests `webtests.trx`: 40 passed).
-- Category evidence from Application TRX: EntityFrameworkCore/PG/Migration 24; Authorization 73; Integration 11; Payments 63; Simulation 2.
+- Full backend suite (post-merge, Application + Web.Tests TRX files): **704 passed, 0 failed, 0 skipped** (Application `application-tests.trx`: 664 passed; Web.Tests `webtests.trx`: 40 passed).
+- PostgreSQL transactional tests (from `origin/main`): `InternalAccountInvitationEndToEndTests` — both `CreateAndInvite_TransactionalRollback_LeavesNoPartialAdministrator` and `InvitationAcceptance_AllowsTokenAuthentication` **passed** in the 40 Web.Tests.
+- Category evidence from Application TRX: EntityFrameworkCore/PG/Migration 24; Authorization 73; Integration 11; Payments 63; Simulation 2. The PostgreSQL migration subset re-ran clean (24/24) against live `postgres:16-alpine` containers.
 - EF model check (`dotnet-ef` 8.0.8, `has-pending-model-changes`): **"No changes have been made to the model since the last migration."**
 - Migration Up/Down inspected; unique index on `EntryParticipationId` verified.
-- Frontend: ESLint clean; `tsc --noEmit` clean; production build compiled successfully (61 static pages, incl. `/member/programme-progress`); full Vitest suite 377 passed/107 files (one intermittent pre-existing flake documented in §9).
-- `git diff --check` clean; secret/TODO/debug/commented-code scans clean.
+- Frontend (post-merge): ESLint clean; `tsc --noEmit` clean; production build compiled successfully (61 static pages, incl. `/member/programme-progress`); full Vitest suite 377 passed/107 files; focused admin test 10/10 consecutive clean runs; previously-flaky `member-programmes.test.tsx` 6/6 isolated runs clean.
+- `git diff --check` clean; no conflict markers in the tree; secret/TODO/debug/commented-code scans clean (only `origin/main`-introduced CI test-only credentials, clearly named).
 
 ---
 
@@ -244,7 +273,7 @@ None outstanding.
 ### Accepted follow-up debt (does not block merge)
 | # | Finding | Owner |
 |---|---------|-------|
-| AF-01 | Pre-existing flaky frontend test `member-programmes.test.tsx` "blocks payment actions…" races `setTimeout(0)`; fix by awaiting the button with `findByRole` (same pattern as the already-de-flaked admin test). Not branch-owned; do not fold into this branch unless desired. | Engineering |
+| AF-01 | Pre-existing flaky frontend test `member-programmes.test.tsx` "blocks payment actions…" races `setTimeout(0)`; fix by awaiting the button with `findByRole`. Not branch-owned; passed the full post-merge run and 6/6 isolated re-runs but remains intermittently racy under load. | Engineering |
 | AF-02 | Funeral-cover inclusion insert has no `DbUpdateException` recovery around the unique index (mirror the payment-insert pattern at `ProgrammePaymentConfirmationProcessor.cs:441-452`). Idempotency-only improvement: the live webhook path is already serialised by the checkout advisory lock + receipt dedupe, and the only other call path has no production callers; correctness is guaranteed by the unique index. | Engineering |
 | AF-03 | An explicit parallel-duplicate webhook delivery test (AD-05) would strengthen hardening evidence. | Engineering |
 | AF-04 | Webhook rate limiting (AD-06 / M-35 / P-01) — pre-existing accepted debt. | Engineering |
@@ -293,20 +322,22 @@ Any deviation from D-1/D-3/D-4 is a deployment blocker, not a code defect.
 ## 19. Final verdict
 
 ### Implementation
-**Meets purpose.** All three branch-purpose gaps (M-15 recurring obligations, M-46 funeral-cover inclusion, M-28/M-44/M-45 member progress + education) are implemented to the confirmed scope, preserve payment-before-inclusion ordering, remain read-only for members, keep tenant isolation, and respect the unresolved decisions PD-06/PD-07 by never inventing state.
+**Meets purpose.** All three branch-purpose gaps (M-15 recurring obligations, M-46 funeral-cover inclusion, M-28/M-44/M-45 member progress + education) are implemented to the confirmed scope, preserve payment-before-inclusion ordering, remain read-only for members, keep tenant isolation, and respect the unresolved decisions PD-06/PD-07 by never inventing state. Post-integration review confirmed the merge did **not** alter any Programme Engine production file; all feature tests pass on the merged tree.
 
 ### Evidence
-**Sufficient for merge.** Backend 704/704, frontend 377/377 (one intermittent pre-existing flake, unrelated to branch), EF model clean, lint/type-check/build clean, migration inspected, security/authorization/performance reviews complete, and documentation aligned. The single observed failure is provably pre-existing and not branch-owned.
+**Sufficient for merge.** Validation was re-run on the **actual integrated result** (merge commit `43d968d` with current `origin/main` `32f02a4`), not only the pre-merge tree: backend 704/704 (incl. the `origin/main` PostgreSQL transactional invitation tests), frontend 377/377 (incl. focused admin test 10/10 and the previously-flaky `member-programmes.test.tsx` clean on this run), EF model clean, PostgreSQL migration tests 24/24, lint/type-check/build clean, migration inspected, security/authorization/performance reviews complete, conflict resolution documented (§4a), and documentation aligned.
 
 ### Operational state
-**CI green** (all suites + checks green; the pre-existing flake is intermittent and documented as follow-up AF-01).
+**CI green** (all suites + checks green on the merged tree; the pre-existing flake is intermittent and documented as follow-up AF-01).
 
 ---
 
 ### Release verdict: **READY FOR MERGE WITH ACCEPTED FOLLOW-UPS**
 
 Rationale:
+- **Mergeability established**: branch merged cleanly with current `origin/main`; the only conflict (test-only admin-approval de-flake overlap) was resolved to the strictly stronger deterministic assertion and validated 10/10 focused runs plus the full suite. No conflict markers remain; no unrelated files pulled in.
 - No blocking defect, no branch-introduced regression, no security or data-integrity finding.
 - Two engineering follow-ups are already known/accepted posture (AF-01 flaky pre-existing test, AF-02 inclusion-insert recovery) and three pre-existing accepted debts remain (AF-03/AF-04/AF-05).
 - Unresolved business decisions PD-06/PD-07 are correctly handled (safe defaults, explicit not-encoded state) and must be scheduled by business; the worker must be armed with `DueDayOfMonth` + `Enabled=true` before production recurring obligations start.
 - The report's remaining verification gaps are confined to the follow-up list above; none invalidates the implemented engine.
+- The branch still has **no upstream/PR**; pushing and opening a PR (which will run the real CI gate) are the remaining external steps and were explicitly out of scope for this pass.

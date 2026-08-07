@@ -35,11 +35,12 @@ Explicit exclusions: BusinessPremier deprecation (documented, out of scope), def
 | AC-11 | 3,906-participant deterministic simulation | Met | New `OnyxProgrammeEngineSimulationTests` (2 tests, ~6.7 s) | Automated + repeated |
 | AC-12 | Concurrency: unique constraints, idempotency, serializable approval, stale-work recovery | Met | EF configurations; hosted advisory locks; `ProgrammePaymentConfirmationProcessor` recovery paths | IT + Inspection |
 
-## 3. Evidence baseline (final, re-run after changes)
+## 3. Evidence baseline (final, re-run after changes; refreshed post-integration)
 
-- Backend Release build: **0 errors**. Full backend suite (final re-run): **664 (Application) + 40 (Web.Tests) = 704 passed, 0 failed, 0 skipped** (TRX `backend-tests.trx`, `webtests.trx`). Build warnings: 2035 total, all pre-existing categories (CS1591 dominant, plus NU1902 AngleSharp in Web.Tests).
+- Backend Release build: **0 errors**. Full backend suite (post-integration re-run on the merged tree, `feat/programme-engine-gap-closure` merged with current `origin/main` at `32f02a4`): **664 (Application) + 40 (Web.Tests) = 704 passed, 0 failed, 0 skipped** (TRX `application-tests.trx`, `webtests.trx`). Build warnings: 2035 total, all pre-existing categories (CS1591 dominant, plus NU1902 AngleSharp in Web.Tests).
 - EF model check with compatible `dotnet-ef` **8.0.8**: "No changes have been made to the model since the last migration."
-- Frontend (final re-run): **ESLint clean, `tsc --noEmit` clean, 377 Vitest tests passed (107 files)**. One intermittent pre-existing flake in `member-programmes.test.tsx` (untouched by the branch; see release report §9, AF-01).
+- PostgreSQL migration subset (EF + PG migration tests): **24/24 passed** against live `postgres:16-alpine` containers; `origin/main` transactional invitation tests (`InternalAccountInvitationEndToEndTests`, incl. rollback proof) passed in the 40 Web.Tests.
+- Frontend (post-integration re-run): **ESLint clean, `tsc --noEmit` clean, 377 Vitest tests passed (107 files)**; focused admin approval test **10/10 consecutive** deterministic passes; previously-flaky `member-programmes.test.tsx` passed the full run and 6/6 isolated re-runs (intermittent flake, see release report §9, AF-01).
 - NuGet vulnerabilities: pre-existing ABP transitives only (unchanged from baseline).
 
 ## 4. Engineering defects found and corrected
@@ -96,7 +97,7 @@ Verified that the codebase keeps distinct: Referral (placement), Qualification (
 **Sufficient for merge** — for the engine's implemented surface, including the gap-closure features, with the accepted debts above owned and tracked. (Product Decisions PD-02/PD-05/PD-06 must be scheduled; they do not invalidate the implemented engine.)
 
 ### Operational state
-**CI green** (backend suite + gap-closure regression tests, frontend suite, EF model clean, lint + type-check clean). Final release validation and verdict are in `docs/verification/release-report-gap-closure.md`.
+**CI green** (backend suite + gap-closure regression tests, frontend suite, EF model clean, lint + type-check clean — all re-validated on the merged tree). Final release validation, mergeability assessment, and verdict are in `docs/verification/release-report-gap-closure.md` (§4a documents the single test-only conflict resolved against current `origin/main`).
 
 ---
 
@@ -120,4 +121,5 @@ Gap closure on `feat/programme-engine-gap-closure`:
 2. `feat(aqgreen): implement recurring obligation model`
 3. `feat(aqgreen): implement funeral-cover inclusion`
 4. `feat(member): expose commission progress and payout explanations`
-5. Final verification re-run and verdict update.
+5. `docs(verification): finalize release readiness documentation`
+6. `Merge origin/main into feat/programme-engine-gap-closure` (`43d968d`) — integrated current `origin/main` (`32f02a4`); only conflict was the test-only admin-approval de-flake overlap, resolved to the stronger `findByRole` + `getByText(..., { selector: "span" })` assertion.
