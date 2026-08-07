@@ -1,4 +1,3 @@
-using System;
 using System.Threading.Tasks;
 using Abp.Dependency;
 using Abp.EntityFrameworkCore;
@@ -9,19 +8,21 @@ namespace AqualLifeStyle.EntityFrameworkCore
 {
     /// <summary>
     /// PostgreSQL advisory / SQL Server application lock that guarantees a single
-    /// running AQGreen monthly-obligation scheduler across host instances. The
-    /// lock is transaction-scoped so it is released when the scheduler's unit of
-    /// work commits or rolls back. Providers without a supported lock are treated
-    /// as a single-node deployment.
+    /// running AQGreen weekly commission calculator across host instances. The
+    /// lock is transaction-scoped so it is released when the calculation's unit of
+    /// work commits or rolls back. It uses a distinct key from the monthly
+    /// obligation lock so commission calculation and obligation scheduling are not
+    /// serialised against each other. Providers without a supported lock are
+    /// treated as a single-node deployment.
     /// </summary>
-    public sealed class EntryMonthlyObligationSchedulingLock
-        : IEntryMonthlyObligationSchedulingLock, ITransientDependency
+    public sealed class EntryWeeklyCommissionCalculationLock
+        : IEntryWeeklyCommissionCalculationLock, ITransientDependency
     {
-        public static long LockKey = AQGreenMonthlyObligationLockKey;
-        private const long AQGreenMonthlyObligationLockKey = 0x415147524F424C;
+        public static long LockKey = AQGreenWeeklyCommissionLockKey;
+        private const long AQGreenWeeklyCommissionLockKey = 0x41514757434F4D50;
         private readonly IDbContextProvider<AqualLifeStyleDbContext> _dbContextProvider;
 
-        public EntryMonthlyObligationSchedulingLock(
+        public EntryWeeklyCommissionCalculationLock(
             IDbContextProvider<AqualLifeStyleDbContext> dbContextProvider)
         {
             _dbContextProvider = dbContextProvider;
@@ -35,7 +36,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             {
                 await context.Database.ExecuteSqlRawAsync(
                     "SELECT pg_advisory_xact_lock({0})",
-                    AQGreenMonthlyObligationLockKey);
+                    AQGreenWeeklyCommissionLockKey);
                 return;
             }
 
@@ -45,8 +46,8 @@ namespace AqualLifeStyle.EntityFrameworkCore
                     "DECLARE @result int; " +
                     "EXEC @result = sp_getapplock @Resource = {0}, @LockMode = 'Exclusive', " +
                     "@LockOwner = 'Transaction', @LockTimeout = 10000; " +
-                    "IF @result < 0 THROW 51000, 'Unable to lock AQGreen monthly obligation scheduling.', 1;",
-                    "aqgreen-monthly-obligation");
+                    "IF @result < 0 THROW 51000, 'Unable to lock AQGreen weekly commission calculation.', 1;",
+                    "aqgreen-weekly-commission");
             }
         }
     }

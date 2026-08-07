@@ -9,6 +9,7 @@ using AqualLifeStyle.Web.Host.Payments.Yoco;
 using Abp.Runtime.Caching.Redis;
 using AqualLifeStyle.Web.Host.Email;
 using AqualLifeStyle.Web.Host.ProgrammeEngine;
+using AqualLifeStyle.Web.Host.Commissions;
 using Abp.Dependency;
 using Abp.Net.Mail;
 using Abp.Configuration.Startup;
@@ -75,6 +76,8 @@ namespace AqualLifeStyle.Web.Host.Startup
                 IocManager.Resolve<TransactionalEmailOutboxWorker>());
             IocManager.Resolve<IBackgroundWorkerManager>().Add(
                 IocManager.Resolve<EntryMonthlyObligationWorker>());
+            IocManager.Resolve<IBackgroundWorkerManager>().Add(
+                IocManager.Resolve<EntryWeeklyCommissionCalculationWorker>());
         }
 
         private static string NormalizeRedisConfiguration(string configuration)
