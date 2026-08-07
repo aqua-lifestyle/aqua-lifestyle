@@ -37,7 +37,7 @@ Evidence keys: **E2E** end-to-end · **IT** integration test · **AT** automated
 | ID | Rule | Status | Evidence | Source |
 |----|------|--------|----------|--------|
 | M-14 | AQGreen monthly commitment is R600, grace period 7 days; overdue state holds the member's own payout while preserving placement and debt | **Confirmed** (domain) | AT | `EntryMonthlyObligation.cs` (enum Due/GracePeriod/Overdue/Paid; `IsOwnPayoutEligible`); `CurrentProgrammeTermsProvider` version "2026-08-single-1200" |
-| M-15 | Automatic obligation scheduling and payment allocation into obligations | **Undefined** | I | Nothing in production calls `EntryMonthlyObligation.Create`/assessment/payment; only tests. `onyx-implementation-plan.md:189-190` "Automatic obligation scheduling and payment allocation are deferred to the secured application workflow phase" |
+| M-15 | Automatic obligation scheduling and payment allocation into obligations | **Confirmed, unimplemented (Branch-Purpose Gap)** | I | Nothing in production calls `EntryMonthlyObligation.Create`/assessment/payment; only tests (`EntryMonthlyObligationTests.cs:49,127`; `EntryWeeklyCommissionTests.cs:87,108`; `EntryMonthlyObligationAppServiceTests.cs:80`; `OnyxProgrammePersistenceTests.cs:153`). FR-03 `requirements.md:20` (Critical, marked ✅ Implemented) has nothing to track because no production mechanism creates the recurring obligation. BR-16 confirms the R600 monthly commitment is separate from the R1,200 joining payment. `onyx-implementation-plan.md:189-190` defers scheduling to the secured workflow phase — a functional gap, not a product decision |
 | M-16 | Effect of an overdue AQGreen member's obligation on upline structural qualification / commissions | **Undefined** | I | `onyx-implementation-plan.md:95-100` "The effect on uplines is unresolved"; `:186-188` "no upline contribution effect is inferred" |
 
 ## 4. Recruitment tree and qualification boundaries
@@ -60,7 +60,7 @@ Evidence keys: **E2E** end-to-end · **IT** integration test · **AT** automated
 | M-25 | Commission ledger distinguishes Earned → Released → Paid (weekly payout status), with per-period uniqueness per participation | **Confirmed** | AT/IT | `OnyxWeeklyCommission` + `WeeklyCommissionPayoutStatus`; `EntryWeeklyCommission`; per-period uniqueness in EF configurations; `EarnedCommission_IsReleasedAndPaidThroughIdempotentTransitions` `OnyxWeeklyCommissionTests.cs:184-203` |
 | M-26 | Overdue own obligations and active Onyx loans hold the member's own payout | **Confirmed** | AT/I | `EntryMonthlyObligation.IsOwnPayoutEligible`; loan-hold decision (`onyx-implementation-plan.md:243-246`); `AdminCommissionAppService` holds logic |
 | M-27 | Commission Calculate / Release / RecordPayment are host-only permissions, idempotent per period | **Confirmed** | I/AT | `AquaPermissions.Commissions.*` host `CreateChildren`; `AdminCommissionAppServiceTests` |
-| M-28 | No member-facing commission ledger is exposed | **Undefined** | I | No `IClubMember*` commission ledger service/endpoint; frontend has no member commission view (Product Decision) |
+| M-28 | No member-facing commission ledger is exposed | **Confirmed, unimplemented (Branch-Purpose Gap)** | I | No `IClubMember*` commission ledger service/endpoint; frontend has no member commission view. The mission brief explicitly requires member commission-ledger transparency |
 
 ## 6. Terms versioning and money quantities
 
@@ -101,14 +101,14 @@ Evidence keys: **E2E** end-to-end · **IT** integration test · **AT** automated
 | ID | Rule | Status | Evidence | Source |
 |----|------|--------|----------|--------|
 | M-43 | Member dashboard shows programme participation, next payment, activation state | **Confirmed** | AT/I | `member-programmes.tsx`, `use-my-programme-participations.ts`; `member-dashboard.test.tsx` |
-| M-44 | Member-visible education component about the programme/tree/commissions | **Undefined** | I | No dedicated education component (Product Decision) |
-| M-45 | Member-facing commission ledger / transparency view | **Undefined** | I | No member commission endpoint or component (Product Decision) |
+| M-44 | Member-visible education component about the programme/tree/commissions | **Confirmed, unimplemented (Branch-Purpose Gap)** | I | No dedicated education component; the mission brief requires member-visible programme/commission education |
+| M-45 | Member-facing commission ledger / transparency view | **Confirmed, unimplemented (Branch-Purpose Gap)** | I | No member commission endpoint or component; the mission brief requires a member-visible commission ledger |
 
 ## 11. Funeral cover
 
 | ID | Rule | Status | Evidence | Source |
 |----|------|--------|----------|--------|
-| M-46 | R30,000 funeral cover plan with 6-month waiting period, external insurer | **Undefined** | I | FR-44 `requirements.md:86` ❌ Missing; A-21 `Assumptions.md` (external insurer); `future-roadmap.md`; no production code references funeral cover (only unrelated `Timer.Period = 30_000` in `TransactionalEmailOutboxWorker.cs`) |
+| M-46 | R30,000 funeral cover plan with 6-month waiting period, external insurer | **Confirmed, unimplemented (Branch-Purpose Gap)** | I | FR-44 `requirements.md:86` ❌ Missing; BR-10 `requirements.md:130` (6-month waiting); A-21 `Assumptions.md:40` (external insurer; platform tracks linkage/eligibility only); confirmed business rule: completion of the R1,200 AQGreen joining obligation — once or R600+R600 — includes the R30,000 funeral-cover benefit. No production code references funeral cover (only unrelated `Timer.Period = 30_000` in `TransactionalEmailOutboxWorker.cs`). Insurance activation/enrolment timing is separate (PD-06) |
 
 ---
 
@@ -116,11 +116,11 @@ Evidence keys: **E2E** end-to-end · **IT** integration test · **AT** automated
 
 | # | Product Decision | Rationale |
 |----|------------------|-----------|
-| PD-01 | Automatic scheduling and payment allocation of the R600 monthly obligation | Domain is complete; production scheduling deferred by `onyx-implementation-plan.md:189-190`. Business must choose a secured scheduler design + scope. |
 | PD-02 | Upline effect of an overdue AQGreen member | Explicitly unresolved in `onyx-implementation-plan.md:95-100,186-188`. |
-| PD-03 | Member-facing commission ledger and education content | Transparency requested by mission; no requirement doc / no implementation. |
-| PD-04 | R30,000 funeral cover product | Missing in requirements (FR-44), assumptions (A-21 external insurer) and roadmap. Requires insurer integration decision before design. |
 | PD-05 | Audit history surfaced to administrators | Data stored append-only; surfacing UX/API is an open decision. |
+| PD-06 | Funeral-cover activation/enrolment timing and effective date | The platform records funeral cover as included/eligible once the R1,200 joining obligation is satisfied. Whether/when the cover becomes "active" (insurer enrolment, 6-month waiting-period activation, policy effective date) is unresolved and must NOT be encoded as active in code until the business defines it. |
+
+The following were previously listed as Product Decisions but are now confirmed **Branch-Purpose Gaps** being closed on `feat/programme-engine-gap-closure`: PD-01 (automatic R600 obligation scheduling/payment allocation → M-15), PD-03 (member-facing commission ledger and education → M-28/M-44/M-45), PD-04 (R30,000 funeral cover product → M-46).
 
 ## Contradictory / provisional notes
 
