@@ -106,6 +106,40 @@ namespace AqualLifeStyle.Email
                 $"Reference: {providerReference}\nConfirmed: {dateText}\n\nThis confirmation is not a tax invoice.\n\n{Brand}", reference);
         }
 
+        public TransactionalEmail ParticipationAwaitingApproval(
+            string name, string email, string programme, string reference)
+            => new TransactionalEmail(email, $"{programme} payment received — awaiting approval",
+                $"<p>Hello {E(name)},</p>" +
+                $"<p>Your <strong>{E(programme)}</strong> payment has been received and confirmed.</p>" +
+                $"<p>Your participation is now under review by the Area team and will be activated once approved. You will receive another email with the outcome.</p>" +
+                $"<p>This confirmation is not a tax invoice.</p><p>{Brand}</p>",
+                $"Hello {name},\n\nYour {programme} payment has been received and confirmed.\n" +
+                $"Your participation is now under review by the Area team and will be activated once approved.\n\n" +
+                $"This confirmation is not a tax invoice.\n\n{Brand}", reference);
+
+        public TransactionalEmail ParticipationApproved(
+            string name, string email, string programme, string reference)
+            => new TransactionalEmail(email, $"{programme} participation approved",
+                $"<p>Hello {E(name)},</p>" +
+                $"<p>Your <strong>{E(programme)}</strong> participation has been reviewed and approved.</p>" +
+                $"<p>Your participation is now active. You can continue your programme from your Aqua Lifestyle Club account.</p>" +
+                $"<p>{Brand}</p>",
+                $"Hello {name},\n\nYour {programme} participation has been reviewed and approved.\n" +
+                $"Your participation is now active.\n\n{Brand}", reference);
+
+        public TransactionalEmail ParticipationDeclined(
+            string name, string email, string programme, string reason, string reference)
+        {
+            var safeReason = E(reason);
+            return new TransactionalEmail(email, $"{programme} participation declined",
+                $"<p>Hello {E(name)},</p>" +
+                $"<p>Your <strong>{E(programme)}</strong> participation could not be approved.</p>" +
+                $"<p><strong>Reason</strong><br>{safeReason}</p>" +
+                $"<p>If you believe this is a mistake, contact the club team.</p><p>{Brand}</p>",
+                $"Hello {name},\n\nYour {programme} participation could not be approved.\n\nReason:\n{reason}\n\n" +
+                $"If you believe this is a mistake, contact the club team.\n\n{Brand}", reference);
+        }
+
         private static TransactionalEmail Build(
             string email, string subject, string name, string explanation, string action,
             string url, string reference)

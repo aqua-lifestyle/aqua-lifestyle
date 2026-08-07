@@ -19,5 +19,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         Task<PagedResultDto<LegacyAQGreenReconciliationDto>>
             GetLegacyAQGreenReconciliationAsync(
                 LegacyAQGreenReconciliationListInput input);
+        Task ApproveProgrammeParticipationAsync(
+            ApproveProgrammeParticipationInput input);
+        Task RejectProgrammeParticipationAsync(
+            RejectProgrammeParticipationInput input);
     }
 }
