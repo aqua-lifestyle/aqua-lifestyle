@@ -146,7 +146,7 @@ namespace AqualLifeStyle.Tests.Application
             {
                 var participation = await context.EntryParticipations
                     .SingleAsync(item => item.Id == persisted.ParticipationId);
-                participation.Status.ShouldBe(EntryParticipationStatus.Active);
+                participation.Status.ShouldBe(EntryParticipationStatus.PaymentConfirmedAwaitingApproval);
                 participation.JoiningPaymentId.ShouldBe(first.PaymentId);
                 var persistedCheckout = await context.AQGreenJoiningCheckouts
                     .SingleAsync(item => item.Id == persisted.CheckoutId);
@@ -162,7 +162,7 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task VerifiedConfirmations_ActivateEntryAndOnyxIdempotently()
+        public async Task VerifiedConfirmations_LeaveEntryAndOnyxAwaitingApproval()
         {
             var suffix = Guid.NewGuid().ToString("N");
             var userId = await CreateTestUserAsync(
@@ -257,10 +257,10 @@ namespace AqualLifeStyle.Tests.Application
                     .ToListAsync();
                 var user = await context.Users.SingleAsync(candidate => candidate.Id == userId);
 
-                Assert.Equal(EntryParticipationStatus.Active, entry.Status);
-                Assert.Equal(OnyxParticipationStatus.Active, onyxParticipation.Status);
-                Assert.Equal(AquaUserRole.Member, user.Role);
-                Assert.Contains(
+                Assert.Equal(EntryParticipationStatus.PaymentConfirmedAwaitingApproval, entry.Status);
+                Assert.Equal(OnyxParticipationStatus.PaymentConfirmedAwaitingApproval, onyxParticipation.Status);
+                Assert.Equal(AquaUserRole.Guest, user.Role);
+                Assert.DoesNotContain(
                     await context.Roles
                         .Where(role => context.UserRoles
                             .Where(userRole => userRole.UserId == userId)
@@ -486,7 +486,7 @@ namespace AqualLifeStyle.Tests.Application
 
                 var participation = await context.OnyxParticipations
                     .SingleAsync(p => p.CustomerId == persisted.CustomerId);
-                participation.Status.ShouldBe(OnyxParticipationStatus.Active);
+                participation.Status.ShouldBe(OnyxParticipationStatus.PaymentConfirmedAwaitingApproval);
                 participation.DirectEntryPaymentId.ShouldBe(payment.Id);
             });
         }
@@ -565,7 +565,7 @@ namespace AqualLifeStyle.Tests.Application
             {
                 var participation = await context.EntryParticipations.SingleAsync(
                     item => item.Id == persisted.ParticipationId);
-                participation.Status.ShouldBe(EntryParticipationStatus.Active);
+                participation.Status.ShouldBe(EntryParticipationStatus.PaymentConfirmedAwaitingApproval);
                 (await context.MemberPayments.CountAsync(payment =>
                     payment.ExternalReference == notification.PaymentId)).ShouldBe(1);
                 var receipt = await context.YocoWebhookReceipts.SingleAsync();
@@ -656,7 +656,7 @@ namespace AqualLifeStyle.Tests.Application
             {
                 (await context.OnyxParticipations.SingleAsync(participation =>
                     participation.CustomerId == persisted.CustomerId)).Status.ShouldBe(
-                    OnyxParticipationStatus.Active);
+                    OnyxParticipationStatus.PaymentConfirmedAwaitingApproval);
                 var receipt = await context.YocoWebhookReceipts.SingleAsync();
                 receipt.Programme.ShouldBe(YocoCheckoutProgramme.Onyx);
                 receipt.CheckoutReferenceId.ShouldBe(persisted.CheckoutId);

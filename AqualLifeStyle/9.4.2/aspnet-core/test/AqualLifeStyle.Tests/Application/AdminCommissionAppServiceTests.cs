@@ -269,6 +269,7 @@ namespace AqualLifeStyle.Tests.Application
                 $"commission-activation-{index}-{suffix}");
             participation.ApplyConfirmedActivationPayment(registration);
             participation.ApplyConfirmedActivationPayment(activation);
+            participation.ApproveByAdministrator(1L, confirmedAt);
             context.MemberPayments.AddRange(registration, activation);
         }
 

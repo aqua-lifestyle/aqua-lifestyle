@@ -15,6 +15,8 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
             builder.ToTable("OnyxParticipations");
 
             builder.Ignore(participation => participation.JoinedIndependently);
+            builder.Ignore(participation => participation.IsAwaitingAdministrativeApproval);
+            builder.Ignore(participation => participation.IsRejected);
 
             builder.Property(participation => participation.TenantId).IsRequired();
             builder.Property(participation => participation.CustomerId).IsRequired();
@@ -69,6 +71,15 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
 
             builder.Navigation(participation => participation.RecruiterCorrections)
                 .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+            builder.HasMany(participation => participation.ApprovalDecisions)
+                .WithOne()
+                .HasForeignKey("OnyxParticipationId")
+                .IsRequired()
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Navigation(participation => participation.ApprovalDecisions)
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
         }
     }
 
@@ -82,6 +93,24 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
             builder.Property(correction => correction.AdministratorUserId).IsRequired();
             builder.Property(correction => correction.Reason).HasMaxLength(1000).IsRequired();
             builder.Property(correction => correction.CorrectedAt).IsRequired();
+            builder.HasIndex("OnyxParticipationId");
+        }
+    }
+
+    internal sealed class OnyxParticipationApprovalDecisionConfiguration
+        : IEntityTypeConfiguration<OnyxParticipationApprovalDecision>
+    {
+        public void Configure(EntityTypeBuilder<OnyxParticipationApprovalDecision> builder)
+        {
+            builder.ToTable("OnyxParticipationApprovalDecisions");
+
+            builder.Property<Guid>("OnyxParticipationId").IsRequired();
+            builder.Property(decision => decision.AdministratorUserId).IsRequired();
+            builder.Property(decision => decision.Approved).IsRequired();
+            builder.Property(decision => decision.Reason)
+                .HasMaxLength(OnyxParticipationApprovalDecision.MaxRejectionReasonLength);
+            builder.Property(decision => decision.DecidedAt).IsRequired();
+
             builder.HasIndex("OnyxParticipationId");
         }
     }

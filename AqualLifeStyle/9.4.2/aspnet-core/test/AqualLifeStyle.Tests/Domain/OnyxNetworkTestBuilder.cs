@@ -114,6 +114,7 @@ namespace AqualLifeStyle.Tests.Domain
                 startedAt);
             payment.Confirm(startedAt.AddMinutes(1));
             participation.ApplyConfirmedDirectEntryPayment(payment);
+            participation.ApproveByAdministrator(1L, startedAt.AddMinutes(2));
         }
     }
 }
