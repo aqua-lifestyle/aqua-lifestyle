@@ -263,6 +263,7 @@ namespace AqualLifeStyle.Tests.Domain
                 600m,
                 EffectiveFrom.AddMinutes(2));
             participation.ApplyConfirmedActivationPayment(activation);
+            participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
         }
 
         private static MemberPayment CreateConfirmedRepayment(

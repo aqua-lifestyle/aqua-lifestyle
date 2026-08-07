@@ -2,6 +2,8 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Configuration;
+using Abp.Domain.Uow;
+using Abp.Runtime.Session;
 using Abp.UI;
 using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Application.ProgrammeParticipations.Dto;
@@ -401,7 +403,7 @@ namespace AqualLifeStyle.Tests.Application
             {
                 var participation = await context.OnyxParticipations.SingleAsync(item =>
                     item.CustomerId == customerId);
-                participation.Status.ShouldBe(OnyxParticipationStatus.Active);
+                participation.Status.ShouldBe(OnyxParticipationStatus.PaymentConfirmedAwaitingApproval);
                 participation.RecruiterCustomerId.ShouldBeNull();
                 participation.DirectEntryPaymentId.ShouldBe(first.PaymentId);
                 var intent = await context.DirectOnyxCheckoutIntents.SingleAsync(item =>
@@ -503,7 +505,7 @@ namespace AqualLifeStyle.Tests.Application
             {
                 var participation = await context.EntryParticipations.SingleAsync(
                     item => item.CustomerId == customerId);
-                participation.Status.ShouldBe(EntryParticipationStatus.Active);
+                participation.Status.ShouldBe(EntryParticipationStatus.PaymentConfirmedAwaitingApproval);
                 participation.JoiningPaymentId.ShouldBe(first.PaymentId);
                 var persistedCheckout = await context.AQGreenJoiningCheckouts.SingleAsync(
                     item => item.Id == checkout.Id);
@@ -899,6 +901,7 @@ namespace AqualLifeStyle.Tests.Application
                     1200m,
                     "ZAR",
                     DateTime.UtcNow);
+            await ApproveAndPromoteAsync(customerId, onyx: false);
         }
 
         private async Task ActivateCurrentOnyxParticipationAsync(int customerId)
@@ -915,6 +918,40 @@ namespace AqualLifeStyle.Tests.Application
                 6120m,
                 "ZAR",
                 DateTime.UtcNow);
+            await ApproveAndPromoteAsync(customerId, onyx: true);
+        }
+
+        private async Task ApproveAndPromoteAsync(int customerId, bool onyx)
+        {
+            using var uow = LocalIocManager.Resolve<IUnitOfWorkManager>().Begin(
+                new UnitOfWorkOptions { IsTransactional = true });
+            using (LocalIocManager.Resolve<IUnitOfWorkManager>().Current.SetTenantId(1))
+            {
+                await UsingDbContextAsync(1, async context =>
+                {
+                    if (onyx)
+                    {
+                        var participation = await context.OnyxParticipations
+                            .SingleAsync(item => item.CustomerId == customerId);
+                        participation.ApproveByAdministrator(
+                            AbpSession.GetUserId(),
+                            DateTime.UtcNow);
+                    }
+                    else
+                    {
+                        var participation = await context.EntryParticipations
+                            .SingleAsync(item => item.CustomerId == customerId);
+                        participation.ApproveByAdministrator(
+                            AbpSession.GetUserId(),
+                            DateTime.UtcNow);
+                    }
+                });
+                var customer = await UsingDbContextAsync(1, async context =>
+                    await context.Customers.SingleAsync(item => item.Id == customerId));
+                await Resolve<ActiveProgrammeParticipantRoleSynchronizer>()
+                    .PromoteGuestToMemberAsync(customer.Id);
+                await uow.CompleteAsync();
+            }
         }
 
         private static ConfirmedProgrammePayment CreateConfirmation(
@@ -990,6 +1027,7 @@ namespace AqualLifeStyle.Tests.Application
                     $"cross-area-joining-{suffix}",
                     1200m);
                 participation.ApplyConfirmedJoiningPayment(joiningPayment);
+                participation.ApproveByAdministrator(1L, DateTime.UtcNow);
                 context.MemberPayments.Add(joiningPayment);
                 context.EntryParticipations.Add(participation);
                 await context.SaveChangesAsync();
@@ -1053,6 +1091,7 @@ namespace AqualLifeStyle.Tests.Application
                     $"cross-area-onyx-{suffix}",
                     6120m);
                 participation.ApplyConfirmedDirectEntryPayment(payment);
+                participation.ApproveByAdministrator(1L, DateTime.UtcNow);
                 context.MemberPayments.Add(payment);
                 context.OnyxParticipations.Add(participation);
                 await context.SaveChangesAsync();

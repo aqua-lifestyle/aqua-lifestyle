@@ -65,6 +65,7 @@ namespace AqualLifeStyle.Tests.Application
                     DateTime.UtcNow.AddMinutes(-1));
                 payment.Confirm(DateTime.UtcNow);
                 participation.ApplyConfirmedJoiningPayment(payment);
+                participation.ApproveByAdministrator(1L, DateTime.UtcNow);
                 context.MemberPayments.Add(payment);
                 context.EntryParticipations.Add(participation);
                 var user = await context.Users.SingleAsync(item => item.Id == customer.UserId);

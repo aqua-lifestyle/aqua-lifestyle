@@ -24,12 +24,15 @@ namespace AqualLifeStyle.Domain.Onyx
         AwaitingJoiningPayment = 0,
         AwaitingRegistrationPayment = AwaitingJoiningPayment,
         AwaitingActivationPayment = 1,
-        Active = 2
+        Active = 2,
+        PaymentConfirmedAwaitingApproval = 3,
+        Rejected = 4
     }
 
     public class EntryParticipation : FullAuditedAggregateRoot<Guid>, IMustHaveTenant
     {
         private readonly List<EntryRecruiterCorrection> _recruiterCorrections = new();
+        private readonly List<EntryParticipationApprovalDecision> _approvalDecisions = new();
 
         public int TenantId { get; set; }
         public int CustomerId { get; private set; }
@@ -52,7 +55,12 @@ namespace AqualLifeStyle.Domain.Onyx
         public int GracePeriodDays { get; private set; }
         public string Currency { get; private set; }
         public IReadOnlyCollection<EntryRecruiterCorrection> RecruiterCorrections => _recruiterCorrections.AsReadOnly();
+        public IReadOnlyCollection<EntryParticipationApprovalDecision> ApprovalDecisions =>
+            _approvalDecisions.AsReadOnly();
         public bool IsQualifiedForNetwork => Status == EntryParticipationStatus.Active;
+        public bool IsAwaitingAdministrativeApproval =>
+            Status == EntryParticipationStatus.PaymentConfirmedAwaitingApproval;
+        public bool IsRejected => Status == EntryParticipationStatus.Rejected;
 
         protected EntryParticipation()
         {
@@ -162,7 +170,7 @@ namespace AqualLifeStyle.Domain.Onyx
             {
                 return;
             }
-            if (Status == EntryParticipationStatus.Active || JoiningPaymentId.HasValue)
+            if (IsJoiningComplete || JoiningPaymentId.HasValue)
             {
                 throw new InvalidOperationException(
                     "The AQGreen joining payment has already been recorded.");
@@ -175,13 +183,12 @@ namespace AqualLifeStyle.Domain.Onyx
 
             EnsureExactAmount(payment, JoiningPaymentAmount);
             JoiningPaymentId = payment.Id;
-            ActivatedAt = payment.ConfirmedAt;
-            Status = EntryParticipationStatus.Active;
+            Status = EntryParticipationStatus.PaymentConfirmedAwaitingApproval;
         }
 
         public void SelectJoiningPaymentSchedule(AQGreenJoiningPaymentSchedule schedule)
         {
-            if (Status == EntryParticipationStatus.Active)
+            if (IsJoiningComplete)
                 throw new InvalidOperationException("AQGreen joining is already complete.");
             if (schedule != AQGreenJoiningPaymentSchedule.Full &&
                 schedule != AQGreenJoiningPaymentSchedule.TwoInstallments)
@@ -222,7 +229,7 @@ namespace AqualLifeStyle.Domain.Onyx
         {
             if (!JoiningPaymentSchedule.HasValue)
                 throw new InvalidOperationException("Select an AQGreen joining schedule first.");
-            if (Status == EntryParticipationStatus.Active)
+            if (IsJoiningComplete)
                 throw new InvalidOperationException("AQGreen joining is already complete.");
             if (JoiningPaymentSchedule == AQGreenJoiningPaymentSchedule.Full)
                 return AQGreenJoiningPaymentStage.Full;
@@ -258,8 +265,7 @@ namespace AqualLifeStyle.Domain.Onyx
             {
                 EnsureExactAmount(payment, JoiningPaymentAmount);
                 JoiningPaymentId = payment.Id;
-                ActivatedAt = payment.ConfirmedAt;
-                Status = EntryParticipationStatus.Active;
+                Status = EntryParticipationStatus.PaymentConfirmedAwaitingApproval;
                 return;
             }
 
@@ -276,9 +282,46 @@ namespace AqualLifeStyle.Domain.Onyx
             ActivationPaymentId = payment.Id;
             if (GetConfirmedJoiningAmount() != JoiningPaymentAmount)
                 throw new InvalidOperationException("The AQGreen joining total is incomplete.");
-            ActivatedAt = payment.ConfirmedAt;
+            Status = EntryParticipationStatus.PaymentConfirmedAwaitingApproval;
+        }
+
+        public void ApproveByAdministrator(long administratorUserId, DateTime decidedAt)
+        {
+            EnsureAwaitingAdministrativeApproval();
+            if (administratorUserId <= 0) throw new ArgumentOutOfRangeException(nameof(administratorUserId));
+            if (decidedAt == default) throw new ArgumentException("A decision time is required.", nameof(decidedAt));
+            if (decidedAt < StartedAt)
+                throw new ArgumentException("Approval cannot precede the participation start.", nameof(decidedAt));
+
+            _approvalDecisions.Add(EntryParticipationApprovalDecision.Approve(administratorUserId, decidedAt));
+            ActivatedAt = decidedAt;
             Status = EntryParticipationStatus.Active;
         }
+
+        public void RejectByAdministrator(long administratorUserId, string reason, DateTime decidedAt)
+        {
+            EnsureAwaitingAdministrativeApproval();
+            if (administratorUserId <= 0) throw new ArgumentOutOfRangeException(nameof(administratorUserId));
+            if (decidedAt == default) throw new ArgumentException("A decision time is required.", nameof(decidedAt));
+
+            _approvalDecisions.Add(
+                EntryParticipationApprovalDecision.Reject(administratorUserId, reason, decidedAt));
+            Status = EntryParticipationStatus.Rejected;
+        }
+
+        private void EnsureAwaitingAdministrativeApproval()
+        {
+            if (!IsAwaitingAdministrativeApproval)
+            {
+                throw new InvalidOperationException(
+                    "The participation is not awaiting administrative approval.");
+            }
+        }
+
+        private bool IsJoiningComplete =>
+            Status is EntryParticipationStatus.Active or
+                EntryParticipationStatus.PaymentConfirmedAwaitingApproval or
+                EntryParticipationStatus.Rejected;
 
         public void CorrectRecruiter(
             EntryParticipation newRecruiterParticipation,
@@ -370,8 +413,7 @@ namespace AqualLifeStyle.Domain.Onyx
 
             EnsureExactAmount(payment, ActivationPaymentAmount);
             ActivationPaymentId = payment.Id;
-            ActivatedAt = payment.ConfirmedAt;
-            Status = EntryParticipationStatus.Active;
+            Status = EntryParticipationStatus.PaymentConfirmedAwaitingApproval;
         }
 
         private void EnsurePaymentBelongsToParticipation(MemberPayment payment)
@@ -472,6 +514,59 @@ namespace AqualLifeStyle.Domain.Onyx
                 administratorUserId,
                 reason,
                 correctedAt);
+        }
+    }
+
+    public class EntryParticipationApprovalDecision : Entity<Guid>
+    {
+        public const int MaxRejectionReasonLength = 1000;
+
+        public long AdministratorUserId { get; private set; }
+        public bool Approved { get; private set; }
+        public string Reason { get; private set; }
+        public DateTime DecidedAt { get; private set; }
+
+        protected EntryParticipationApprovalDecision()
+        {
+        }
+
+        private EntryParticipationApprovalDecision(
+            long administratorUserId,
+            bool approved,
+            string reason,
+            DateTime decidedAt)
+        {
+            AdministratorUserId = administratorUserId;
+            Approved = approved;
+            Reason = reason;
+            DecidedAt = decidedAt;
+        }
+
+        internal static EntryParticipationApprovalDecision Approve(
+            long administratorUserId,
+            DateTime decidedAt)
+        {
+            return new EntryParticipationApprovalDecision(administratorUserId, true, null, decidedAt);
+        }
+
+        internal static EntryParticipationApprovalDecision Reject(
+            long administratorUserId,
+            string reason,
+            DateTime decidedAt)
+        {
+            var normalizedReason = reason?.Trim();
+            if (string.IsNullOrWhiteSpace(normalizedReason))
+                throw new ArgumentException("A rejection reason is required.", nameof(reason));
+            if (normalizedReason.Length > MaxRejectionReasonLength)
+                throw new ArgumentException(
+                    $"The rejection reason cannot exceed {MaxRejectionReasonLength} characters.",
+                    nameof(reason));
+
+            return new EntryParticipationApprovalDecision(
+                administratorUserId,
+                false,
+                normalizedReason,
+                decidedAt);
         }
     }
 }

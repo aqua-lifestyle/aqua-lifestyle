@@ -112,6 +112,9 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     recruiterEntry,
                     $"entry-recruiter-registration-{suffix}",
                     $"entry-recruiter-activation-{suffix}");
+                recruiterEntry.ApproveByAdministrator(
+                    recruiterUserId,
+                    EffectiveFrom.AddMinutes(3));
 
                 var participantEntry = EntryParticipation.StartUnderRecruiter(
                     1,
@@ -127,6 +130,9 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     recruiterUserId,
                     "The customer confirmed that they joined independently.",
                     EffectiveFrom.AddDays(1));
+                participantEntry.ApproveByAdministrator(
+                    recruiterUserId,
+                    EffectiveFrom.AddDays(1).AddMinutes(1));
 
                 var onyxParticipation = OnyxParticipation.StartDirectIndependently(
                     1,
@@ -140,6 +146,9 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     6120m,
                     $"onyx-direct-{suffix}");
                 onyxParticipation.ApplyConfirmedDirectEntryPayment(onyxPayment);
+                onyxParticipation.ApproveByAdministrator(
+                    recruiterUserId,
+                    EffectiveFrom.AddMinutes(3));
 
                 var monthlyObligation = EntryMonthlyObligation.Create(
                     participantEntry,
@@ -177,6 +186,9 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                         recruit,
                         $"transient-registration-{index}-{suffix}",
                         $"transient-activation-{index}-{suffix}");
+                    recruit.ApproveByAdministrator(
+                        recruiterUserId,
+                        EffectiveFrom.AddMinutes(3));
                     network.Add(recruit);
                 }
 
@@ -293,6 +305,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     entryParticipation,
                     $"loan-entry-registration-{suffix}",
                     $"loan-entry-activation-{suffix}");
+                entryParticipation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
 
                 var network = BuildLevelTwoNetwork(entryParticipation, suffix);
                 var agreement = OnyxLoanAgreement.OfferToEligibleEntryParticipant(
@@ -388,6 +401,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     6120m,
                     $"onyx-network-root-{suffix}");
                 root.ApplyConfirmedDirectEntryPayment(rootPayment);
+                root.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(2));
 
                 var network = new List<OnyxParticipation> { root };
                 var payments = new List<MemberPayment> { rootPayment };
@@ -406,6 +420,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                         6120m,
                         $"onyx-network-recruit-{index}-{suffix}");
                     recruit.ApplyConfirmedDirectEntryPayment(payment);
+                    recruit.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(2));
                     network.Add(recruit);
                     payments.Add(payment);
                 }
@@ -485,6 +500,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     6120m,
                     $"onyx-travel-root-{suffix}");
                 root.ApplyConfirmedDirectEntryPayment(rootPayment);
+                root.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(2));
                 var network = BuildTransientCompleteOnyxNetwork(
                     root,
                     membership.Id,
@@ -554,6 +570,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                             6120m,
                             $"onyx-travel-network-{recruit.CustomerId}-{referenceSuffix}");
                         recruit.ApplyConfirmedDirectEntryPayment(payment);
+                        recruit.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(2));
                         network.Add(recruit);
                         nextLevel.Add(recruit);
                     }
@@ -585,6 +602,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     recruit,
                     $"loan-network-l1-registration-{index}-{referenceSuffix}",
                     $"loan-network-l1-activation-{index}-{referenceSuffix}");
+                recruit.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
                 network.Add(recruit);
                 firstLevel.Add(recruit);
             }
@@ -603,6 +621,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                         recruit,
                         $"loan-network-l2-registration-{nextCustomerId}-{referenceSuffix}",
                         $"loan-network-l2-activation-{nextCustomerId}-{referenceSuffix}");
+                    recruit.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
                     network.Add(recruit);
                 }
             }

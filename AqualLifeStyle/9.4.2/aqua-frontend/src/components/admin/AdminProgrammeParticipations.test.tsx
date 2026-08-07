@@ -246,4 +246,90 @@ describe("AdminProgrammeParticipations", () => {
       },
     ));
   });
+
+  it("lists confirmed payments awaiting Area approval and approves one", async () => {
+    vi.mocked(useAuthState).mockReturnValue(
+      authState([
+        "Aqua.Admin.ProgrammeParticipations.View",
+        "Aqua.Admin.ProgrammeParticipations.Approve",
+      ]),
+    );
+    const awaiting = {
+      ...participation,
+      participationId: "1b4f6d8e-3a2c-4f9b-8d7e-0a1b2c3d4e5f",
+      status: "Awaiting Area approval",
+    };
+    vi.mocked(httpClient.get).mockResolvedValue({
+      items: [awaiting],
+      totalCount: 1,
+    });
+    vi.mocked(httpClient.post).mockResolvedValue(undefined);
+
+    render(<AdminProgrammeParticipations />);
+
+    const approveButton = await screen.findByRole("button", {
+      name: "Approve",
+    });
+    expect(screen.getByText("Awaiting Area approval", { selector: "span" }))
+      .toBeInTheDocument();
+    expect(approveButton).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+
+    await waitFor(() =>
+      expect(httpClient.post).toHaveBeenCalledWith(
+        apiEndpoints.programmeParticipations.approveParticipation,
+        {
+          programme: 0,
+          participationId: awaiting.participationId,
+        },
+      ),
+    );
+    expect(
+      await screen.findByText(/participation was approved and activated/i),
+    ).toBeInTheDocument();
+  });
+
+  it("requires a reason before declining an awaiting participation", async () => {
+    vi.mocked(useAuthState).mockReturnValue(
+      authState([
+        "Aqua.Admin.ProgrammeParticipations.View",
+        "Aqua.Admin.ProgrammeParticipations.Approve",
+      ]),
+    );
+    const awaiting = {
+      ...participation,
+      participationId: "1b4f6d8e-3a2c-4f9b-8d7e-0a1b2c3d4e5f",
+      status: "Awaiting Area approval",
+    };
+    vi.mocked(httpClient.get).mockResolvedValue({
+      items: [awaiting],
+      totalCount: 1,
+    });
+    vi.mocked(httpClient.post).mockResolvedValue(undefined);
+
+    render(<AdminProgrammeParticipations />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reject" }));
+    expect(screen.getByRole("button", { name: "Decline participation" }))
+      .toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Reason for declining"), {
+      target: { value: "Signed joining form does not match the payer" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Decline participation" }));
+
+    await waitFor(() =>
+      expect(httpClient.post).toHaveBeenCalledWith(
+        apiEndpoints.programmeParticipations.rejectParticipation,
+        {
+          programme: 0,
+          participationId: awaiting.participationId,
+          reason: "Signed joining form does not match the payer",
+        },
+      ),
+    );
+    expect(
+      await screen.findByText(/participation was declined/i),
+    ).toBeInTheDocument();
+  });
 });

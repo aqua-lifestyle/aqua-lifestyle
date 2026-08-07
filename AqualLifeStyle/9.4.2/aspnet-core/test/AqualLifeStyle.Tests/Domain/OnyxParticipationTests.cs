@@ -71,9 +71,17 @@ namespace AqualLifeStyle.Tests.Domain
             payment.Confirm(EffectiveFrom.AddMinutes(1));
             participation.ApplyConfirmedDirectEntryPayment(payment);
 
-            Assert.Equal(OnyxParticipationStatus.Active, participation.Status);
+            Assert.Equal(
+                OnyxParticipationStatus.PaymentConfirmedAwaitingApproval,
+                participation.Status);
+            Assert.True(participation.IsAwaitingAdministrativeApproval);
             Assert.Equal(payment.Id, participation.DirectEntryPaymentId);
-            Assert.Equal(payment.ConfirmedAt, participation.ActivatedAt);
+            Assert.Null(participation.ActivatedAt);
+
+            participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(2));
+
+            Assert.Equal(OnyxParticipationStatus.Active, participation.Status);
+            Assert.Equal(EffectiveFrom.AddMinutes(2), participation.ActivatedAt);
             Assert.Equal("onyx-2026-07", participation.TermsVersion);
         }
 
@@ -301,6 +309,7 @@ namespace AqualLifeStyle.Tests.Domain
                 MemberPaymentPurpose.EntryActivation,
                 $"aqgreen-activation-{participation.CustomerId}",
                 EffectiveFrom.AddMinutes(2)));
+            participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
         }
 
         private static MemberPayment CreateConfirmedAQGreenPayment(
@@ -333,6 +342,7 @@ namespace AqualLifeStyle.Tests.Domain
                 EffectiveFrom);
             payment.Confirm(EffectiveFrom.AddMinutes(1));
             participation.ApplyConfirmedDirectEntryPayment(payment);
+            participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(2));
         }
     }
 }

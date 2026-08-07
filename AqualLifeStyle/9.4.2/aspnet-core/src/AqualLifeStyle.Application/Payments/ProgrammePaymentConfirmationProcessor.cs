@@ -27,17 +27,20 @@ namespace AqualLifeStyle.Payments
         public Guid ParticipationId { get; }
         public ProgrammeParticipationKind ParticipationKind { get; }
         public bool WasAlreadyProcessed { get; }
+        public bool AwaitingAdministrativeApproval { get; }
 
         public ProgrammePaymentConfirmationResult(
             Guid paymentId,
             Guid participationId,
             ProgrammeParticipationKind participationKind,
-            bool wasAlreadyProcessed)
+            bool wasAlreadyProcessed,
+            bool awaitingAdministrativeApproval = false)
         {
             PaymentId = paymentId;
             ParticipationId = participationId;
             ParticipationKind = participationKind;
             WasAlreadyProcessed = wasAlreadyProcessed;
+            AwaitingAdministrativeApproval = awaitingAdministrativeApproval;
         }
     }
 
@@ -60,7 +63,6 @@ namespace AqualLifeStyle.Payments
         private readonly ICustomerRepository _customerRepository;
         private readonly IMembershipRepository _membershipRepository;
         private readonly IProgrammeInvitationResolver _invitationResolver;
-        private readonly ActiveProgrammeParticipantRoleSynchronizer _participantRoleSynchronizer;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public ProgrammePaymentConfirmationProcessor(
@@ -72,7 +74,6 @@ namespace AqualLifeStyle.Payments
             ICustomerRepository customerRepository,
             IMembershipRepository membershipRepository,
             IProgrammeInvitationResolver invitationResolver,
-            ActiveProgrammeParticipantRoleSynchronizer participantRoleSynchronizer,
             IUnitOfWorkManager unitOfWorkManager)
         {
             _paymentRepository = paymentRepository;
@@ -83,7 +84,6 @@ namespace AqualLifeStyle.Payments
             _customerRepository = customerRepository;
             _membershipRepository = membershipRepository;
             _invitationResolver = invitationResolver;
-            _participantRoleSynchronizer = participantRoleSynchronizer;
             _unitOfWorkManager = unitOfWorkManager;
         }
 
@@ -226,14 +226,14 @@ namespace AqualLifeStyle.Payments
                     await _onyxParticipationRepository.InsertAsync(participation);
                     await ClearLegacyOnyxMembershipAssignmentAsync(intent.CustomerId);
                     intent.Complete(payment.Id, participation.Id, confirmedAt);
-                    await _participantRoleSynchronizer.PromoteGuestToMemberAsync(intent.CustomerId);
                     await _unitOfWorkManager.Current.SaveChangesAsync();
 
                     return new ProgrammePaymentConfirmationResult(
                         payment.Id,
                         participation.Id,
                         ProgrammeParticipationKind.Onyx,
-                        wasAlreadyProcessed);
+                        wasAlreadyProcessed,
+                        participation.IsAwaitingAdministrativeApproval);
                 }
                 catch (DbUpdateException)
                 {
@@ -460,14 +460,14 @@ namespace AqualLifeStyle.Payments
                 else
                     participation.ApplyConfirmedJoiningPayment(payment, checkout.Stage);
                 checkout.Complete(payment.Id, confirmedAt);
-                await _participantRoleSynchronizer.PromoteGuestToMemberAsync(checkout.CustomerId);
                 await _unitOfWorkManager.Current.SaveChangesAsync();
 
                 return new ProgrammePaymentConfirmationResult(
                     payment.Id,
                     participation.Id,
                     ProgrammeParticipationKind.Entry,
-                    wasAlreadyProcessed);
+                    wasAlreadyProcessed,
+                    participation.IsAwaitingAdministrativeApproval);
             }
         }
 
@@ -513,22 +513,18 @@ namespace AqualLifeStyle.Payments
                 }
 
                 var participation = await ApplyToParticipationAsync(payment);
-                if (participation.IsActive)
-                {
-                    await _participantRoleSynchronizer.PromoteGuestToMemberAsync(
-                        payment.CustomerId);
-                }
                 await _unitOfWorkManager.Current.SaveChangesAsync();
 
                 return new ProgrammePaymentConfirmationResult(
                     payment.Id,
                     participation.Id,
                     participation.Kind,
-                    wasAlreadyProcessed);
+                    wasAlreadyProcessed,
+                    participation.IsAwaitingApproval);
             }
         }
 
-        private async Task<(Guid Id, ProgrammeParticipationKind Kind, bool IsActive)> ApplyToParticipationAsync(
+        private async Task<(Guid Id, ProgrammeParticipationKind Kind, bool IsAwaitingApproval)> ApplyToParticipationAsync(
             MemberPayment payment)
         {
             if (payment.Purpose == MemberPaymentPurpose.OnyxDirectEntry)
@@ -547,7 +543,7 @@ namespace AqualLifeStyle.Payments
                 return (
                     onyxParticipation.Id,
                     ProgrammeParticipationKind.Onyx,
-                    onyxParticipation.Status == OnyxParticipationStatus.Active);
+                    onyxParticipation.IsAwaitingAdministrativeApproval);
             }
 
             var entryParticipation = await _entryParticipationRepository.FirstOrDefaultAsync(
@@ -567,7 +563,7 @@ namespace AqualLifeStyle.Payments
             return (
                 entryParticipation.Id,
                 ProgrammeParticipationKind.Entry,
-                entryParticipation.Status == EntryParticipationStatus.Active);
+                entryParticipation.IsAwaitingAdministrativeApproval);
         }
 
         private static void EnsureSupportedPurpose(MemberPaymentPurpose purpose)

@@ -297,6 +297,7 @@ namespace AqualLifeStyle.Tests.Application
                 activationReference,
                 EffectiveFrom.AddHours(1));
             participation.ApplyConfirmedActivationPayment(activation);
+            participation.ApproveByAdministrator(1L, EffectiveFrom.AddHours(2));
             return (registration, activation);
         }
 

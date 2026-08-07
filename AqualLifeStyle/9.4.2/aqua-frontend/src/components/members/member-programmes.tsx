@@ -53,7 +53,15 @@ const ParticipationCard = ({
         <p className="text-sm font-medium text-muted-foreground">Programme</p>
         <h2 className="mt-1 text-2xl font-bold">{participation.programmeName}</h2>
       </div>
-      <Badge tone={participation.isActive ? "success" : "warning"}>
+      <Badge
+        tone={
+          participation.isActive
+            ? "success"
+            : participation.status === "Declined"
+              ? "error"
+              : "warning"
+        }
+      >
         {participation.status}
       </Badge>
     </div>
@@ -90,6 +98,24 @@ const ParticipationCard = ({
         </dd>
       </div>
     </dl>
+
+    {participation.status === "Awaiting Area approval" ? (
+      <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 text-sm">
+        <p className="font-semibold">Payment confirmed</p>
+        <p className="mt-1 text-muted-foreground">
+          Your payment has been received and your participation is under review
+          by the Area team. It will activate once approved.
+        </p>
+      </div>
+    ) : participation.status === "Declined" ? (
+      <div className="rounded-xl border border-error/30 bg-error/5 p-4 text-sm">
+        <p className="font-semibold">Not approved</p>
+        <p className="mt-1 text-muted-foreground">
+          The Area team could not approve this participation. Contact the club
+          team if you believe this is a mistake.
+        </p>
+      </div>
+    ) : null}
 
     {participation.nextPaymentAmount !== null ? (
       <div className="rounded-xl border border-warning/30 bg-warning/5 p-4">
@@ -244,8 +270,8 @@ export const MemberProgrammes = () => {
       if (paymentResult === "success") {
         setSuccess(
           programme === "aqgreen"
-            ? "Payment submitted. Awaiting secure confirmation before your AQGreen participation can activate."
-            : "Payment submitted. Awaiting secure confirmation before your Onyx participation can be created.",
+            ? "Payment submitted. Once the provider confirms it, the Area team will review your AQGreen participation before it activates."
+            : "Payment submitted. Once the provider confirms it, the Area team will review your Onyx participation before it is created.",
         );
       } else if (paymentResult === "cancelled") {
         setActionError(
@@ -371,32 +397,36 @@ export const MemberProgrammes = () => {
               <ParticipationCard
                 participation={participations.entry}
                 paymentAction={
-                  participations.entry.isActive ? undefined : participations.pendingAQGreenCheckout ? (
-                    paymentActionsUnavailable ? (
-                      <Button disabled>Continue secure payment</Button>
+                  !participations.entry.isActive &&
+                  participations.entry.status !== "Awaiting Area approval" &&
+                  participations.entry.status !== "Declined" ? (
+                    participations.pendingAQGreenCheckout ? (
+                      paymentActionsUnavailable ? (
+                        <Button disabled>Continue secure payment</Button>
+                      ) : (
+                        <a
+                          className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
+                          href={participations.pendingAQGreenCheckout.checkoutUrl}
+                        >
+                          Continue secure payment
+                        </a>
+                      )
                     ) : (
-                      <a
-                        className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
-                        href={participations.pendingAQGreenCheckout.checkoutUrl}
-                      >
-                        Continue secure payment
-                      </a>
+                      <div className="flex flex-col gap-4">
+                        <Button
+                          disabled={paymentActionsUnavailable}
+                          isLoading={startingAQGreenPayment}
+                          onClick={() => void startAQGreenPayment()}
+                        >
+                          Pay {formatCurrency(
+                            participations.entry.nextPaymentAmount ??
+                              participations.entry.joiningOutstandingAmount ?? 1200,
+                            participations.entry.currency,
+                          )} securely
+                        </Button>
+                      </div>
                     )
-                  ) : (
-                    <div className="flex flex-col gap-4">
-                      <Button
-                        disabled={paymentActionsUnavailable}
-                        isLoading={startingAQGreenPayment}
-                        onClick={() => void startAQGreenPayment()}
-                      >
-                        Pay {formatCurrency(
-                          participations.entry.nextPaymentAmount ??
-                            participations.entry.joiningOutstandingAmount ?? 1200,
-                          participations.entry.currency,
-                        )} securely
-                      </Button>
-                    </div>
-                  )
+                  ) : undefined
                 }
               />
             ) : (

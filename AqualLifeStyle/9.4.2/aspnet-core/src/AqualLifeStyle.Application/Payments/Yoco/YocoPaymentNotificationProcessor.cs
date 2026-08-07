@@ -228,12 +228,24 @@ namespace AqualLifeStyle.Payments.Yoco
         {
             var payment = await _paymentRepository.GetAsync(confirmation.PaymentId);
             var customer = await _customerRepository.GetAsync(payment.CustomerId);
+            var programmeName = programme == YocoCheckoutProgramme.AQGreen ? "AQGreen" : "Onyx";
             var key = $"payment-confirmed:{payment.Id}";
+            if (confirmation.AwaitingAdministrativeApproval)
+            {
+                await _emailOutbox.EnqueueAsync(payment.TenantId, "PaymentConfirmation", key,
+                    _emailTemplates.ParticipationAwaitingApproval(
+                        customer.Name,
+                        customer.Email.Value,
+                        programmeName,
+                        key));
+                return;
+            }
+
             await _emailOutbox.EnqueueAsync(payment.TenantId, "PaymentConfirmation", key,
                 _emailTemplates.PaymentConfirmation(
                     customer.Name,
                     customer.Email.Value,
-                    programme == YocoCheckoutProgramme.AQGreen ? "AQGreen" : "Onyx",
+                    programmeName,
                     payment.Amount,
                     payment.Currency,
                     payment.ExternalReference,

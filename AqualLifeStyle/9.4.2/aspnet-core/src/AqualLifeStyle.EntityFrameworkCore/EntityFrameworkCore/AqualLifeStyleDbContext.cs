@@ -45,12 +45,14 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<InternalAccountInvitation> InternalAccountInvitations { get; set; }
         public virtual DbSet<EntryParticipation> EntryParticipations { get; set; }
         public virtual DbSet<EntryRecruiterCorrection> EntryRecruiterCorrections { get; set; }
+        public virtual DbSet<EntryParticipationApprovalDecision> EntryParticipationApprovalDecisions { get; set; }
         public virtual DbSet<EntryMonthlyObligation> EntryMonthlyObligations { get; set; }
         public virtual DbSet<EntryCommissionPeriod> EntryCommissionPeriods { get; set; }
         public virtual DbSet<EntryWeeklyCommission> EntryWeeklyCommissions { get; set; }
         public virtual DbSet<EntryCommissionComponent> EntryCommissionComponents { get; set; }
         public virtual DbSet<OnyxParticipation> OnyxParticipations { get; set; }
         public virtual DbSet<OnyxRecruiterCorrection> OnyxRecruiterCorrections { get; set; }
+        public virtual DbSet<OnyxParticipationApprovalDecision> OnyxParticipationApprovalDecisions { get; set; }
         public virtual DbSet<ProgrammeInvitation> ProgrammeInvitations { get; set; }
         public virtual DbSet<OnyxCommissionPeriod> OnyxCommissionPeriods { get; set; }
         public virtual DbSet<OnyxWeeklyCommission> OnyxWeeklyCommissions { get; set; }

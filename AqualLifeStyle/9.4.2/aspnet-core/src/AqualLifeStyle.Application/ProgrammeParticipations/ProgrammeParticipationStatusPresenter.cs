@@ -31,6 +31,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                             : "Awaiting registration payment",
                     EntryParticipationStatus.AwaitingActivationPayment =>
                         "Awaiting activation payment",
+                    EntryParticipationStatus.PaymentConfirmedAwaitingApproval =>
+                        "Awaiting Area approval",
+                    EntryParticipationStatus.Rejected => "Declined",
                     EntryParticipationStatus.Active => "Active",
                     _ => throw new ArgumentOutOfRangeException(
                         nameof(participation.Status),
@@ -73,6 +76,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 {
                     OnyxParticipationStatus.AwaitingDirectEntryPayment =>
                         "Awaiting full payment",
+                    OnyxParticipationStatus.PaymentConfirmedAwaitingApproval =>
+                        "Awaiting Area approval",
+                    OnyxParticipationStatus.Rejected => "Declined",
                     OnyxParticipationStatus.Active => "Active",
                     _ => throw new ArgumentOutOfRangeException(
                         nameof(participation.Status),

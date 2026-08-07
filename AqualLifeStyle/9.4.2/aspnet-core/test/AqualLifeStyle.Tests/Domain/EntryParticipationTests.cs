@@ -62,6 +62,15 @@ namespace AqualLifeStyle.Tests.Domain
                     EffectiveFrom));
 
             ApplyBothActivationPayments(inactiveRecruiter);
+            Assert.Throws<InvalidOperationException>(() =>
+                EntryParticipation.StartUnderRecruiter(
+                    tenantId: 1,
+                    customerId: 10,
+                    inactiveRecruiter,
+                    Terms,
+                    EffectiveFrom));
+
+            inactiveRecruiter.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
             var participation = EntryParticipation.StartUnderRecruiter(
                 tenantId: 1,
                 customerId: 10,
@@ -92,15 +101,25 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
-        public void EntryParticipant_QualifiesAfterTwoConfirmedSixHundredRandPayments()
+        public void EntryParticipant_ActivatesAfterTwoConfirmedPaymentsAndAdministrativeApproval()
         {
             var participation = StartParticipation();
             ApplyBothActivationPayments(participation);
 
-            Assert.Equal(EntryParticipationStatus.Active, participation.Status);
-            Assert.True(participation.IsQualifiedForNetwork);
+            Assert.Equal(
+                EntryParticipationStatus.PaymentConfirmedAwaitingApproval,
+                participation.Status);
+            Assert.True(participation.IsAwaitingAdministrativeApproval);
+            Assert.False(participation.IsQualifiedForNetwork);
+            Assert.Null(participation.ActivatedAt);
             Assert.NotNull(participation.RegistrationPaymentId);
             Assert.NotNull(participation.ActivationPaymentId);
+
+            participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
+
+            Assert.Equal(EntryParticipationStatus.Active, participation.Status);
+            Assert.True(participation.IsQualifiedForNetwork);
+            Assert.NotNull(participation.ActivatedAt);
             Assert.Equal(600m, participation.MonthlyCommitmentAmount);
             Assert.Equal(7, participation.GracePeriodDays);
             Assert.Equal("entry-2026-07", participation.TermsVersion);
@@ -126,7 +145,7 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
-        public void AQGreenParticipant_ActivatesAfterOneConfirmedTwelveHundredRandPayment()
+        public void AQGreenParticipant_ActivatesAfterOneConfirmedPaymentAndAdministrativeApproval()
         {
             var participation = EntryParticipation.StartIndependently(
                 tenantId: 1,
@@ -146,12 +165,20 @@ namespace AqualLifeStyle.Tests.Domain
             participation.ApplyConfirmedJoiningPayment(payment);
             participation.ApplyConfirmedJoiningPayment(payment);
 
-            Assert.Equal(EntryParticipationStatus.Active, participation.Status);
-            Assert.True(participation.IsQualifiedForNetwork);
+            Assert.Equal(
+                EntryParticipationStatus.PaymentConfirmedAwaitingApproval,
+                participation.Status);
+            Assert.True(participation.IsAwaitingAdministrativeApproval);
+            Assert.False(participation.IsQualifiedForNetwork);
             Assert.Equal(payment.Id, participation.JoiningPaymentId);
             Assert.Null(participation.RegistrationPaymentId);
             Assert.Null(participation.ActivationPaymentId);
             Assert.Equal(1200m, participation.JoiningPaymentAmount);
+
+            participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(2));
+
+            Assert.Equal(EntryParticipationStatus.Active, participation.Status);
+            Assert.True(participation.IsQualifiedForNetwork);
         }
 
         [Fact]
@@ -214,7 +241,7 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
-        public void FlexibleAQGreen_ActivatesAfterOneVerifiedFullPayment()
+        public void FlexibleAQGreen_ActivatesAfterOneVerifiedFullPaymentAndApproval()
         {
             var participation = StartFlexibleParticipation();
             participation.SelectJoiningPaymentSchedule(AQGreenJoiningPaymentSchedule.Full);
@@ -228,10 +255,16 @@ namespace AqualLifeStyle.Tests.Domain
                 payment,
                 AQGreenJoiningPaymentStage.Full);
 
-            Assert.Equal(EntryParticipationStatus.Active, participation.Status);
+            Assert.Equal(
+                EntryParticipationStatus.PaymentConfirmedAwaitingApproval,
+                participation.Status);
             Assert.Equal(1200m, participation.GetConfirmedJoiningAmount());
             Assert.Equal(0m, participation.GetOutstandingJoiningAmount());
             Assert.Equal(payment.Id, participation.JoiningPaymentId);
+
+            participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(2));
+
+            Assert.Equal(EntryParticipationStatus.Active, participation.Status);
         }
 
         [Fact]
@@ -262,11 +295,17 @@ namespace AqualLifeStyle.Tests.Domain
                 second,
                 AQGreenJoiningPaymentStage.SecondInstallment);
 
-            Assert.Equal(EntryParticipationStatus.Active, participation.Status);
+            Assert.Equal(
+                EntryParticipationStatus.PaymentConfirmedAwaitingApproval,
+                participation.Status);
             Assert.Equal(1200m, participation.GetConfirmedJoiningAmount());
             Assert.NotEqual(
                 participation.RegistrationPaymentId,
                 participation.ActivationPaymentId);
+
+            participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
+
+            Assert.Equal(EntryParticipationStatus.Active, participation.Status);
         }
 
         [Fact]
@@ -318,6 +357,8 @@ namespace AqualLifeStyle.Tests.Domain
                 Terms,
                 EffectiveFrom);
             ApplyBothActivationPayments(recruiter);
+            participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
+            recruiter.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
 
             participation.CorrectRecruiter(
                 recruiter,

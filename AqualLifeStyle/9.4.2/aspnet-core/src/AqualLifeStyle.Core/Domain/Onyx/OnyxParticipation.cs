@@ -15,12 +15,15 @@ namespace AqualLifeStyle.Domain.Onyx
     public enum OnyxParticipationStatus
     {
         AwaitingDirectEntryPayment = 0,
-        Active = 1
+        Active = 1,
+        PaymentConfirmedAwaitingApproval = 2,
+        Rejected = 3
     }
 
     public class OnyxParticipation : FullAuditedAggregateRoot<Guid>, IMustHaveTenant
     {
         private readonly List<OnyxRecruiterCorrection> _recruiterCorrections = new();
+        private readonly List<OnyxParticipationApprovalDecision> _approvalDecisions = new();
 
         public int TenantId { get; set; }
         public int CustomerId { get; private set; }
@@ -40,6 +43,11 @@ namespace AqualLifeStyle.Domain.Onyx
         public string Currency { get; private set; }
         public IReadOnlyCollection<OnyxRecruiterCorrection> RecruiterCorrections =>
             _recruiterCorrections.AsReadOnly();
+        public IReadOnlyCollection<OnyxParticipationApprovalDecision> ApprovalDecisions =>
+            _approvalDecisions.AsReadOnly();
+        public bool IsAwaitingAdministrativeApproval =>
+            Status == OnyxParticipationStatus.PaymentConfirmedAwaitingApproval;
+        public bool IsRejected => Status == OnyxParticipationStatus.Rejected;
 
         protected OnyxParticipation()
         {
@@ -211,7 +219,7 @@ namespace AqualLifeStyle.Domain.Onyx
                 return;
             }
 
-            if (Status == OnyxParticipationStatus.Active || DirectEntryPaymentId.HasValue)
+            if (IsSettled || DirectEntryPaymentId.HasValue)
             {
                 throw new InvalidOperationException("The direct Onyx entry payment has already been recorded.");
             }
@@ -238,9 +246,46 @@ namespace AqualLifeStyle.Domain.Onyx
             }
 
             DirectEntryPaymentId = payment.Id;
-            ActivatedAt = payment.ConfirmedAt;
+            Status = OnyxParticipationStatus.PaymentConfirmedAwaitingApproval;
+        }
+
+        public void ApproveByAdministrator(long administratorUserId, DateTime decidedAt)
+        {
+            EnsureAwaitingAdministrativeApproval();
+            if (administratorUserId <= 0) throw new ArgumentOutOfRangeException(nameof(administratorUserId));
+            if (decidedAt == default) throw new ArgumentException("A decision time is required.", nameof(decidedAt));
+            if (decidedAt < StartedAt)
+                throw new ArgumentException("Approval cannot precede the participation start.", nameof(decidedAt));
+
+            _approvalDecisions.Add(OnyxParticipationApprovalDecision.Approve(administratorUserId, decidedAt));
+            ActivatedAt = decidedAt;
             Status = OnyxParticipationStatus.Active;
         }
+
+        public void RejectByAdministrator(long administratorUserId, string reason, DateTime decidedAt)
+        {
+            EnsureAwaitingAdministrativeApproval();
+            if (administratorUserId <= 0) throw new ArgumentOutOfRangeException(nameof(administratorUserId));
+            if (decidedAt == default) throw new ArgumentException("A decision time is required.", nameof(decidedAt));
+
+            _approvalDecisions.Add(
+                OnyxParticipationApprovalDecision.Reject(administratorUserId, reason, decidedAt));
+            Status = OnyxParticipationStatus.Rejected;
+        }
+
+        private void EnsureAwaitingAdministrativeApproval()
+        {
+            if (!IsAwaitingAdministrativeApproval)
+            {
+                throw new InvalidOperationException(
+                    "The participation is not awaiting administrative approval.");
+            }
+        }
+
+        private bool IsSettled =>
+            Status is OnyxParticipationStatus.Active or
+                OnyxParticipationStatus.PaymentConfirmedAwaitingApproval or
+                OnyxParticipationStatus.Rejected;
 
         public void CorrectRecruiter(
             OnyxParticipation newRecruiterParticipation,
@@ -342,5 +387,58 @@ namespace AqualLifeStyle.Domain.Onyx
                 administratorUserId,
                 reason,
                 correctedAt);
+    }
+
+    public class OnyxParticipationApprovalDecision : Entity<Guid>
+    {
+        public const int MaxRejectionReasonLength = 1000;
+
+        public long AdministratorUserId { get; private set; }
+        public bool Approved { get; private set; }
+        public string Reason { get; private set; }
+        public DateTime DecidedAt { get; private set; }
+
+        protected OnyxParticipationApprovalDecision()
+        {
+        }
+
+        private OnyxParticipationApprovalDecision(
+            long administratorUserId,
+            bool approved,
+            string reason,
+            DateTime decidedAt)
+        {
+            AdministratorUserId = administratorUserId;
+            Approved = approved;
+            Reason = reason;
+            DecidedAt = decidedAt;
+        }
+
+        internal static OnyxParticipationApprovalDecision Approve(
+            long administratorUserId,
+            DateTime decidedAt)
+        {
+            return new OnyxParticipationApprovalDecision(administratorUserId, true, null, decidedAt);
+        }
+
+        internal static OnyxParticipationApprovalDecision Reject(
+            long administratorUserId,
+            string reason,
+            DateTime decidedAt)
+        {
+            var normalizedReason = reason?.Trim();
+            if (string.IsNullOrWhiteSpace(normalizedReason))
+                throw new ArgumentException("A rejection reason is required.", nameof(reason));
+            if (normalizedReason.Length > MaxRejectionReasonLength)
+                throw new ArgumentException(
+                    $"The rejection reason cannot exceed {MaxRejectionReasonLength} characters.",
+                    nameof(reason));
+
+            return new OnyxParticipationApprovalDecision(
+                administratorUserId,
+                false,
+                normalizedReason,
+                decidedAt);
+        }
     }
 }

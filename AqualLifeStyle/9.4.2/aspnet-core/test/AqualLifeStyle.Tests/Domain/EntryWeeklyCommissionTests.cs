@@ -318,6 +318,7 @@ namespace AqualLifeStyle.Tests.Domain
                 MemberPaymentPurpose.EntryActivation,
                 $"activation-{participation.CustomerId}");
             participation.ApplyConfirmedActivationPayment(activation);
+            participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
         }
 
         private static MemberPayment CreatePayment(
