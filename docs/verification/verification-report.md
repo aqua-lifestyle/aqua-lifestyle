@@ -37,9 +37,9 @@ Explicit exclusions: BusinessPremier deprecation (documented, out of scope), def
 
 ## 3. Evidence baseline (final, re-run after changes)
 
-- Backend Release build: **0 errors**. Full backend suite: **640 + 40 = 680 passed, 0 failed** (2 new simulation tests added).
+- Backend Release build: **0 errors**. Full backend suite (final re-run): **664 (Application) + 40 (Web.Tests) = 704 passed, 0 failed, 0 skipped** (TRX `backend-tests.trx`, `webtests.trx`). Build warnings: 2035 total, all pre-existing categories (CS1591 dominant, plus NU1902 AngleSharp in Web.Tests).
 - EF model check with compatible `dotnet-ef` **8.0.8**: "No changes have been made to the model since the last migration."
-- Frontend: **ESLint clean, `tsc --noEmit` clean, 372 Vitest tests passed (105 files)**.
+- Frontend (final re-run): **ESLint clean, `tsc --noEmit` clean, 377 Vitest tests passed (107 files)**. One intermittent pre-existing flake in `member-programmes.test.tsx` (untouched by the branch; see release report §9, AF-01).
 - NuGet vulnerabilities: pre-existing ABP transitives only (unchanged from baseline).
 
 ## 4. Engineering defects found and corrected
@@ -96,7 +96,7 @@ Verified that the codebase keeps distinct: Referral (placement), Qualification (
 **Sufficient for merge** — for the engine's implemented surface, including the gap-closure features, with the accepted debts above owned and tracked. (Product Decisions PD-02/PD-05/PD-06 must be scheduled; they do not invalidate the implemented engine.)
 
 ### Operational state
-**CI green** (backend suite + gap-closure regression tests, frontend suite, EF model clean, lint + type-check clean).
+**CI green** (backend suite + gap-closure regression tests, frontend suite, EF model clean, lint + type-check clean). Final release validation and verdict are in `docs/verification/release-report-gap-closure.md`.
 
 ---
 
