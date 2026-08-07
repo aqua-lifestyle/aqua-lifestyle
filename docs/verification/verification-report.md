@@ -106,7 +106,7 @@ Verified that the codebase keeps distinct: Referral (placement), Qualification (
 - `docs/verification/verification-report.md` — this report.
 - `aspnet-core/test/AqualLifeStyle.Tests/Domain/OnyxProgrammeEngineSimulationTests.cs` — deterministic 3,906-participant simulation (qualification by depth, commission bounded, aggregate R353,402.50).
 - Fixed flaky frontend test `AdminProgrammeParticipations.test.tsx`.
-- `feat/programme-engine-gap-closure`: M-15 monthly obligation creation, M-46 funeral-cover inclusion/eligibility, M-28/M-44/M-45 member commission progress + payout explanations, each with regression tests.
+- `feat/programme-engine-gap-closure`: M-15 monthly obligation creation, M-46 funeral-cover inclusion/eligibility, M-28/M-44/M-45 member commission progress + education + payout explanations, each with regression tests.
 
 ## 11. Commits
 
@@ -117,7 +117,7 @@ Plus the two documentation deliverables (can be a third commit: `docs: add progr
 
 Gap closure on `feat/programme-engine-gap-closure`:
 1. `docs: record programme-engine gap closure baseline` (reclassifications + PD-06)
-2. `feat(aqgreen): create recurring monthly obligations`
-3. `feat(aqgreen): record funeral-cover inclusion after joining completion`
+2. `feat(aqgreen): implement recurring obligation model`
+3. `feat(aqgreen): implement funeral-cover inclusion`
 4. `feat(member): expose commission progress and payout explanations`
 5. Final verification re-run and verdict update.
