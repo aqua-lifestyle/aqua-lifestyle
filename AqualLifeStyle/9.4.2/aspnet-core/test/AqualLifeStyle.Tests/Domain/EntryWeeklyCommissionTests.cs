@@ -75,8 +75,48 @@ namespace AqualLifeStyle.Tests.Domain
                     Assert.Equal(3, levelThree.Level);
                     Assert.Equal(1250m, levelThree.Amount);
                 });
-            Assert.Equal(1650m, commission.TotalAmount);
+                Assert.Equal(1650m, commission.TotalAmount);
             Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
+        }
+
+        [Fact]
+        public void QualifiedNetwork_EarnsAgainInEachSubsequentClosedCycle()
+        {
+            var network = BuildNetwork(maxDepth: 1);
+            var firstPeriod = CreatePeriod(EffectiveFrom.AddDays(5));
+            var secondPeriod = CreatePeriod(EffectiveFrom.AddDays(12));
+
+            var firstCommission = CalculateForPeriod(network, firstPeriod);
+            var secondCommission = CalculateForPeriod(network, secondPeriod);
+
+            Assert.Equal(1, firstCommission.HighestCompletedLevel);
+            Assert.Single(firstCommission.Components);
+            Assert.Equal(1, firstCommission.Components.Single().Level);
+            Assert.Equal(150m, firstCommission.TotalAmount);
+            Assert.Equal(WeeklyCommissionPayoutStatus.Earned, firstCommission.PayoutStatus);
+
+            Assert.Equal(1, secondCommission.HighestCompletedLevel);
+            Assert.Single(secondCommission.Components);
+            Assert.Equal(1, secondCommission.Components.Single().Level);
+            Assert.Equal(150m, secondCommission.TotalAmount);
+            Assert.Equal(WeeklyCommissionPayoutStatus.Earned, secondCommission.PayoutStatus);
+
+            Assert.NotEqual(firstCommission.Id, secondCommission.Id);
+            Assert.NotEqual(firstCommission.CommissionPeriodId, secondCommission.CommissionPeriodId);
+        }
+
+        [Fact]
+        public void SamePeriodReevaluation_YieldsIdenticalResult_NoDuplicateComponents()
+        {
+            var network = BuildNetwork(maxDepth: 3);
+            var period = CreatePeriod(EffectiveFrom.AddDays(5));
+
+            var first = CalculateForPeriod(network, period);
+            var repeated = CalculateForPeriod(network, period);
+
+            Assert.Equal(first.HighestCompletedLevel, repeated.HighestCompletedLevel);
+            Assert.Equal(first.TotalAmount, repeated.TotalAmount);
+            Assert.Equal(first.Components.Count, repeated.Components.Count);
         }
 
         [Fact]
@@ -208,15 +248,28 @@ namespace AqualLifeStyle.Tests.Domain
             IEnumerable<EntryMonthlyObligation> obligations = null,
             IEnumerable<OnyxLoanAgreement> loans = null)
         {
-            var periodStart = EffectiveFrom.AddDays(5);
+            var period = CreatePeriod(EffectiveFrom.AddDays(5));
+            return CalculateForPeriod(network, period, obligations, loans);
+        }
+
+        private static EntryCommissionPeriod CreatePeriod(DateTime periodStart)
+        {
             var periodEnd = periodStart.AddDays(7).AddTicks(-1);
-            var period = EntryCommissionPeriod.CreateClosedPeriod(
+            return EntryCommissionPeriod.CreateClosedPeriod(
                 1,
                 periodStart,
                 periodEnd,
                 "Africa/Johannesburg",
                 periodEnd.AddMinutes(1),
                 CommissionTerms);
+        }
+
+        private static EntryWeeklyCommission CalculateForPeriod(
+            IReadOnlyCollection<EntryParticipation> network,
+            EntryCommissionPeriod period,
+            IEnumerable<EntryMonthlyObligation> obligations = null,
+            IEnumerable<OnyxLoanAgreement> loans = null)
+        {
             var calculator = new EntryWeeklyCommissionCalculator(
                 new EntryNetworkQualificationEvaluator());
 
