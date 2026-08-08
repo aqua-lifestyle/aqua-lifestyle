@@ -11,7 +11,6 @@ import {
 import { isPaymentApiCompatible } from "@/src/providers/SystemHealth/contract";
 import {
   apiEndpoints,
-  getExpiredSessionLoginUrl,
   httpClient,
   refreshAccessToken,
 } from "@/src/shared/api";
@@ -246,14 +245,13 @@ export const MemberProgrammes = () => {
 
     accessRefreshAttempted.current = true;
     void refreshAccessToken()
-      .then((accessToken) => {
-        if (accessToken) {
-          setAccessRefreshFinished(true);
-          return;
-        }
-        if (typeof window === "undefined") return;
-        const returnPath = `${window.location.pathname}${window.location.search}`;
-        window.location.href = getExpiredSessionLoginUrl(returnPath);
+      .then(() => {
+        // A null result means no refresh credential is available (ABP
+        // TokenAuth issues no refresh token), not that the session is
+        // invalid. Keep the member signed in and ask them to re-authenticate
+        // to load the freshly granted permission instead of redirecting to the
+        // sign-in page (which loops back here forever).
+        setAccessRefreshFinished(true);
       })
       .catch(() => {
         setAccessRefreshFinished(true);
