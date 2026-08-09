@@ -118,6 +118,39 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 AreaActivationStateLock.LockKey(tenantId))).ShouldBeTrue();
         }
 
+        [Fact]
+        public async Task MonthlyObligationLock_SerializesPaymentApplication()
+        {
+            await using var secondConnection = new NpgsqlConnection(ConnectionString);
+            await secondConnection.OpenAsync();
+            await using var secondTransaction = await secondConnection.BeginTransactionAsync();
+            await using var context = new AqualLifeStyleDbContext(
+                new DbContextOptionsBuilder<AqualLifeStyleDbContext>()
+                    .UseNpgsql(ConnectionString)
+                    .Options);
+            await context.Database.OpenConnectionAsync();
+            await using var firstTransaction =
+                await context.Database.BeginTransactionAsync();
+            var contextProvider =
+                Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>();
+            contextProvider.GetDbContext().Returns(context);
+            var obligationLock = new EntryMonthlyObligationSchedulingLock(
+                contextProvider);
+
+            await obligationLock.AcquireAsync();
+            (await TryAcquireAsync(
+                secondConnection,
+                secondTransaction,
+                EntryMonthlyObligationSchedulingLock.LockKey)).ShouldBeFalse();
+
+            await firstTransaction.CommitAsync();
+
+            (await TryAcquireAsync(
+                secondConnection,
+                secondTransaction,
+                EntryMonthlyObligationSchedulingLock.LockKey)).ShouldBeTrue();
+        }
+
         private static async Task<bool> TryAcquireAsync(
             NpgsqlConnection connection,
             NpgsqlTransaction transaction)

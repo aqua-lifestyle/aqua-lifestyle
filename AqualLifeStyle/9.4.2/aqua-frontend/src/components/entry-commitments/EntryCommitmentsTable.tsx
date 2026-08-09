@@ -1,5 +1,5 @@
 import type { EntryMonthlyObligation } from "@/src/shared/domain/entry-monthly-obligations";
-import { Badge, DataTable } from "@/src/shared/ui";
+import { Badge, Button, DataTable } from "@/src/shared/ui";
 
 const formatCurrency = (amount: number, currency: string) =>
   new Intl.NumberFormat("en-ZA", { currency, style: "currency" }).format(amount);
@@ -16,9 +16,13 @@ const formatPeriod = (year: number, month: number) =>
 
 export const EntryCommitmentsTable = ({
   obligations,
+  onPay,
+  payingId,
   showClubMember = false,
 }: {
   obligations: EntryMonthlyObligation[];
+  onPay?: (obligation: EntryMonthlyObligation) => void;
+  payingId?: string;
   showClubMember?: boolean;
 }) => {
   const columns = [
@@ -89,6 +93,25 @@ export const EntryCommitmentsTable = ({
         </Badge>
       ),
     },
+    ...(onPay
+      ? [{
+          header: "Payment",
+          key: "payment",
+          render: (item: EntryMonthlyObligation) =>
+            item.status === "Paid" || item.paymentId ? null : (
+              <Button
+                disabled={payingId === item.id}
+                onClick={() => onPay(item)}
+                size="sm"
+                variant="outline"
+              >
+                {payingId === item.id
+                  ? "Starting secure payment..."
+                  : `Pay ${formatPeriod(item.periodYear, item.periodMonth)}`}
+              </Button>
+            ),
+        }]
+      : []),
   ];
 
   return (

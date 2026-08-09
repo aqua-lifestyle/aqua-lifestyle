@@ -227,6 +227,10 @@ namespace AqualLifeStyle.Tests.Application
                 nameof(ClubMemberEntryMonthlyObligationAppService.GetMyObligationsAsync),
                 AquaPermissions.EntryMonthlyObligations.ViewSelf);
             AssertAuthorizeAttribute(
+                typeof(ClubMemberEntryMonthlyObligationAppService),
+                nameof(ClubMemberEntryMonthlyObligationAppService.CreateCheckoutAsync),
+                AquaPermissions.EntryMonthlyObligations.Pay);
+            AssertAuthorizeAttribute(
                 typeof(AdminEntryMonthlyObligationAppService),
                 nameof(AdminEntryMonthlyObligationAppService.GetAllAsync),
                 AquaPermissions.Admin.EntryMonthlyObligations.View);

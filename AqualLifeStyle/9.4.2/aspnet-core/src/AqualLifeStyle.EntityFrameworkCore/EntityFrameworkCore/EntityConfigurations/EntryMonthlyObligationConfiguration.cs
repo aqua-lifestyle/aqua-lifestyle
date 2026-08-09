@@ -45,6 +45,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
                     obligation.CustomerId,
                     obligation.Status
                 });
+            builder.HasIndex(obligation => obligation.PaymentId).IsUnique();
 
             builder.HasOne<EntryParticipation>()
                 .WithMany()

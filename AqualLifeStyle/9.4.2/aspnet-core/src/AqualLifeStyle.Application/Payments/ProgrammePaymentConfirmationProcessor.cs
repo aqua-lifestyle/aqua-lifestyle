@@ -29,19 +29,22 @@ namespace AqualLifeStyle.Payments
         public ProgrammeParticipationKind ParticipationKind { get; }
         public bool WasAlreadyProcessed { get; }
         public bool AwaitingAdministrativeApproval { get; }
+        public bool AllocationReconciliationRequired { get; }
 
         public ProgrammePaymentConfirmationResult(
             Guid paymentId,
             Guid participationId,
             ProgrammeParticipationKind participationKind,
             bool wasAlreadyProcessed,
-            bool awaitingAdministrativeApproval = false)
+            bool awaitingAdministrativeApproval = false,
+            bool allocationReconciliationRequired = false)
         {
             PaymentId = paymentId;
             ParticipationId = participationId;
             ParticipationKind = participationKind;
             WasAlreadyProcessed = wasAlreadyProcessed;
             AwaitingAdministrativeApproval = awaitingAdministrativeApproval;
+            AllocationReconciliationRequired = allocationReconciliationRequired;
         }
     }
 
@@ -61,6 +64,10 @@ namespace AqualLifeStyle.Payments
         private readonly IRepository<OnyxParticipation, Guid> _onyxParticipationRepository;
         private readonly IRepository<DirectOnyxCheckoutIntent, Guid> _directOnyxCheckoutIntentRepository;
         private readonly IRepository<AQGreenJoiningCheckout, Guid> _aqGreenJoiningCheckoutRepository;
+        private readonly IRepository<AQGreenMonthlyObligationCheckout, Guid>
+            _aqGreenMonthlyCheckoutRepository;
+        private readonly IRepository<EntryMonthlyObligation, Guid> _monthlyObligationRepository;
+        private readonly IEntryMonthlyObligationSchedulingLock _monthlyObligationLock;
         private readonly ICustomerRepository _customerRepository;
         private readonly IMembershipRepository _membershipRepository;
         private readonly IProgrammeInvitationResolver _invitationResolver;
@@ -73,6 +80,9 @@ namespace AqualLifeStyle.Payments
             IRepository<OnyxParticipation, Guid> onyxParticipationRepository,
             IRepository<DirectOnyxCheckoutIntent, Guid> directOnyxCheckoutIntentRepository,
             IRepository<AQGreenJoiningCheckout, Guid> aqGreenJoiningCheckoutRepository,
+            IRepository<AQGreenMonthlyObligationCheckout, Guid> aqGreenMonthlyCheckoutRepository,
+            IRepository<EntryMonthlyObligation, Guid> monthlyObligationRepository,
+            IEntryMonthlyObligationSchedulingLock monthlyObligationLock,
             ICustomerRepository customerRepository,
             IMembershipRepository membershipRepository,
             IProgrammeInvitationResolver invitationResolver,
@@ -84,6 +94,9 @@ namespace AqualLifeStyle.Payments
             _onyxParticipationRepository = onyxParticipationRepository;
             _directOnyxCheckoutIntentRepository = directOnyxCheckoutIntentRepository;
             _aqGreenJoiningCheckoutRepository = aqGreenJoiningCheckoutRepository;
+            _aqGreenMonthlyCheckoutRepository = aqGreenMonthlyCheckoutRepository;
+            _monthlyObligationRepository = monthlyObligationRepository;
+            _monthlyObligationLock = monthlyObligationLock;
             _customerRepository = customerRepository;
             _membershipRepository = membershipRepository;
             _invitationResolver = invitationResolver;
@@ -476,6 +489,169 @@ namespace AqualLifeStyle.Payments
                     wasAlreadyProcessed,
                     participation.IsAwaitingAdministrativeApproval);
             }
+        }
+
+        /// <summary>
+        /// Applies a verified provider payment only to the obligation persisted on
+        /// its AQGreen monthly checkout.
+        /// </summary>
+        [UnitOfWork]
+        public virtual async Task<ProgrammePaymentConfirmationResult>
+            ProcessAQGreenMonthlyObligationCheckoutAsync(
+                Guid checkoutId,
+                string provider,
+                string externalPaymentReference,
+                string providerCheckoutId,
+                decimal amount,
+                string currency,
+                DateTime confirmedAt)
+        {
+            if (checkoutId == Guid.Empty)
+                throw new ArgumentException(
+                    "An AQGreen monthly checkout is required.",
+                    nameof(checkoutId));
+
+            AQGreenMonthlyObligationCheckout checkout;
+            using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
+            {
+                checkout = await _aqGreenMonthlyCheckoutRepository.FirstOrDefaultAsync(
+                    checkoutId);
+            }
+            if (checkout == null)
+                throw new UserFriendlyException(
+                    "The AQGreen monthly payment could not be matched to a checkout.");
+
+            using (_unitOfWorkManager.Current.SetTenantId(checkout.TenantId))
+            {
+                if (checkout.Status == HostedPaymentCheckoutStatus.Completed)
+                {
+                    if (!checkout.PaymentId.HasValue)
+                        throw new InvalidOperationException(
+                            "The completed AQGreen monthly checkout is missing its payment reference.");
+                    EnsureProviderCheckoutMatches(
+                        checkout,
+                        providerCheckoutId,
+                        "AQGreen monthly");
+                    var existing = await _paymentRepository.GetAsync(
+                        checkout.PaymentId.Value);
+                    var repeated = MemberPayment.CreatePending(
+                        checkout.TenantId,
+                        checkout.CustomerId,
+                        MemberPaymentPurpose.EntryMonthlyCommitment,
+                        amount,
+                        provider,
+                        externalPaymentReference,
+                        checkout.CheckoutCreatedAt ?? checkout.CreatedAt,
+                        currency);
+                    EnsureMatchingPaymentFacts(existing, repeated);
+                    return new ProgrammePaymentConfirmationResult(
+                        existing.Id,
+                        checkout.EntryParticipationId,
+                        ProgrammeParticipationKind.Entry,
+                        true,
+                        allocationReconciliationRequired:
+                            checkout.AllocationStatus ==
+                            AQGreenMonthlyPaymentAllocationStatus.ReconciliationRequired);
+                }
+
+                EnsureCheckoutPaymentFacts(
+                    checkout,
+                    providerCheckoutId,
+                    amount,
+                    currency,
+                    "AQGreen monthly");
+                await _monthlyObligationLock.AcquireAsync();
+
+                var candidate = MemberPayment.CreatePending(
+                    checkout.TenantId,
+                    checkout.CustomerId,
+                    MemberPaymentPurpose.EntryMonthlyCommitment,
+                    amount,
+                    provider,
+                    externalPaymentReference,
+                    checkout.CheckoutCreatedAt ?? checkout.CreatedAt,
+                    currency);
+                candidate.Confirm(confirmedAt);
+                var existingPayment = await _paymentRepository.FirstOrDefaultAsync(payment =>
+                    payment.Provider == candidate.Provider &&
+                    payment.ExternalReference == candidate.ExternalReference);
+                var wasAlreadyProcessed =
+                    existingPayment?.Status == MemberPaymentStatus.Confirmed;
+                var payment = existingPayment ?? candidate;
+                if (existingPayment == null)
+                    await _paymentRepository.InsertAsync(payment);
+                else
+                {
+                    EnsureMatchingPaymentFacts(existingPayment, candidate);
+                    existingPayment.Confirm(confirmedAt);
+                }
+
+                EntryMonthlyObligation obligation;
+                EntryMonthlyObligation existingAllocation;
+                using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.SoftDelete))
+                {
+                    obligation = await _monthlyObligationRepository.FirstOrDefaultAsync(
+                        checkout.EntryMonthlyObligationId);
+                    existingAllocation = await _monthlyObligationRepository.FirstOrDefaultAsync(
+                        item => item.PaymentId == payment.Id);
+                }
+
+                var reconciliationReason = ReconciliationReason(
+                    checkout,
+                    obligation,
+                    payment,
+                    existingAllocation);
+                if (reconciliationReason == null)
+                {
+                    obligation.ApplyConfirmedPayment(payment);
+                    checkout.CompleteAllocation(payment.Id, confirmedAt);
+                }
+                else
+                {
+                    checkout.RequireReconciliation(
+                        payment.Id,
+                        confirmedAt,
+                        reconciliationReason);
+                }
+
+                await _unitOfWorkManager.Current.SaveChangesAsync();
+                return new ProgrammePaymentConfirmationResult(
+                    payment.Id,
+                    checkout.EntryParticipationId,
+                    ProgrammeParticipationKind.Entry,
+                    wasAlreadyProcessed,
+                    allocationReconciliationRequired: reconciliationReason != null);
+            }
+        }
+
+        private static string ReconciliationReason(
+            AQGreenMonthlyObligationCheckout checkout,
+            EntryMonthlyObligation obligation,
+            MemberPayment payment,
+            EntryMonthlyObligation existingAllocation)
+        {
+            if (existingAllocation != null &&
+                existingAllocation.Id != checkout.EntryMonthlyObligationId)
+                return "The provider payment is already associated with another AQGreen monthly obligation.";
+            if (obligation == null || obligation.IsDeleted)
+                return "The checkout's recorded AQGreen monthly obligation is unavailable.";
+            if (obligation.Id != checkout.EntryMonthlyObligationId ||
+                obligation.EntryParticipationId != checkout.EntryParticipationId ||
+                obligation.TenantId != checkout.TenantId ||
+                obligation.CustomerId != checkout.CustomerId ||
+                obligation.PeriodYear != checkout.PeriodYear ||
+                obligation.PeriodMonth != checkout.PeriodMonth ||
+                obligation.AmountDue != checkout.Amount ||
+                !string.Equals(obligation.Currency, checkout.Currency, StringComparison.Ordinal))
+                return "The checkout and AQGreen monthly obligation financial identity do not match.";
+            if (obligation.Status == EntryMonthlyObligationStatus.Paid ||
+                obligation.PaymentId.HasValue)
+                return obligation.PaymentId == payment.Id
+                    ? null
+                    : "The AQGreen monthly obligation was already settled by another payment.";
+            if (obligation.OutstandingAmount != checkout.Amount)
+                return "The checkout and AQGreen monthly obligation financial identity do not match.";
+            return null;
         }
 
         [UnitOfWork]

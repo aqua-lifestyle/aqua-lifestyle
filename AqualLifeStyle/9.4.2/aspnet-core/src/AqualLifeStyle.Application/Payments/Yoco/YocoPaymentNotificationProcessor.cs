@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Email;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace AqualLifeStyle.Payments.Yoco
 {
@@ -43,6 +44,8 @@ namespace AqualLifeStyle.Payments.Yoco
         private readonly IConfiguration _configuration;
         private readonly IRepository<DirectOnyxCheckoutIntent, Guid> _onyxCheckoutRepository;
         private readonly IRepository<AQGreenJoiningCheckout, Guid> _aqGreenCheckoutRepository;
+        private readonly IRepository<AQGreenMonthlyObligationCheckout, Guid>
+            _aqGreenMonthlyCheckoutRepository;
         private readonly IRepository<YocoWebhookReceipt, Guid> _receiptRepository;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
         private readonly IRepository<MemberPayment, Guid> _paymentRepository;
@@ -50,24 +53,28 @@ namespace AqualLifeStyle.Payments.Yoco
         private readonly ITransactionalEmailOutbox _emailOutbox;
         private readonly TransactionalEmailTemplateBuilder _emailTemplates;
         private readonly IHostedPaymentCheckoutLock _hostedPaymentCheckoutLock;
+        private readonly ILogger<YocoPaymentNotificationProcessor> _logger;
 
         public YocoPaymentNotificationProcessor(
             ProgrammePaymentConfirmationProcessor confirmationProcessor,
             IConfiguration configuration,
             IRepository<DirectOnyxCheckoutIntent, Guid> onyxCheckoutRepository,
             IRepository<AQGreenJoiningCheckout, Guid> aqGreenCheckoutRepository,
+            IRepository<AQGreenMonthlyObligationCheckout, Guid> aqGreenMonthlyCheckoutRepository,
             IRepository<YocoWebhookReceipt, Guid> receiptRepository,
             IUnitOfWorkManager unitOfWorkManager,
             IRepository<MemberPayment, Guid> paymentRepository,
             ICustomerRepository customerRepository,
             ITransactionalEmailOutbox emailOutbox,
             TransactionalEmailTemplateBuilder emailTemplates,
-            IHostedPaymentCheckoutLock hostedPaymentCheckoutLock)
+            IHostedPaymentCheckoutLock hostedPaymentCheckoutLock,
+            ILogger<YocoPaymentNotificationProcessor> logger)
         {
             _confirmationProcessor = confirmationProcessor;
             _configuration = configuration;
             _onyxCheckoutRepository = onyxCheckoutRepository;
             _aqGreenCheckoutRepository = aqGreenCheckoutRepository;
+            _aqGreenMonthlyCheckoutRepository = aqGreenMonthlyCheckoutRepository;
             _receiptRepository = receiptRepository;
             _unitOfWorkManager = unitOfWorkManager;
             _paymentRepository = paymentRepository;
@@ -75,6 +82,7 @@ namespace AqualLifeStyle.Payments.Yoco
             _emailOutbox = emailOutbox;
             _emailTemplates = emailTemplates;
             _hostedPaymentCheckoutLock = hostedPaymentCheckoutLock;
+            _logger = logger;
         }
 
         [UnitOfWork]
@@ -167,9 +175,9 @@ namespace AqualLifeStyle.Payments.Yoco
                     }
 
                     ProgrammePaymentConfirmationResult confirmation;
-                    switch (checkout.Programme)
+                    switch (checkout.Kind)
                     {
-                        case YocoCheckoutProgramme.Onyx:
+                        case YocoCheckoutKind.DirectOnyx:
                             confirmation = await _confirmationProcessor.ProcessDirectOnyxCheckoutAsync(
                                 checkout.ReferenceId,
                                 "Yoco",
@@ -179,7 +187,7 @@ namespace AqualLifeStyle.Payments.Yoco
                                 notification.Currency,
                                 confirmedAt);
                             break;
-                        case YocoCheckoutProgramme.AQGreen:
+                        case YocoCheckoutKind.AQGreenJoining:
                             confirmation = await _confirmationProcessor.ProcessAQGreenJoiningCheckoutAsync(
                                 checkout.ReferenceId,
                                 "Yoco",
@@ -188,6 +196,17 @@ namespace AqualLifeStyle.Payments.Yoco
                                 notification.AmountInCents / 100m,
                                 notification.Currency,
                                 confirmedAt);
+                            break;
+                        case YocoCheckoutKind.AQGreenMonthlyObligation:
+                            confirmation = await _confirmationProcessor
+                                .ProcessAQGreenMonthlyObligationCheckoutAsync(
+                                    checkout.ReferenceId,
+                                    "Yoco",
+                                    notification.PaymentId,
+                                    providerCheckoutId,
+                                    notification.AmountInCents / 100m,
+                                    notification.Currency,
+                                    confirmedAt);
                             break;
                         default:
                             throw new YocoWebhookValidationException(
@@ -226,6 +245,16 @@ namespace AqualLifeStyle.Payments.Yoco
             ProgrammePaymentConfirmationResult confirmation,
             YocoCheckoutProgramme programme)
         {
+            if (confirmation.AllocationReconciliationRequired)
+            {
+                _logger.LogError(
+                    "PaymentOperationsAlert {AlertType}: AQGreen participation {ParticipationId} retained payment {PaymentId} without allocating another obligation",
+                    "aqgreen_monthly_payment_allocation_reconciliation_required",
+                    confirmation.ParticipationId,
+                    confirmation.PaymentId);
+                return;
+            }
+
             var payment = await _paymentRepository.GetAsync(confirmation.PaymentId);
             var customer = await _customerRepository.GetAsync(payment.CustomerId);
             var programmeName = programme == YocoCheckoutProgramme.AQGreen ? "AQGreen" : "Onyx";
@@ -258,6 +287,7 @@ namespace AqualLifeStyle.Payments.Yoco
         {
             DirectOnyxCheckoutIntent onyxCheckout;
             AQGreenJoiningCheckout aqGreenCheckout;
+            AQGreenMonthlyObligationCheckout aqGreenMonthlyCheckout;
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
             {
                 onyxCheckout = await _onyxCheckoutRepository.GetAll()
@@ -268,9 +298,16 @@ namespace AqualLifeStyle.Payments.Yoco
                     .AsNoTracking()
                     .FirstOrDefaultAsync(
                         checkout => checkout.ProviderCheckoutId == providerCheckoutId);
+                aqGreenMonthlyCheckout = await _aqGreenMonthlyCheckoutRepository.GetAll()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        checkout => checkout.ProviderCheckoutId == providerCheckoutId);
             }
 
-            if (onyxCheckout != null && aqGreenCheckout != null)
+            var matchCount = (onyxCheckout == null ? 0 : 1) +
+                             (aqGreenCheckout == null ? 0 : 1) +
+                             (aqGreenMonthlyCheckout == null ? 0 : 1);
+            if (matchCount > 1)
                 throw new YocoWebhookValidationException(
                     "The Yoco checkout reference matches more than one programme payment.");
             if (onyxCheckout != null)
@@ -278,6 +315,7 @@ namespace AqualLifeStyle.Payments.Yoco
                     onyxCheckout.TenantId,
                     onyxCheckout.Id,
                     YocoCheckoutProgramme.Onyx,
+                    YocoCheckoutKind.DirectOnyx,
                     onyxCheckout.Amount,
                     onyxCheckout.Currency,
                     YocoCheckoutMetadata.DirectOnyxPurpose);
@@ -286,9 +324,19 @@ namespace AqualLifeStyle.Payments.Yoco
                     aqGreenCheckout.TenantId,
                     aqGreenCheckout.Id,
                     YocoCheckoutProgramme.AQGreen,
+                    YocoCheckoutKind.AQGreenJoining,
                     aqGreenCheckout.Amount,
                     aqGreenCheckout.Currency,
                     YocoCheckoutMetadata.AQGreenJoiningPurpose);
+            if (aqGreenMonthlyCheckout != null)
+                return new ResolvedYocoCheckout(
+                    aqGreenMonthlyCheckout.TenantId,
+                    aqGreenMonthlyCheckout.Id,
+                    YocoCheckoutProgramme.AQGreen,
+                    YocoCheckoutKind.AQGreenMonthlyObligation,
+                    aqGreenMonthlyCheckout.Amount,
+                    aqGreenMonthlyCheckout.Currency,
+                    YocoCheckoutMetadata.AQGreenMonthlyObligationPurpose);
 
             throw new YocoWebhookTransientException(
                 "The Yoco checkout has not been recorded locally yet.");
@@ -327,6 +375,17 @@ namespace AqualLifeStyle.Payments.Yoco
                     StringComparison.Ordinal))
                 throw new YocoWebhookValidationException(
                     "The Yoco payment purpose does not match the recorded checkout.");
+            if (checkout.Kind == YocoCheckoutKind.AQGreenMonthlyObligation)
+            {
+                var reference = GetRequiredMetadataText(
+                    notification.Metadata,
+                    YocoCheckoutMetadata.AQGreenMonthlyObligationCheckoutId,
+                    "The Yoco monthly payment is missing its merchant checkout reference.");
+                if (!Guid.TryParseExact(reference, "N", out var referenceId) ||
+                    referenceId != checkout.ReferenceId)
+                    throw new YocoWebhookValidationException(
+                        "The Yoco monthly payment merchant reference does not match the recorded checkout.");
+            }
         }
 
         private static string GetRequiredMetadataText(
@@ -347,6 +406,7 @@ namespace AqualLifeStyle.Payments.Yoco
             public int TenantId { get; }
             public Guid ReferenceId { get; }
             public YocoCheckoutProgramme Programme { get; }
+            public YocoCheckoutKind Kind { get; }
             public decimal Amount { get; }
             public string Currency { get; }
             public string ExpectedPurpose { get; }
@@ -355,6 +415,7 @@ namespace AqualLifeStyle.Payments.Yoco
                 int tenantId,
                 Guid referenceId,
                 YocoCheckoutProgramme programme,
+                YocoCheckoutKind kind,
                 decimal amount,
                 string currency,
                 string expectedPurpose)
@@ -362,10 +423,18 @@ namespace AqualLifeStyle.Payments.Yoco
                 TenantId = tenantId;
                 ReferenceId = referenceId;
                 Programme = programme;
+                Kind = kind;
                 Amount = amount;
                 Currency = currency;
                 ExpectedPurpose = expectedPurpose;
             }
+        }
+
+        private enum YocoCheckoutKind
+        {
+            DirectOnyx,
+            AQGreenJoining,
+            AQGreenMonthlyObligation
         }
     }
 }

@@ -22,6 +22,10 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
     public class AQGreenMigrationRollbackPostgreSqlTests : IAsyncLifetime
     {
         private const string PostgresImage = "postgres:16-alpine";
+        private const string MonthlyCheckoutMigration =
+            "20260809114317_AddAQGreenMonthlyObligationCheckouts";
+        private const string PreviousMonthlyCheckoutMigration =
+            "20260809081746_AddAreaActivationStateHistory";
         private readonly string _containerName = $"aqgreen-migration-test-pg-{Guid.NewGuid():N}";
         private readonly string _databaseName = $"aqgreen_test_{Guid.NewGuid():N}";
         private readonly int _hostPort;
@@ -237,6 +241,14 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await using var command = new Npgsql.NpgsqlCommand(sql, connection);
             var result = await command.ExecuteScalarAsync();
             return Convert.ToInt64(result);
+        }
+
+        private static async Task ExecuteAsync(string connectionString, string sql)
+        {
+            await using var connection = new Npgsql.NpgsqlConnection(connectionString);
+            await connection.OpenAsync();
+            await using var command = new Npgsql.NpgsqlCommand(sql, connection);
+            await command.ExecuteNonQueryAsync();
         }
 
         private async Task MigrateToAsync(string targetMigration)
@@ -760,6 +772,205 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await using var verifyContext = CreateDbContext();
             var applied = await verifyContext.Database.GetAppliedMigrationsAsync();
             applied.ShouldContain("20260809081746_AddAreaActivationStateHistory");
+        }
+
+        [Fact]
+        public async Task MonthlyCheckoutMigration_AppliesAndRollsBackWhenEmpty_PostgreSQL()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(PreviousMonthlyCheckoutMigration);
+            await ExecuteAsync(
+                BuildTestConnectionString(),
+                """
+                INSERT INTO "AbpRoles"
+                    ("Id", "CreationTime", "IsDeleted", "TenantId", "Name", "DisplayName", "IsStatic", "IsDefault", "NormalizedName")
+                VALUES
+                    (9101, NOW(), FALSE, 1, 'Member', 'Area 1 Member', TRUE, FALSE, 'MEMBER'),
+                    (9102, NOW(), FALSE, 2, 'Member', 'Area 2 Member', TRUE, FALSE, 'MEMBER');
+                """);
+
+            await MigrateToAsync(MonthlyCheckoutMigration);
+
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'AQGreenMonthlyObligationCheckouts'"))
+                .ShouldBe(1);
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'EntryMonthlyObligations' AND indexname = 'IX_EntryMonthlyObligations_PaymentId' AND indexdef LIKE 'CREATE UNIQUE INDEX%'"))
+                .ShouldBe(1);
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'AQGreenMonthlyObligationCheckouts' AND indexname = 'IX_AQGreenMonthlyObligationCheckouts_EntryMonthlyObligationId' AND indexdef LIKE 'CREATE UNIQUE INDEX%' AND indexdef LIKE '%WHERE (\"Status\" = ANY (ARRAY[0, 1, 2]))%'"))
+                .ShouldBe(1);
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'AQGreenMonthlyObligationCheckouts' AND indexname = 'IX_AQGreenMonthlyObligationCheckouts_PaymentId' AND indexdef LIKE 'CREATE INDEX%'"))
+                .ShouldBe(1);
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(*) FROM \"AbpPermissions\" WHERE \"Name\" = 'Aqua.EntryMonthlyObligations.Pay' AND \"RoleId\" IN (9101, 9102) AND \"IsGranted\" = TRUE"))
+                .ShouldBe(2);
+
+            await MigrateToAsync(PreviousMonthlyCheckoutMigration);
+
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'AQGreenMonthlyObligationCheckouts'"))
+                .ShouldBe(0);
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'EntryMonthlyObligations' AND indexname = 'IX_EntryMonthlyObligations_PaymentId' AND indexdef LIKE 'CREATE INDEX%'"))
+                .ShouldBe(1);
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(*) FROM \"AbpPermissions\" WHERE \"Name\" = 'Aqua.EntryMonthlyObligations.Pay' AND \"RoleId\" IN (9101, 9102) AND \"IsGranted\" = TRUE"))
+                .ShouldBe(2);
+        }
+
+        [Fact]
+        public async Task MonthlyCheckoutMigration_RejectsDuplicatePaymentAssociations_PostgreSQL()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(PreviousMonthlyCheckoutMigration);
+            await SeedMinimalUserAsync();
+            var obligations = await SeedMonthlyObligationsAsync();
+            await using (var context = CreateDbContext())
+            {
+                var payment = CreateConfirmedPayment(
+                    MemberPaymentPurpose.EntryMonthlyCommitment,
+                    "duplicate-monthly-association",
+                    DateTime.UtcNow);
+                context.MemberPayments.Add(payment);
+                await context.SaveChangesAsync();
+                await context.Database.ExecuteSqlInterpolatedAsync($"""
+                    UPDATE "EntryMonthlyObligations"
+                    SET "PaymentId" = {payment.Id}
+                    WHERE "Id" IN ({obligations.First.Id}, {obligations.Second.Id})
+                    """);
+            }
+
+            var ex = await Should.ThrowAsync<PostgresException>(async () =>
+                await MigrateToAsync(MonthlyCheckoutMigration));
+
+            ex.SqlState.ShouldBe(PostgresErrorCodes.RaiseException);
+            ex.MessageText.ShouldContain("duplicate payment associations exist");
+            await using var verifyContext = CreateDbContext();
+            (await verifyContext.Database.GetAppliedMigrationsAsync())
+                .ShouldNotContain(MonthlyCheckoutMigration);
+        }
+
+        [Fact]
+        public async Task MonthlyCheckoutSchema_EnforcesActiveUniquenessAndProtectsEvidence_PostgreSQL()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToLatestAsync();
+            var obligations = await SeedMonthlyObligationsAsync();
+            await using (var context = CreateDbContext())
+            {
+                context.AQGreenMonthlyObligationCheckouts.Add(
+                    AQGreenMonthlyObligationCheckout.Create(
+                        obligations.First,
+                        DateTime.UtcNow));
+                await context.SaveChangesAsync();
+            }
+
+            await using (var duplicateContext = CreateDbContext())
+            {
+                duplicateContext.AQGreenMonthlyObligationCheckouts.Add(
+                    AQGreenMonthlyObligationCheckout.Create(
+                        obligations.First,
+                        DateTime.UtcNow.AddSeconds(1)));
+                var duplicate = await Should.ThrowAsync<DbUpdateException>(async () =>
+                    await duplicateContext.SaveChangesAsync());
+                ((PostgresException)duplicate.InnerException).SqlState
+                    .ShouldBe(PostgresErrorCodes.UniqueViolation);
+            }
+
+            var rollback = await Should.ThrowAsync<PostgresException>(async () =>
+                await MigrateToAsync(PreviousMonthlyCheckoutMigration));
+
+            rollback.SqlState.ShouldBe(PostgresErrorCodes.RaiseException);
+            rollback.MessageText.ShouldContain(
+                "Cannot remove AQGreen monthly checkout schema");
+            await using var verifyContext = CreateDbContext();
+            (await verifyContext.Database.GetAppliedMigrationsAsync())
+                .ShouldContain(MonthlyCheckoutMigration);
+            (await verifyContext.AQGreenMonthlyObligationCheckouts.CountAsync())
+                .ShouldBe(1);
+        }
+
+        private async Task<(EntryMonthlyObligation First, EntryMonthlyObligation Second)>
+            SeedMonthlyObligationsAsync()
+        {
+            var customerId = await GetTenantOneCustomerIdAsync();
+            var startedAt = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+            var suffix = Guid.NewGuid().ToString("N").Substring(0, 8);
+            var participation = EntryParticipation.StartIndependently(
+                1,
+                customerId,
+                EntryProgrammeTerms.Create(
+                    $"migration-{suffix}",
+                    startedAt,
+                    600m,
+                    600m,
+                    600m,
+                    7),
+                startedAt);
+            var registration = CreateConfirmedPayment(
+                MemberPaymentPurpose.EntryRegistration,
+                $"migration-registration-{Guid.NewGuid():N}",
+                startedAt);
+            var activation = CreateConfirmedPayment(
+                MemberPaymentPurpose.EntryActivation,
+                $"migration-activation-{Guid.NewGuid():N}",
+                startedAt.AddMinutes(2));
+            participation.ApplyConfirmedActivationPayment(registration);
+            participation.ApplyConfirmedActivationPayment(activation);
+            participation.ApproveByAdministrator(1, startedAt.AddMinutes(4));
+            var policyVersion = $"migration-policy-{suffix}";
+            var first = EntryMonthlyObligation.Create(
+                participation,
+                2026,
+                6,
+                new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc),
+                policyVersion);
+            var second = EntryMonthlyObligation.Create(
+                participation,
+                2026,
+                7,
+                new DateTime(2026, 7, 10, 0, 0, 0, DateTimeKind.Utc),
+                policyVersion);
+            await using var context = CreateDbContext();
+            context.EntryMonthlyObligationDuePolicies.Add(
+                EntryMonthlyObligationDuePolicy.Create(
+                    policyVersion,
+                    10,
+                    EntryMonthlyObligationDuePolicy.JohannesburgMonthStartUtc(
+                        2026,
+                        6)));
+            context.MemberPayments.AddRange(registration, activation);
+            context.EntryParticipations.Add(participation);
+            context.EntryMonthlyObligations.AddRange(first, second);
+            await context.SaveChangesAsync();
+            return (first, second);
+        }
+
+        private static MemberPayment CreateConfirmedPayment(
+            MemberPaymentPurpose purpose,
+            string reference,
+            DateTime initiatedAt)
+        {
+            var payment = MemberPayment.CreatePending(
+                1,
+                1,
+                purpose,
+                600m,
+                "MigrationTest",
+                reference,
+                initiatedAt);
+            payment.Confirm(initiatedAt.AddMinutes(1));
+            return payment;
         }
 
         private void TraceLine(string message)

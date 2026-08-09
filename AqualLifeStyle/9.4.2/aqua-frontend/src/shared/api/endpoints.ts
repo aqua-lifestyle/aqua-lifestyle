@@ -148,6 +148,8 @@ export const apiEndpoints = {
       "/api/services/app/AdminEntryMonthlyObligation/GetAll",
     getMyObligations:
       "/api/services/app/ClubMemberEntryMonthlyObligation/GetMyObligations",
+    createCheckout:
+      "/api/services/app/ClubMemberEntryMonthlyObligation/CreateCheckout",
   },
   weeklyEarnings: {
     calculateLatestClosedWeek:

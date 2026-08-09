@@ -6,7 +6,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuthState } from "@/src/providers";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
-import type { EntryMonthlyObligation } from "@/src/shared/domain/entry-monthly-obligations";
+import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
+import type {
+  EntryMonthlyObligation,
+  EntryMonthlyObligationCheckout,
+} from "@/src/shared/domain/entry-monthly-obligations";
 import {
   Breadcrumb,
   Card,
@@ -17,14 +21,17 @@ import {
 import { EntryCommitmentsTable } from "../entry-commitments/EntryCommitmentsTable";
 
 const VIEW_PERMISSION = "Aqua.EntryMonthlyObligations.ViewSelf";
+const PAY_PERMISSION = "Aqua.EntryMonthlyObligations.Pay";
 
 export const MemberEntryCommitments = () => {
   const { session } = useAuthState();
   const canView =
     session?.user?.permissions?.includes(VIEW_PERMISSION) ?? false;
+  const canPay = session?.user?.permissions?.includes(PAY_PERMISSION) ?? false;
   const [items, setItems] = useState<EntryMonthlyObligation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
+  const [payingId, setPayingId] = useState<string>();
 
   const load = useCallback(async () => {
     if (!canView) {
@@ -55,6 +62,29 @@ export const MemberEntryCommitments = () => {
     const task = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(task);
   }, [load]);
+
+  const pay = async (obligation: EntryMonthlyObligation) => {
+    setPayingId(obligation.id);
+    setError(undefined);
+    try {
+      const checkout = await httpClient.post<
+        EntryMonthlyObligationCheckout,
+        { obligationId: string }
+      >(apiEndpoints.entryMonthlyObligations.createCheckout, {
+        obligationId: obligation.id,
+      });
+      navigateToExternalUrl(checkout.checkoutUrl);
+    } catch (requestError) {
+      setError(
+        getRequestErrorMessage(
+          requestError,
+          "This AQGreen monthly payment could not be started. No payment has been taken.",
+        ),
+      );
+    } finally {
+      setPayingId(undefined);
+    }
+  };
 
   if (!canView) {
     return (
@@ -87,7 +117,11 @@ export const MemberEntryCommitments = () => {
           <Skeleton className="h-80" />
         ) : items.length ? (
           <Card>
-            <EntryCommitmentsTable obligations={items} />
+            <EntryCommitmentsTable
+              obligations={items}
+              onPay={canPay ? pay : undefined}
+              payingId={payingId}
+            />
           </Card>
         ) : (
           <EmptyState

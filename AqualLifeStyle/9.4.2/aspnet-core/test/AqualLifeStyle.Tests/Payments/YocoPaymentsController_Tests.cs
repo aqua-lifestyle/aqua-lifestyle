@@ -24,7 +24,9 @@ namespace AqualLifeStyle.Tests.Payments
         private sealed class TestYocoPaymentNotificationProcessor : YocoPaymentNotificationProcessor
         {
             public TestYocoPaymentNotificationProcessor()
-                : base(null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!)
+                : base(
+                    null!, null!, null!, null!, null!, null!, null!, null!, null!,
+                    null!, null!, null!, null!)
             {
             }
 

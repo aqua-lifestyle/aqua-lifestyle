@@ -4,6 +4,22 @@ using AqualLifeStyle.Domain.Onyx;
 
 namespace AqualLifeStyle.Application.EntryMonthlyObligations.Dto
 {
+    public class CreateEntryMonthlyObligationCheckoutInput
+    {
+        public Guid ObligationId { get; set; }
+    }
+
+    public class EntryMonthlyObligationCheckoutDto
+    {
+        public Guid CheckoutId { get; set; }
+        public Guid ObligationId { get; set; }
+        public int PeriodYear { get; set; }
+        public int PeriodMonth { get; set; }
+        public decimal Amount { get; set; }
+        public string Currency { get; set; }
+        public string CheckoutUrl { get; set; }
+    }
+
     public class EntryMonthlyObligationDto
     {
         public Guid Id { get; set; }
