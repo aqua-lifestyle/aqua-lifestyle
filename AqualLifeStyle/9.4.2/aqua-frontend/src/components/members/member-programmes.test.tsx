@@ -112,9 +112,10 @@ describe("MemberProgrammes", () => {
 
     expect(await screen.findByText(/cannot verify a compatible payment API/i))
       .toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Join AQGreen" }))
+    expect(await screen.findByRole("button", { name: "Join AQGreen" }))
       .toBeDisabled();
-    expect(screen.getByRole("button", { name: "Join Onyx" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "Join Onyx" }))
+      .toBeDisabled();
   });
 
   it("refreshes account access after programme activation changes the role", async () => {
