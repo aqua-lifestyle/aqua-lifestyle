@@ -1,7 +1,7 @@
 # Confirmed Onyx Model and Implementation Plan
 
 Status: approved business direction, including the AQGreen naming clarification
-and confirmed joining/graduation rules, as of 2026-08-01.
+and confirmed joining/graduation rules, as of 2026-08-09.
 
 This document is the source of truth for the current Onyx feature phase. Older
 membership documents remain useful historical material but do not override the
@@ -15,11 +15,12 @@ rules below.
   Existing `Entry*` code identifiers, API routes, database tables, and immutable
   records are retained for backward compatibility; they represent AQGreen and
   must not be treated as a separate programme.
-- Direct entrants create an Onyx participation only after a confirmed R6,120
-  payment.
-- AQGreen entrants create a separate AQGreen participation and activate only after
-  one verified R1,200 joining payment. The R600 monthly commitment is separate
-  from the joining payment.
+- Direct entrants create an Onyx participation after a confirmed R6,120 payment;
+  the participation remains inactive until Area Administrator approval.
+- AQGreen entrants create a separate AQGreen participation. Its R1,200 joining
+  obligation may be paid once or as two R600 instalments. Confirmed payment
+  remains inactive until Area Administrator approval, and the separate R600
+  monthly commitment is not a joining instalment.
 - AQGreen Level 2 makes the loan agreement available. Member acceptance followed
   by administrator approval makes the agreement effective. Creation of the
   separate Onyx participation uses independent placement: the graduate has no
@@ -162,11 +163,11 @@ The persistence and provider-neutral confirmation foundation is complete:
   hosted checkout, and signature-verified payment webhooks. The adapter checks
   timestamp freshness, deployment mode, exact amount/currency, invitation and
   recruiter eligibility, and provider-reference idempotency before atomically
-  creating or activating programme state. AQGreen placement exists before payment,
-  but it becomes active only after the verified R1,200 joining total. An active
-  hosted checkout locks the full-payment schedule. A historical participant with
-  one verified R600 joining instalment may complete that preserved obligation;
-  the verified payment history is not rewritten.
+  recording confirmed programme-payment state. AQGreen placement exists before
+  payment, but it becomes active only after the verified R1,200 joining total and
+  an Area Administrator approval. The customer chooses the full-payment or
+  two-instalment schedule before the first checkout; an active checkout then locks
+  that schedule. Historical verified payment records are not rewritten.
 
 ### Phase 3 obligation status
 

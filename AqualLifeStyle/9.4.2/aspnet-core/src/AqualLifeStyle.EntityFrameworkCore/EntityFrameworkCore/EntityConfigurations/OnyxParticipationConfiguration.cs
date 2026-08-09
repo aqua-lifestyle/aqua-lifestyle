@@ -111,7 +111,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
                 .HasMaxLength(OnyxParticipationApprovalDecision.MaxRejectionReasonLength);
             builder.Property(decision => decision.DecidedAt).IsRequired();
 
-            builder.HasIndex("OnyxParticipationId");
+            builder.HasIndex("OnyxParticipationId").IsUnique();
         }
     }
 }

@@ -22,7 +22,7 @@ namespace AqualLifeStyle.Web.Host.Controllers
     public sealed class OperationsDiagnosticsController : ControllerBase, ITransientDependency
     {
         public const string RequiredPaymentMigration =
-            "20260801092352_AddAQGreenSchedulesAndOnyxGraduation";
+            "20260809052330_EnableAQGreenFlexibleJoiningPayments";
 
         private readonly IDbContextProvider<AqualLifeStyleDbContext> _dbContextProvider;
         private readonly IConfiguration _configuration;

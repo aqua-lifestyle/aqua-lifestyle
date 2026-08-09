@@ -14,7 +14,7 @@ Nothing in this document should be interpreted as a defect in the current codeba
 
 ### Overview
 
-The payment platform is built around a **shared hosted-checkout lifecycle** with programme-specific activation logic. The current implementation is Yoco-only and uses a single R1,200 payment for AQGreen joining, replacing the historical R600 + R600 split-payment flow.
+The payment platform is built around a **shared hosted-checkout lifecycle** with programme-specific confirmation and human-approval logic. The current implementation is Yoco-only. AQGreen's R1,200 joining obligation can be paid once or as two R600 instalments; historical split registration/activation records remain distinct.
 
 ### Hosted Yoco Checkout
 
@@ -51,16 +51,17 @@ as custom metadata are not trusted for routing.
 - Reuses an existing confirmed payment if the same provider reference arrives again.
 - Returns `WasAlreadyProcessed = true` on repeat delivery without re-applying activation.
 
-### Atomic Activation
+### Atomic Payment Confirmation and Human Approval
 
-Activation is performed inside a single ABP `[UnitOfWork]`:
+Payment confirmation is performed inside a single ABP `[UnitOfWork]`:
 
 - The confirmed `MemberPayment` is inserted or reused.
 - The programme participation (`EntryParticipation` or `OnyxParticipation`) is updated.
 - The checkout aggregate is marked `Completed`.
-- `ActiveProgrammeParticipantRoleSynchronizer` promotes the user from Guest to Member if needed.
+- AQGreen records the R30,000 funeral-cover benefit as included when its R1,200 joining obligation is complete.
+- The participation becomes `PaymentConfirmedAwaitingApproval` and an idempotent Area Administrator alert is written to the transactional outbox.
 
-There is no intermediate "pending activation" state that can be observed without a confirmed payment, and once a verified webhook is processed the activation is atomic and local. A successful provider payment can still remain temporarily inactive if the webhook is delayed, fails, or is lost; in that case the participation stays inactive until webhook retry, polling, manual reconciliation, or future automated reconciliation runs.
+The participation state itself is the durable, Area-scoped approval queue. A separately authorised Area Administrator records an append-only decision. Approval changes the participation to `Active` and promotes a Guest to Member; rejection records its reason and keeps the participation inactive. Payment confirmation never substitutes for this human boundary.
 
 ### Programme-Specific Payment Handlers
 
@@ -72,12 +73,18 @@ Each programme aggregate decides what a confirmed payment activates. The shared 
 ### AQGreen Payment Lifecycle
 
 1. Customer is already registered with an `EntryParticipation` in `AwaitingJoiningPayment` status (recruiter placement recorded).
-2. Customer requests a checkout. The app service creates an `AQGreenJoiningCheckout` for R1,200.
+2. Customer selects R1,200 once or two R600 instalments. The app service creates
+   an `AQGreenJoiningCheckout` for the selected schedule and next stage.
 3. Existing incomplete checkout is reused if present (resume-payment support).
 4. The returned Yoco checkout ID is recorded as the stable provider reference.
-5. Webhook confirms payment → atomic activation → participation becomes `Active`.
+5. Webhook confirms payment → joining obligation completes → funeral-cover inclusion is recorded → participation becomes `PaymentConfirmedAwaitingApproval`.
+6. The responsible Area Administrator discovers the durable queue item and receives an outbox email alert.
+7. Approval records the decision and changes the participation to `Active`; rejection records the reason and keeps it inactive.
 
-Historical split-payment participations (R600 + R600) are preserved in the database and are explicitly excluded from the new checkout flow. The migration updates only wholly unpaid rows to the new terms.
+Historical registration/activation participations are preserved in the
+database and are excluded from the modern checkout flow. Modern AQGreen
+participations support either the full payment or the two-instalment schedule;
+the migration updated only wholly unpaid historical rows to modern terms.
 
 ### AQGreen Migration Rollback Behavior and Tests
 
@@ -174,7 +181,8 @@ completely removes the AQGreen payment schema.
 1. Customer requests a direct Onyx checkout. No participation exists yet.
 2. `DirectOnyxCheckoutIntent` is created with recruiter/invite placement.
 3. Yoco checkout is recorded.
-4. Webhook confirms payment → `OnyxParticipation` is created and activated atomically.
+4. Webhook confirms payment → `OnyxParticipation` is created in `PaymentConfirmedAwaitingApproval`.
+5. An authorised Area Administrator approves or rejects it through the same durable queue.
 
 ### Shared Payment Infrastructure
 
@@ -182,7 +190,7 @@ completely removes the AQGreen payment schema.
 - `MemberPayment`: provider-neutral confirmed payment record with `(TenantId, CustomerId, Purpose, Amount, Currency, Provider, ExternalReference)`.
 - `YocoCheckoutGateway`: server-side credentials, idempotency, mode validation.
 - `YocoWebhookSignatureVerifier`: timestamped HMAC verification.
-- `ActiveProgrammeParticipantRoleSynchronizer`: role promotion after activation.
+- `ActiveProgrammeParticipantRoleSynchronizer`: role promotion after administrator approval.
 
 ### Current Strengths
 
@@ -191,7 +199,7 @@ completely removes the AQGreen payment schema.
 - Financial amounts are validated exactly (no floating-point rounding surprises).
 - Checkout and payment IDs are validated and unique.
 - Idempotency is achieved through stable provider references and persisted checkout state.
-- Activation is atomic and never observable in a half-completed state.
+- Payment confirmation is atomic, and no payment callback can bypass administrator approval.
 - Historical data is preserved and not silently migrated.
 - The architecture cleanly separates provider plumbing from programme business rules.
 
@@ -219,7 +227,7 @@ Currency is normalized to a three-letter uppercase code and validated at multipl
 
 ### Checkout Validation
 
-Before a webhook can activate a participation, the processor validates that the checkout is in `AwaitingPayment` status, that the `ProviderCheckoutId` matches, and that the payment amount and currency match the persisted checkout. This prevents cross-checkout contamination.
+Before a webhook can confirm a programme payment, the processor validates that the checkout is in `AwaitingPayment` status, that the `ProviderCheckoutId` matches, and that the payment amount and currency match the persisted checkout. This prevents cross-checkout contamination; activation still requires administrator approval.
 
 ### Provider Reference Validation
 
@@ -227,13 +235,13 @@ Before a webhook can activate a participation, the processor validates that the 
 
 ### Transactional Consistency
 
-Activation happens inside a single database transaction. If any step fails, the participation remains in its previous state and the checkout remains incomplete. Once a verified webhook is processed, there is no window in which the local database shows a customer as active without a confirmed payment, or paid without active status. A successful provider payment can still remain temporarily inactive if the webhook is delayed, failed, or lost, until recovery runs.
+Payment confirmation, checkout completion, funeral-cover inclusion where applicable, and administrator-alert enqueue happen inside a single database transaction. If any step fails, the participation remains in its previous state and the checkout remains incomplete. A confirmed participation remains inactive and durably queued until an authorised administrator decision is committed.
 
 ### Idempotency
 
 Repeat webhook delivery is expected and handled. A successfully processed event
-receipt is committed in the same transaction as payment confirmation and
-activation. Repeated delivery with the same event ID and matching payload hash
+receipt is committed in the same transaction as payment confirmation and the
+approval-queue transition. Repeated delivery with the same event ID and matching payload hash
 returns without side effects. The same event ID with a conflicting payload hash
 is rejected; payment-reference idempotency remains a second line of defence.
 
@@ -622,8 +630,9 @@ Once daily transaction volume justifies dedicated operational attention. Early-s
 
 - Hosted Yoco checkout lifecycle
 - Verified webhooks with exact amount and currency validation
-- Atomic programme activation
-- AQGreen single R1,200 payment
+- Atomic payment confirmation with a separate human approval boundary
+- AQGreen R1,200 once or two R600 instalments
+- Durable Area-scoped programme approval queue and transactional alerts
 - Onyx direct R6,120 payment
 - Idempotent webhook processing
 - Frontend with resume-payment support
@@ -705,7 +714,7 @@ Every webhook handler and every public endpoint that touches payment state must 
 
 ### Financial History Remains Immutable
 
-Once a payment is confirmed and a participation activated, the historical record must not be altered. Corrections (e.g., recruiter placement) are additive audit events. Refunds and reversals are new records that reference the original, not mutations of it.
+Once a payment is confirmed and an approval decision is recorded, the historical record must not be altered. Corrections (e.g., recruiter placement) are additive audit events. Refunds and reversals are new records that reference the original, not mutations of it.
 
 ### Provider Logic Remains Isolated from Business Rules
 
@@ -723,16 +732,19 @@ AQGreen, Onyx, and any future programme must define their own activation and qua
 
 The current implementation is production-ready for the approved business requirements:
 
-- AQGreen single R1,200 joining payment
+- AQGreen R1,200 joining obligation paid once or in two R600 instalments
 - Onyx direct R6,120 entry payment
 - Hosted Yoco checkout lifecycle
 - Verified webhook processing
-- Idempotent activation
+- Idempotent payment confirmation and administrator decisions
+- Durable Area-scoped approval queue, global badge, and administrator email alert
+- R30,000 AQGreen funeral-cover inclusion without insurer activation semantics
 - Frontend with resume-payment support
 - Admin reconciliation view
 - Comprehensive test coverage
 
-No changes are required before production deployment.
+Production deployment still requires the migrations, environment-specific
+configuration, and the validation gates in `docs/development/validation.md`.
 
 ---
 

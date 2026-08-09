@@ -22,6 +22,7 @@ export const JoinProgrammeDialog = ({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
+  const [aqGreenSchedule, setAQGreenSchedule] = useState<0 | 1>(0);
 
   const close = () => {
     if (submitting) return;
@@ -44,7 +45,7 @@ export const JoinProgrammeDialog = ({
           { schedule: 0 | 1 }
         >(
           apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
-          { schedule: 0 },
+          { schedule: aqGreenSchedule },
         );
         navigateToExternalUrl(checkout.checkoutUrl);
       } else {
@@ -78,9 +79,45 @@ export const JoinProgrammeDialog = ({
         <form className="flex flex-col gap-5" onSubmit={submit}>
           <div className="rounded-lg bg-muted/60 p-4 text-sm text-muted-foreground">
             {programme === "AQGreen"
-              ? "AQGreen joining requires one full payment of R1,200. Participation activates only after Yoco verifies the payment."
-              : "Joining Onyx directly requires one full payment of R6,120. AQGreen participation is not required."}
+              ? "AQGreen joining is R1,200. Pay once or as two R600 instalments. Provider confirmation is followed by Area Administrator review before activation."
+              : "Joining Onyx directly requires one full payment of R6,120. Provider confirmation is followed by Area Administrator review before activation."}
           </div>
+
+          {programme === "AQGreen" ? (
+            <fieldset className="grid gap-3">
+              <legend className="text-sm font-semibold">Payment schedule</legend>
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-4">
+                <input
+                  checked={aqGreenSchedule === 0}
+                  className="mt-1"
+                  name="aqgreen-payment-schedule"
+                  onChange={() => setAQGreenSchedule(0)}
+                  type="radio"
+                />
+                <span>
+                  <span className="block font-medium">Pay R1,200 once</span>
+                  <span className="text-sm text-muted-foreground">
+                    Complete the joining obligation in one payment.
+                  </span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-4">
+                <input
+                  checked={aqGreenSchedule === 1}
+                  className="mt-1"
+                  name="aqgreen-payment-schedule"
+                  onChange={() => setAQGreenSchedule(1)}
+                  type="radio"
+                />
+                <span>
+                  <span className="block font-medium">Pay two R600 instalments</span>
+                  <span className="text-sm text-muted-foreground">
+                    Area review starts only after both instalments are confirmed.
+                  </span>
+                </span>
+              </label>
+            </fieldset>
+          ) : null}
 
           <div className="rounded-lg border border-border p-4">
             <p className="font-medium">Start my own network</p>

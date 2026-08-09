@@ -60,14 +60,15 @@ describe("ProgrammeInvitationLanding", () => {
         buildId: "test-build",
         checkedAtUtc: "2026-08-01T10:00:00Z",
         contractCapabilities: [
-          "aqgreen-single-payment-v1",
+          "aqgreen-flexible-joining-v1",
+          "programme-approval-queue-v1",
           "direct-onyx-checkout-v1",
         ],
         databaseStatus: "Healthy",
         environment: "Test",
         imageId: "unavailable",
         isDatabaseReachable: true,
-        paymentContractVersion: "aqua-payments-2026-08-01-single-payment",
+        paymentContractVersion: "aqua-payments-2026-08-09-flexible-payment-approval",
         releaseDate: "2026-08-01T00:00:00Z",
         status: "Healthy",
         traceId: "test-trace",
@@ -104,6 +105,9 @@ describe("ProgrammeInvitationLanding", () => {
     expect(
       screen.getByText(/eligible to invite Club Members to AQGreen/i),
     ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", {
+      name: /Pay two R600 instalments/i,
+    }));
     fireEvent.click(screen.getByRole("button", { name: /confirm and continue to payment/i }));
 
     await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
@@ -112,7 +116,7 @@ describe("ProgrammeInvitationLanding", () => {
     ));
     expect(httpClient.post).toHaveBeenCalledWith(
       apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
-      { schedule: 0 },
+      { schedule: 1 },
     );
     expect(httpClient.post).not.toHaveBeenCalledWith(
       apiEndpoints.programmeParticipations.createDirectOnyxCheckout,

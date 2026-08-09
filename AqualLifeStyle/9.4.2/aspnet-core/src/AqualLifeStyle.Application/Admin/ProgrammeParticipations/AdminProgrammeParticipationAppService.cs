@@ -345,6 +345,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 
             Customer customer;
             Guid participationId;
+            bool decisionApplied;
             using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
             {
                 IsTransactional = true,
@@ -352,18 +353,23 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             }))
             using (DisableAllTenantDataFiltersForHost())
             {
-                (customer, participationId) = await ApplyDecisionAsync(
+                await _hostedPaymentCheckoutLock
+                    .AcquireProgrammeParticipationDecisionAsync(input.ParticipationId);
+                (customer, participationId, decisionApplied) = await ApplyDecisionAsync(
                     input.Programme,
                     input.ParticipationId,
                     approve: true,
                     reason: null);
-                await _participantRoleSynchronizer.PromoteGuestToMemberAsync(customer.Id);
-                await EnqueueDecisionEmailAsync(
-                    customer,
-                    input.Programme,
-                    participationId,
-                    approved: true,
-                    reason: null);
+                if (decisionApplied)
+                {
+                    await _participantRoleSynchronizer.PromoteGuestToMemberAsync(customer.Id);
+                    await EnqueueDecisionEmailAsync(
+                        customer,
+                        input.Programme,
+                        participationId,
+                        approved: true,
+                        reason: null);
+                }
                 await CurrentUnitOfWork.SaveChangesAsync();
                 await uow.CompleteAsync();
             }
@@ -386,6 +392,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 
             Customer customer;
             Guid participationId;
+            bool decisionApplied;
             using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
             {
                 IsTransactional = true,
@@ -393,17 +400,22 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             }))
             using (DisableAllTenantDataFiltersForHost())
             {
-                (customer, participationId) = await ApplyDecisionAsync(
+                await _hostedPaymentCheckoutLock
+                    .AcquireProgrammeParticipationDecisionAsync(input.ParticipationId);
+                (customer, participationId, decisionApplied) = await ApplyDecisionAsync(
                     input.Programme,
                     input.ParticipationId,
                     approve: false,
                     reason: input?.Reason);
-                await EnqueueDecisionEmailAsync(
-                    customer,
-                    input.Programme,
-                    participationId,
-                    approved: false,
-                    reason: input.Reason);
+                if (decisionApplied)
+                {
+                    await EnqueueDecisionEmailAsync(
+                        customer,
+                        input.Programme,
+                        participationId,
+                        approved: false,
+                        reason: input.Reason);
+                }
                 await CurrentUnitOfWork.SaveChangesAsync();
                 await uow.CompleteAsync();
             }
@@ -412,7 +424,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 $"Programme participation rejected programme={input.Programme} participation={participationId} administrator={AbpSession.GetUserId()}");
         }
 
-        private async Task<(Customer Customer, Guid ParticipationId)> ApplyDecisionAsync(
+        private async Task<(Customer Customer, Guid ParticipationId, bool DecisionApplied)>
+            ApplyDecisionAsync(
             AdminProgrammeType programme,
             Guid participationId,
             bool approve,
@@ -425,22 +438,34 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     item => item.Id == participationId);
                 if (onyx == null)
                     throw Failed("Participation decision", "The participation was not found in your Area.");
+                ValidateRequestedTenant(onyx.TenantId, "Participation decision");
+                if ((approve && onyx.Status == OnyxParticipationStatus.Active) ||
+                    (!approve && onyx.Status == OnyxParticipationStatus.Rejected))
+                {
+                    return (await _customerRepository.GetAsync(onyx.CustomerId), onyx.Id, false);
+                }
                 if (approve)
                     onyx.ApproveByAdministrator(AbpSession.GetUserId(), decidedAt);
                 else
                     onyx.RejectByAdministrator(AbpSession.GetUserId(), reason, decidedAt);
-                return (await _customerRepository.GetAsync(onyx.CustomerId), onyx.Id);
+                return (await _customerRepository.GetAsync(onyx.CustomerId), onyx.Id, true);
             }
 
             var entry = await _entryParticipationRepository.FirstOrDefaultAsync(
                 item => item.Id == participationId);
             if (entry == null)
                 throw Failed("Participation decision", "The participation was not found in your Area.");
+            ValidateRequestedTenant(entry.TenantId, "Participation decision");
+            if ((approve && entry.Status == EntryParticipationStatus.Active) ||
+                (!approve && entry.Status == EntryParticipationStatus.Rejected))
+            {
+                return (await _customerRepository.GetAsync(entry.CustomerId), entry.Id, false);
+            }
             if (approve)
                 entry.ApproveByAdministrator(AbpSession.GetUserId(), decidedAt);
             else
                 entry.RejectByAdministrator(AbpSession.GetUserId(), reason, decidedAt);
-            return (await _customerRepository.GetAsync(entry.CustomerId), entry.Id);
+            return (await _customerRepository.GetAsync(entry.CustomerId), entry.Id, true);
         }
 
         private async Task EnqueueDecisionEmailAsync(
@@ -567,6 +592,47 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 return input.Programme == AdminProgrammeType.Onyx
                     ? await GetOnyxParticipationsAsync(input)
                     : await GetEntryParticipationsAsync(input);
+            }
+        }
+
+        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.View)]
+        public async Task<PendingProgrammeApprovalSummaryDto>
+            GetPendingApprovalSummaryAsync(PendingProgrammeApprovalSummaryInput input)
+        {
+            input ??= new PendingProgrammeApprovalSummaryInput();
+            ValidateRequestedTenant(input.TenantId, "Pending programme approval");
+            if (!AbpSession.TenantId.HasValue &&
+                !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
+            {
+                throw new AbpAuthorizationException(
+                    "Host-wide pending programme approval access requires permission to view all Areas.");
+            }
+
+            using (DisableAllTenantDataFiltersForHost())
+            {
+                var entryQuery = _entryParticipationRepository.GetAll()
+                    .Where(participation =>
+                        participation.Status ==
+                        EntryParticipationStatus.PaymentConfirmedAwaitingApproval);
+                var onyxQuery = _onyxParticipationRepository.GetAll()
+                    .Where(participation =>
+                        participation.Status ==
+                        OnyxParticipationStatus.PaymentConfirmedAwaitingApproval);
+
+                var tenantId = AbpSession.TenantId ?? input.TenantId;
+                if (tenantId.HasValue)
+                {
+                    entryQuery = entryQuery.Where(participation =>
+                        participation.TenantId == tenantId.Value);
+                    onyxQuery = onyxQuery.Where(participation =>
+                        participation.TenantId == tenantId.Value);
+                }
+
+                return new PendingProgrammeApprovalSummaryDto
+                {
+                    AQGreenCount = await entryQuery.CountAsync(),
+                    OnyxCount = await onyxQuery.CountAsync()
+                };
             }
         }
 
@@ -784,6 +850,13 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     row.Customer.Email.Value.ToLower().Contains(keyword));
             }
 
+            if (input.AwaitingApprovalOnly)
+            {
+                query = query.Where(row =>
+                    row.Participation.Status ==
+                    EntryParticipationStatus.PaymentConfirmedAwaitingApproval);
+            }
+
             return query;
         }
 
@@ -808,6 +881,13 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 query = query.Where(row =>
                     row.Customer.Name.ToLower().Contains(keyword) ||
                     row.Customer.Email.Value.ToLower().Contains(keyword));
+            }
+
+            if (input.AwaitingApprovalOnly)
+            {
+                query = query.Where(row =>
+                    row.Participation.Status ==
+                    OnyxParticipationStatus.PaymentConfirmedAwaitingApproval);
             }
 
             return query;
@@ -852,6 +932,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 participation.RecruiterCustomerId,
                 participation.StartedAt,
                 participation.ActivatedAt,
+                participation.JoiningPaymentAmount > 0m
+                    ? participation.JoiningPaymentAmount
+                    : participation.RegistrationPaymentAmount +
+                      participation.ActivationPaymentAmount,
                 participation.Currency,
                 new[]
                 {
@@ -882,6 +966,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 participation.RecruiterCustomerId,
                 participation.StartedAt,
                 participation.ActivatedAt,
+                participation.DirectEntryAmount,
                 participation.Currency,
                 new[] { participation.DirectEntryPaymentId },
                 payments,
@@ -899,6 +984,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             int? recruiterCustomerId,
             DateTime startedAt,
             DateTime? activatedAt,
+            decimal expectedJoiningAmount,
             string currency,
             IEnumerable<Guid?> paymentIds,
             IReadOnlyDictionary<Guid, MemberPayment> payments,
@@ -924,6 +1010,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                         : null,
                 StartedAt = startedAt,
                 ActivatedAt = activatedAt,
+                ExpectedJoiningAmount = expectedJoiningAmount,
                 NextPaymentAmount = details.NextPaymentAmount,
                 NextPaymentDescription = details.NextPaymentDescription,
                 Currency = currency,

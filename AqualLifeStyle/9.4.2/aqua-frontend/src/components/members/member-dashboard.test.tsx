@@ -269,6 +269,7 @@ describe("MemberDashboard", () => {
         onyx: null,
         pendingAQGreenCheckout: null,
         pendingDirectOnyxCheckout: null,
+        funeralCover: null,
         travelBenefit: null,
       },
       errorMessage: undefined,

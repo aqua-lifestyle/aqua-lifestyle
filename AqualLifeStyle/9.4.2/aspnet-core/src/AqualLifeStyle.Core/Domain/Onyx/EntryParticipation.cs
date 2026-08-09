@@ -58,6 +58,14 @@ namespace AqualLifeStyle.Domain.Onyx
         public IReadOnlyCollection<EntryParticipationApprovalDecision> ApprovalDecisions =>
             _approvalDecisions.AsReadOnly();
         public bool IsQualifiedForNetwork => Status == EntryParticipationStatus.Active;
+
+        /// <summary>
+        /// True when the modern AQGreen joining obligation has been fully paid
+        /// (the R1,200 once or two R600 instalments). Historical participations
+        /// that use the split registration/activation lifecycle are excluded.
+        /// </summary>
+        public bool IsJoiningObligationSatisfied =>
+            JoiningPaymentAmount > 0m && GetOutstandingJoiningAmount() == 0m;
         public bool IsAwaitingAdministrativeApproval =>
             Status == EntryParticipationStatus.PaymentConfirmedAwaitingApproval;
         public bool IsRejected => Status == EntryParticipationStatus.Rejected;
