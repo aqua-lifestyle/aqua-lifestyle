@@ -720,10 +720,12 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                                 CycleStartUtc = cycleStart,
                                 IsLatestClosedCycle =
                                     cycleStart == latestClosedWeek.PeriodStartUtc,
-                                Disposition = MissingCommissionCycleDisposition
-                                    .ManualFinancialReconciliationRequired,
+                                Disposition = cycleStart == latestClosedWeek.PeriodStartUtc
+                                    ? MissingCommissionCycleDisposition.PendingCalculation
+                                    : MissingCommissionCycleDisposition
+                                        .ManualFinancialReconciliationRequired,
                                 Message = cycleStart == latestClosedWeek.PeriodStartUtc
-                                    ? "Automatic calculation is blocked because mutable network and eligibility state cannot be reconstructed reliably at the cycle cutoff. Manual financial reconciliation required."
+                                    ? "Automatic calculation is pending for the latest closed cycle. It is generated deterministically by the automatic calculation pipeline at the cycle cutoff once calculation is enabled; it is not reconstructible from current state. Commission is only classified after verified payment."
                                     : "Historical calculation is unavailable because period-effective network, qualification, eligibility, and terms cannot be reconstructed reliably. Manual financial reconciliation required."
                             })
                             .ToList()

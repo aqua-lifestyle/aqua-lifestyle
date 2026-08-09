@@ -162,7 +162,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions.Dto
 
     public enum MissingCommissionCycleDisposition
     {
-        ManualFinancialReconciliationRequired = 0
+        ManualFinancialReconciliationRequired = 0,
+        PendingCalculation = 1
     }
 
     public class MissingCommissionCycleDto

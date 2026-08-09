@@ -381,9 +381,8 @@ namespace AqualLifeStyle.Tests.Application
             missingCycle.CycleStartUtc.ShouldBe(latestClosed.PeriodStartUtc);
             missingCycle.IsLatestClosedCycle.ShouldBeTrue();
             missingCycle.Disposition.ShouldBe(
-                MissingCommissionCycleDisposition
-                    .ManualFinancialReconciliationRequired);
-            missingCycle.Message.ShouldContain("cycle cutoff");
+                MissingCommissionCycleDisposition.PendingCalculation);
+            missingCycle.Message.ShouldContain("pending for the latest closed cycle");
             var after = await UsingDbContextAsync(1, async context =>
                 new
                 {
@@ -440,6 +439,94 @@ namespace AqualLifeStyle.Tests.Application
                 MissingCommissionCycleDisposition
                     .ManualFinancialReconciliationRequired);
             missingCycle.Message.ShouldContain("Historical calculation is unavailable");
+        }
+
+        [Fact]
+        public async Task Inventory_ClassifiesLatestClosedMissingCycleAsPendingCalculation()
+        {
+            var latestClosed = Resolve<LatestClosedCommissionWeekResolver>()
+                .Resolve(DateTime.UtcNow);
+            var terms = Resolve<ICurrentCommissionTermsProvider>().GetEntryTerms();
+            await UsingDbContextAsync(1, async context =>
+            {
+                foreach (var periodStart in new[]
+                {
+                    latestClosed.PeriodStartUtc.AddDays(-14),
+                    latestClosed.PeriodStartUtc.AddDays(-7)
+                })
+                {
+                    context.EntryCommissionPeriods.Add(
+                        EntryCommissionPeriod.CreateClosedPeriod(
+                            1,
+                            periodStart,
+                            periodStart.AddDays(7).AddTicks(-1),
+                            LatestClosedCommissionWeekResolver.CommissionTimeZoneId,
+                            DateTime.UtcNow,
+                            terms));
+                }
+
+                await context.SaveChangesAsync();
+            });
+            LoginAsHostAdmin();
+
+            var inventory = await _service.GetPeriodInventoryAsync(
+                new GetCommissionPeriodInventoryInput
+                {
+                    TenantId = 1,
+                    Programme = CommissionInventoryProgramme.AQGreen
+                });
+
+            var missingCycle = inventory.ProgrammeBoundaries.Single()
+                .MissingCanonicalCycles.Single();
+            missingCycle.CycleStartUtc.ShouldBe(latestClosed.PeriodStartUtc);
+            missingCycle.IsLatestClosedCycle.ShouldBeTrue();
+            missingCycle.Disposition.ShouldBe(
+                MissingCommissionCycleDisposition.PendingCalculation);
+            missingCycle.Message.ShouldContain("pending for the latest closed cycle");
+        }
+
+        [Fact]
+        public async Task Inventory_DistinguishesOlderGapFromPendingLatestClosedCycle()
+        {
+            var latestClosed = Resolve<LatestClosedCommissionWeekResolver>()
+                .Resolve(DateTime.UtcNow);
+            var terms = Resolve<ICurrentCommissionTermsProvider>().GetEntryTerms();
+            await UsingDbContextAsync(1, async context =>
+            {
+                context.EntryCommissionPeriods.Add(
+                    EntryCommissionPeriod.CreateClosedPeriod(
+                        1,
+                        latestClosed.PeriodStartUtc.AddDays(-14),
+                        latestClosed.PeriodStartUtc.AddDays(-14).AddDays(7).AddTicks(-1),
+                        LatestClosedCommissionWeekResolver.CommissionTimeZoneId,
+                        DateTime.UtcNow,
+                        terms));
+                await context.SaveChangesAsync();
+            });
+            LoginAsHostAdmin();
+
+            var inventory = await _service.GetPeriodInventoryAsync(
+                new GetCommissionPeriodInventoryInput
+                {
+                    TenantId = 1,
+                    Programme = CommissionInventoryProgramme.AQGreen
+                });
+
+            var missingCycles = inventory.ProgrammeBoundaries.Single()
+                .MissingCanonicalCycles
+                .OrderBy(cycle => cycle.CycleStartUtc)
+                .ToList();
+            missingCycles.Count.ShouldBe(2);
+            missingCycles[0].CycleStartUtc.ShouldBe(
+                latestClosed.PeriodStartUtc.AddDays(-7));
+            missingCycles[0].IsLatestClosedCycle.ShouldBeFalse();
+            missingCycles[0].Disposition.ShouldBe(
+                MissingCommissionCycleDisposition
+                    .ManualFinancialReconciliationRequired);
+            missingCycles[1].CycleStartUtc.ShouldBe(latestClosed.PeriodStartUtc);
+            missingCycles[1].IsLatestClosedCycle.ShouldBeTrue();
+            missingCycles[1].Disposition.ShouldBe(
+                MissingCommissionCycleDisposition.PendingCalculation);
         }
 
         [Fact]
