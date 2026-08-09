@@ -1,9 +1,9 @@
 # Release Report — Programme Engine Gap Closure (`feat/programme-engine-gap-closure`)
 
 Release role: Release Engineer — final validation pass
-Branch: `feat/programme-engine-gap-closure` (HEAD `43d968d` — post-integration)
-Base: merge-base `e371f85`; merged against `origin/main` at `32f02a4` (merge commit `43d968d`)
-Date: 2026-08-07 (updated after integrating current `origin/main`)
+Branch: `feat/programme-engine-gap-closure` (verification update based on `ab7187c` plus the current weekly-engine changes)
+Base: merge-base `e371f85`; current work extends the post-integration programme engine
+Date: 2026-08-08
 Companion docs: `docs/verification/business-rule-matrix.md`, `docs/verification/verification-report.md`
 
 ---
@@ -12,7 +12,7 @@ Companion docs: `docs/verification/business-rule-matrix.md`, `docs/verification/
 
 ### Problem
 Three confirmed branch-purpose gaps in the AQGreen/Onyx programme engine had no production implementation:
-- **M-15**: automatic recurring R600 monthly obligation scheduling and confirmed-payment allocation existed only as domain + tests, with no production caller.
+- **M-15**: automatic recurring R600 monthly obligation scheduling existed only as domain + tests, with no production caller. The prior oldest-open payment allocation heuristic was not authoritative.
 - **M-46**: the R30,000 funeral-cover benefit had no requirement/implementation; only product-decision notes.
 - **M-28 / M-44 / M-45**: no member-facing commission ledger, payout explanation, or programme education content existed.
 
@@ -23,10 +23,11 @@ A member can see a truthful, read-only explanation of their AQGreen position (ne
 - M-15 recurring obligation engine: scheduler, due-date policy, advisory-lock, config-gated worker.
 - M-46 funeral-cover inclusion: entitlement aggregate, inclusion processor, payment-confirmation wiring, migration.
 - M-28/M-44/M-45 member progress: `GetMyProgressAsync` app service + DTOs, frontend page/hook, navbar link, tests.
+- Automatic Friday–Thursday calculation for both AQGreen and Onyx, with travel eligibility and financial settlement kept independent.
 
 ### Explicit exclusions
 - PD-06 (funeral-cover activation/enrolment timing and effective date) — unresolved business decision, **not** encoded as active.
-- PD-07 (monthly due-date policy) — unresolved business decision; scheduler refuses to invent due dates.
+- Initial monthly due-policy version/day/effective month — intentionally not supplied; the confirmed durable policy model fails closed while empty.
 - PD-02, PD-05 — pre-existing unresolved decisions, out of branch scope.
 - Webhook rate limiting (M-35/AD-06), parallel-duplicate webhook test (AD-05) — pre-existing accepted debt.
 
@@ -34,7 +35,7 @@ A member can see a truthful, read-only explanation of their AQGreen position (ne
 
 ## 2. Branch state
 
-- **Integrated with current `origin/main`** via merge commit `43d968d` (parents `724c9fc` branch, `32f02a4` origin/main). Working tree **clean**; nothing staged.
+- **Integrated baseline:** merge commit `43d968d` (parents `724c9fc` branch, `32f02a4` origin/main), followed by the programme-engine verification and weekly-engine commits/changes documented in §17.
 - No upstream configured (`git push --dry-run`/PR not performed; not requested).
 - Pre-merge commits (`origin/main..HEAD`, 8): `724c9fc` docs: finalize release readiness documentation; `4e15a28` feat(member): expose commission progress and payout explanations; `9fb1baf` feat(aqgreen): implement funeral-cover inclusion; `e17f3c6` feat(aqgreen): implement recurring obligation model; `e6b6302` docs: record programme-engine gap closure baseline; `34e38d6` docs: add programme-engine business rule matrix and verification report; `4abcdc1` test(frontend): de-flake awaiting-approval admin test; `655b7f9` test(programmes): add deterministic 3,906-participant Onyx simulation.
 - Commits integrated from `origin/main` (9): CI workflow additions (PostgreSQL transactional gate, Render deploy gate, manual dispatch), and `b4f0de7` frontend admin-approval async-race fix.
@@ -47,9 +48,9 @@ A member can see a truthful, read-only explanation of their AQGreen position (ne
 | # | Criterion | Status | Evidence strength |
 |---|-----------|--------|-------------------|
 | AC-1 | M-15 scheduler creates one obligation per active participation per period; repeated runs idempotent | **Met** | Automated component test (`ActiveParticipant_GetsOneObligationPerPeriod_RepeatedRunsAreIdempotent`), unique index `IX_EntryMonthlyObligations_EntryParticipationId_PeriodYear_PeriodMonth` |
-| AC-2 | M-15 confirmed monthly payments allocated to earliest open obligation exactly once | **Met** | Automated test `ConfirmedMonthlyPayment_IsAllocatedToEarliestOpenObligation_Once`; `linkedSet`/`PaymentId` guards |
+| AC-2 | M-15 confirmed monthly payment settles only its server-linked obligation | **Not implemented; safe state** | The oldest-open heuristic was removed. No recurring checkout currently persists authoritative `ObligationId` and period evidence, so unlinked confirmed payments require authorised financial reconciliation. |
 | AC-3 | M-15 overdue assessment respects due + grace period, marks overdue, holds own payout | **Met** | Automated test `UnpaidObligations_AreAssessed_IntoOverdue`; `AssessStatus` transitions |
-| AC-4 | M-15 due-date policy never invents due dates (PD-07); worker gated by config, defaults disabled | **Met** | Inspection + `ConfigurationEntryMonthlyObligationDueDatePolicyTests`; `App:EntryMonthlyObligations:Enabled=false`, `DueDayOfMonth=""` |
+| AC-4 | M-15 due-date policy never invents due dates; worker gated by config, defaults disabled | **Met** | Durable empty-by-default policy table + fail-closed resolver tests; `App:EntryMonthlyObligations:Enabled=false` and no configured due-day fallback |
 | AC-5 | M-46 funeral cover recorded once per participation after joining satisfied (full or two-installment) | **Met** | Automated tests (`EnsureIncludedAsync_IsIdempotent_AndGrantsOnce`, two-installment test), unique index on `EntryParticipationId` |
 | AC-6 | M-46 never encodes insurance activation or waiting period (PD-06) | **Met** | Inspection: single `Included` enum value; domain doc comments |
 | AC-7 | M-28/M-44/M-45 member can read level, direct-recruit progress, weekly earning components/status/hold reason, monthly obligation status, funeral-cover inclusion, education | **Met** | Automated tests (`ClubMemberProgrammeProgressAppServiceTests` 4, frontend `member-programme-progress.test.tsx` 3, `use-my-programme-progress.test.ts`) |
@@ -64,9 +65,9 @@ A member can see a truthful, read-only explanation of their AQGreen position (ne
 ## 4. Implementation review (M-15 / M-46 / M-28 / M-44 / M-45)
 
 ### M-15 — recurring obligation engine
-- `EntryMonthlyObligationScheduler` (`Application/EntryMonthlyObligations/EntryMonthlyObligationScheduler.cs`): three idempotent operations — `EnsureObligationsForPeriodAsync`, `AssessObligationsAsync`, `AllocateConfirmedMonthlyPaymentsAsync`. Each disables the tenant filter and works across tenants because `EntryMonthlyObligation` carries `TenantId`/`CustomerId`. Allocations match on exact amount + ordinal currency, skip already-linked payment IDs, and remove allocated targets. `SaveChanges` only when work was done. **No duplicate period obligation** backed by the DB unique index; **no double-payment allocation** backed by `PaymentId` linkage.
-- `ConfigurationEntryMonthlyObligationDueDatePolicy`: reads `App:EntryMonthlyObligations:DueDayOfMonth` (1–28, UTC midnight); missing/invalid → `null` → scheduler does **not** create obligations. Correct PD-07 handling.
-- `EntryMonthlyObligationWorker` (`Web.Host/ProgrammeEngine/`): config-gated (`Enabled=false` default), 60-min interval, acquires the scheduling lock inside the UoW, then create/assess/allocate, logs structured `ProgrammeEngineAlert` events. Errors rethrown (operational visibility).
+- `EntryMonthlyObligationScheduler` (`Application/EntryMonthlyObligations/EntryMonthlyObligationScheduler.cs`): two idempotent operations — `EnsureObligationsForPeriodAsync` and `AssessObligationsAsync`. Each disables the tenant filter and works across tenants because `EntryMonthlyObligation` carries `TenantId`/`CustomerId`. `SaveChanges` occurs only when work was done. **No duplicate period obligation** is backed by the DB unique index. Payment application is intentionally absent until checkout persists one authoritative `ObligationId`; the scheduler never guesses a target month.
+- `PersistedEntryMonthlyObligationDueDatePolicy`: selects exactly one latest applicable host policy version. Missing, ambiguous, or invalid evidence returns an explicit failure result, logs `aqgreen_monthly_due_policy_unresolved`, and creates no obligation. Due dates are day 1–28 at 00:00 `Africa/Johannesburg`, converted to UTC.
+- `EntryMonthlyObligationWorker` (`Web.Host/ProgrammeEngine/`): config-gated (`Enabled=false` default), 60-min interval, acquires the scheduling lock inside the UoW, then creates and assesses obligations, and logs structured `ProgrammeEngineAlert` events. Errors are rethrown for operational visibility. It never guesses payment allocation.
 - `EntryMonthlyObligationSchedulingLock`: `pg_advisory_xact_lock` on PostgreSQL / `sp_getapplock` on SQL Server; transaction-scoped, released on commit/rollback. Prevents cross-instance double scheduling.
 - Assessment: `AssessStatus(asOf)` is deterministic; prevents reassessment at an earlier time; sets `MarkedOverdueAt` once.
 - `EntryMonthlyObligation.ApplyConfirmedPayment` validates confirmed status, tenant/customer/currency/amount, idempotent on same `PaymentId`.
@@ -149,7 +150,7 @@ Every change reviewed for breakage of existing behaviour:
 ## 7. Time and state review
 
 - All timestamps are UTC-typed (`DateTimeKind.Utc` validated in scheduler/policy; domain `AssessStatus` rejects earlier reassessment).
-- `IncludedAt`/`paidAt`/`dueAt` are explicit, never invented. The due-date policy returns `null` rather than guessing (PD-07).
+- `IncludedAt`/`paidAt`/`dueAt` are explicit, never invented. Monthly due-policy resolution returns a typed missing/ambiguous/invalid result rather than guessing.
 - No global normalizers or compatibility switches introduced.
 - `MarkedOverdueAt ??= asOf` keeps first-overdue time.
 
@@ -203,7 +204,7 @@ A full-suite run reported `1 failed / 376 passed`. The failing test was `src/com
 
 ## 11. Documentation review
 
-- `docs/verification/business-rule-matrix.md`: M-15/M-28/M-44/M-45/M-46 statuses accurately reflect implementation; PD-06/PD-07 correctly recorded as unresolved; PD-01/03/04 correctly reclassified as branch-purpose gaps. Source references are `file:line` accurate.
+- `docs/verification/business-rule-matrix.md`: M-15/M-28/M-44/M-45/M-46 statuses reflect implementation; PD-06 remains unresolved, while monthly due semantics are confirmed and the initial policy row remains intentionally absent.
 - `docs/verification/verification-report.md`: accurate for its baseline; evidence numbers there predate the post-integration re-run, which this report supersedes.
 - Appsettings now documents the obligation worker config block with defaults (`Enabled=false`), matching operational reality.
 - No stale "not implemented" statements remain about M-15/M-46/M-28/44/45.
@@ -213,8 +214,8 @@ A full-suite run reported `1 failed / 376 passed`. The failing test was `src/com
 ## 12. PD-06 / PD-07 status verification
 
 - **PD-06 (funeral-cover activation/enrolment timing and effective date)**: still an **unresolved business decision**. Verified not encoded: `AQGreenFuneralCoverStatus` has a single value `Included = 0`; domain XML docs explicitly forbid encoding activation; frontend text says activation/waiting period/claims are handled by the external insurer. No code path presents the benefit as active.
-- **PD-07 (monthly due-date policy)**: still an **unresolved business decision**. Verified not invented: `ResolveDueDate` returns `null` when `DueDayOfMonth` is missing/invalid; the worker logs `aqgreen_monthly_due_date_undefined` and skips scheduling while still assessing and allocating. No default due date exists.
-- Both remain owned by business; neither blocks merge because each feature is designed to be safe in the unresolved state (inclusion recorded as eligible only; obligations only scheduled when a due date is supplied).
+- **Monthly due-date policy**: semantics are confirmed and implemented as append-only, versioned, effective-dated host evidence. The initial version/day/effective month is intentionally absent, so the empty table fails closed and the disabled worker creates no obligations. A future authorised migration/workflow must insert the first version; no mutation API or default exists.
+- PD-06 remains owned by Business; the initial due-policy row and launch remain owned by Business/Ops. Both paths stay safe while unset: inclusion is eligibility-only and recurring obligations require exactly one valid persisted policy.
 
 ---
 
@@ -281,7 +282,7 @@ None outstanding.
 
 ### Unresolved business decisions (required, not code defects)
 - PD-06 funeral-cover activation/enrolment timing and effective date — **must not** be encoded as active until decided. Presently represented correctly as included/eligible.
-- PD-07 monthly due-date policy — the scheduler will not create recurring obligations until `App:EntryMonthlyObligations:DueDayOfMonth` is set and the worker is enabled. Operational implication: **deployment must arm `Enabled=true` and set a due day** before R600 obligations begin.
+- PD-07 monthly due-date semantics are confirmed: the first obligation month is the month after activation; policy versions are effective-dated; the business selects day 1–28; due time is 00:00 `Africa/Johannesburg`. The initial version, day, effective instant, and launch month remain unset, so the worker must remain disabled.
 - PD-02 (upline effect of an overdue member), PD-05 (audit surfaced to admins) — out of scope.
 
 ### Improvements (out of branch scope)
@@ -291,14 +292,16 @@ None outstanding.
 
 ## 17. Operational and migration requirements
 
-1. **Migrations**: run `AddAQGreenFuneralCoverEntitlements` (Up) on deploy; Down drops the table (safe reverse). Snapshot is synchronized; no pending model changes.
-2. **Worker configuration** (`App:EntryMonthlyObligations`): `Enabled=false` by default — **recurring obligations are intentionally not scheduled until (a) business decides PD-07 and (b) ops sets `DueDayOfMonth` (1–28) and `Enabled=true`.** Assessment and payment allocation will then also run; they are safe to run against manually created obligations regardless.
+1. **Migrations**: run `AddAQGreenFuneralCoverEntitlements`, `AddAQGreenMonthlyObligationDuePolicies`, then `AddAreaActivationStateHistory`. The due-policy migration creates an empty append-only host policy table and does not seed or backfill. The Area migration also creates no baseline; new provisioning and explicit operator observation create only prospective evidence. PostgreSQL rejects update, delete, and truncate of Area evidence. Both Down migrations refuse to discard recorded evidence, so rollback after rollout requires an authorised data-preserving plan.
+2. **Worker configuration** (`App:EntryMonthlyObligations`): `Enabled=false` by default. Keep it disabled until Business/Ops authorise and insert the first immutable policy version, day, effective instant, and launch month. The policy table is intentionally empty after migration.
 3. **Scheduling lock**: uses `pg_advisory_xact_lock` (PostgreSQL) / `sp_getapplock` (SQL Server); multi-instance safe. Providers without a supported lock are treated as single-node.
-4. **Arming timing (mid-month)**: the worker schedules obligations for the **current** month only (`periodYear`/`periodMonth` = `nowUtc`). If the worker is first armed **after** the configured due day of the current month, the current month's obligations are created with a `DueAt` already in the past and are immediately assessed (overdue after the 7-day grace), which would hold `IsOwnPayoutEligible` for affected members. Arm on or before the due day (ideally the 1st) so the first scheduled period has a future due date. The engine performs **no backfill**: months while the worker was disabled produce no obligation records and therefore no arrears, and a confirmed monthly payment received during such a window remains unallocated until a later matching open obligation exists (oldest period first).
+4. **Arming timing**: the worker schedules the current `Africa/Johannesburg` month only and never creates activation-month debt. The first obligation month for each participation is the following Johannesburg month, bounded by the first applicable policy version. The engine performs no backfill for months before policy launch or while disabled. Business/Ops must choose an effective launch month and arm before obligations for that month are expected.
 5. **Frontend**: no env change needed for the new page; the navbar link appears automatically for members with `ViewSelf`.
-6. **Logs**: structured `ProgrammeEngineAlert` events for processed obligations and any undefined-due-date condition; no secrets/customer/payment data logged.
-7. **Product workflow verification** (per AGENTS.md "Product Workflow Verification Standard"): the journey was walked to a terminal business outcome, not a method return. Customer pays via a Yoco hosted checkout (idempotent webhook path via `HostedPaymentCheckoutLock`) → Area Administrator discovers the pending case via the admin UI "awaiting approval" queue (not email) and approves (`ApproveProgrammeParticipationAsync`, `Serializable` + admin correction lock, emails the member) → member becomes `Active` → the member then must recruit a 5-person downline (recursive; `EntryNetworkQualificationEvaluator`, `BranchSize=5`, `MaximumLevel=3`) → `EntryWeeklyCommission` records are computed → they progress Earned → Released → Paid. **Correction:** the `EntryMonthlyObligationWorker` does *not* calculate or release commissions — it only schedules/assesses monthly R600 obligations (M-15). Weekly commission **calculation** (`AdminCommissionAppService.CalculateLatestClosedWeekAsync`, perm `Admin.Commissions.Calculate`) and release (`ReleaseAsync`, `Admin.Commissions.Release`) are **manual Platform Administrator actions**, and the actual member payout is **external** (`RecordPaymentAsync` records an external payment reference; it does not transfer funds). **New with this branch:** a recurring `EntryWeeklyCommissionCalculationWorker` is now available to **automate the calculation step only** (see item 8). It is **disabled by default** and never releases or marks commissions Paid. AQGreen funeral-cover inclusion is recorded (`AQGreenFuneralCoverInclusionProcessor` runs on joining payment confirmation) as an `AQGreenFuneralCoverEntitlement` (version `2026-08-funeral-30000`, R30,000 ZAR), surfaced read-only on the member's progress page. Recovery is supported via payment-confirmation receipt idempotency, scheduler idempotency + advisory lock, and `[UnitOfWork]` boundaries. **Human-dependent steps (outside branch scope, pre-existing):** (a) the actual bank payout is external — the platform cannot itself transfer money to members; (b) any node in the recruit chain that is never approved by an Area Administrator stays `PaymentConfirmedAwaitingApproval` indefinitely. **Branch-introduced (new):** a Platform Administrator no longer *must* manually kick off weekly calculation if the worker is armed, but release and external payout remain manual (item 8). PD-06 (insurer enrolment/waiting period) and PD-07 (monthly due-day) remain the only business decisions unresolved as encoded rules.
-8. **Automated weekly AQGreen commission calculation worker** (`EntryWeeklyCommissionCalculationWorker`, gated by `App:EntryWeeklyCommissions:Enabled=false`): on each daily wake (default 1440 min) it resolves the latest **fully-closed Friday 00:00–Thursday 23:59:59** week (Africa/Johannesburg) via `LatestClosedCommissionWeekResolver` and runs the authoritative `WeeklyCommissionCalculator.CalculateEntryAsync` once per active tenant. Behaviour follows the confirmed business rule: it computes the just-closed Friday–Thursday cycle (so Friday-morning wakes produce commissions for the Thursday-closed week — robust to host restarts on the nominal slot), for **all tenants**; **creates/updates Earned (or Held/NotEarned) records only**; **never releases and never marks Paid**; recovery is idempotent per tenant+week (the `EntryCommissionPeriods(TenantId, PeriodStart, PeriodEnd)` unique constraint is the authoritative duplicate guard) and per-tenant failures are isolated. Release and external payout remain Friday-morning manual admin + external steps. Multi-instance safe via a distinct advisory lock key (`0x41514757434F4D50`, separate from the monthly obligation lock `0x415147524F424C`), so commission calculation and obligation scheduling are not serialised against each other. **Onyx is intentionally not automated by this branch:** Onyx weekly commission uses the same Friday–Thursday cycle and a parallel `OnyxWeeklyCommissionCalculator`, but its calculation is currently coupled to `OnyxTravelBenefitEligibilityProcessor.SynchronizeAsync` (a travel-benefit subscription side effect). Automating Onyx commission therefore requires first decoupling travel-benefit synchronization from commission calculation — classified as a **planned follow-up** (architectural-coupling defect), not an accepted permanent exclusion. `LatestClosedCommissionWeekResolver.WeekStartDay = Friday` is the single authoritative cycle definition for both programmes; no Monday–Sunday convention remains in the worker, admin service, or frontend. Structured `ProgrammeEngineAlert` events record each run (`aqgreen_weekly_commission_calculation_run`) and per-tenant failures (`aqgreen_weekly_commission_calculation_failed`); no secrets/customer/payment data are logged.
+6. **Logs**: structured `ProgrammeEngineAlert` events for processed obligations and unresolved persisted-policy outcomes; no secrets/customer/payment data logged.
+7. **Product workflow verification** (per AGENTS.md "Product Workflow Verification Standard"): verified payment and Area Administrator approval create separate active AQGreen or Onyx participation. Calculation records Earned/Held/NotEarned only; release and external payout remain separate authorised human actions. Network placement and travel qualification use a shared cutoff-effective projection. Forward-only target-Area history and its operator baseline action are implemented, but no existing-Area baseline is seeded. The automatic Friday workflow is still **not verified complete** because AQGreen reads mutable compliance state, cycle-effective terms are absent, provider finality is unproven, and pre-baseline Area cutoffs remain unknown. Production automation therefore remains blocked.
+8. **Automatic weekly commission engine implementation** (`WeeklyCommissionCalculationWorker`, gated by `App:WeeklyCommissions:Enabled=false`): orchestration, independent transactions, locking, idempotency, and no-automatic-release boundaries are implemented. Those controls do not establish financial cutoff correctness. `App:WeeklyCommissions:Enabled` must remain `false`; the worker is not approved for production arming.
+9. **Inventory and recovery posture**: the host-only period inventory is read-only and includes soft-deleted AQGreen and Onyx periods, boundary classification, totals, exact duplicates, non-overlapping boundaries, and missing canonical cycles. Every missing cycle is explicitly classified as requiring authorised manual financial reconciliation. No arbitrary historical recovery API is exposed, because current network, qualification, eligibility, compliance, and terms cannot prove an older cycle's business-effective state. The existing latest-week calculator is also not authoritative production recovery until its Thursday-cutoff correctness is resolved.
+10. **Cutoff correction status**: activation and recruiter placement are reconstructed at `PeriodEnd`; valid correction chains are replayed and uncertain network evidence fails closed. Target-Area observation/change is serialized per Area; provisioning and mutation use database time on supported production providers; unknown/inactive state creates no new ledger. Legacy Area deletion is rejected because deletion has no authorised financial meaning. AQGreen hold calculation still uses current obligation and loan status. Existing-Area baselines, versioned due-policy rollout, immutable loan allocation time, cycle-effective terms, and provider finality remain unresolved evidence/implementation blockers. The first calculated result is retained idempotently, so weekly automation remains disabled.
 
 ---
 
@@ -309,40 +312,45 @@ Pre-merge / pre-release verification steps, in order:
 | # | Check | Owner | Expected |
 |---|-------|-------|----------|
 | D-1 | Migration `20260807065821_AddAQGreenFuneralCoverEntitlements` applied (Up) on the target environment. | Ops/DBA | Table `AQGreenFuneralCoverEntitlements` exists with unique index on `EntryParticipationId`; FKs `Restrict`. Down drops the table safely. |
+| D-1a | Migration `20260809054416_AddAQGreenMonthlyObligationDuePolicies` applied after D-1. | Ops/DBA | Empty `EntryMonthlyObligationDuePolicies` table exists; legacy `DuePolicyVersion` values remain null; no policy row or obligation is seeded/backfilled. |
+| D-1b | Migration `20260809081746_AddAreaActivationStateHistory` applied after D-1a. | Ops/DBA | Empty append-only `AreaActivationStateRecords` table exists; no legacy baseline is seeded. Update/delete/truncate and evidence-losing rollback are rejected. |
 | D-2 | EF snapshot aligned; `dotnet-ef has-pending-model-changes` returns "No changes". | Dev | Clean (already verified for this branch). |
-| D-3 | Confirm `App:EntryMonthlyObligations.Enabled` is `false` in the environment unless PD-07 is decided AND ops intentionally arms the scheduler. | Ops | Recurring obligations are **not** created while disabled; assessment/allocation only run when the worker is enabled. |
-| D-4 | When arming the worker: set `App:EntryMonthlyObligations.DueDayOfMonth` to a valid day (1–28, UTC midnight). Empty/invalid values cause the worker to log `aqgreen_monthly_due_date_undefined` and skip scheduling (never invents a due date). | Ops + Business | No obligations created until a due day is supplied. |
-| D-4a | Arm on or before the configured due day (ideally the 1st of the month). Arming mid-month creates current-month obligations with an already-past `DueAt`, immediately assessed overdue after grace, holding the member's own payout (`IsOwnPayoutEligible`). No backfill occurs for months the worker was disabled, and monthly payments from such a window remain unallocated until a later matching open obligation exists. | Ops + Business | First scheduled period has a future due date; confirm catch-up/arrears policy with Business. |
+| D-3 | Confirm `App:EntryMonthlyObligations.Enabled` is `false` until the first authorised policy row and launch month are approved and deployed. | Ops | Recurring obligations are **not** created while disabled; assessment only runs when the worker is enabled. Payment application requires the separate obligation-linked checkout workflow. |
+| D-4 | Do not arm the monthly worker until an authorised migration/workflow inserts the first immutable policy version, effective obligation month, and day 1–28. | Ops + Business + Engineering | Empty/missing/ambiguous/invalid policy evidence logs a warning and creates no obligation; no obsolete configured-day fallback exists. |
+| D-4a | Confirm the operational launch month before scheduling. The first obligation month is the month after activation, bounded by policy launch; do not invent debt for earlier disabled periods. | Ops + Business | Expected obligation existence is deterministic and auditable. |
 | D-5 | Multi-instance safety confirmed: `pg_advisory_xact_lock` (PostgreSQL) / `sp_getapplock` (SQL Server) is transaction-scoped and released on commit/rollback. | Ops | One scheduler at a time across instances. |
 | D-6 | Frontend: rebuild + redeploy static pages; new nav link "AQGreen progress" appears for members with `Aqua.ProgrammeParticipations.ViewSelf`. No env change needed. | Dev/Ops | `/member/programme-progress` reachable, permission-gated, read-only. |
 | D-7 | Backend Release build 0 errors; full backend 704 + frontend 377 suites pass. | Dev | Same as §15 evidence baseline. |
 | D-8 | Smoke: an AQGreen member with a completed joining obligation sees their funeral-cover inclusion card; a member with no participation sees the "Not yet qualified" empty state; a user without `ViewSelf` is denied. | QA | Matches §13 member journey. |
-| D-9 | PD-06/PD-07 status recorded as unresolved in the business decision tracker; no code path presents the benefit as active or invents due dates. | Business | Explicit not-encoded state maintained. |
-| D-10 | Confirm `App:EntryWeeklyCommissions.Enabled` is `false` in the environment unless Business approves automated AQGreen weekly calculation (perm `Admin.Commissions.Calculate`). When armed, the worker resolves the latest fully-closed **Friday 00:00–Thursday 23:59:59** (Africa/Johannesburg) cycle and calculates all tenants' AQGreen commissions (calculation-only; Earned/Held/NotEarned — never Released/Paid) on each daily wake (default 1440 min). Multi-instance safe via advisory lock `aqgreen-weekly-commission` (`0x41514757434F4D50`). Onyx weekly commission remains admin-triggered only until travel-benefit synchronization is decoupled from its calculation (planned follow-up). Release + external payout remain Friday-morning manual admin + external. | Ops + Business | No new commissions Released or Paid by this worker; release + external payout remain Friday-morning manual admin + external. |
+| D-9 | PD-06 remains unresolved; monthly due-policy semantics are confirmed but the initial policy version/day/effective month remains intentionally unset. | Business | No code path presents funeral cover as active or invents monthly due-policy evidence. |
+| D-10 | Keep `App:WeeklyCommissions.Enabled=false`. Network placement and prospective target-Area state are cutoff-aware, but existing-Area baselines, AQGreen compliance, terms selection, and provider finality remain incomplete. | Ops + Engineering + Business | No automatic AQGreen/Onyx calculation or Onyx travel qualification runs. |
+| D-11 | Run the host-only period inventory, resolve legacy overlaps, and assign Finance/Ops ownership for every missing cycle. The inventory does not calculate amounts or mutate ledgers. | Finance + Ops | Every historical gap has an authorised manual reconciliation decision and audit evidence. |
+| D-12 | Before any future arming, implement and verify period-end state correctness for network placement and all applicable eligibility/compliance inputs, including Friday-delay, cross-Area, correction, and retry tests. | Engineering + Business | The same closed cycle produces the same financially correct result regardless of post-cutoff mutations or processing order. |
 
-Any deviation from D-1/D-3/D-4 is a deployment blocker, not a code defect.
+Any deviation from D-1/D-3/D-4/D-10 is a deployment blocker. D-10 reflects the
+remaining verified financial cutoff gaps that require correction before
+production arming.
 
 ---
 
 ## 19. Final verdict
 
 ### Implementation
-**Meets purpose.** All three branch-purpose gaps (M-15 recurring obligations, M-46 funeral-cover inclusion, M-28/M-44/M-45 member progress + education) are implemented to the confirmed scope, preserve payment-before-inclusion ordering, remain read-only for members, keep tenant isolation, and respect the unresolved decisions PD-06/PD-07 by never inventing state. Post-integration review confirmed the merge did **not** alter any Programme Engine production file; all feature tests pass on the merged tree.
+**Partially meets purpose.** Friday-to-Thursday orchestration, isolation, locking, idempotency, read-only period inventory, cutoff-effective recruiter placement, stable earliest-five selection, shared travel network timing, and forward-only target-Area history are implemented. The durable monthly due-policy capability starts empty and disabled, and unauthoritative oldest-open payment allocation was removed. Existing-Area baselines, AQGreen compliance, cycle-effective terms, provider finality, and missed historical travel-cutoff recovery remain incomplete. Historical recovery from current state was rejected and is not exposed.
 
 ### Evidence
-**Sufficient for merge.** Validation was re-run on the **actual integrated result** (merge commit `43d968d` with current `origin/main` `32f02a4`), not only the pre-merge tree: backend 704/704 (incl. the `origin/main` PostgreSQL transactional invitation tests), frontend 377/377 (incl. focused admin test 10/10 and the previously-flaky `member-programmes.test.tsx` clean on this run), EF model clean, PostgreSQL migration tests 24/24, lint/type-check/build clean, migration inspected, security/authorization/performance reviews complete, conflict resolution documented (§4a), and documentation aligned.
+**Additional verification required.** The final local Release solution build passed with 0 errors; existing XML-documentation, nullable-context, analyzer, obsolete-API, and dependency-advisory warnings remain. Ninety-five focused policy, scheduler, worker, commission, network, correction, progress, administrator, and travel tests passed; 27 PostgreSQL/EF tests passed, including append-only mutation and used-evidence rollback rejection. EF reports no pending model changes. A full backend attempt was partial: Web tests passed 40/40, but the application suite did not complete before the 20-minute timeout. Passing tests prove the implemented slices, not the unresolved financial workflow.
 
 ### Operational state
-**CI green** (all suites + checks green on the merged tree; the pre-existing flake is intermittent and documented as follow-up AF-01).
+**Production arming blocked; remote CI not run.** The disabled configuration is the required safe state.
 
 ---
 
-### Release verdict: **READY FOR MERGE WITH ACCEPTED FOLLOW-UPS**
+### Release verdict: **NOT READY FOR MERGE OR PRODUCTION ARMING**
 
 Rationale:
-- **Mergeability established**: branch merged cleanly with current `origin/main`; the only conflict (test-only admin-approval de-flake overlap) was resolved to the strictly stronger deterministic assertion and validated 10/10 focused runs plus the full suite. No conflict markers remain; no unrelated files pulled in.
-- No blocking defect, no branch-introduced regression, no security or data-integrity finding.
-- Two engineering follow-ups are already known/accepted posture (AF-01 flaky pre-existing test, AF-02 inclusion-insert recovery) and three pre-existing accepted debts remain (AF-03/AF-04/AF-05).
-- Unresolved business decisions PD-06/PD-07 are correctly handled (safe defaults, explicit not-encoded state) and must be scheduled by business; the worker must be armed with `DueDayOfMonth` + `Enabled=true` before production recurring obligations start.
-- The report's remaining verification gaps are confined to the follow-up list above; none invalidates the implemented engine.
-- The branch still has **no upstream/PR**; pushing and opening a PR (which will run the real CI gate) are the remaining external steps and were explicitly out of scope for this pass.
+- Verified branch-owned financial blockers remain in AQGreen compliance, existing-Area baseline evidence, terms selection, provider finality, and historical travel-cutoff recovery.
+- Database uniqueness and idempotency prevent duplicates but retain the first potentially cutoff-incorrect result; they do not repair it.
+- Period inventory safely identifies legacy and missing periods without mutation. It does not make automation safe or provide historical commission reconstruction.
+- Older gaps require authorised manual financial reconciliation. A future application workflow requires separate design and is not implemented here.
+- The branch still has no upstream/PR; no push, PR, merge, or commit was performed in this pass.

@@ -26,9 +26,27 @@ namespace AqualLifeStyle.Domain.Onyx
                 throw new ArgumentNullException(nameof(networkParticipations));
             }
 
-            var highestQualifiedNetworkLevel = _networkQualificationEvaluator.Evaluate(
+            return Calculate(
                 participation,
-                networkParticipations);
+                period,
+                terms,
+                EffectiveProgrammeNetwork.BuildOnyx(
+                    networkParticipations,
+                    period.PeriodEnd));
+        }
+
+        public OnyxWeeklyCommission Calculate(
+            OnyxParticipation participation,
+            OnyxCommissionPeriod period,
+            OnyxCommissionTerms terms,
+            EffectiveProgrammeNetwork network)
+        {
+            if (participation == null) throw new ArgumentNullException(nameof(participation));
+            if (network == null) throw new ArgumentNullException(nameof(network));
+
+            var highestQualifiedNetworkLevel = _networkQualificationEvaluator.Evaluate(
+                participation.CustomerId,
+                network);
             return OnyxWeeklyCommission.RecordCalculation(
                 participation,
                 period,

@@ -46,22 +46,33 @@ namespace AqualLifeStyle.Tests.Application
             var network = CreateCompleteLevelThreeNetwork();
             var eligibleAt =
                 new DateTime(2026, 8, 3, 10, 0, 0, DateTimeKind.Utc);
+            var effectiveNetwork = EffectiveProgrammeNetwork.BuildOnyx(
+                network,
+                eligibleAt);
 
             var grant = await processor.SynchronizeAsync(
                 1,
                 network,
+                effectiveNetwork,
+                eligibleAt,
                 eligibleAt);
             var repeatGrant = await processor.SynchronizeAsync(
                 1,
                 network,
+                effectiveNetwork,
+                eligibleAt,
                 eligibleAt.AddDays(1));
             var activation = await processor.SynchronizeAsync(
                 1,
                 network,
+                effectiveNetwork,
+                eligibleAt,
                 eligibleAt.AddMonths(3));
             var repeatActivation = await processor.SynchronizeAsync(
                 1,
                 network,
+                effectiveNetwork,
+                eligibleAt,
                 eligibleAt.AddMonths(3).AddDays(1));
 
             grant.GrantedCount.ShouldBe(1);
@@ -76,6 +87,54 @@ namespace AqualLifeStyle.Tests.Application
                 OnyxNetworkLevel.Level3);
             persisted[0].MemberTripContributionPercent.ShouldBe(10m);
             persisted[0].Status.ShouldBe(OnyxTravelBenefitStatus.Active);
+            persisted[0].EligibleAt.ShouldBe(eligibleAt);
+            persisted[0].ActivatedAt.ShouldBe(persisted[0].WaitingPeriodEndsAt);
+        }
+
+        [Fact]
+        public async Task DelayedFirstGrant_ActivatesAtTheContractualWaitingEnd()
+        {
+            var repository = Substitute.For<
+                IRepository<OnyxTravelBenefitEntitlement, Guid>>();
+            var persisted = new List<OnyxTravelBenefitEntitlement>();
+            repository.GetAllListAsync(
+                    Arg.Any<Expression<
+                        Func<OnyxTravelBenefitEntitlement, bool>>>()!)
+                .Returns(_ => Task.FromResult(persisted));
+            repository.InsertAsync(Arg.Any<OnyxTravelBenefitEntitlement>())
+                .Returns(call =>
+                {
+                    var entitlement = call.Arg<OnyxTravelBenefitEntitlement>();
+                    persisted.Add(entitlement);
+                    return Task.FromResult(entitlement);
+                });
+            var processor = new OnyxTravelBenefitEligibilityProcessor(
+                repository,
+                new CurrentOnyxTravelBenefitTermsProvider());
+            var network = CreateCompleteLevelThreeNetwork();
+            var eligibleAt = new DateTime(
+                2026,
+                8,
+                3,
+                10,
+                0,
+                0,
+                DateTimeKind.Utc);
+            var effectiveNetwork = EffectiveProgrammeNetwork.BuildOnyx(
+                network,
+                eligibleAt);
+
+            var result = await processor.SynchronizeAsync(
+                1,
+                network,
+                effectiveNetwork,
+                eligibleAt,
+                eligibleAt.AddMonths(3).AddDays(2));
+
+            result.GrantedCount.ShouldBe(1);
+            result.ActivatedCount.ShouldBe(1);
+            persisted[0].Status.ShouldBe(OnyxTravelBenefitStatus.Active);
+            persisted[0].ActivatedAt.ShouldBe(persisted[0].WaitingPeriodEndsAt);
         }
 
         private static List<OnyxParticipation>

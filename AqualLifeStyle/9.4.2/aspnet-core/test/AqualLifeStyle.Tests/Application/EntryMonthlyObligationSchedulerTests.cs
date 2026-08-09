@@ -6,7 +6,6 @@ using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Shouldly;
 using Xunit;
 
@@ -31,9 +30,11 @@ namespace AqualLifeStyle.Tests.Application
             var customerId = await CreateActiveParticipantAsync(
                 $"active-{Guid.NewGuid():N}");
 
-            var dueAt = new DateTime(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc);
-            var first = await _scheduler.EnsureObligationsForPeriodAsync(2026, 8, dueAt);
-            var second = await _scheduler.EnsureObligationsForPeriodAsync(2026, 8, dueAt);
+            var dueAt = new DateTime(2026, 8, 9, 22, 0, 0, DateTimeKind.Utc);
+            var first = await _scheduler.EnsureObligationsForPeriodAsync(
+                2026, 8, dueAt, "due-policy-v1");
+            var second = await _scheduler.EnsureObligationsForPeriodAsync(
+                2026, 8, dueAt, "due-policy-v1");
 
             first.ShouldBe(1);
             second.ShouldBe(0);
@@ -49,6 +50,34 @@ namespace AqualLifeStyle.Tests.Application
             persisted[0].OutstandingAmount.ShouldBe(600m);
             persisted[0].Status.ShouldBe(EntryMonthlyObligationStatus.Due);
             persisted[0].Currency.ShouldBe("ZAR");
+            persisted[0].DuePolicyVersion.ShouldBe("due-policy-v1");
+        }
+
+        [Fact]
+        public async Task ActivationMonthIsSkipped_AndFollowingMonthIsCreated()
+        {
+            var customerId = await CreateActiveParticipantAsync(
+                $"activation-month-{Guid.NewGuid():N}");
+
+            var activationMonthCreated = await _scheduler.EnsureObligationsForPeriodAsync(
+                2026,
+                7,
+                new DateTime(2026, 7, 9, 22, 0, 0, DateTimeKind.Utc),
+                "due-policy-v1");
+            var followingMonthCreated = await _scheduler.EnsureObligationsForPeriodAsync(
+                2026,
+                8,
+                new DateTime(2026, 8, 9, 22, 0, 0, DateTimeKind.Utc),
+                "due-policy-v1");
+
+            activationMonthCreated.ShouldBe(0);
+            followingMonthCreated.ShouldBe(1);
+            var obligation = await UsingDbContextAsync(1, async context =>
+                await context.EntryMonthlyObligations.SingleAsync(
+                    item => item.CustomerId == customerId));
+            obligation.PeriodYear.ShouldBe(2026);
+            obligation.PeriodMonth.ShouldBe(8);
+            obligation.DuePolicyVersion.ShouldBe("due-policy-v1");
         }
 
         [Fact]
@@ -85,7 +114,8 @@ namespace AqualLifeStyle.Tests.Application
             var created = await _scheduler.EnsureObligationsForPeriodAsync(
                 2026,
                 8,
-                new DateTime(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc));
+                new DateTime(2026, 8, 9, 22, 0, 0, DateTimeKind.Utc),
+                "due-policy-v1");
 
             created.ShouldBe(0);
             var count = await UsingDbContextAsync(1, async context =>
@@ -113,73 +143,16 @@ namespace AqualLifeStyle.Tests.Application
             obligation.IsOwnPayoutEligible.ShouldBeFalse();
         }
 
-        [Fact]
-        public async Task ConfirmedMonthlyPayment_IsAllocatedToEarliestOpenObligation_Once()
-        {
-            var suffix = Guid.NewGuid().ToString("N");
-            var customerId = await CreateActiveParticipantAsync($"alloc-{suffix}");
-            await CreateObligationAsync(customerId, 2026, 8);
-            await CreateObligationAsync(customerId, 2026, 9);
-            await CreateConfirmedMonthlyPaymentAsync(customerId, $"monthly-{suffix}");
-
-            var allocated = await _scheduler.AllocateConfirmedMonthlyPaymentsAsync();
-            var secondRun = await _scheduler.AllocateConfirmedMonthlyPaymentsAsync();
-
-            allocated.ShouldBe(1);
-            secondRun.ShouldBe(0);
-
-            var obligations = await UsingDbContextAsync(1, async context =>
-                await context.EntryMonthlyObligations
-                    .Where(obligation => obligation.CustomerId == customerId)
-                    .OrderBy(obligation => obligation.PeriodMonth)
-                    .ToListAsync());
-            obligations[0].PeriodMonth.ShouldBe(8);
-            obligations[0].Status.ShouldBe(EntryMonthlyObligationStatus.Paid);
-            obligations[0].OutstandingAmount.ShouldBe(0m);
-            obligations[0].PaymentId.ShouldNotBeNull();
-            obligations[0].IsOwnPayoutEligible.ShouldBeTrue();
-            obligations[1].PeriodMonth.ShouldBe(9);
-            obligations[1].Status.ShouldBe(EntryMonthlyObligationStatus.Due);
-            obligations[1].PaymentId.ShouldBeNull();
-        }
-
-        [Fact]
-        public async Task MismatchedMonthlyPayment_IsNotAllocated()
-        {
-            var suffix = Guid.NewGuid().ToString("N");
-            var customerId = await CreateActiveParticipantAsync($"mismatch-{suffix}");
-            await CreateObligationAsync(customerId, 2026, 8);
-
-            var payment = MemberPayment.CreatePending(
-                1,
-                customerId,
-                MemberPaymentPurpose.EntryMonthlyCommitment,
-                800m,
-                "Test",
-                $"mismatch-monthly-{suffix}",
-                EffectiveFrom);
-            payment.Confirm(EffectiveFrom.AddHours(1));
-            await UsingDbContextAsync(1, async context =>
-            {
-                context.MemberPayments.Add(payment);
-                await context.SaveChangesAsync();
-            });
-
-            var allocated = await _scheduler.AllocateConfirmedMonthlyPaymentsAsync();
-
-            allocated.ShouldBe(0);
-            var obligation = await UsingDbContextAsync(1, async context =>
-                await context.EntryMonthlyObligations.SingleAsync(
-                    item => item.CustomerId == customerId));
-            obligation.Status.ShouldBe(EntryMonthlyObligationStatus.Due);
-            obligation.PaymentId.ShouldBeNull();
-        }
-
         private async Task<int> CreateActiveParticipantAsync(string suffix)
         {
             var email = $"{suffix}@example.com";
             return await UsingDbContextAsync(1, async context =>
             {
+                context.EntryMonthlyObligationDuePolicies.Add(
+                    EntryMonthlyObligationDuePolicy.Create(
+                        "due-policy-v1",
+                        10,
+                        EntryMonthlyObligationDuePolicy.JohannesburgMonthStartUtc(2026, 8)));
                 var userId = await CreateTestUserAsync(1, suffix, email);
                 var customer = Customer.Create(
                     1,
@@ -236,21 +209,9 @@ namespace AqualLifeStyle.Tests.Application
                         0,
                         0,
                         0,
-                        DateTimeKind.Utc));
+                        DateTimeKind.Utc),
+                    "due-policy-v1");
                 context.EntryMonthlyObligations.Add(obligation);
-                await context.SaveChangesAsync();
-            });
-        }
-
-        private async Task CreateConfirmedMonthlyPaymentAsync(int customerId, string reference)
-        {
-            var payment = ConfirmedPayment(
-                customerId,
-                MemberPaymentPurpose.EntryMonthlyCommitment,
-                reference);
-            await UsingDbContextAsync(1, async context =>
-            {
-                context.MemberPayments.Add(payment);
                 await context.SaveChangesAsync();
             });
         }
@@ -273,52 +234,96 @@ namespace AqualLifeStyle.Tests.Application
         }
     }
 
-    public class ConfigurationEntryMonthlyObligationDueDatePolicyTests
+    public class PersistedEntryMonthlyObligationDueDatePolicyTests
+        : AqualLifeStyleTestBase
     {
-        [Theory]
-        [InlineData("10", 2026, 8)]
-        [InlineData("1", 2026, 8)]
-        [InlineData("28", 2026, 8)]
-        public void ConfiguredDay_ResolvesUtcDueDate(
-            string configuredDay,
-            int periodYear,
-            int periodMonth)
+        private readonly IEntryMonthlyObligationDueDatePolicy _resolver;
+
+        public PersistedEntryMonthlyObligationDueDatePolicyTests()
         {
-            var policy = CreatePolicy(configuredDay);
-
-            var dueAt = policy.ResolveDueDate(periodYear, periodMonth);
-
-            dueAt.ShouldNotBeNull();
-            dueAt.Value.Year.ShouldBe(periodYear);
-            dueAt.Value.Month.ShouldBe(periodMonth);
-            dueAt.Value.Day.ShouldBe(int.Parse(configuredDay));
-            dueAt.Value.Kind.ShouldBe(DateTimeKind.Utc);
+            _resolver = Resolve<IEntryMonthlyObligationDueDatePolicy>();
         }
 
-        [Theory]
-        [InlineData("")]
-        [InlineData("0")]
-        [InlineData("29")]
-        [InlineData("not-a-number")]
-        public void UndefinedOrInvalidDay_ReturnsNull(string configuredDay)
+        [Fact]
+        public async Task EmptyPolicyTable_FailsClosedAsMissing()
         {
-            var policy = CreatePolicy(configuredDay);
+            var result = await _resolver.ResolveDueDateAsync(2026, 8);
 
-            policy.ResolveDueDate(2026, 8).ShouldBeNull();
+            result.Status.ShouldBe(
+                EntryMonthlyObligationDueDateResolutionStatus.Missing);
+            result.IsResolved.ShouldBeFalse();
+            result.DueAtUtc.ShouldBeNull();
+            result.PolicyVersion.ShouldBeNull();
         }
 
-        private static ConfigurationEntryMonthlyObligationDueDatePolicy CreatePolicy(
-            string configuredDay)
+        [Fact]
+        public async Task LatestApplicableVersion_IsSelectedAndConvertedFromJohannesburg()
         {
-            var configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(new[]
-                {
-                    new System.Collections.Generic.KeyValuePair<string, string>(
-                        "App:EntryMonthlyObligations:DueDayOfMonth",
-                        configuredDay)
-                })
-                .Build();
-            return new ConfigurationEntryMonthlyObligationDueDatePolicy(configuration);
+            await InsertPoliciesAsync(
+                EntryMonthlyObligationDuePolicy.Create(
+                    "due-v1",
+                    1,
+                    EntryMonthlyObligationDuePolicy.JohannesburgMonthStartUtc(2026, 8)),
+                EntryMonthlyObligationDuePolicy.Create(
+                    "due-v2",
+                    28,
+                    EntryMonthlyObligationDuePolicy.JohannesburgMonthStartUtc(2026, 10)));
+
+            var september = await _resolver.ResolveDueDateAsync(2026, 9);
+            var november = await _resolver.ResolveDueDateAsync(2026, 11);
+
+            september.Status.ShouldBe(
+                EntryMonthlyObligationDueDateResolutionStatus.Resolved);
+            september.PolicyVersion.ShouldBe("due-v1");
+            september.DueAtUtc.ShouldBe(
+                new DateTime(2026, 8, 31, 22, 0, 0, DateTimeKind.Utc));
+            november.PolicyVersion.ShouldBe("due-v2");
+            november.DueAtUtc.ShouldBe(
+                new DateTime(2026, 11, 27, 22, 0, 0, DateTimeKind.Utc));
+        }
+
+        [Fact]
+        public async Task TiedLatestEffectiveVersions_FailClosedAsAmbiguous()
+        {
+            var effectiveFrom = EntryMonthlyObligationDuePolicy
+                .JohannesburgMonthStartUtc(2026, 8);
+            await InsertPoliciesAsync(
+                EntryMonthlyObligationDuePolicy.Create("due-a", 1, effectiveFrom),
+                EntryMonthlyObligationDuePolicy.Create("due-b", 28, effectiveFrom));
+
+            var result = await _resolver.ResolveDueDateAsync(2026, 8);
+
+            result.Status.ShouldBe(
+                EntryMonthlyObligationDueDateResolutionStatus.Ambiguous);
+            result.IsResolved.ShouldBeFalse();
+        }
+
+        [Fact]
+        public async Task ExistingPolicy_CannotBeDeletedThroughPersistence()
+        {
+            await InsertPoliciesAsync(
+                EntryMonthlyObligationDuePolicy.Create(
+                    "append-only-v1",
+                    10,
+                    EntryMonthlyObligationDuePolicy.JohannesburgMonthStartUtc(2026, 8)));
+
+            using var context = LocalIocManager.Resolve<
+                AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>();
+            var policy = await context.EntryMonthlyObligationDuePolicies.SingleAsync();
+            context.EntryMonthlyObligationDuePolicies.Remove(policy);
+
+            await Should.ThrowAsync<InvalidOperationException>(
+                () => context.SaveChangesAsync());
+        }
+
+        private Task InsertPoliciesAsync(
+            params EntryMonthlyObligationDuePolicy[] policies)
+        {
+            return UsingDbContextAsync(null, async context =>
+            {
+                context.EntryMonthlyObligationDuePolicies.AddRange(policies);
+                await context.SaveChangesAsync();
+            });
         }
     }
 }

@@ -6,11 +6,9 @@ using Abp.Dependency;
 using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
 using AqualLifeStyle.Application.Admin.Commissions.Dto;
-using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Onyx;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace AqualLifeStyle.Application.Admin.Commissions
 {
@@ -20,15 +18,14 @@ namespace AqualLifeStyle.Application.Admin.Commissions
     /// calculation path and the automated weekly scheduler so that there is a
     /// single source of truth for commission outcomes (no second calculator).
     ///
-    /// Idempotency boundary: for a given (TenantId, closed week) the period row
-    /// is inserted exactly once; the database unique constraint on
-    /// <c>EntryCommissionPeriods(TenantId, PeriodStart, PeriodEnd)</c> is the
-    /// authoritative guard against duplicate outcomes even across concurrent
-    /// attempts. A re-invocation with an existing period returns without
-    /// creating duplicate commission rows.
+    /// Idempotency boundary: for a given programme, tenant, and closed cycle the
+    /// period row is inserted exactly once. The EntryCommissionPeriods and
+    /// OnyxCommissionPeriods unique constraints on
+    /// (TenantId, PeriodStart, PeriodEnd) are the authoritative duplicate guards.
     ///
-    /// This service only <em>creates Earned commission records</em> (status
-    /// Earned/Held/NotEarned). It never releases or marks Paid.
+    /// This service only records calculated commission state
+    /// (Earned/Held/NotEarned). It never releases, marks Paid, synchronizes
+    /// travel benefits, or invokes payment services.
     /// </summary>
     public interface IWeeklyCommissionCalculator : ITransientDependency
     {
@@ -54,9 +51,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         private readonly IRepository<EntryWeeklyCommission, Guid> _entryCommissionRepository;
         private readonly IRepository<OnyxWeeklyCommission, Guid> _onyxCommissionRepository;
         private readonly ICurrentCommissionTermsProvider _termsProvider;
+        private readonly IAreaActivationStateResolver _areaActivationStateResolver;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
-        private readonly OnyxTravelBenefitEligibilityProcessor _travelBenefitEligibilityProcessor;
-        private readonly ILogger<WeeklyCommissionCalculator> _logger;
 
         public WeeklyCommissionCalculator(
             IRepository<EntryParticipation, Guid> entryParticipationRepository,
@@ -68,9 +64,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             IRepository<EntryWeeklyCommission, Guid> entryCommissionRepository,
             IRepository<OnyxWeeklyCommission, Guid> onyxCommissionRepository,
             ICurrentCommissionTermsProvider termsProvider,
-            IUnitOfWorkManager unitOfWorkManager,
-            OnyxTravelBenefitEligibilityProcessor travelBenefitEligibilityProcessor,
-            ILogger<WeeklyCommissionCalculator> logger)
+            IAreaActivationStateResolver areaActivationStateResolver,
+            IUnitOfWorkManager unitOfWorkManager)
         {
             _entryParticipationRepository = entryParticipationRepository;
             _onyxParticipationRepository = onyxParticipationRepository;
@@ -81,9 +76,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             _entryCommissionRepository = entryCommissionRepository;
             _onyxCommissionRepository = onyxCommissionRepository;
             _termsProvider = termsProvider;
+            _areaActivationStateResolver = areaActivationStateResolver;
             _unitOfWorkManager = unitOfWorkManager;
-            _travelBenefitEligibilityProcessor = travelBenefitEligibilityProcessor;
-            _logger = logger;
         }
 
         public async Task<CommissionCalculationResultDto> CalculateEntryAsync(
@@ -91,7 +85,6 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             ClosedCommissionWeek closedWeek,
             DateTime calculatedAt)
         {
-            var terms = _termsProvider.GetEntryTerms();
             var existingPeriod = await _entryPeriodRepository.FirstOrDefaultAsync(period =>
                 period.TenantId == tenantId &&
                 period.PeriodStart == closedWeek.PeriodStartUtc &&
@@ -112,16 +105,32 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                         new CommissionSummaryRow(
                             commission.TotalAmount,
                             commission.PayoutStatus)),
-                    terms.Currency,
+                    existingCommissions.Select(commission => commission.Currency)
+                        .Distinct()
+                        .SingleOrDefault() ?? "ZAR",
                     wasAlreadyCalculated: true,
                     recordsCreated: 0);
             }
 
-            var networkParticipations = await _entryParticipationRepository.GetAll()
-                .Where(participation =>
-                    participation.Status == EntryParticipationStatus.Active &&
-                    participation.ActivatedAt <= closedWeek.PeriodEndUtc)
-                .ToListAsync();
+            await _areaActivationStateResolver.EnsureActiveAsync(
+                tenantId,
+                closedWeek.PeriodEndUtc);
+            var terms = _termsProvider.GetEntryTerms();
+            List<EntryParticipation> networkParticipations;
+            using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.SoftDelete))
+            {
+                networkParticipations = await _entryParticipationRepository
+                    .GetAllIncluding(participation => participation.RecruiterCorrections)
+                    .Where(participation =>
+                        participation.Status == EntryParticipationStatus.Active &&
+                        (!participation.ActivatedAt.HasValue ||
+                         participation.ActivatedAt <= closedWeek.PeriodEndUtc))
+                    .ToListAsync();
+            }
+            EnsureNoDeletedParticipationEvidence(networkParticipations, "AQGreen");
+            var effectiveNetwork = EffectiveProgrammeNetwork.BuildAQGreen(
+                networkParticipations,
+                closedWeek.PeriodEndUtc);
             var targetParticipations = networkParticipations
                 .Where(participation => participation.TenantId == tenantId)
                 .ToList();
@@ -153,7 +162,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     participation,
                     period,
                     terms,
-                    networkParticipations,
+                    effectiveNetwork,
                     obligations,
                     loanAgreements))
                 .ToList();
@@ -183,27 +192,6 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             ClosedCommissionWeek closedWeek,
             DateTime calculatedAt)
         {
-            var terms = _termsProvider.GetOnyxTerms();
-            var networkParticipations = await _onyxParticipationRepository.GetAll()
-                .Where(participation =>
-                    participation.Status == OnyxParticipationStatus.Active &&
-                    participation.ActivatedAt <= closedWeek.PeriodEndUtc)
-                .ToListAsync();
-            var travelBenefitResult =
-                await _travelBenefitEligibilityProcessor.SynchronizeAsync(
-                    tenantId,
-                    networkParticipations,
-                    calculatedAt);
-            if (travelBenefitResult.GrantedCount > 0 ||
-                travelBenefitResult.ActivatedCount > 0)
-            {
-                _logger.LogInformation(
-                    "Onyx travel benefits synchronized tenant={TenantId} granted={Granted} activated={Activated}",
-                    tenantId,
-                    travelBenefitResult.GrantedCount,
-                    travelBenefitResult.ActivatedCount);
-            }
-
             var existingPeriod = await _onyxPeriodRepository.FirstOrDefaultAsync(period =>
                 period.TenantId == tenantId &&
                 period.PeriodStart == closedWeek.PeriodStartUtc &&
@@ -224,10 +212,32 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                         new CommissionSummaryRow(
                             commission.TotalAmount,
                             commission.PayoutStatus)),
-                    terms.Currency,
+                    existingCommissions.Select(commission => commission.Currency)
+                        .Distinct()
+                        .SingleOrDefault() ?? "ZAR",
                     wasAlreadyCalculated: true,
                     recordsCreated: 0);
             }
+
+            await _areaActivationStateResolver.EnsureActiveAsync(
+                tenantId,
+                closedWeek.PeriodEndUtc);
+            var terms = _termsProvider.GetOnyxTerms();
+            List<OnyxParticipation> networkParticipations;
+            using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.SoftDelete))
+            {
+                networkParticipations = await _onyxParticipationRepository
+                    .GetAllIncluding(participation => participation.RecruiterCorrections)
+                    .Where(participation =>
+                        participation.Status == OnyxParticipationStatus.Active &&
+                        (!participation.ActivatedAt.HasValue ||
+                         participation.ActivatedAt <= closedWeek.PeriodEndUtc))
+                    .ToListAsync();
+            }
+            EnsureNoDeletedParticipationEvidence(networkParticipations, "Onyx");
+            var effectiveNetwork = EffectiveProgrammeNetwork.BuildOnyx(
+                networkParticipations,
+                closedWeek.PeriodEndUtc);
 
             var targetParticipations = networkParticipations
                 .Where(participation => participation.TenantId == tenantId)
@@ -247,7 +257,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     participation,
                     period,
                     terms,
-                    networkParticipations))
+                    effectiveNetwork))
                 .ToList();
             foreach (var commission in commissions)
             {
@@ -297,6 +307,18 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 TotalEarnedAmount = rows.Sum(row => row.Amount),
                 Currency = currency
             };
+        }
+
+        private static void EnsureNoDeletedParticipationEvidence<TParticipation>(
+            IEnumerable<TParticipation> participations,
+            string programmeName)
+            where TParticipation : Abp.Domain.Entities.Auditing.IFullAudited
+        {
+            if (participations.Any(participation => participation.IsDeleted))
+            {
+                throw new InvalidOperationException(
+                    $"{programmeName} calculation cannot prove cutoff participation state because deleted network evidence exists.");
+            }
         }
 
         private sealed class CommissionSummaryRow

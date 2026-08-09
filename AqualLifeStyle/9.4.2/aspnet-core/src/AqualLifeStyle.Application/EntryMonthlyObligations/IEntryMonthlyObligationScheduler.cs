@@ -12,13 +12,14 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
     {
         /// <summary>
         /// Ensures every active AQGreen participation has exactly one obligation
-        /// for the given calendar period, using the caller-supplied due time.
-        /// Returns the number of obligations created.
+        /// for the given calendar period, using the caller-supplied due time and
+        /// selected durable policy version. Returns the number created.
         /// </summary>
         Task<int> EnsureObligationsForPeriodAsync(
             int periodYear,
             int periodMonth,
-            System.DateTime dueAt);
+            System.DateTime dueAt,
+            string duePolicyVersion);
 
         /// <summary>
         /// Advances the status of unpaid obligations (due → grace period →
@@ -27,11 +28,5 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
         /// </summary>
         Task<int> AssessObligationsAsync(System.DateTime asOf);
 
-        /// <summary>
-        /// Allocates confirmed AQGreen monthly-commitment payments that are not
-        /// yet linked to an obligation into the member's earliest open
-        /// obligation. Returns the number of payments allocated.
-        /// </summary>
-        Task<int> AllocateConfirmedMonthlyPaymentsAsync();
     }
 }

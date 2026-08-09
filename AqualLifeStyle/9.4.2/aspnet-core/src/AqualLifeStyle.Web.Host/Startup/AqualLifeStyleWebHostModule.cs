@@ -77,7 +77,7 @@ namespace AqualLifeStyle.Web.Host.Startup
             IocManager.Resolve<IBackgroundWorkerManager>().Add(
                 IocManager.Resolve<EntryMonthlyObligationWorker>());
             IocManager.Resolve<IBackgroundWorkerManager>().Add(
-                IocManager.Resolve<EntryWeeklyCommissionCalculationWorker>());
+                IocManager.Resolve<WeeklyCommissionCalculationWorker>());
         }
 
         private static string NormalizeRedisConfiguration(string configuration)

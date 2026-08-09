@@ -6,7 +6,6 @@ using Abp.Dependency;
 using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
 using AqualLifeStyle.Domain.Onyx;
-using AqualLifeStyle.Domain.Payments;
 using Microsoft.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Application.EntryMonthlyObligations
@@ -23,18 +22,15 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
     {
         private readonly IRepository<EntryMonthlyObligation, Guid> _obligationRepository;
         private readonly IRepository<EntryParticipation, Guid> _participationRepository;
-        private readonly IRepository<MemberPayment, Guid> _paymentRepository;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public EntryMonthlyObligationScheduler(
             IRepository<EntryMonthlyObligation, Guid> obligationRepository,
             IRepository<EntryParticipation, Guid> participationRepository,
-            IRepository<MemberPayment, Guid> paymentRepository,
             IUnitOfWorkManager unitOfWorkManager)
         {
             _obligationRepository = obligationRepository;
             _participationRepository = participationRepository;
-            _paymentRepository = paymentRepository;
             _unitOfWorkManager = unitOfWorkManager;
         }
 
@@ -42,10 +38,12 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
         public virtual async Task<int> EnsureObligationsForPeriodAsync(
             int periodYear,
             int periodMonth,
-            DateTime dueAt)
+            DateTime dueAt,
+            string duePolicyVersion)
         {
             ValidatePeriod(periodYear, periodMonth);
             ValidateUtc(dueAt, nameof(dueAt));
+            ValidateDuePolicyVersion(duePolicyVersion);
 
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
             {
@@ -70,12 +68,21 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
                         continue;
                     }
 
+                    if (!IsObligationMonthAfterActivation(
+                            participation,
+                            periodYear,
+                            periodMonth))
+                    {
+                        continue;
+                    }
+
                     await _obligationRepository.InsertAsync(
                         EntryMonthlyObligation.Create(
                             participation,
                             periodYear,
                             periodMonth,
-                            dueAt));
+                            dueAt,
+                            duePolicyVersion));
                     existingSet.Add(participation.Id);
                     created++;
                 }
@@ -115,79 +122,6 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
             }
         }
 
-        [UnitOfWork]
-        public virtual async Task<int> AllocateConfirmedMonthlyPaymentsAsync()
-        {
-            using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
-            {
-                var linkedPaymentIds = await _obligationRepository.GetAll()
-                    .Where(obligation => obligation.PaymentId.HasValue)
-                    .Select(obligation => obligation.PaymentId.Value)
-                    .ToListAsync();
-                var linkedSet = new HashSet<Guid>(linkedPaymentIds);
-
-                var confirmedMonthlyPayments = await _paymentRepository.GetAll()
-                    .Where(payment =>
-                        payment.Status == MemberPaymentStatus.Confirmed &&
-                        payment.Purpose == MemberPaymentPurpose.EntryMonthlyCommitment)
-                    .ToListAsync();
-
-                var openObligations = await _obligationRepository.GetAll()
-                    .Where(obligation =>
-                        obligation.Status != EntryMonthlyObligationStatus.Paid &&
-                        obligation.PaymentId == null)
-                    .OrderBy(obligation => obligation.PeriodYear)
-                    .ThenBy(obligation => obligation.PeriodMonth)
-                    .ToListAsync();
-
-                var openByMember = openObligations
-                    .GroupBy(obligation => new
-                    {
-                        obligation.TenantId,
-                        obligation.CustomerId
-                    })
-                    .ToDictionary(group => group.Key, group => group.ToList());
-
-                var allocated = 0;
-                foreach (var payment in confirmedMonthlyPayments)
-                {
-                    if (linkedSet.Contains(payment.Id))
-                    {
-                        continue;
-                    }
-
-                    var memberKey = new { payment.TenantId, payment.CustomerId };
-                    if (!openByMember.TryGetValue(memberKey, out var memberObligations))
-                    {
-                        continue;
-                    }
-
-                    var target = memberObligations.FirstOrDefault(obligation =>
-                        obligation.AmountDue == payment.Amount &&
-                        string.Equals(
-                            obligation.Currency,
-                            payment.Currency,
-                            StringComparison.Ordinal));
-                    if (target == null)
-                    {
-                        continue;
-                    }
-
-                    target.ApplyConfirmedPayment(payment);
-                    memberObligations.Remove(target);
-                    linkedSet.Add(payment.Id);
-                    allocated++;
-                }
-
-                if (allocated > 0)
-                {
-                    await _unitOfWorkManager.Current.SaveChangesAsync();
-                }
-
-                return allocated;
-            }
-        }
-
         private static void ValidatePeriod(int periodYear, int periodMonth)
         {
             if (periodYear < 2000 || periodYear > 9999)
@@ -216,6 +150,34 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
                     "The timestamp must be UTC.",
                     parameterName);
             }
+        }
+
+        private static void ValidateDuePolicyVersion(string duePolicyVersion)
+        {
+            if (string.IsNullOrWhiteSpace(duePolicyVersion) ||
+                duePolicyVersion.Trim().Length > EntryMonthlyObligationDuePolicy.MaxVersionLength)
+            {
+                throw new ArgumentException(
+                    "A valid due-policy version is required.",
+                    nameof(duePolicyVersion));
+            }
+        }
+
+        private static bool IsObligationMonthAfterActivation(
+            EntryParticipation participation,
+            int periodYear,
+            int periodMonth)
+        {
+            if (!participation.ActivatedAt.HasValue)
+            {
+                return false;
+            }
+
+            var activationMonth = EntryMonthlyObligationDuePolicy
+                .JohannesburgMonth(participation.ActivatedAt.Value);
+            var activationMonthNumber = activationMonth.Year * 12 + activationMonth.Month;
+            var obligationMonthNumber = periodYear * 12 + periodMonth;
+            return obligationMonthNumber > activationMonthNumber;
         }
     }
 }

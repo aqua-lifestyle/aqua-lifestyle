@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Application.Services.Dto;
@@ -20,15 +22,25 @@ namespace AqualLifeStyle.Application.Admin.Tenants
         private readonly IAreaLeaderRepository _areaLeaderRepository;
         private readonly ICustomerRepository _customerRepository;
         private readonly ITenantAccountProvisioner _tenantAccountProvisioner;
+        private readonly IRepository<AreaActivationStateRecord, Guid>
+            _activationStateRepository;
+        private readonly IAreaActivationStateRecorder _activationStateRecorder;
+        private readonly IAreaActivationStateLock _activationStateLock;
 
         public AdminTenantAppService(IRepository<Tenant, int> tenantRepository,
             IAreaLeaderRepository areaLeaderRepository, ICustomerRepository customerRepository,
-            ITenantAccountProvisioner tenantAccountProvisioner)
+            ITenantAccountProvisioner tenantAccountProvisioner,
+            IRepository<AreaActivationStateRecord, Guid> activationStateRepository,
+            IAreaActivationStateRecorder activationStateRecorder,
+            IAreaActivationStateLock activationStateLock)
         {
             _tenantRepository = tenantRepository;
             _areaLeaderRepository = areaLeaderRepository;
             _customerRepository = customerRepository;
             _tenantAccountProvisioner = tenantAccountProvisioner;
+            _activationStateRepository = activationStateRepository;
+            _activationStateRecorder = activationStateRecorder;
+            _activationStateLock = activationStateLock;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Tenants.View)]
@@ -61,7 +73,8 @@ namespace AqualLifeStyle.Application.Admin.Tenants
             var tenant = await _tenantAccountProvisioner.ProvisionAsync(new TenantProvisioningRequest
             {
                 TenancyName = input.TenancyName, Name = input.Name, AdminEmailAddress = input.AdminEmailAddress,
-                ConnectionString = input.ConnectionString, IsActive = input.IsActive
+                ConnectionString = input.ConnectionString, IsActive = input.IsActive,
+                Justification = input.Justification
             });
             LogAdminMutation("Tenant", "created", tenant.Id, tenant.Id, input.Justification);
             return (await MapAsync(new[] { tenant })).Single();
@@ -85,10 +98,65 @@ namespace AqualLifeStyle.Application.Admin.Tenants
         {
             if (input == null) throw Failed("Tenant activation update", "The request body was empty.");
             ValidatePositiveId(input.Id, "Tenant");
+            var effectiveAt = await _activationStateLock.AcquireAsync(input.Id);
             var tenant = await GetTenantAsync(input.Id);
-            tenant.IsActive = input.IsActive;
-            await _tenantRepository.UpdateAsync(tenant);
+            if (tenant.IsActive != input.IsActive)
+            {
+                tenant.IsActive = input.IsActive;
+                await _tenantRepository.UpdateAsync(tenant);
+                await _activationStateRecorder.RecordAsync(
+                    tenant.Id,
+                    tenant.IsActive,
+                    AreaActivationStateRecordKind.Changed,
+                    input.Justification,
+                    effectiveAt);
+            }
+            else if (!await _activationStateRecorder.HasHistoryAsync(tenant.Id))
+            {
+                await _activationStateRecorder.RecordAsync(
+                    tenant.Id,
+                    tenant.IsActive,
+                    AreaActivationStateRecordKind.ObservedBaseline,
+                    input.Justification,
+                    effectiveAt);
+            }
+
+            await CurrentUnitOfWork.SaveChangesAsync();
             LogAdminMutation("Tenant", input.IsActive ? "activated" : "deactivated", tenant.Id, tenant.Id, input.Justification);
+            return (await MapAsync(new[] { tenant })).Single();
+        }
+
+        [AbpAuthorize(AquaPermissions.Admin.Tenants.Activate)]
+        public async Task<AdminTenantDto> ObserveActivationStateAsync(
+            ObserveTenantActivationStateInput input)
+        {
+            if (input == null)
+            {
+                throw Failed(
+                    "Tenant activation observation",
+                    "The request body was empty.");
+            }
+
+            ValidatePositiveId(input.Id, "Tenant");
+            var effectiveAt = await _activationStateLock.AcquireAsync(input.Id);
+            var tenant = await GetTenantAsync(input.Id);
+            if (!await _activationStateRecorder.HasHistoryAsync(tenant.Id))
+            {
+                await _activationStateRecorder.RecordAsync(
+                    tenant.Id,
+                    tenant.IsActive,
+                    AreaActivationStateRecordKind.ObservedBaseline,
+                    input.Justification,
+                    effectiveAt);
+                await CurrentUnitOfWork.SaveChangesAsync();
+                LogAdminMutation(
+                    "Tenant",
+                    "activation state observed",
+                    tenant.Id,
+                    tenant.Id,
+                    input.Justification);
+            }
+
             return (await MapAsync(new[] { tenant })).Single();
         }
 
@@ -118,9 +186,18 @@ namespace AqualLifeStyle.Application.Admin.Tenants
             return tenant;
         }
 
-        private async Task<System.Collections.Generic.List<AdminTenantDto>> MapAsync(System.Collections.Generic.IEnumerable<Tenant> tenantSequence)
+        private async Task<List<AdminTenantDto>> MapAsync(IEnumerable<Tenant> tenantSequence)
         {
             var tenants = tenantSequence.ToList();
+            var tenantIds = tenants.Select(tenant => tenant.Id).ToArray();
+            var activationHistoryStarts = tenantIds.Length == 0
+                ? new Dictionary<int, AreaActivationStateRecord>()
+                : (await _activationStateRepository.GetAll()
+                    .Where(record => tenantIds.Contains(record.TenantId))
+                    .OrderBy(record => record.EffectiveAt)
+                    .ToListAsync())
+                    .GroupBy(record => record.TenantId)
+                    .ToDictionary(group => group.Key, group => group.First());
             var leaderIds = tenants.Where(tenant => tenant.AreaLeaderId.HasValue).Select(tenant => tenant.AreaLeaderId.Value).Distinct().ToArray();
             using (DisableTenantFilterForHost())
             {
@@ -131,6 +208,8 @@ namespace AqualLifeStyle.Application.Admin.Tenants
                 return tenants.Select(tenant => new AdminTenantDto
                 {
                     Id = tenant.Id, TenancyName = tenant.TenancyName, Name = tenant.Name, IsActive = tenant.IsActive,
+                    HasActivationHistory = activationHistoryStarts.TryGetValue(tenant.Id, out var activationHistoryStart),
+                    ActivationHistoryBeginsAt = activationHistoryStart?.EffectiveAt,
                     AreaLeaderId = tenant.AreaLeaderId,
                     AreaLeaderName = tenant.AreaLeaderId.HasValue && leaderCustomers.TryGetValue(tenant.AreaLeaderId.Value, out var name) ? name : null
                 }).ToList();

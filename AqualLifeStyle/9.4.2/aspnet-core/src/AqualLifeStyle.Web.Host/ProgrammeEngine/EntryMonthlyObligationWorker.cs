@@ -15,13 +15,12 @@ namespace AqualLifeStyle.Web.Host.ProgrammeEngine
     /// Runs the recurring AQGreen R600 monthly obligations. Gated by
     /// <c>App:EntryMonthlyObligations:Enabled</c> (defaults to disabled): until
     /// operations arm it, no obligation is created, assessed, or settled by the
-    /// worker. New obligations are only scheduled once the due-date policy
-    /// (PD-07) is defined via
-    /// <c>App:EntryMonthlyObligations:DueDayOfMonth</c>. Assessment and payment
-    /// allocation run regardless so that manually created obligations and
-    /// confirmed monthly payments stay consistent.
+    /// worker. New obligations are only scheduled when exactly one valid,
+    /// effective host due-policy version exists. Assessment runs for existing
+    /// obligations; payment application requires a separate obligation-linked
+    /// provider workflow and is never guessed by this worker.
     /// </summary>
-    public sealed class EntryMonthlyObligationWorker
+    public class EntryMonthlyObligationWorker
         : AsyncPeriodicBackgroundWorkerBase, ISingletonDependency
     {
         private const int DefaultIntervalMinutes = 60;
@@ -61,9 +60,11 @@ namespace AqualLifeStyle.Web.Host.ProgrammeEngine
                 return;
             }
 
-            var nowUtc = DateTime.UtcNow;
-            var periodYear = nowUtc.Year;
-            var periodMonth = nowUtc.Month;
+            var nowUtc = GetUtcNow();
+            var currentJohannesburgMonth = EntryMonthlyObligationDuePolicy
+                .JohannesburgMonth(nowUtc);
+            var periodYear = currentJohannesburgMonth.Year;
+            var periodMonth = currentJohannesburgMonth.Month;
 
             try
             {
@@ -71,35 +72,37 @@ namespace AqualLifeStyle.Web.Host.ProgrammeEngine
                 {
                     await _schedulingLock.AcquireAsync();
 
-                    var dueAt = _dueDatePolicy.ResolveDueDate(periodYear, periodMonth);
+                    var dueDateResolution = await _dueDatePolicy.ResolveDueDateAsync(
+                        periodYear,
+                        periodMonth);
                     var created = 0;
-                    if (dueAt.HasValue)
+                    if (dueDateResolution.IsResolved)
                     {
                         created = await _scheduler.EnsureObligationsForPeriodAsync(
                             periodYear,
                             periodMonth,
-                            dueAt.Value);
+                            dueDateResolution.DueAtUtc.Value,
+                            dueDateResolution.PolicyVersion);
                     }
                     else
                     {
                         _logger.LogWarning(
-                            "ProgrammeEngineAlert {AlertType}: the AQGreen monthly due-date policy (PD-07) is undefined, so recurring obligations are not being scheduled; assessment and payment allocation still run",
-                            "aqgreen_monthly_due_date_undefined");
+                            "ProgrammeEngineAlert {AlertType}: AQGreen due-policy resolution failed with {ResolutionStatus}, so recurring obligations are not being scheduled; assessment still runs",
+                            "aqgreen_monthly_due_policy_unresolved",
+                            dueDateResolution.Status);
                     }
 
                     var assessed = await _scheduler.AssessObligationsAsync(nowUtc);
-                    var allocated = await _scheduler.AllocateConfirmedMonthlyPaymentsAsync();
 
                     await unitOfWork.CompleteAsync();
 
                     _logger.LogInformation(
-                        "ProgrammeEngineAlert {AlertType}: AQGreen monthly obligations processed for {PeriodYear}-{PeriodMonth:00}; Created={Created}, Assessed={Assessed}, Allocated={Allocated}",
+                        "ProgrammeEngineAlert {AlertType}: AQGreen monthly obligations processed for {PeriodYear}-{PeriodMonth:00}; Created={Created}, Assessed={Assessed}",
                         "aqgreen_monthly_obligations_processed",
                         periodYear,
                         periodMonth,
                         created,
-                        assessed,
-                        allocated);
+                        assessed);
                 }
             }
             catch (Exception exception)
@@ -118,5 +121,10 @@ namespace AqualLifeStyle.Web.Host.ProgrammeEngine
                 ? minutes
                 : defaultValue;
         }
+
+        /// <summary>
+        /// Supplies the current UTC instant for deterministic worker verification.
+        /// </summary>
+        protected virtual DateTime GetUtcNow() => DateTime.UtcNow;
     }
 }

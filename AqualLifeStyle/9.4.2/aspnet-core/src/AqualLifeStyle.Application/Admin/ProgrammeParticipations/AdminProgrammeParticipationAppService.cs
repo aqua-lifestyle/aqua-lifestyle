@@ -271,7 +271,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                             "Onyx graduation requires reconciliation.",
                             "An Onyx participation already exists without this graduation decision.");
 
-                    var network = await _entryParticipationRepository.GetAll()
+                    var network = await _entryParticipationRepository
+                        .GetAllIncluding(item => item.RecruiterCorrections)
                         .Where(item => item.TenantId == loan.TenantId &&
                                        item.Status == EntryParticipationStatus.Active)
                         .ToListAsync();

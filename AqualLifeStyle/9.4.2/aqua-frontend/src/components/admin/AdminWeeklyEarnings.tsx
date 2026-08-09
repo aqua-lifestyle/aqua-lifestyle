@@ -377,8 +377,8 @@ export const AdminWeeklyEarnings = () => {
             <div className="flex-1">
               <h2 className="font-semibold">Prepare the latest completed week</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                The system uses the latest fully completed Monday-to-Sunday week
-                in Johannesburg time and will not create duplicates.
+                The system uses the latest fully completed Friday-to-Thursday
+                cycle in Johannesburg time and will not create duplicates.
               </p>
             </div>
             <AdminAreaSelectionField

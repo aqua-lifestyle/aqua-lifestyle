@@ -7,7 +7,10 @@ using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
 using Abp.Authorization.Users;
+using Abp.Application.Services.Dto;
+using Abp.UI;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.MultiTenancy;
 
 namespace AqualLifeStyle.Tests.Application
 {
@@ -47,6 +50,11 @@ namespace AqualLifeStyle.Tests.Application
                 (await context.TransactionalEmailOutboxMessages.IgnoreQueryFilters().CountAsync(message =>
                     message.TenantId == tenant.Id && message.NotificationType == "InternalAccountInvitation" &&
                     message.Recipient == email)).ShouldBe(1);
+                var activationState = await context.AreaActivationStateRecords
+                    .SingleAsync(record => record.TenantId == tenant.Id);
+                activationState.IsActive.ShouldBeTrue();
+                activationState.Kind.ShouldBe(AreaActivationStateRecordKind.Provisioned);
+                activationState.Justification.ShouldBe("Initial administrator invitation test");
             });
         }
 
@@ -80,6 +88,8 @@ namespace AqualLifeStyle.Tests.Application
                 Justification = "Tenant requested a temporary pause"
             });
             deactivated.IsActive.ShouldBeFalse();
+            deactivated.HasActivationHistory.ShouldBeTrue();
+            deactivated.ActivationHistoryBeginsAt.ShouldNotBeNull();
 
             var assigned = await _tenantAdministration.AssignAreaLeaderAsync(new AssignTenantAreaLeaderInput
             {
@@ -96,6 +106,58 @@ namespace AqualLifeStyle.Tests.Application
                 tenant.Name.ShouldBe("Default tenant updated");
                 tenant.IsActive.ShouldBeFalse();
                 tenant.AreaLeaderId.ShouldBe(leaderId);
+                var activationState = await context.AreaActivationStateRecords
+                    .SingleAsync(record => record.TenantId == tenant.Id);
+                activationState.IsActive.ShouldBeFalse();
+                activationState.Kind.ShouldBe(AreaActivationStateRecordKind.Changed);
+            });
+        }
+
+        [Fact]
+        public async Task ObserveActivationState_RecordsOneProspectiveBaseline()
+        {
+            var observed = await _tenantAdministration.ObserveActivationStateAsync(
+                new ObserveTenantActivationStateInput
+                {
+                    Id = 1,
+                    Justification = "Observed current Area state before financial rollout"
+                });
+            var repeated = await _tenantAdministration.ObserveActivationStateAsync(
+                new ObserveTenantActivationStateInput
+                {
+                    Id = 1,
+                    Justification = "Repeated baseline observation request"
+                });
+
+            observed.HasActivationHistory.ShouldBeTrue();
+            observed.ActivationHistoryBeginsAt.ShouldNotBeNull();
+            repeated.ActivationHistoryBeginsAt.ShouldBe(
+                observed.ActivationHistoryBeginsAt);
+
+            await UsingDbContextAsync(null, async context =>
+            {
+                var record = await context.AreaActivationStateRecords.SingleAsync(
+                    item => item.TenantId == 1);
+                record.Kind.ShouldBe(AreaActivationStateRecordKind.ObservedBaseline);
+                record.IsActive.ShouldBeTrue();
+                record.Justification.ShouldBe(
+                    "Observed current Area state before financial rollout");
+            });
+        }
+
+        [Fact]
+        public async Task LegacyTenantDeletion_IsRejectedToPreserveFinancialHistory()
+        {
+            var legacyService = Resolve<ITenantAppService>();
+
+            var exception = await Should.ThrowAsync<UserFriendlyException>(
+                () => legacyService.DeleteAsync(new EntityDto<int> { Id = 1 }));
+
+            exception.Message.ShouldContain("Deactivate the Area instead");
+            await UsingDbContextAsync(null, async context =>
+            {
+                (await context.Tenants.IgnoreQueryFilters().CountAsync(
+                    tenant => tenant.Id == 1)).ShouldBe(1);
             });
         }
     }

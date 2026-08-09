@@ -33,8 +33,7 @@ namespace AqualLifeStyle.Tests.Domain
             Assert.Throws<InvalidOperationException>(() =>
                 OnyxTravelBenefitEntitlement.GrantForQualifiedParticipant(
                     network[0],
-                    network,
-                    new OnyxNetworkQualificationEvaluator(),
+                    OnyxNetworkLevel.Level2,
                     TravelTerms,
                     EffectiveFrom.AddDays(10)));
         }
@@ -51,8 +50,7 @@ namespace AqualLifeStyle.Tests.Domain
             var entitlement =
                 OnyxTravelBenefitEntitlement.GrantForQualifiedParticipant(
                     network[0],
-                    network,
-                    new OnyxNetworkQualificationEvaluator(),
+                    OnyxNetworkLevel.Level3,
                     TravelTerms,
                     eligibleAt);
 
@@ -74,8 +72,7 @@ namespace AqualLifeStyle.Tests.Domain
             var entitlement =
                 OnyxTravelBenefitEntitlement.GrantForQualifiedParticipant(
                     network[0],
-                    network,
-                    new OnyxNetworkQualificationEvaluator(),
+                    OnyxNetworkLevel.Level3,
                     TravelTerms,
                     EffectiveFrom.AddDays(10));
             var activatedAt = entitlement.WaitingPeriodEndsAt;

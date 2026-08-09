@@ -84,7 +84,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 .FirstOrDefaultAsync(item => item.CustomerId == customer.Id);
             var activeParticipations = participation == null
                 ? new List<EntryParticipation>()
-                : await _entryParticipationRepository.GetAll()
+                : await _entryParticipationRepository
+                    .GetAllIncluding(item => item.RecruiterCorrections)
                     .Where(item =>
                         item.Status == EntryParticipationStatus.Active)
                     .ToListAsync();

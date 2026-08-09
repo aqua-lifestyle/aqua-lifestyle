@@ -6,6 +6,14 @@ Date: 2026-08-07
 
 Companion deliverable: `docs/verification/business-rule-matrix.md` (46 rules classified Confirmed/Provisional/Contradictory/Undefined with `file:line` evidence and Product Decisions). Three confirmed Branch-Purpose Gaps (M-15, M-46, M-28/M-44/M-45) are implemented on `feat/programme-engine-gap-closure`.
 
+> Readiness update, 2026-08-09: the historical verdict and test totals below are
+> superseded by `release-report-gap-closure.md` and
+> `weekly-commission-temporal-input-matrix.md`. Forward-only append-only Area
+> activation history is implemented without a seed or legacy backfill, but
+> AQGreen compliance, existing-Area baselines, cycle-effective terms, provider
+> finality, release evidence, and external payout evidence remain incomplete.
+> The branch is not merge-ready and both workers remain disabled.
+
 ---
 
 ## 1. Purpose reconstructed
@@ -60,7 +68,7 @@ None.
 
 | # | Finding | Class | Owner |
 |---|---------|-------|-------|
-| AD-01 | Automatic R600 obligation scheduling and payment allocation had no production caller (only domain + tests), deferred per `onyx-implementation-plan.md:189-190`. **Closed on `feat/programme-engine-gap-closure` (M-15).** | Branch-Purpose Gap (closed) | AqualLifeStyle |
+| AD-01 | Automatic R600 obligation scheduling and payment application had no production caller. Scheduling/assessment now has a disabled, versioned-policy worker. Payment application remains open: checkout must persist an authoritative obligation relationship; the rejected oldest-open heuristic was removed. | Branch-Purpose Gap (partially closed) | AqualLifeStyle |
 | AD-02 | Funeral cover R30,000 had no requirement/implementation. **Closed on `feat/programme-engine-gap-closure` (M-46): cover recorded as included/eligible after R1,200 joining completion; activation/enrolment timing remains PD-06.** | Branch-Purpose Gap (closed) | Business (PD-06) |
 | AD-03 | No member-facing commission ledger or programme education content. **Closed on `feat/programme-engine-gap-closure` (M-28/M-44/M-45).** | Branch-Purpose Gap (closed) | AqualLifeStyle |
 | AD-04 | Audit history is stored append-only but not surfaced to administrators. | Unresolved decision (PD-05) | Product |
@@ -83,7 +91,7 @@ Verified that the codebase keeps distinct: Referral (placement), Qualification (
 
 ## 8. Remaining risks
 
-1. Recurring R600 obligation creation is implemented on `feat/programme-engine-gap-closure` (M-15); ongoing assessment of due/grace/overdue status and allocation of confirmed payments into obligations is production-supported but relies on the worker being deployed and enabled (config-gated). Payment allocation for `EntryMonthlyCommitment` payments follows the established confirmed-payment path.
+1. Recurring R600 obligation creation and due/grace/overdue assessment are implemented behind a disabled worker and an initially empty durable policy registry. Confirmed-payment application is not production-supported until an obligation-specific checkout persists `ObligationId` and period evidence; no oldest-open fallback remains.
 2. Funeral cover is now recorded as included/eligible after R1,200 joining completion (M-46). The commercial risk shifts to PD-06: activation/enrolment timing and effective date are still unresolved and must not be presented as "active".
 3. Commission holds currently keyed to overdue own obligations / loans; the upline effect of an overdue member is unresolved (business decision).
 4. Webhook rate limiting and an explicit parallel-replay test would strengthen hardening (accepted debt).

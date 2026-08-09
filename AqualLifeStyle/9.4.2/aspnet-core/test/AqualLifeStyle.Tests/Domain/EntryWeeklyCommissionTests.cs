@@ -128,7 +128,8 @@ namespace AqualLifeStyle.Tests.Domain
                 root,
                 2026,
                 7,
-                EffectiveFrom.AddDays(1));
+                EffectiveFrom.AddDays(1),
+                "due-policy-v1");
             obligation.AssessStatus(EffectiveFrom.AddDays(9));
 
             var commission = Calculate(network, new[] { obligation });
@@ -149,7 +150,8 @@ namespace AqualLifeStyle.Tests.Domain
                 root,
                 2026,
                 7,
-                EffectiveFrom.AddDays(1));
+                EffectiveFrom.AddDays(1),
+                "due-policy-v1");
             obligation.AssessStatus(EffectiveFrom.AddDays(9));
             var commission = Calculate(network, new[] { obligation });
             var releasedAt = EffectiveFrom.AddDays(15);

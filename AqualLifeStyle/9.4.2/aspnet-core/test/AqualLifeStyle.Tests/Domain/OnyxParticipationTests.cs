@@ -174,6 +174,35 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
+        public void AdministrativeRecruiterCorrection_RejectsAmbiguousEffectiveOrder()
+        {
+            var originalRecruiter = OnyxParticipation.StartDirectIndependently(
+                1, 20, 7, Terms, EffectiveFrom);
+            var firstNewRecruiter = OnyxParticipation.StartDirectIndependently(
+                1, 30, 7, Terms, EffectiveFrom);
+            var secondNewRecruiter = OnyxParticipation.StartDirectIndependently(
+                1, 40, 7, Terms, EffectiveFrom);
+            Activate(originalRecruiter, "onyx-original-order");
+            Activate(firstNewRecruiter, "onyx-first-order");
+            Activate(secondNewRecruiter, "onyx-second-order");
+            var participation = OnyxParticipation.StartDirectUnderRecruiter(
+                1, 10, originalRecruiter, 7, Terms, EffectiveFrom);
+            var correctedAt = EffectiveFrom.AddHours(1);
+            participation.CorrectRecruiter(
+                firstNewRecruiter,
+                999,
+                "First correction",
+                correctedAt);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                participation.CorrectRecruiter(
+                    secondNewRecruiter,
+                    999,
+                    "Ambiguous correction",
+                    correctedAt));
+        }
+
+        [Fact]
         public void AQGreenGraduation_StartsAnIndependentActiveOnyxNetwork()
         {
             var aqGreenParticipation = CreateActiveAQGreenParticipation();

@@ -9,6 +9,7 @@ using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.EntityFrameworkCore;
+using AqualLifeStyle.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -624,6 +625,141 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 BuildTestConnectionString(),
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'AQGreenMigrationBackup'");
             hasBackupTable.ShouldBe(0);
+        }
+
+        [Fact]
+        public async Task DuePolicyHistory_RejectsDirectUpdateAndDelete_PostgreSQL()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToLatestAsync();
+            await using (var context = CreateDbContext())
+            {
+                context.EntryMonthlyObligationDuePolicies.Add(
+                    EntryMonthlyObligationDuePolicy.Create(
+                        "append-only-v1",
+                        10,
+                        EntryMonthlyObligationDuePolicy.JohannesburgMonthStartUtc(2026, 9)));
+                await context.SaveChangesAsync();
+            }
+
+            await using (var updateContext = CreateDbContext())
+            {
+                await Should.ThrowAsync<PostgresException>(async () =>
+                    await updateContext.Database.ExecuteSqlRawAsync(
+                        "UPDATE \"EntryMonthlyObligationDuePolicies\" SET \"DueDayOfMonth\" = 11 WHERE \"Version\" = 'append-only-v1'"));
+            }
+
+            await using (var deleteContext = CreateDbContext())
+            {
+                await Should.ThrowAsync<PostgresException>(async () =>
+                    await deleteContext.Database.ExecuteSqlRawAsync(
+                        "DELETE FROM \"EntryMonthlyObligationDuePolicies\" WHERE \"Version\" = 'append-only-v1'"));
+            }
+        }
+
+        [Fact]
+        public async Task DuePolicyMigration_RefusesRollbackAfterEvidenceExists_PostgreSQL()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToLatestAsync();
+            await using (var context = CreateDbContext())
+            {
+                context.EntryMonthlyObligationDuePolicies.Add(
+                    EntryMonthlyObligationDuePolicy.Create(
+                        "rollback-protected-v1",
+                        10,
+                        EntryMonthlyObligationDuePolicy.JohannesburgMonthStartUtc(2026, 9)));
+                await context.SaveChangesAsync();
+            }
+
+            await Should.ThrowAsync<PostgresException>(async () =>
+                await MigrateToAsync(
+                    "20260807065821_AddAQGreenFuneralCoverEntitlements"));
+        }
+
+        [Fact]
+        public async Task AreaActivationHistory_RejectsDirectUpdateAndDelete_PostgreSQL()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToLatestAsync();
+            int tenantId;
+            await using (var context = CreateDbContext())
+            {
+                var recordedAt = DateTime.UtcNow;
+                var tenant = new Tenant(
+                    "area-history-append-only",
+                    "Area history append-only");
+                context.Tenants.Add(tenant);
+                await context.SaveChangesAsync();
+                tenantId = tenant.Id;
+                context.AreaActivationStateRecords.Add(
+                    AreaActivationStateRecord.Record(
+                        Guid.NewGuid(),
+                        tenantId,
+                        true,
+                        recordedAt,
+                        recordedAt,
+                        null,
+                        "PostgreSQL append-only test",
+                        AreaActivationStateRecordKind.ObservedBaseline));
+                await context.SaveChangesAsync();
+            }
+
+            await using (var updateContext = CreateDbContext())
+            {
+                await Should.ThrowAsync<PostgresException>(async () =>
+                    await updateContext.Database.ExecuteSqlAsync(
+                        $"UPDATE \"AreaActivationStateRecords\" SET \"IsActive\" = FALSE WHERE \"TenantId\" = {tenantId}"));
+            }
+
+            await using (var deleteContext = CreateDbContext())
+            {
+                await Should.ThrowAsync<PostgresException>(async () =>
+                    await deleteContext.Database.ExecuteSqlAsync(
+                        $"DELETE FROM \"AreaActivationStateRecords\" WHERE \"TenantId\" = {tenantId}"));
+            }
+
+            await using (var truncateContext = CreateDbContext())
+            {
+                await Should.ThrowAsync<PostgresException>(async () =>
+                    await truncateContext.Database.ExecuteSqlRawAsync(
+                        "TRUNCATE TABLE \"AreaActivationStateRecords\""));
+            }
+        }
+
+        [Fact]
+        public async Task AreaActivationHistoryMigration_RefusesRollbackAfterEvidenceExists_PostgreSQL()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToLatestAsync();
+            await using (var context = CreateDbContext())
+            {
+                var recordedAt = DateTime.UtcNow;
+                var tenant = new Tenant(
+                    "area-history-rollback",
+                    "Area history rollback");
+                context.Tenants.Add(tenant);
+                await context.SaveChangesAsync();
+                context.AreaActivationStateRecords.Add(
+                    AreaActivationStateRecord.Record(
+                        Guid.NewGuid(),
+                        tenant.Id,
+                        true,
+                        recordedAt,
+                        recordedAt,
+                        null,
+                        "PostgreSQL rollback protection test",
+                        AreaActivationStateRecordKind.ObservedBaseline));
+                await context.SaveChangesAsync();
+            }
+
+            await Should.ThrowAsync<PostgresException>(async () =>
+                await MigrateToAsync(
+                    "20260809054416_AddAQGreenMonthlyObligationDuePolicies"));
+
+            await using var verifyContext = CreateDbContext();
+            var applied = await verifyContext.Database.GetAppliedMigrationsAsync();
+            applied.ShouldContain("20260809081746_AddAreaActivationStateHistory");
         }
 
         private void TraceLine(string message)

@@ -36,7 +36,7 @@
 - [x] Secured customer joining/status screens and read-only administrator reconciliation
 - [x] Guest-to-Club-Member access promotion after verified final activation payment
 - [x] Secured AQGreen monthly-commitment history and administrator reconciliation views
-- [ ] Automatic AQGreen commitment scheduling and confirmed-payment allocation
+- [ ] AQGreen obligation-specific checkout/payment application and member UI; scheduling/assessment capability exists but remains disabled with an empty due-policy registry
 - [x] Yoco hosted checkout and signed webhook activation for direct Onyx and AQGreen joining payments
 - [ ] Yoco checkout workflows for other confirmed payment purposes
 - [ ] AQGreen-to-Onyx graduation that preserves AQGreen history
@@ -47,9 +47,11 @@
 - [x] Onyx structural qualification and confirmed commission components through Level 5
 - [x] Level 3 travel eligibility, three-month waiting period, automatic activation tracking, and Club Member visibility
 - [x] Secured administrator calculation and review for the latest completed Johannesburg week
-- [ ] Confirm whether future earning periods should close on Friday instead of Sunday
+- [x] Weekly earning cycles run Friday through Thursday in Africa/Johannesburg
 - [x] Host-administrator release and external-payment recording workflows
 - [x] Onyx Levels 2–5 commission rules using the confirmed per-person rates and cumulative totals
+- [ ] Complete cutoff-correct weekly calculation: recruiter placement, travel network timing, and forward-only target-Area history are implemented; existing-Area baselines, AQGreen compliance, cycle-effective terms, and provider finality still block production automation
+- [ ] Authorised, auditable financial reconciliation for older missing commission cycles using sufficient period-effective evidence
 - [ ] Jasper activation plans (Standard R950 / Premium R1200) with combo allocation
 - [ ] Virtual membership cards with QR codes
 

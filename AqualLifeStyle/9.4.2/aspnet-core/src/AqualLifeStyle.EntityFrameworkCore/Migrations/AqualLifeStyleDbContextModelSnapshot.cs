@@ -2508,6 +2508,10 @@ namespace AqualLifeStyle.Migrations
                     b.Property<DateTime>("DueAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("DuePolicyVersion")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<Guid>("EntryParticipationId")
                         .HasColumnType("uuid");
 
@@ -2563,6 +2567,8 @@ namespace AqualLifeStyle.Migrations
 
                     b.HasIndex("CustomerId");
 
+                    b.HasIndex("DuePolicyVersion");
+
                     b.HasIndex("PaymentId");
 
                     b.HasIndex("EntryParticipationId", "PeriodYear", "PeriodMonth")
@@ -2571,6 +2577,41 @@ namespace AqualLifeStyle.Migrations
                     b.HasIndex("TenantId", "CustomerId", "Status");
 
                     b.ToTable("EntryMonthlyObligations", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryMonthlyObligationDuePolicy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("DueDayOfMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EffectiveFrom");
+
+                    b.ToTable("EntryMonthlyObligationDuePolicies", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_EntryMonthlyObligationDuePolicies_DueDayOfMonth", "\"DueDayOfMonth\" >= 1 AND \"DueDayOfMonth\" <= 28");
+
+                            t.HasCheckConstraint("CK_EntryMonthlyObligationDuePolicies_Version_NotBlank", "length(trim(\"Version\")) > 0");
+                        });
                 });
 
             modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryParticipation", b =>
@@ -4155,6 +4196,56 @@ namespace AqualLifeStyle.Migrations
                     b.ToTable("SavingsContributions", (string)null);
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.MultiTenancy.AreaActivationStateRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("EffectiveAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Justification")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("RecordedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "EffectiveAt")
+                        .IsUnique();
+
+                    b.ToTable("AreaActivationStateRecords", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AreaActivationStateRecords_EffectiveAt_RecordedAt", "\"EffectiveAt\" <= \"RecordedAt\"");
+
+                            t.HasCheckConstraint("CK_AreaActivationStateRecords_Justification_NotBlank", "length(trim(\"Justification\")) > 0");
+
+                            t.HasCheckConstraint("CK_AreaActivationStateRecords_Kind", "\"Kind\" >= 0 AND \"Kind\" <= 2");
+                        });
+                });
+
             modelBuilder.Entity("AqualLifeStyle.MultiTenancy.Tenant", b =>
                 {
                     b.Property<int>("Id")
@@ -4616,6 +4707,12 @@ namespace AqualLifeStyle.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.EntryMonthlyObligationDuePolicy", null)
+                        .WithMany()
+                        .HasForeignKey("DuePolicyVersion")
+                        .HasPrincipalKey("Version")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("AqualLifeStyle.Domain.Onyx.EntryParticipation", null)
                         .WithMany()
                         .HasForeignKey("EntryParticipationId")
@@ -4934,6 +5031,15 @@ namespace AqualLifeStyle.Migrations
                         .WithMany("Contributions")
                         .HasForeignKey("SavingsAccountId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.MultiTenancy.AreaActivationStateRecord", b =>
+                {
+                    b.HasOne("AqualLifeStyle.MultiTenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

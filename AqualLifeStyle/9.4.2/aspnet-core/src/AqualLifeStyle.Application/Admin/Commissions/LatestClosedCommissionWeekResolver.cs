@@ -71,5 +71,136 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 TimeZoneInfo.ConvertTimeToUtc(closedWeekEndLocal, timeZone),
                 CommissionTimeZoneId);
         }
+
+        public bool IsCanonicalCycle(
+            DateTime periodStartUtc,
+            DateTime periodEndUtc,
+            string timeZoneId)
+        {
+            return IsCycle(
+                periodStartUtc,
+                periodEndUtc,
+                timeZoneId,
+                WeekStartDay);
+        }
+
+        public bool IsLegacyMondayToSundayCycle(
+            DateTime periodStartUtc,
+            DateTime periodEndUtc,
+            string timeZoneId)
+        {
+            return IsCycle(
+                periodStartUtc,
+                periodEndUtc,
+                timeZoneId,
+                DayOfWeek.Monday);
+        }
+
+        public DateTime ResolveFirstCycleStartAfter(DateTime periodEndUtc)
+        {
+            var normalizedEnd = NormalizeUtc(periodEndUtc, nameof(periodEndUtc));
+            var timeZone = TimeZoneInfo.FindSystemTimeZoneById(
+                CommissionTimeZoneId);
+            var localEnd = TimeZoneInfo.ConvertTimeFromUtc(normalizedEnd, timeZone);
+            var daysUntilFriday =
+                ((int)WeekStartDay - (int)localEnd.DayOfWeek + 7) % 7;
+            var candidate = DateTime.SpecifyKind(
+                localEnd.Date.AddDays(daysUntilFriday),
+                DateTimeKind.Unspecified);
+            if (candidate <= localEnd)
+            {
+                candidate = candidate.AddDays(7);
+            }
+
+            return TimeZoneInfo.ConvertTimeToUtc(candidate, timeZone);
+        }
+
+        public bool OverlapsCanonicalCycle(
+            DateTime periodStartUtc,
+            DateTime periodEndUtc)
+        {
+            if (periodStartUtc == default ||
+                periodEndUtc == default ||
+                periodEndUtc <= periodStartUtc)
+            {
+                return false;
+            }
+
+            var timeZone = TimeZoneInfo.FindSystemTimeZoneById(
+                CommissionTimeZoneId);
+            var normalizedStart = periodStartUtc.Kind == DateTimeKind.Utc
+                ? periodStartUtc
+                : periodStartUtc.ToUniversalTime();
+            var normalizedEnd = periodEndUtc.Kind == DateTimeKind.Utc
+                ? periodEndUtc
+                : periodEndUtc.ToUniversalTime();
+            var localStart = TimeZoneInfo.ConvertTimeFromUtc(
+                normalizedStart,
+                timeZone);
+            var daysSinceFriday =
+                ((int)localStart.DayOfWeek - (int)WeekStartDay + 7) % 7;
+            var canonicalStartLocal = DateTime.SpecifyKind(
+                localStart.Date.AddDays(-daysSinceFriday),
+                DateTimeKind.Unspecified);
+            var canonicalStartUtc = TimeZoneInfo.ConvertTimeToUtc(
+                canonicalStartLocal,
+                timeZone);
+            var canonicalEndUtc = TimeZoneInfo.ConvertTimeToUtc(
+                canonicalStartLocal.AddDays(7).AddTicks(-1),
+                timeZone);
+
+            return normalizedStart <= canonicalEndUtc &&
+                normalizedEnd >= canonicalStartUtc;
+        }
+
+        private static bool IsCycle(
+            DateTime periodStartUtc,
+            DateTime periodEndUtc,
+            string timeZoneId,
+            DayOfWeek startDay)
+        {
+            if (!string.Equals(
+                    timeZoneId,
+                    CommissionTimeZoneId,
+                    StringComparison.Ordinal) ||
+                periodStartUtc == default ||
+                periodEndUtc == default ||
+                periodEndUtc <= periodStartUtc)
+            {
+                return false;
+            }
+
+            var timeZone = TimeZoneInfo.FindSystemTimeZoneById(
+                CommissionTimeZoneId);
+            var normalizedStart = periodStartUtc.Kind == DateTimeKind.Utc
+                ? periodStartUtc
+                : periodStartUtc.ToUniversalTime();
+            var normalizedEnd = periodEndUtc.Kind == DateTimeKind.Utc
+                ? periodEndUtc
+                : periodEndUtc.ToUniversalTime();
+            var localStart = TimeZoneInfo.ConvertTimeFromUtc(normalizedStart, timeZone);
+            var localEnd = TimeZoneInfo.ConvertTimeFromUtc(normalizedEnd, timeZone);
+            var expectedEnd = DateTime.SpecifyKind(
+                localStart,
+                DateTimeKind.Unspecified).AddDays(7).AddTicks(-1);
+
+            return localStart.DayOfWeek == startDay &&
+                localStart.TimeOfDay == TimeSpan.Zero &&
+                Math.Abs((localEnd - expectedEnd).Ticks) < TimeSpan.TicksPerMillisecond;
+        }
+
+        private static DateTime NormalizeUtc(DateTime value, string parameterName)
+        {
+            if (value == default)
+            {
+                throw new ArgumentException(
+                    "A commission cycle timestamp is required.",
+                    parameterName);
+            }
+
+            return value.Kind == DateTimeKind.Utc
+                ? value
+                : value.ToUniversalTime();
+        }
     }
 }

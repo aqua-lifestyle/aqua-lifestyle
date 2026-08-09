@@ -154,7 +154,13 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     participantEntry,
                     2026,
                     8,
-                    EffectiveFrom.AddMonths(1));
+                    EffectiveFrom.AddMonths(1),
+                    "due-policy-v1");
+                context.EntryMonthlyObligationDuePolicies.Add(
+                    EntryMonthlyObligationDuePolicy.Create(
+                        "due-policy-v1",
+                        1,
+                        EntryMonthlyObligationDuePolicy.JohannesburgMonthStartUtc(2026, 8)));
                 monthlyObligation.AssessStatus(EffectiveFrom.AddMonths(1).AddDays(8));
                 var monthlyPayment = CreateConfirmedPayment(
                     participantCustomer.Id,
@@ -509,8 +515,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 var entitlement =
                     OnyxTravelBenefitEntitlement.GrantForQualifiedParticipant(
                         root,
-                        network,
-                        new OnyxNetworkQualificationEvaluator(),
+                        OnyxNetworkLevel.Level3,
                         TravelBenefitTerms,
                         EffectiveFrom.AddDays(10));
                 entitlement.ActivateAfterWaitingPeriod(

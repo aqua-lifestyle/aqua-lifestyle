@@ -41,7 +41,7 @@ const authState = (permissions: string[]) => ({
 const weeklyEarnings = {
   items: [
     {
-      calculatedAt: "2026-07-20T08:00:00Z",
+      calculatedAt: "2026-07-24T08:00:00Z",
       components: [{ amount: 150, level: 1 }],
       currency: "ZAR",
       customerId: 42,
@@ -51,8 +51,8 @@ const weeklyEarnings = {
       highestQualifiedLevel: 1,
       holdReason: null,
       id: "earning-1",
-      periodEnd: "2026-07-19T21:59:59Z",
-      periodStart: "2026-07-12T22:00:00Z",
+      periodEnd: "2026-07-23T21:59:59Z",
+      periodStart: "2026-07-16T22:00:00Z",
       paidAt: null,
       paymentReference: null,
       programmeName: "AQGreen",
@@ -63,7 +63,7 @@ const weeklyEarnings = {
       totalAmount: 150,
     },
     {
-      calculatedAt: "2026-07-20T08:00:00Z",
+      calculatedAt: "2026-07-24T08:00:00Z",
       components: [{ amount: 150, level: 1 }],
       currency: "ZAR",
       customerId: 43,
@@ -75,10 +75,10 @@ const weeklyEarnings = {
       id: "earning-2",
       paidAt: null,
       paymentReference: null,
-      periodEnd: "2026-07-19T21:59:59Z",
-      periodStart: "2026-07-12T22:00:00Z",
+      periodEnd: "2026-07-23T21:59:59Z",
+      periodStart: "2026-07-16T22:00:00Z",
       programmeName: "AQGreen",
-      releasedAt: "2026-07-20T09:00:00Z",
+      releasedAt: "2026-07-24T09:00:00Z",
       releaseReason: "Eligible weekly commission released.",
       status: "Released — awaiting payment",
       tenantId: 3,
@@ -121,8 +121,8 @@ describe("AdminWeeklyEarnings", () => {
       currency: "ZAR",
       earnedCount: 1,
       heldCount: 0,
-      periodEnd: "2026-07-19T21:59:59Z",
-      periodStart: "2026-07-12T22:00:00Z",
+      periodEnd: "2026-07-23T21:59:59Z",
+      periodStart: "2026-07-16T22:00:00Z",
       programmeName: "AQGreen",
       recordsCreated: 6,
       totalEarnedAmount: 150,
@@ -152,6 +152,10 @@ describe("AdminWeeklyEarnings", () => {
 
   it("prepares the latest completed week for the selected Area", async () => {
     render(<AdminWeeklyEarnings />);
+
+    expect(
+      screen.getByText(/Friday-to-Thursday cycle in Johannesburg time/i),
+    ).toBeInTheDocument();
 
     fireEvent.change(await screen.findByLabelText("Area"), {
       target: { value: "3" },

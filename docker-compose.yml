@@ -47,6 +47,8 @@ services:
       App__ClientRootAddress: http://localhost:3000/
       App__CorsOrigins: http://localhost:3000
       App__DefaultTenantName: ${DEFAULT_AREA_NAME:-Default}
+      App__WeeklyCommissions__Enabled: ${WEEKLY_COMMISSIONS_ENABLED:-false}
+      App__WeeklyCommissions__IntervalMinutes: 1440
       Authentication__JwtBearer__IsEnabled: "true"
       Authentication__JwtBearer__SecurityKey: ${JWT_SECURITY_KEY:?Set JWT_SECURITY_KEY in .env}
       Authentication__JwtBearer__Issuer: ${JWT_ISSUER:-AqualLifeStyle}

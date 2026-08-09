@@ -392,11 +392,17 @@ namespace AqualLifeStyle.Tests.Application
             return await UsingDbContextAsync(1, async context =>
             {
                 var dueAt = EffectiveFrom.AddMonths(1);
+                context.EntryMonthlyObligationDuePolicies.Add(
+                    EntryMonthlyObligationDuePolicy.Create(
+                        "due-policy-v1",
+                        1,
+                        EntryMonthlyObligationDuePolicy.JohannesburgMonthStartUtc(2026, 8)));
                 var obligation = EntryMonthlyObligation.Create(
                     participation,
                     2026,
                     8,
-                    dueAt);
+                    dueAt,
+                    "due-policy-v1");
                 if (status == "Overdue")
                 {
                     obligation.AssessStatus(dueAt.AddDays(8));
