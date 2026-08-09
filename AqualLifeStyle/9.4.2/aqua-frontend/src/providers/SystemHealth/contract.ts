@@ -16,10 +16,11 @@ const systemHealthSchema = z.object({
 });
 
 export const REQUIRED_PAYMENT_CONTRACT_VERSION =
-  "aqua-payments-2026-08-01-single-payment";
+  "aqua-payments-2026-08-09-flexible-payment-approval";
 
 const requiredPaymentCapabilities = [
-  "aqgreen-single-payment-v1",
+  "aqgreen-flexible-joining-v1",
+  "programme-approval-queue-v1",
   "direct-onyx-checkout-v1",
 ] as const;
 

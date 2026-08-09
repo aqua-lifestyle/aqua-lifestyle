@@ -659,19 +659,18 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task AQGreenCheckout_RejectsTwoInstallmentsForANewParticipation()
+        public async Task AQGreenCheckout_AllowsTwoInstallmentsForANewParticipation()
         {
             var customerId = await RegisterAndSignInCustomerAsync();
             await _participationService.StartEntryAsync(
                 new StartEntryParticipationInput());
-            var exception = await Should.ThrowAsync<UserFriendlyException>(() =>
-                _participationService.CreateAQGreenJoiningCheckoutAsync(
-                    new CreateAQGreenJoiningCheckoutInput
-                    {
-                        Schedule = AQGreenJoiningPaymentSchedule.TwoInstallments
-                    }));
+            var checkout = await _participationService.CreateAQGreenJoiningCheckoutAsync(
+                new CreateAQGreenJoiningCheckoutInput
+                {
+                    Schedule = AQGreenJoiningPaymentSchedule.TwoInstallments
+                });
 
-            exception.Message.ShouldContain("one full R1,200 payment");
+            checkout.Amount.ShouldBe(600m);
 
             await UsingDbContextAsync(1, async context =>
             {
@@ -679,9 +678,17 @@ namespace AqualLifeStyle.Tests.Application
                     item => item.CustomerId == customerId);
                 participation.Status.ShouldBe(
                     EntryParticipationStatus.AwaitingJoiningPayment);
-                participation.JoiningPaymentSchedule.ShouldBeNull();
-                (await context.AQGreenJoiningCheckouts.AnyAsync(item =>
-                    item.CustomerId == customerId)).ShouldBeFalse();
+                participation.JoiningPaymentSchedule.ShouldBe(
+                    AQGreenJoiningPaymentSchedule.TwoInstallments);
+                participation.JoiningInstallmentAmount.ShouldBe(600m);
+
+                var persistedCheckout = await context.AQGreenJoiningCheckouts.SingleAsync(
+                    item => item.CustomerId == customerId);
+                persistedCheckout.Schedule.ShouldBe(
+                    AQGreenJoiningPaymentSchedule.TwoInstallments);
+                persistedCheckout.Stage.ShouldBe(
+                    AQGreenJoiningPaymentStage.FirstInstallment);
+                persistedCheckout.Amount.ShouldBe(600m);
                 (await context.MemberPayments.AnyAsync(item =>
                     item.CustomerId == customerId)).ShouldBeFalse();
             });

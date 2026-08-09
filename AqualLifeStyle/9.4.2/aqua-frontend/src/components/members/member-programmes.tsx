@@ -336,13 +336,10 @@ export const MemberProgrammes = () => {
     return () => window.clearTimeout(task);
   }, []);
 
-  const startAQGreenPayment = async () => {
+  const startAQGreenPayment = async (selectedSchedule?: 0 | 1) => {
     if (paymentActionsUnavailable) return;
-    const schedule =
-      participations?.entry?.joiningSchedule === 1 &&
-      (participations.entry.joiningPaidAmount ?? 0) > 0
-        ? 1
-        : 0;
+    const schedule = selectedSchedule ??
+      (participations?.entry?.joiningSchedule === 1 ? 1 : 0);
     setStartingAQGreenPayment(true);
     setActionError(undefined);
     try {
@@ -457,6 +454,25 @@ export const MemberProgrammes = () => {
                           Continue secure payment
                         </a>
                       )
+                    ) : participations.entry.joiningSchedule == null &&
+                      (participations.entry.joiningPaidAmount ?? 0) === 0 ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Button
+                          disabled={paymentActionsUnavailable}
+                          isLoading={startingAQGreenPayment}
+                          onClick={() => void startAQGreenPayment(0)}
+                        >
+                          Pay R1,200 once
+                        </Button>
+                        <Button
+                          disabled={paymentActionsUnavailable}
+                          isLoading={startingAQGreenPayment}
+                          onClick={() => void startAQGreenPayment(1)}
+                          variant="outline"
+                        >
+                          Pay first R600 instalment
+                        </Button>
+                      </div>
                     ) : (
                       <div className="flex flex-col gap-4">
                         <Button

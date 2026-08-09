@@ -271,18 +271,6 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         "Online payment is unavailable for this historical AQGreen record.",
                         "Contact the club team so an existing payment is not charged again.");
 
-                var isCompletingVerifiedInstallments =
-                    input.Schedule == AQGreenJoiningPaymentSchedule.TwoInstallments &&
-                    participation.JoiningPaymentSchedule ==
-                    AQGreenJoiningPaymentSchedule.TwoInstallments &&
-                    participation.RegistrationPaymentId.HasValue &&
-                    !participation.ActivationPaymentId.HasValue;
-                if (input.Schedule != AQGreenJoiningPaymentSchedule.Full &&
-                    !isCompletingVerifiedInstallments)
-                    throw new UserFriendlyException(
-                        "AQGreen joining requires one full R1,200 payment.",
-                        "The R600 monthly commitment is separate from the joining payment.");
-
                 await _hostedPaymentCheckoutLock.AcquireAQGreenParticipationAsync(
                     participation.Id);
 
