@@ -56,6 +56,54 @@ namespace AqualLifeStyle.Domain.Onyx
             (Status == OnyxLoanAgreementStatus.Active &&
              _weeklyRequirements.Any(requirement =>
                  requirement.Status == OnyxLoanWeeklyRequirementStatus.Overdue));
+
+        /// <summary>
+        /// Evaluates the payout-hold rule at a historical cutoff from immutable
+        /// facts only: agreement existence by <see cref="EffectiveAt"/>, settlement
+        /// by <see cref="SettledAt"/>, agreement-level overdue by
+        /// <see cref="RepaymentDeadlineAt"/> and the repayments received by the
+        /// cutoff, and weekly requirement standing by each requirement's due and
+        /// satisfaction timestamps. The current <see cref="Status"/> projection,
+        /// <see cref="OutstandingAmount"/>, and requirement statuses are never
+        /// consulted, so later assessments or repayments cannot rewrite a closed
+        /// commission cycle.
+        /// </summary>
+        public bool WasRequiringPayoutHoldAt(DateTime cutoffUtc)
+        {
+            if (cutoffUtc == default)
+            {
+                throw new ArgumentException(
+                    "A cutoff time is required.",
+                    nameof(cutoffUtc));
+            }
+
+            if (!EffectiveAt.HasValue || EffectiveAt.Value > cutoffUtc)
+            {
+                return false;
+            }
+
+            if (SettledAt.HasValue && SettledAt.Value <= cutoffUtc)
+            {
+                return false;
+            }
+
+            if (cutoffUtc > RepaymentDeadlineAt.Value &&
+                OutstandingAt(cutoffUtc) > 0m)
+            {
+                return true;
+            }
+
+            return _weeklyRequirements.Any(requirement =>
+                requirement.WasOverdueAt(cutoffUtc));
+        }
+
+        private decimal OutstandingAt(DateTime cutoffUtc)
+        {
+            var settledByCutoff = _repayments
+                .Where(repayment => repayment.ReceivedAt <= cutoffUtc)
+                .Sum(repayment => repayment.Amount);
+            return TotalPayableAmount - settledByCutoff;
+        }
         public IReadOnlyCollection<OnyxLoanWeeklyRequirement> WeeklyRequirements =>
             _weeklyRequirements.AsReadOnly();
         public IReadOnlyCollection<OnyxLoanRepaymentAllocation> Repayments =>
@@ -446,6 +494,29 @@ namespace AqualLifeStyle.Domain.Onyx
                 Status = OnyxLoanWeeklyRequirementStatus.Satisfied;
                 SatisfiedAt ??= creditedAt;
             }
+        }
+
+        /// <summary>
+        /// Evaluates the weekly requirement standing at a historical cutoff from
+        /// immutable facts only: satisfaction is proven by <see cref="SatisfiedAt"/>
+        /// and the overdue boundary by <see cref="DueAt"/>. The current
+        /// <see cref="Status"/> projection is never consulted.
+        /// </summary>
+        public bool WasOverdueAt(DateTime cutoffUtc)
+        {
+            if (cutoffUtc == default)
+            {
+                throw new ArgumentException(
+                    "A cutoff time is required.",
+                    nameof(cutoffUtc));
+            }
+
+            if (SatisfiedAt.HasValue && SatisfiedAt.Value <= cutoffUtc)
+            {
+                return false;
+            }
+
+            return cutoffUtc > DueAt;
         }
     }
 

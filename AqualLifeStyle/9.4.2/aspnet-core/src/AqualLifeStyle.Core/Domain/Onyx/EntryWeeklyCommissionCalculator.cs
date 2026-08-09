@@ -69,12 +69,12 @@ namespace AqualLifeStyle.Domain.Onyx
                 network);
             var hasOverdueOwnObligation = customerObligations.Any(obligation =>
                 obligation.EntryParticipationId == participation.Id &&
-                obligation.Status == EntryMonthlyObligationStatus.Overdue);
+                obligation.WasOverdueAt(period.PeriodEnd));
             var hasOverdueOwnLoan = (customerLoanAgreements ??
                     Array.Empty<OnyxLoanAgreement>())
                 .Any(agreement =>
                     agreement.EntryParticipationId == participation.Id &&
-                    agreement.RequiresPayoutHold);
+                    agreement.WasRequiringPayoutHoldAt(period.PeriodEnd));
 
             var holdReasons = new List<string>();
             if (hasOverdueOwnObligation)

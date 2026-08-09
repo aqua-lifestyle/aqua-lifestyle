@@ -118,13 +118,13 @@ zero is `NotEarned`.
 | Existing calculated components | Both | Persisted level and amount | Immutable through supported workflow | Ledger and components | `CalculatedAt` | No ordinary recalculation | B | Existing component facts explain the stored result but do not prove that every source input was cutoff-correct. |
 | Monthly obligation policy coverage | AQGreen | Which obligation months must exist | Append-only capability, currently empty | Policy version, due day, and effective month once supplied | Durable resolver exists | Yes while no version covers the cycle | D/E | First required month is after activation. No initial version, due day, launch boundary, or effective month is authorised. Calculation must fail closed outside proven policy coverage. |
 | Expected monthly obligation completeness | AQGreen | Whether compliance can hold payout | Rows are scheduled later and soft-deletable | Year/month, due/grace, policy version, audit fields | Conditional on proven policy coverage | Yes; missing rows currently mean no hold | D | Require exactly one visible, policy-consistent row for every expected month through cutoff. Missing, deleted, duplicate, or inconsistent evidence is unresolved, not compliant. |
-| Monthly due and grace boundary | AQGreen | Overdue state | Immutable on row | `DueAt`, `GracePeriodEndsAt` | Yes | Current status can change Friday | C | Policy is versioned/effective-dated; day 1-28 at 00:00 Johannesburg. Derive overdue as of cutoff from persisted boundaries, not current status. |
+| Monthly due and grace boundary | AQGreen | Overdue state | Immutable on row | `DueAt`, `GracePeriodEndsAt` | Yes | Current status can change Friday | C | Policy is versioned/effective-dated; day 1-28 at 00:00 Johannesburg. `EntryMonthlyObligation.WasOverdueAt(cutoff)` derives overdue from persisted `DueAt`/`GracePeriodEndsAt`; the calculator consumes it at `PeriodEnd`. Boundary-inclusive: paid exactly at cutoff or grace ending exactly at cutoff is not overdue. Covered by focused domain tests. |
 | Monthly payment-to-obligation association | AQGreen | Which debt is settled | Mutable projection; checkout flow absent | Obligation `PaymentId` when applied | No server-persisted monthly checkout intent exists | Yes | D | A fresh hosted checkout must identify exactly one server-authoritative `ObligationId` and its immutable period context before provider creation. Unlinked or conflicting evidence requires reconciliation. Persistence must prevent one payment settling multiple obligations. |
 | Provider payment occurrence | AQGreen | Whether payment removed a hold by cutoff | External fact | Signed event status and provider payment object | No verified successful-payment occurrence field | Yes | D/E | Signature-verified `payment.succeeded` proves final status. Official evidence reviewed so far describes `payload.createdDate` as payment-object creation, not success occurrence. Do not map it to financial effectiveness without a provider contract. |
 | Provider event receipt and processing | AQGreen | Operational retry/reconciliation only | Yes | Local notification processing state | `ProcessedAt` exists; distinct HTTP receipt time and completeness watermark do not | Can conceal late or missing evidence | D | Keep provider occurrence, HTTP receipt, and completed processing distinct. No delivery-finality horizon or reconciliation watermark currently proves that all pre-cutoff events were received. |
-| Obligation current status | AQGreen | Earned versus Held | Yes | Due/grace/payment timestamps | Conditional | Yes | C | Current enum should be replaced by an as-of derivation once semantics are confirmed. |
-| Loan agreement effective state | AQGreen | Earned versus Held | Yes | `EffectiveAt`, deadline, settlement and allocation rows | Multiple timestamps exist | Yes | C/D | Derive from immutable facts as of cutoff. Legacy allocations remain unprovable until authorised reconciliation supplies allocation evidence. |
-| Weekly loan requirement | AQGreen | Earned versus Held | Yes | Due time, overdue observation, satisfaction and allocations | Due and payment receipt times exist | Yes | C/D | Cure is effective at the allocation decision time; current rows lack that evidence. |
+| Obligation current status | AQGreen | Earned versus Held | Yes | Due/grace/payment timestamps | Conditional | Yes | C | Replaced: the calculator no longer reads the current enum. `WasOverdueAt(cutoff)` derives standing from persisted due/grace/payment timestamps and is independent of assessment state; post-cutoff assessment or cure cannot change a closed cycle. Covered by focused domain tests. |
+| Loan agreement effective state | AQGreen | Earned versus Held | Yes | `EffectiveAt`, deadline, settlement and allocation rows | Multiple timestamps exist | Yes | C/D | Implemented: `OnyxLoanAgreement.WasRequiringPayoutHoldAt(cutoff)` derives the hold from agreement effective date, weekly requirement due/satisfaction times, and outstanding balance at the deadline, all as of cutoff. A loan not yet effective at cutoff never holds; cure after cutoff never removes a closed-cycle hold. Legacy allocations remain unprovable until authorised reconciliation supplies allocation evidence. |
+| Weekly loan requirement | AQGreen | Earned versus Held | Yes | Due time, overdue observation, satisfaction and allocations | Due and payment receipt times exist | Yes | C/D | Implemented: a weekly requirement holds a cycle when its due time is on or before the cutoff and it has no satisfaction confirmed at or before the cutoff (cure effective at confirmation time, cutoff-inclusive). Covered by focused domain tests. Allocation decision times for legacy rows remain unproven. |
 | Loan repayment allocation | AQGreen | Requirement satisfaction and balance | Yes | Append-only allocation with `ReceivedAt` | No separate `AllocatedAt` | Yes | D | Add immutable `AllocatedAt`; do not backfill legacy values from provider receipt time. |
 | Customer active state | Both | Currently no calculation effect | Yes | Current projection only | No history used | No, because calculator ignores it | B/out of calculation | Do not add a new eligibility rule without a business decision. |
 | Refund, dispute, or chargeback | Both | Participation, network, compliance, and payout state | External and operational | No complete programme policy or transition history | No confirmed business-effective rule | Unknown | E | Do not reverse participation, qualification, or existing ledgers without an authorised policy and auditable adjustment workflow. |
@@ -198,16 +198,26 @@ The following deterministic regressions define the temporal correction scope:
 2. Onyx placement changes after cutoff: corrected and covered by domain and
    application tests.
 3. AQGreen obligation changes from current to overdue after cutoff and the
-   current calculator incorrectly holds the closed cycle.
+   current calculator incorrectly holds the closed cycle: **corrected** —
+   `EntryWeeklyCommissionCalculator` evaluates `WasOverdueAt(PeriodEnd)`;
+   covered by focused domain tests and the corrected
+   `ClubMemberProgrammeProgressAppServiceTests` scenario.
 4. AQGreen obligation is overdue at cutoff, is paid after cutoff, and the current
-   calculator incorrectly removes the closed-cycle hold.
+   calculator incorrectly removes the closed-cycle hold: **corrected** — the
+   cutoff derivation is replay-stable; covered by focused domain tests.
 5. Onyx travel qualification changes after cutoff: corrected by sharing the
    cutoff-effective network; focused processor/domain coverage passes, while an
    application-level post-correction travel test remains desirable.
+6. AQGreen loan payout-hold evaluation after cutoff: **corrected** —
+   `WasRequiringPayoutHoldAt(PeriodEnd)` derives requirement and agreement
+   standing as of the cutoff; post-cutoff repayment cannot release a closed
+   cycle. Covered by focused domain tests.
 
-The obligation cases remain blocked by the provider and due-policy evidence in
-the final section. The correction does not promote partial compliance logic into
-an authoritative result.
+The obligation and loan hold calculations now use cutoff-effective derivations
+from persisted boundaries (regressions 3, 4, 6). The remaining obligation cases
+stay blocked by the provider and due-policy evidence in the final section. The
+correction does not promote partial compliance logic into an authoritative
+result.
 
 ## Approved Minimum Architecture
 
@@ -218,7 +228,9 @@ an authoritative result.
 3. Make both commission and Onyx travel qualification consume that same temporal
    network semantics.
 4. Derive AQGreen compliance from immutable due/deadline/payment/allocation facts
-   rather than current status enums.
+   rather than current status enums: **implemented** for obligation and loan
+   payout holds (`WasOverdueAt`, `WasRequiringPayoutHoldAt`); coverage still
+   depends on the due-policy and provider-evidence items below.
 5. Resolve commission and travel terms from a small immutable as-of capability by
    the Friday 00:00 Johannesburg cycle start; start empty and do not create a
    generic rules engine or invent the current versions' boundaries.

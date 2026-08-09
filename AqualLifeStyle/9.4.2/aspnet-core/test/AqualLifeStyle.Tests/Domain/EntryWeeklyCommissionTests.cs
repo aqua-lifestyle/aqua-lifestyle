@@ -245,6 +245,275 @@ namespace AqualLifeStyle.Tests.Domain
                     CommissionTerms));
         }
 
+        [Fact]
+        public void EligibleAtCutoff_BecomingOverdueAfterCutoff_KeepsHistoricalCycleEarned()
+        {
+            var network = BuildNetwork(maxDepth: 1);
+            var root = network.Single(participation => participation.CustomerId == 1);
+            var obligation = EntryMonthlyObligation.Create(
+                root,
+                2026,
+                7,
+                EffectiveFrom.AddDays(6),
+                "due-policy-v1");
+            var commission = Calculate(network, new[] { obligation });
+            Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
+            Assert.Null(commission.HoldReason);
+
+            obligation.AssessStatus(EffectiveFrom.AddDays(14));
+            Assert.Equal(EntryMonthlyObligationStatus.Overdue, obligation.Status);
+
+            var replayed = Calculate(network, new[] { obligation });
+            Assert.Equal(WeeklyCommissionPayoutStatus.Earned, replayed.PayoutStatus);
+            Assert.Null(replayed.HoldReason);
+            Assert.Equal(commission.TotalAmount, replayed.TotalAmount);
+        }
+
+        [Fact]
+        public void OverdueAtCutoff_PaidAfterCutoff_HistoricalCycleRemainsHeld()
+        {
+            var network = BuildNetwork(maxDepth: 1);
+            var root = network.Single(participation => participation.CustomerId == 1);
+            var obligation = EntryMonthlyObligation.Create(
+                root,
+                2026,
+                7,
+                EffectiveFrom.AddDays(1),
+                "due-policy-v1");
+            var cutoff = CreatePeriod(EffectiveFrom.AddDays(5)).PeriodEnd;
+            var commission = Calculate(network, new[] { obligation });
+            Assert.Equal(WeeklyCommissionPayoutStatus.Held, commission.PayoutStatus);
+
+            var payment = CreateConfirmedMonthlyPayment(
+                root.CustomerId,
+                "cutoff-hold-after",
+                EffectiveFrom.AddDays(13));
+            obligation.ApplyConfirmedPayment(payment);
+            Assert.Equal(EntryMonthlyObligationStatus.Paid, obligation.Status);
+
+            var replayed = Calculate(network, new[] { obligation });
+            Assert.Equal(WeeklyCommissionPayoutStatus.Held, replayed.PayoutStatus);
+            Assert.Equal("AQGreen monthly commitment is overdue.", replayed.HoldReason);
+            Assert.True(payment.ConfirmedAt > cutoff);
+        }
+
+        [Fact]
+        public void ObligationPaidBeforeCutoff_HistoricalCycleEligible()
+        {
+            var network = BuildNetwork(maxDepth: 1);
+            var root = network.Single(participation => participation.CustomerId == 1);
+            var obligation = EntryMonthlyObligation.Create(
+                root,
+                2026,
+                7,
+                EffectiveFrom.AddDays(1),
+                "due-policy-v1");
+            var payment = CreateConfirmedMonthlyPayment(
+                root.CustomerId,
+                "paid-before-cutoff",
+                EffectiveFrom.AddDays(7));
+            obligation.ApplyConfirmedPayment(payment);
+
+            var commission = Calculate(network, new[] { obligation });
+            Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
+            Assert.Null(commission.HoldReason);
+        }
+
+        [Fact]
+        public void ObligationPaidExactlyAtCutoff_HistoricalCycleEligible_InclusiveBoundary()
+        {
+            var network = BuildNetwork(maxDepth: 1);
+            var root = network.Single(participation => participation.CustomerId == 1);
+            var obligation = EntryMonthlyObligation.Create(
+                root,
+                2026,
+                7,
+                EffectiveFrom.AddDays(1),
+                "due-policy-v1");
+            var period = CreatePeriod(EffectiveFrom.AddDays(5));
+            var payment = CreateConfirmedMonthlyPayment(
+                root.CustomerId,
+                "paid-at-cutoff",
+                period.PeriodEnd);
+            obligation.ApplyConfirmedPayment(payment);
+
+            var commission = CalculateForPeriod(network, period, new[] { obligation });
+            Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
+        }
+
+        [Fact]
+        public void GracePeriodEndingExactlyAtCutoff_IsNotOverdue_ForThatCycle()
+        {
+            var network = BuildNetwork(maxDepth: 1);
+            var root = network.Single(participation => participation.CustomerId == 1);
+            var period = CreatePeriod(EffectiveFrom.AddDays(5));
+            var obligation = EntryMonthlyObligation.Create(
+                root,
+                2026,
+                7,
+                period.PeriodEnd.AddDays(-7),
+                "due-policy-v1");
+            Assert.Equal(period.PeriodEnd, obligation.GracePeriodEndsAt);
+
+            var commission = CalculateForPeriod(network, period, new[] { obligation });
+            Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
+        }
+
+        [Fact]
+        public void GracePeriodEndingBeforeCutoff_IsOverdue_ForThatCycle()
+        {
+            var network = BuildNetwork(maxDepth: 1);
+            var root = network.Single(participation => participation.CustomerId == 1);
+            var period = CreatePeriod(EffectiveFrom.AddDays(5));
+            var obligation = EntryMonthlyObligation.Create(
+                root,
+                2026,
+                7,
+                period.PeriodEnd.AddDays(-8),
+                "due-policy-v1");
+
+            var commission = CalculateForPeriod(network, period, new[] { obligation });
+            Assert.Equal(WeeklyCommissionPayoutStatus.Held, commission.PayoutStatus);
+            Assert.Equal("AQGreen monthly commitment is overdue.", commission.HoldReason);
+        }
+
+        [Fact]
+        public void ObligationStanding_IsIndependentOfAssessmentState_NoCurrentStateFallback()
+        {
+            var network = BuildNetwork(maxDepth: 1);
+            var root = network.Single(participation => participation.CustomerId == 1);
+            var unassessed = EntryMonthlyObligation.Create(
+                root,
+                2026,
+                7,
+                EffectiveFrom.AddDays(1),
+                "due-policy-v1");
+            var assessed = EntryMonthlyObligation.Create(
+                root,
+                2026,
+                7,
+                EffectiveFrom.AddDays(1),
+                "due-policy-v1");
+            assessed.AssessStatus(EffectiveFrom.AddDays(14));
+
+            var fromUnassessed = Calculate(network, new[] { unassessed });
+            var fromAssessed = Calculate(network, new[] { assessed });
+            Assert.Equal(EntryMonthlyObligationStatus.Due, unassessed.Status);
+            Assert.Equal(EntryMonthlyObligationStatus.Overdue, assessed.Status);
+            Assert.Equal(fromAssessed.PayoutStatus, fromUnassessed.PayoutStatus);
+            Assert.Equal(WeeklyCommissionPayoutStatus.Held, fromUnassessed.PayoutStatus);
+            Assert.Equal(fromAssessed.HoldReason, fromUnassessed.HoldReason);
+        }
+
+        [Fact]
+        public void LoanNotEffectiveAtCutoff_HoldsNoHistoricalCommission()
+        {
+            var network = BuildNetwork(maxDepth: 2);
+            var loan = CreateLoanApprovedAt(network, EffectiveFrom.AddDays(13));
+            loan.AssessCompliance(EffectiveFrom.AddDays(21));
+            Assert.True(loan.RequiresPayoutHold);
+
+            var commission = Calculate(network, loans: new[] { loan });
+            Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
+            Assert.Null(commission.HoldReason);
+        }
+
+        [Fact]
+        public void LoanRequirementOverdueAtCutoff_RepaidAfterCutoff_HistoricalCycleRemainsHeld()
+        {
+            var network = BuildNetwork(maxDepth: 2);
+            var root = network.Single(participation => participation.CustomerId == 1);
+            var loan = CreateActiveLoan(network);
+            var cutoff = CreatePeriod(EffectiveFrom.AddDays(5)).PeriodEnd;
+            var commission = Calculate(network, loans: new[] { loan });
+            Assert.Equal(WeeklyCommissionPayoutStatus.Held, commission.PayoutStatus);
+
+            var repayment = CreateConfirmedLoanRepayment(
+                root.CustomerId,
+                "loan-repaid-after-cutoff",
+                EffectiveFrom.AddDays(13));
+            loan.ApplyConfirmedRepayment(repayment, weeklyRequirementNumber: 1);
+            Assert.False(loan.RequiresPayoutHold);
+
+            var replayed = Calculate(network, loans: new[] { loan });
+            Assert.Equal(WeeklyCommissionPayoutStatus.Held, replayed.PayoutStatus);
+            Assert.Equal("Onyx loan repayment is overdue.", replayed.HoldReason);
+            Assert.True(repayment.ConfirmedAt > cutoff);
+        }
+
+        [Fact]
+        public void LoanRequirementRepaidBeforeCutoff_HistoricalCycleEligible()
+        {
+            var network = BuildNetwork(maxDepth: 2);
+            var root = network.Single(participation => participation.CustomerId == 1);
+            var loan = CreateActiveLoan(network);
+            var repayment = CreateConfirmedLoanRepayment(
+                root.CustomerId,
+                "loan-repaid-before-cutoff",
+                EffectiveFrom.AddDays(6));
+            loan.ApplyConfirmedRepayment(repayment, weeklyRequirementNumber: 1);
+
+            var commission = Calculate(network, loans: new[] { loan });
+            Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
+            Assert.Null(commission.HoldReason);
+        }
+
+        [Fact]
+        public void LoanAgreementOverdueAtCutoff_HoldsPayout_WhenRequirementsSatisfiedButDeadlinePassed()
+        {
+            var network = BuildNetwork(maxDepth: 2);
+            var root = network.Single(participation => participation.CustomerId == 1);
+            var loan = CreateActiveLoan(network);
+            for (var number = 1; number <= loan.WeeklyRequirements.Count; number++)
+            {
+                var repayment = CreateConfirmedLoanRepayment(
+                    root.CustomerId,
+                    $"loan-full-repayment-{number}",
+                    EffectiveFrom.AddDays(20 + number));
+                loan.ApplyConfirmedRepayment(repayment, weeklyRequirementNumber: number);
+            }
+            Assert.False(loan.RequiresPayoutHold);
+
+            var period = CreatePeriod(EffectiveFrom.AddDays(95));
+            var commission = CalculateForPeriod(network, period, loans: new[] { loan });
+            Assert.Equal(WeeklyCommissionPayoutStatus.Held, commission.PayoutStatus);
+            Assert.Equal("Onyx loan repayment is overdue.", commission.HoldReason);
+        }
+
+        private static MemberPayment CreateConfirmedMonthlyPayment(
+            int customerId,
+            string externalReference,
+            DateTime confirmedAt)
+        {
+            var payment = MemberPayment.CreatePending(
+                1,
+                customerId,
+                MemberPaymentPurpose.EntryMonthlyCommitment,
+                600m,
+                "Yoco",
+                externalReference,
+                confirmedAt.AddMinutes(-1));
+            payment.Confirm(confirmedAt);
+            return payment;
+        }
+
+        private static MemberPayment CreateConfirmedLoanRepayment(
+            int customerId,
+            string externalReference,
+            DateTime confirmedAt)
+        {
+            var payment = MemberPayment.CreatePending(
+                1,
+                customerId,
+                MemberPaymentPurpose.OnyxLoanRepayment,
+                200m,
+                "Yoco",
+                externalReference,
+                confirmedAt.AddMinutes(-1));
+            payment.Confirm(confirmedAt);
+            return payment;
+        }
+
         private static EntryWeeklyCommission Calculate(
             IReadOnlyCollection<EntryParticipation> network,
             IEnumerable<EntryMonthlyObligation> obligations = null,
@@ -298,6 +567,24 @@ namespace AqualLifeStyle.Tests.Domain
                 "I accept the Onyx loan terms.",
                 EffectiveFrom.AddHours(1));
             loan.ApproveByAdministrator(99, EffectiveFrom.AddHours(2));
+            return loan;
+        }
+
+        private static OnyxLoanAgreement CreateLoanApprovedAt(
+            IReadOnlyCollection<EntryParticipation> network,
+            DateTime approvedAt)
+        {
+            var loan = OnyxLoanAgreement.OfferToEligibleEntryParticipant(
+                network.Single(participation => participation.CustomerId == 1),
+                network,
+                new EntryNetworkQualificationEvaluator(),
+                LoanTerms,
+                EffectiveFrom);
+            loan.AcceptByMember(
+                20,
+                "I accept the Onyx loan terms.",
+                approvedAt.AddDays(-1));
+            loan.ApproveByAdministrator(99, approvedAt);
             return loan;
         }
 

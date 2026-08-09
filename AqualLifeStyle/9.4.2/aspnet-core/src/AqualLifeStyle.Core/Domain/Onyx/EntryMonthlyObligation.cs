@@ -35,6 +35,30 @@ namespace AqualLifeStyle.Domain.Onyx
         public DateTime? PaidAt { get; private set; }
         public bool IsOwnPayoutEligible => Status != EntryMonthlyObligationStatus.Overdue;
 
+        /// <summary>
+        /// Evaluates the obligation standing at a historical cutoff from immutable
+        /// facts only: settlement is proven by <see cref="PaidAt"/> and the
+        /// overdue boundary by <see cref="GracePeriodEndsAt"/>. The current
+        /// <see cref="Status"/> projection is never consulted, so later
+        /// assessments or payments cannot rewrite a closed commission cycle.
+        /// </summary>
+        public bool WasOverdueAt(DateTime cutoffUtc)
+        {
+            if (cutoffUtc == default)
+            {
+                throw new ArgumentException(
+                    "A cutoff time is required.",
+                    nameof(cutoffUtc));
+            }
+
+            if (PaidAt.HasValue && PaidAt.Value <= cutoffUtc)
+            {
+                return false;
+            }
+
+            return cutoffUtc > GracePeriodEndsAt;
+        }
+
         protected EntryMonthlyObligation()
         {
         }
