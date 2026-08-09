@@ -327,6 +327,7 @@ describe("CustomerDashboard", () => {
         },
         pendingAQGreenCheckout: null,
         pendingDirectOnyxCheckout: null,
+        funeralCover: null,
         travelBenefit: null,
       },
       errorMessage: undefined,

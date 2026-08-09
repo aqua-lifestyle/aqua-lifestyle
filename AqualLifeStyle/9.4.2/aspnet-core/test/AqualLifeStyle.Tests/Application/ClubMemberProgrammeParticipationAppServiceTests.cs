@@ -417,7 +417,7 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task AQGreenCheckout_ActivatesOnlyAfterOneVerifiedTwelveHundredRandPayment()
+        public async Task AQGreenCheckout_AwaitsApprovalAfterOneVerifiedTwelveHundredRandPayment()
         {
             var customerId = await RegisterAndSignInCustomerAsync();
             await _participationService.StartEntryAsync(
@@ -552,6 +552,40 @@ namespace AqualLifeStyle.Tests.Application
             await UsingDbContextAsync(1, async context =>
                 (await context.AQGreenJoiningCheckouts.CountAsync(item =>
                     item.CustomerId == customerId)).ShouldBe(1));
+        }
+
+        [Fact]
+        public async Task RejectedParticipation_ReturnsTheRecordedDecisionReasonToTheCustomer()
+        {
+            var customerId = await RegisterAndSignInCustomerAsync();
+            const string reason = "Identity evidence requires correction before activation.";
+            var decidedAt = DateTime.UtcNow;
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customerId,
+                    Resolve<ICurrentProgrammeTermsProvider>().GetEntryTerms(),
+                    decidedAt.AddMinutes(-2));
+                var payment = CreateConfirmedPayment(
+                    1,
+                    customerId,
+                    MemberPaymentPurpose.AQGreenJoining,
+                    $"rejected-customer-state-{Guid.NewGuid():N}",
+                    1200m);
+                participation.ApplyConfirmedJoiningPayment(payment);
+                participation.RejectByAdministrator(1L, reason, decidedAt);
+                context.MemberPayments.Add(payment);
+                context.EntryParticipations.Add(participation);
+                await context.SaveChangesAsync();
+            });
+
+            var result = await _participationService.GetMyParticipationsAsync();
+
+            result.Entry.Status.ShouldBe("Declined");
+            result.Entry.DecisionReason.ShouldBe(reason);
+            result.Entry.DecidedAt.ShouldBe(decidedAt);
         }
 
         [Fact]

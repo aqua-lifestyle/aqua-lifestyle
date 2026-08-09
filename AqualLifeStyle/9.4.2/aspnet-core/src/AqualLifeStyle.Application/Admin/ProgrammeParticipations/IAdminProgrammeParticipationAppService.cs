@@ -9,6 +9,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
     {
         Task<PagedResultDto<AdminProgrammeParticipationDto>> GetAllAsync(
             AdminProgrammeParticipationListInput input);
+        Task<PendingProgrammeApprovalSummaryDto> GetPendingApprovalSummaryAsync(
+            PendingProgrammeApprovalSummaryInput input);
         Task CorrectRecruiterAsync(CorrectProgrammeRecruiterInput input);
         Task<OnyxGraduationDecisionDto> GraduateAQGreenToOnyxAsync(
             GraduateAQGreenToOnyxInput input);

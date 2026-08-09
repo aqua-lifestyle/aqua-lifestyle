@@ -10,8 +10,8 @@ using AqualLifeStyle.Domain.Enums;
 namespace AqualLifeStyle.Payments
 {
     /// <summary>
-    /// Promotes a guest account when a provider-confirmed payment activates
-    /// programme participation. Existing business roles are never downgraded.
+    /// Promotes a guest account when an authorised administrator activates a
+    /// paid programme participation. Existing business roles are never downgraded.
     /// </summary>
     public class ActiveProgrammeParticipantRoleSynchronizer : ITransientDependency
     {

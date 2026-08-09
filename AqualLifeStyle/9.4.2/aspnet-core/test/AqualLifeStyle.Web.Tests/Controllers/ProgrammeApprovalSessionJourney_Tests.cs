@@ -106,6 +106,16 @@ namespace AqualLifeStyle.Web.Tests.Controllers
             confirmResponse.StatusCode.ShouldBe(HttpStatusCode.OK,
                 await confirmResponse.Content.ReadAsStringAsync());
 
+            // The approval boundary is never reachable without authentication.
+            AbpSession.UserId = null;
+            var unauthenticatedApproval = await SendJsonAsync(
+                HttpMethod.Post,
+                "/api/services/app/AdminProgrammeParticipation/ApproveProgrammeParticipation",
+                new { programme = 0, participationId = Guid.NewGuid() });
+            unauthenticatedApproval.StatusCode.ShouldBe(
+                HttpStatusCode.Unauthorized,
+                await unauthenticatedApproval.Content.ReadAsStringAsync());
+
             // 3. Real TokenAuth endpoint: the Guest JWT must NOT carry the Invite permission and
             //    must contain the initially issued security stamp.
             var guestJwt = await AuthenticateAsync("Default", new AuthenticateModel
@@ -132,6 +142,16 @@ namespace AqualLifeStyle.Web.Tests.Controllers
             // 5. Seed the confirmed joining payments + awaiting-approval participation for the
             //    registered customer (the same domain states the production webhook creates).
             var participationId = await SeedAwaitingApprovalParticipationAsync(registeredUser.Id);
+
+            // A customer cannot approve their own paid participation by calling the API directly.
+            var guestApproval = await SendJsonWithTokenAsync(
+                HttpMethod.Post,
+                "/api/services/app/AdminProgrammeParticipation/ApproveProgrammeParticipation",
+                new { programme = 0, participationId },
+                guestToken);
+            guestApproval.StatusCode.ShouldBe(
+                HttpStatusCode.Forbidden,
+                await guestApproval.Content.ReadAsStringAsync());
 
             // 6. The Area administrator approves the participation through the real HTTP API.
             EnsureAdminPassword(1, User.DefaultPassword);

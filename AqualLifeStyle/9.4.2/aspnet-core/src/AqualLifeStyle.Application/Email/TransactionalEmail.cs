@@ -117,6 +117,50 @@ namespace AqualLifeStyle.Email
                 $"Your participation is now under review by the Area team and will be activated once approved.\n\n" +
                 $"This confirmation is not a tax invoice.\n\n{Brand}", reference);
 
+        public TransactionalEmail ProgrammeParticipationAwaitingAdministratorReview(
+            string administratorName,
+            string administratorEmail,
+            string memberName,
+            string clubMemberNumber,
+            string areaName,
+            string programme,
+            decimal amount,
+            string currency,
+            DateTime confirmedAt,
+            string portalUrl,
+            string reference)
+        {
+            var amountText = string.Format(
+                CultureInfo.InvariantCulture,
+                "{0} {1:N2}",
+                currency,
+                amount);
+            var dateText = confirmedAt.ToUniversalTime().ToString(
+                "yyyy-MM-dd HH:mm 'UTC'",
+                CultureInfo.InvariantCulture);
+            var htmlAction = string.IsNullOrWhiteSpace(portalUrl)
+                ? "<p>Sign in to the Aqua administrator portal to review and approve or reject the participation.</p>"
+                : $"<p><a href=\"{E(portalUrl)}\">Open Programme Approvals</a></p>";
+            var textAction = string.IsNullOrWhiteSpace(portalUrl)
+                ? "Sign in to the Aqua administrator portal to review and approve or reject the participation."
+                : $"Open Programme Approvals: {portalUrl}";
+
+            return new TransactionalEmail(
+                administratorEmail,
+                $"{programme} payment awaiting your review",
+                $"<p>Hello {E(administratorName)},</p>" +
+                $"<p>A confirmed <strong>{E(programme)}</strong> joining payment is awaiting Area Administrator review.</p>" +
+                $"<p>Member: {E(memberName)}<br>Club Member number: {E(clubMemberNumber)}<br>" +
+                $"Area: {E(areaName)}<br>Amount received: {E(amountText)}<br>Confirmed: {E(dateText)}</p>" +
+                htmlAction +
+                $"<p>The administrator portal is the authoritative approval queue.</p><p>{Brand}</p>",
+                $"Hello {administratorName},\n\nA confirmed {programme} joining payment is awaiting Area Administrator review.\n" +
+                $"Member: {memberName}\nClub Member number: {clubMemberNumber}\nArea: {areaName}\n" +
+                $"Amount received: {amountText}\nConfirmed: {dateText}\n\n{textAction}\n\n" +
+                $"The administrator portal is the authoritative approval queue.\n\n{Brand}",
+                reference);
+        }
+
         public TransactionalEmail ParticipationApproved(
             string name, string email, string programme, string reference)
             => new TransactionalEmail(email, $"{programme} participation approved",

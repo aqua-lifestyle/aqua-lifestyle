@@ -112,7 +112,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
                 .HasMaxLength(EntryParticipationApprovalDecision.MaxRejectionReasonLength);
             builder.Property(decision => decision.DecidedAt).IsRequired();
 
-            builder.HasIndex("EntryParticipationId");
+            builder.HasIndex("EntryParticipationId").IsUnique();
         }
     }
 }

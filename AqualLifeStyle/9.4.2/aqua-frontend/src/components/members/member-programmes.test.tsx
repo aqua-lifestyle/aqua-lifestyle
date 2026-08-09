@@ -320,6 +320,37 @@ describe("MemberProgrammes", () => {
       .not.toBeInTheDocument();
   });
 
+  it("shows the recorded Area decision reason for a declined participation", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: {
+        activatedAt: null,
+        canRecruitForThisProgramme: false,
+        currency: "ZAR",
+        decidedAt: "2026-08-09T11:42:22Z",
+        decisionReason: "Identity evidence requires correction before activation.",
+        isActive: false,
+        joinedIndependently: true,
+        nextPaymentAmount: null,
+        nextPaymentDescription: null,
+        programmeName: "AQGreen",
+        recruiterClubMemberNumber: null,
+        startedAt: "2026-08-09T10:00:00Z",
+        status: "Declined",
+      },
+      onyx: null,
+      pendingAQGreenCheckout: null,
+      pendingDirectOnyxCheckout: null,
+      funeralCover: null,
+      travelBenefit: null,
+    });
+
+    render(<MemberProgrammes />);
+
+    expect(await screen.findByText("Not approved")).toBeInTheDocument();
+    expect(screen.getByText(/Identity evidence requires correction/))
+      .toBeInTheDocument();
+  });
+
   it("preserves completion of a verified historical AQGreen instalment", async () => {
     vi.mocked(httpClient.get).mockResolvedValue({
       entry: {
@@ -385,5 +416,28 @@ describe("MemberProgrammes", () => {
     expect(
       screen.getByText(/trip selection, pricing, and booking/i),
     ).toBeInTheDocument();
+  });
+
+  it("shows the included AQGreen funeral-cover benefit without claiming activation", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: null,
+      funeralCover: {
+        coverAmount: 30000,
+        currency: "ZAR",
+        includedAt: "2026-08-09T10:00:00Z",
+        status: "Included",
+      },
+      onyx: null,
+      travelBenefit: null,
+    });
+
+    render(<MemberProgrammes />);
+
+    expect(await screen.findByText("Funeral-cover inclusion"))
+      .toBeInTheDocument();
+    expect(screen.getByText("Included")).toBeInTheDocument();
+    expect(screen.getByText(/R\s*30[\s,\u00a0]*000/)).toBeInTheDocument();
+    expect(screen.getByText(/does not represent insurer activation or enrolment/i))
+      .toBeInTheDocument();
   });
 });

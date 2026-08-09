@@ -3,6 +3,7 @@ using System;
 using AqualLifeStyle.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AqualLifeStyle.Migrations
 {
     [DbContext(typeof(AqualLifeStyleDbContext))]
-    partial class AqualLifeStyleDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260809042322_EnforceSingleProgrammeParticipationDecision")]
+    partial class EnforceSingleProgrammeParticipationDecision
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2326,74 +2329,6 @@ namespace AqualLifeStyle.Migrations
                     b.ToTable("MembershipBenefits", (string)null);
                 });
 
-            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.AQGreenFuneralCoverEntitlement", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("CreatorUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)");
-
-                    b.Property<int>("CustomerId")
-                        .HasColumnType("integer");
-
-                    b.Property<long?>("DeleterUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("EntryParticipationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("FuneralCoverAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<DateTime>("IncludedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("LastModifierUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TenantId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("TermsVersion")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CustomerId");
-
-                    b.HasIndex("EntryParticipationId")
-                        .IsUnique();
-
-                    b.HasIndex("TenantId", "CustomerId", "Status");
-
-                    b.ToTable("AQGreenFuneralCoverEntitlements", (string)null);
-                });
-
             modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.EntryCommissionComponent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4582,21 +4517,6 @@ namespace AqualLifeStyle.Migrations
                     b.HasOne("AqualLifeStyle.Domain.Enquiries.Enquiry", null)
                         .WithMany()
                         .HasForeignKey("SourceEnquiryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.AQGreenFuneralCoverEntitlement", b =>
-                {
-                    b.HasOne("AqualLifeStyle.Domain.Customers.Customer", null)
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("AqualLifeStyle.Domain.Onyx.EntryParticipation", null)
-                        .WithMany()
-                        .HasForeignKey("EntryParticipationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

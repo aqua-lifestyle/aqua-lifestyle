@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthState } from "@/src/providers";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
+import { usePendingProgrammeApprovals } from "@/src/shared/hooks/use-pending-programme-approvals";
 import { AdminProgrammeParticipations } from "./AdminProgrammeParticipations";
 
 vi.mock("@/src/providers", () => ({ useAuthState: vi.fn() }));
@@ -12,6 +13,10 @@ vi.mock("@/src/shared/api", async () => {
   );
   return { ...actual, httpClient: { get: vi.fn(), post: vi.fn() } };
 });
+vi.mock("@/src/shared/hooks/use-pending-programme-approvals", () => ({
+  PROGRAMME_APPROVAL_QUEUE_CHANGED: "programme-approval-queue-changed",
+  usePendingProgrammeApprovals: vi.fn(),
+}));
 
 const authState = (permissions: string[]) => ({
   isAuthenticated: true,
@@ -37,6 +42,7 @@ const participation = {
   clubMemberNumber: "CLB-DORA23456789",
   customerName: "Dora Shongwe",
   email: "dora@example.com",
+  expectedJoiningAmount: 1200,
   isActive: false,
   joinedIndependently: true,
   nextPaymentAmount: 600,
@@ -82,6 +88,10 @@ describe("AdminProgrammeParticipations", () => {
     vi.mocked(useAuthState).mockReturnValue(
       authState(["Aqua.Admin.ProgrammeParticipations.View"]),
     );
+    vi.mocked(usePendingProgrammeApprovals).mockReturnValue({
+      reload: vi.fn(),
+      summary: { aqGreenCount: 0, onyxCount: 0, totalCount: 0 },
+    });
     vi.mocked(httpClient.get).mockResolvedValue({
       items: [participation],
       totalCount: 1,
@@ -256,6 +266,14 @@ describe("AdminProgrammeParticipations", () => {
     );
     const awaiting = {
       ...participation,
+      confirmedPayments: [{
+        amount: 1200,
+        confirmedAt: "2026-08-09T10:15:00Z",
+        currency: "ZAR",
+        description: "Full AQGreen joining payment",
+        provider: "Yoco",
+        providerReference: "pay_safe_reference",
+      }],
       participationId: "1b4f6d8e-3a2c-4f9b-8d7e-0a1b2c3d4e5f",
       status: "Awaiting Area approval",
     };
@@ -272,6 +290,12 @@ describe("AdminProgrammeParticipations", () => {
     });
     expect(screen.getByText("Awaiting Area approval", { selector: "span" }))
       .toBeInTheDocument();
+    expect(screen.getByText("Area review required")).toBeInTheDocument();
+    expect(screen.getByText(/Expected joining amount:/))
+      .toBeInTheDocument();
+    expect(screen.getByText("Full AQGreen joining payment"))
+      .toBeInTheDocument();
+    expect(screen.getByText(/Confirmed:/)).toBeInTheDocument();
     expect(approveButton).toBeEnabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Approve" }));
@@ -288,6 +312,38 @@ describe("AdminProgrammeParticipations", () => {
     expect(
       await screen.findByText(/participation was approved and activated/i),
     ).toBeInTheDocument();
+  });
+
+  it("loads the durable awaiting queue on the server and removes a decided row", async () => {
+    vi.mocked(useAuthState).mockReturnValue(
+      authState([
+        "Aqua.Admin.ProgrammeParticipations.View",
+        "Aqua.Admin.ProgrammeParticipations.Approve",
+      ]),
+    );
+    const awaiting = {
+      ...participation,
+      participationId: "1b4f6d8e-3a2c-4f9b-8d7e-0a1b2c3d4e5f",
+      status: "Awaiting Area approval",
+    };
+    vi.mocked(httpClient.get)
+      .mockResolvedValueOnce({ items: [awaiting], totalCount: 1 })
+      .mockResolvedValueOnce({ items: [awaiting], totalCount: 1 })
+      .mockResolvedValueOnce({ items: [], totalCount: 0 });
+    vi.mocked(httpClient.post).mockResolvedValue(undefined);
+
+    render(<AdminProgrammeParticipations />);
+
+    await screen.findByText("Dora Shongwe");
+    fireEvent.click(screen.getByRole("button", { name: "Awaiting approval" }));
+    await waitFor(() => expect(httpClient.get).toHaveBeenCalledWith(
+      `${apiEndpoints.programmeParticipations.getAdminParticipations}?Programme=0&MaxResultCount=100&AwaitingApprovalOnly=true`,
+    ));
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+
+    await waitFor(() => expect(screen.queryByText("Dora Shongwe"))
+      .not.toBeInTheDocument());
   });
 
   it("requires a reason before declining an awaiting participation", async () => {
