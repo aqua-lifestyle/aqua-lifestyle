@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
 using Abp.Authorization.Users;
+using Abp.Authorization;
 using Abp.Application.Services.Dto;
 using Abp.UI;
 using AqualLifeStyle.Authorization.Users;
@@ -142,6 +143,26 @@ namespace AqualLifeStyle.Tests.Application
                 record.IsActive.ShouldBeTrue();
                 record.Justification.ShouldBe(
                     "Observed current Area state before financial rollout");
+            });
+        }
+
+        [Fact]
+        public async Task TenantAdministrator_CannotRecordAreaActivationBaseline()
+        {
+            LoginAsDefaultTenantAdmin();
+
+            await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                _tenantAdministration.ObserveActivationStateAsync(
+                    new ObserveTenantActivationStateInput
+                    {
+                        Id = 1,
+                        Justification = "Unauthorised baseline attempt"
+                    }));
+
+            await UsingDbContextAsync(null, async context =>
+            {
+                (await context.AreaActivationStateRecords.CountAsync(
+                    record => record.TenantId == 1)).ShouldBe(0);
             });
         }
 

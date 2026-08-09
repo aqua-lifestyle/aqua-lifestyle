@@ -76,4 +76,28 @@ describe("AdminTenants", () => {
       },
     ));
   });
+
+  it("hides the baseline action without activation permission", async () => {
+    vi.mocked(useAuthState).mockReturnValue({
+      isAuthenticated: true,
+      isReady: true,
+      session: {
+        accessToken: "token",
+        expiresAt: null,
+        user: {
+          email: "admin@example.com",
+          id: 1,
+          name: "Administrator",
+          permissions: ["Aqua.Admin.Tenants.View"],
+          role: "SystemAdmin",
+        },
+      },
+    });
+
+    render(<AdminTenants />);
+
+    expect(await screen.findByText("Cutoff history not recorded")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Record cutoff baseline" })).not.toBeInTheDocument();
+    expect(httpClient.post).not.toHaveBeenCalled();
+  });
 });
