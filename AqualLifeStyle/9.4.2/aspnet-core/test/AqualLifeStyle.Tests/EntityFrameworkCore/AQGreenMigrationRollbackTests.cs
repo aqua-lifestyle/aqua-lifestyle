@@ -26,6 +26,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             "20260809114317_AddAQGreenMonthlyObligationCheckouts";
         private const string PreviousMonthlyCheckoutMigration =
             "20260809081746_AddAreaActivationStateHistory";
+        private const string TermsVersionsMigration =
+            "20260809201814_AddCommissionTermsVersions";
         private readonly string _containerName = $"aqgreen-migration-test-pg-{Guid.NewGuid():N}";
         private readonly string _databaseName = $"aqgreen_test_{Guid.NewGuid():N}";
         private readonly int _hostPort;
@@ -898,6 +900,82 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 .ShouldContain(MonthlyCheckoutMigration);
             (await verifyContext.AQGreenMonthlyObligationCheckouts.CountAsync())
                 .ShouldBe(1);
+        }
+
+        [Fact]
+        public async Task CommissionTermsVersions_RejectDirectUpdateAndDelete_PostgreSQL()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToLatestAsync();
+            await using (var context = CreateDbContext())
+            {
+                context.EntryCommissionTermsVersions.Add(
+                    EntryCommissionTermsVersion.Create(
+                        "append-only-entry-v1",
+                        new DateTime(2026, 7, 16, 22, 0, 0, DateTimeKind.Utc),
+                        150m,
+                        250m,
+                        1250m));
+                context.OnyxCommissionTermsVersions.Add(
+                    OnyxCommissionTermsVersion.Create(
+                        "append-only-onyx-v1",
+                        new DateTime(2026, 7, 16, 22, 0, 0, DateTimeKind.Utc),
+                        50m,
+                        20m,
+                        12.62m,
+                        5m,
+                        4m));
+                await context.SaveChangesAsync();
+            }
+
+            await using (var updateContext = CreateDbContext())
+            {
+                await Should.ThrowAsync<PostgresException>(async () =>
+                    await updateContext.Database.ExecuteSqlRawAsync(
+                        "UPDATE \"EntryCommissionTermsVersions\" SET \"LevelOneComponentAmount\" = 1 WHERE \"Version\" = 'append-only-entry-v1'"));
+            }
+
+            await using (var deleteContext = CreateDbContext())
+            {
+                await Should.ThrowAsync<PostgresException>(async () =>
+                    await deleteContext.Database.ExecuteSqlRawAsync(
+                        "DELETE FROM \"OnyxCommissionTermsVersions\" WHERE \"Version\" = 'append-only-onyx-v1'"));
+            }
+
+            await using (var truncateContext = CreateDbContext())
+            {
+                await Should.ThrowAsync<PostgresException>(async () =>
+                    await truncateContext.Database.ExecuteSqlRawAsync(
+                        "TRUNCATE TABLE \"EntryCommissionTermsVersions\""));
+            }
+        }
+
+        [Fact]
+        public async Task CommissionTermsVersionsMigration_RefusesRollbackAfterEvidenceExists_PostgreSQL()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToLatestAsync();
+            await using (var context = CreateDbContext())
+            {
+                context.EntryCommissionTermsVersions.Add(
+                    EntryCommissionTermsVersion.Create(
+                        "rollback-protected-entry-v1",
+                        new DateTime(2026, 7, 16, 22, 0, 0, DateTimeKind.Utc),
+                        150m,
+                        250m,
+                        1250m));
+                await context.SaveChangesAsync();
+            }
+
+            var ex = await Should.ThrowAsync<PostgresException>(async () =>
+                await MigrateToAsync(PreviousMonthlyCheckoutMigration));
+
+            ex.SqlState.ShouldBe(PostgresErrorCodes.RaiseException);
+            ex.MessageText.ShouldContain(
+                "Cannot remove commission terms versions after evidence has been recorded");
+            await using var verifyContext = CreateDbContext();
+            (await verifyContext.Database.GetAppliedMigrationsAsync())
+                .ShouldContain(TermsVersionsMigration);
         }
 
         private async Task<(EntryMonthlyObligation First, EntryMonthlyObligation Second)>

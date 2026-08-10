@@ -29,6 +29,9 @@ namespace AqualLifeStyle.Tests.Application
         private static readonly DateTime EffectiveFrom =
             new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
 
+        private static readonly DateTime CommissionTermsBoundary =
+            new DateTime(2026, 7, 16, 22, 0, 0, DateTimeKind.Utc);
+
         private static readonly EntryProgrammeTerms LegacySplitPaymentTerms =
             EntryProgrammeTerms.Create(
                 "entry-2026-07",
@@ -59,6 +62,22 @@ namespace AqualLifeStyle.Tests.Application
                         null,
                         "Test cutoff Area baseline",
                         AreaActivationStateRecordKind.ObservedBaseline));
+                context.EntryCommissionTermsVersions.Add(
+                    EntryCommissionTermsVersion.Create(
+                        "test-entry-commission-2026-07",
+                        CommissionTermsBoundary,
+                        150m,
+                        250m,
+                        1250m));
+                context.OnyxCommissionTermsVersions.Add(
+                    OnyxCommissionTermsVersion.Create(
+                        "test-onyx-commission-2026-07",
+                        CommissionTermsBoundary,
+                        50m,
+                        20m,
+                        12.62m,
+                        5m,
+                        4m));
                 context.SaveChanges();
             });
             _service = Resolve<IAdminCommissionAppService>();
@@ -182,6 +201,104 @@ namespace AqualLifeStyle.Tests.Application
             paidCommission.PaymentReference.ShouldBe(
                 "bank-payment-2026-07-entry-1");
             paidCommission.PaidAt.ShouldNotBeNull();
+        }
+
+        [Fact]
+        public async Task TermsVersioning_ComposesWithCutoffEffectiveHolds()
+        {
+            var network = await CreateQualifiedLevelOneEntryNetworkAsync();
+            LoginAsHostAdmin();
+            var closedWeek = Resolve<LatestClosedCommissionWeekResolver>()
+                .Resolve(DateTime.UtcNow);
+            var dueAt = closedWeek.PeriodStartUtc.AddDays(-5);
+            await UsingDbContextAsync(1, async context =>
+            {
+                var root = context.EntryParticipations.Single(
+                    participation =>
+                        participation.Id == network.OriginalRecruiterParticipationId);
+                context.EntryMonthlyObligationDuePolicies.Add(
+                    EntryMonthlyObligationDuePolicy.Create(
+                        "test-due-policy-v1",
+                        1,
+                        EntryMonthlyObligationDuePolicy
+                            .JohannesburgMonthStartUtc(2026, 8)));
+                context.EntryMonthlyObligations.Add(
+                    EntryMonthlyObligation.Create(
+                        root,
+                        2026,
+                        8,
+                        dueAt,
+                        "test-due-policy-v1"));
+                await context.SaveChangesAsync();
+            });
+
+            var input = new CalculateLatestClosedCommissionWeekInput
+            {
+                TenantId = 1,
+                Programme = AdminCommissionProgramme.Entry
+            };
+            var first = await _service.CalculateLatestClosedWeekAsync(input);
+            first.WasAlreadyCalculated.ShouldBeFalse();
+            first.HeldCount.ShouldBe(1);
+            first.EarnedCount.ShouldBe(1);
+
+            var cureTime = closedWeek.PeriodEndUtc.AddHours(2);
+            await UsingDbContextAsync(1, async context =>
+            {
+                var root = await context.EntryParticipations.SingleAsync(
+                    participation =>
+                        participation.Id == network.OriginalRecruiterParticipationId);
+                var payment = MemberPayment.CreatePending(
+                    1,
+                    root.CustomerId,
+                    MemberPaymentPurpose.EntryMonthlyCommitment,
+                    600m,
+                    "Yoco",
+                    $"post-cutoff-cure-{Guid.NewGuid():N}",
+                    cureTime);
+                payment.Confirm(cureTime);
+                var obligation = context.EntryMonthlyObligations.Single(
+                    item =>
+                        item.EntryParticipationId ==
+                        network.OriginalRecruiterParticipationId);
+                obligation.ApplyConfirmedPayment(payment);
+                context.MemberPayments.Add(payment);
+                await context.SaveChangesAsync();
+            });
+
+            var laterBoundary = Resolve<LatestClosedCommissionWeekResolver>()
+                .ResolveFirstCycleStartAfter(closedWeek.PeriodEndUtc)
+                .AddDays(7);
+            await UsingDbContextAsync(null, async context =>
+            {
+                context.EntryCommissionTermsVersions.Add(
+                    EntryCommissionTermsVersion.Create(
+                        "test-entry-commission-2026-08",
+                        laterBoundary,
+                        999m,
+                        999m,
+                        999m));
+                await context.SaveChangesAsync();
+            });
+
+            var replayed = await _service.CalculateLatestClosedWeekAsync(input);
+            replayed.WasAlreadyCalculated.ShouldBeTrue();
+            replayed.RecordsCreated.ShouldBe(0);
+            replayed.PeriodId.ShouldBe(first.PeriodId);
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var period = await context.EntryCommissionPeriods.SingleAsync(
+                    item => item.Id == replayed.PeriodId);
+                period.RulesVersion.ShouldBe("test-entry-commission-2026-07");
+                var commission = await context.EntryWeeklyCommissions.SingleAsync(
+                    item =>
+                        item.EntryParticipationId ==
+                        network.OriginalRecruiterParticipationId);
+                commission.PayoutStatus.ShouldBe(
+                    WeeklyCommissionPayoutStatus.Held);
+                commission.RulesVersion.ShouldBe("test-entry-commission-2026-07");
+            });
         }
 
         [Fact]

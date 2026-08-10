@@ -50,7 +50,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         private readonly IRepository<OnyxCommissionPeriod, Guid> _onyxPeriodRepository;
         private readonly IRepository<EntryWeeklyCommission, Guid> _entryCommissionRepository;
         private readonly IRepository<OnyxWeeklyCommission, Guid> _onyxCommissionRepository;
-        private readonly ICurrentCommissionTermsProvider _termsProvider;
+        private readonly ICommissionTermsResolver _termsResolver;
         private readonly IAreaActivationStateResolver _areaActivationStateResolver;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
 
@@ -63,7 +63,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             IRepository<OnyxCommissionPeriod, Guid> onyxPeriodRepository,
             IRepository<EntryWeeklyCommission, Guid> entryCommissionRepository,
             IRepository<OnyxWeeklyCommission, Guid> onyxCommissionRepository,
-            ICurrentCommissionTermsProvider termsProvider,
+            ICommissionTermsResolver termsResolver,
             IAreaActivationStateResolver areaActivationStateResolver,
             IUnitOfWorkManager unitOfWorkManager)
         {
@@ -75,7 +75,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             _onyxPeriodRepository = onyxPeriodRepository;
             _entryCommissionRepository = entryCommissionRepository;
             _onyxCommissionRepository = onyxCommissionRepository;
-            _termsProvider = termsProvider;
+            _termsResolver = termsResolver;
             _areaActivationStateResolver = areaActivationStateResolver;
             _unitOfWorkManager = unitOfWorkManager;
         }
@@ -115,7 +115,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             await _areaActivationStateResolver.EnsureActiveAsync(
                 tenantId,
                 closedWeek.PeriodEndUtc);
-            var terms = _termsProvider.GetEntryTerms();
+            var terms = await _termsResolver.ResolveEntryTermsAsync(closedWeek);
             List<EntryParticipation> networkParticipations;
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.SoftDelete))
             {
@@ -222,7 +222,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             await _areaActivationStateResolver.EnsureActiveAsync(
                 tenantId,
                 closedWeek.PeriodEndUtc);
-            var terms = _termsProvider.GetOnyxTerms();
+            var terms = await _termsResolver.ResolveOnyxTermsAsync(closedWeek);
             List<OnyxParticipation> networkParticipations;
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.SoftDelete))
             {

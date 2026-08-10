@@ -72,6 +72,8 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<OnyxGraduationDecision> OnyxGraduationDecisions { get; set; }
         public virtual DbSet<SavingsAccount> SavingsAccounts { get; set; }
         public virtual DbSet<SavingsContribution> SavingsContributions { get; set; }
+        public virtual DbSet<EntryCommissionTermsVersion> EntryCommissionTermsVersions { get; set; }
+        public virtual DbSet<OnyxCommissionTermsVersion> OnyxCommissionTermsVersions { get; set; }
 
         public AqualLifeStyleDbContext(DbContextOptions<AqualLifeStyleDbContext> options)
             : base(options)
@@ -82,6 +84,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         {
             EnsureDuePoliciesAreAppendOnly();
             EnsureAreaActivationStateRecordsAreAppendOnly();
+            EnsureCommissionTermsVersionsAreAppendOnly();
             return base.SaveChanges();
         }
 
@@ -89,6 +92,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         {
             EnsureDuePoliciesAreAppendOnly();
             EnsureAreaActivationStateRecordsAreAppendOnly();
+            EnsureCommissionTermsVersionsAreAppendOnly();
             return base.SaveChanges(acceptAllChangesOnSuccess);
         }
 
@@ -97,6 +101,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         {
             EnsureDuePoliciesAreAppendOnly();
             EnsureAreaActivationStateRecordsAreAppendOnly();
+            EnsureCommissionTermsVersionsAreAppendOnly();
             return base.SaveChangesAsync(cancellationToken);
         }
 
@@ -106,6 +111,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         {
             EnsureDuePoliciesAreAppendOnly();
             EnsureAreaActivationStateRecordsAreAppendOnly();
+            EnsureCommissionTermsVersionsAreAppendOnly();
             return base.SaveChangesAsync(
                 acceptAllChangesOnSuccess,
                 cancellationToken);
@@ -255,6 +261,20 @@ namespace AqualLifeStyle.EntityFrameworkCore
             {
                 throw new InvalidOperationException(
                     "Area activation state records are append-only.");
+            }
+        }
+
+        private void EnsureCommissionTermsVersionsAreAppendOnly()
+        {
+            if (ChangeTracker.Entries<EntryCommissionTermsVersion>().Any(entry =>
+                    entry.State == EntityState.Modified ||
+                    entry.State == EntityState.Deleted) ||
+                ChangeTracker.Entries<OnyxCommissionTermsVersion>().Any(entry =>
+                    entry.State == EntityState.Modified ||
+                    entry.State == EntityState.Deleted))
+            {
+                throw new InvalidOperationException(
+                    "Commission terms versions are append-only.");
             }
         }
     }
