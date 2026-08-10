@@ -80,7 +80,8 @@ namespace AqualLifeStyle.Authorization
                     AquaPermissions.Savings.Withdraw,
                     AquaPermissions.Savings.ViewSelf,
                     AquaPermissions.Loans.ViewSelf,
-                    AquaPermissions.EntryMonthlyObligations.ViewSelf
+                    AquaPermissions.EntryMonthlyObligations.ViewSelf,
+                    AquaPermissions.EntryMonthlyObligations.Pay
                 },
                 [AquaUserRole.Guest] = new[]
                 {

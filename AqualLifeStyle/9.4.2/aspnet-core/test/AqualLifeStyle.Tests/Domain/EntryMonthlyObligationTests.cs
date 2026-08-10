@@ -21,6 +21,7 @@ namespace AqualLifeStyle.Tests.Domain
             Assert.Equal(600m, obligation.AmountDue);
             Assert.Equal(600m, obligation.OutstandingAmount);
             Assert.Equal("2026-07", obligation.TermsVersion);
+            Assert.Equal("due-policy-v1", obligation.DuePolicyVersion);
             Assert.Equal(DueAt.AddDays(7), obligation.GracePeriodEndsAt);
             Assert.Equal(EntryMonthlyObligationStatus.Due, obligation.Status);
             Assert.True(obligation.IsOwnPayoutEligible);
@@ -50,7 +51,8 @@ namespace AqualLifeStyle.Tests.Domain
                 participation,
                 2026,
                 8,
-                DueAt);
+                DueAt,
+                "due-policy-v1");
 
             obligation.AssessStatus(DueAt.AddDays(8));
 
@@ -128,7 +130,8 @@ namespace AqualLifeStyle.Tests.Domain
                 CreateActiveParticipation(),
                 2026,
                 8,
-                DueAt);
+                DueAt,
+                "due-policy-v1");
         }
 
         private static EntryParticipation CreateActiveParticipation()

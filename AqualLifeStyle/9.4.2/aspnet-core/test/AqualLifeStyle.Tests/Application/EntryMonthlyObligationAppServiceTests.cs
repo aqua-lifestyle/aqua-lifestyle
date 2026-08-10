@@ -77,12 +77,18 @@ namespace AqualLifeStyle.Tests.Application
                     "activation-" + suffix);
                 participation.ApplyConfirmedActivationPayment(activation);
                 participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
+                context.EntryMonthlyObligationDuePolicies.Add(
+                    EntryMonthlyObligationDuePolicy.Create(
+                        "due-policy-v1",
+                        10,
+                        EntryMonthlyObligationDuePolicy.JohannesburgMonthStartUtc(2026, 8)));
                 var obligation = EntryMonthlyObligation.Create(
                     participation,
                     2026,
                     8,
                     new DateTime(
-                        2026, 8, 10, 0, 0, 0, DateTimeKind.Utc));
+                        2026, 8, 10, 0, 0, 0, DateTimeKind.Utc),
+                    "due-policy-v1");
                 obligation.AssessStatus(
                     new DateTime(
                         2026, 8, 18, 0, 0, 0, DateTimeKind.Utc));

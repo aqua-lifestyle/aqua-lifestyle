@@ -78,6 +78,7 @@ namespace AqualLifeStyle.Authorization
         {
             public const string Default = "Aqua.EntryMonthlyObligations";
             public const string ViewSelf = Default + ".ViewSelf";
+            public const string Pay = Default + ".Pay";
         }
 
         public static class Enquiries

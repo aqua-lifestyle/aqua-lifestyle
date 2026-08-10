@@ -10,10 +10,10 @@ using Abp.Domain.Uow;
 using Abp.Runtime.Session;
 using Abp.Timing;
 using AqualLifeStyle.Application.Admin.Commissions.Dto;
-using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Onyx;
+using AqualLifeStyle.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Application.Admin.Commissions
@@ -23,46 +23,35 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         : AdminAppServiceBase, IAdminCommissionAppService
     {
         private readonly ICustomerRepository _customerRepository;
-        private readonly IRepository<EntryParticipation, Guid> _entryParticipationRepository;
-        private readonly IRepository<OnyxParticipation, Guid> _onyxParticipationRepository;
-        private readonly IRepository<EntryMonthlyObligation, Guid> _entryObligationRepository;
-        private readonly IRepository<OnyxLoanAgreement, Guid> _loanAgreementRepository;
         private readonly IRepository<EntryCommissionPeriod, Guid> _entryPeriodRepository;
         private readonly IRepository<OnyxCommissionPeriod, Guid> _onyxPeriodRepository;
         private readonly IRepository<EntryWeeklyCommission, Guid> _entryCommissionRepository;
         private readonly IRepository<OnyxWeeklyCommission, Guid> _onyxCommissionRepository;
-        private readonly ICurrentCommissionTermsProvider _termsProvider;
         private readonly LatestClosedCommissionWeekResolver _closedWeekResolver;
-        private readonly OnyxTravelBenefitEligibilityProcessor
-            _travelBenefitEligibilityProcessor;
+        private readonly IWeeklyCommissionCalculator _commissionCalculator;
+        private readonly IWeeklyCommissionCalculationLock _calculationLock;
+        private readonly IRepository<Tenant, int> _tenantRepository;
 
         public AdminCommissionAppService(
             ICustomerRepository customerRepository,
-            IRepository<EntryParticipation, Guid> entryParticipationRepository,
-            IRepository<OnyxParticipation, Guid> onyxParticipationRepository,
-            IRepository<EntryMonthlyObligation, Guid> entryObligationRepository,
-            IRepository<OnyxLoanAgreement, Guid> loanAgreementRepository,
             IRepository<EntryCommissionPeriod, Guid> entryPeriodRepository,
             IRepository<OnyxCommissionPeriod, Guid> onyxPeriodRepository,
             IRepository<EntryWeeklyCommission, Guid> entryCommissionRepository,
             IRepository<OnyxWeeklyCommission, Guid> onyxCommissionRepository,
-            ICurrentCommissionTermsProvider termsProvider,
             LatestClosedCommissionWeekResolver closedWeekResolver,
-            OnyxTravelBenefitEligibilityProcessor travelBenefitEligibilityProcessor)
+            IWeeklyCommissionCalculator commissionCalculator,
+            IWeeklyCommissionCalculationLock calculationLock,
+            IRepository<Tenant, int> tenantRepository)
         {
             _customerRepository = customerRepository;
-            _entryParticipationRepository = entryParticipationRepository;
-            _onyxParticipationRepository = onyxParticipationRepository;
-            _entryObligationRepository = entryObligationRepository;
-            _loanAgreementRepository = loanAgreementRepository;
             _entryPeriodRepository = entryPeriodRepository;
             _onyxPeriodRepository = onyxPeriodRepository;
             _entryCommissionRepository = entryCommissionRepository;
             _onyxCommissionRepository = onyxCommissionRepository;
-            _termsProvider = termsProvider;
             _closedWeekResolver = closedWeekResolver;
-            _travelBenefitEligibilityProcessor =
-                travelBenefitEligibilityProcessor;
+            _commissionCalculator = commissionCalculator;
+            _calculationLock = calculationLock;
+            _tenantRepository = tenantRepository;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Commissions.View)]
@@ -113,9 +102,10 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                        AbpDataFilters.MayHaveTenant,
                        AbpDataFilters.MustHaveTenant))
             {
+                await _calculationLock.AcquireAsync();
                 var result = input.Programme == AdminCommissionProgramme.Onyx
-                    ? await CalculateOnyxAsync(tenantId, closedWeek, calculatedAt)
-                    : await CalculateEntryAsync(tenantId, closedWeek, calculatedAt);
+                    ? await _commissionCalculator.CalculateOnyxAsync(tenantId, closedWeek, calculatedAt)
+                    : await _commissionCalculator.CalculateEntryAsync(tenantId, closedWeek, calculatedAt);
                 Logger.Info(
                     $"Admin commission calculation actor={AbpSession.GetUserId()} " +
                     $"tenant={tenantId} programme={result.ProgrammeName} " +
@@ -123,6 +113,64 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     $"alreadyCalculated={result.WasAlreadyCalculated} " +
                     $"recordsCreated={result.RecordsCreated}");
                 return result;
+            }
+        }
+
+        [AbpAuthorize(
+            AquaPermissions.Admin.Commissions.Calculate,
+            AquaPermissions.Admin.AllTenants,
+            RequireAllPermissions = true)]
+        public async Task<CommissionPeriodInventoryOutput> GetPeriodInventoryAsync(
+            GetCommissionPeriodInventoryInput input)
+        {
+            RequireHostCommissionInventoryAccess();
+            input = input ?? new GetCommissionPeriodInventoryInput();
+            if (input.TenantId.HasValue)
+            {
+                ResolveTargetTenant(input.TenantId.Value, "Commission", "inventory");
+            }
+
+            ValidateInventoryProgramme(input.Programme);
+            using (CurrentUnitOfWork.DisableFilter(
+                       AbpDataFilters.MayHaveTenant,
+                       AbpDataFilters.MustHaveTenant,
+                       AbpDataFilters.SoftDelete))
+            {
+                var tenants = await _tenantRepository.GetAllListAsync(tenant =>
+                    !input.TenantId.HasValue || tenant.Id == input.TenantId.Value);
+                var tenantNames = tenants.ToDictionary(
+                    tenant => tenant.Id,
+                    tenant => tenant.Name);
+                var periods = new List<CommissionPeriodInventoryDto>();
+
+                if (input.Programme != CommissionInventoryProgramme.Onyx)
+                {
+                    await AddEntryInventoryAsync(input.TenantId, tenantNames, periods);
+                }
+
+                if (input.Programme != CommissionInventoryProgramme.AQGreen)
+                {
+                    await AddOnyxInventoryAsync(input.TenantId, tenantNames, periods);
+                }
+
+                MarkExactBoundaryDuplicates(periods);
+                var latestClosedWeek = _closedWeekResolver.Resolve(
+                    Clock.Now.ToUniversalTime());
+                return new CommissionPeriodInventoryOutput
+                {
+                    LatestClosedCycleStartUtc = latestClosedWeek.PeriodStartUtc,
+                    LatestClosedCycleEndUtc = latestClosedWeek.PeriodEndUtc,
+                    Periods = periods
+                        .OrderBy(item => item.TenantId)
+                        .ThenBy(item => item.ProgrammeName)
+                        .ThenBy(item => item.PeriodStart)
+                        .ToList(),
+                    ProgrammeBoundaries = BuildPeriodBoundaries(
+                        tenants,
+                        input.Programme,
+                        periods,
+                        latestClosedWeek)
+                };
             }
         }
 
@@ -253,189 +301,6 @@ namespace AqualLifeStyle.Application.Admin.Commissions
 
                 await CurrentUnitOfWork.SaveChangesAsync();
             }
-        }
-
-        private async Task<CommissionCalculationResultDto> CalculateEntryAsync(
-            int tenantId,
-            ClosedCommissionWeek closedWeek,
-            DateTime calculatedAt)
-        {
-            var terms = _termsProvider.GetEntryTerms();
-            var existingPeriod = await _entryPeriodRepository.FirstOrDefaultAsync(period =>
-                period.TenantId == tenantId &&
-                period.PeriodStart == closedWeek.PeriodStartUtc &&
-                period.PeriodEnd == closedWeek.PeriodEndUtc);
-            if (existingPeriod != null)
-            {
-                var existingCommissions = await _entryCommissionRepository.GetAll()
-                    .Where(commission =>
-                        commission.CommissionPeriodId == existingPeriod.Id)
-                    .ToListAsync();
-                return BuildResult(
-                    existingPeriod.Id,
-                    "AQGreen",
-                    existingPeriod.PeriodStart,
-                    existingPeriod.PeriodEnd,
-                    existingPeriod.TimeZoneId,
-                    existingCommissions.Select(commission =>
-                        new CommissionSummaryRow(
-                            commission.TotalAmount,
-                            commission.PayoutStatus)),
-                    terms.Currency,
-                    wasAlreadyCalculated: true,
-                    recordsCreated: 0);
-            }
-
-            var networkParticipations = await _entryParticipationRepository.GetAll()
-                .Where(participation =>
-                    participation.Status == EntryParticipationStatus.Active &&
-                    participation.ActivatedAt <= closedWeek.PeriodEndUtc)
-                .ToListAsync();
-            var targetParticipations = networkParticipations
-                .Where(participation => participation.TenantId == tenantId)
-                .ToList();
-            var targetParticipationIds = targetParticipations
-                .Select(participation => participation.Id)
-                .ToList();
-            var obligations = await _entryObligationRepository.GetAll()
-                .Where(obligation =>
-                    targetParticipationIds.Contains(obligation.EntryParticipationId))
-                .ToListAsync();
-            var loanAgreements = await _loanAgreementRepository
-                .GetAllIncluding(agreement => agreement.WeeklyRequirements)
-                .Where(agreement =>
-                    targetParticipationIds.Contains(agreement.EntryParticipationId))
-                .ToListAsync();
-
-            var period = EntryCommissionPeriod.CreateClosedPeriod(
-                tenantId,
-                closedWeek.PeriodStartUtc,
-                closedWeek.PeriodEndUtc,
-                closedWeek.TimeZoneId,
-                calculatedAt,
-                terms);
-            await _entryPeriodRepository.InsertAsync(period);
-            var calculator = new EntryWeeklyCommissionCalculator(
-                new EntryNetworkQualificationEvaluator());
-            var commissions = targetParticipations
-                .Select(participation => calculator.Calculate(
-                    participation,
-                    period,
-                    terms,
-                    networkParticipations,
-                    obligations,
-                    loanAgreements))
-                .ToList();
-            foreach (var commission in commissions)
-            {
-                await _entryCommissionRepository.InsertAsync(commission);
-            }
-
-            await CurrentUnitOfWork.SaveChangesAsync();
-            return BuildResult(
-                period.Id,
-                "AQGreen",
-                period.PeriodStart,
-                period.PeriodEnd,
-                period.TimeZoneId,
-                commissions.Select(commission =>
-                    new CommissionSummaryRow(
-                        commission.TotalAmount,
-                        commission.PayoutStatus)),
-                terms.Currency,
-                wasAlreadyCalculated: false,
-                recordsCreated: commissions.Count);
-        }
-
-        private async Task<CommissionCalculationResultDto> CalculateOnyxAsync(
-            int tenantId,
-            ClosedCommissionWeek closedWeek,
-            DateTime calculatedAt)
-        {
-            var terms = _termsProvider.GetOnyxTerms();
-            var networkParticipations = await _onyxParticipationRepository.GetAll()
-                .Where(participation =>
-                    participation.Status == OnyxParticipationStatus.Active &&
-                    participation.ActivatedAt <= closedWeek.PeriodEndUtc)
-                .ToListAsync();
-            var travelBenefitResult =
-                await _travelBenefitEligibilityProcessor.SynchronizeAsync(
-                    tenantId,
-                    networkParticipations,
-                    calculatedAt);
-            if (travelBenefitResult.GrantedCount > 0 ||
-                travelBenefitResult.ActivatedCount > 0)
-            {
-                Logger.Info(
-                    $"Onyx travel benefits synchronized tenant={tenantId} " +
-                    $"granted={travelBenefitResult.GrantedCount} " +
-                    $"activated={travelBenefitResult.ActivatedCount}");
-            }
-
-            var existingPeriod = await _onyxPeriodRepository.FirstOrDefaultAsync(period =>
-                period.TenantId == tenantId &&
-                period.PeriodStart == closedWeek.PeriodStartUtc &&
-                period.PeriodEnd == closedWeek.PeriodEndUtc);
-            if (existingPeriod != null)
-            {
-                var existingCommissions = await _onyxCommissionRepository.GetAll()
-                    .Where(commission =>
-                        commission.CommissionPeriodId == existingPeriod.Id)
-                    .ToListAsync();
-                return BuildResult(
-                    existingPeriod.Id,
-                    "Onyx",
-                    existingPeriod.PeriodStart,
-                    existingPeriod.PeriodEnd,
-                    existingPeriod.TimeZoneId,
-                    existingCommissions.Select(commission =>
-                        new CommissionSummaryRow(
-                            commission.TotalAmount,
-                            commission.PayoutStatus)),
-                    terms.Currency,
-                    wasAlreadyCalculated: true,
-                    recordsCreated: 0);
-            }
-
-            var targetParticipations = networkParticipations
-                .Where(participation => participation.TenantId == tenantId)
-                .ToList();
-            var period = OnyxCommissionPeriod.CreateClosedPeriod(
-                tenantId,
-                closedWeek.PeriodStartUtc,
-                closedWeek.PeriodEndUtc,
-                closedWeek.TimeZoneId,
-                calculatedAt,
-                terms);
-            await _onyxPeriodRepository.InsertAsync(period);
-            var calculator = new OnyxWeeklyCommissionCalculator(
-                new OnyxNetworkQualificationEvaluator());
-            var commissions = targetParticipations
-                .Select(participation => calculator.Calculate(
-                    participation,
-                    period,
-                    terms,
-                    networkParticipations))
-                .ToList();
-            foreach (var commission in commissions)
-            {
-                await _onyxCommissionRepository.InsertAsync(commission);
-            }
-
-            await CurrentUnitOfWork.SaveChangesAsync();
-            return BuildResult(
-                period.Id,
-                "Onyx",
-                period.PeriodStart,
-                period.PeriodEnd,
-                period.TimeZoneId,
-                commissions.Select(commission =>
-                    new CommissionSummaryRow(
-                        commission.TotalAmount,
-                        commission.PayoutStatus)),
-                terms.Currency,
-                wasAlreadyCalculated: false,
-                recordsCreated: commissions.Count);
         }
 
         private async Task<PagedResultDto<AdminWeeklyCommissionDto>>
@@ -609,49 +474,356 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     .ToList()
             };
 
-        private static CommissionCalculationResultDto BuildResult(
-            Guid periodId,
+        private async Task AddEntryInventoryAsync(
+            int? tenantId,
+            IReadOnlyDictionary<int, string> tenantNames,
+            ICollection<CommissionPeriodInventoryDto> output)
+        {
+            var periods = await _entryPeriodRepository.GetAll()
+                .Where(period => !tenantId.HasValue || period.TenantId == tenantId.Value)
+                .ToListAsync();
+            var byPeriod = new Dictionary<Guid, InventoryCommissionSummary>();
+            var commissionRows = _entryCommissionRepository.GetAll()
+                .AsNoTracking()
+                .Where(commission =>
+                    !tenantId.HasValue || commission.TenantId == tenantId.Value)
+                .Select(commission => new InventoryCommissionRow
+                {
+                    PeriodId = commission.CommissionPeriodId,
+                    Amount = commission.TotalAmount,
+                    Status = commission.PayoutStatus,
+                    IsDeleted = commission.IsDeleted
+                });
+            await foreach (var row in commissionRows.AsAsyncEnumerable())
+            {
+                if (!byPeriod.TryGetValue(row.PeriodId, out var summary))
+                {
+                    summary = new InventoryCommissionSummary();
+                    byPeriod.Add(row.PeriodId, summary);
+                }
+
+                summary.Add(row.Amount, row.Status, row.IsDeleted);
+            }
+
+            foreach (var period in periods)
+            {
+                byPeriod.TryGetValue(period.Id, out var summary);
+                output.Add(CreateInventoryItem(
+                    period.TenantId,
+                    tenantNames,
+                    "AQGreen",
+                    period.Id,
+                    period.PeriodStart,
+                    period.PeriodEnd,
+                    period.TimeZoneId,
+                    period.RulesVersion,
+                    period.CalculatedAt,
+                    period.IsDeleted,
+                    period.DeletionTime,
+                    summary ?? InventoryCommissionSummary.Empty));
+            }
+        }
+
+        private async Task AddOnyxInventoryAsync(
+            int? tenantId,
+            IReadOnlyDictionary<int, string> tenantNames,
+            ICollection<CommissionPeriodInventoryDto> output)
+        {
+            var periods = await _onyxPeriodRepository.GetAll()
+                .Where(period => !tenantId.HasValue || period.TenantId == tenantId.Value)
+                .ToListAsync();
+            var byPeriod = new Dictionary<Guid, InventoryCommissionSummary>();
+            var commissionRows = _onyxCommissionRepository.GetAll()
+                .AsNoTracking()
+                .Where(commission =>
+                    !tenantId.HasValue || commission.TenantId == tenantId.Value)
+                .Select(commission => new InventoryCommissionRow
+                {
+                    PeriodId = commission.CommissionPeriodId,
+                    Amount = commission.TotalAmount,
+                    Status = commission.PayoutStatus,
+                    IsDeleted = commission.IsDeleted
+                });
+            await foreach (var row in commissionRows.AsAsyncEnumerable())
+            {
+                if (!byPeriod.TryGetValue(row.PeriodId, out var summary))
+                {
+                    summary = new InventoryCommissionSummary();
+                    byPeriod.Add(row.PeriodId, summary);
+                }
+
+                summary.Add(row.Amount, row.Status, row.IsDeleted);
+            }
+
+            foreach (var period in periods)
+            {
+                byPeriod.TryGetValue(period.Id, out var summary);
+                output.Add(CreateInventoryItem(
+                    period.TenantId,
+                    tenantNames,
+                    "Onyx",
+                    period.Id,
+                    period.PeriodStart,
+                    period.PeriodEnd,
+                    period.TimeZoneId,
+                    period.RulesVersion,
+                    period.CalculatedAt,
+                    period.IsDeleted,
+                    period.DeletionTime,
+                    summary ?? InventoryCommissionSummary.Empty));
+            }
+        }
+
+        private CommissionPeriodInventoryDto CreateInventoryItem(
+            int tenantId,
+            IReadOnlyDictionary<int, string> tenantNames,
             string programmeName,
+            Guid periodId,
             DateTime periodStart,
             DateTime periodEnd,
             string timeZoneId,
-            IEnumerable<CommissionSummaryRow> commissions,
-            string currency,
-            bool wasAlreadyCalculated,
-            int recordsCreated)
+            string rulesVersion,
+            DateTime calculatedAt,
+            bool isDeleted,
+            DateTime? deletionTime,
+            InventoryCommissionSummary summary)
         {
-            var rows = commissions.ToList();
-            return new CommissionCalculationResultDto
+            var classification = _closedWeekResolver.IsCanonicalCycle(
+                    periodStart,
+                    periodEnd,
+                    timeZoneId)
+                ? CommissionPeriodClassification.FridayToThursday
+                : _closedWeekResolver.IsLegacyMondayToSundayCycle(
+                    periodStart,
+                    periodEnd,
+                    timeZoneId)
+                    ? CommissionPeriodClassification.LegacyMondayToSunday
+                    : CommissionPeriodClassification.Malformed;
+
+            return new CommissionPeriodInventoryDto
             {
-                PeriodId = periodId,
+                TenantId = tenantId,
+                TenantName = tenantNames.TryGetValue(tenantId, out var name)
+                    ? name
+                    : $"Unknown tenant {tenantId}",
                 ProgrammeName = programmeName,
+                PeriodId = periodId,
                 PeriodStart = periodStart,
                 PeriodEnd = periodEnd,
                 TimeZoneId = timeZoneId,
-                WasAlreadyCalculated = wasAlreadyCalculated,
-                RecordsCreated = recordsCreated,
-                EarnedCount = rows.Count(row =>
-                    row.Amount > 0m),
-                HeldCount = rows.Count(row =>
-                    row.Status == WeeklyCommissionPayoutStatus.Held),
-                TotalEarnedAmount = rows.Sum(row => row.Amount),
-                Currency = currency
+                RulesVersion = rulesVersion,
+                CalculatedAt = calculatedAt,
+                CommissionCount = summary.CommissionCount,
+                NotEarnedCount = summary.NotEarnedCount,
+                EarnedCount = summary.EarnedCount,
+                HeldCount = summary.HeldCount,
+                ReleasedCount = summary.ReleasedCount,
+                PaidCount = summary.PaidCount,
+                DeletedCommissionCount = summary.DeletedCommissionCount,
+                TotalAmount = summary.TotalAmount,
+                EarnedTotal = summary.EarnedTotal,
+                HeldTotal = summary.HeldTotal,
+                ReleasedTotal = summary.ReleasedTotal,
+                PaidTotal = summary.PaidTotal,
+                DeletedCommissionTotal = summary.DeletedCommissionTotal,
+                Classification = classification,
+                OverlapsFridayToThursdayCycle =
+                    classification != CommissionPeriodClassification.FridayToThursday &&
+                    _closedWeekResolver.OverlapsCanonicalCycle(periodStart, periodEnd),
+                IsDeleted = isDeleted,
+                DeletionTime = deletionTime
             };
         }
 
-        private sealed class CommissionSummaryRow
+        private static void MarkExactBoundaryDuplicates(
+            IEnumerable<CommissionPeriodInventoryDto> periods)
         {
-            public decimal Amount { get; }
-            public WeeklyCommissionPayoutStatus Status { get; }
-
-            public CommissionSummaryRow(
-                decimal amount,
-                WeeklyCommissionPayoutStatus status)
+            foreach (var duplicateGroup in periods
+                .GroupBy(period => new
+                {
+                    period.TenantId,
+                    period.ProgrammeName,
+                    period.PeriodStart,
+                    period.PeriodEnd
+                })
+                .Where(group => group.Count() > 1))
             {
-                Amount = amount;
-                Status = status;
+                foreach (var period in duplicateGroup)
+                {
+                    period.HasExactBoundaryDuplicate = true;
+                }
             }
         }
+
+        private IReadOnlyList<CommissionPeriodBoundaryDto>
+            BuildPeriodBoundaries(
+                IEnumerable<Tenant> tenants,
+                CommissionInventoryProgramme requestedProgramme,
+                IReadOnlyCollection<CommissionPeriodInventoryDto> periods,
+                ClosedCommissionWeek latestClosedWeek)
+        {
+            var programmes = requestedProgramme == CommissionInventoryProgramme.Both
+                ? new[] { "AQGreen", "Onyx" }
+                : new[] { requestedProgramme.ToString() };
+            var result = new List<CommissionPeriodBoundaryDto>();
+
+            foreach (var tenant in tenants)
+            {
+                foreach (var programme in programmes)
+                {
+                    var programmePeriods = periods
+                        .Where(period =>
+                            period.TenantId == tenant.Id &&
+                            string.Equals(
+                                period.ProgrammeName,
+                                programme,
+                                StringComparison.Ordinal))
+                        .ToList();
+                    var firstSafeStart = programmePeriods.Count == 0
+                        ? latestClosedWeek.PeriodStartUtc
+                        : _closedWeekResolver.ResolveFirstCycleStartAfter(
+                            programmePeriods.Max(period => period.PeriodEnd));
+                    var canonicalStarts = programmePeriods
+                        .Where(period =>
+                            period.Classification ==
+                                CommissionPeriodClassification.FridayToThursday)
+                        .Select(period => period.PeriodStart)
+                        .ToHashSet();
+                    var missingStarts = new List<DateTime>();
+                    if (canonicalStarts.Count > 0 &&
+                        canonicalStarts.Min() <= latestClosedWeek.PeriodStartUtc)
+                    {
+                        for (var cycleStart = canonicalStarts.Min();
+                             cycleStart <= latestClosedWeek.PeriodStartUtc;
+                             cycleStart = cycleStart.AddDays(7))
+                        {
+                            if (!canonicalStarts.Contains(cycleStart))
+                            {
+                                missingStarts.Add(cycleStart);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        missingStarts.Add(latestClosedWeek.PeriodStartUtc);
+                    }
+
+                    result.Add(new CommissionPeriodBoundaryDto
+                    {
+                        TenantId = tenant.Id,
+                        TenantName = tenant.Name,
+                        ProgrammeName = programme,
+                        FirstNonOverlappingCycleStartUtc = firstSafeStart,
+                        MissingCanonicalCycles = missingStarts
+                            .Select(cycleStart => new MissingCommissionCycleDto
+                            {
+                                CycleStartUtc = cycleStart,
+                                IsLatestClosedCycle =
+                                    cycleStart == latestClosedWeek.PeriodStartUtc,
+                                Disposition = cycleStart == latestClosedWeek.PeriodStartUtc
+                                    ? MissingCommissionCycleDisposition.PendingCalculation
+                                    : MissingCommissionCycleDisposition
+                                        .ManualFinancialReconciliationRequired,
+                                Message = cycleStart == latestClosedWeek.PeriodStartUtc
+                                    ? "Automatic calculation is pending for the latest closed cycle. It is generated deterministically by the automatic calculation pipeline at the cycle cutoff once calculation is enabled; it is not reconstructible from current state. Commission is only classified after verified payment."
+                                    : "Historical calculation is unavailable because period-effective network, qualification, eligibility, and terms cannot be reconstructed reliably. Manual financial reconciliation required."
+                            })
+                            .ToList()
+                    });
+                }
+            }
+
+            return result;
+        }
+
+        private static void ValidateInventoryProgramme(
+            CommissionInventoryProgramme programme)
+        {
+            if (programme != CommissionInventoryProgramme.AQGreen &&
+                programme != CommissionInventoryProgramme.Onyx &&
+                programme != CommissionInventoryProgramme.Both)
+            {
+                throw Failed(
+                    "Commission period inventory",
+                    "Select AQGreen, Onyx, or both programmes.");
+            }
+        }
+
+        private void RequireHostCommissionInventoryAccess()
+        {
+            if (AbpSession.TenantId.HasValue)
+            {
+                throw new AbpAuthorizationException(
+                    "Commission period inventory is restricted to the host.");
+            }
+        }
+
+        private sealed class InventoryCommissionSummary
+        {
+            public static readonly InventoryCommissionSummary Empty =
+                new InventoryCommissionSummary();
+
+            public Guid PeriodId { get; set; }
+            public int CommissionCount { get; set; }
+            public int NotEarnedCount { get; set; }
+            public int EarnedCount { get; set; }
+            public int HeldCount { get; set; }
+            public int ReleasedCount { get; set; }
+            public int PaidCount { get; set; }
+            public int DeletedCommissionCount { get; set; }
+            public decimal TotalAmount { get; set; }
+            public decimal EarnedTotal { get; set; }
+            public decimal HeldTotal { get; set; }
+            public decimal ReleasedTotal { get; set; }
+            public decimal PaidTotal { get; set; }
+            public decimal DeletedCommissionTotal { get; set; }
+
+            public void Add(
+                decimal amount,
+                WeeklyCommissionPayoutStatus status,
+                bool isDeleted)
+            {
+                CommissionCount++;
+                TotalAmount += amount;
+                if (isDeleted)
+                {
+                    DeletedCommissionCount++;
+                    DeletedCommissionTotal += amount;
+                }
+
+                switch (status)
+                {
+                    case WeeklyCommissionPayoutStatus.NotEarned:
+                        NotEarnedCount++;
+                        break;
+                    case WeeklyCommissionPayoutStatus.Earned:
+                        EarnedCount++;
+                        EarnedTotal += amount;
+                        break;
+                    case WeeklyCommissionPayoutStatus.Held:
+                        HeldCount++;
+                        HeldTotal += amount;
+                        break;
+                    case WeeklyCommissionPayoutStatus.Released:
+                        ReleasedCount++;
+                        ReleasedTotal += amount;
+                        break;
+                    case WeeklyCommissionPayoutStatus.Paid:
+                        PaidCount++;
+                        PaidTotal += amount;
+                        break;
+                }
+            }
+        }
+
+        private sealed class InventoryCommissionRow
+        {
+            public Guid PeriodId { get; set; }
+            public decimal Amount { get; set; }
+            public WeeklyCommissionPayoutStatus Status { get; set; }
+            public bool IsDeleted { get; set; }
+        }
+
 
         private async Task<EntryWeeklyCommission> GetEntryCommissionAsync(
             Guid id,

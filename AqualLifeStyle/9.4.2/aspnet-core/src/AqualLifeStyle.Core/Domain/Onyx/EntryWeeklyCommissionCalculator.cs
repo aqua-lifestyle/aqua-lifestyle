@@ -38,17 +38,43 @@ namespace AqualLifeStyle.Domain.Onyx
                 throw new ArgumentNullException(nameof(customerObligations));
             }
 
+            return Calculate(
+                participation,
+                period,
+                terms,
+                EffectiveProgrammeNetwork.BuildAQGreen(
+                    networkParticipations,
+                    period.PeriodEnd),
+                customerObligations,
+                customerLoanAgreements);
+        }
+
+        public EntryWeeklyCommission Calculate(
+            EntryParticipation participation,
+            EntryCommissionPeriod period,
+            EntryCommissionTerms terms,
+            EffectiveProgrammeNetwork network,
+            IEnumerable<EntryMonthlyObligation> customerObligations,
+            IEnumerable<OnyxLoanAgreement> customerLoanAgreements = null)
+        {
+            if (participation == null) throw new ArgumentNullException(nameof(participation));
+            if (network == null) throw new ArgumentNullException(nameof(network));
+            if (customerObligations == null)
+            {
+                throw new ArgumentNullException(nameof(customerObligations));
+            }
+
             var highestCompletedLevel = (int)_networkQualificationEvaluator.Evaluate(
-                    participation.CustomerId,
-                    networkParticipations);
+                participation.CustomerId,
+                network);
             var hasOverdueOwnObligation = customerObligations.Any(obligation =>
                 obligation.EntryParticipationId == participation.Id &&
-                obligation.Status == EntryMonthlyObligationStatus.Overdue);
+                obligation.WasOverdueAt(period.PeriodEnd));
             var hasOverdueOwnLoan = (customerLoanAgreements ??
                     Array.Empty<OnyxLoanAgreement>())
                 .Any(agreement =>
                     agreement.EntryParticipationId == participation.Id &&
-                    agreement.RequiresPayoutHold);
+                    agreement.WasRequiringPayoutHoldAt(period.PeriodEnd));
 
             var holdReasons = new List<string>();
             if (hasOverdueOwnObligation)

@@ -27,7 +27,14 @@ namespace AqualLifeStyle.Domain.Onyx
             var qualified = participations
                 .Where(participation => participation.IsQualifiedForNetwork)
                 .ToList();
-            EnsureCustomerParticipationIsUnique(qualified);
+            var duplicateCustomer = qualified
+                .GroupBy(participation => participation.CustomerId)
+                .FirstOrDefault(group => group.Count() > 1);
+            if (duplicateCustomer != null)
+            {
+                throw new InvalidOperationException(
+                    $"Customer {duplicateCustomer.Key} has more than one qualified AQGreen participation.");
+            }
 
             if (qualified.All(participation => participation.CustomerId != customerId))
             {
@@ -37,19 +44,55 @@ namespace AqualLifeStyle.Domain.Onyx
             var byRecruiter = qualified
                 .Where(participation => participation.RecruiterCustomerId.HasValue)
                 .GroupBy(participation => participation.RecruiterCustomerId.Value)
-                .ToDictionary(group => group.Key, group => group.ToList());
-
-            if (!IsCompleteBranch(customerId, 1, byRecruiter))
+                .ToDictionary(
+                    group => group.Key,
+                    group => group
+                        .OrderBy(EffectiveProgrammeNetwork.CurrentQualifiedUnderRecruiterAt)
+                        .ThenBy(item => item.Id)
+                        .Take(BranchSize)
+                        .ToList());
+            if (!IsCompleteCurrentBranch(customerId, 1, byRecruiter))
             {
                 return EntryNetworkLevel.None;
             }
 
-            if (!IsCompleteBranch(customerId, 2, byRecruiter))
+            if (!IsCompleteCurrentBranch(customerId, 2, byRecruiter))
             {
                 return EntryNetworkLevel.Level1;
             }
 
-            return IsCompleteBranch(customerId, 3, byRecruiter)
+            return IsCompleteCurrentBranch(customerId, 3, byRecruiter)
+                ? EntryNetworkLevel.Level3
+                : EntryNetworkLevel.Level2;
+        }
+
+        public EntryNetworkLevel Evaluate(
+            int customerId,
+            EffectiveProgrammeNetwork network)
+        {
+            if (customerId <= 0) throw new ArgumentOutOfRangeException(nameof(customerId));
+            if (network == null) throw new ArgumentNullException(nameof(network));
+            if (network.Kind != ProgrammeNetworkKind.AQGreen)
+            {
+                throw new ArgumentException("An AQGreen network is required.", nameof(network));
+            }
+
+            if (!network.ContainsCustomer(customerId))
+            {
+                return EntryNetworkLevel.None;
+            }
+
+            if (!IsCompleteBranch(customerId, 1, network))
+            {
+                return EntryNetworkLevel.None;
+            }
+
+            if (!IsCompleteBranch(customerId, 2, network))
+            {
+                return EntryNetworkLevel.Level1;
+            }
+
+            return IsCompleteBranch(customerId, 3, network)
                 ? EntryNetworkLevel.Level3
                 : EntryNetworkLevel.Level2;
         }
@@ -57,34 +100,37 @@ namespace AqualLifeStyle.Domain.Onyx
         private static bool IsCompleteBranch(
             int customerId,
             int remainingDepth,
-            IReadOnlyDictionary<int, List<EntryParticipation>> byRecruiter)
+            EffectiveProgrammeNetwork network)
         {
             if (remainingDepth == 0)
             {
                 return true;
             }
 
-            if (!byRecruiter.TryGetValue(customerId, out var directRecruits) ||
-                directRecruits.Count != BranchSize)
+            var directRecruits = network.GetSelectedChildren(customerId);
+            if (directRecruits.Count < BranchSize)
             {
                 return false;
             }
 
             return directRecruits.All(recruit =>
-                IsCompleteBranch(recruit.CustomerId, remainingDepth - 1, byRecruiter));
+                IsCompleteBranch(recruit.CustomerId, remainingDepth - 1, network));
         }
 
-        private static void EnsureCustomerParticipationIsUnique(
-            IEnumerable<EntryParticipation> participations)
+        private static bool IsCompleteCurrentBranch(
+            int customerId,
+            int remainingDepth,
+            IReadOnlyDictionary<int, List<EntryParticipation>> byRecruiter)
         {
-            var duplicateCustomer = participations
-                .GroupBy(participation => participation.CustomerId)
-                .FirstOrDefault(group => group.Count() > 1);
-            if (duplicateCustomer != null)
+            if (remainingDepth == 0) return true;
+            if (!byRecruiter.TryGetValue(customerId, out var directRecruits) ||
+                directRecruits.Count < BranchSize)
             {
-                throw new InvalidOperationException(
-                    $"Customer {duplicateCustomer.Key} has more than one qualified AQGreen participation.");
+                return false;
             }
+
+            return directRecruits.All(recruit =>
+                IsCompleteCurrentBranch(recruit.CustomerId, remainingDepth - 1, byRecruiter));
         }
     }
 }

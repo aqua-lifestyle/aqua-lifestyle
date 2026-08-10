@@ -24,6 +24,7 @@ namespace AqualLifeStyle.Domain.Onyx
         public decimal OutstandingAmount { get; private set; }
         public string Currency { get; private set; }
         public string TermsVersion { get; private set; }
+        public string DuePolicyVersion { get; private set; }
         public DateTime DueAt { get; private set; }
         public int GracePeriodDays { get; private set; }
         public DateTime GracePeriodEndsAt { get; private set; }
@@ -34,6 +35,30 @@ namespace AqualLifeStyle.Domain.Onyx
         public DateTime? PaidAt { get; private set; }
         public bool IsOwnPayoutEligible => Status != EntryMonthlyObligationStatus.Overdue;
 
+        /// <summary>
+        /// Evaluates the obligation standing at a historical cutoff from immutable
+        /// facts only: settlement is proven by <see cref="PaidAt"/> and the
+        /// overdue boundary by <see cref="GracePeriodEndsAt"/>. The current
+        /// <see cref="Status"/> projection is never consulted, so later
+        /// assessments or payments cannot rewrite a closed commission cycle.
+        /// </summary>
+        public bool WasOverdueAt(DateTime cutoffUtc)
+        {
+            if (cutoffUtc == default)
+            {
+                throw new ArgumentException(
+                    "A cutoff time is required.",
+                    nameof(cutoffUtc));
+            }
+
+            if (PaidAt.HasValue && PaidAt.Value <= cutoffUtc)
+            {
+                return false;
+            }
+
+            return cutoffUtc > GracePeriodEndsAt;
+        }
+
         protected EntryMonthlyObligation()
         {
         }
@@ -42,7 +67,8 @@ namespace AqualLifeStyle.Domain.Onyx
             EntryParticipation participation,
             int periodYear,
             int periodMonth,
-            DateTime dueAt)
+            DateTime dueAt,
+            string duePolicyVersion)
         {
             if (participation == null)
             {
@@ -70,6 +96,26 @@ namespace AqualLifeStyle.Domain.Onyx
                 throw new ArgumentException("A payment due time is required.", nameof(dueAt));
             }
 
+            if (dueAt.Kind != DateTimeKind.Utc)
+            {
+                throw new ArgumentException("The payment due time must be UTC.", nameof(dueAt));
+            }
+
+            var normalizedDuePolicyVersion = duePolicyVersion?.Trim();
+            if (string.IsNullOrWhiteSpace(normalizedDuePolicyVersion))
+            {
+                throw new ArgumentException(
+                    "A due-policy version is required for a new monthly obligation.",
+                    nameof(duePolicyVersion));
+            }
+
+            if (normalizedDuePolicyVersion.Length > EntryMonthlyObligationDuePolicy.MaxVersionLength)
+            {
+                throw new ArgumentException(
+                    $"The due-policy version cannot exceed {EntryMonthlyObligationDuePolicy.MaxVersionLength} characters.",
+                    nameof(duePolicyVersion));
+            }
+
             Id = Guid.NewGuid();
             TenantId = participation.TenantId;
             EntryParticipationId = participation.Id;
@@ -80,6 +126,7 @@ namespace AqualLifeStyle.Domain.Onyx
             OutstandingAmount = AmountDue;
             Currency = participation.Currency;
             TermsVersion = participation.TermsVersion;
+            DuePolicyVersion = normalizedDuePolicyVersion;
             DueAt = dueAt;
             GracePeriodDays = participation.GracePeriodDays;
             GracePeriodEndsAt = dueAt.AddDays(GracePeriodDays);
@@ -90,13 +137,15 @@ namespace AqualLifeStyle.Domain.Onyx
             EntryParticipation participation,
             int periodYear,
             int periodMonth,
-            DateTime dueAt)
+            DateTime dueAt,
+            string duePolicyVersion)
         {
             return new EntryMonthlyObligation(
                 participation,
                 periodYear,
                 periodMonth,
-                dueAt);
+                dueAt,
+                duePolicyVersion);
         }
 
         public void AssessStatus(DateTime asOf)

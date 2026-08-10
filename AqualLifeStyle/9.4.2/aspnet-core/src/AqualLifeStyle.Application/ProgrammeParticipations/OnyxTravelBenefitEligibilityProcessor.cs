@@ -25,6 +25,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         public async Task<OnyxTravelBenefitEligibilityResult> SynchronizeAsync(
             int tenantId,
             IReadOnlyCollection<OnyxParticipation> networkParticipations,
+            EffectiveProgrammeNetwork effectiveNetwork,
+            DateTime eligibleAt,
             DateTime processedAt)
         {
             if (tenantId <= 0)
@@ -35,6 +37,18 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             if (networkParticipations == null)
             {
                 throw new ArgumentNullException(nameof(networkParticipations));
+            }
+
+            if (effectiveNetwork == null)
+            {
+                throw new ArgumentNullException(nameof(effectiveNetwork));
+            }
+
+            if (eligibleAt == default)
+            {
+                throw new ArgumentException(
+                    "A travel benefit eligibility cutoff is required.",
+                    nameof(eligibleAt));
             }
 
             if (processedAt == default)
@@ -67,10 +81,17 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         participation.Id,
                         out var existing))
                 {
+                    if (existing.TenantId != participation.TenantId ||
+                        existing.CustomerId != participation.CustomerId)
+                    {
+                        throw new InvalidOperationException(
+                            "The Onyx travel entitlement does not match its participation owner.");
+                    }
+
                     if (existing.Status == OnyxTravelBenefitStatus.WaitingPeriod &&
                         existing.IsWaitingPeriodComplete(processedAt))
                     {
-                        existing.ActivateAfterWaitingPeriod(processedAt);
+                        existing.ActivateAfterWaitingPeriod(existing.WaitingPeriodEndsAt);
                         activatedCount++;
                     }
 
@@ -78,8 +99,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 }
 
                 var qualifiedLevel = evaluator.Evaluate(
-                    participation,
-                    networkParticipations);
+                    participation.CustomerId,
+                    effectiveNetwork);
                 if (qualifiedLevel < terms.RequiredNetworkLevel)
                 {
                     continue;
@@ -88,12 +109,16 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 var entitlement =
                     OnyxTravelBenefitEntitlement.GrantForQualifiedParticipant(
                         participation,
-                        networkParticipations,
-                        evaluator,
+                        qualifiedLevel,
                         terms,
-                        processedAt);
+                        eligibleAt);
                 await _entitlementRepository.InsertAsync(entitlement);
                 grantedCount++;
+                if (entitlement.IsWaitingPeriodComplete(processedAt))
+                {
+                    entitlement.ActivateAfterWaitingPeriod(entitlement.WaitingPeriodEndsAt);
+                    activatedCount++;
+                }
             }
 
             return new OnyxTravelBenefitEligibilityResult(

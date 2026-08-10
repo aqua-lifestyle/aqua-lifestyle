@@ -24,6 +24,9 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
             builder.Property(obligation => obligation.OutstandingAmount).HasPrecision(18, 2).IsRequired();
             builder.Property(obligation => obligation.Currency).HasMaxLength(3).IsRequired();
             builder.Property(obligation => obligation.TermsVersion).HasMaxLength(32).IsRequired();
+            builder.Property(obligation => obligation.DuePolicyVersion)
+                .HasMaxLength(EntryMonthlyObligationDuePolicy.MaxVersionLength)
+                .IsRequired(false);
             builder.Property(obligation => obligation.DueAt).IsRequired();
             builder.Property(obligation => obligation.GracePeriodDays).IsRequired();
             builder.Property(obligation => obligation.GracePeriodEndsAt).IsRequired();
@@ -42,6 +45,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
                     obligation.CustomerId,
                     obligation.Status
                 });
+            builder.HasIndex(obligation => obligation.PaymentId).IsUnique();
 
             builder.HasOne<EntryParticipation>()
                 .WithMany()
@@ -56,6 +60,12 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
             builder.HasOne<MemberPayment>()
                 .WithMany()
                 .HasForeignKey(obligation => obligation.PaymentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasOne<EntryMonthlyObligationDuePolicy>()
+                .WithMany()
+                .HasPrincipalKey(policy => policy.Version)
+                .HasForeignKey(obligation => obligation.DuePolicyVersion)
                 .OnDelete(DeleteBehavior.Restrict);
         }
     }

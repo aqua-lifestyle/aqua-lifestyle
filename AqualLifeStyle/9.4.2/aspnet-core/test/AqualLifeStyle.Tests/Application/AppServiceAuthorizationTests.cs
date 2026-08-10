@@ -162,6 +162,7 @@ namespace AqualLifeStyle.Tests.Application
             AssertAuthorizeAttribute(typeof(AdminTenantAppService), nameof(AdminTenantAppService.CreateAsync), AquaPermissions.Admin.Tenants.Create);
             AssertAuthorizeAttribute(typeof(AdminTenantAppService), nameof(AdminTenantAppService.EditAsync), AquaPermissions.Admin.Tenants.Edit);
             AssertAuthorizeAttribute(typeof(AdminTenantAppService), nameof(AdminTenantAppService.SetActivationAsync), AquaPermissions.Admin.Tenants.Activate);
+            AssertAuthorizeAttribute(typeof(AdminTenantAppService), nameof(AdminTenantAppService.ObserveActivationStateAsync), AquaPermissions.Admin.Tenants.Activate);
             AssertAuthorizeAttribute(typeof(AdminTenantAppService), nameof(AdminTenantAppService.AssignAreaLeaderAsync), AquaPermissions.Admin.Tenants.AssignLeader);
         }
 
@@ -225,6 +226,10 @@ namespace AqualLifeStyle.Tests.Application
                 typeof(ClubMemberEntryMonthlyObligationAppService),
                 nameof(ClubMemberEntryMonthlyObligationAppService.GetMyObligationsAsync),
                 AquaPermissions.EntryMonthlyObligations.ViewSelf);
+            AssertAuthorizeAttribute(
+                typeof(ClubMemberEntryMonthlyObligationAppService),
+                nameof(ClubMemberEntryMonthlyObligationAppService.CreateCheckoutAsync),
+                AquaPermissions.EntryMonthlyObligations.Pay);
             AssertAuthorizeAttribute(
                 typeof(AdminEntryMonthlyObligationAppService),
                 nameof(AdminEntryMonthlyObligationAppService.GetAllAsync),

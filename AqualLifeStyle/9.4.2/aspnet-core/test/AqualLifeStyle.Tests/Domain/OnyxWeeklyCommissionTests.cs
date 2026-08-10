@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using AqualLifeStyle.Domain.Onyx;
 using Xunit;
 
@@ -107,6 +108,161 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
+        public void MoreThanFiveActiveDirectRecruits_UsesTheEarliestFive()
+        {
+            var network = OnyxNetworkTestBuilder.BuildLevelOneNetwork(
+                OnyxNetworkQualificationEvaluator.BranchSize + 1,
+                PlanTerms,
+                EffectiveFrom);
+
+            var commission = Calculate(network);
+
+            Assert.Equal((int)OnyxNetworkLevel.Level1, commission.HighestQualifiedNetworkLevel);
+            Assert.Equal(250m, commission.TotalAmount);
+        }
+
+        [Fact]
+        public void CutoffNetwork_UsesPlacementBeforeAPostCutoffCorrection()
+        {
+            var network = OnyxNetworkTestBuilder.BuildLevelOneNetwork(
+                OnyxNetworkQualificationEvaluator.BranchSize,
+                PlanTerms,
+                EffectiveFrom);
+            var originalRecruiter = network[0];
+            var correctedParticipation = network[1];
+            var newRecruiter = OnyxParticipation.StartDirectIndependently(
+                tenantId: 1,
+                customerId: 100,
+                onyxMembershipId: 7,
+                PlanTerms,
+                EffectiveFrom);
+            var payment = AqualLifeStyle.Domain.Payments.MemberPayment.CreatePending(
+                1,
+                100,
+                AqualLifeStyle.Domain.Payments.MemberPaymentPurpose.OnyxDirectEntry,
+                PlanTerms.DirectEntryAmount,
+                "Test",
+                "new-recruiter",
+                EffectiveFrom);
+            payment.Confirm(EffectiveFrom.AddMinutes(1));
+            newRecruiter.ApplyConfirmedDirectEntryPayment(payment);
+            newRecruiter.ApproveByAdministrator(1, EffectiveFrom.AddMinutes(2));
+            network.Add(newRecruiter);
+            var cutoff = EffectiveFrom.AddDays(7);
+            correctedParticipation.CorrectRecruiter(
+                newRecruiter,
+                administratorUserId: 1,
+                reason: "Correct placement",
+                correctedAt: cutoff.AddMinutes(1));
+
+            var cutoffNetwork = EffectiveProgrammeNetwork.BuildOnyx(network, cutoff);
+            var evaluator = new OnyxNetworkQualificationEvaluator();
+
+            Assert.Equal(
+                OnyxNetworkLevel.Level1,
+                evaluator.Evaluate(originalRecruiter.CustomerId, cutoffNetwork));
+            Assert.Equal(
+                OnyxNetworkLevel.None,
+                evaluator.Evaluate(newRecruiter.CustomerId, cutoffNetwork));
+        }
+
+        [Fact]
+        public void EarliestFive_DoNotUseALaterMoreFavourableBranch()
+        {
+            var network = OnyxNetworkTestBuilder.BuildLevelOneNetwork(
+                OnyxNetworkQualificationEvaluator.BranchSize + 1,
+                PlanTerms,
+                EffectiveFrom);
+            var directRecruits = network.Skip(1)
+                .OrderBy(participation => participation.Id)
+                .ToList();
+            var recruitersWithCompleteDownlines = directRecruits
+                .Take(4)
+                .Append(directRecruits[5]);
+            var nextCustomerId = 100;
+            foreach (var recruiter in recruitersWithCompleteDownlines)
+            {
+                for (var index = 0;
+                     index < OnyxNetworkQualificationEvaluator.BranchSize;
+                     index++)
+                {
+                    network.Add(OnyxNetworkTestBuilder.CreateActiveUnderRecruiter(
+                        nextCustomerId++,
+                        recruiter,
+                        PlanTerms,
+                        EffectiveFrom));
+                }
+            }
+
+            var effectiveNetwork = EffectiveProgrammeNetwork.BuildOnyx(
+                network,
+                EffectiveFrom.AddDays(7));
+            var level = new OnyxNetworkQualificationEvaluator().Evaluate(
+                network[0].CustomerId,
+                effectiveNetwork);
+
+            Assert.Equal(OnyxNetworkLevel.Level1, level);
+        }
+
+        [Fact]
+        public void CurrentNetwork_OrdersByCurrentPlacementEffectiveTime()
+        {
+            var network = OnyxNetworkTestBuilder.BuildLevelOneNetwork(
+                OnyxNetworkQualificationEvaluator.BranchSize,
+                PlanTerms,
+                EffectiveFrom.AddDays(1));
+            var root = network[0];
+            var otherRecruiter = OnyxParticipation.StartDirectIndependently(
+                1,
+                90,
+                7,
+                PlanTerms,
+                EffectiveFrom);
+            var recruiterPayment = AqualLifeStyle.Domain.Payments.MemberPayment.CreatePending(
+                1,
+                90,
+                AqualLifeStyle.Domain.Payments.MemberPaymentPurpose.OnyxDirectEntry,
+                PlanTerms.DirectEntryAmount,
+                "Test",
+                "current-order-recruiter",
+                EffectiveFrom);
+            recruiterPayment.Confirm(EffectiveFrom.AddMinutes(1));
+            otherRecruiter.ApplyConfirmedDirectEntryPayment(recruiterPayment);
+            otherRecruiter.ApproveByAdministrator(1, EffectiveFrom.AddMinutes(2));
+            var movedRecruit = OnyxNetworkTestBuilder.CreateActiveUnderRecruiter(
+                91,
+                otherRecruiter,
+                PlanTerms,
+                EffectiveFrom);
+            movedRecruit.CorrectRecruiter(
+                root,
+                1,
+                "Move after the original five placements",
+                EffectiveFrom.AddDays(2));
+            network.Add(otherRecruiter);
+            network.Add(movedRecruit);
+
+            var nextCustomerId = 100;
+            foreach (var recruiter in network.Skip(1).Take(4).Append(movedRecruit))
+            {
+                for (var index = 0;
+                     index < OnyxNetworkQualificationEvaluator.BranchSize;
+                     index++)
+                {
+                    network.Add(OnyxNetworkTestBuilder.CreateActiveUnderRecruiter(
+                        nextCustomerId++,
+                        recruiter,
+                        PlanTerms,
+                        EffectiveFrom.AddDays(2)));
+                }
+            }
+
+            var level = new OnyxNetworkQualificationEvaluator().Evaluate(root, network);
+
+            Assert.Equal(OnyxNetworkLevel.Level1, level);
+        }
+
+        [Fact]
         public void IncompleteLevelTwo_DoesNotEarnAPartialLevelTwoComponent()
         {
             var network = OnyxNetworkTestBuilder.BuildLevelOneNetwork(
@@ -156,6 +312,47 @@ namespace AqualLifeStyle.Tests.Domain
                     Assert.Equal(2, levelTwo.Level);
                     Assert.Equal(500m, levelTwo.Amount);
                 });
+        }
+
+        [Fact]
+        public void QualifiedNetwork_EarnsAgainInEachSubsequentClosedCycle()
+        {
+            var network = OnyxNetworkTestBuilder.BuildLevelOneNetwork(
+                OnyxNetworkQualificationEvaluator.BranchSize,
+                PlanTerms,
+                EffectiveFrom);
+            var firstPeriod = CreatePeriod(EffectiveFrom.AddDays(5));
+            var secondPeriod = CreatePeriod(EffectiveFrom.AddDays(12));
+
+            var firstCommission = Calculate(network, firstPeriod);
+            var secondCommission = Calculate(network, secondPeriod);
+
+            Assert.Equal(250m, firstCommission.TotalAmount);
+            Assert.Equal(WeeklyCommissionPayoutStatus.Earned,
+                firstCommission.PayoutStatus);
+            Assert.Equal(250m, secondCommission.TotalAmount);
+            Assert.Equal(WeeklyCommissionPayoutStatus.Earned,
+                secondCommission.PayoutStatus);
+            Assert.NotEqual(firstCommission.CommissionPeriodId,
+                secondCommission.CommissionPeriodId);
+        }
+
+        [Fact]
+        public void SamePeriodReevaluation_YieldsIdenticalResultWithoutDuplicateComponents()
+        {
+            var network = OnyxNetworkTestBuilder.BuildCompleteNetwork(
+                maximumDepth: 2,
+                PlanTerms,
+                EffectiveFrom);
+            var period = CreatePeriod(EffectiveFrom.AddDays(5));
+
+            var first = Calculate(network, period);
+            var repeated = Calculate(network, period);
+
+            Assert.Equal(first.TotalAmount, repeated.TotalAmount);
+            Assert.Equal(first.Components.Count, repeated.Components.Count);
+            Assert.Equal(first.HighestCommissionedLevel,
+                repeated.HighestCommissionedLevel);
         }
 
         [Fact]
@@ -231,15 +428,24 @@ namespace AqualLifeStyle.Tests.Domain
         private static OnyxWeeklyCommission Calculate(
             IReadOnlyCollection<OnyxParticipation> network)
         {
-            var periodStart = EffectiveFrom.AddDays(5);
+            return Calculate(network, CreatePeriod(EffectiveFrom.AddDays(5)));
+        }
+
+        private static OnyxCommissionPeriod CreatePeriod(DateTime periodStart)
+        {
             var periodEnd = periodStart.AddDays(7).AddTicks(-1);
-            var period = OnyxCommissionPeriod.CreateClosedPeriod(
+            return OnyxCommissionPeriod.CreateClosedPeriod(
                 1,
                 periodStart,
                 periodEnd,
                 "Africa/Johannesburg",
-                periodEnd.AddMinutes(1),
-                CommissionTerms);
+                periodEnd.AddMinutes(1), CommissionTerms);
+        }
+
+        private static OnyxWeeklyCommission Calculate(
+            IReadOnlyCollection<OnyxParticipation> network,
+            OnyxCommissionPeriod period)
+        {
             var calculator = new OnyxWeeklyCommissionCalculator(
                 new OnyxNetworkQualificationEvaluator());
 

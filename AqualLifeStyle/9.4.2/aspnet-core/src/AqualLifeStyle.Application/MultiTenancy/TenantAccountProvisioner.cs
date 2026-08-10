@@ -22,6 +22,7 @@ namespace AqualLifeStyle.MultiTenancy
         public string AdminEmailAddress { get; set; }
         public string ConnectionString { get; set; }
         public bool IsActive { get; set; }
+        public string Justification { get; set; }
     }
 
     public interface ITenantAccountProvisioner
@@ -39,11 +40,15 @@ namespace AqualLifeStyle.MultiTenancy
         private readonly IUnitOfWorkManager _unitOfWorkManager;
         private readonly ILocalizationManager _localizationManager;
         private readonly InternalAccountInvitationManager _invitationManager;
+        private readonly IAreaActivationStateRecorder _activationStateRecorder;
+        private readonly IAreaActivationStateClock _activationStateClock;
 
         public TenantAccountProvisioner(TenantManager tenantManager, EditionManager editionManager,
             UserManager userManager, RoleManager roleManager, IAbpZeroDbMigrator databaseMigrator,
             IUnitOfWorkManager unitOfWorkManager, ILocalizationManager localizationManager,
-            InternalAccountInvitationManager invitationManager)
+            InternalAccountInvitationManager invitationManager,
+            IAreaActivationStateRecorder activationStateRecorder,
+            IAreaActivationStateClock activationStateClock)
         {
             _tenantManager = tenantManager;
             _editionManager = editionManager;
@@ -53,6 +58,8 @@ namespace AqualLifeStyle.MultiTenancy
             _unitOfWorkManager = unitOfWorkManager;
             _localizationManager = localizationManager;
             _invitationManager = invitationManager;
+            _activationStateRecorder = activationStateRecorder;
+            _activationStateClock = activationStateClock;
         }
 
         public async Task<Tenant> ProvisionAsync(TenantProvisioningRequest request)
@@ -67,6 +74,16 @@ namespace AqualLifeStyle.MultiTenancy
             var defaultEdition = await _editionManager.FindByNameAsync(EditionManager.DefaultEditionName);
             if (defaultEdition != null) tenant.EditionId = defaultEdition.Id;
             await _tenantManager.CreateAsync(tenant);
+            await _unitOfWorkManager.Current.SaveChangesAsync();
+            var effectiveAt = await _activationStateClock.GetUtcNowAsync();
+            await _activationStateRecorder.RecordAsync(
+                tenant.Id,
+                tenant.IsActive,
+                AreaActivationStateRecordKind.Provisioned,
+                string.IsNullOrWhiteSpace(request.Justification)
+                    ? "Area provisioned through tenant administration."
+                    : request.Justification,
+                effectiveAt);
             await _unitOfWorkManager.Current.SaveChangesAsync();
             _databaseMigrator.CreateOrMigrateForTenant(tenant);
 

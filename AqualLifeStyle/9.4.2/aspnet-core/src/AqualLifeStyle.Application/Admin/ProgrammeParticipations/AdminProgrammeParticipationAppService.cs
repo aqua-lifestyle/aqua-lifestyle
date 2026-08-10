@@ -36,6 +36,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         private readonly IRepository<Membership> _membershipRepository;
         private readonly IRepository<MemberPayment, Guid> _paymentRepository;
         private readonly IRepository<AQGreenJoiningCheckout, Guid> _aqGreenJoiningCheckoutRepository;
+        private readonly IRepository<AQGreenMonthlyObligationCheckout, Guid>
+            _monthlyObligationCheckoutRepository;
+        private readonly IRepository<EntryMonthlyObligation, Guid>
+            _monthlyObligationRepository;
         private readonly IRepository<Tenant> _tenantRepository;
         private readonly IProgrammeRecruiterCorrectionPolicyResolver _correctionPolicyResolver;
         private readonly IProgrammeRecruiterCorrectionLock _correctionLock;
@@ -55,6 +59,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             IRepository<Membership> membershipRepository,
             IRepository<MemberPayment, Guid> paymentRepository,
             IRepository<AQGreenJoiningCheckout, Guid> aqGreenJoiningCheckoutRepository,
+            IRepository<AQGreenMonthlyObligationCheckout, Guid>
+                monthlyObligationCheckoutRepository,
+            IRepository<EntryMonthlyObligation, Guid> monthlyObligationRepository,
             IRepository<Tenant> tenantRepository,
             IProgrammeRecruiterCorrectionPolicyResolver correctionPolicyResolver,
             IProgrammeRecruiterCorrectionLock correctionLock,
@@ -73,6 +80,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             _membershipRepository = membershipRepository;
             _paymentRepository = paymentRepository;
             _aqGreenJoiningCheckoutRepository = aqGreenJoiningCheckoutRepository;
+            _monthlyObligationCheckoutRepository = monthlyObligationCheckoutRepository;
+            _monthlyObligationRepository = monthlyObligationRepository;
             _tenantRepository = tenantRepository;
             _correctionPolicyResolver = correctionPolicyResolver;
             _correctionLock = correctionLock;
@@ -271,7 +280,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                             "Onyx graduation requires reconciliation.",
                             "An Onyx participation already exists without this graduation decision.");
 
-                    var network = await _entryParticipationRepository.GetAll()
+                    var network = await _entryParticipationRepository
+                        .GetAllIncluding(item => item.RecruiterCorrections)
                         .Where(item => item.TenantId == loan.TenantId &&
                                        item.Status == EntryParticipationStatus.Active)
                         .ToListAsync();
@@ -738,6 +748,112 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             }
         }
 
+        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation)]
+        public async Task<PagedResultDto<MonthlyObligationCheckoutReconciliationDto>>
+            GetMonthlyObligationCheckoutReconciliationAsync(
+                MonthlyObligationCheckoutReconciliationListInput input)
+        {
+            input ??= new MonthlyObligationCheckoutReconciliationListInput();
+            ValidateRequestedTenant(input.TenantId, "Monthly obligation checkout reconciliation");
+            if (!AbpSession.TenantId.HasValue &&
+                !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
+                throw new AbpAuthorizationException(
+                    "Host-wide monthly obligation reconciliation access requires permission to view all Areas.");
+
+            using (DisableAllTenantDataFiltersForHost())
+            {
+                var query =
+                    from checkout in _monthlyObligationCheckoutRepository.GetAll()
+                    join obligation in _monthlyObligationRepository.GetAll()
+                        on checkout.EntryMonthlyObligationId equals obligation.Id
+                    join participation in _entryParticipationRepository.GetAll()
+                        on checkout.EntryParticipationId equals participation.Id
+                    join customer in _customerRepository.GetAll()
+                        on checkout.CustomerId equals customer.Id
+                    join tenant in _tenantRepository.GetAll()
+                        on checkout.TenantId equals tenant.Id
+                    where checkout.Status == HostedPaymentCheckoutStatus.Completed
+                    select new MonthlyObligationCheckoutReconciliationRow
+                    {
+                        Checkout = checkout,
+                        Obligation = obligation,
+                        Participation = participation,
+                        Customer = customer,
+                        AreaName = tenant.TenancyName
+                    };
+                if (AbpSession.TenantId.HasValue)
+                {
+                    var tenantId = AbpSession.TenantId.Value;
+                    query = query.Where(row => row.Checkout.TenantId == tenantId);
+                }
+                else if (input.TenantId.HasValue)
+                {
+                    var tenantId = input.TenantId.Value;
+                    query = query.Where(row => row.Checkout.TenantId == tenantId);
+                }
+                if (input.PeriodYear.HasValue)
+                {
+                    var periodYear = input.PeriodYear.Value;
+                    query = query.Where(row => row.Checkout.PeriodYear == periodYear);
+                }
+                if (input.PeriodMonth.HasValue)
+                {
+                    var periodMonth = input.PeriodMonth.Value;
+                    query = query.Where(row => row.Checkout.PeriodMonth == periodMonth);
+                }
+
+                var total = await query.CountAsync();
+                var rows = await query
+                    .OrderByDescending(row => row.Checkout.CompletedAt)
+                    .ThenByDescending(row => row.Checkout.CreatedAt)
+                    .Skip(input.SkipCount)
+                    .Take(input.MaxResultCount)
+                    .ToListAsync();
+                var paymentIds = rows.Select(row => row.Checkout.PaymentId)
+                    .Where(paymentId => paymentId.HasValue)
+                    .Select(paymentId => paymentId.Value)
+                    .Distinct()
+                    .ToArray();
+                var payments = paymentIds.Length == 0
+                    ? new Dictionary<Guid, MemberPayment>()
+                    : await _paymentRepository.GetAll()
+                        .Where(payment => paymentIds.Contains(payment.Id))
+                        .ToDictionaryAsync(payment => payment.Id);
+
+                return new PagedResultDto<MonthlyObligationCheckoutReconciliationDto>(
+                    total,
+                    rows.Select(row => new MonthlyObligationCheckoutReconciliationDto
+                    {
+                        CheckoutId = row.Checkout.Id,
+                        TenantId = row.Checkout.TenantId,
+                        AreaName = row.AreaName,
+                        ClubMemberNumber = row.Customer.ClubMemberNumber,
+                        CustomerName = row.Customer.Name,
+                        PeriodYear = row.Checkout.PeriodYear,
+                        PeriodMonth = row.Checkout.PeriodMonth,
+                        Amount = row.Checkout.Amount,
+                        Currency = row.Checkout.Currency,
+                        Status = row.Checkout.Status,
+                        ProviderCheckoutId = row.Checkout.ProviderCheckoutId,
+                        PaymentId = row.Checkout.PaymentId,
+                        ProviderPaymentReference =
+                            row.Checkout.PaymentId.HasValue &&
+                            payments.TryGetValue(row.Checkout.PaymentId.Value, out var payment)
+                                ? payment.ExternalReference
+                                : null,
+                        AllocationStatus = row.Checkout.AllocationStatus,
+                        AllocationEvidence = row.Checkout.AllocationEvidence,
+                        CreatedAt = row.Checkout.CreatedAt,
+                        CompletedAt = row.Checkout.CompletedAt,
+                        IsPaymentAllocated = row.Checkout.PaymentId.HasValue &&
+                                             row.Obligation.PaymentId.HasValue &&
+                                             row.Checkout.PaymentId.Value ==
+                                             row.Obligation.PaymentId.Value,
+                        RecordedObligationStatus = row.Obligation.Status
+                    }).ToList());
+            }
+        }
+
         private async Task<PagedResultDto<AdminProgrammeParticipationDto>>
             GetEntryParticipationsAsync(AdminProgrammeParticipationListInput input)
         {
@@ -1057,6 +1173,15 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             public EntryParticipation Participation { get; init; }
             public Customer Customer { get; init; }
+        }
+
+        private sealed class MonthlyObligationCheckoutReconciliationRow
+        {
+            public AQGreenMonthlyObligationCheckout Checkout { get; init; }
+            public EntryMonthlyObligation Obligation { get; init; }
+            public EntryParticipation Participation { get; init; }
+            public Customer Customer { get; init; }
+            public string AreaName { get; init; }
         }
 
         private sealed class OnyxParticipationQueryRow

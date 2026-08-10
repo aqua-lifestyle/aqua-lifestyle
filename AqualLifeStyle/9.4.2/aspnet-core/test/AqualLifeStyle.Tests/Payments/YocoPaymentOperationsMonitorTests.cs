@@ -32,7 +32,8 @@ namespace AqualLifeStyle.Tests.Payments
         [Fact]
         public async Task RunOnceAsync_EmitsOneAggregateAlertForStaleCheckouts()
         {
-            var detector = new Mock<StaleYocoCheckoutDetector>(null!, null!, null!);
+            var detector = new Mock<StaleYocoCheckoutDetector>(
+                null!, null!, null!, null!);
             detector.Setup(service => service.DetectAsync(It.IsAny<DateTime>()))
                 .ReturnsAsync(new StaleYocoCheckoutSnapshot(
                     aqGreenCount: 2,
@@ -65,7 +66,8 @@ namespace AqualLifeStyle.Tests.Payments
         [Fact]
         public async Task RunOnceAsync_DoesNotAlertWhenNoCheckoutIsStale()
         {
-            var detector = new Mock<StaleYocoCheckoutDetector>(null!, null!, null!);
+            var detector = new Mock<StaleYocoCheckoutDetector>(
+                null!, null!, null!, null!);
             detector.Setup(service => service.DetectAsync(It.IsAny<DateTime>()))
                 .ReturnsAsync(new StaleYocoCheckoutSnapshot(0, 0, null));
             var logger = new TestLogger<YocoPaymentOperationsMonitor>();
@@ -83,7 +85,8 @@ namespace AqualLifeStyle.Tests.Payments
         [Fact]
         public async Task RunOnceAsync_AlertsAndRethrowsWhenMonitoringFails()
         {
-            var detector = new Mock<StaleYocoCheckoutDetector>(null!, null!, null!);
+            var detector = new Mock<StaleYocoCheckoutDetector>(
+                null!, null!, null!, null!);
             detector.Setup(service => service.DetectAsync(It.IsAny<DateTime>()))
                 .ThrowsAsync(new InvalidOperationException("Database unavailable"));
             var logger = new TestLogger<YocoPaymentOperationsMonitor>();

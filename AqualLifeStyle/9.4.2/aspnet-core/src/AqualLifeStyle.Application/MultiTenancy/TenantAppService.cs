@@ -9,6 +9,7 @@ using Abp.IdentityFramework;
 using Abp.Linq.Extensions;
 using Abp.MultiTenancy;
 using Abp.Runtime.Security;
+using Abp.UI;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
@@ -21,16 +22,13 @@ namespace AqualLifeStyle.MultiTenancy
     [AbpAuthorize(PermissionNames.Pages_Tenants)]
     public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, PagedTenantResultRequestDto, CreateTenantDto, TenantDto>, ITenantAppService
     {
-        private readonly TenantManager _tenantManager;
         private readonly ITenantAccountProvisioner _tenantAccountProvisioner;
 
         public TenantAppService(
             IRepository<Tenant, int> repository,
-            TenantManager tenantManager,
             ITenantAccountProvisioner tenantAccountProvisioner)
             : base(repository)
         {
-            _tenantManager = tenantManager;
             _tenantAccountProvisioner = tenantAccountProvisioner;
         }
 
@@ -41,7 +39,8 @@ namespace AqualLifeStyle.MultiTenancy
             var tenant = await _tenantAccountProvisioner.ProvisionAsync(new TenantProvisioningRequest
             {
                 TenancyName = input.TenancyName, Name = input.Name, AdminEmailAddress = input.AdminEmailAddress,
-                ConnectionString = input.ConnectionString, IsActive = input.IsActive
+                ConnectionString = input.ConnectionString, IsActive = input.IsActive,
+                Justification = "Area provisioned through legacy tenant administration."
             });
 
             return MapToEntityDto(tenant);
@@ -59,15 +58,18 @@ namespace AqualLifeStyle.MultiTenancy
             // Manually mapped since TenantDto contains non-editable properties too.
             entity.Name = updateInput.Name;
             entity.TenancyName = updateInput.TenancyName;
-            entity.IsActive = updateInput.IsActive;
+            if (entity.IsActive != updateInput.IsActive)
+            {
+                throw new UserFriendlyException(
+                    "Area activation must be changed through the audited Area activation action.");
+            }
         }
 
-        public override async Task DeleteAsync(EntityDto<int> input)
+        public override Task DeleteAsync(EntityDto<int> input)
         {
             CheckDeletePermission();
-
-            var tenant = await _tenantManager.GetByIdAsync(input.Id);
-            await _tenantManager.DeleteAsync(tenant);
+            throw new UserFriendlyException(
+                "Area deletion is unavailable because financial history must be preserved. Deactivate the Area instead.");
         }
 
         private void CheckErrors(IdentityResult identityResult)

@@ -55,28 +55,70 @@ namespace AqualLifeStyle.Domain.Onyx
                 return OnyxNetworkLevel.None;
             }
 
-            var activeParticipations = networkParticipations
+            var active = networkParticipations
                 .Where(candidate => candidate.Status == OnyxParticipationStatus.Active)
                 .ToList();
-            EnsureCustomerParticipationIsUnique(activeParticipations);
+            var duplicateCustomer = active
+                .GroupBy(candidate => candidate.CustomerId)
+                .FirstOrDefault(group => group.Count() > 1);
+            if (duplicateCustomer != null)
+            {
+                throw new InvalidOperationException(
+                    $"Customer {duplicateCustomer.Key} has more than one active Onyx participation.");
+            }
 
-            if (activeParticipations.All(candidate => candidate.Id != participation.Id))
+            if (active.All(candidate => candidate.Id != participation.Id))
             {
                 return OnyxNetworkLevel.None;
             }
 
-            var activeParticipationsByRecruiter = activeParticipations
+            var byRecruiter = active
                 .Where(candidate => candidate.RecruiterCustomerId.HasValue)
                 .GroupBy(candidate => candidate.RecruiterCustomerId.Value)
-                .ToDictionary(group => group.Key, group => group.ToList());
+                .ToDictionary(
+                    group => group.Key,
+                    group => group
+                        .OrderBy(EffectiveProgrammeNetwork.CurrentQualifiedUnderRecruiterAt)
+                        .ThenBy(item => item.Id)
+                        .Take(BranchSize)
+                        .ToList());
+            var highest = OnyxNetworkLevel.None;
+            for (var level = 1; level <= HighestConfirmedStructuralLevel; level++)
+            {
+                if (!IsCompleteCurrentBranch(participation.CustomerId, level, byRecruiter))
+                {
+                    break;
+                }
+
+                highest = (OnyxNetworkLevel)level;
+            }
+
+            return highest;
+        }
+
+        public OnyxNetworkLevel Evaluate(
+            int customerId,
+            EffectiveProgrammeNetwork network)
+        {
+            if (customerId <= 0) throw new ArgumentOutOfRangeException(nameof(customerId));
+            if (network == null) throw new ArgumentNullException(nameof(network));
+            if (network.Kind != ProgrammeNetworkKind.Onyx)
+            {
+                throw new ArgumentException("An Onyx network is required.", nameof(network));
+            }
+
+            if (!network.ContainsCustomer(customerId))
+            {
+                return OnyxNetworkLevel.None;
+            }
 
             var highestCompletedLevel = OnyxNetworkLevel.None;
             for (var level = 1; level <= HighestConfirmedStructuralLevel; level++)
             {
                 if (!IsCompleteBranch(
-                        participation.CustomerId,
+                        customerId,
                         level,
-                        activeParticipationsByRecruiter))
+                        network))
                 {
                     break;
                 }
@@ -90,17 +132,15 @@ namespace AqualLifeStyle.Domain.Onyx
         private static bool IsCompleteBranch(
             int customerId,
             int remainingDepth,
-            IReadOnlyDictionary<int, List<OnyxParticipation>> activeParticipationsByRecruiter)
+            EffectiveProgrammeNetwork network)
         {
             if (remainingDepth == 0)
             {
                 return true;
             }
 
-            if (!activeParticipationsByRecruiter.TryGetValue(
-                    customerId,
-                    out var directRecruits) ||
-                directRecruits.Count != BranchSize)
+            var directRecruits = network.GetSelectedChildren(customerId);
+            if (directRecruits.Count < BranchSize)
             {
                 return false;
             }
@@ -109,20 +149,23 @@ namespace AqualLifeStyle.Domain.Onyx
                 IsCompleteBranch(
                     recruit.CustomerId,
                     remainingDepth - 1,
-                    activeParticipationsByRecruiter));
+                    network));
         }
 
-        private static void EnsureCustomerParticipationIsUnique(
-            IEnumerable<OnyxParticipation> activeParticipations)
+        private static bool IsCompleteCurrentBranch(
+            int customerId,
+            int remainingDepth,
+            IReadOnlyDictionary<int, List<OnyxParticipation>> byRecruiter)
         {
-            var duplicateCustomer = activeParticipations
-                .GroupBy(participation => participation.CustomerId)
-                .FirstOrDefault(group => group.Count() > 1);
-            if (duplicateCustomer != null)
+            if (remainingDepth == 0) return true;
+            if (!byRecruiter.TryGetValue(customerId, out var directRecruits) ||
+                directRecruits.Count < BranchSize)
             {
-                throw new InvalidOperationException(
-                    $"Customer {duplicateCustomer.Key} has more than one active Onyx participation.");
+                return false;
             }
+
+            return directRecruits.All(recruit =>
+                IsCompleteCurrentBranch(recruit.CustomerId, remainingDepth - 1, byRecruiter));
         }
     }
 }

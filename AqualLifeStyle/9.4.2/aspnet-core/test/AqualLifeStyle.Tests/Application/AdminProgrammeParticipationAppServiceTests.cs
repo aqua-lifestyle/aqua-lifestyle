@@ -90,6 +90,169 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task Administrator_CanReviewMonthlyObligationCheckoutReconciliationQueue()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"monthly-reconciliation-{suffix}",
+                $"monthly-reconciliation-{suffix}@example.com");
+            var checkoutIds = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    $"Monthly Reconciliation {suffix}",
+                    new EmailAddress($"monthly-reconciliation-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    LegacySplitPaymentTerms,
+                    EffectiveFrom);
+                context.EntryParticipations.Add(participation);
+                var activationPayments = Activate(
+                    participation,
+                    customer.Id,
+                    $"monthly-reconciliation-{suffix}");
+                context.MemberPayments.AddRange(activationPayments);
+                await context.SaveChangesAsync();
+
+                var allocatedObligation = EntryMonthlyObligation.Create(
+                    participation,
+                    2026,
+                    7,
+                    new DateTime(2026, 7, 10, 0, 0, 0, DateTimeKind.Utc),
+                    "monthly-policy-v1");
+                var unallocatedObligation = EntryMonthlyObligation.Create(
+                    participation,
+                    2026,
+                    8,
+                    new DateTime(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc),
+                    "monthly-policy-v1");
+                context.EntryMonthlyObligationDuePolicies.Add(
+                    EntryMonthlyObligationDuePolicy.Create(
+                        "monthly-policy-v1",
+                        10,
+                        EntryMonthlyObligationDuePolicy
+                            .JohannesburgMonthStartUtc(2026, 7)));
+                var payment = MemberPayment.CreatePending(
+                    1,
+                    customer.Id,
+                    MemberPaymentPurpose.EntryMonthlyCommitment,
+                    600m,
+                    "Test",
+                    $"monthly-payment-{suffix}",
+                    EffectiveFrom);
+                payment.Confirm(EffectiveFrom.AddMinutes(1));
+                var unallocatedPayment = MemberPayment.CreatePending(
+                    1,
+                    customer.Id,
+                    MemberPaymentPurpose.EntryMonthlyCommitment,
+                    600m,
+                    "Test",
+                    $"monthly-payment-unallocated-{suffix}",
+                    EffectiveFrom);
+                unallocatedPayment.Confirm(EffectiveFrom.AddMinutes(1));
+
+                var allocatedCheckout = AQGreenMonthlyObligationCheckout.Create(
+                    allocatedObligation,
+                    EffectiveFrom);
+                allocatedCheckout.RecordCheckout(
+                    $"ch_monthly_allocated_{suffix}",
+                    $"https://payments.example.test/ch_monthly_allocated_{suffix}",
+                    EffectiveFrom.AddMinutes(1));
+                var unallocatedCheckout = AQGreenMonthlyObligationCheckout.Create(
+                    unallocatedObligation,
+                    EffectiveFrom);
+                unallocatedCheckout.RecordCheckout(
+                    $"ch_monthly_unallocated_{suffix}",
+                    $"https://payments.example.test/ch_monthly_unallocated_{suffix}",
+                    EffectiveFrom.AddMinutes(1));
+
+                allocatedObligation.ApplyConfirmedPayment(payment);
+                allocatedCheckout.CompleteAllocation(payment.Id, EffectiveFrom.AddMinutes(2));
+                unallocatedCheckout.RequireReconciliation(
+                    unallocatedPayment.Id,
+                    EffectiveFrom.AddMinutes(2),
+                    $"The monthly obligation for {suffix} could not be settled.");
+
+                context.MemberPayments.Add(payment);
+                context.MemberPayments.Add(unallocatedPayment);
+                context.EntryMonthlyObligations.AddRange(
+                    allocatedObligation,
+                    unallocatedObligation);
+                context.AQGreenMonthlyObligationCheckouts.AddRange(
+                    allocatedCheckout,
+                    unallocatedCheckout);
+                await context.SaveChangesAsync();
+                return new[] { allocatedCheckout.Id, unallocatedCheckout.Id };
+            });
+            LoginAsHostAdmin();
+
+            var result = await _service.GetMonthlyObligationCheckoutReconciliationAsync(
+                new MonthlyObligationCheckoutReconciliationListInput
+                {
+                    PeriodMonth = 7,
+                    MaxResultCount = 50
+                });
+
+            result.TotalCount.ShouldBe(1);
+            var allocated = result.Items.Single();
+            allocated.CheckoutId.ShouldBe(checkoutIds[0]);
+            allocated.TenantId.ShouldBe(1);
+            allocated.AreaName.ShouldBe("Default");
+            allocated.ClubMemberNumber.ShouldStartWith("CLB-");
+            allocated.CustomerName.ShouldBe($"Monthly Reconciliation {suffix}");
+            allocated.PeriodYear.ShouldBe(2026);
+            allocated.PeriodMonth.ShouldBe(7);
+            allocated.Amount.ShouldBe(600m);
+            allocated.Currency.ShouldBe("ZAR");
+            allocated.Status.ShouldBe(HostedPaymentCheckoutStatus.Completed);
+            allocated.ProviderCheckoutId.ShouldBe(
+                $"ch_monthly_allocated_{suffix}");
+            allocated.AllocationStatus.ShouldBe(
+                AQGreenMonthlyPaymentAllocationStatus.Allocated);
+            allocated.AllocationEvidence.ShouldBeNull();
+            allocated.CompletedAt.ShouldNotBeNull();
+            allocated.IsPaymentAllocated.ShouldBeTrue();
+            allocated.RecordedObligationStatus.ShouldBe(
+                EntryMonthlyObligationStatus.Paid);
+            allocated.PaymentId.ShouldNotBeNull();
+            allocated.ProviderPaymentReference.ShouldBe(
+                $"monthly-payment-{suffix}");
+
+            var all = await _service.GetMonthlyObligationCheckoutReconciliationAsync(
+                new MonthlyObligationCheckoutReconciliationListInput
+                {
+                    MaxResultCount = 50
+                });
+            all.TotalCount.ShouldBe(2);
+            var unallocated = all.Items.Single(item => item.CheckoutId == checkoutIds[1]);
+            unallocated.AllocationStatus.ShouldBe(
+                AQGreenMonthlyPaymentAllocationStatus.ReconciliationRequired);
+            unallocated.AllocationEvidence.ShouldContain(suffix);
+            unallocated.IsPaymentAllocated.ShouldBeFalse();
+            unallocated.RecordedObligationStatus.ShouldBe(
+                EntryMonthlyObligationStatus.Due);
+            unallocated.ProviderPaymentReference.ShouldBe(
+                $"monthly-payment-unallocated-{suffix}");
+        }
+
+        [Fact]
+        public async Task TenantAdministrator_CannotRequestAnotherAreasMonthlyObligationReconciliation()
+        {
+            await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                _service.GetMonthlyObligationCheckoutReconciliationAsync(
+                    new MonthlyObligationCheckoutReconciliationListInput
+                    {
+                        TenantId = 2
+                    }));
+        }
+
+        [Fact]
         public async Task TenantAdministrator_CannotRequestAnotherAreasParticipations()
         {
             await Should.ThrowAsync<AbpAuthorizationException>(() =>

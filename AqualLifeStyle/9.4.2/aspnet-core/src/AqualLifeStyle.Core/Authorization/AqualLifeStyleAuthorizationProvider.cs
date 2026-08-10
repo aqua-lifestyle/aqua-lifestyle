@@ -58,7 +58,8 @@ namespace AqualLifeStyle.Authorization
             CreateGroup(
                 context,
                 AquaPermissions.EntryMonthlyObligations.Default,
-                AquaPermissions.EntryMonthlyObligations.ViewSelf);
+                AquaPermissions.EntryMonthlyObligations.ViewSelf,
+                AquaPermissions.EntryMonthlyObligations.Pay);
             CreateGroup(context, AquaPermissions.Enquiries.Default, AquaPermissions.Enquiries.View, AquaPermissions.Enquiries.Create, AquaPermissions.Enquiries.Update, AquaPermissions.Enquiries.Resolve, AquaPermissions.Enquiries.ViewSelf);
             CreateGroup(context, AquaPermissions.Referrals.Default, AquaPermissions.Referrals.View, AquaPermissions.Referrals.Create, AquaPermissions.Referrals.Confirm, AquaPermissions.Referrals.ViewSelf);
             CreateGroup(context, AquaPermissions.Memberships.Default, AquaPermissions.Memberships.View, AquaPermissions.Memberships.ViewSelf, AquaPermissions.Memberships.Upgrade);

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Abp.Domain.Entities;
 using Abp.Domain.Entities.Auditing;
 
@@ -84,20 +83,10 @@ namespace AqualLifeStyle.Domain.Onyx
 
         public static OnyxTravelBenefitEntitlement GrantForQualifiedParticipant(
             OnyxParticipation participation,
-            IEnumerable<OnyxParticipation> networkParticipations,
-            OnyxNetworkQualificationEvaluator networkQualificationEvaluator,
+            OnyxNetworkLevel qualifiedNetworkLevel,
             OnyxTravelBenefitTerms terms,
             DateTime eligibleAt)
         {
-            if (networkQualificationEvaluator == null)
-            {
-                throw new ArgumentNullException(nameof(networkQualificationEvaluator));
-            }
-
-            var qualifiedNetworkLevel = networkQualificationEvaluator.Evaluate(
-                participation,
-                networkParticipations);
-
             return new OnyxTravelBenefitEntitlement(
                 participation,
                 qualifiedNetworkLevel,

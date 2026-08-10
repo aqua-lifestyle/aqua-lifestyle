@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Abp.Domain.Entities;
 using Abp.Domain.Entities.Auditing;
 using AqualLifeStyle.Domain.Payments;
@@ -374,6 +375,13 @@ namespace AqualLifeStyle.Domain.Onyx
             if (newRecruiterCustomerId == RecruiterCustomerId)
             {
                 return;
+            }
+
+            if (_recruiterCorrections.Count > 0 &&
+                correctedAt <= _recruiterCorrections.Max(item => item.CorrectedAt))
+            {
+                throw new InvalidOperationException(
+                    "Recruiter corrections must be recorded in strictly increasing effective-time order.");
             }
 
             _recruiterCorrections.Add(EntryRecruiterCorrection.Record(

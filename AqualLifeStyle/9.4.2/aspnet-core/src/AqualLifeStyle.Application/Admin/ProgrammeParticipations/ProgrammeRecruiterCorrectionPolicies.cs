@@ -77,7 +77,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
             {
-                var target = await _repository.GetAll()
+                var target = await _repository
+                    .GetAllIncluding(item => item.RecruiterCorrections)
                     .SingleOrDefaultAsync(item =>
                         item.TenantId == tenantId && item.CustomerId == customerId);
                 if (target == null) throw NotFound();
@@ -139,7 +140,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
             {
-                var target = await _repository.GetAll()
+                var target = await _repository
+                    .GetAllIncluding(item => item.RecruiterCorrections)
                     .SingleOrDefaultAsync(item =>
                         item.TenantId == tenantId && item.CustomerId == customerId);
                 if (target == null)

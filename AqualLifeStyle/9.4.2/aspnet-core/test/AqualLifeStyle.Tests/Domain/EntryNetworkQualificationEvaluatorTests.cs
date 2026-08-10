@@ -77,6 +77,56 @@ namespace AqualLifeStyle.Tests.Domain
             Assert.Equal(EntryNetworkLevel.None, _evaluator.Evaluate(1, network));
         }
 
+        [Fact]
+        public void MoreThanFiveQualifiedDirectRecruits_UsesTheEarliestFive()
+        {
+            var network = BuildNetwork(maxDepth: 1);
+            var root = network.Find(participation => participation.CustomerId == 1);
+            network.Add(CreateQualifiedParticipation(7, root));
+
+            Assert.Equal(EntryNetworkLevel.Level1, _evaluator.Evaluate(1, network));
+        }
+
+        [Fact]
+        public void CutoffNetwork_UsesPlacementBeforeAPostCutoffCorrection()
+        {
+            var network = BuildNetwork(maxDepth: 1);
+            var originalRecruiter = network.Find(participation => participation.CustomerId == 1);
+            var correctedParticipation = network.Find(participation => participation.CustomerId == 2);
+            var newRecruiter = CreateQualifiedIndependentParticipation(customerId: 100);
+            var cutoff = EffectiveFrom.AddDays(7);
+            network.Add(newRecruiter);
+            correctedParticipation.CorrectRecruiter(
+                newRecruiter,
+                administratorUserId: 1,
+                reason: "Correct placement",
+                correctedAt: cutoff.AddMinutes(1));
+
+            var cutoffNetwork = EffectiveProgrammeNetwork.BuildAQGreen(network, cutoff);
+
+            Assert.Equal(
+                EntryNetworkLevel.Level1,
+                _evaluator.Evaluate(originalRecruiter.CustomerId, cutoffNetwork));
+            Assert.Equal(
+                EntryNetworkLevel.None,
+                _evaluator.Evaluate(newRecruiter.CustomerId, cutoffNetwork));
+        }
+
+        [Fact]
+        public void CutoffNetwork_RejectsActiveParticipationWithoutActivationEvidence()
+        {
+            var network = BuildNetwork(maxDepth: 1);
+            var activatedAt = typeof(EntryParticipation)
+                .GetProperty(nameof(EntryParticipation.ActivatedAt));
+            Assert.NotNull(activatedAt);
+            activatedAt.SetValue(network[0], null);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                EffectiveProgrammeNetwork.BuildAQGreen(
+                    network,
+                    EffectiveFrom.AddDays(7)));
+        }
+
         private static List<EntryParticipation> BuildNetwork(
             int maxDepth,
             int? incompleteRecruiterId = null)

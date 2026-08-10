@@ -448,3 +448,264 @@ A feature branch should verify:
 It should not re-validate infrastructure merely because it depends on it.
 
 Infrastructure verification belongs to the infrastructure owner unless the feature changes its assumptions.
+
+
+---
+
+# Product Workflow Verification Standard
+
+A branch may satisfy its implementation purpose while the overall product workflow remains incomplete.
+
+Implementation correctness and workflow completeness are independent.
+
+Passing tests, successful builds, and green CI do not prove that users can successfully complete the business process.
+
+Before declaring a branch ready for merge, perform the following workflow verification.
+
+---
+
+## 1. Reconstruct the complete workflow
+
+Do not begin by reviewing the implementation.
+
+First reconstruct the complete business workflow from the perspective of every participating actor.
+
+Identify:
+
+- where the workflow begins;
+- where it ends;
+- every actor;
+- every state transition;
+- every approval;
+- every notification;
+- every background process;
+- every external dependency;
+- every expected outcome.
+
+State the workflow explicitly before reviewing implementation.
+
+Example:
+
+Customer
+↓
+Registers
+↓
+Pays
+↓
+Payment confirmed
+↓
+Area Administrator notified
+↓
+Area Administrator reviews
+↓
+Area Administrator approves
+↓
+Member becomes Active
+↓
+Qualification begins
+↓
+Commission becomes eligible
+↓
+Member receives benefits
+
+---
+
+## 2. Verify every actor
+
+Every actor participating in the workflow must be able to complete their responsibility.
+
+Typical actors include:
+
+- Customer
+- Member
+- Area Administrator
+- Platform Administrator
+- Background workers
+- Payment providers
+- Email processors
+- Scheduled jobs
+
+For every actor determine:
+
+- what information they receive;
+- what action they are expected to perform;
+- how they discover that action;
+- what happens if they take no action.
+
+If an actor cannot continue the workflow, the workflow is incomplete.
+
+---
+
+## 3. Verify every state transition
+
+For every transition determine:
+
+- trigger;
+- owner;
+- persistence;
+- authorization;
+- auditability;
+- notification;
+- idempotency;
+- recovery.
+
+Also determine:
+
+- what happens if it never occurs;
+- what happens if it occurs twice;
+- what happens if it occurs out of order.
+
+Do not verify only the transition modified by the branch.
+
+Verify the entire lifecycle.
+
+---
+
+## 4. Verify discoverability
+
+Do not assume backend state is sufficient.
+
+Determine how users discover the next required action.
+
+Examples:
+
+- dashboard status;
+- approval queues;
+- pending badges;
+- actionable messages;
+- progress indicators.
+
+Email should normally be treated as an attention mechanism, not the authoritative workflow.
+
+Users must still be able to complete the workflow without relying solely on email delivery.
+
+---
+
+## 5. Verify workflow completion
+
+Do not stop when the branch purpose succeeds.
+
+Instead ask:
+
+Can a first-time user complete the entire business process without developer intervention?
+
+If not:
+
+identify the missing transition.
+
+---
+
+## 6. Perform exploratory testing
+
+For workflows involving:
+
+- authentication;
+- authorization;
+- onboarding;
+- payments;
+- approvals;
+- notifications;
+- permissions;
+- background workers;
+- long-running state;
+
+perform exploratory testing beyond acceptance criteria.
+
+Examples include:
+
+- browser refresh;
+- leaving and returning later;
+- multiple tabs;
+- duplicate actions;
+- retries;
+- delayed background workers;
+- delayed email;
+- expired sessions;
+- direct URL navigation;
+- interrupted workflows.
+
+Attempt to break the workflow.
+
+---
+
+## 7. Independent verification
+
+The implementation agent must not determine that the workflow is complete.
+
+Workflow verification must assume the implementation is incorrect until evidence demonstrates otherwise.
+
+Review the workflow independently of the implementation report.
+
+---
+
+## 8. Separate implementation from workflow
+
+Provide separate conclusions.
+
+### Implementation
+
+- Meets purpose
+- Partially meets purpose
+- Does not meet purpose
+
+### Workflow
+
+- Complete
+- Partially complete
+- Incomplete
+
+### Evidence
+
+- End-to-end verified
+- Integration verified
+- Automated tests
+- Inspection only
+- Inference
+
+Implementation success must never be promoted into workflow completion without appropriate evidence.
+
+---
+
+## 9. Final workflow questions
+
+Before declaring a branch ready for merge, answer:
+
+- Can every actor complete their part of the workflow?
+- Can every actor discover their next required action?
+- Does every state transition have a clear owner?
+- Are notifications sufficient but not authoritative?
+- Can the workflow recover from interruption?
+- Can a first-time customer complete the journey?
+- Can a first-time administrator complete the journey?
+- Is any step dependent on developer intervention?
+
+If any answer is "No", classify the finding as:
+
+- Blocking
+- Accepted debt
+- Product decision
+- Outside branch scope
+
+and justify the classification with evidence.
+
+---
+
+## 10. Stopping rule
+
+Workflow verification stops only when:
+
+1. Every intended actor can complete the workflow.
+2. Every required state transition is reachable.
+3. Every transition has appropriate evidence.
+4. No verified branch-owned workflow blocker remains.
+5. Remaining workflow gaps have documented owners or follow-up actions.
+6. No new evidence invalidates an earlier conclusion.
+
+A branch is not ready for merge merely because its implementation meets the branch purpose.
+
+It is ready only when both:
+
+- the implementation satisfies its intended purpose; and
+- the complete user workflow has sufficient evidence that it can be completed successfully.
+
+- Treat the complete user workflow as authoritative, not individual implementation tasks. A feature is not complete until every participating actor can successfully complete the end-to-end business process with appropriate evidence. Do not assume that satisfying the branch purpose alone proves workflow completion.

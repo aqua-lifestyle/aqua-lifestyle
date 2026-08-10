@@ -200,4 +200,39 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
         public IReadOnlyList<LegacyAQGreenPaymentFactDto> VerifiedPayments { get; set; }
         public IReadOnlyList<LegacyAQGreenCheckoutFactDto> CheckoutAttempts { get; set; }
     }
+
+    public class MonthlyObligationCheckoutReconciliationListInput : PagedResultRequestDto
+    {
+        [Range(1, int.MaxValue)]
+        public int? TenantId { get; set; }
+
+        [Range(2000, 2100)]
+        public int? PeriodYear { get; set; }
+
+        [Range(1, 12)]
+        public int? PeriodMonth { get; set; }
+    }
+
+    public class MonthlyObligationCheckoutReconciliationDto
+    {
+        public Guid CheckoutId { get; set; }
+        public int TenantId { get; set; }
+        public string AreaName { get; set; }
+        public string ClubMemberNumber { get; set; }
+        public string CustomerName { get; set; }
+        public int PeriodYear { get; set; }
+        public int PeriodMonth { get; set; }
+        public decimal Amount { get; set; }
+        public string Currency { get; set; }
+        public HostedPaymentCheckoutStatus Status { get; set; }
+        public string ProviderCheckoutId { get; set; }
+        public Guid? PaymentId { get; set; }
+        public string ProviderPaymentReference { get; set; }
+        public AQGreenMonthlyPaymentAllocationStatus AllocationStatus { get; set; }
+        public string AllocationEvidence { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? CompletedAt { get; set; }
+        public bool IsPaymentAllocated { get; set; }
+        public EntryMonthlyObligationStatus RecordedObligationStatus { get; set; }
+    }
 }

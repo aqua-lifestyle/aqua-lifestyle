@@ -18,3 +18,13 @@ export type EntryMonthlyObligation = {
   paidAt: string | null;
   isOwnPayoutEligible: boolean;
 };
+
+export type EntryMonthlyObligationCheckout = {
+  checkoutId: string;
+  obligationId: string;
+  periodYear: number;
+  periodMonth: number;
+  amount: number;
+  currency: string;
+  checkoutUrl: string;
+};

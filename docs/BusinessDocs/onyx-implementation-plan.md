@@ -100,10 +100,13 @@ held. The effect on uplines is unresolved. Structural network qualification must
 therefore remain separate from the future commission-contribution policy; no
 assumed upline effect may be embedded in placement or qualification.
 
-Commission periods initially use Africa/Johannesburg, Monday 00:00 through Sunday
-23:59:59 local time. Period boundaries are configurable application settings and
-every run records its exact period, time zone, calculation time, and rule version.
-Administrator-triggered calculations precede automated scheduling.
+Commission periods use Africa/Johannesburg, Friday 00:00 through Thursday
+23:59:59 local time. Every run records its exact period, time zone, calculation
+time, and rule version. Automatic AQGreen and Onyx orchestration is implemented
+behind a disabled production gate, but must not be armed until calculation uses
+business state effective at Thursday close. Administrator-triggered calculation
+must not be used as historical recovery: older missing cycles require authorised
+manual financial reconciliation.
 
 ## BusinessPremier deprecation
 
@@ -204,11 +207,11 @@ The AQGreen weekly commission-ledger foundation is also complete:
 - an overdue customer's own record is held, while structural network
   qualification remains unchanged and no unconfirmed upline effect is applied.
 
-The secured administrator-triggered calculation and review workflow is complete:
+The shared automatic and administrator-triggered calculation foundation is complete:
 
 - only a host administrator with both the dedicated calculation permission and
   all-Areas access can prepare earnings;
-- the calculation derives the latest fully completed Monday-to-Sunday week in
+- the calculation derives the latest fully completed Friday-to-Thursday cycle in
   `Africa/Johannesburg` time rather than accepting administrator-entered dates;
 - active AQGreen networks are evaluated across Areas while ledger records are
   created only for the selected Area;
@@ -218,6 +221,31 @@ The secured administrator-triggered calculation and review workflow is complete:
   review requires all-Areas permission;
 - the administrator interface describes the records as weekly earnings and
   states that calculation does not release or pay funds.
+
+Network qualification now reconstructs AQGreen and Onyx placement at the period
+cutoff from `ActivatedAt` and valid recruiter-correction history. Ambiguous,
+discontinuous, dangling, cyclic, or soft-deleted network evidence fails closed;
+branches with more than five children use the earliest five by effective
+placement/activation time and participation ID. Onyx travel consumes the same
+cutoff network, vests eligibility at the first qualifying closed-cycle cutoff,
+and records delayed activation at the contractual waiting-period end.
+
+Production calculation is still not fully cutoff-correct. AQGreen continues to
+read mutable obligation and loan compliance state, existing Areas still require
+explicit prospective activation baselines, cycle-effective terms boundaries are
+not configured, and the Yoco occurrence timestamp/finality contract is
+unverified. The append-only Area-history capability now makes future cutoffs
+deterministic and blocks new ledgers when target-Area state is unknown or inactive;
+it does not invent historical state. Consequently
+`App:WeeklyCommissions:Enabled` must remain `false`, and the latest-week
+administrator action must not be treated as authoritative production recovery.
+
+The host-only period inventory reports canonical Friday-to-Thursday periods,
+legacy Monday-to-Sunday or malformed periods, soft-deleted rows, exact boundary
+duplicates, non-overlapping boundaries, and missing canonical cycles. It is
+read-only. Every missing cycle is classified as requiring manual financial
+reconciliation; no API calculates an arbitrary historical cycle from current
+state or current terms.
 
 Eligible earnings can now be released for payment by a host administrator with
 separate release and all-Areas permissions. A separately permissioned action
@@ -291,7 +319,8 @@ latest-completed-week, permission, Area-scope, audit, and idempotency controls
 documented for AQGreen. Payment recording requires the reference from a transfer
 completed outside the platform and does not initiate a transfer. No Onyx hold
 rule has been inferred from AQGreen obligations or the unresolved effect of
-overdue members on their uplines.
+overdue members on their uplines. These controls do not solve the documented
+period-end placement cutoff blocker.
 
 ### Phase 6 benefits and separate accounts status
 
@@ -308,12 +337,18 @@ The confirmed Level 3 travel-entitlement foundation is complete:
 - the entitlement is persisted separately from participation, commissions,
   loans, payments, and future travel bookings.
 
-The secured application workflow now synchronizes travel eligibility during the
-administrator's Onyx weekly review. A verified complete Level 3 structure grants
-one entitlement, repeated reviews do not duplicate it, and a later review
-activates it after the three-month waiting period has elapsed. The signed-in
-Club Member can see the waiting-period end, availability status, and their 10%
-trip contribution in business language.
+The weekly engine synchronizes travel eligibility independently from commission
+calculation. A verified complete Level 3 structure in the latest closed Onyx
+network grants one entitlement, repeated runs do not duplicate it, and a later
+run activates it after the three-month waiting period has elapsed. A travel
+failure cannot roll back an Onyx commission period, and a commission failure
+cannot suppress travel synchronization. The signed-in Club Member can see the
+waiting-period end, availability status, and their 10% trip contribution in
+business language. New travel qualification uses the same cutoff-effective Onyx
+network as commission and no longer changes because of a post-cutoff recruiter
+correction. Existing-Area baselines, cycle-effective travel terms, missed-cycle
+discovery, and complete workflow evidence remain blockers, so the automatic gate
+must remain disabled.
 
 Trip selection, pricing, booking, fulfilment, and payment are intentionally not
 implemented.

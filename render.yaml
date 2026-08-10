@@ -45,6 +45,10 @@ services:
         sync: false
       - key: App__DefaultTenantName
         value: Default
+      - key: App__WeeklyCommissions__Enabled
+        sync: false
+      - key: App__WeeklyCommissions__IntervalMinutes
+        value: "1440"
       - key: App__ServerRootAddress
         value: https://aqualifestyle-api.onrender.com/
       - key: App__ClientRootAddress

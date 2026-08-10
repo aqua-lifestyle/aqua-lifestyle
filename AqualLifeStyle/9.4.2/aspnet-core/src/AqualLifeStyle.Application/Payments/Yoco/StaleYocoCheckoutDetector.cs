@@ -34,15 +34,19 @@ namespace AqualLifeStyle.Payments.Yoco
     public class StaleYocoCheckoutDetector : ITransientDependency
     {
         private readonly IRepository<AQGreenJoiningCheckout, Guid> _aqGreenCheckoutRepository;
+        private readonly IRepository<AQGreenMonthlyObligationCheckout, Guid>
+            _aqGreenMonthlyCheckoutRepository;
         private readonly IRepository<DirectOnyxCheckoutIntent, Guid> _onyxCheckoutRepository;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public StaleYocoCheckoutDetector(
             IRepository<AQGreenJoiningCheckout, Guid> aqGreenCheckoutRepository,
+            IRepository<AQGreenMonthlyObligationCheckout, Guid> aqGreenMonthlyCheckoutRepository,
             IRepository<DirectOnyxCheckoutIntent, Guid> onyxCheckoutRepository,
             IUnitOfWorkManager unitOfWorkManager)
         {
             _aqGreenCheckoutRepository = aqGreenCheckoutRepository;
+            _aqGreenMonthlyCheckoutRepository = aqGreenMonthlyCheckoutRepository;
             _onyxCheckoutRepository = onyxCheckoutRepository;
             _unitOfWorkManager = unitOfWorkManager;
         }
@@ -61,8 +65,13 @@ namespace AqualLifeStyle.Payments.Yoco
                 var onyxQuery = _onyxCheckoutRepository.GetAll().Where(checkout =>
                     checkout.Status == HostedPaymentCheckoutStatus.AwaitingPayment &&
                     checkout.CheckoutCreatedAt <= cutoffUtc);
+                var aqGreenMonthlyQuery = _aqGreenMonthlyCheckoutRepository.GetAll()
+                    .Where(checkout =>
+                        checkout.Status == HostedPaymentCheckoutStatus.AwaitingPayment &&
+                        checkout.CheckoutCreatedAt <= cutoffUtc);
 
-                var aqGreenCount = await aqGreenQuery.CountAsync();
+                var aqGreenCount = await aqGreenQuery.CountAsync() +
+                                   await aqGreenMonthlyQuery.CountAsync();
                 var onyxCount = await onyxQuery.CountAsync();
                 var aqGreenOldest = await aqGreenQuery
                     .Select(checkout => (DateTime?)checkout.CheckoutCreatedAt)
@@ -70,11 +79,16 @@ namespace AqualLifeStyle.Payments.Yoco
                 var onyxOldest = await onyxQuery
                     .Select(checkout => (DateTime?)checkout.CheckoutCreatedAt)
                     .MinAsync();
+                var aqGreenMonthlyOldest = await aqGreenMonthlyQuery
+                    .Select(checkout => (DateTime?)checkout.CheckoutCreatedAt)
+                    .MinAsync();
 
                 return new StaleYocoCheckoutSnapshot(
                     aqGreenCount,
                     onyxCount,
-                    Earlier(aqGreenOldest, onyxOldest));
+                    Earlier(
+                        Earlier(aqGreenOldest, aqGreenMonthlyOldest),
+                        onyxOldest));
             }
         }
 

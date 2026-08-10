@@ -1,4 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Abp.Zero.EntityFrameworkCore;
 using AqualLifeStyle.Authorization.Roles;
@@ -38,14 +42,17 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<MemberPayment> MemberPayments { get; set; }
         public virtual DbSet<DirectOnyxCheckoutIntent> DirectOnyxCheckoutIntents { get; set; }
         public virtual DbSet<AQGreenJoiningCheckout> AQGreenJoiningCheckouts { get; set; }
+        public virtual DbSet<AQGreenMonthlyObligationCheckout> AQGreenMonthlyObligationCheckouts { get; set; }
         public virtual DbSet<YocoWebhookReceipt> YocoWebhookReceipts { get; set; }
         public virtual DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
+        public virtual DbSet<AreaActivationStateRecord> AreaActivationStateRecords { get; set; }
         public virtual DbSet<TransactionalEmailOutboxMessage> TransactionalEmailOutboxMessages { get; set; }
         public virtual DbSet<AccountEmailThrottle> AccountEmailThrottles { get; set; }
         public virtual DbSet<InternalAccountInvitation> InternalAccountInvitations { get; set; }
         public virtual DbSet<EntryParticipation> EntryParticipations { get; set; }
         public virtual DbSet<EntryRecruiterCorrection> EntryRecruiterCorrections { get; set; }
         public virtual DbSet<EntryParticipationApprovalDecision> EntryParticipationApprovalDecisions { get; set; }
+        public virtual DbSet<EntryMonthlyObligationDuePolicy> EntryMonthlyObligationDuePolicies { get; set; }
         public virtual DbSet<EntryMonthlyObligation> EntryMonthlyObligations { get; set; }
         public virtual DbSet<EntryCommissionPeriod> EntryCommissionPeriods { get; set; }
         public virtual DbSet<EntryWeeklyCommission> EntryWeeklyCommissions { get; set; }
@@ -65,10 +72,49 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<OnyxGraduationDecision> OnyxGraduationDecisions { get; set; }
         public virtual DbSet<SavingsAccount> SavingsAccounts { get; set; }
         public virtual DbSet<SavingsContribution> SavingsContributions { get; set; }
+        public virtual DbSet<EntryCommissionTermsVersion> EntryCommissionTermsVersions { get; set; }
+        public virtual DbSet<OnyxCommissionTermsVersion> OnyxCommissionTermsVersions { get; set; }
 
         public AqualLifeStyleDbContext(DbContextOptions<AqualLifeStyleDbContext> options)
             : base(options)
         {
+        }
+
+        public override int SaveChanges()
+        {
+            EnsureDuePoliciesAreAppendOnly();
+            EnsureAreaActivationStateRecordsAreAppendOnly();
+            EnsureCommissionTermsVersionsAreAppendOnly();
+            return base.SaveChanges();
+        }
+
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            EnsureDuePoliciesAreAppendOnly();
+            EnsureAreaActivationStateRecordsAreAppendOnly();
+            EnsureCommissionTermsVersionsAreAppendOnly();
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+
+        public override Task<int> SaveChangesAsync(
+            CancellationToken cancellationToken = default)
+        {
+            EnsureDuePoliciesAreAppendOnly();
+            EnsureAreaActivationStateRecordsAreAppendOnly();
+            EnsureCommissionTermsVersionsAreAppendOnly();
+            return base.SaveChangesAsync(cancellationToken);
+        }
+
+        public override Task<int> SaveChangesAsync(
+            bool acceptAllChangesOnSuccess,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureDuePoliciesAreAppendOnly();
+            EnsureAreaActivationStateRecordsAreAppendOnly();
+            EnsureCommissionTermsVersionsAreAppendOnly();
+            return base.SaveChangesAsync(
+                acceptAllChangesOnSuccess,
+                cancellationToken);
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -194,6 +240,42 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 entity.HasIndex(e => e.EnquiryId);
             });
 
+        }
+
+        private void EnsureDuePoliciesAreAppendOnly()
+        {
+            if (ChangeTracker.Entries<EntryMonthlyObligationDuePolicy>().Any(entry =>
+                    entry.State == EntityState.Modified ||
+                    entry.State == EntityState.Deleted))
+            {
+                throw new InvalidOperationException(
+                    "AQGreen monthly obligation due policies are append-only.");
+            }
+        }
+
+        private void EnsureAreaActivationStateRecordsAreAppendOnly()
+        {
+            if (ChangeTracker.Entries<AreaActivationStateRecord>().Any(entry =>
+                    entry.State == EntityState.Modified ||
+                    entry.State == EntityState.Deleted))
+            {
+                throw new InvalidOperationException(
+                    "Area activation state records are append-only.");
+            }
+        }
+
+        private void EnsureCommissionTermsVersionsAreAppendOnly()
+        {
+            if (ChangeTracker.Entries<EntryCommissionTermsVersion>().Any(entry =>
+                    entry.State == EntityState.Modified ||
+                    entry.State == EntityState.Deleted) ||
+                ChangeTracker.Entries<OnyxCommissionTermsVersion>().Any(entry =>
+                    entry.State == EntityState.Modified ||
+                    entry.State == EntityState.Deleted))
+            {
+                throw new InvalidOperationException(
+                    "Commission terms versions are append-only.");
+            }
         }
     }
 }

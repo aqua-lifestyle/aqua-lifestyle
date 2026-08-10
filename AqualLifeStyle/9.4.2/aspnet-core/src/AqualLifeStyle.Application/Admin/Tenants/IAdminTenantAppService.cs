@@ -12,6 +12,7 @@ namespace AqualLifeStyle.Application.Admin.Tenants
         Task<AdminTenantDto> CreateAsync(CreateAdminTenantInput input);
         Task<AdminTenantDto> EditAsync(EditAdminTenantInput input);
         Task<AdminTenantDto> SetActivationAsync(SetTenantActivationInput input);
+        Task<AdminTenantDto> ObserveActivationStateAsync(ObserveTenantActivationStateInput input);
         Task<AdminTenantDto> AssignAreaLeaderAsync(AssignTenantAreaLeaderInput input);
     }
 }

@@ -121,6 +121,8 @@ export const apiEndpoints = {
       "/api/services/app/AdminProgrammeParticipation/GetLegacyAQGreenReconciliation",
     getMyParticipations:
       "/api/services/app/ClubMemberProgrammeParticipation/GetMyParticipations",
+    getMyProgress:
+      "/api/services/app/ClubMemberProgrammeProgress/GetMyProgress",
     getMyInvitations:
       "/api/services/app/ProgrammeInvitation/GetMyInvitations",
     getInvitationPreview: (inviteCode: string) =>
@@ -148,6 +150,8 @@ export const apiEndpoints = {
       "/api/services/app/AdminEntryMonthlyObligation/GetAll",
     getMyObligations:
       "/api/services/app/ClubMemberEntryMonthlyObligation/GetMyObligations",
+    createCheckout:
+      "/api/services/app/ClubMemberEntryMonthlyObligation/CreateCheckout",
   },
   weeklyEarnings: {
     calculateLatestClosedWeek:

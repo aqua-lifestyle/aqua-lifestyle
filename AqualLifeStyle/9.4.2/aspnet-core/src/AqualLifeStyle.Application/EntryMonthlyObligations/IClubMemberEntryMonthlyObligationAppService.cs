@@ -10,5 +10,8 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
     {
         Task<IReadOnlyList<EntryMonthlyObligationDto>>
             GetMyObligationsAsync();
+
+        Task<EntryMonthlyObligationCheckoutDto> CreateCheckoutAsync(
+            CreateEntryMonthlyObligationCheckoutInput input);
     }
 }

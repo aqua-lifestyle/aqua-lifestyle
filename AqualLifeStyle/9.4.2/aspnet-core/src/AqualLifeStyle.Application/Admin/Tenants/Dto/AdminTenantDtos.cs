@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel.DataAnnotations;
 using Abp.Application.Services.Dto;
 using Abp.Authorization.Users;
@@ -15,6 +16,8 @@ namespace AqualLifeStyle.Application.Admin.Tenants.Dto
         public string TenancyName { get; set; }
         public string Name { get; set; }
         public bool IsActive { get; set; }
+        public bool HasActivationHistory { get; set; }
+        public DateTime? ActivationHistoryBeginsAt { get; set; }
         public int? AreaLeaderId { get; set; }
         public string AreaLeaderName { get; set; }
     }
@@ -36,6 +39,10 @@ namespace AqualLifeStyle.Application.Admin.Tenants.Dto
     public class SetTenantActivationInput : EntityDto<int>
     {
         public bool IsActive { get; set; }
+        [Required, StringLength(500, MinimumLength = 3)] public string Justification { get; set; }
+    }
+    public class ObserveTenantActivationStateInput : EntityDto<int>
+    {
         [Required, StringLength(500, MinimumLength = 3)] public string Justification { get; set; }
     }
     public class AssignTenantAreaLeaderInput : EntityDto<int>
