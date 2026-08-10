@@ -68,11 +68,19 @@ shown as an operational error instead of an unusable payment journey.
 9. Follow each hosted checkout return route and confirm the UI still says that
    secure confirmation is pending and programme state has not advanced.
 10. Complete one Yoco test payment and confirm exactly one signed success event,
-    receipt, payment record, checkout completion, and programme transition.
-11. Repeat or redeliver the event and confirm no duplicate payment or state
-    transition is created.
-12. With fresh AQGreen data, test administrator recovery as described below.
-13. Confirm AQGreen and direct-Onyx payment purposes cannot settle one another.
+    receipt, payment record, checkout completion, and transition to
+    `PaymentConfirmedAwaitingApproval`—never directly to `Active`.
+11. For AQGreen, confirm the completed R1,200 joining obligation records one
+    R30,000 funeral-cover inclusion without asserting insurer activation.
+12. Confirm the responsible active Area Administrator with the approval
+    permission sees the durable queue item and receives one transactional email.
+13. Repeat or redeliver the event and confirm no duplicate payment, funeral-cover
+    inclusion, approval requirement, or administrator email is created.
+14. Approve or reject from the Area-scoped portal. Confirm one audit decision,
+    one customer outcome email, and removal from the pending queue. Only approval
+    may transition the participation to `Active`.
+15. With fresh AQGreen data, test administrator recovery as described below.
+16. Confirm AQGreen and direct-Onyx payment purposes cannot settle one another.
 
 Do not represent locally generated signing fixtures in automated tests as Yoco
 integration evidence.
@@ -125,6 +133,9 @@ not be rewritten or charged automatically.
 - competing-checkout prevention and local idempotency boundaries;
 - browser return pages remaining pending;
 - Area-scoped administrator inspection and termination;
+- Area-scoped approval queues, permission-aware administrator email resolution,
+  decision idempotency, and cross-Area denial;
+- R1,200-once and R600-plus-R600 funeral-cover inclusion;
 - migration, uniqueness, amount-cap, authorization, and purpose-isolation
   behavior covered by repository tests.
 

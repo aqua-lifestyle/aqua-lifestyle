@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using Abp.EntityFrameworkCore;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
@@ -14,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
+using NSubstitute;
 using Shouldly;
 using Xunit;
 
@@ -28,6 +30,10 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             "20260809081746_AddAreaActivationStateHistory";
         private const string TermsVersionsMigration =
             "20260809201814_AddCommissionTermsVersions";
+        private const string BeforeFuneralCoverMigration =
+            "20260809042322_EnforceSingleProgrammeParticipationDecision";
+        private const string FuneralCoverMigration =
+            "20260809043240_AddAQGreenFuneralCoverEntitlements";
         private readonly string _containerName = $"aqgreen-migration-test-pg-{Guid.NewGuid():N}";
         private readonly string _databaseName = $"aqgreen_test_{Guid.NewGuid():N}";
         private readonly int _hostPort;
@@ -189,6 +195,40 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             TraceLine("Seeded minimal user and customer.");
         }
 
+        private async Task SeedAdditionalCustomerAsync(int customerId)
+        {
+            await ExecuteAsync($$"""
+                INSERT INTO "AbpUsers" (
+                    "Id", "TenantId", "UserName", "EmailAddress", "Name", "Surname",
+                    "NormalizedUserName", "NormalizedEmailAddress", "Password",
+                    "IsEmailConfirmed", "IsActive", "CreationTime",
+                    "CreatorUserId", "LastModificationTime", "LastModifierUserId",
+                    "IsDeleted", "DeleterUserId", "DeletionTime",
+                    "AccessFailedCount", "IsLockoutEnabled", "IsPhoneNumberConfirmed",
+                    "IsTwoFactorEnabled", "SecurityStamp", "ConcurrencyStamp"
+                )
+                VALUES (
+                    {{customerId}}, 1, 'cover{{customerId}}', 'cover{{customerId}}@example.test',
+                    'Cover', 'Member {{customerId}}', 'COVER{{customerId}}',
+                    'COVER{{customerId}}@EXAMPLE.TEST',
+                    'AQAAAAIAAYagAAAAEIyc0dGWfvhRQXjBOiIQ6L8yZeE5W1e5vTXvjC/zvGkqsYH/F0L32b2sK0oN5sN9w==',
+                    TRUE, TRUE, NOW(), NULL, NULL, NULL, FALSE, NULL, NULL,
+                    0, FALSE, FALSE, FALSE, NULL, NULL
+                );
+
+                INSERT INTO "Customers" (
+                    "Id", "TenantId", "Name", "Email", "IsActive", "CreationTime",
+                    "ClubMemberNumber", "CreatorUserId", "UserId", "LastModificationTime",
+                    "LastModifierUserId", "IsDeleted", "DeleterUserId", "DeletionTime"
+                )
+                VALUES (
+                    {{customerId}}, 1, 'AQGreen Migration Member {{customerId}}',
+                    'cover{{customerId}}@example.test', TRUE, NOW(), 'CLB-TEST-{{customerId}}',
+                    NULL, {{customerId}}, NULL, NULL, FALSE, NULL, NULL
+                );
+                """);
+        }
+
         private async Task StopPostgreSqlContainerAsync()
         {
             var stopInfo = new ProcessStartInfo
@@ -253,6 +293,127 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await command.ExecuteNonQueryAsync();
         }
 
+        private async Task ExecuteAsync(string sql)
+        {
+            await using var connection = new Npgsql.NpgsqlConnection(
+                BuildTestConnectionString());
+            await connection.OpenAsync();
+            await using var command = new Npgsql.NpgsqlCommand(sql, connection);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        private async Task<(Guid ParticipationId, DateTime ConfirmedAt)>
+            SeedModernAQGreenParticipationAsync(
+                bool completeJoiningPayment,
+                int? requestedCustomerId = null)
+        {
+            var customerId = requestedCustomerId ?? await GetTenantOneCustomerIdAsync();
+            var startedAt = new DateTime(
+                2026,
+                8,
+                1,
+                9,
+                0,
+                0,
+                DateTimeKind.Utc);
+            var confirmedAt = startedAt.AddMinutes(5);
+
+            await using var context = CreateDbContext();
+            var participation = EntryParticipation.StartIndependently(
+                1,
+                customerId,
+                EntryProgrammeTerms.CreateSingleJoiningPayment(
+                    "2026-08-single-1200",
+                    new DateTime(2026, 7, 26, 0, 0, 0, DateTimeKind.Utc),
+                    1200m,
+                    600m,
+                    7),
+                startedAt);
+            context.EntryParticipations.Add(participation);
+
+            if (completeJoiningPayment)
+            {
+                var payment = MemberPayment.CreatePending(
+                    1,
+                    customerId,
+                    MemberPaymentPurpose.AQGreenJoining,
+                    1200m,
+                    "Test",
+                    $"historical-cover-{Guid.NewGuid():N}",
+                    startedAt,
+                    "ZAR");
+                payment.Confirm(confirmedAt);
+                participation.ApplyConfirmedJoiningPayment(payment);
+                context.MemberPayments.Add(payment);
+            }
+
+            await context.SaveChangesAsync();
+            return (participation.Id, confirmedAt);
+        }
+
+        private async Task<(Guid ParticipationId, DateTime FirstConfirmedAt,
+            DateTime SecondConfirmedAt)> SeedInstallmentParticipationAsync(
+                bool includeSecondPayment,
+                int? requestedCustomerId = null)
+        {
+            var customerId = requestedCustomerId ?? await GetTenantOneCustomerIdAsync();
+            var startedAt = new DateTime(2026, 8, 2, 9, 0, 0, DateTimeKind.Utc);
+            var firstConfirmedAt = startedAt.AddMinutes(5);
+            var secondConfirmedAt = startedAt.AddMinutes(10);
+
+            await using var context = CreateDbContext();
+            var participation = EntryParticipation.StartIndependently(
+                1,
+                customerId,
+                EntryProgrammeTerms.CreateFlexibleJoiningPayment(
+                    "2026-08-flexible-1200",
+                    new DateTime(2026, 7, 26, 0, 0, 0, DateTimeKind.Utc),
+                    1200m,
+                    600m,
+                    600m,
+                    7),
+                startedAt);
+            participation.SelectJoiningPaymentSchedule(
+                AQGreenJoiningPaymentSchedule.TwoInstallments);
+
+            var firstPayment = MemberPayment.CreatePending(
+                1,
+                customerId,
+                MemberPaymentPurpose.AQGreenJoining,
+                600m,
+                "Test",
+                $"historical-cover-first-{Guid.NewGuid():N}",
+                startedAt,
+                "ZAR");
+            firstPayment.Confirm(firstConfirmedAt);
+            participation.ApplyConfirmedJoiningPayment(
+                firstPayment,
+                AQGreenJoiningPaymentStage.FirstInstallment);
+            context.MemberPayments.Add(firstPayment);
+            context.EntryParticipations.Add(participation);
+
+            if (includeSecondPayment)
+            {
+                var secondPayment = MemberPayment.CreatePending(
+                    1,
+                    customerId,
+                    MemberPaymentPurpose.AQGreenJoining,
+                    600m,
+                    "Test",
+                    $"historical-cover-second-{Guid.NewGuid():N}",
+                    startedAt.AddMinutes(6),
+                    "ZAR");
+                secondPayment.Confirm(secondConfirmedAt);
+                participation.ApplyConfirmedJoiningPayment(
+                    secondPayment,
+                    AQGreenJoiningPaymentStage.SecondInstallment);
+                context.MemberPayments.Add(secondPayment);
+            }
+
+            await context.SaveChangesAsync();
+            return (participation.Id, firstConfirmedAt, secondConfirmedAt);
+        }
+
         private async Task MigrateToAsync(string targetMigration)
         {
             await using var context = CreateDbContext();
@@ -269,6 +430,349 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 .Where(c => c.TenantId == 1)
                 .Select(c => c.Id)
                 .FirstAsync();
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_BackfillsHistoricalFullPaymentAtConfirmationTime()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(BeforeFuneralCoverMigration);
+            await SeedMinimalUserAsync();
+            var completion = await SeedModernAQGreenParticipationAsync(
+                completeJoiningPayment: true);
+
+            await MigrateToAsync(FuneralCoverMigration);
+
+            await using var context = CreateDbContext();
+            var entitlement = await context.AQGreenFuneralCoverEntitlements.SingleAsync();
+            entitlement.EntryParticipationId.ShouldBe(completion.ParticipationId);
+            entitlement.IncludedAt.ShouldBe(completion.ConfirmedAt);
+            entitlement.FuneralCoverAmount.ShouldBe(30000m);
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_BackfillsTwoInstallmentsAtLaterConfirmationTime()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(BeforeFuneralCoverMigration);
+            await SeedMinimalUserAsync();
+            var completion = await SeedInstallmentParticipationAsync(
+                includeSecondPayment: true);
+
+            await MigrateToAsync(FuneralCoverMigration);
+
+            await using var context = CreateDbContext();
+            var entitlement = await context.AQGreenFuneralCoverEntitlements.SingleAsync();
+            entitlement.EntryParticipationId.ShouldBe(completion.ParticipationId);
+            entitlement.IncludedAt.ShouldBe(completion.SecondConfirmedAt);
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_LeavesFirstInstallmentOnlyUntouched()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(BeforeFuneralCoverMigration);
+            await SeedMinimalUserAsync();
+            await SeedInstallmentParticipationAsync(includeSecondPayment: false);
+
+            await MigrateToAsync(FuneralCoverMigration);
+
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(*) FROM \"AQGreenFuneralCoverEntitlements\""))
+                .ShouldBe(0);
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_LeavesPendingFullPaymentUntouched()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(BeforeFuneralCoverMigration);
+            await SeedMinimalUserAsync();
+            var seeded = await SeedModernAQGreenParticipationAsync(
+                completeJoiningPayment: false);
+
+            await using (var context = CreateDbContext())
+            {
+                var payment = MemberPayment.CreatePending(
+                    1,
+                    await GetTenantOneCustomerIdAsync(),
+                    MemberPaymentPurpose.AQGreenJoining,
+                    1200m,
+                    "Test",
+                    $"historical-pending-{Guid.NewGuid():N}",
+                    new DateTime(2026, 8, 1, 9, 1, 0, DateTimeKind.Utc),
+                    "ZAR");
+                context.MemberPayments.Add(payment);
+                var participation = await context.EntryParticipations.SingleAsync(
+                    item => item.Id == seeded.ParticipationId);
+                context.Entry(participation).Property("JoiningPaymentId").CurrentValue = payment.Id;
+                await context.SaveChangesAsync();
+            }
+
+            await MigrateToAsync(FuneralCoverMigration);
+
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(*) FROM \"AQGreenFuneralCoverEntitlements\""))
+                .ShouldBe(0);
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_FailsClosedForContradictoryCompletionFacts()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(BeforeFuneralCoverMigration);
+            await SeedMinimalUserAsync();
+            await SeedModernAQGreenParticipationAsync(completeJoiningPayment: true);
+            await ExecuteAsync(
+                "UPDATE \"MemberPayments\" SET \"Amount\" = 1199.00 WHERE \"Purpose\" = 7");
+
+            var exception = await Should.ThrowAsync<PostgresException>(() =>
+                MigrateToAsync(FuneralCoverMigration));
+
+            exception.SqlState.ShouldBe(PostgresErrorCodes.RaiseException);
+            exception.MessageText.ShouldContain(
+                "Contradictory historical AQGreen joining-payment data");
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_FailsClosedForWrongPaymentCustomer()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(BeforeFuneralCoverMigration);
+            await SeedMinimalUserAsync();
+            await SeedAdditionalCustomerAsync(2);
+            await SeedModernAQGreenParticipationAsync(completeJoiningPayment: true);
+            await ExecuteAsync(
+                "UPDATE \"MemberPayments\" SET \"CustomerId\" = 2 WHERE \"Purpose\" = 7");
+
+            var exception = await Should.ThrowAsync<PostgresException>(() =>
+                MigrateToAsync(FuneralCoverMigration));
+
+            exception.SqlState.ShouldBe(PostgresErrorCodes.RaiseException);
+            exception.MessageText.ShouldContain(
+                "Contradictory historical AQGreen joining-payment data");
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_FailsClosedForCrossTenantCustomerRelationship()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(BeforeFuneralCoverMigration);
+            await SeedMinimalUserAsync();
+            await SeedModernAQGreenParticipationAsync(completeJoiningPayment: true);
+            await ExecuteAsync(
+                "UPDATE \"Customers\" SET \"TenantId\" = 2 WHERE \"Id\" = 1");
+
+            var exception = await Should.ThrowAsync<PostgresException>(() =>
+                MigrateToAsync(FuneralCoverMigration));
+
+            exception.SqlState.ShouldBe(PostgresErrorCodes.RaiseException);
+            exception.MessageText.ShouldContain(
+                "Contradictory historical AQGreen joining-payment data");
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_FailsClosedForDuplicateInstallmentReference()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(BeforeFuneralCoverMigration);
+            await SeedMinimalUserAsync();
+            var completion = await SeedInstallmentParticipationAsync(
+                includeSecondPayment: true);
+            await ExecuteAsync($$"""
+                UPDATE "EntryParticipations"
+                SET "ActivationPaymentId" = "RegistrationPaymentId"
+                WHERE "Id" = '{{completion.ParticipationId}}';
+                """);
+
+            var exception = await Should.ThrowAsync<PostgresException>(() =>
+                MigrateToAsync(FuneralCoverMigration));
+
+            exception.SqlState.ShouldBe(PostgresErrorCodes.RaiseException);
+            exception.MessageText.ShouldContain(
+                "Contradictory historical AQGreen joining-payment data");
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_DoesNotDuplicateExistingEntitlement_AndDownDropsData()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(FuneralCoverMigration);
+            await SeedMinimalUserAsync();
+            var completion = await SeedModernAQGreenParticipationAsync(
+                completeJoiningPayment: true);
+
+            await using (var context = CreateDbContext())
+            {
+                var participation = await context.EntryParticipations.SingleAsync(
+                    item => item.Id == completion.ParticipationId);
+                var entitlement = AQGreenFuneralCoverEntitlement
+                    .GrantForJoiningCompletion(
+                        participation,
+                        AQGreenFuneralCoverTerms.Create(
+                            "2026-08-funeral-30000",
+                            new DateTime(2026, 7, 26, 0, 0, 0, DateTimeKind.Utc),
+                            30000m),
+                        completion.ConfirmedAt);
+                context.AQGreenFuneralCoverEntitlements.Add(entitlement);
+                await context.SaveChangesAsync();
+            }
+
+            await MigrateToAsync(FuneralCoverMigration);
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(*) FROM \"AQGreenFuneralCoverEntitlements\""))
+                .ShouldBe(1);
+
+            // This proves the existing Down behaviour is destructive after use.
+            await MigrateToAsync(BeforeFuneralCoverMigration);
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'AQGreenFuneralCoverEntitlements'"))
+                .ShouldBe(0);
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_BackfillsEachQualifyingParticipantOnce()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(BeforeFuneralCoverMigration);
+            await SeedMinimalUserAsync();
+            await SeedAdditionalCustomerAsync(2);
+            await SeedAdditionalCustomerAsync(3);
+            await SeedModernAQGreenParticipationAsync(true, 1);
+            await SeedModernAQGreenParticipationAsync(true, 2);
+            await SeedInstallmentParticipationAsync(true, 3);
+
+            await MigrateToAsync(FuneralCoverMigration);
+
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(*) FROM \"AQGreenFuneralCoverEntitlements\""))
+                .ShouldBe(3);
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(DISTINCT \"EntryParticipationId\") FROM \"AQGreenFuneralCoverEntitlements\""))
+                .ShouldBe(3);
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_DoesNotInventModernHistoryForLegacyParticipation()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(BeforeFuneralCoverMigration);
+            await SeedMinimalUserAsync();
+
+            await using (var context = CreateDbContext())
+            {
+                context.EntryParticipations.Add(
+                    EntryParticipation.StartIndependently(
+                        1,
+                        await GetTenantOneCustomerIdAsync(),
+                        EntryProgrammeTerms.Create(
+                            "legacy-split-lifecycle",
+                            new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                            600m,
+                            600m,
+                            600m,
+                            7),
+                        new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+                await context.SaveChangesAsync();
+            }
+
+            await MigrateToAsync(FuneralCoverMigration);
+
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(*) FROM \"AQGreenFuneralCoverEntitlements\""))
+                .ShouldBe(0);
+        }
+
+        [Fact]
+        public async Task FlexibleJoiningMigration_BackfillsUnpaidRows_AndProtectsInstallmentHistory()
+        {
+            const string previousMigration =
+                "20260809043240_AddAQGreenFuneralCoverEntitlements";
+            await ResetDatabaseAsync();
+            await MigrateToAsync(previousMigration);
+            await SeedMinimalUserAsync();
+            var customerId = await GetTenantOneCustomerIdAsync();
+            Guid participationId;
+
+            await using (var context = CreateDbContext())
+            {
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customerId,
+                    EntryProgrammeTerms.CreateSingleJoiningPayment(
+                        "2026-08-single-1200",
+                        new DateTime(2026, 7, 26, 0, 0, 0, DateTimeKind.Utc),
+                        1200m,
+                        600m,
+                        7),
+                    DateTime.UtcNow);
+                context.EntryParticipations.Add(participation);
+                await context.SaveChangesAsync();
+                participationId = participation.Id;
+            }
+
+            await MigrateToLatestAsync();
+
+            await using (var context = CreateDbContext())
+            {
+                var participation = await context.EntryParticipations.SingleAsync(
+                    item => item.Id == participationId);
+                participation.TermsVersion.ShouldBe("2026-08-flexible-1200");
+                participation.JoiningInstallmentAmount.ShouldBe(600m);
+                participation.SelectJoiningPaymentSchedule(
+                    AQGreenJoiningPaymentSchedule.TwoInstallments);
+                await context.SaveChangesAsync();
+            }
+
+            var exception = await Should.ThrowAsync<PostgresException>(() =>
+                MigrateToAsync(previousMigration));
+            exception.SqlState.ShouldBe(PostgresErrorCodes.RaiseException);
+            exception.MessageText.ShouldContain(
+                "two-instalment history exists");
+        }
+
+        [Fact]
+        public async Task ProgrammeDecisionLock_SerializesCompetingPostgreSqlTransactions()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToLatestAsync();
+            var participationId = Guid.NewGuid();
+
+            await using var firstContext = CreateDbContext();
+            await using var secondContext = CreateDbContext();
+            await using var firstTransaction =
+                await firstContext.Database.BeginTransactionAsync();
+            await using var secondTransaction =
+                await secondContext.Database.BeginTransactionAsync();
+
+            var firstProvider =
+                Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>();
+            firstProvider.GetDbContext().Returns(firstContext);
+            var secondProvider =
+                Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>();
+            secondProvider.GetDbContext().Returns(secondContext);
+            var firstLock = new HostedPaymentCheckoutLock(firstProvider);
+            var secondLock = new HostedPaymentCheckoutLock(secondProvider);
+
+            await firstLock.AcquireProgrammeParticipationDecisionAsync(
+                participationId);
+            var competingAcquisition =
+                secondLock.AcquireProgrammeParticipationDecisionAsync(
+                    participationId);
+
+            await Task.Delay(250);
+            competingAcquisition.IsCompleted.ShouldBeFalse();
+
+            await firstTransaction.CommitAsync();
+            await competingAcquisition.WaitAsync(TimeSpan.FromSeconds(5));
+            await secondTransaction.CommitAsync();
         }
 
         [Fact]
@@ -688,7 +1192,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
 
             await Should.ThrowAsync<PostgresException>(async () =>
                 await MigrateToAsync(
-                    "20260807065821_AddAQGreenFuneralCoverEntitlements"));
+                    "20260809043240_AddAQGreenFuneralCoverEntitlements"));
         }
 
         [Fact]

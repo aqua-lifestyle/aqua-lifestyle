@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthState } from "@/src/providers";
+import { usePendingProgrammeApprovals } from "@/src/shared/hooks/use-pending-programme-approvals";
 import { AdminSidebar } from "./AdminSidebar";
 
 vi.mock("next/navigation", () => ({
@@ -10,6 +11,10 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/src/providers", () => ({
   useAuthState: vi.fn(),
+}));
+
+vi.mock("@/src/shared/hooks/use-pending-programme-approvals", () => ({
+  usePendingProgrammeApprovals: vi.fn(),
 }));
 
 const authState = (permissions: string[]) => ({
@@ -24,6 +29,10 @@ const authState = (permissions: string[]) => ({
 
 describe("AdminSidebar", () => {
   beforeEach(() => {
+    vi.mocked(usePendingProgrammeApprovals).mockReturnValue({
+      reload: vi.fn(),
+      summary: undefined,
+    });
     vi.mocked(useAuthState).mockReturnValue(authState([
       "Aqua.Admin.Customers.View",
       "Aqua.Admin.ProgrammeParticipations.View",
@@ -56,5 +65,20 @@ describe("AdminSidebar", () => {
     render(<AdminSidebar />);
 
     expect(screen.getByRole("link", { name: "Customer accounts" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("shows the global pending approval count beside the navigation link", () => {
+    vi.mocked(usePendingProgrammeApprovals).mockReturnValue({
+      reload: vi.fn(),
+      summary: { aqGreenCount: 2, onyxCount: 1, totalCount: 3 },
+    });
+
+    render(<AdminSidebar />);
+
+    expect(screen.getByLabelText("3 approvals awaiting review"))
+      .toBeInTheDocument();
+    expect(screen.getByRole("link", {
+      name: /programme participation.*3 approvals awaiting review/i,
+    })).toHaveAttribute("href", "/admin/programme-participations");
   });
 });

@@ -54,6 +54,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
         public string RecruiterClubMemberNumber { get; set; }
         public DateTime StartedAt { get; set; }
         public DateTime? ActivatedAt { get; set; }
+        public DateTime? DecidedAt { get; set; }
+        public string DecisionReason { get; set; }
         public decimal? NextPaymentAmount { get; set; }
         public string NextPaymentDescription { get; set; }
         public string Currency { get; set; }
@@ -74,9 +76,18 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
         public ProgrammeParticipationDto Onyx { get; set; }
         public PendingProgrammeCheckoutDto PendingAQGreenCheckout { get; set; }
         public PendingProgrammeCheckoutDto PendingDirectOnyxCheckout { get; set; }
+        public AQGreenFuneralCoverDto FuneralCover { get; set; }
         public OnyxTravelBenefitDto TravelBenefit { get; set; }
         public bool CanJoinEntry => Entry == null;
         public bool CanJoinOnyxDirectly => Onyx == null && PendingDirectOnyxCheckout == null;
+    }
+
+    public class AQGreenFuneralCoverDto
+    {
+        public string Status { get; set; }
+        public decimal CoverAmount { get; set; }
+        public string Currency { get; set; }
+        public DateTime IncludedAt { get; set; }
     }
 
     public class OnyxTravelBenefitDto

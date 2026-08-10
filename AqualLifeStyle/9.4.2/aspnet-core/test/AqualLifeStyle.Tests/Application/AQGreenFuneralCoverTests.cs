@@ -7,6 +7,7 @@ using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
+using AqualLifeStyle.Email;
 using AqualLifeStyle.Payments;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -411,12 +412,36 @@ namespace AqualLifeStyle.Tests.Application
             entitlements.Count.ShouldBe(1);
             entitlements.Single().Status.ShouldBe(AQGreenFuneralCoverStatus.Included);
             entitlements.Single().FuneralCoverAmount.ShouldBe(30000m);
+            entitlements.Single().IncludedAt.ShouldBe(TermsEffectiveFrom.AddDays(3));
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var administrator = await context.Users.SingleAsync(candidate =>
+                    candidate.TenantId == 1 && candidate.UserName == "admin");
+                var alert = await context.TransactionalEmailOutboxMessages.SingleAsync(message =>
+                    message.NotificationType ==
+                        "ProgrammeParticipationAwaitingApproval" &&
+                    message.IdempotencyKey ==
+                        $"programme-approval:Entry:{persisted.ParticipationId}:administrator:{administrator.Id}");
+                var alertText = Resolve<ITransactionalEmailBodyProtector>()
+                    .Unprotect(alert.TextBody);
+                alertText.ShouldContain("ZAR 1,200.00");
+                alertText.ShouldNotContain("Amount received: ZAR 600.00");
+            });
 
             var participation = await UsingDbContextAsync(1, async context =>
                 await context.EntryParticipations.SingleAsync(
                     item => item.Id == persisted.ParticipationId));
             participation.IsJoiningObligationSatisfied.ShouldBeTrue();
             participation.GetConfirmedJoiningAmount().ShouldBe(1200m);
+
+            SetCurrentUser(userId, 1);
+            var memberView = await Resolve<IClubMemberProgrammeParticipationAppService>()
+                .GetMyParticipationsAsync();
+            memberView.FuneralCover.ShouldNotBeNull();
+            memberView.FuneralCover.Status.ShouldBe("Included");
+            memberView.FuneralCover.CoverAmount.ShouldBe(30000m);
+            memberView.FuneralCover.Currency.ShouldBe("ZAR");
         }
 
         private async Task<AQGreenJoiningCheckout> CreateCheckoutAsync(

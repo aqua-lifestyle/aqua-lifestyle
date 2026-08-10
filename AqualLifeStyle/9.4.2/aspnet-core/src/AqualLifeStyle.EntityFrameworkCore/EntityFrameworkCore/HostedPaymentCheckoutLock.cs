@@ -30,6 +30,13 @@ namespace AqualLifeStyle.EntityFrameworkCore
             return AcquireAsync($"direct-onyx-checkout-creation:{customerId}");
         }
 
+        public Task AcquireProgrammeParticipationDecisionAsync(Guid participationId)
+        {
+            if (participationId == Guid.Empty)
+                throw new ArgumentException("A participation identifier is required.", nameof(participationId));
+            return AcquireAsync($"programme-participation-decision:{participationId:N}");
+        }
+
         private async Task AcquireAsync(string resource)
         {
             var context = _dbContextProvider.GetDbContext();

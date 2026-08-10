@@ -2,6 +2,8 @@ export type ProgrammeParticipation = {
   activatedAt: string | null;
   canRecruitForThisProgramme: boolean;
   currency: string;
+  decidedAt?: string | null;
+  decisionReason?: string | null;
   isActive: boolean;
   joiningCompletedAt?: string | null;
   joiningOutstandingAmount?: number;
@@ -31,7 +33,15 @@ export type MyProgrammeParticipations = {
   onyx: ProgrammeParticipation | null;
   pendingAQGreenCheckout: PendingProgrammeCheckout | null;
   pendingDirectOnyxCheckout: PendingProgrammeCheckout | null;
+  funeralCover: AQGreenFuneralCover | null;
   travelBenefit: OnyxTravelBenefit | null;
+};
+
+export type AQGreenFuneralCover = {
+  coverAmount: number;
+  currency: string;
+  includedAt: string;
+  status: "Included";
 };
 
 export type ProgrammeCheckout = {

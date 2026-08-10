@@ -10,8 +10,11 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
     }
 
     /// <summary>
-    /// Supplies the confirmed R30,000 funeral-cover benefit terms that apply to
-    /// AQGreen joining completions from 2026-07-26.
+    /// Supplies the R30,000 inclusion terms for the modern AQGreen joining
+    /// lifecycle. The Aqua promise predates this implementation. The 2026-07-26
+    /// lower bound identifies the modern application joining model only; it is
+    /// not the promise inception, software deployment, or insurer activation
+    /// date.
     /// </summary>
     public class CurrentAQGreenFuneralCoverTermsProvider
         : ICurrentAQGreenFuneralCoverTermsProvider, ITransientDependency

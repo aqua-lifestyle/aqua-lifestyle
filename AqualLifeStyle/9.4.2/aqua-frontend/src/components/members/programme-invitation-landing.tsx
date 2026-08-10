@@ -33,9 +33,9 @@ const getProgrammeJoinEndpoint = (programmeKey: string) => {
 const getProgrammePaymentExplanation = (programmeKey: string) => {
   switch (programmeKey) {
     case "AQGREEN":
-      return "Confirming records your AQGreen place under this inviting Club Member. AQGreen joining costs R1,200 and activates only after the full amount is verified.";
+      return "Confirming records your AQGreen place under this inviting Club Member. AQGreen joining is R1,200, paid once or as two R600 instalments. Area Administrator approval is required after the full amount is confirmed.";
     case "ONYX":
-      return "Confirming continues to Yoco for the full R6,120 payment. Your Onyx participation and network place are created only after Yoco confirms payment.";
+      return "Confirming continues to Yoco for the full R6,120 payment. Your Onyx participation and network place are created after confirmation, then remain inactive until Area Administrator approval.";
     default:
       return undefined;
   }
@@ -50,6 +50,7 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string>();
+  const [aqGreenSchedule, setAQGreenSchedule] = useState<0 | 1>(0);
   const paymentApiCompatible = isPaymentApiCompatible(healthState.health);
   const paymentActionsUnavailable =
     healthState.isPending || !paymentApiCompatible;
@@ -104,7 +105,7 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
           { schedule: 0 | 1 }
         >(
           apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
-          { schedule: 0 },
+          { schedule: aqGreenSchedule },
         );
         navigateToExternalUrl(checkout.checkoutUrl);
       }
@@ -169,6 +170,30 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
               <StatusMessage tone="info">
                 {programmePaymentExplanation}
               </StatusMessage>
+            ) : null}
+
+            {preview.programmeKey === "AQGREEN" && session ? (
+              <fieldset className="grid gap-3">
+                <legend className="text-sm font-semibold">Payment schedule</legend>
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-4">
+                  <input
+                    checked={aqGreenSchedule === 0}
+                    name="invitation-aqgreen-payment-schedule"
+                    onChange={() => setAQGreenSchedule(0)}
+                    type="radio"
+                  />
+                  <span className="font-medium">Pay R1,200 once</span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-4">
+                  <input
+                    checked={aqGreenSchedule === 1}
+                    name="invitation-aqgreen-payment-schedule"
+                    onChange={() => setAQGreenSchedule(1)}
+                    type="radio"
+                  />
+                  <span className="font-medium">Pay two R600 instalments</span>
+                </label>
+              </fieldset>
             ) : null}
 
             {!healthState.isPending && !paymentApiCompatible && session ? (

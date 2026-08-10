@@ -14,6 +14,7 @@ using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
+using AqualLifeStyle.Email;
 using AqualLifeStyle.MultiTenancy;
 using AqualLifeStyle.Payments;
 using Microsoft.EntityFrameworkCore;
@@ -574,12 +575,36 @@ namespace AqualLifeStyle.Tests.Application
             var suffix = Guid.NewGuid().ToString("N");
             var fixture = await CreateAwaitingApprovalEntryAsync(suffix);
 
+            var before = await _service.GetPendingApprovalSummaryAsync(
+                new PendingProgrammeApprovalSummaryInput());
+            before.AQGreenCount.ShouldBe(1);
+            before.TotalCount.ShouldBe(1);
+
+            var queue = await _service.GetAllAsync(
+                new AdminProgrammeParticipationListInput
+                {
+                    Programme = AdminProgrammeType.Entry,
+                    AwaitingApprovalOnly = true,
+                    MaxResultCount = 20
+                });
+            queue.Items.Single().ParticipationId.ShouldBe(fixture.ParticipationId);
+
             await _service.ApproveProgrammeParticipationAsync(
                 new ApproveProgrammeParticipationInput
                 {
                     Programme = AdminProgrammeType.Entry,
                     ParticipationId = fixture.ParticipationId
                 });
+            await _service.ApproveProgrammeParticipationAsync(
+                new ApproveProgrammeParticipationInput
+                {
+                    Programme = AdminProgrammeType.Entry,
+                    ParticipationId = fixture.ParticipationId
+                });
+
+            var after = await _service.GetPendingApprovalSummaryAsync(
+                new PendingProgrammeApprovalSummaryInput());
+            after.TotalCount.ShouldBe(0);
 
             await UsingDbContextAsync(1, async context =>
             {
@@ -603,6 +628,9 @@ namespace AqualLifeStyle.Tests.Application
                     message.NotificationType == "ParticipationDecision" &&
                     message.IdempotencyKey ==
                         $"Entry:{fixture.ParticipationId}:approved")).ShouldBe(1);
+                (await context.EntryParticipationApprovalDecisions.CountAsync(item =>
+                    EF.Property<Guid>(item, "EntryParticipationId") ==
+                    fixture.ParticipationId)).ShouldBe(1);
             });
         }
 
@@ -611,6 +639,8 @@ namespace AqualLifeStyle.Tests.Application
         {
             var suffix = Guid.NewGuid().ToString("N");
             var fixture = await CreateAwaitingApprovalOnyxAsync(suffix);
+            (await _service.GetPendingApprovalSummaryAsync(
+                new PendingProgrammeApprovalSummaryInput())).OnyxCount.ShouldBe(1);
 
             await _service.RejectProgrammeParticipationAsync(
                 new RejectProgrammeParticipationInput
@@ -619,6 +649,16 @@ namespace AqualLifeStyle.Tests.Application
                     ParticipationId = fixture.ParticipationId,
                     Reason = "Signed joining form does not match the payer"
                 });
+            await _service.RejectProgrammeParticipationAsync(
+                new RejectProgrammeParticipationInput
+                {
+                    Programme = AdminProgrammeType.Onyx,
+                    ParticipationId = fixture.ParticipationId,
+                    Reason = "Signed joining form does not match the payer"
+                });
+
+            (await _service.GetPendingApprovalSummaryAsync(
+                new PendingProgrammeApprovalSummaryInput())).TotalCount.ShouldBe(0);
 
             await UsingDbContextAsync(1, async context =>
             {
@@ -637,10 +677,45 @@ namespace AqualLifeStyle.Tests.Application
                 var user = await context.Users.SingleAsync(candidate => candidate.Id == fixture.UserId);
                 user.Role.ShouldBe(AquaUserRole.Guest);
 
-                (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
+                var outcome = await context.TransactionalEmailOutboxMessages.SingleAsync(message =>
                     message.NotificationType == "ParticipationDecision" &&
                     message.IdempotencyKey ==
-                        $"Onyx:{fixture.ParticipationId}:declined")).ShouldBe(1);
+                        $"Onyx:{fixture.ParticipationId}:declined");
+                Resolve<ITransactionalEmailBodyProtector>()
+                    .Unprotect(outcome.TextBody)
+                    .ShouldContain("Signed joining form does not match the payer");
+                (await context.OnyxParticipationApprovalDecisions.CountAsync(item =>
+                    EF.Property<Guid>(item, "OnyxParticipationId") ==
+                    fixture.ParticipationId)).ShouldBe(1);
+            });
+        }
+
+        [Fact]
+        public async Task TenantAdministrator_CannotApproveAnotherAreasParticipationByIdentifier()
+        {
+            await EnsureCrossAreaTenantAsync();
+            var fixture = await CreateAwaitingApprovalEntryAsync(
+                Guid.NewGuid().ToString("N"),
+                tenantId: 2);
+
+            var exception = await Should.ThrowAsync<Abp.UI.UserFriendlyException>(() =>
+                _service.ApproveProgrammeParticipationAsync(
+                    new ApproveProgrammeParticipationInput
+                    {
+                        Programme = AdminProgrammeType.Entry,
+                        ParticipationId = fixture.ParticipationId
+                    }));
+            exception.Details.ShouldContain("not found in your Area");
+
+            await UsingDbContextAsync(2, async context =>
+            {
+                var participation = await context.EntryParticipations.SingleAsync(
+                    item => item.Id == fixture.ParticipationId);
+                participation.Status.ShouldBe(
+                    EntryParticipationStatus.PaymentConfirmedAwaitingApproval);
+                (await context.EntryParticipationApprovalDecisions.AnyAsync(item =>
+                    EF.Property<Guid>(item, "EntryParticipationId") ==
+                    fixture.ParticipationId)).ShouldBeFalse();
             });
         }
 
@@ -740,6 +815,49 @@ namespace AqualLifeStyle.Tests.Application
 
             AbpSession.TenantId = null;
             AbpSession.UserId = userId;
+
+            await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                _service.ApproveProgrammeParticipationAsync(
+                    new ApproveProgrammeParticipationInput
+                    {
+                        Programme = AdminProgrammeType.Entry,
+                        ParticipationId = fixture.ParticipationId
+                    }));
+        }
+
+        [Fact]
+        public async Task TenantReviewerWithoutApprovalPermission_CannotApproveParticipation()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var fixture = await CreateAwaitingApprovalEntryAsync(suffix);
+            var userName = $"tenant-approval-reviewer-{suffix}";
+            var reviewerId = await CreateTestUserAsync(
+                1,
+                userName,
+                $"{userName}@example.com");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var role = new Role(
+                    1,
+                    $"ApprovalViewer-{suffix}",
+                    $"Approval Viewer {suffix}");
+                context.Roles.Add(role);
+                await context.SaveChangesAsync();
+                context.UserRoles.RemoveRange(context.UserRoles.Where(userRole =>
+                    userRole.UserId == reviewerId));
+                context.UserRoles.Add(new UserRole(1, reviewerId, role.Id));
+                context.Permissions.Add(new RolePermissionSetting
+                {
+                    TenantId = 1,
+                    Name = AquaPermissions.Admin.ProgrammeParticipations.View,
+                    IsGranted = true,
+                    RoleId = role.Id
+                });
+                await context.SaveChangesAsync();
+            });
+
+            AbpSession.TenantId = 1;
+            AbpSession.UserId = reviewerId;
 
             await Should.ThrowAsync<AbpAuthorizationException>(() =>
                 _service.ApproveProgrammeParticipationAsync(
@@ -1095,16 +1213,18 @@ namespace AqualLifeStyle.Tests.Application
             return payment;
         }
 
-        private async Task<ApprovalFixture> CreateAwaitingApprovalEntryAsync(string suffix)
+        private async Task<ApprovalFixture> CreateAwaitingApprovalEntryAsync(
+            string suffix,
+            int tenantId = 1)
         {
             var userId = await CreateTestUserAsync(
-                1,
+                tenantId,
                 $"approval-entry-{suffix}",
                 $"approval-entry-{suffix}@example.com");
-            return await UsingDbContextAsync(1, async context =>
+            return await UsingDbContextAsync(tenantId, async context =>
             {
                 var customer = Customer.Create(
-                    1,
+                    tenantId,
                     userId,
                     $"Approval Entry {suffix}",
                     new EmailAddress($"approval-entry-customer-{suffix}@example.com"));
@@ -1112,7 +1232,7 @@ namespace AqualLifeStyle.Tests.Application
                 await context.SaveChangesAsync();
 
                 var participation = EntryParticipation.StartIndependently(
-                    1,
+                    tenantId,
                     customer.Id,
                     LegacySplitPaymentTerms,
                     EffectiveFrom);
@@ -1120,7 +1240,7 @@ namespace AqualLifeStyle.Tests.Application
                 await context.SaveChangesAsync();
 
                 var registration = MemberPayment.CreatePending(
-                    1,
+                    tenantId,
                     customer.Id,
                     MemberPaymentPurpose.EntryRegistration,
                     600m,
@@ -1130,7 +1250,7 @@ namespace AqualLifeStyle.Tests.Application
                 registration.Confirm(EffectiveFrom.AddMinutes(1));
                 participation.ApplyConfirmedActivationPayment(registration);
                 var activation = MemberPayment.CreatePending(
-                    1,
+                    tenantId,
                     customer.Id,
                     MemberPaymentPurpose.EntryActivation,
                     600m,

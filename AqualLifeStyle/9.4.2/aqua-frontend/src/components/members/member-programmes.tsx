@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleDollarSign, Network, Plane, Route } from "lucide-react";
+import { CircleDollarSign, HeartHandshake, Network, Plane, Route } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
@@ -11,13 +11,13 @@ import {
 import { isPaymentApiCompatible } from "@/src/providers/SystemHealth/contract";
 import {
   apiEndpoints,
-  getExpiredSessionLoginUrl,
   httpClient,
   refreshAccessToken,
 } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 import type {
+  AQGreenFuneralCover,
   OnyxTravelBenefit,
   ProgrammeParticipation,
 } from "@/src/shared/domain/programme-participations";
@@ -114,6 +114,12 @@ const ParticipationCard = ({
           The Area team could not approve this participation. Contact the club
           team if you believe this is a mistake.
         </p>
+        {participation.decisionReason ? (
+          <p className="mt-3">
+            <span className="font-semibold">Reason: </span>
+            {participation.decisionReason}
+          </p>
+        ) : null}
       </div>
     ) : null}
 
@@ -130,8 +136,8 @@ const ParticipationCard = ({
               )}
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Participation activates only after the payment provider confirms
-              receipt.
+              Provider confirmation records the payment. Participation activates
+              only after Area Administrator approval.
             </p>
           </div>
         </div>
@@ -195,6 +201,47 @@ const TravelBenefitCard = ({
   </Card>
 );
 
+const FuneralCoverCard = ({
+  funeralCover,
+}: {
+  funeralCover: AQGreenFuneralCover;
+}) => (
+  <Card className="flex flex-col gap-5">
+    <div className="flex items-start justify-between gap-4">
+      <div className="flex items-center gap-3">
+        <HeartHandshake className="size-7 text-accent" />
+        <div>
+          <p className="text-sm font-medium text-muted-foreground">
+            AQGreen joining benefit
+          </p>
+          <h2 className="mt-1 text-xl font-bold">Funeral-cover inclusion</h2>
+        </div>
+      </div>
+      <Badge tone="success">{funeralCover.status}</Badge>
+    </div>
+
+    <dl className="grid gap-4 text-sm sm:grid-cols-2">
+      <div>
+        <dt className="text-muted-foreground">Included cover amount</dt>
+        <dd className="mt-1 text-xl font-bold">
+          {formatCurrency(funeralCover.coverAmount, funeralCover.currency)}
+        </dd>
+      </div>
+      <div>
+        <dt className="text-muted-foreground">Included from</dt>
+        <dd className="mt-1 font-semibold">
+          {new Date(funeralCover.includedAt).toLocaleDateString()}
+        </dd>
+      </div>
+    </dl>
+
+    <StatusMessage tone="info">
+      This records the funeral-cover benefit included with completed AQGreen
+      joining. It does not represent insurer activation or enrolment.
+    </StatusMessage>
+  </Card>
+);
+
 export const MemberProgrammes = () => {
   const { session } = useAuthState();
   const healthActions = useSystemHealthActions();
@@ -246,14 +293,13 @@ export const MemberProgrammes = () => {
 
     accessRefreshAttempted.current = true;
     void refreshAccessToken()
-      .then((accessToken) => {
-        if (accessToken) {
-          setAccessRefreshFinished(true);
-          return;
-        }
-        if (typeof window === "undefined") return;
-        const returnPath = `${window.location.pathname}${window.location.search}`;
-        window.location.href = getExpiredSessionLoginUrl(returnPath);
+      .then(() => {
+        // A null result means no refresh credential is available (ABP
+        // TokenAuth issues no refresh token), not that the session is
+        // invalid. Keep the member signed in and ask them to re-authenticate
+        // to load the freshly granted permission instead of redirecting to the
+        // sign-in page (which loops back here forever).
+        setAccessRefreshFinished(true);
       })
       .catch(() => {
         setAccessRefreshFinished(true);
@@ -290,13 +336,10 @@ export const MemberProgrammes = () => {
     return () => window.clearTimeout(task);
   }, []);
 
-  const startAQGreenPayment = async () => {
+  const startAQGreenPayment = async (selectedSchedule?: 0 | 1) => {
     if (paymentActionsUnavailable) return;
-    const schedule =
-      participations?.entry?.joiningSchedule === 1 &&
-      (participations.entry.joiningPaidAmount ?? 0) > 0
-        ? 1
-        : 0;
+    const schedule = selectedSchedule ??
+      (participations?.entry?.joiningSchedule === 1 ? 1 : 0);
     setStartingAQGreenPayment(true);
     setActionError(undefined);
     try {
@@ -411,6 +454,25 @@ export const MemberProgrammes = () => {
                           Continue secure payment
                         </a>
                       )
+                    ) : participations.entry.joiningSchedule == null &&
+                      (participations.entry.joiningPaidAmount ?? 0) === 0 ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Button
+                          disabled={paymentActionsUnavailable}
+                          isLoading={startingAQGreenPayment}
+                          onClick={() => void startAQGreenPayment(0)}
+                        >
+                          Pay R1,200 once
+                        </Button>
+                        <Button
+                          disabled={paymentActionsUnavailable}
+                          isLoading={startingAQGreenPayment}
+                          onClick={() => void startAQGreenPayment(1)}
+                          variant="outline"
+                        >
+                          Pay first R600 instalment
+                        </Button>
+                      </div>
                     ) : (
                       <div className="flex flex-col gap-4">
                         <Button
@@ -445,6 +507,10 @@ export const MemberProgrammes = () => {
                 />
               </Card>
             )}
+
+            {participations.funeralCover ? (
+              <FuneralCoverCard funeralCover={participations.funeralCover} />
+            ) : null}
 
             {participations.onyx ? (
               <ParticipationCard participation={participations.onyx} />

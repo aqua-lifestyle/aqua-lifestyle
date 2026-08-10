@@ -68,14 +68,15 @@ describe("MemberProgrammes", () => {
         buildId: "test-build",
         checkedAtUtc: "2026-08-01T10:00:00Z",
         contractCapabilities: [
-          "aqgreen-single-payment-v1",
+          "aqgreen-flexible-joining-v1",
+          "programme-approval-queue-v1",
           "direct-onyx-checkout-v1",
         ],
         databaseStatus: "Healthy",
         environment: "Test",
         imageId: "unavailable",
         isDatabaseReachable: true,
-        paymentContractVersion: "aqua-payments-2026-08-01-single-payment",
+        paymentContractVersion: "aqua-payments-2026-08-09-flexible-payment-approval",
         releaseDate: "2026-08-01T00:00:00Z",
         status: "Healthy",
         traceId: "test-trace",
@@ -111,9 +112,10 @@ describe("MemberProgrammes", () => {
 
     expect(await screen.findByText(/cannot verify a compatible payment API/i))
       .toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Join AQGreen" }))
+    expect(await screen.findByRole("button", { name: "Join AQGreen" }))
       .toBeDisabled();
-    expect(screen.getByRole("button", { name: "Join Onyx" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "Join Onyx" }))
+      .toBeDisabled();
   });
 
   it("refreshes account access after programme activation changes the role", async () => {
@@ -138,6 +140,43 @@ describe("MemberProgrammes", () => {
     render(<MemberProgrammes />);
 
     await waitFor(() => expect(refreshAccessToken).toHaveBeenCalledOnce());
+  });
+
+  it("keeps a recruitable member signed in when no refresh token is available", async () => {
+    vi.mocked(useAuthState).mockReturnValue(
+      authState([
+        "Aqua.ProgrammeParticipations.ViewSelf",
+        "Aqua.ProgrammeParticipations.Join",
+      ]),
+    );
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: {
+        activatedAt: "2026-07-30T00:00:00Z",
+        canRecruitForThisProgramme: true,
+        currency: "ZAR",
+        isActive: true,
+        joinedIndependently: true,
+        nextPaymentAmount: null,
+        nextPaymentDescription: null,
+        programmeName: "AQGreen",
+        recruiterClubMemberNumber: null,
+        startedAt: "2026-07-30T00:00:00Z",
+        status: "Active",
+      },
+      onyx: null,
+      travelBenefit: null,
+    });
+    vi.mocked(refreshAccessToken).mockResolvedValue(null);
+
+    render(<MemberProgrammes />);
+
+    await waitFor(() => expect(refreshAccessToken).toHaveBeenCalledOnce());
+    expect(
+      await screen.findByText(
+        /sign out and sign in again to load your updated club member access/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/session-ended/i)).not.toBeInTheDocument();
   });
 
   it("shows both network placements without requiring an invitation", async () => {
@@ -179,17 +218,19 @@ describe("MemberProgrammes", () => {
     );
   });
 
-  it("offers only the full AQGreen joining payment", async () => {
+  it("offers full or two-instalment AQGreen joining payment", async () => {
     render(<MemberProgrammes />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Join AQGreen" }));
-    expect(screen.getByText(/one full payment of R1,200/i)).toBeInTheDocument();
-    expect(screen.queryByText(/two R600 instalments/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Pay R1,200 once/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", {
+      name: /Pay two R600 instalments/i,
+    }));
     fireEvent.click(screen.getByRole("button", { name: "Continue to secure payment" }));
 
     await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
       apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
-      { schedule: 0 },
+      { schedule: 1 },
     ));
   });
 
@@ -283,6 +324,37 @@ describe("MemberProgrammes", () => {
       .not.toBeInTheDocument();
   });
 
+  it("shows the recorded Area decision reason for a declined participation", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: {
+        activatedAt: null,
+        canRecruitForThisProgramme: false,
+        currency: "ZAR",
+        decidedAt: "2026-08-09T11:42:22Z",
+        decisionReason: "Identity evidence requires correction before activation.",
+        isActive: false,
+        joinedIndependently: true,
+        nextPaymentAmount: null,
+        nextPaymentDescription: null,
+        programmeName: "AQGreen",
+        recruiterClubMemberNumber: null,
+        startedAt: "2026-08-09T10:00:00Z",
+        status: "Declined",
+      },
+      onyx: null,
+      pendingAQGreenCheckout: null,
+      pendingDirectOnyxCheckout: null,
+      funeralCover: null,
+      travelBenefit: null,
+    });
+
+    render(<MemberProgrammes />);
+
+    expect(await screen.findByText("Not approved")).toBeInTheDocument();
+    expect(screen.getByText(/Identity evidence requires correction/))
+      .toBeInTheDocument();
+  });
+
   it("preserves completion of a verified historical AQGreen instalment", async () => {
     vi.mocked(httpClient.get).mockResolvedValue({
       entry: {
@@ -307,6 +379,39 @@ describe("MemberProgrammes", () => {
 
     render(<MemberProgrammes />);
     fireEvent.click(await screen.findByRole("button", { name: /Pay.*600.*securely/i }));
+
+    await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
+      apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+      { schedule: 1 },
+    ));
+  });
+
+  it("offers both AQGreen schedules before the first checkout", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: {
+        activatedAt: null,
+        canRecruitForThisProgramme: false,
+        currency: "ZAR",
+        isActive: false,
+        joinedIndependently: true,
+        joiningPaidAmount: 0,
+        joiningSchedule: null,
+        nextPaymentAmount: 1200,
+        nextPaymentDescription: "AQGreen joining payment",
+        programmeName: "AQGreen",
+        recruiterClubMemberNumber: null,
+        startedAt: "2026-07-26T10:00:00Z",
+        status: "Awaiting joining payment",
+      },
+      onyx: null,
+      pendingAQGreenCheckout: null,
+      travelBenefit: null,
+    });
+
+    render(<MemberProgrammes />);
+    fireEvent.click(await screen.findByRole("button", {
+      name: "Pay first R600 instalment",
+    }));
 
     await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
       apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
@@ -348,5 +453,28 @@ describe("MemberProgrammes", () => {
     expect(
       screen.getByText(/trip selection, pricing, and booking/i),
     ).toBeInTheDocument();
+  });
+
+  it("shows the included AQGreen funeral-cover benefit without claiming activation", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: null,
+      funeralCover: {
+        coverAmount: 30000,
+        currency: "ZAR",
+        includedAt: "2026-08-09T10:00:00Z",
+        status: "Included",
+      },
+      onyx: null,
+      travelBenefit: null,
+    });
+
+    render(<MemberProgrammes />);
+
+    expect(await screen.findByText("Funeral-cover inclusion"))
+      .toBeInTheDocument();
+    expect(screen.getByText("Included")).toBeInTheDocument();
+    expect(screen.getByText(/R\s*30[\s,\u00a0]*000/)).toBeInTheDocument();
+    expect(screen.getByText(/does not represent insurer activation or enrolment/i))
+      .toBeInTheDocument();
   });
 });

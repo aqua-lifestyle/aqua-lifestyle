@@ -22,6 +22,21 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
         public int? TenantId { get; set; }
 
         public AdminProgrammeType Programme { get; set; }
+
+        public bool AwaitingApprovalOnly { get; set; }
+    }
+
+    public class PendingProgrammeApprovalSummaryInput
+    {
+        [Range(1, int.MaxValue)]
+        public int? TenantId { get; set; }
+    }
+
+    public class PendingProgrammeApprovalSummaryDto
+    {
+        public int AQGreenCount { get; set; }
+        public int OnyxCount { get; set; }
+        public int TotalCount => AQGreenCount + OnyxCount;
     }
 
     public class AdminProgrammePaymentDto
@@ -48,6 +63,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
         public string RecruiterClubMemberNumber { get; set; }
         public DateTime StartedAt { get; set; }
         public DateTime? ActivatedAt { get; set; }
+        public decimal ExpectedJoiningAmount { get; set; }
         public decimal? NextPaymentAmount { get; set; }
         public string NextPaymentDescription { get; set; }
         public string Currency { get; set; }

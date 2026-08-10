@@ -37,6 +37,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             _aqGreenJoiningCheckoutRepository;
         private readonly IRepository<OnyxTravelBenefitEntitlement, Guid>
             _travelBenefitRepository;
+        private readonly IRepository<AQGreenFuneralCoverEntitlement, Guid>
+            _funeralCoverRepository;
         private readonly ICurrentProgrammeTermsProvider _termsProvider;
         private readonly IProgrammeInvitationResolver _invitationResolver;
         private readonly IYocoCheckoutGateway _yocoCheckoutGateway;
@@ -54,6 +56,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             IRepository<DirectOnyxCheckoutIntent, Guid> directOnyxCheckoutIntentRepository,
             IRepository<AQGreenJoiningCheckout, Guid> aqGreenJoiningCheckoutRepository,
             IRepository<OnyxTravelBenefitEntitlement, Guid> travelBenefitRepository,
+            IRepository<AQGreenFuneralCoverEntitlement, Guid> funeralCoverRepository,
             ICurrentProgrammeTermsProvider termsProvider,
             IProgrammeInvitationResolver invitationResolver,
             IYocoCheckoutGateway yocoCheckoutGateway,
@@ -68,6 +71,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             _directOnyxCheckoutIntentRepository = directOnyxCheckoutIntentRepository;
             _aqGreenJoiningCheckoutRepository = aqGreenJoiningCheckoutRepository;
             _travelBenefitRepository = travelBenefitRepository;
+            _funeralCoverRepository = funeralCoverRepository;
             _termsProvider = termsProvider;
             _invitationResolver = invitationResolver;
             _yocoCheckoutGateway = yocoCheckoutGateway;
@@ -80,10 +84,12 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         public async Task<MyProgrammeParticipationsDto> GetMyParticipationsAsync()
         {
             var customer = await GetCurrentActiveCustomerAsync();
-            var entry = await _entryParticipationRepository.FirstOrDefaultAsync(
-                participation => participation.CustomerId == customer.Id);
-            var onyx = await _onyxParticipationRepository.FirstOrDefaultAsync(
-                participation => participation.CustomerId == customer.Id);
+            var entry = await _entryParticipationRepository.GetAll()
+                .Include(participation => participation.ApprovalDecisions)
+                .FirstOrDefaultAsync(participation => participation.CustomerId == customer.Id);
+            var onyx = await _onyxParticipationRepository.GetAll()
+                .Include(participation => participation.ApprovalDecisions)
+                .FirstOrDefaultAsync(participation => participation.CustomerId == customer.Id);
             var directOnyxCheckout = await _directOnyxCheckoutIntentRepository.FirstOrDefaultAsync(
                 intent =>
                     intent.CustomerId == customer.Id &&
@@ -102,6 +108,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             }
             var travelBenefit =
                 await _travelBenefitRepository.FirstOrDefaultAsync(
+                    entitlement => entitlement.CustomerId == customer.Id);
+            var funeralCover =
+                await _funeralCoverRepository.FirstOrDefaultAsync(
                     entitlement => entitlement.CustomerId == customer.Id);
 
             return new MyProgrammeParticipationsDto
@@ -123,6 +132,15 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         Currency = directOnyxCheckout.Currency,
                         CheckoutUrl = directOnyxCheckout.CheckoutUrl,
                         Status = "Awaiting payment"
+                    },
+                FuneralCover = funeralCover == null
+                    ? null
+                    : new AQGreenFuneralCoverDto
+                    {
+                        Status = "Included",
+                        CoverAmount = funeralCover.FuneralCoverAmount,
+                        Currency = funeralCover.Currency,
+                        IncludedAt = funeralCover.IncludedAt
                     },
                 TravelBenefit = travelBenefit == null
                     ? null
@@ -252,18 +270,6 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                     throw new UserFriendlyException(
                         "Online payment is unavailable for this historical AQGreen record.",
                         "Contact the club team so an existing payment is not charged again.");
-
-                var isCompletingVerifiedInstallments =
-                    input.Schedule == AQGreenJoiningPaymentSchedule.TwoInstallments &&
-                    participation.JoiningPaymentSchedule ==
-                    AQGreenJoiningPaymentSchedule.TwoInstallments &&
-                    participation.RegistrationPaymentId.HasValue &&
-                    !participation.ActivationPaymentId.HasValue;
-                if (input.Schedule != AQGreenJoiningPaymentSchedule.Full &&
-                    !isCompletingVerifiedInstallments)
-                    throw new UserFriendlyException(
-                        "AQGreen joining requires one full R1,200 payment.",
-                        "The R600 monthly commitment is separate from the joining payment.");
 
                 await _hostedPaymentCheckoutLock.AcquireAQGreenParticipationAsync(
                     participation.Id);
@@ -688,6 +694,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             string recruiterClubMemberNumber)
         {
             var details = ProgrammeParticipationStatusPresenter.Describe(participation);
+            var decision = participation.ApprovalDecisions
+                .OrderByDescending(item => item.DecidedAt)
+                .FirstOrDefault();
             return new ProgrammeParticipationDto
             {
                 ProgrammeCode = RecruitmentProgrammeKeys.AQGreen,
@@ -698,6 +707,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 RecruiterClubMemberNumber = recruiterClubMemberNumber,
                 StartedAt = participation.StartedAt,
                 ActivatedAt = participation.ActivatedAt,
+                DecidedAt = decision?.DecidedAt,
+                DecisionReason = decision?.Reason,
                 NextPaymentAmount = details.NextPaymentAmount,
                 NextPaymentDescription = details.NextPaymentDescription,
                 Currency = participation.Currency,
@@ -722,6 +733,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             string recruiterClubMemberNumber)
         {
             var details = ProgrammeParticipationStatusPresenter.Describe(participation);
+            var decision = participation.ApprovalDecisions
+                .OrderByDescending(item => item.DecidedAt)
+                .FirstOrDefault();
             return new ProgrammeParticipationDto
             {
                 ProgrammeCode = RecruitmentProgrammeKeys.Onyx,
@@ -732,6 +746,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 RecruiterClubMemberNumber = recruiterClubMemberNumber,
                 StartedAt = participation.StartedAt,
                 ActivatedAt = participation.ActivatedAt,
+                DecidedAt = decision?.DecidedAt,
+                DecisionReason = decision?.Reason,
                 NextPaymentAmount = details.NextPaymentAmount,
                 NextPaymentDescription = details.NextPaymentDescription,
                 Currency = participation.Currency,

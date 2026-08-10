@@ -8,6 +8,10 @@ import { useAuthState } from "@/src/providers";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import {
+  PROGRAMME_APPROVAL_QUEUE_CHANGED,
+  usePendingProgrammeApprovals,
+} from "@/src/shared/hooks/use-pending-programme-approvals";
+import {
   Avatar,
   Badge,
   Breadcrumb,
@@ -41,6 +45,7 @@ type AdminProgrammeParticipation = {
   clubMemberNumber: string;
   customerName: string;
   email: string;
+  expectedJoiningAmount: number;
   isActive: boolean;
   joinedIndependently: boolean;
   nextPaymentAmount: number | null;
@@ -107,6 +112,7 @@ export const AdminProgrammeParticipations = () => {
     session?.user?.permissions?.includes(VIEW_CHECKOUTS_PERMISSION) ?? false;
   const canTerminateCheckouts =
     session?.user?.permissions?.includes(TERMINATE_CHECKOUTS_PERMISSION) ?? false;
+  const { summary: pendingSummary } = usePendingProgrammeApprovals(canView);
   const [programme, setProgramme] = useState<ProgrammeType>("entry");
   const [participations, setParticipations] = useState<
     AdminProgrammeParticipation[]
@@ -141,13 +147,16 @@ export const AdminProgrammeParticipations = () => {
     try {
       const programmeValue = programme === "entry" ? 0 : 1;
       const pageSize = 100;
+      const awaitingFilter = queue === "awaiting"
+        ? "&AwaitingApprovalOnly=true"
+        : "";
       const firstPage = await httpClient.get<PagedParticipations>(
-        `${apiEndpoints.programmeParticipations.getAdminParticipations}?Programme=${programmeValue}&MaxResultCount=${pageSize}`,
+        `${apiEndpoints.programmeParticipations.getAdminParticipations}?Programme=${programmeValue}&MaxResultCount=${pageSize}${awaitingFilter}`,
       );
       const allParticipations = [...firstPage.items];
       while (allParticipations.length < firstPage.totalCount) {
         const nextPage = await httpClient.get<PagedParticipations>(
-          `${apiEndpoints.programmeParticipations.getAdminParticipations}?Programme=${programmeValue}&SkipCount=${allParticipations.length}&MaxResultCount=${pageSize}`,
+          `${apiEndpoints.programmeParticipations.getAdminParticipations}?Programme=${programmeValue}&SkipCount=${allParticipations.length}&MaxResultCount=${pageSize}${awaitingFilter}`,
         );
         if (nextPage.items.length === 0) break;
         allParticipations.push(...nextPage.items);
@@ -163,7 +172,7 @@ export const AdminProgrammeParticipations = () => {
     } finally {
       setLoading(false);
     }
-  }, [canView, programme]);
+  }, [canView, programme, queue]);
 
   const loadCheckouts = useCallback(async () => {
     if (!canViewCheckouts) {
@@ -293,6 +302,7 @@ export const AdminProgrammeParticipations = () => {
       setSuccess(
         `${item.customerName}'s ${item.programmeName} participation was approved and activated.`,
       );
+      window.dispatchEvent(new Event(PROGRAMME_APPROVAL_QUEUE_CHANGED));
       await loadParticipations();
     } catch (requestError) {
       setError(
@@ -331,6 +341,7 @@ export const AdminProgrammeParticipations = () => {
       setSuccess(
         `${rejecting.customerName}'s ${rejecting.programmeName} participation was declined and the decision was recorded.`,
       );
+      window.dispatchEvent(new Event(PROGRAMME_APPROVAL_QUEUE_CHANGED));
       await loadParticipations();
     } catch (requestError) {
       setError(
@@ -395,11 +406,19 @@ export const AdminProgrammeParticipations = () => {
       header: "Next step",
       key: "nextPaymentDescription",
       render: (item: AdminProgrammeParticipation) =>
-        item.nextPaymentAmount === null ? (
+        item.status === AWAITING_APPROVAL_STATUS ? (
+          <span className="inline-flex items-center gap-1.5 font-medium text-warning">
+            <ShieldAlert className="size-4" /> Area review required
+          </span>
+        ) : item.isActive ? (
           <span className="inline-flex items-center gap-1.5 font-medium text-success">
             <CircleCheck className="size-4" />
             Activated
           </span>
+        ) : item.status === "Declined" ? (
+          <span className="font-medium text-destructive">Review completed</span>
+        ) : item.nextPaymentAmount === null ? (
+          <span className="text-muted-foreground">No payment action</span>
         ) : (
           <div>
             <p className="font-medium">{item.nextPaymentDescription}</p>
@@ -412,12 +431,17 @@ export const AdminProgrammeParticipations = () => {
     {
       header: "Confirmed payments",
       key: "confirmedPayments",
-      render: (item: AdminProgrammeParticipation) =>
-        item.confirmedPayments.length === 0 ? (
-          <span className="text-muted-foreground">None confirmed</span>
-        ) : (
-          <div className="flex flex-col gap-1">
-            {item.confirmedPayments.map((payment) => (
+      render: (item: AdminProgrammeParticipation) => (
+        <div className="flex flex-col gap-1">
+          <p className="text-xs text-muted-foreground">
+            Expected joining amount: {formatCurrency(
+              item.expectedJoiningAmount,
+              item.currency,
+            )}
+          </p>
+          {item.confirmedPayments.length === 0 ? (
+            <span className="text-muted-foreground">None confirmed</span>
+          ) : item.confirmedPayments.map((payment) => (
               <div
                 key={`${payment.provider}:${payment.providerReference}:${payment.confirmedAt}`}
                 className="text-xs"
@@ -426,13 +450,17 @@ export const AdminProgrammeParticipations = () => {
                   {formatCurrency(payment.amount, payment.currency)} ·{" "}
                   {payment.provider}
                 </p>
+                <p>{payment.description}</p>
                 <p className="text-muted-foreground">
                   Reference: {payment.providerReference}
                 </p>
+                <p className="text-muted-foreground">
+                  Confirmed: {new Date(payment.confirmedAt).toLocaleString()}
+                </p>
               </div>
             ))}
-          </div>
-        ),
+        </div>
+      ),
     },
     ...(canCorrect || canApprove
       ? [{
@@ -471,19 +499,12 @@ export const AdminProgrammeParticipations = () => {
       : []),
   ];
 
-  const visibleParticipations =
-    queue === "awaiting"
-      ? participations.filter(
-          (item) => item.status === AWAITING_APPROVAL_STATUS,
-        )
-      : participations;
-
   const table = loading ? (
     <Skeleton className="h-80" />
   ) : (
     <DataTable
       columns={columns}
-      data={visibleParticipations}
+      data={participations}
       emptyState={`No ${programme === "entry" ? "AQGreen" : "Onyx"} participation records found.`}
       keyExtractor={(item) => `${item.programmeName}:${item.clubMemberNumber}`}
       searchFn={(item, query) =>
@@ -599,9 +620,11 @@ export const AdminProgrammeParticipations = () => {
                 Awaiting Area approval
               </p>
               <p className="text-2xl font-bold">
-                {participations.filter(
-                  (item) => item.status === AWAITING_APPROVAL_STATUS,
-                ).length}
+                {pendingSummary
+                  ? programme === "entry"
+                    ? pendingSummary.aqGreenCount
+                    : pendingSummary.onyxCount
+                  : "—"}
               </p>
             </div>
           </Card>

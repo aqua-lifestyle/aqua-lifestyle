@@ -1,19 +1,25 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Abp.Application.Services;
 using Abp.Domain.Uow;
+using AqualLifeStyle.Application.Admin.ProgrammeParticipations;
+using AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
+using AqualLifeStyle.Email;
 using AqualLifeStyle.Payments;
 using AqualLifeStyle.Payments.Yoco;
 using Microsoft.EntityFrameworkCore;
+using NSubstitute;
 using Shouldly;
 using Xunit;
 
@@ -28,7 +34,7 @@ namespace AqualLifeStyle.Tests.Application
             new(2026, 7, 26, 0, 0, 0, DateTimeKind.Utc);
 
         [Fact]
-        public async Task AQGreenJoiningCheckout_ActivatesAfterOneVerifiedTwelveHundredRandPayment()
+        public async Task AQGreenJoiningCheckout_AwaitsApprovalAfterOneVerifiedTwelveHundredRandPayment()
         {
             var suffix = Guid.NewGuid().ToString("N");
             var userId = await CreateTestUserAsync(
@@ -298,6 +304,277 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task MissingActiveAreaAdministrator_DoesNotLoseDurableApprovalQueueItem()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"approval-queue-{suffix}",
+                $"approval-queue-{suffix}@example.com");
+            var customerId = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    $"Durable Queue {suffix}",
+                    new EmailAddress($"approval-queue-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+                context.EntryParticipations.Add(EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    EntryProgrammeTerms.Create(
+                        $"approval-queue-{suffix}",
+                        EffectiveFrom,
+                        600m,
+                        600m,
+                        600m,
+                        7),
+                    EffectiveFrom));
+                await context.SaveChangesAsync();
+                return customer.Id;
+            });
+
+            var processor = Resolve<ProgrammePaymentConfirmationProcessor>();
+            await processor.ProcessAsync(CreateConfirmation(
+                customerId,
+                MemberPaymentPurpose.EntryRegistration,
+                600m,
+                $"approval-queue-registration-{suffix}"));
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var administrator = await context.Users.SingleAsync(candidate =>
+                    candidate.TenantId == 1 && candidate.UserName == "admin");
+                administrator.IsActive = false;
+                await context.SaveChangesAsync();
+            });
+
+            await processor.ProcessAsync(CreateConfirmation(
+                customerId,
+                MemberPaymentPurpose.EntryActivation,
+                600m,
+                $"approval-queue-activation-{suffix}"));
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations.SingleAsync(item =>
+                    item.CustomerId == customerId);
+                participation.Status.ShouldBe(
+                    EntryParticipationStatus.PaymentConfirmedAwaitingApproval);
+                (await context.TransactionalEmailOutboxMessages.AnyAsync(message =>
+                    message.NotificationType ==
+                        "ProgrammeParticipationAwaitingApproval")).ShouldBeFalse();
+            });
+        }
+
+        [Fact]
+        public async Task ConfirmedAQGreenPayment_FlowsThroughQueueAndApprovalToActive()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"approval-workflow-{suffix}",
+                $"approval-workflow-{suffix}@example.com");
+            var persisted = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    $"Approval Workflow {suffix}",
+                    new EmailAddress($"approval-workflow-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    EntryProgrammeTerms.CreateSingleJoiningPayment(
+                        $"approval-workflow-{suffix}",
+                        AQGreenSinglePaymentEffectiveFrom,
+                        1200m,
+                        600m,
+                        7),
+                    AQGreenSinglePaymentEffectiveFrom);
+                context.EntryParticipations.Add(participation);
+                await context.SaveChangesAsync();
+                return new { customer.Id, ParticipationId = participation.Id };
+            });
+
+            var confirmation = await Resolve<ProgrammePaymentConfirmationProcessor>()
+                .ProcessAsync(new ConfirmedProgrammePayment(
+                    1,
+                    persisted.Id,
+                    MemberPaymentPurpose.AQGreenJoining,
+                    1200m,
+                    "ZAR",
+                    "Yoco",
+                    $"approval-workflow-{suffix}",
+                    AQGreenSinglePaymentEffectiveFrom,
+                    AQGreenSinglePaymentEffectiveFrom.AddMinutes(1)));
+            confirmation.AwaitingAdministrativeApproval.ShouldBeTrue();
+
+            var administratorService =
+                Resolve<IAdminProgrammeParticipationAppService>();
+            var pending = await administratorService.GetAllAsync(
+                new AdminProgrammeParticipationListInput
+                {
+                    Programme = AdminProgrammeType.Entry,
+                    AwaitingApprovalOnly = true,
+                    MaxResultCount = 20
+                });
+            pending.Items.Single().ParticipationId.ShouldBe(
+                persisted.ParticipationId);
+
+            await administratorService.ApproveProgrammeParticipationAsync(
+                new ApproveProgrammeParticipationInput
+                {
+                    Programme = AdminProgrammeType.Entry,
+                    ParticipationId = persisted.ParticipationId
+                });
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations.SingleAsync(item =>
+                    item.Id == persisted.ParticipationId);
+                participation.Status.ShouldBe(EntryParticipationStatus.Active);
+                participation.IsQualifiedForNetwork.ShouldBeTrue();
+                (await context.AQGreenFuneralCoverEntitlements.CountAsync(item =>
+                    item.EntryParticipationId == persisted.ParticipationId &&
+                    item.FuneralCoverAmount == 30000m)).ShouldBe(1);
+                (await context.EntryParticipationApprovalDecisions.CountAsync(item =>
+                    EF.Property<Guid>(item, "EntryParticipationId") ==
+                    persisted.ParticipationId && item.Approved)).ShouldBe(1);
+                (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
+                    message.NotificationType ==
+                        "ProgrammeParticipationAwaitingApproval" &&
+                    message.IdempotencyKey.StartsWith(
+                        $"programme-approval:Entry:{persisted.ParticipationId}:administrator:")))
+                    .ShouldBe(1);
+                (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
+                    message.NotificationType == "ParticipationDecision" &&
+                    message.IdempotencyKey ==
+                        $"Entry:{persisted.ParticipationId}:approved"))
+                    .ShouldBe(1);
+            });
+
+            (await administratorService.GetPendingApprovalSummaryAsync(
+                new PendingProgrammeApprovalSummaryInput())).TotalCount.ShouldBe(0);
+        }
+
+        [Fact]
+        public async Task AdministratorAlertDeliveryFailure_DoesNotBlockDurableQueueOrRejection()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"approval-failure-{suffix}",
+                $"approval-failure-{suffix}@example.com");
+            var persisted = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    $"Approval Failure {suffix}",
+                    new EmailAddress($"approval-failure-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    EntryProgrammeTerms.CreateSingleJoiningPayment(
+                        $"approval-failure-{suffix}",
+                        AQGreenSinglePaymentEffectiveFrom,
+                        1200m,
+                        600m,
+                        7),
+                    AQGreenSinglePaymentEffectiveFrom);
+                context.EntryParticipations.Add(participation);
+                await context.SaveChangesAsync();
+                return new { customer.Id, ParticipationId = participation.Id };
+            });
+
+            await Resolve<ProgrammePaymentConfirmationProcessor>().ProcessAsync(
+                new ConfirmedProgrammePayment(
+                    1,
+                    persisted.Id,
+                    MemberPaymentPurpose.AQGreenJoining,
+                    1200m,
+                    "ZAR",
+                    "Yoco",
+                    $"approval-failure-{suffix}",
+                    AQGreenSinglePaymentEffectiveFrom,
+                    AQGreenSinglePaymentEffectiveFrom.AddMinutes(1)));
+
+            var deliveryGateway = Resolve<ITransactionalEmailDeliveryGateway>();
+            deliveryGateway.ClearReceivedCalls();
+            deliveryGateway
+                .SendAsync(
+                    Arg.Any<TransactionalEmail>(),
+                    Arg.Any<CancellationToken>())
+                .Returns<Task<string>>(_ =>
+                    throw new HttpRequestException("Email provider unavailable."));
+            await Resolve<TransactionalEmailOutboxProcessor>().ProcessPendingAsync();
+
+            var administratorService =
+                Resolve<IAdminProgrammeParticipationAppService>();
+            var pending = await administratorService.GetAllAsync(
+                new AdminProgrammeParticipationListInput
+                {
+                    Programme = AdminProgrammeType.Entry,
+                    AwaitingApprovalOnly = true,
+                    MaxResultCount = 20
+                });
+            pending.Items.Single().ParticipationId.ShouldBe(
+                persisted.ParticipationId);
+
+            const string reason = "Payment evidence requires member correction";
+            await administratorService.RejectProgrammeParticipationAsync(
+                new RejectProgrammeParticipationInput
+                {
+                    Programme = AdminProgrammeType.Entry,
+                    ParticipationId = persisted.ParticipationId,
+                    Reason = reason
+                });
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations.SingleAsync(item =>
+                    item.Id == persisted.ParticipationId);
+                participation.Status.ShouldBe(EntryParticipationStatus.Rejected);
+                participation.IsQualifiedForNetwork.ShouldBeFalse();
+                (await context.AQGreenFuneralCoverEntitlements.CountAsync(item =>
+                    item.EntryParticipationId == persisted.ParticipationId &&
+                    item.Status == AQGreenFuneralCoverStatus.Included &&
+                    item.FuneralCoverAmount == 30000m)).ShouldBe(1);
+
+                var decision = await context.EntryParticipationApprovalDecisions
+                    .SingleAsync(item =>
+                        EF.Property<Guid>(item, "EntryParticipationId") ==
+                        persisted.ParticipationId);
+                decision.Approved.ShouldBeFalse();
+                decision.Reason.ShouldBe(reason);
+
+                var failedAlert = await context.TransactionalEmailOutboxMessages
+                    .SingleAsync(message =>
+                        message.NotificationType ==
+                        "ProgrammeParticipationAwaitingApproval");
+                failedAlert.Status.ShouldBe(
+                    AqualLifeStyle.Domain.Email.TransactionalEmailStatus.Pending);
+                failedAlert.AttemptCount.ShouldBe(1);
+
+                var customerOutcome = await context.TransactionalEmailOutboxMessages
+                    .SingleAsync(message =>
+                        message.NotificationType == "ParticipationDecision");
+                Resolve<ITransactionalEmailBodyProtector>()
+                    .Unprotect(customerOutcome.TextBody)
+                    .ShouldContain(reason);
+            });
+
+            (await administratorService.GetPendingApprovalSummaryAsync(
+                new PendingProgrammeApprovalSummaryInput())).TotalCount.ShouldBe(0);
+        }
+
+        [Fact]
         public async Task ActiveParticipation_DoesNotDemoteAnExistingBusinessRole()
         {
             var suffix = Guid.NewGuid().ToString("N");
@@ -554,6 +831,19 @@ namespace AqualLifeStyle.Tests.Application
                     ProviderCheckoutId = providerCheckoutId
                 };
             });
+            var unauthorisedAdministratorId = await CreateTestUserAsync(
+                1,
+                $"approval-observer-{suffix}",
+                $"approval-observer-{suffix}@example.com");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var observer = await context.Users.SingleAsync(candidate =>
+                    candidate.Id == unauthorisedAdministratorId);
+                observer.SetRole(AquaUserRole.SystemAdmin);
+                context.UserRoles.RemoveRange(context.UserRoles.Where(userRole =>
+                    userRole.UserId == unauthorisedAdministratorId));
+                await context.SaveChangesAsync();
+            });
 
             var notification = CreateNotification(
                 $"evt_{suffix}",
@@ -589,6 +879,24 @@ namespace AqualLifeStyle.Tests.Application
                 (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
                     message.IdempotencyKey == $"payment-confirmed:{payment.Id}" &&
                     message.NotificationType == "PaymentConfirmation")).ShouldBe(1);
+                var administrator = await context.Users.SingleAsync(candidate =>
+                    candidate.TenantId == 1 && candidate.UserName == "admin");
+                var alert = await context.TransactionalEmailOutboxMessages.SingleAsync(message =>
+                    message.IdempotencyKey ==
+                        $"programme-approval:Entry:{persisted.ParticipationId}:administrator:{administrator.Id}" &&
+                    message.NotificationType ==
+                        "ProgrammeParticipationAwaitingApproval");
+                alert.Recipient.ShouldBe(administrator.EmailAddress);
+                var alertText = Resolve<ITransactionalEmailBodyProtector>()
+                    .Unprotect(alert.TextBody);
+                alertText.ShouldContain("AQGreen Webhook Test");
+                alertText.ShouldContain("ZAR 1,200.00");
+                alertText.ShouldContain("Open Programme Approvals");
+                (await context.TransactionalEmailOutboxMessages.AnyAsync(message =>
+                    message.NotificationType ==
+                        "ProgrammeParticipationAwaitingApproval" &&
+                    message.Recipient ==
+                        $"approval-observer-{suffix}@example.com")).ShouldBeFalse();
             });
 
             var conflictingReplay = CreateNotification(
@@ -676,6 +984,16 @@ namespace AqualLifeStyle.Tests.Application
                 (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
                     message.IdempotencyKey == $"payment-confirmed:{payment.Id}" &&
                     message.NotificationType == "PaymentConfirmation")).ShouldBe(1);
+                var participation = await context.OnyxParticipations.SingleAsync(item =>
+                    item.CustomerId == persisted.CustomerId);
+                var administrator = await context.Users.SingleAsync(candidate =>
+                    candidate.TenantId == 1 && candidate.UserName == "admin");
+                (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
+                    message.IdempotencyKey ==
+                        $"programme-approval:Onyx:{participation.Id}:administrator:{administrator.Id}" &&
+                    message.Recipient == administrator.EmailAddress &&
+                    message.NotificationType ==
+                        "ProgrammeParticipationAwaitingApproval")).ShouldBe(1);
             });
         }
 

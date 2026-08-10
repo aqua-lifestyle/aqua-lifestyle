@@ -111,6 +111,8 @@ export const apiEndpoints = {
       "/api/services/app/AdminProgrammeParticipation/RejectProgrammeParticipation",
     getAdminParticipations:
       "/api/services/app/AdminProgrammeParticipation/GetAll",
+    getPendingApprovalSummary:
+      "/api/services/app/AdminProgrammeParticipation/GetPendingApprovalSummary",
     getAQGreenJoiningCheckouts:
       "/api/services/app/AdminProgrammeParticipation/GetAQGreenJoiningCheckouts",
     terminateAQGreenJoiningCheckout:

@@ -133,7 +133,7 @@ Status legend: ✅ Implemented in codebase · 🔧 Domain/persistence foundation
 | BR-13 | Pooled savings may finance AQGreen customer loans, but Club Member savings and borrower loan ledgers remain separate | Current confirmed rule |
 | BR-14 | AQGreen replaces the earlier working name “Entry”; all existing Entry participation, payment, network, obligation, commission, and ledger behavior remains AQGreen behavior | Current confirmed rule |
 | BR-15 | The customer-facing Onyx joining action is direct entry only; AQGreen-to-Onyx graduation is an explicit authorised administrator decision after the active, member-accepted and administrator-approved R6,120 loan and current Level 2 eligibility are revalidated. It creates a separate independent Onyx participation and does not rewrite or terminate AQGreen | Current confirmed rule |
-| BR-16 | AQGreen joining requires one verified R1,200 payment. The separate R600 monthly commitment is not a joining-payment instalment. A historical participant who already has one verified joining instalment may complete that preserved obligation without rewriting or duplicating payment history | Current confirmed rule |
+| BR-16 | AQGreen joining requires a verified R1,200 total, paid once or as two R600 joining instalments. The separate R600 monthly commitment is not a joining-payment instalment. Historical payment records remain immutable and must not be rewritten or duplicated | Current confirmed rule |
 
 ## 5. Assumptions
 

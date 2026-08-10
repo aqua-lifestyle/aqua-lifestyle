@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AqualLifeStyle.Migrations
 {
     [DbContext(typeof(AqualLifeStyleDbContext))]
-    [Migration("20260807065821_AddAQGreenFuneralCoverEntitlements")]
+    [Migration("20260809043240_AddAQGreenFuneralCoverEntitlements")]
     partial class AddAQGreenFuneralCoverEntitlements
     {
         /// <inheritdoc />
@@ -2711,7 +2711,8 @@ namespace AqualLifeStyle.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EntryParticipationId");
+                    b.HasIndex("EntryParticipationId")
+                        .IsUnique();
 
                     b.ToTable("EntryParticipationApprovalDecisions", (string)null);
                 });
@@ -3313,7 +3314,8 @@ namespace AqualLifeStyle.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OnyxParticipationId");
+                    b.HasIndex("OnyxParticipationId")
+                        .IsUnique();
 
                     b.ToTable("OnyxParticipationApprovalDecisions", (string)null);
                 });

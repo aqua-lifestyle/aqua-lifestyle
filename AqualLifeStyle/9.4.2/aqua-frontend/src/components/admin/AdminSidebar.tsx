@@ -17,6 +17,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useAuthState } from "@/src/providers";
+import { usePendingProgrammeApprovals } from "@/src/shared/hooks/use-pending-programme-approvals";
 import { cn } from "@/src/shared/lib/utils";
 
 const adminLinks = [
@@ -39,6 +40,12 @@ export const AdminSidebar = () => {
   const pathname = usePathname();
   const { session } = useAuthState();
   const permissions = session?.user?.permissions ?? [];
+  const canViewProgrammeParticipations = permissions.includes(
+    "Aqua.Admin.ProgrammeParticipations.View",
+  );
+  const { summary } = usePendingProgrammeApprovals(
+    canViewProgrammeParticipations,
+  );
   const visibleLinks = adminLinks.filter(
     ({ permission }) => permission === null || permissions.includes(permission),
   );
@@ -70,7 +77,16 @@ export const AdminSidebar = () => {
                 key={link.href}
               >
                 <link.icon aria-hidden="true" className="size-4" />
-                {link.label}
+                <span>{link.label}</span>
+                {link.href === "/admin/programme-participations" &&
+                summary?.totalCount ? (
+                  <span
+                    aria-label={`${summary.totalCount} approvals awaiting review`}
+                    className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-warning px-1.5 py-0.5 text-xs font-bold text-warning-foreground"
+                  >
+                    {summary.totalCount}
+                  </span>
+                ) : null}
               </Link>
             );
           })}

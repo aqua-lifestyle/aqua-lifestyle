@@ -37,6 +37,7 @@ const participations = (
   onyx,
   pendingAQGreenCheckout: null,
   pendingDirectOnyxCheckout: null,
+  funeralCover: null,
   travelBenefit: null,
 });
 

@@ -40,18 +40,18 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
         public async Task<AQGreenFuneralCoverInclusionResult> EnsureIncludedAsync(
             EntryParticipation participation,
-            DateTime processedAt)
+            DateTime joiningCompletedAt)
         {
             if (participation == null)
             {
                 throw new ArgumentNullException(nameof(participation));
             }
 
-            if (processedAt == default)
+            if (joiningCompletedAt == default)
             {
                 throw new ArgumentException(
                     "A funeral-cover inclusion time is required.",
-                    nameof(processedAt));
+                    nameof(joiningCompletedAt));
             }
 
             if (!participation.IsJoiningObligationSatisfied)
@@ -70,7 +70,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             }
 
             var terms = _termsProvider.GetTerms();
-            if (processedAt < terms.EffectiveFrom)
+            if (joiningCompletedAt < terms.EffectiveFrom)
             {
                 return new AQGreenFuneralCoverInclusionResult(false, null);
             }
@@ -78,7 +78,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             var entitlement = AQGreenFuneralCoverEntitlement.GrantForJoiningCompletion(
                 participation,
                 terms,
-                processedAt);
+                joiningCompletedAt);
             await _entitlementRepository.InsertAsync(entitlement);
             return new AQGreenFuneralCoverInclusionResult(true, entitlement.Id);
         }
