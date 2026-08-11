@@ -344,6 +344,12 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     "Funeral Installment Member",
                     new EmailAddress($"funeral-customer-{suffix}@example.com"));
+                var area = await context.Areas.SingleAsync(candidate =>
+                    candidate.TenantId == 1 && candidate.Code == "JHB");
+                customer.AssignInitialArea(
+                    area,
+                    TermsEffectiveFrom,
+                    "Funeral-cover installment test Area assignment");
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
 
