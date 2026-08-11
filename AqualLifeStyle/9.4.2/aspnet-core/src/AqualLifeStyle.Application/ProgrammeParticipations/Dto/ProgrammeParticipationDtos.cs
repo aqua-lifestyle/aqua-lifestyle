@@ -48,6 +48,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
     {
         public string ProgrammeCode { get; set; }
         public string ProgrammeName { get; set; }
+        public string StatusCode { get; set; }
         public string Status { get; set; }
         public bool IsActive { get; set; }
         public bool JoinedIndependently { get; set; }

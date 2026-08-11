@@ -1,11 +1,5 @@
-import type { Metadata } from "next";
-
-import { MemberProgrammeProgress } from "@/src/components/members/member-programme-progress";
-
-export const metadata: Metadata = {
-  title: "AQGreen Progress | Aqua Lifestyle Club",
-};
+import { redirect } from "next/navigation";
 
 export default function MemberProgrammeProgressPage() {
-  return <MemberProgrammeProgress />;
+  redirect("/member/programmes");
 }

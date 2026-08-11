@@ -247,6 +247,8 @@ namespace AqualLifeStyle.Tests.WebHost
                 "aqgreen-flexible-joining-v1");
             response.ContractCapabilities.ShouldContain(
                 "programme-approval-queue-v1");
+            response.ContractCapabilities.ShouldContain(
+                "member-programme-journey-v1");
             response.TraceId.ShouldNotBeNull();
         }
 

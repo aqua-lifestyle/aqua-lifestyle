@@ -3,6 +3,119 @@ using System.Collections.Generic;
 
 namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
 {
+    public class MyProgrammeJourneyDto
+    {
+        public DateTime ProjectedAt { get; set; }
+        public IReadOnlyList<MemberProgrammeJourneyDto> Programmes { get; set; }
+    }
+
+    public class MemberProgrammeJourneyDto
+    {
+        public string ProgrammeCode { get; set; }
+        public string ProgrammeName { get; set; }
+        public bool HasParticipation { get; set; }
+        public string ParticipationStatus { get; set; }
+        public string DecisionReason { get; set; }
+        public bool IsActive { get; set; }
+        public DateTime? StartedAt { get; set; }
+        public DateTime? ActivatedAt { get; set; }
+        public string Currency { get; set; }
+        public int QualifiedLevel { get; set; }
+        public int MaximumLevel { get; set; }
+        public IReadOnlyList<MemberActivationStepDto> ActivationSteps { get; set; }
+        public IReadOnlyList<MemberLevelProgressDto> Levels { get; set; }
+        public MemberJoiningProgressDto Joining { get; set; }
+        public MemberMonthlyObligationSummaryDto MonthlySubscription { get; set; }
+        public MemberProgrammeEarningsDto Earnings { get; set; }
+        public IReadOnlyList<MemberProgrammeBenefitDto> Benefits { get; set; }
+        public string NextActionCode { get; set; }
+        public string NextActionTitle { get; set; }
+        public string NextActionBody { get; set; }
+    }
+
+    public class MemberActivationStepDto
+    {
+        public string Code { get; set; }
+        public string Label { get; set; }
+        public string State { get; set; }
+        public string Explanation { get; set; }
+    }
+
+    public class MemberLevelProgressDto
+    {
+        public int Level { get; set; }
+        public string Label { get; set; }
+        public string State { get; set; }
+        public string MeasureLabel { get; set; }
+        public int AchievedCount { get; set; }
+        public int RequiredCount { get; set; }
+        public int RemainingCount { get; set; }
+        public int ProgressPercent { get; set; }
+        public bool IsStructurallyComplete { get; set; }
+        public decimal? CommissionRate { get; set; }
+        public string CommissionRateLabel { get; set; }
+        public decimal CommissionComponentAmount { get; set; }
+    }
+
+    public class MemberJoiningProgressDto
+    {
+        public string Kind { get; set; }
+        public decimal RequiredAmount { get; set; }
+        public decimal PaidAmount { get; set; }
+        public decimal RemainingAmount { get; set; }
+        public int ProgressPercent { get; set; }
+        public string ScheduleLabel { get; set; }
+        public bool IsComplete { get; set; }
+        public DateTime? CompletedAt { get; set; }
+    }
+
+    public class MemberMonthlyObligationSummaryDto
+    {
+        public string Status { get; set; }
+        public decimal MonthlyAmount { get; set; }
+        public decimal? OutstandingAmount { get; set; }
+        public DateTime? DueAt { get; set; }
+        public string Explanation { get; set; }
+        public bool RequiresAction { get; set; }
+    }
+
+    public class MemberProgrammeEarningsDto
+    {
+        public string Currency { get; set; }
+        public decimal TotalEarned { get; set; }
+        public decimal EarnedAwaitingRelease { get; set; }
+        public decimal OnHold { get; set; }
+        public decimal ReleasedAwaitingPayment { get; set; }
+        public decimal RecordedAsPaid { get; set; }
+        public MemberProgrammeCycleEarningDto LatestRecordedWeek { get; set; }
+        public IReadOnlyList<MemberProgrammeCycleEarningDto> RecentWeeks { get; set; }
+    }
+
+    public class MemberProgrammeCycleEarningDto
+    {
+        public DateTime PeriodStart { get; set; }
+        public DateTime PeriodEnd { get; set; }
+        public decimal TotalAmount { get; set; }
+        public string Status { get; set; }
+        public string HoldReason { get; set; }
+        public string ZeroReason { get; set; }
+        public int QualifiedLevel { get; set; }
+        public int CommissionedLevel { get; set; }
+        public IReadOnlyList<MemberEarningComponentDto> Components { get; set; }
+    }
+
+    public class MemberProgrammeBenefitDto
+    {
+        public string Code { get; set; }
+        public string Name { get; set; }
+        public string State { get; set; }
+        public string Description { get; set; }
+        public decimal? Amount { get; set; }
+        public string Currency { get; set; }
+        public DateTime? UnlockedAt { get; set; }
+        public DateTime? AvailableAt { get; set; }
+    }
+
     public class MyProgrammeProgressDto
     {
         public bool HasEntryParticipation { get; set; }

@@ -578,9 +578,15 @@ export const CustomerDashboard = () => {
               <Building2 className="size-5 text-accent" />
               <h2 className="text-lg font-semibold">My area</h2>
             </div>
-            <div className="mt-4 text-sm text-muted-foreground">
-              Your area leader and facilitator information will appear here once
-              available.
+            <div className="mt-4 rounded-lg bg-muted/50 px-4 py-3">
+              <p className="text-sm text-muted-foreground">Business Area</p>
+              <p className="mt-1 text-xl font-bold text-foreground">
+                {programmeParticipations?.areaName ?? "Not assigned"}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Area context comes from your member record and is separate from
+                programme level progression.
+              </p>
             </div>
           </Card>
         </section>

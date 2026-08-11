@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { AuthenticatedPage } from "@/src/components/auth/authenticated-page";
 import { MemberProgrammes } from "@/src/components/members/member-programmes";
 
 export const metadata: Metadata = {
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function MemberProgrammesPage() {
-  return <MemberProgrammes />;
+  return (
+    <AuthenticatedPage>
+      <MemberProgrammes />
+    </AuthenticatedPage>
+  );
 }

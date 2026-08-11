@@ -18,6 +18,7 @@ export type ProgrammeParticipation = {
   recruiterClubMemberNumber: string | null;
   startedAt: string;
   status: string;
+  statusCode?: string;
   monthlyGracePeriodDays?: number;
   monthlySubscriptionAmount?: number;
 };
@@ -26,6 +27,8 @@ export type AQGreenJoiningPaymentSchedule = 0 | 1;
 export type AQGreenJoiningPaymentStage = 0 | 1 | 2;
 
 export type MyProgrammeParticipations = {
+  areaId?: string | null;
+  areaName?: string | null;
   canJoinEntry: boolean;
   canJoinOnyxDirectly: boolean;
   clubMemberNumber: string;

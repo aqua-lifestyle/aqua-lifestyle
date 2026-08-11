@@ -32,6 +32,8 @@ export type MemberWeeklyEarning = {
   status: string;
   holdReason: string | null;
   highestLevel: number;
+  highestQualifiedLevel: number;
+  highestCommissionedLevel: number;
   calculatedAt: string;
   components: MemberEarningComponent[];
 };

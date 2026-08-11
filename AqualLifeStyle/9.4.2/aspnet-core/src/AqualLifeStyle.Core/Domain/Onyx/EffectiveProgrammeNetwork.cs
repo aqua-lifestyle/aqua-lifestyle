@@ -69,6 +69,25 @@ namespace AqualLifeStyle.Domain.Onyx
                 ? children
                 : Array.Empty<EffectiveNetworkParticipation>();
 
+        public int CountSelectedParticipantsAtDepth(int customerId, int depth)
+        {
+            if (customerId <= 0) throw new ArgumentOutOfRangeException(nameof(customerId));
+            if (depth <= 0) throw new ArgumentOutOfRangeException(nameof(depth));
+            if (!ContainsCustomer(customerId)) return 0;
+
+            IReadOnlyCollection<int> current = new[] { customerId };
+            for (var currentDepth = 0; currentDepth < depth; currentDepth++)
+            {
+                current = current
+                    .SelectMany(parent => GetSelectedChildren(parent))
+                    .Select(child => child.CustomerId)
+                    .ToList();
+                if (current.Count == 0) return 0;
+            }
+
+            return current.Count;
+        }
+
         public static EffectiveProgrammeNetwork BuildAQGreen(
             int expectedTenantId,
             IEnumerable<EntryParticipation> participations,

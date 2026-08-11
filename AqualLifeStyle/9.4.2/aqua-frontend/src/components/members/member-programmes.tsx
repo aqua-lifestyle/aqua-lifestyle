@@ -1,14 +1,16 @@
 "use client";
 
-import { CircleDollarSign, HeartHandshake, Network, Plane, Route } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   useAuthState,
   useSystemHealthActions,
   useSystemHealthState,
 } from "@/src/providers";
-import { isPaymentApiCompatible } from "@/src/providers/SystemHealth/contract";
+import {
+  isPaymentApiCompatible,
+  isProgrammeJourneyApiCompatible,
+} from "@/src/providers/SystemHealth/contract";
 import {
   apiEndpoints,
   httpClient,
@@ -16,21 +18,16 @@ import {
 } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
-import type {
-  AQGreenFuneralCover,
-  OnyxTravelBenefit,
-  ProgrammeParticipation,
-} from "@/src/shared/domain/programme-participations";
+import { useMyProgrammeJourney } from "@/src/shared/hooks/use-my-programme-journey";
 import { useMyProgrammeParticipations } from "@/src/shared/hooks/use-my-programme-participations";
 import {
-  Badge,
   Breadcrumb,
   Button,
-  Card,
   Skeleton,
   StatusMessage,
 } from "@/src/shared/ui";
 import { JoinProgrammeDialog } from "./join-programme-dialog";
+import { ProgrammeJourneyOverview } from "./programme-journey-overview";
 
 const VIEW_PERMISSION = "Aqua.ProgrammeParticipations.ViewSelf";
 
@@ -39,208 +36,6 @@ const formatCurrency = (amount: number, currency: string) =>
     currency,
     style: "currency",
   }).format(amount);
-
-const ParticipationCard = ({
-  paymentAction,
-  participation,
-}: {
-  paymentAction?: ReactNode;
-  participation: ProgrammeParticipation;
-}) => (
-  <Card className="flex flex-col gap-5">
-    <div className="flex items-start justify-between gap-4">
-      <div>
-        <p className="text-sm font-medium text-muted-foreground">Programme</p>
-        <h2 className="mt-1 text-2xl font-bold">{participation.programmeName}</h2>
-      </div>
-      <Badge
-        tone={
-          participation.isActive
-            ? "success"
-            : participation.status === "Declined"
-              ? "error"
-              : "warning"
-        }
-      >
-        {participation.status}
-      </Badge>
-    </div>
-
-    <dl className="grid gap-4 text-sm sm:grid-cols-2">
-      <div>
-        <dt className="text-muted-foreground">Network placement</dt>
-        <dd className="mt-1 font-semibold">
-          {participation.joinedIndependently
-            ? "Independent"
-            : `Invited by ${participation.recruiterClubMemberNumber ?? "a verified Club Member"}`}
-        </dd>
-      </div>
-      <div>
-        <dt className="text-muted-foreground">Started</dt>
-        <dd className="mt-1 font-semibold">
-          {new Date(participation.startedAt).toLocaleDateString()}
-        </dd>
-      </div>
-      <div>
-        <dt className="text-muted-foreground">Member invitations</dt>
-        <dd className="mt-1 font-semibold">
-          {participation.canRecruitForThisProgramme
-            ? `May invite Club Members to ${participation.programmeName}`
-            : "Available after activation"}
-        </dd>
-      </div>
-      <div>
-        <dt className="text-muted-foreground">Activation</dt>
-        <dd className="mt-1 font-semibold">
-          {participation.activatedAt
-            ? new Date(participation.activatedAt).toLocaleDateString()
-            : "Pending"}
-        </dd>
-      </div>
-    </dl>
-
-    {participation.status === "Awaiting Area approval" ? (
-      <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 text-sm">
-        <p className="font-semibold">Payment confirmed</p>
-        <p className="mt-1 text-muted-foreground">
-          Your payment has been received and your participation is under review
-          by the Area team. It will activate once approved.
-        </p>
-      </div>
-    ) : participation.status === "Declined" ? (
-      <div className="rounded-xl border border-error/30 bg-error/5 p-4 text-sm">
-        <p className="font-semibold">Not approved</p>
-        <p className="mt-1 text-muted-foreground">
-          The Area team could not approve this participation. Contact the club
-          team if you believe this is a mistake.
-        </p>
-        {participation.decisionReason ? (
-          <p className="mt-3">
-            <span className="font-semibold">Reason: </span>
-            {participation.decisionReason}
-          </p>
-        ) : null}
-      </div>
-    ) : null}
-
-    {participation.nextPaymentAmount !== null ? (
-      <div className="rounded-xl border border-warning/30 bg-warning/5 p-4">
-        <div className="flex items-start gap-3">
-          <CircleDollarSign className="mt-0.5 size-5 text-warning" />
-          <div>
-            <p className="font-semibold">{participation.nextPaymentDescription}</p>
-            <p className="mt-1 text-xl font-bold">
-              {formatCurrency(
-                participation.nextPaymentAmount,
-                participation.currency,
-              )}
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Provider confirmation records the payment. Participation activates
-              only after Area Administrator approval.
-            </p>
-          </div>
-        </div>
-      </div>
-    ) : null}
-    {paymentAction}
-  </Card>
-);
-
-const TravelBenefitCard = ({
-  travelBenefit,
-}: {
-  travelBenefit: OnyxTravelBenefit;
-}) => (
-  <Card className="flex flex-col gap-5">
-    <div className="flex items-start justify-between gap-4">
-      <div className="flex items-center gap-3">
-        <Plane className="size-7 text-accent" />
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">
-            Onyx Level 3 benefit
-          </p>
-          <h2 className="mt-1 text-xl font-bold">Travel benefit</h2>
-        </div>
-      </div>
-      <Badge tone={travelBenefit.activatedAt ? "success" : "warning"}>
-        {travelBenefit.status}
-      </Badge>
-    </div>
-
-    <p className="text-sm text-muted-foreground">
-      Your eligibility is preserved after completing Onyx Level 3. You
-      contribute {travelBenefit.memberTripContributionPercent}% of the trip
-      cost when a future trip is arranged.
-    </p>
-
-    <dl className="grid gap-4 text-sm sm:grid-cols-2">
-      <div>
-        <dt className="text-muted-foreground">Eligible from</dt>
-        <dd className="mt-1 font-semibold">
-          {new Date(travelBenefit.eligibleAt).toLocaleDateString()}
-        </dd>
-      </div>
-      <div>
-        <dt className="text-muted-foreground">
-          {travelBenefit.activatedAt ? "Available since" : "Waiting period ends"}
-        </dt>
-        <dd className="mt-1 font-semibold">
-          {new Date(
-            travelBenefit.activatedAt ??
-              travelBenefit.waitingPeriodEndsAt,
-          ).toLocaleDateString()}
-        </dd>
-      </div>
-    </dl>
-
-    <StatusMessage tone="info">
-      Trip selection, pricing, and booking will be provided separately when
-      those services become available.
-    </StatusMessage>
-  </Card>
-);
-
-const FuneralCoverCard = ({
-  funeralCover,
-}: {
-  funeralCover: AQGreenFuneralCover;
-}) => (
-  <Card className="flex flex-col gap-5">
-    <div className="flex items-start justify-between gap-4">
-      <div className="flex items-center gap-3">
-        <HeartHandshake className="size-7 text-accent" />
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">
-            AQGreen joining benefit
-          </p>
-          <h2 className="mt-1 text-xl font-bold">Funeral-cover inclusion</h2>
-        </div>
-      </div>
-      <Badge tone="success">{funeralCover.status}</Badge>
-    </div>
-
-    <dl className="grid gap-4 text-sm sm:grid-cols-2">
-      <div>
-        <dt className="text-muted-foreground">Included cover amount</dt>
-        <dd className="mt-1 text-xl font-bold">
-          {formatCurrency(funeralCover.coverAmount, funeralCover.currency)}
-        </dd>
-      </div>
-      <div>
-        <dt className="text-muted-foreground">Included from</dt>
-        <dd className="mt-1 font-semibold">
-          {new Date(funeralCover.includedAt).toLocaleDateString()}
-        </dd>
-      </div>
-    </dl>
-
-    <StatusMessage tone="info">
-      This records the funeral-cover benefit included with completed AQGreen
-      joining. It does not represent insurer activation or enrolment.
-    </StatusMessage>
-  </Card>
-);
 
 export const MemberProgrammes = () => {
   const { session } = useAuthState();
@@ -253,6 +48,12 @@ export const MemberProgrammes = () => {
     errorMessage: loadError,
     isLoading: loading,
   } = useMyProgrammeParticipations(canView);
+  const journeyApiCompatible = isProgrammeJourneyApiCompatible(healthState.health);
+  const {
+    data: journey,
+    errorMessage: journeyError,
+    isLoading: journeyLoading,
+  } = useMyProgrammeJourney(canView && journeyApiCompatible);
   const [actionError, setActionError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [startingAQGreenPayment, setStartingAQGreenPayment] = useState(false);
@@ -270,6 +71,15 @@ export const MemberProgrammes = () => {
   const paymentApiCompatible = isPaymentApiCompatible(healthState.health);
   const paymentActionsUnavailable =
     healthState.isPending || !paymentApiCompatible;
+  const entryCanAcceptJoiningPayment = [
+    "AwaitingJoiningPayment",
+    "AwaitingActivationPayment",
+  ].includes(participations?.entry?.statusCode ?? "");
+  const journeyAcceptsAQGreenPayment = journey?.programmes.some(
+    (programme) =>
+      programme.programmeCode === "AQGREEN" &&
+      programme.nextActionCode === "CompleteJoiningPayment",
+  ) ?? false;
 
   useEffect(() => {
     if (
@@ -363,6 +173,85 @@ export const MemberProgrammes = () => {
     }
   };
 
+  const aqGreenPaymentAction = journeyAcceptsAQGreenPayment &&
+    participations?.entry &&
+    entryCanAcceptJoiningPayment ? (
+      participations.pendingAQGreenCheckout ? (
+        paymentActionsUnavailable ? (
+          <Button className="w-full" disabled>Continue secure payment</Button>
+        ) : (
+          <a
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+            href={participations.pendingAQGreenCheckout.checkoutUrl}
+          >
+            Continue secure payment
+          </a>
+        )
+      ) : participations.entry.joiningSchedule == null &&
+        (participations.entry.joiningPaidAmount ?? 0) === 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Button
+            disabled={paymentActionsUnavailable}
+            isLoading={startingAQGreenPayment}
+            onClick={() => void startAQGreenPayment(0)}
+          >
+            Pay R1,200 once
+          </Button>
+          <Button
+            disabled={paymentActionsUnavailable}
+            isLoading={startingAQGreenPayment}
+            onClick={() => void startAQGreenPayment(1)}
+            variant="outline"
+          >
+            Pay first R600 instalment
+          </Button>
+        </div>
+      ) : participations.entry.nextPaymentAmount != null &&
+        participations.entry.nextPaymentAmount > 0 ? (
+        <Button
+          className="w-full"
+          disabled={paymentActionsUnavailable}
+          isLoading={startingAQGreenPayment}
+          onClick={() => void startAQGreenPayment()}
+        >
+          Complete joining: {formatCurrency(
+            participations.entry.nextPaymentAmount,
+            participations.entry.currency,
+          )}
+        </Button>
+      ) : (
+        <StatusMessage tone="error">
+          The next joining-payment amount is unavailable. No payment can be
+          started until the API provides the authoritative amount.
+        </StatusMessage>
+      )
+    ) : undefined;
+
+  const aqGreenJoinAction = !participations?.entry ? (
+    <JoinProgrammeDialog
+      disabled={paymentActionsUnavailable}
+      programme="AQGreen"
+    />
+  ) : undefined;
+
+  const onyxJoinAction = participations?.pendingDirectOnyxCheckout ? (
+    paymentActionsUnavailable ? (
+      <Button className="w-full" disabled>Continue secure payment</Button>
+    ) : (
+      <a
+        className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+        href={participations.pendingDirectOnyxCheckout.checkoutUrl}
+      >
+        Continue secure payment
+      </a>
+    )
+  ) : !participations?.onyx ? (
+    <JoinProgrammeDialog
+      disabled={paymentActionsUnavailable}
+      programme="Onyx"
+    />
+  ) : undefined;
+
   if (!canView) {
     return (
       <main className="p-6">
@@ -383,18 +272,29 @@ export const MemberProgrammes = () => {
               { label: "My programmes" },
             ]}
           />
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">My programmes</h1>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">My programme journey</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Join AQGreen or Onyx, follow activation progress, and see whether your
-            network starts independently or through an inviting Club Member.
+            See where you are, what you have completed, what comes next, and how
+            your network progress connects to earnings and benefits.
+          </p>
+          <p className="mt-3 text-sm font-semibold text-foreground">
+            Area: {participations?.areaName ?? "Not assigned"}
           </p>
         </header>
 
-        {loadError || actionError ? (
-          <StatusMessage tone="error">{loadError ?? actionError}</StatusMessage>
-        ) : null}
+        {[loadError, journeyError, actionError].filter(Boolean).map((message) => (
+          <StatusMessage key={message} tone="error">{message}</StatusMessage>
+        ))}
         {success ? (
           <StatusMessage tone="info">{success}</StatusMessage>
+        ) : null}
+
+        {participations?.pendingDirectOnyxCheckout && !participations.onyx ? (
+          <StatusMessage tone="info">
+            <strong>Awaiting payment</strong>. Your Onyx participation and network
+            place do not exist yet. Continue the existing secure checkout when
+            you are ready.
+          </StatusMessage>
         ) : null}
 
         {!healthState.isPending && !paymentApiCompatible ? (
@@ -406,167 +306,38 @@ export const MemberProgrammes = () => {
           </StatusMessage>
         ) : null}
 
-        {hasActiveInvitationAccess ? (
-          <Card className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-bold">Grow your network</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Share a secure invitation link. Your friend will see your name
-                and programme before confirming.
-              </p>
-            </div>
-            {hasInvitationPermission ? (
-              <a className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark" href="/member/invitations">
-                Invite Club Members
-              </a>
-            ) : (
-              <p className="text-sm font-medium text-muted-foreground">
-                {accessRefreshFinished
-                  ? "Sign out and sign in again to load your updated Club Member access."
-                  : "Updating your Club Member access…"}
-              </p>
-            )}
-          </Card>
+        {!healthState.isPending && healthState.isSuccess && !journeyApiCompatible ? (
+          <StatusMessage tone="error">
+            The programme journey is unavailable because this API does not
+            advertise the required member journey capability. Payment controls
+            remain fail-closed on this page.
+          </StatusMessage>
         ) : null}
 
-        {loading ? (
-          <div className="grid gap-5 lg:grid-cols-2">
+        {hasActiveInvitationAccess && !hasInvitationPermission ? (
+          <StatusMessage tone="info">
+            {accessRefreshFinished
+              ? "Sign out and sign in again to load your updated invitation access."
+              : "Updating your Club Member invitation access…"}
+          </StatusMessage>
+        ) : null}
+
+        {loading || journeyLoading ? (
+          <div aria-busy="true" aria-label="Loading programme journey" className="flex flex-col gap-5" role="status">
             <Skeleton className="h-80" />
-            <Skeleton className="h-80" />
+            <Skeleton className="h-96" />
           </div>
-        ) : participations ? (
-          <div className="grid gap-5 lg:grid-cols-2">
-            {participations.entry ? (
-              <ParticipationCard
-                participation={participations.entry}
-                paymentAction={
-                  !participations.entry.isActive &&
-                  participations.entry.status !== "Awaiting Area approval" &&
-                  participations.entry.status !== "Declined" ? (
-                    participations.pendingAQGreenCheckout ? (
-                      paymentActionsUnavailable ? (
-                        <Button disabled>Continue secure payment</Button>
-                      ) : (
-                        <a
-                          className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
-                          href={participations.pendingAQGreenCheckout.checkoutUrl}
-                        >
-                          Continue secure payment
-                        </a>
-                      )
-                    ) : participations.entry.joiningSchedule == null &&
-                      (participations.entry.joiningPaidAmount ?? 0) === 0 ? (
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <Button
-                          disabled={paymentActionsUnavailable}
-                          isLoading={startingAQGreenPayment}
-                          onClick={() => void startAQGreenPayment(0)}
-                        >
-                          Pay R1,200 once
-                        </Button>
-                        <Button
-                          disabled={paymentActionsUnavailable}
-                          isLoading={startingAQGreenPayment}
-                          onClick={() => void startAQGreenPayment(1)}
-                          variant="outline"
-                        >
-                          Pay first R600 instalment
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-4">
-                        <Button
-                          disabled={paymentActionsUnavailable}
-                          isLoading={startingAQGreenPayment}
-                          onClick={() => void startAQGreenPayment()}
-                        >
-                          Pay {formatCurrency(
-                            participations.entry.nextPaymentAmount ??
-                              participations.entry.joiningOutstandingAmount ?? 1200,
-                            participations.entry.currency,
-                          )} securely
-                        </Button>
-                      </div>
-                    )
-                  ) : undefined
-                }
+        ) : participations && journey ? (
+          <div className="flex flex-col gap-12">
+            {journey.programmes.map((programme) => (
+              <ProgrammeJourneyOverview
+                canInvite={hasInvitationPermission}
+                joinAction={programme.programmeCode === "AQGREEN" ? aqGreenJoinAction : onyxJoinAction}
+                journey={programme}
+                key={programme.programmeCode}
+                paymentAction={programme.programmeCode === "AQGREEN" ? aqGreenPaymentAction : undefined}
               />
-            ) : (
-              <Card className="flex flex-col items-start gap-4">
-                <Route className="size-8 text-accent" />
-                <div>
-                  <h2 className="text-xl font-bold">AQGreen</h2>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Start with AQGreen and work toward graduating into a separate
-                    Onyx participation later. An invitation is optional.
-                  </p>
-                </div>
-                <JoinProgrammeDialog
-                  disabled={paymentActionsUnavailable}
-                  programme="AQGreen"
-                />
-              </Card>
-            )}
-
-            {participations.funeralCover ? (
-              <FuneralCoverCard funeralCover={participations.funeralCover} />
-            ) : null}
-
-            {participations.onyx ? (
-              <ParticipationCard participation={participations.onyx} />
-            ) : participations.pendingDirectOnyxCheckout ? (
-              <Card className="flex flex-col items-start gap-4">
-                <Network className="size-8 text-accent" />
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-xl font-bold">Onyx</h2>
-                    <Badge tone="warning">
-                      {participations.pendingDirectOnyxCheckout.status}
-                    </Badge>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Your Onyx participation and network place do not exist yet.
-                    They will be created only after Yoco confirms the full payment.
-                  </p>
-                  <p className="mt-3 text-2xl font-bold">
-                    {formatCurrency(
-                      participations.pendingDirectOnyxCheckout.amount,
-                      participations.pendingDirectOnyxCheckout.currency,
-                    )}
-                  </p>
-                </div>
-                {paymentActionsUnavailable ? (
-                  <Button disabled>Continue secure payment</Button>
-                ) : (
-                  <a
-                    className="inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
-                    href={participations.pendingDirectOnyxCheckout.checkoutUrl}
-                  >
-                    Continue secure payment
-                  </a>
-                )}
-              </Card>
-            ) : (
-              <Card className="flex flex-col items-start gap-4">
-                <Network className="size-8 text-accent" />
-                <div>
-                  <h2 className="text-xl font-bold">Onyx</h2>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Join Onyx through its single direct joining path with the full
-                    R6,120 payment. AQGreen and an invitation are not required.
-                  </p>
-                </div>
-                <JoinProgrammeDialog
-                  disabled={paymentActionsUnavailable}
-                  programme="Onyx"
-                />
-              </Card>
-            )}
-            {participations.travelBenefit ? (
-              <TravelBenefitCard
-                travelBenefit={participations.travelBenefit}
-              />
-            ) : null}
+            ))}
           </div>
         ) : null}
       </div>

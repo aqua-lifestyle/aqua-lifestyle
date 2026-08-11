@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { isPaymentApiCompatible, parseSystemHealth } from "./contract";
+import {
+  isPaymentApiCompatible,
+  isProgrammeJourneyApiCompatible,
+  parseSystemHealth,
+} from "./contract";
 
 describe("parseSystemHealth", () => {
   it("accepts the backend health response contract", () => {
@@ -15,6 +19,7 @@ describe("parseSystemHealth", () => {
       contractCapabilities: [
         "aqgreen-flexible-joining-v1",
         "programme-approval-queue-v1",
+        "member-programme-journey-v1",
         "direct-onyx-checkout-v1",
       ],
       releaseDate: "2026-07-09T00:00:00Z",
@@ -26,6 +31,7 @@ describe("parseSystemHealth", () => {
     expect(health.status).toBe("Healthy");
     expect(health.isDatabaseReachable).toBe(true);
     expect(isPaymentApiCompatible(health)).toBe(true);
+    expect(isProgrammeJourneyApiCompatible(health)).toBe(true);
   });
 
   it("rejects an older payment contract", () => {
@@ -45,6 +51,7 @@ describe("parseSystemHealth", () => {
     });
 
     expect(isPaymentApiCompatible(health)).toBe(false);
+    expect(isProgrammeJourneyApiCompatible(health)).toBe(false);
   });
 
   it("rejects missing database readiness fields", () => {

@@ -216,9 +216,16 @@ export const MemberProgrammeProgress = () => {
                             </p>
                           </td>
                           <td className="py-3 pr-4 text-muted-foreground">
-                            {earning.highestLevel === 0
-                              ? "None"
-                              : `Level${earning.highestLevel > 1 ? "s" : ""} 1${earning.highestLevel > 1 ? `–${earning.highestLevel}` : ""}`}
+                            <p>
+                              Commissioned: {earning.highestCommissionedLevel === 0
+                                ? "None"
+                                : `Level${earning.highestCommissionedLevel > 1 ? "s" : ""} 1${earning.highestCommissionedLevel > 1 ? `–${earning.highestCommissionedLevel}` : ""}`}
+                            </p>
+                            {earning.highestQualifiedLevel !== earning.highestCommissionedLevel ? (
+                              <p className="mt-1 text-xs">
+                                Structurally qualified: Level {earning.highestQualifiedLevel}
+                              </p>
+                            ) : null}
                           </td>
                           <td className="py-3 pr-4 font-semibold">
                             {formatCurrency(earning.totalAmount, data.currency)}

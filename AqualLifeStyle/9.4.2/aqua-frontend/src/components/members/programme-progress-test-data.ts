@@ -42,6 +42,8 @@ export const levelOneProgress: MyProgrammeProgress = {
       calculatedAt: "2026-07-13T00:00:00Z",
       components: [{ amount: 150, level: 1 }],
       highestLevel: 1,
+      highestQualifiedLevel: 1,
+      highestCommissionedLevel: 1,
       holdReason: null,
       periodEnd: "2026-07-12T00:00:00Z",
       periodStart: "2026-07-06T00:00:00Z",

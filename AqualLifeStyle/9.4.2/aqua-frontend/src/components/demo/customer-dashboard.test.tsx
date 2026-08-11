@@ -308,6 +308,8 @@ describe("CustomerDashboard", () => {
     });
     vi.mocked(useMyProgrammeParticipations).mockReturnValue({
       data: {
+        areaId: "a0000000-0000-0000-0000-000000000001",
+        areaName: "Johannesburg",
         canJoinEntry: true,
         canJoinOnyxDirectly: false,
         clubMemberNumber: "CLB-000000000007",
@@ -340,6 +342,9 @@ describe("CustomerDashboard", () => {
     expect(await screen.findByText("Club Member")).toBeInTheDocument();
     expect(screen.getByText("Active programme participation")).toBeInTheDocument();
     expect(screen.getByText("Onyx")).toBeInTheDocument();
+    expect(screen.getByText("Johannesburg")).toBeInTheDocument();
+    expect(screen.getByText(/separate from programme level progression/i))
+      .toBeInTheDocument();
   });
 
   it("routes Onyx joining through the programme participation workflow", async () => {

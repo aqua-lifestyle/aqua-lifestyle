@@ -176,6 +176,25 @@ namespace AqualLifeStyle.Tests.Domain
             Assert.Contains("outside Tenant 1", exception.Message);
         }
 
+        [Fact]
+        public void SelectedPopulationCounts_ExposePartialProgressAtEachDepth()
+        {
+            var cutoff = EffectiveFrom.AddDays(7);
+            var incomplete = EffectiveProgrammeNetwork.BuildAQGreen(
+                expectedTenantId: 1,
+                BuildNetwork(maxDepth: 2, incompleteRecruiterId: 2),
+                cutoff);
+            var complete = EffectiveProgrammeNetwork.BuildAQGreen(
+                expectedTenantId: 1,
+                BuildNetwork(maxDepth: 2),
+                cutoff);
+
+            Assert.Equal(5, incomplete.CountSelectedParticipantsAtDepth(1, 1));
+            Assert.Equal(24, incomplete.CountSelectedParticipantsAtDepth(1, 2));
+            Assert.Equal(25, complete.CountSelectedParticipantsAtDepth(1, 2));
+            Assert.Equal(0, complete.CountSelectedParticipantsAtDepth(999, 1));
+        }
+
         private static List<EntryParticipation> BuildNetwork(
             int maxDepth,
             int? incompleteRecruiterId = null)
