@@ -22,7 +22,7 @@ jobs:
   backend:
     name: Backend build and tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: AqualLifeStyle/9.4.2/aspnet-core
