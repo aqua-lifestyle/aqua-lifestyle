@@ -100,14 +100,14 @@ The portal exposes:
 Backend enforcement includes:
 
 - dedicated view/approval permissions;
-- Area scope from the authenticated tenant/host authority, not a trusted client ID;
-- independent Area checks on queue, approve, and reject paths;
+- Tenant scope from authenticated server identity plus active persisted Area assignments, never a trusted client ID;
+- independent Tenant and Area checks on queue, approve, and reject paths;
 - a transaction-owned per-participation decision lock;
 - a unique decision constraint;
 - append-only approval/rejection records;
 - idempotent matching repeats and rejection of conflicting outcomes.
 
-The responsible Area Administrator can act. A different Area Administrator cannot discover or mutate the participation through direct API access.
+The responsible Area Administrator can act. An administrator without an active assignment to the member's active Area cannot discover or mutate the participation through direct API access, even within the same Tenant. Cross-Tenant access remains forbidden independently.
 
 ## 6. Notifications and durable work
 

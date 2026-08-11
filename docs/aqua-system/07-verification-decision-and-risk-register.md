@@ -5,11 +5,11 @@ This register is the status and evidence companion to the Aqua system pack. It i
 ```text
 Repository: aqua-lifestyle/aqua-lifestyle
 Branch baseline: origin/main
-Commit: 6ba776b7ef2f117aeaf78be7b3da06231a4f72e5
+Starting commit for the Area/Tenant branch: e8188101e85fbe2cdd42862a3267d2fdedaf2d55
 Evidence reviewed: 11 August 2026
 ```
 
-Agent 1's production AQGreen/Render/P0001 reconciliation and Agent 2's member/customer programme visual work are active, unmerged workstreams. Neither is authoritative until merged into `main` and verified at that resulting commit.
+The production AQGreen reconciliation and programme-network corrections are merged in the starting baseline. Separate member/customer visual work is not treated as authoritative unless merged and verified at its resulting commit.
 
 ## A. Status ladder
 
@@ -37,8 +37,9 @@ No status implies the status to its right.
 | Area approval queue and badge | `MERGED` | Backend/UI/tests on `main`; historical browser discovery, persistence and badge evidence carried forward. |
 | Approval/rejection and rejection reason | `MERGED` | Unique decision model, Area enforcement, customer projection/UI and tests on `main`; historical browser approval/rejection evidence carried forward. |
 | AQGreen funeral-cover inclusion | `MERGED` | Runtime and deterministic migration/backfill on `main`; current CI passed. The production migration is under active reconciliation and external insurer activation is not modelled. |
-| AQGreen network qualification | `IMPLEMENTED — PR #72` | Structural Levels 1–5 are represented independently from the currently authorised Level 1–3 commission depth. Focused tests cover complete and incomplete same-Tenant structures. |
-| Programme network tenant boundary | `IMPLEMENTED — PR #72` | AQGreen and Onyx graph construction, recruitment placement, host calculation, ledgers, and projections are bounded by Tenant and programme. Mixed-Tenant graph input fails closed. Area remains a planned subdivision inside Tenant. |
+| AQGreen network qualification | `MERGED` | Structural Levels 1–3 are represented and Level 3 is the maximum. Focused tests cover complete/incomplete same-Tenant structures and the Level 3 cap. |
+| Programme network tenant boundary | `MERGED` | AQGreen and Onyx graph construction, recruitment placement, host calculation, ledgers, and projections are bounded by Tenant and programme. Mixed-Tenant graph input fails closed. |
+| Tenant/Area separation | `IMPLEMENTED — CURRENT BRANCH` | Area aggregate, effective customer assignment, multi-Area administrator assignment, Area-scoped approval, Johannesburg backfill and PostgreSQL constraints/tests. Tenant remains the hard boundary and same-Tenant cross-Area recruitment remains valid. Not merged, deployed, or production verified. |
 | Onyx qualification | `MERGED` | Levels 1–5 and 3,906-person deterministic simulation are on `main`. |
 | Effective-dated weekly commission engine | `MERGED` | Friday–Thursday resolver, terms registry/resolver, cutoff facts, locks, ledgers and tests on `main`. |
 | Weekly automatic calculation | `MERGED` | Worker code is merged; repository default is disabled. Not `ENABLED` or `PRODUCTION VERIFIED`. |
@@ -52,9 +53,9 @@ No status implies the status to its right.
 
 ## C. Current-tree verification evidence
 
-### Current `origin/main`
+### Carried-forward `origin/main` CI baseline
 
-GitHub Actions run [31455701182](https://github.com/aqua-lifestyle/aqua-lifestyle/actions/runs/31455701182) completed successfully at exact commit `6ba776b7` on 11 August 2026.
+GitHub Actions run [31455701182](https://github.com/aqua-lifestyle/aqua-lifestyle/actions/runs/31455701182) completed successfully at exact commit `6ba776b7` on 11 August 2026. It predates the current `e8188101` branch baseline and is retained only as exact historical evidence; the Area/Tenant PR CI is the current merge gate.
 
 | Job/check | Current evidence |
 | --- | --- |
