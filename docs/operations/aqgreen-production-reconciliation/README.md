@@ -182,3 +182,69 @@ this tool before any conclusion is drawn.
 - The scratch validation artifacts (`guard.sql`, `schema.sql`, `seed_all.sql`,
   `validate.sh`, `production_shape.sql`) were consumed during Phase 2 and are
   not committed.
+
+## Production deployment result
+
+### Simulation verified
+
+On 2026-08-11, the corrected P0001 guard was executed against the current
+production PostgreSQL 18.4 population inside an explicit read-only transaction.
+The four in-scope participations comprised two healthy modern rows and two
+backup-proven legacy rows. All C01-C15 counts were zero, and the guard completed
+without raising P0001. This was a simulation only; it did not execute migration
+DDL or DML.
+
+### Production deployment verified
+
+PR #73 merged the remediation as commit `925aabd` (merge commit `e818810`).
+Render's normal pre-deploy migrator applied
+`20260809043240_AddAQGreenFuneralCoverEntitlements` without raising P0001 and
+continued through `20260809201814_AddCommissionTermsVersions`. The subsequent
+current-main deployment at commit `e6d04e6` also applied
+`20260811150251_SeparateAreaFromTenantBoundary`.
+
+Before deployment verification, a PostgreSQL 18 custom-format logical backup
+completed at `2026-08-11T17:40:20Z`. PostgreSQL 18.4 `pg_restore` accepted the
+archive and restored it successfully into an isolated PostgreSQL 18.4 instance.
+The restored database contained the expected 46 migration records, five AQGreen
+participations, two legacy backup records, and payment data. The archive was
+stored outside the repository with owner-only filesystem permissions; no
+credentials or production export are committed. Its SHA-256 is
+`8a7c495663e1b68c5175a6821046981d735d95c8e17fc183395e00d4705483b7`.
+
+The first API update attempts were rejected by the fail-closed production
+configuration validator because the configured Yoco mode and secret-key class
+did not match. No compatibility or validation bypass was introduced. After the
+owner aligned the existing non-secret mode setting with the configured key
+class, the final Render deployment `dep-d9tm52qjnfac73c89vu0` completed at
+`2026-08-11T17:58:28Z` through the normal build, pre-deploy migrator, and API
+startup path.
+
+Post-deployment verification recorded:
+
+- deployed API build: `e6d04e67ac04d5f6ab128c25d7b84dcdb6206840`;
+- production migration head:
+  `20260811150251_SeparateAreaFromTenantBoundary`;
+- P0001 migration history row and `AQGreenFuneralCoverEntitlements` schema:
+  present;
+- funeral-cover backfill: three live entitlements for three qualifying
+  participations, with none missing;
+- legacy integrity: both authoritative backup rows remain coherent, and the
+  joining/payment history digests match the pre-deployment backup;
+- API and database health: healthy;
+- payment contract:
+  `aqua-payments-2026-08-09-flexible-payment-approval`;
+- required frontend capabilities: present (`aqgreen-flexible-joining-v1`,
+  `programme-approval-queue-v1`, `direct-onyx-checkout-v1`);
+- production frontend compatibility guard: satisfied without a bypass;
+- Area baseline: Johannesburg (`JHB`) present, all 10 Default-tenant customers
+  mapped, all five AQGreen participations Area-resolvable, and three active
+  Area Admin assignments present;
+- customer topology: 13 live `Customers` rows existed in total; 10 belonged to
+  the Default tenant and were Area-mapped, while three were host-scoped
+  (`TenantId IS NULL`) Customer entities outside the tenant Area baseline;
+- weekly commission and monthly-obligation worker settings: unset, retaining
+  their application defaults of disabled.
+
+No manual database mutation, migration-history edit, reconciliation, approval
+creation, payment-history change, or historical member change was performed.
