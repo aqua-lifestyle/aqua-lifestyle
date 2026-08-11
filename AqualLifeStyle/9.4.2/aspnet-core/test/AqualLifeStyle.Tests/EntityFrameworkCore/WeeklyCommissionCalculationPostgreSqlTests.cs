@@ -98,7 +98,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     .Include(p => p.RecruiterCorrections)
                     .Where(p => p.TenantId == 1 && p.Status == EntryParticipationStatus.Active)
                     .ToListAsync();
-                CompleteInMemoryNetworkToLevelFive(
+                CompleteInMemoryNetworkToLevelThree(
                     participation,
                     network,
                     suffix);
@@ -131,7 +131,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 var persistedCommission = await context.EntryWeeklyCommissions
                     .Include(commission => commission.Components)
                     .SingleAsync();
-                persistedCommission.HighestQualifiedNetworkLevel.ShouldBe(5);
+                persistedCommission.HighestQualifiedNetworkLevel.ShouldBe(3);
                 persistedCommission.HighestCommissionedLevel.ShouldBe(3);
                 persistedCommission.TotalAmount.ShouldBe(1650m);
                 persistedCommission.Components
@@ -594,13 +594,13 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             return participation.Id;
         }
 
-        private static void CompleteInMemoryNetworkToLevelFive(
+        private static void CompleteInMemoryNetworkToLevelThree(
             EntryParticipation root,
             List<EntryParticipation> network,
             string suffix)
         {
             var structuralTerms = EntryProgrammeTerms.CreateSingleJoiningPayment(
-                version: $"entry-level-five-{suffix}",
+                version: $"entry-level-three-{suffix}",
                 effectiveFrom: new DateTime(
                     2026,
                     7,
@@ -654,7 +654,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                             MemberPaymentPurpose.AQGreenJoining,
                             1200m,
                             "Test",
-                            $"commission-level-five-{suffix}-{nextCustomerId}",
+                            $"commission-level-three-{suffix}-{nextCustomerId}",
                             startedAt.AddSeconds(1));
                         payment.Confirm(startedAt.AddSeconds(2));
                         recruit.ApplyConfirmedJoiningPayment(payment);

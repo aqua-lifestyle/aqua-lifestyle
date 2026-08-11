@@ -107,8 +107,8 @@ Carried-forward evidence is context, not a current rerun.
 | Payment and approval | Payment completion awaits the responsible Area Admin; only approval activates. |
 | Funeral inclusion | Earned on final qualifying AQGreen joining payment; `IncludedAt` is final `MemberPayment.ConfirmedAt`; approval/rejection does not earn/remove it. |
 | Programme separation | AQGreen and Onyx participation, recruitment, payments and ledgers remain separate. |
-| Recruitment structure | Five complete branches per level; both AQGreen and Onyx structurally continue through Levels 1–5: 5, 25, 125, 625, and 3,125 people. |
-| AQGreen commission rates | Per-person rates are confirmed at R30 for Level 1 and R10 for Levels 2–3. Level 4/5 rates are unresolved; current authorised components end at Level 3. |
+| Recruitment structure | Five complete branches per level. AQGreen ends at Level 3 (5, 25, 125); Onyx continues through Level 5 (5, 25, 125, 625, 3,125). |
+| AQGreen commission rates | Per-person rates are confirmed at R30 for Level 1 and R10 for Levels 2–3. Level 3 is final, with a cumulative weekly amount of ZAR 1,650. |
 | Weekly cycle | Friday–Thursday, Johannesburg time. |
 | Initial automated commission terms boundary | 14 August 2026 00:00 Johannesburg. This is the engine's first effective-dated boundary, not necessarily the business model's creation date. |
 | Automatic history | No automatic commission backfill before the initial cycle. |
@@ -120,7 +120,6 @@ The owner-confirmed AQGreen Level 1–3 commission facts may be taken from the r
 
 | Decision | Impact and current safe state | Owner |
 | --- | --- | --- |
-| AQGreen Level 4 and Level 5 per-person commission rates | Structural requirements are confirmed at 625 and 3,125 people. No Level 4/5 rate, zero amount, or extrapolation is authorised; future rates must be effective-dated. | Aqua programme/commission owner |
 | AQGreen `DueDayOfMonth` and first authorised due policy | Blocks monthly worker enablement; no date is invented. | Aqua business owner (#61) |
 | Upline effect of an overdue AQGreen member | Current implementation holds only that member's payout and preserves placement. | Aqua programme/commission owner |
 | External funeral-cover process | Aqua inclusion exists; insurer enrolment, six-month waiting meaning, cover dates and claims facts remain unclaimed. | Aqua + insurer/compliance |
@@ -164,7 +163,6 @@ Current issue state was inspected on 11 August 2026.
 | Risk | Impact | Evidence | Status / owner | Required follow-up |
 | --- | --- | --- | --- | --- |
 | P0001 modern AQGreen contradiction blocks funeral migration | API deployment/schema may not advance; production facts may need classification | Merged fail-closed migration; active inventory branch, no merged production result | Blocking deployment incident; Agent 1 + Finance/Ops | Complete read-only inventory, classify from evidence, obtain authorised remediation, preserve audit. |
-| AQGreen structural depth exceeds currently authorised commission depth | Future rate changes could rewrite history or invent components if the two concepts are conflated | Five-level evaluator tests, separate qualified/commissioned projections, and Level 4/5 calculator regressions | Mitigated in the current implementation; Engineering | Keep Level 4/5 components absent until owner-authorised effective-dated rates exist. |
 | Weekly workers enabled before inputs are authoritative | False or duplicate financial ledgers | Workers default off; open issues #55–#60 | Blocking enablement; Ops/Engineering/Business | Complete prerequisites in document 06. |
 | Monthly worker enabled without due policy | Invented member obligation dates | Empty append-only policy and issue #61 | Blocking enablement; Business/Ops | Authorise due day and first month, then E2E and controlled rollout. |
 | Manual reconciliation resolution absent | Detected financial contradictions become operational dead ends | Read-only queries, no resolution API; #66 | Blocking monthly enablement; Product/Finance/Engineering | Define outcomes/evidence and implement immutable audit workflow. |
@@ -281,11 +279,11 @@ Current issue state was inspected on 11 August 2026.
 
 ### 10. AQGreen structural depth and commission depth
 
-- **Conflicting sources:** Earlier programme documents and the pre-correction code stopped AQGreen at Level 3; owner-confirmed business intent defines AQGreen structural Levels 1–5 while authorising commission rates only through Level 3.
-- **Current authoritative evidence:** Owner clarification confirms structural populations of 5, 25, 125, 625, and 3,125 and per-person rates of R30, R10, and R10 for Levels 1–3. The current evaluator and enum represent Levels 1–5; weekly ledger and API projections record structural qualification separately from commissioned depth; focused Level 4/5 regressions retain only the Level 1–3 components.
-- **Status:** `IMPLEMENTED` for five structural levels; `UNRESOLVED` for Level 4/5 rates.
-- **Impact:** Conflating structural depth with authorised commission depth can hide valid network progress or invent unauthorised money.
-- **Required action:** Add no Level 4/5 commission amount until Aqua authorises effective-dated rates; introduce any future rate only through reviewed effective-dated terms.
+- **Superseded interpretation:** An earlier owner interpretation extended AQGreen structure through Levels 4–5 while rates stopped at Level 3.
+- **Current authoritative evidence:** The client subsequently confirmed that AQGreen ends at Level 3, with structural populations of 5, 25, and 125 and per-person rates of R30, R10, and R10. Onyx alone continues through Level 5.
+- **Status:** `CLIENT CONFIRMED / IMPLEMENTED` for AQGreen Levels 1–3.
+- **Impact:** Retaining the superseded extension would expose nonexistent milestones and qualification states.
+- **Required action:** Keep AQGreen qualification and commission outputs capped at Level 3. Preserve Onyx Levels 1–5.
 
 ## N. Superseded terminology and rules
 
@@ -296,6 +294,7 @@ Current issue state was inspected on 11 August 2026.
 | New AQGreen joining is R1,200 only | R1,200 once or two distinct R600 joining instalments. |
 | R1,200 is monthly | R1,200 is joining; R600 is the separate monthly obligation. |
 | Payment success activates participation | Payment complete awaits Area Admin approval. |
+| AQGreen structurally continues through Levels 4–5 | AQGreen ends at Level 3; Onyx remains the five-level programme. |
 | Monday–Sunday or caller-selected weekly periods | Friday–Thursday Johannesburg closed cycles. |
 | Recalculate old cycles from current state/terms | Reconstruct cutoff-effective facts and effective-dated terms; fail closed otherwise. |
 | Enabled means production ready | Enabled and production verified are separate statuses. |
@@ -304,7 +303,7 @@ Current issue state was inspected on 11 August 2026.
 
 ### Implementation
 
-The programme engine implements the intended modern joining, payment/approval, inclusion, monthly-obligation, and AQGreen commission boundaries. AQGreen structural qualification now continues through Level 5 while currently authorised commission components remain limited to Levels 1–3.
+The programme engine implements the intended modern joining, payment/approval, inclusion, monthly-obligation, and AQGreen commission boundaries. AQGreen structural qualification and commissioned depth both end at Level 3; Onyx remains separate through Level 5.
 
 ### Workflow
 
@@ -312,4 +311,4 @@ The customer/Area Admin approval and rejection workflow has historical browser e
 
 ### Evidence
 
-Focused repository tests cover AQGreen structural Levels 1–5, incomplete branches, the unchanged Level 1–3 amounts, Level 4/5 structural-versus-commissioned projections, and absence of Level 4/5 components. Authoritative CI remains the broad regression gate. Production provider, deployment, worker enablement, external delivery, and historical reconciliation resolution must not be inferred from repository tests.
+Focused repository tests cover AQGreen structural Levels 1–3, incomplete branches, the confirmed Level 1–3 amounts, the Level 3 cap for larger networks, and tenant isolation. Authoritative CI remains the broad regression gate. Production provider, deployment, worker enablement, external delivery, and historical reconciliation resolution must not be inferred from repository tests.

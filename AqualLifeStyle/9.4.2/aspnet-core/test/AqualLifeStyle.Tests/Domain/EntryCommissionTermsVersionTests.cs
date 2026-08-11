@@ -119,7 +119,7 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
-        public void ToTerms_SeparatesStructuralLevelFromAuthorisedCommissionDepth()
+        public void ToTerms_UsesTheThreeLevelAQGreenBoundary()
         {
             var terms = EntryCommissionTermsVersion.Create(
                     "entry-2026-07",
@@ -135,14 +135,10 @@ namespace AqualLifeStyle.Tests.Domain
                 .ShouldBe(EntryNetworkLevel.Level1);
             terms.GetHighestCommissionedLevel(EntryNetworkLevel.Level3)
                 .ShouldBe(EntryNetworkLevel.Level3);
-            terms.GetHighestCommissionedLevel(EntryNetworkLevel.Level4)
-                .ShouldBe(EntryNetworkLevel.Level3);
-            terms.GetHighestCommissionedLevel(EntryNetworkLevel.Level5)
-                .ShouldBe(EntryNetworkLevel.Level3);
+            Should.Throw<ArgumentOutOfRangeException>(() =>
+                terms.GetHighestCommissionedLevel((EntryNetworkLevel)4));
             Should.Throw<ArgumentOutOfRangeException>(() =>
                 terms.GetComponentAmount(4));
-            Should.Throw<ArgumentOutOfRangeException>(() =>
-                terms.GetComponentAmount(5));
         }
     }
 }

@@ -114,22 +114,22 @@ namespace AqualLifeStyle.Tests.Application
             progress.FuneralCoverBenefitAmount.ShouldBe(30000m);
             progress.Education.Count.ShouldBe(4);
             progress.Education.Single(item => item.Title == "Build your network")
-                .Body.ShouldContain("3,125");
+                .Body.ShouldContain("Level 3 is the final AQGreen level");
             progress.Education.Single(item => item.Title == "Weekly earnings")
-                .Body.ShouldContain("not yet authorised");
+                .Body.ShouldContain("AQGreen ends at Level 3");
         }
 
         [Fact]
-        public async Task StructuralLevelFiveEarning_ExposesCommissionedDepthSeparately()
+        public async Task LevelThreeEarning_ExposesTheAQGreenMaximum()
         {
-            var userId = await CreateActiveMemberWithLevelFiveEarningAsync();
+            var userId = await CreateActiveMemberWithLevelThreeEarningAsync();
             SetCurrentUser(userId, 1);
 
             var progress = await _progressService.GetMyProgressAsync();
 
             var earning = progress.RecentEarnings.Single();
             earning.HighestLevel.ShouldBe(3);
-            earning.HighestQualifiedLevel.ShouldBe(5);
+            earning.HighestQualifiedLevel.ShouldBe(3);
             earning.HighestCommissionedLevel.ShouldBe(3);
             earning.TotalAmount.ShouldBe(1650m);
             earning.Components.Select(component => component.Level)
@@ -205,28 +205,28 @@ namespace AqualLifeStyle.Tests.Application
             return userId;
         }
 
-        private async Task<long> CreateActiveMemberWithLevelFiveEarningAsync()
+        private async Task<long> CreateActiveMemberWithLevelThreeEarningAsync()
         {
             var suffix = Guid.NewGuid().ToString("N");
             var userId = await CreateTestUserAsync(
                 1,
-                $"progress-level-five-{suffix}",
-                $"progress-level-five-{suffix}@example.com");
+                $"progress-level-three-{suffix}",
+                $"progress-level-three-{suffix}@example.com");
             var customerId = await UsingDbContextAsync(1, async context =>
             {
                 var customer = Customer.Create(
                     1,
                     userId,
-                    "Level Five Progress Member",
+                    "Level Three Progress Member",
                     new EmailAddress(
-                        $"progress-level-five-customer-{suffix}@example.com"));
+                        $"progress-level-three-customer-{suffix}@example.com"));
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
                 return customer.Id;
             });
             var participation = await CreateActiveParticipationAsync(
                 customerId,
-                $"progress-level-five-{suffix}");
+                $"progress-level-three-{suffix}");
             var network = BuildInMemoryNetwork(
                 participation,
                 maxDepth: EntryNetworkQualificationEvaluator.MaximumLevel,
@@ -290,7 +290,7 @@ namespace AqualLifeStyle.Tests.Application
                             MemberPaymentPurpose.AQGreenJoining,
                             1200m,
                             "Test",
-                            $"level-five-{suffix}-{nextCustomerId}",
+                            $"level-three-{suffix}-{nextCustomerId}",
                             EffectiveFrom.AddMinutes(depth));
                         payment.Confirm(EffectiveFrom.AddMinutes(depth + 1));
                         recruit.ApplyConfirmedJoiningPayment(payment);

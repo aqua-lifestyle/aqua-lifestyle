@@ -79,7 +79,7 @@ namespace AqualLifeStyle.Domain.Onyx
             EntryNetworkLevel highestQualifiedNetworkLevel)
         {
             if (highestQualifiedNetworkLevel < EntryNetworkLevel.None ||
-                highestQualifiedNetworkLevel > EntryNetworkLevel.Level5)
+                highestQualifiedNetworkLevel > EntryNetworkLevel.Level3)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(highestQualifiedNetworkLevel));

@@ -9,20 +9,18 @@ namespace AqualLifeStyle.Domain.Onyx
         None = 0,
         Level1 = 1,
         Level2 = 2,
-        Level3 = 3,
-        Level4 = 4,
-        Level5 = 5
+        Level3 = 3
     }
 
     public sealed class EntryNetworkQualificationEvaluator
     {
         public const int BranchSize = 5;
-        public const int MaximumLevel = 5;
+        public const int MaximumLevel = 3;
 
         public static int GetRequiredPopulation(EntryNetworkLevel level)
         {
             if (level < EntryNetworkLevel.Level1 ||
-                level > EntryNetworkLevel.Level5)
+                level > EntryNetworkLevel.Level3)
             {
                 throw new ArgumentOutOfRangeException(nameof(level));
             }

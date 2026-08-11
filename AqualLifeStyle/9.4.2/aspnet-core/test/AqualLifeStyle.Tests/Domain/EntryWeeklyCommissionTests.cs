@@ -84,28 +84,24 @@ namespace AqualLifeStyle.Tests.Domain
         [InlineData(2, 2, 400)]
         [InlineData(3, 3, 1650)]
         [InlineData(4, 3, 1650)]
-        [InlineData(5, 3, 1650)]
-        public void StructuralLevel_UsesOnlyAuthorisedCommissionComponents(
-            int structuralDepth,
-            int expectedCommissionedDepth,
+        public void NetworkDepth_CapsQualificationAndCommissionAtLevel3(
+            int networkDepth,
+            int expectedLevel,
             decimal expectedTotal)
         {
-            var network = BuildNetwork(maxDepth: structuralDepth);
+            var network = BuildNetwork(maxDepth: networkDepth);
 
             var commission = Calculate(network);
 
-            Assert.Equal(structuralDepth, commission.HighestCompletedLevel);
-            Assert.Equal(structuralDepth, commission.HighestQualifiedNetworkLevel);
-            Assert.Equal(expectedCommissionedDepth, commission.HighestCommissionedLevel);
-            Assert.Equal(expectedCommissionedDepth, commission.Components.Count);
+            Assert.Equal(expectedLevel, commission.HighestCompletedLevel);
+            Assert.Equal(expectedLevel, commission.HighestQualifiedNetworkLevel);
+            Assert.Equal(expectedLevel, commission.HighestCommissionedLevel);
+            Assert.Equal(expectedLevel, commission.Components.Count);
             Assert.All(commission.Components, component =>
             {
                 Assert.InRange(component.Level, 1, 3);
                 Assert.True(component.Amount > 0m);
             });
-            Assert.DoesNotContain(
-                commission.Components,
-                component => component.Level == 4 || component.Level == 5);
             Assert.Equal(expectedTotal, commission.TotalAmount);
             Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
         }

@@ -258,8 +258,6 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 EntryNetworkLevel.None => EntryNetworkLevel.Level1,
                 EntryNetworkLevel.Level1 => EntryNetworkLevel.Level2,
                 EntryNetworkLevel.Level2 => EntryNetworkLevel.Level3,
-                EntryNetworkLevel.Level3 => EntryNetworkLevel.Level4,
-                EntryNetworkLevel.Level4 => EntryNetworkLevel.Level5,
                 _ => null
             };
 
@@ -269,8 +267,6 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 EntryNetworkLevel.Level1 => "Level 1",
                 EntryNetworkLevel.Level2 => "Level 2",
                 EntryNetworkLevel.Level3 => "Level 3",
-                EntryNetworkLevel.Level4 => "Level 4",
-                EntryNetworkLevel.Level5 => "Level 5",
                 _ => "Not yet qualified"
             };
 
@@ -334,8 +330,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         "level needs 5 active direct recruits, each of whom has " +
                         "completed their own joining: Level 1 needs 5 direct " +
                         $"recruits, Level 2 needs 25 across your network, and " +
-                        $"Levels 3, 4, and 5 need 125, 625, and 3,125. " +
-                        "Progress counts only active " +
+                        $"Level 3 needs 125. Level 3 is the final AQGreen " +
+                        "level. Progress counts only active " +
                         "participations."
                 },
                 new()
@@ -346,9 +342,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         $"{commissionTerms.GetComponentAmount(1):0.00}, " +
                         $"{commissionTerms.GetComponentAmount(2):0.00}, and " +
                         $"{commissionTerms.GetComponentAmount(3):0.00} " +
-                        $"({currency}) for Levels 1, 2, and 3. Level 4 and " +
-                        "Level 5 commission rates are not yet authorised. " +
-                        "Earnings are " +
+                        $"({currency}) for Levels 1, 2, and 3. AQGreen ends " +
+                        "at Level 3. Earnings are " +
                         "held until they are released for payment. While your " +
                         "own AQGreen subscription is overdue, your own weekly " +
                         "earnings are held."
