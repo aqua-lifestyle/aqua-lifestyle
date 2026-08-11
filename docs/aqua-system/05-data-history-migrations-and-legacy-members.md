@@ -164,7 +164,7 @@ These are different concepts:
 - **Recording time**: when Aqua stored a fact or operator assertion.
 - **External provider date**: an insurer/payment/payout fact only when the provider supplies authoritative evidence.
 
-For funeral cover, 26 July 2026 is a technical lower bound for the supported modern joining model. It is not the funeral promise inception or external cover commencement. For commission terms, 14 August 2026 00:00 Johannesburg is the authorised initial cycle boundary, not merely the date software happened to deploy.
+For funeral cover, 26 July 2026 is a technical lower bound for the supported modern joining model. It is not the funeral promise inception or external cover commencement. For commission automation, 14 August 2026 00:00 Johannesburg is the engine's authorised initial effective-dated terms boundary. It is neither merely the software deployment date nor necessarily the date on which Aqua originally created the underlying commission model.
 
 ## 11. Reconciliation is a controlled process
 

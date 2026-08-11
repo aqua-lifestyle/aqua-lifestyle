@@ -113,9 +113,9 @@ Aqua records its own inclusion entitlement. It does not claim insurer activation
 
 ## Recruitment and levels
 
-The network grows in groups of five. A level is complete only when every required branch at that depth is complete; four direct recruits do not earn a partial Level 1.
+The network grows in groups of five. Both AQGreen and Onyx have five structural levels: 5, 25, 125, 625, and 3,125 qualifying people. A level is complete only when every required branch at that depth is complete; four direct recruits do not earn a partial Level 1.
 
-AQGreen currently uses Levels 1–3. Onyx uses Levels 1–5. Only Active participation in the same programme contributes. Network placement is preserved even when a member's own payout is held.
+AQGreen currently has authorised commission rates only for Levels 1–3; its Level 4 and Level 5 rates remain a business decision. The current software also evaluates AQGreen structure only through Level 3, which is an implementation gap rather than the end of the business network. Onyx already evaluates and has confirmed rates through Level 5. Only Active participation in the same programme contributes, and a payout hold does not remove network placement.
 
 ## How weekly earnings work
 
@@ -159,9 +159,10 @@ Repository defaults are not proof of current production settings. Production dep
 
 These are business questions, not a technical backlog:
 
-1. **Which day of each month is the R600 AQGreen obligation due?** The answer must be a day from 1 to 28 and must define the first authorised month.
-2. **Does an overdue AQGreen member affect an upline's structural qualification or only that member's own payout?** The current safe rule holds only the member's payout.
-3. **What insurer process turns Aqua's funeral-cover inclusion into external cover?** Aqua must confirm enrolment authority, any six-month waiting-period meaning, effective dates, and which evidence the system may display.
-4. **What should refunds, disputes, or chargebacks do to participation, funeral inclusion, network qualification, and already-calculated earnings?** Historical ledgers must not be rewritten without an authorised policy.
-5. **What evidence and authority are acceptable for importing legitimate legacy members who have no modern Aqua payment history?** The import must record real historical facts, not fabricate modern payments.
-6. **What resolution decisions may authorised operators make when financial records are marked `ReconciliationRequired`?** The allowed outcomes and evidence standard must be decided before a mutation workflow is built.
+1. **What are the AQGreen Level 4 and Level 5 per-person commission rates?** The structural levels exist, but no amounts may be invented; current authorised commission components end at Level 3.
+2. **Which day of each month is the R600 AQGreen obligation due?** The answer must be a day from 1 to 28 and must define the first authorised month.
+3. **Does an overdue AQGreen member affect an upline's structural qualification or only that member's own payout?** The current safe rule holds only the member's payout.
+4. **What insurer process turns Aqua's funeral-cover inclusion into external cover?** Aqua must confirm enrolment authority, any six-month waiting-period meaning, effective dates, and which evidence the system may display.
+5. **What should refunds, disputes, or chargebacks do to participation, funeral inclusion, network qualification, and already-calculated earnings?** Historical ledgers must not be rewritten without an authorised policy.
+6. **What evidence and authority are acceptable for importing legitimate legacy members who have no modern Aqua payment history?** The import must record real historical facts, not fabricate modern payments.
+7. **What resolution decisions may authorised operators make when financial records are marked `ReconciliationRequired`?** The allowed outcomes and evidence standard must be decided before a mutation workflow is built.

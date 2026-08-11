@@ -23,7 +23,17 @@ The worker wakes periodically, resolves the latest fully closed Friday-to-Thursd
 
 Only Active participants in the same programme form the qualifying network. Each selected branch needs five people at every required depth.
 
-AQGreen qualifies through Levels 1–3. Onyx qualifies through Levels 1–5. An incomplete branch gives no partial level component.
+Both AQGreen and Onyx have five structural levels. Each level requires five complete branches at every depth: 5, 25, 125, 625, and 3,125 people at Levels 1–5. An incomplete branch gives no partial level component.
+
+```mermaid
+flowchart LR
+    A1[AQGreen L1<br/>5] --> A2[L2<br/>25]
+    A2 --> A3[L3<br/>125]
+    A3 --> A4[L4<br/>625]
+    A4 --> A5[L5<br/>3,125]
+```
+
+`IMPLEMENTATION GAP`: the current AQGreen evaluator and level enum stop at Level 3. The five-level AQGreen structure is now confirmed business intent, but this documentation task does not implement Levels 4–5. Onyx already evaluates through Level 5.
 
 ```mermaid
 flowchart LR
@@ -73,20 +83,32 @@ flowchart LR
     Onyx --> Ledger
 ```
 
-`BUSINESS DECISION`: the initial automatic terms boundary is **14 August 2026 00:00 Johannesburg**. The initial values are:
+`BUSINESS DECISION`: the initial automated commission terms become effective from **14 August 2026 00:00 Johannesburg**. This is the programme engine's first authorised effective-dated terms boundary; it is not necessarily the date when the underlying business commission model was created.
 
-- AQGreen components: R150, R250, R1,250;
-- Onyx per-person rates: R50, R20, R12.62, R5, R4.
+Both programmes use per-person commission models, with different rate schedules:
+
+| Level | AQGreen rate/person | Onyx rate/person |
+| --- | ---: | ---: |
+| Level 1 | R30 | R50 |
+| Level 2 | R10 | R20 |
+| Level 3 | R10 | R12.62 |
+| Level 4 | `UNRESOLVED` | R5 |
+| Level 5 | `UNRESOLVED` | R4 |
+
+For AQGreen, the confirmed rates derive the implemented components exactly: 5 × R30 = R150; 25 × R10 = R250; and 125 × R10 = R1,250. Their cumulative weekly amount is R1,650. This is only the sum of authorised Levels 1–3; it is not a Level 4 or Level 5 rate or eventual total.
 
 `VERIFIED IMPLEMENTATION`: the bootstrap is idempotent and conflict-checked; it does not enable a worker. Repository presence does not prove those rows exist in production.
 
 ## 5. Qualification, payable level, and holds
 
-Network level and payout status answer different questions:
+Structural qualification, authorised commission depth, and payout status answer different questions:
 
-- **Structural level**: how much of the network was complete at cutoff?
+- **Business structural level**: how much of the five-level network was complete at cutoff?
+- **Authorised commission depth**: which level rates are known and effective for the cycle?
 - **Calculated amount**: which complete level components apply under the terms?
 - **Payout status**: is that amount Earned, Held, Released, or Paid?
+
+The current AQGreen engine answers both structural and commission depth only through Level 3. Future implementation must represent structural Levels 4–5 without assigning them a zero, guessed, or inherited rate. Future Level 4/5 rates must be explicitly authorised and effective-dated so they cannot rewrite old periods.
 
 For AQGreen, an own monthly obligation or applicable Onyx loan can hold the member's payout when it was overdue at cutoff. A later cure affects future eligibility but not the closed week. The current implementation does not remove network placement and does not infer an upline penalty.
 

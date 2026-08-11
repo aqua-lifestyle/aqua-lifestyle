@@ -37,7 +37,7 @@ No status implies the status to its right.
 | Area approval queue and badge | `MERGED` | Backend/UI/tests on `main`; historical browser discovery, persistence and badge evidence carried forward. |
 | Approval/rejection and rejection reason | `MERGED` | Unique decision model, Area enforcement, customer projection/UI and tests on `main`; historical browser approval/rejection evidence carried forward. |
 | AQGreen funeral-cover inclusion | `MERGED` | Runtime and deterministic migration/backfill on `main`; current CI passed. The production migration is under active reconciliation and external insurer activation is not modelled. |
-| AQGreen network qualification | `MERGED` | Levels 1–3, cutoff network reconstruction, tests and member progress on `main`. |
+| AQGreen network qualification | `MERGED` (Levels 1–3 only) | Current code, cutoff reconstruction, tests, and member progress model Levels 1–3 only. Owner-confirmed business structure continues through Levels 4–5, which are not yet implemented. |
 | Onyx qualification | `MERGED` | Levels 1–5 and 3,906-person deterministic simulation are on `main`. |
 | Effective-dated weekly commission engine | `MERGED` | Friday–Thursday resolver, terms registry/resolver, cutoff facts, locks, ledgers and tests on `main`. |
 | Weekly automatic calculation | `MERGED` | Worker code is merged; repository default is disabled. Not `ENABLED` or `PRODUCTION VERIFIED`. |
@@ -106,16 +106,20 @@ Carried-forward evidence is context, not a current rerun.
 | Payment and approval | Payment completion awaits the responsible Area Admin; only approval activates. |
 | Funeral inclusion | Earned on final qualifying AQGreen joining payment; `IncludedAt` is final `MemberPayment.ConfirmedAt`; approval/rejection does not earn/remove it. |
 | Programme separation | AQGreen and Onyx participation, recruitment, payments and ledgers remain separate. |
-| Recruitment | Five complete branches per level; AQGreen Levels 1–3, Onyx Levels 1–5. |
+| Recruitment structure | Five complete branches per level; both AQGreen and Onyx structurally continue through Levels 1–5: 5, 25, 125, 625, and 3,125 people. |
+| AQGreen commission rates | Per-person rates are confirmed at R30 for Level 1 and R10 for Levels 2–3. Level 4/5 rates are unresolved; current authorised components end at Level 3. |
 | Weekly cycle | Friday–Thursday, Johannesburg time. |
-| Initial commission terms boundary | 14 August 2026 00:00 Johannesburg. |
+| Initial automated commission terms boundary | 14 August 2026 00:00 Johannesburg. This is the engine's first effective-dated boundary, not necessarily the business model's creation date. |
 | Automatic history | No automatic commission backfill before the initial cycle. |
 | History | Current state and deployment time cannot substitute for business-effective evidence. |
+
+The owner-confirmed AQGreen Level 1–3 commission facts may be taken from the reviewed historical communication. Other payment, activation, funeral-cover, or loan wording in that same historical source remains subject to the current rules and contradiction boundaries in this register; it is not restored by association.
 
 ## G. Unresolved business decisions
 
 | Decision | Impact and current safe state | Owner |
 | --- | --- | --- |
+| AQGreen Level 4 and Level 5 per-person commission rates | Structural requirements are confirmed at 625 and 3,125 people. No Level 4/5 rate, zero amount, or extrapolation is authorised; future rates must be effective-dated. | Aqua programme/commission owner |
 | AQGreen `DueDayOfMonth` and first authorised due policy | Blocks monthly worker enablement; no date is invented. | Aqua business owner (#61) |
 | Upline effect of an overdue AQGreen member | Current implementation holds only that member's payout and preserves placement. | Aqua programme/commission owner |
 | External funeral-cover process | Aqua inclusion exists; insurer enrolment, six-month waiting meaning, cover dates and claims facts remain unclaimed. | Aqua + insurer/compliance |
@@ -129,10 +133,11 @@ Carried-forward evidence is context, not a current rerun.
 These are not the same as business questions.
 
 1. **P0001 production migration incident** — production row classification/remediation is not merged or production verified. Agent 1 owns the active workstream.
-2. **Weekly enablement gates** — initial rows/baselines in production, topology, PostgreSQL application-path idempotency, E2E, recovery, observability and controlled arming remain open (#55–#60).
-3. **Monthly enablement gates** — business due day, due-policy, E2E, reconciliation resolution and Yoco acceptance remain open (#61–#66).
-4. **Provider acceptance** — real Yoco and Bird external outcomes remain unverified.
-5. **Automated full AQGreen E2E** — historical manual browser evidence exists, but recurring CI E2E is open (#67).
+2. **AQGreen five-level implementation gap** — current code evaluates structure and terms only through Level 3, while confirmed business structure continues through Level 5. Level 4/5 rates also require an owner decision before they can be introduced as effective-dated terms.
+3. **Weekly enablement gates** — initial rows/baselines in production, topology, PostgreSQL application-path idempotency, E2E, recovery, observability and controlled arming remain open (#55–#60).
+4. **Monthly enablement gates** — business due day, due-policy, E2E, reconciliation resolution and Yoco acceptance remain open (#61–#66).
+5. **Provider acceptance** — real Yoco and Bird external outcomes remain unverified.
+6. **Automated full AQGreen E2E** — historical manual browser evidence exists, but recurring CI E2E is open (#67).
 
 ## I. Open GitHub work
 
@@ -159,6 +164,7 @@ Current issue state was inspected on 11 August 2026.
 | Risk | Impact | Evidence | Status / owner | Required follow-up |
 | --- | --- | --- | --- | --- |
 | P0001 modern AQGreen contradiction blocks funeral migration | API deployment/schema may not advance; production facts may need classification | Merged fail-closed migration; active inventory branch, no merged production result | Blocking deployment incident; Agent 1 + Finance/Ops | Complete read-only inventory, classify from evidence, obtain authorised remediation, preserve audit. |
+| AQGreen engine stops at structural Level 3 | Member progress and qualification do not represent confirmed Levels 4–5; future rates could be mishandled if structure and commission depth remain conflated | `EntryNetworkLevel` and `EntryNetworkQualificationEvaluator.MaximumLevel` at baseline `6ba776b7`; owner clarification | Implementation gap; Engineering + Aqua programme owner | Model structural Levels 4–5 separately; do not add commission values until owner-authorised effective-dated rates exist. |
 | Weekly workers enabled before inputs are authoritative | False or duplicate financial ledgers | Workers default off; open issues #55–#60 | Blocking enablement; Ops/Engineering/Business | Complete prerequisites in document 06. |
 | Monthly worker enabled without due policy | Invented member obligation dates | Empty append-only policy and issue #61 | Blocking enablement; Business/Ops | Authorise due day and first month, then E2E and controlled rollout. |
 | Manual reconciliation resolution absent | Detected financial contradictions become operational dead ends | Read-only queries, no resolution API; #66 | Blocking monthly enablement; Product/Finance/Engineering | Define outcomes/evidence and implement immutable audit workflow. |
@@ -191,7 +197,7 @@ Current issue state was inspected on 11 August 2026.
 | [`business-rule-matrix.md`](../verification/business-rule-matrix.md) | `PARTIALLY CURRENT` | Several core rules are useful; single-payment-only rows are superseded by flexible joining. |
 | [`verification-report.md`](../verification/verification-report.md) | `HISTORICAL` | Explicitly superseded by later integration and current CI. |
 | [`requirements.md`](../BusinessDocs/requirements.md) | `PARTIALLY CURRENT` | BR-16 is current; FR-44 still marks funeral cover missing and mixes legacy product concepts. |
-| [`onyx-implementation-plan.md`](../BusinessDocs/onyx-implementation-plan.md) | `PARTIALLY CURRENT` | Rich confirmed boundaries, but some deferred/cutoff status wording predates merged work. |
+| [`onyx-implementation-plan.md`](../BusinessDocs/onyx-implementation-plan.md) | `PARTIALLY CURRENT` | Rich confirmed boundaries, but its three-level AQGreen wording and some deferred/cutoff status wording are superseded. |
 | [`future-roadmap.md`](../BusinessDocs/future-roadmap.md) | `PARTIALLY CURRENT` | Issue #65 tracks readiness corrections. |
 | [`workflows.md`](../BusinessDocs/workflows.md) | `HISTORICAL / TARGET` | Explicit target flows include legacy Business Premier and savings assumptions, not current programme authority. |
 | [`yoco-production-readiness-review.md`](../BusinessDocs/yoco-production-readiness-review.md) | `PARTIALLY CURRENT / HISTORICAL` | Security architecture is useful; single-only AQGreen and payment-activation wording is superseded. |
@@ -273,6 +279,14 @@ Current issue state was inspected on 11 August 2026.
 - **Impact:** A stale file checklist could produce a false completion claim or prompt duplicate work.
 - **Required action:** Reconcile issue #59 against current behaviour and remaining acceptance criteria before closing it.
 
+### 10. AQGreen structural depth and commission depth
+
+- **Conflicting sources:** Earlier programme documents and current code stop AQGreen at Level 3; owner-confirmed business intent defines AQGreen structural Levels 1–5 while authorising commission rates only through Level 3.
+- **Current authoritative evidence:** Owner clarification confirms structural populations of 5, 25, 125, 625, and 3,125 and per-person rates of R30, R10, and R10 for Levels 1–3. Repository inspection at `6ba776b7` confirms the current evaluator, enum, terms, and ledger cap at Level 3.
+- **Status:** `CURRENT RULE CONFIRMED` for five structural levels; `UNRESOLVED` for Level 4/5 rates; `IMPLEMENTATION GAP` for current AQGreen Level 4/5 qualification.
+- **Impact:** Conflating structural depth with authorised commission depth can hide valid network progress or invent unauthorised money.
+- **Required action:** Correct the engine in a separate reviewed workstream to represent Levels 4–5 structurally; add no Level 4/5 commission amount until Aqua authorises effective-dated rates.
+
 ## N. Superseded terminology and rules
 
 | Superseded item | Replacement / boundary |
@@ -290,7 +304,7 @@ Current issue state was inspected on 11 August 2026.
 
 ### Implementation
 
-The merged programme engine implements the intended modern joining, payment/approval, inclusion, network, monthly-obligation and commission boundaries.
+The merged programme engine implements the intended modern joining, payment/approval, inclusion, monthly-obligation, and Level 1–3 AQGreen commission boundaries. It does not yet meet the newly clarified five-level AQGreen structural model: the current evaluator and level enum stop at Level 3.
 
 ### Workflow
 
@@ -298,4 +312,4 @@ The customer/Area Admin approval and rejection workflow has historical browser e
 
 ### Evidence
 
-Current main CI is green and feature-specific evidence is substantial. Production provider, deployment, worker enablement, external delivery, and historical reconciliation resolution must not be inferred from it.
+Current main CI is green and feature-specific evidence is substantial for the implementation it exercised. It is not evidence that AQGreen Levels 4–5 are implemented. Production provider, deployment, worker enablement, external delivery, and historical reconciliation resolution must not be inferred from it.
