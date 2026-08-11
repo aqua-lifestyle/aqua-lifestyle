@@ -709,6 +709,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             {
                 ProgrammeCode = RecruitmentProgrammeKeys.AQGreen,
                 ProgrammeName = "AQGreen",
+                StatusCode = participation.Status.ToString(),
                 Status = details.Status,
                 IsActive = details.IsActive,
                 JoinedIndependently = participation.JoinedIndependently,
@@ -748,6 +749,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             {
                 ProgrammeCode = RecruitmentProgrammeKeys.Onyx,
                 ProgrammeName = "Onyx",
+                StatusCode = participation.Status.ToString(),
                 Status = details.Status,
                 IsActive = details.IsActive,
                 JoinedIndependently = participation.JoinedIndependently,

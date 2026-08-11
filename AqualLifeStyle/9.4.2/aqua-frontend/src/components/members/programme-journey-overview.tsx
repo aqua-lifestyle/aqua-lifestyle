@@ -31,7 +31,7 @@ const formatDate = (value: string) =>
   });
 
 const stateTone = (state: string) => {
-  if (["Complete", "Unlocked", "Available"].includes(state)) return "success";
+  if (["Complete", "Included", "Available"].includes(state)) return "success";
   if (["Current", "Waiting period", "Pending record"].includes(state)) return "warning";
   return "neutral";
 };
@@ -41,7 +41,7 @@ const ProgressBar = ({ label, percent }: { label: string; percent: number }) => 
     aria-label={label}
     aria-valuemax={100}
     aria-valuemin={0}
-    aria-valuenow={percent}
+    aria-valuenow={Math.max(0, Math.min(100, percent))}
     className="h-3 overflow-hidden rounded-full bg-muted"
     role="progressbar"
   >
@@ -111,7 +111,7 @@ const LevelRail = ({ headingId, levels }: { headingId: string; levels: Programme
       </div>
       <p className="hidden text-sm text-muted-foreground sm:block">Complete one level to advance to the next.</p>
     </div>
-    <ol className="relative grid gap-0 sm:grid-cols-3 lg:grid-cols-5">
+    <ol className={`relative grid gap-0 ${levels.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-3 lg:grid-cols-5"}`}>
       {levels.map((level, index) => (
         <li
           aria-current={level.state === "Current" ? "step" : undefined}
@@ -258,6 +258,11 @@ const EarningsCard = ({ journey }: { journey: MemberProgrammeJourney }) => {
             <p className="mt-1 text-sm text-muted-foreground">
               {formatDate(latest.periodStart)} – {formatDate(latest.periodEnd)}
             </p>
+            <p className="mt-2 text-xs font-semibold text-muted-foreground">
+              Qualified depth: {latest.qualifiedLevel > 0 ? `Level ${latest.qualifiedLevel}` : "None"}
+              {" · "}
+              Commissioned depth: {latest.commissionedLevel > 0 ? `Level ${latest.commissionedLevel}` : "None"}
+            </p>
           </div>
           {latest.components.length > 0 ? (
             <dl className="divide-y divide-border rounded-xl border border-border">
@@ -315,11 +320,14 @@ const EarningsCard = ({ journey }: { journey: MemberProgrammeJourney }) => {
   );
 };
 
-const BenefitCard = ({ benefit }: { benefit: ProgrammeBenefit }) => (
-  <div className={`rounded-2xl border p-4 ${benefit.state === "Locked" ? "border-border bg-muted/30" : "border-success/30 bg-success/5"}`}>
+const BenefitCard = ({ benefit }: { benefit: ProgrammeBenefit }) => {
+  const isAvailable = benefit.state === "Included" || benefit.state === "Available";
+  const isPending = benefit.state === "Pending record" || benefit.state === "Waiting period";
+  return (
+  <div className={`rounded-2xl border p-4 ${isAvailable ? "border-success/30 bg-success/5" : isPending ? "border-warning/30 bg-warning/5" : "border-border bg-muted/30"}`}>
     <div className="flex items-start justify-between gap-3">
-      <span className={`flex size-9 items-center justify-center rounded-full ${benefit.state === "Locked" ? "bg-muted text-muted-foreground" : "bg-success/15 text-success"}`}>
-        {benefit.state === "Locked" ? <LockKeyhole className="size-5" /> : <CheckCircle2 className="size-5" />}
+      <span className={`flex size-9 items-center justify-center rounded-full ${isAvailable ? "bg-success/15 text-success" : isPending ? "bg-warning/15 text-warning" : "bg-muted text-muted-foreground"}`}>
+        {isAvailable ? <CheckCircle2 className="size-5" /> : isPending ? <Clock3 className="size-5" /> : <LockKeyhole className="size-5" />}
       </span>
       <Badge tone={stateTone(benefit.state)}>{benefit.state}</Badge>
     </div>
@@ -340,9 +348,10 @@ const BenefitCard = ({ benefit }: { benefit: ProgrammeBenefit }) => (
       <p className="mt-1 text-xs font-semibold">Available since {formatDate(benefit.availableAt)}</p>
     ) : null}
   </div>
-);
+  );
+};
 
-const CommissionGrowth = ({ levels }: { levels: ProgrammeLevelProgress[] }) => (
+const CommissionGrowth = ({ currency, levels }: { currency: string; levels: ProgrammeLevelProgress[] }) => (
   <Card>
     <div className="flex items-center gap-2">
       <TrendingUp className="size-5 text-accent" />
@@ -358,7 +367,7 @@ const CommissionGrowth = ({ levels }: { levels: ProgrammeLevelProgress[] }) => (
             <p className="font-bold">{level.label}</p>
             <p className="text-sm text-muted-foreground">
               {level.commissionRate !== null
-                ? `${formatCurrency(level.commissionRate, "ZAR")} ${level.commissionRateLabel}`
+                ? `${formatCurrency(level.commissionRate, currency)} ${level.commissionRateLabel}`
                 : level.commissionRateLabel}
             </p>
           </div>
@@ -380,7 +389,7 @@ export const ProgrammeJourneyOverview = ({
   paymentAction?: ReactNode;
   canInvite: boolean;
 }) => {
-  const target = journey.levels.find((level) => level.state === "Current") ?? journey.levels.at(-1)!;
+  const target = journey.levels.find((level) => level.state === "Current") ?? journey.levels.at(-1);
   const contextualAction = paymentAction ?? (journey.nextActionCode === "JoinProgramme"
     ? joinAction
     : journey.nextActionCode === "CompleteJoiningPayment"
@@ -419,7 +428,7 @@ export const ProgrammeJourneyOverview = ({
       </Card>
 
       <LevelRail headingId={`${journey.programmeCode}-level-rail-heading`} levels={journey.levels} />
-      {journey.isActive ? <CurrentTarget action={contextualAction} level={target} /> : null}
+      {journey.isActive && target ? <CurrentTarget action={contextualAction} level={target} /> : null}
 
       <Card className="border-accent/30 bg-accent/5">
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Next action</p>
@@ -448,12 +457,14 @@ export const ProgrammeJourneyOverview = ({
         </Card>
       ) : null}
 
-      <CommissionGrowth levels={journey.levels} />
+      <CommissionGrowth currency={journey.currency} levels={journey.levels} />
 
       <Card>
         <div className="flex items-center gap-2"><ShieldCheck className="size-5 text-accent" /><h3 className="text-lg font-bold">Benefits and unlocks</h3></div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          {journey.benefits.map((benefit) => <BenefitCard benefit={benefit} key={benefit.code} />)}
+          {journey.benefits.length > 0
+            ? journey.benefits.map((benefit) => <BenefitCard benefit={benefit} key={benefit.code} />)
+            : <p className="text-sm text-muted-foreground">No benefit records are available for this programme.</p>}
         </div>
       </Card>
     </article>

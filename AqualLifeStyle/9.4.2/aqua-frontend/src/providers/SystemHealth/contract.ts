@@ -36,6 +36,9 @@ export const isPaymentApiCompatible = (health: SystemHealth | null) =>
     health.contractCapabilities.includes(capability),
   );
 
+export const isProgrammeJourneyApiCompatible = (health: SystemHealth | null) =>
+  health?.contractCapabilities.includes("member-programme-journey-v1") ?? false;
+
 export const isSystemHealthContractError = (error: unknown) => {
   return error instanceof z.ZodError;
 };

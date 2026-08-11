@@ -7,7 +7,10 @@ import {
   useSystemHealthActions,
   useSystemHealthState,
 } from "@/src/providers";
-import { isPaymentApiCompatible } from "@/src/providers/SystemHealth/contract";
+import {
+  isPaymentApiCompatible,
+  isProgrammeJourneyApiCompatible,
+} from "@/src/providers/SystemHealth/contract";
 import {
   apiEndpoints,
   httpClient,
@@ -45,11 +48,12 @@ export const MemberProgrammes = () => {
     errorMessage: loadError,
     isLoading: loading,
   } = useMyProgrammeParticipations(canView);
+  const journeyApiCompatible = isProgrammeJourneyApiCompatible(healthState.health);
   const {
     data: journey,
     errorMessage: journeyError,
     isLoading: journeyLoading,
-  } = useMyProgrammeJourney(canView);
+  } = useMyProgrammeJourney(canView && journeyApiCompatible);
   const [actionError, setActionError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [startingAQGreenPayment, setStartingAQGreenPayment] = useState(false);
@@ -67,6 +71,15 @@ export const MemberProgrammes = () => {
   const paymentApiCompatible = isPaymentApiCompatible(healthState.health);
   const paymentActionsUnavailable =
     healthState.isPending || !paymentApiCompatible;
+  const entryCanAcceptJoiningPayment = [
+    "AwaitingJoiningPayment",
+    "AwaitingActivationPayment",
+  ].includes(participations?.entry?.statusCode ?? "");
+  const journeyAcceptsAQGreenPayment = journey?.programmes.some(
+    (programme) =>
+      programme.programmeCode === "AQGREEN" &&
+      programme.nextActionCode === "CompleteJoiningPayment",
+  ) ?? false;
 
   useEffect(() => {
     if (
@@ -160,16 +173,15 @@ export const MemberProgrammes = () => {
     }
   };
 
-  const aqGreenPaymentAction = participations?.entry &&
-    !participations.entry.isActive &&
-    participations.entry.status !== "Awaiting Area approval" &&
-    participations.entry.status !== "Declined" ? (
+  const aqGreenPaymentAction = journeyAcceptsAQGreenPayment &&
+    participations?.entry &&
+    entryCanAcceptJoiningPayment ? (
       participations.pendingAQGreenCheckout ? (
         paymentActionsUnavailable ? (
           <Button className="w-full" disabled>Continue secure payment</Button>
         ) : (
           <a
-            className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
             href={participations.pendingAQGreenCheckout.checkoutUrl}
           >
             Continue secure payment
@@ -194,7 +206,8 @@ export const MemberProgrammes = () => {
             Pay first R600 instalment
           </Button>
         </div>
-      ) : (
+      ) : participations.entry.nextPaymentAmount != null &&
+        participations.entry.nextPaymentAmount > 0 ? (
         <Button
           className="w-full"
           disabled={paymentActionsUnavailable}
@@ -202,11 +215,15 @@ export const MemberProgrammes = () => {
           onClick={() => void startAQGreenPayment()}
         >
           Complete joining: {formatCurrency(
-            participations.entry.nextPaymentAmount ??
-              participations.entry.joiningOutstandingAmount ?? 1200,
+            participations.entry.nextPaymentAmount,
             participations.entry.currency,
           )}
         </Button>
+      ) : (
+        <StatusMessage tone="error">
+          The next joining-payment amount is unavailable. No payment can be
+          started until the API provides the authoritative amount.
+        </StatusMessage>
       )
     ) : undefined;
 
@@ -222,7 +239,7 @@ export const MemberProgrammes = () => {
       <Button className="w-full" disabled>Continue secure payment</Button>
     ) : (
       <a
-        className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
+        className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
         href={participations.pendingDirectOnyxCheckout.checkoutUrl}
       >
         Continue secure payment
@@ -260,11 +277,14 @@ export const MemberProgrammes = () => {
             See where you are, what you have completed, what comes next, and how
             your network progress connects to earnings and benefits.
           </p>
+          <p className="mt-3 text-sm font-semibold text-foreground">
+            Area: {participations?.areaName ?? "Not assigned"}
+          </p>
         </header>
 
-        {loadError || journeyError || actionError ? (
-          <StatusMessage tone="error">{loadError ?? journeyError ?? actionError}</StatusMessage>
-        ) : null}
+        {[loadError, journeyError, actionError].filter(Boolean).map((message) => (
+          <StatusMessage key={message} tone="error">{message}</StatusMessage>
+        ))}
         {success ? (
           <StatusMessage tone="info">{success}</StatusMessage>
         ) : null}
@@ -286,6 +306,14 @@ export const MemberProgrammes = () => {
           </StatusMessage>
         ) : null}
 
+        {!healthState.isPending && healthState.isSuccess && !journeyApiCompatible ? (
+          <StatusMessage tone="error">
+            The programme journey is unavailable because this API does not
+            advertise the required member journey capability. Payment controls
+            remain fail-closed on this page.
+          </StatusMessage>
+        ) : null}
+
         {hasActiveInvitationAccess && !hasInvitationPermission ? (
           <StatusMessage tone="info">
             {accessRefreshFinished
@@ -295,7 +323,7 @@ export const MemberProgrammes = () => {
         ) : null}
 
         {loading || journeyLoading ? (
-          <div className="flex flex-col gap-5">
+          <div aria-busy="true" aria-label="Loading programme journey" className="flex flex-col gap-5" role="status">
             <Skeleton className="h-80" />
             <Skeleton className="h-96" />
           </div>

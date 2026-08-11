@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
-import type { MyProgrammeJourney } from "@/src/shared/domain/programme-journey";
+import {
+  parseMyProgrammeJourney,
+  type MyProgrammeJourney,
+} from "@/src/shared/domain/programme-journey";
 
 export const useMyProgrammeJourney = (enabled: boolean) => {
   const requestId = useRef(0);
@@ -26,11 +29,13 @@ export const useMyProgrammeJourney = (enabled: boolean) => {
       setIsLoading(true);
       setErrorMessage(undefined);
       void httpClient
-        .get<MyProgrammeJourney>(
+        .get<unknown>(
           apiEndpoints.programmeParticipations.getMyJourney,
         )
         .then((result) => {
-          if (requestId.current === currentRequest) setData(result);
+          if (requestId.current === currentRequest) {
+            setData(parseMyProgrammeJourney(result));
+          }
         })
         .catch((error) => {
           if (requestId.current === currentRequest) {

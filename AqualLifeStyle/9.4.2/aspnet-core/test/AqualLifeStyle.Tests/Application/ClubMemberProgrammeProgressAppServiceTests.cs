@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AqualLifeStyle.Application.ProgrammeParticipations;
+using AqualLifeStyle.Domain.Areas;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
@@ -35,6 +36,16 @@ namespace AqualLifeStyle.Tests.Application
                 150m,
                 250m,
                 1250m);
+
+        private static readonly OnyxCommissionTerms ApprovedOnyxCommissionTerms =
+            OnyxCommissionTerms.Create(
+                "onyx-commission-2026-07-levels-1-5",
+                EffectiveFrom,
+                50m,
+                20m,
+                12.62m,
+                5m,
+                4m);
 
         private readonly IClubMemberProgrammeProgressAppService _progressService;
 
@@ -189,7 +200,7 @@ namespace AqualLifeStyle.Tests.Application
             aqGreen.Levels[1].RemainingCount.ShouldBe(25);
             aqGreen.Earnings.LatestRecordedWeek.Components.Single().Amount
                 .ShouldBe(150m);
-            aqGreen.Benefits.Single().State.ShouldBe("Unlocked");
+            aqGreen.Benefits.Single().State.ShouldBe("Included");
 
             var onyx = journey.Programmes.Single(item => item.ProgrammeCode == "ONYX");
             onyx.HasParticipation.ShouldBeFalse();
@@ -226,6 +237,31 @@ namespace AqualLifeStyle.Tests.Application
             journey.Programmes.Single(item => item.ProgrammeCode == "ONYX")
                 .Joining.RequiredAmount.ShouldBe(6120m);
             journey.Programmes.ShouldAllBe(item => item.Earnings.LatestRecordedWeek == null);
+        }
+
+        [Fact]
+        public async Task Journey_DoesNotResolveACustomerFromAnotherTenant()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"journey-tenant-boundary-{suffix}",
+                $"journey-tenant-boundary-{suffix}@example.com");
+            await UsingDbContextAsync(2, async context =>
+            {
+                context.Customers.Add(Customer.Create(
+                    2,
+                    userId,
+                    "Other Tenant Journey Member",
+                    new EmailAddress($"journey-other-tenant-{suffix}@example.com")));
+                await context.SaveChangesAsync();
+            });
+            SetCurrentUser(userId, 1);
+
+            var exception = await Should.ThrowAsync<Abp.UI.UserFriendlyException>(() =>
+                _progressService.GetMyJourneyAsync());
+
+            exception.Details.ShouldContain("active Club Member");
         }
 
         [Fact]
@@ -490,6 +526,164 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task Journey_OnyxDirectPaymentAwaitingApproval_IsCompleteButInactive()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"journey-onyx-approval-{suffix}",
+                $"journey-onyx-approval-{suffix}@example.com");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "Onyx Approval Journey Member",
+                    new EmailAddress($"journey-onyx-approval-customer-{suffix}@example.com"));
+                var membership = Membership.Create(
+                    1,
+                    $"Onyx-Approval-{suffix}",
+                    "Onyx approval journey projection test",
+                    MembershipType.Onyx);
+                context.Customers.Add(customer);
+                context.Memberships.Add(membership);
+                await context.SaveChangesAsync();
+
+                var participation = OnyxParticipation.StartDirectIndependently(
+                    1,
+                    customer.Id,
+                    membership.Id,
+                    OnyxPlanTerms.Create("onyx-approval-journey", EffectiveFrom, 6120m),
+                    EffectiveFrom);
+                var payment = ConfirmPayment(
+                    customer.Id,
+                    MemberPaymentPurpose.OnyxDirectEntry,
+                    $"onyx-approval-joining-{suffix}",
+                    EffectiveFrom.AddMinutes(1),
+                    6120m);
+                participation.ApplyConfirmedDirectEntryPayment(payment);
+                context.MemberPayments.Add(payment);
+                context.OnyxParticipations.Add(participation);
+                await context.SaveChangesAsync();
+            });
+            SetCurrentUser(userId, 1);
+
+            var journey = await _progressService.GetMyJourneyAsync();
+            var onyx = journey.Programmes.Single(item => item.ProgrammeCode == "ONYX");
+
+            onyx.ParticipationStatus.ShouldBe("Awaiting Area approval");
+            onyx.IsActive.ShouldBeFalse();
+            onyx.Joining.RequiredAmount.ShouldBe(6120m);
+            onyx.Joining.PaidAmount.ShouldBe(6120m);
+            onyx.Joining.IsComplete.ShouldBeTrue();
+            onyx.NextActionCode.ShouldBe("AwaitApproval");
+            onyx.Levels.ShouldAllBe(item => item.State == "Locked");
+        }
+
+        [Fact]
+        public async Task Journey_OnyxEarnings_UsesPersistedCommissionLevelsAndComponents()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userIds = new List<long>();
+            for (var index = 0; index <= OnyxNetworkQualificationEvaluator.BranchSize; index++)
+            {
+                userIds.Add(await CreateTestUserAsync(
+                    1,
+                    $"journey-onyx-earning-{index}-{suffix}",
+                    $"journey-onyx-earning-{index}-{suffix}@example.com"));
+            }
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var customers = userIds.Select((userId, index) => Customer.Create(
+                    1,
+                    userId,
+                    $"Onyx Earning Journey Member {index}",
+                    new EmailAddress($"journey-onyx-earning-customer-{index}-{suffix}@example.com")))
+                    .ToList();
+                var membership = Membership.Create(
+                    1,
+                    $"Onyx-Earning-{suffix}",
+                    "Onyx earning journey projection test",
+                    MembershipType.Onyx);
+                context.Customers.AddRange(customers);
+                context.Memberships.Add(membership);
+                await context.SaveChangesAsync();
+
+                var root = OnyxParticipation.StartDirectIndependently(
+                    1,
+                    customers[0].Id,
+                    membership.Id,
+                    OnyxPlanTerms.Create("onyx-earning-journey", EffectiveFrom, 6120m),
+                    EffectiveFrom);
+                var rootPayment = ConfirmPayment(
+                    root.CustomerId,
+                    MemberPaymentPurpose.OnyxDirectEntry,
+                    $"onyx-earning-root-{suffix}",
+                    EffectiveFrom.AddMinutes(1),
+                    6120m);
+                root.ApplyConfirmedDirectEntryPayment(rootPayment);
+                root.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(2));
+
+                var network = new List<OnyxParticipation> { root };
+                var payments = new List<MemberPayment> { rootPayment };
+                for (var index = 1; index < customers.Count; index++)
+                {
+                    var recruit = OnyxParticipation.StartDirectUnderRecruiter(
+                        1,
+                        customers[index].Id,
+                        root,
+                        membership.Id,
+                        OnyxPlanTerms.Create("onyx-earning-journey", EffectiveFrom, 6120m),
+                        EffectiveFrom);
+                    var payment = ConfirmPayment(
+                        recruit.CustomerId,
+                        MemberPaymentPurpose.OnyxDirectEntry,
+                        $"onyx-earning-recruit-{index}-{suffix}",
+                        EffectiveFrom.AddMinutes(1),
+                        6120m);
+                    recruit.ApplyConfirmedDirectEntryPayment(payment);
+                    recruit.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(2));
+                    network.Add(recruit);
+                    payments.Add(payment);
+                }
+
+                var periodStart = EffectiveFrom.AddDays(5);
+                var periodEnd = periodStart.AddDays(7).AddTicks(-1);
+                var period = OnyxCommissionPeriod.CreateClosedPeriod(
+                    1,
+                    periodStart,
+                    periodEnd,
+                    "Africa/Johannesburg",
+                    periodEnd.AddMinutes(1),
+                    ApprovedOnyxCommissionTerms);
+                var commission = new OnyxWeeklyCommissionCalculator(
+                        new OnyxNetworkQualificationEvaluator())
+                    .Calculate(root, period, ApprovedOnyxCommissionTerms, network);
+
+                context.MemberPayments.AddRange(payments);
+                context.OnyxParticipations.AddRange(network);
+                context.OnyxCommissionPeriods.Add(period);
+                context.OnyxWeeklyCommissions.Add(commission);
+                await context.SaveChangesAsync();
+            });
+            SetCurrentUser(userIds[0], 1);
+
+            var journey = await _progressService.GetMyJourneyAsync();
+            var earnings = journey.Programmes
+                .Single(item => item.ProgrammeCode == "ONYX")
+                .Earnings;
+
+            earnings.TotalEarned.ShouldBe(250m);
+            earnings.EarnedAwaitingRelease.ShouldBe(250m);
+            earnings.LatestRecordedWeek.Status.ShouldBe("Earned — awaiting release");
+            earnings.LatestRecordedWeek.QualifiedLevel.ShouldBe(1);
+            earnings.LatestRecordedWeek.CommissionedLevel.ShouldBe(1);
+            earnings.LatestRecordedWeek.Components.Single().Level.ShouldBe(1);
+            earnings.LatestRecordedWeek.Components.Single().Amount.ShouldBe(250m);
+        }
+
+        [Fact]
         public async Task Journey_OnyxTravelBenefit_UsesPersistedEntitlementState()
         {
             var suffix = Guid.NewGuid().ToString("N");
@@ -547,10 +741,17 @@ namespace AqualLifeStyle.Tests.Application
             SetCurrentUser(userId, 1);
 
             var journey = await _progressService.GetMyJourneyAsync();
-            var benefitProjection = journey.Programmes
-                .Single(item => item.ProgrammeCode == "ONYX")
-                .Benefits.Single();
+            var onyx = journey.Programmes
+                .Single(item => item.ProgrammeCode == "ONYX");
+            var benefitProjection = onyx.Benefits.Single();
 
+            onyx.IsActive.ShouldBeTrue();
+            onyx.Joining.RequiredAmount.ShouldBe(6120m);
+            onyx.Joining.PaidAmount.ShouldBe(6120m);
+            onyx.Joining.IsComplete.ShouldBeTrue();
+            onyx.Levels.Count.ShouldBe(5);
+            onyx.Levels[4].RequiredCount.ShouldBe(3125);
+            onyx.NextActionCode.ShouldBe("InviteMembers");
             benefitProjection.State.ShouldBe("Waiting period");
             benefitProjection.UnlockedAt.ShouldBe(EffectiveFrom.AddDays(1));
             benefitProjection.AvailableAt.ShouldBe(EffectiveFrom.AddDays(1).AddMonths(3));
@@ -561,43 +762,49 @@ namespace AqualLifeStyle.Tests.Application
         public async Task Journey_ActiveCrossAreaRecruit_ContributesToNetworkProgress()
         {
             var suffix = Guid.NewGuid().ToString("N");
-            var tenantOneUserId = await CreateTestUserAsync(
+            var rootUserId = await CreateTestUserAsync(
                 1,
-                $"journey-tenant-one-{suffix}",
-                $"journey-tenant-one-{suffix}@example.com");
-            var tenantOneCustomerId = await UsingDbContextAsync(1, async context =>
+                $"journey-area-root-{suffix}",
+                $"journey-area-root-{suffix}@example.com");
+            var rootCustomerId = await UsingDbContextAsync(1, async context =>
             {
+                var rootArea = Area.Create(1, $"R{suffix[..6]}", "Root Area");
                 var customer = Customer.Create(
                     1,
-                    tenantOneUserId,
-                    "Tenant One Journey Member",
-                    new EmailAddress($"journey-tenant-one-customer-{suffix}@example.com"));
+                    rootUserId,
+                    "Root Area Journey Member",
+                    new EmailAddress($"journey-area-root-customer-{suffix}@example.com"));
+                customer.AssignInitialArea(rootArea, EffectiveFrom, "Test baseline");
+                context.Areas.Add(rootArea);
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
                 return customer.Id;
             });
-            var tenantOneRoot = await CreateActiveParticipationAsync(
-                tenantOneCustomerId,
-                $"tenant-one-{suffix}");
+            var root = await CreateActiveParticipationAsync(
+                rootCustomerId,
+                $"area-root-{suffix}");
 
-            var tenantTwoUserId = await CreateTestUserAsync(
-                2,
-                $"journey-tenant-two-{suffix}",
-                $"journey-tenant-two-{suffix}@example.com");
-            await UsingDbContextAsync(2, async context =>
+            var recruitUserId = await CreateTestUserAsync(
+                1,
+                $"journey-area-recruit-{suffix}",
+                $"journey-area-recruit-{suffix}@example.com");
+            await UsingDbContextAsync(1, async context =>
             {
+                var recruitArea = Area.Create(1, $"C{suffix[..6]}", "Recruit Area");
                 var customer = Customer.Create(
-                    2,
-                    tenantTwoUserId,
-                    "Tenant Two Journey Member",
-                    new EmailAddress($"journey-tenant-two-customer-{suffix}@example.com"));
+                    1,
+                    recruitUserId,
+                    "Recruit Area Journey Member",
+                    new EmailAddress($"journey-area-recruit-customer-{suffix}@example.com"));
+                customer.AssignInitialArea(recruitArea, EffectiveFrom, "Test baseline");
+                context.Areas.Add(recruitArea);
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
 
-                var crossTenantRecruit = EntryParticipation.StartUnderRecruiter(
-                    2,
+                var crossAreaRecruit = EntryParticipation.StartUnderRecruiter(
+                    1,
                     customer.Id,
-                    tenantOneRoot,
+                    root,
                     EntryTerms,
                     EffectiveFrom.AddMinutes(1));
                 var payment = ConfirmPayment(
@@ -606,14 +813,14 @@ namespace AqualLifeStyle.Tests.Application
                     $"tenant-two-joining-{suffix}",
                     EffectiveFrom.AddMinutes(2),
                     1200m,
-                    2);
-                crossTenantRecruit.ApplyConfirmedJoiningPayment(payment);
-                crossTenantRecruit.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
-                context.EntryParticipations.Add(crossTenantRecruit);
+                    1);
+                crossAreaRecruit.ApplyConfirmedJoiningPayment(payment);
+                crossAreaRecruit.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
+                context.EntryParticipations.Add(crossAreaRecruit);
                 context.MemberPayments.Add(payment);
                 await context.SaveChangesAsync();
             });
-            SetCurrentUser(tenantOneUserId, 1);
+            SetCurrentUser(rootUserId, 1);
 
             var journey = await _progressService.GetMyJourneyAsync();
             var aqGreen = journey.Programmes.Single(item => item.ProgrammeCode == "AQGREEN");

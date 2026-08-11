@@ -10,6 +10,8 @@ const requirements = {
 } as const;
 
 const rates = [50, 20, 12.62, 5, 4];
+const aqGreenComponents = [150, 250, 1250];
+const aqGreenCumulative = [150, 400, 1650];
 
 const levels = (
   code: "AQGREEN" | "ONYX",
@@ -28,9 +30,9 @@ const levels = (
     const achievedCount = achieved[index] ?? 0;
     return {
       achievedCount,
-      commissionComponentAmount: code === "ONYX" ? requiredCount * rates[index] : [150, 250, 1250][index],
+      commissionComponentAmount: code === "ONYX" ? requiredCount * rates[index] : aqGreenComponents[index],
       commissionRate: code === "ONYX" ? rates[index] : null,
-      commissionRateLabel: code === "ONYX" ? "per qualifying person" : `R${[150, 250, 1250][index]} weekly component`,
+      commissionRateLabel: code === "ONYX" ? "per qualifying person" : `R${aqGreenCumulative[index]} cumulative weekly commission`,
       isStructurallyComplete: level <= qualifiedLevel,
       label: `Level ${level}`,
       level,
@@ -61,7 +63,7 @@ export const createProgrammeJourney = (
       code: isAQGreen ? "AQGREEN_FUNERAL_COVER" : "ONYX_TRAVEL",
       currency: isAQGreen ? "ZAR" : null,
       description: isAQGreen
-        ? "Unlocks when the AQGreen joining payment is complete."
+        ? "An internal inclusion record can be created after the full AQGreen joining payment is confirmed."
         : "Unlocks after completing Onyx Level 3.",
       name: isAQGreen ? "Funeral-cover inclusion" : "Travel benefit",
       state: "Locked",

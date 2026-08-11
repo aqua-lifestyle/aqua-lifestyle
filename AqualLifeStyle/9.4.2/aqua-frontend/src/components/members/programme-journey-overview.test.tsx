@@ -19,7 +19,10 @@ describe("ProgrammeJourneyOverview", () => {
 
     const programme = screen.getByRole("article", { name: "AQGreen" });
     const activation = within(programme).getByRole("region", { name: "Activation journey" });
+    const levels = within(programme).getByRole("region", { name: "Programme levels" });
     expect(within(activation).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(levels).getAllByRole("listitem")).toHaveLength(3);
+    expect(within(levels).queryByText("Level 4")).not.toBeInTheDocument();
     expect(within(programme).getByText("17 / 25")).toBeInTheDocument();
     expect(within(programme).getByText("8 more qualifying network members needed."))
       .toBeInTheDocument();
@@ -30,6 +33,10 @@ describe("ProgrammeJourneyOverview", () => {
       .toBeInTheDocument();
     expect(within(programme).getByRole("link", { name: "Invite someone" }))
       .toHaveAttribute("href", "/member/invitations");
+    expect(within(programme).getByText(/R\s*400.*cumulative weekly commission/i))
+      .toBeInTheDocument();
+    expect(within(programme).getByText(/R\s*1[,.\s]*650.*cumulative weekly commission/i))
+      .toBeInTheDocument();
   });
 
   it("shows all five Onyx levels and the current Level 3 target", () => {
@@ -156,7 +163,7 @@ describe("ProgrammeJourneyOverview", () => {
     expect(screen.getByText(holdReason ?? zeroReason!)).toBeInTheDocument();
   });
 
-  it("distinguishes an unlocked benefit from joining completion", () => {
+  it("distinguishes a persisted inclusion from joining completion", () => {
     const journey = createProgrammeJourney("AQGREEN", {
       benefits: [{
         amount: 30000,
@@ -165,7 +172,7 @@ describe("ProgrammeJourneyOverview", () => {
         currency: "ZAR",
         description: "Included with completed joining; insurer enrolment remains separate.",
         name: "Funeral-cover inclusion",
-        state: "Unlocked",
+        state: "Included",
         unlockedAt: "2026-08-09T00:00:00Z",
       }],
       joining: {
@@ -183,7 +190,7 @@ describe("ProgrammeJourneyOverview", () => {
     render(<ProgrammeJourneyOverview canInvite={false} journey={journey} />);
 
     expect(screen.getByText("Joining payment confirmed")).toBeInTheDocument();
-    expect(screen.getByText("Unlocked")).toBeInTheDocument();
+    expect(screen.getByText("Included")).toBeInTheDocument();
     expect(screen.getByText(/insurer enrolment remains separate/i)).toBeInTheDocument();
   });
 

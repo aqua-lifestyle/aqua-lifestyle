@@ -78,6 +78,7 @@ describe("MemberProgrammes", () => {
         contractCapabilities: [
           "aqgreen-flexible-joining-v1",
           "programme-approval-queue-v1",
+          "member-programme-journey-v1",
           "direct-onyx-checkout-v1",
         ],
         databaseStatus: "Healthy",
@@ -129,6 +130,27 @@ describe("MemberProgrammes", () => {
       .toBeDisabled();
     expect(await screen.findByRole("button", { name: "Join Onyx" }))
       .toBeDisabled();
+  });
+
+  it("fails closed when the API does not advertise the member journey capability", async () => {
+    const current = vi.mocked(useSystemHealthState).getMockImplementation()?.();
+    vi.mocked(useSystemHealthState).mockReturnValue({
+      ...current!,
+      health: {
+        ...current!.health!,
+        contractCapabilities: [
+          "aqgreen-flexible-joining-v1",
+          "programme-approval-queue-v1",
+          "direct-onyx-checkout-v1",
+        ],
+      },
+    });
+
+    render(<MemberProgrammes />);
+
+    expect(await screen.findByText(/does not advertise the required member journey capability/i))
+      .toBeInTheDocument();
+    expect(useMyProgrammeJourney).toHaveBeenCalledWith(false);
   });
 
   it("refreshes account access after programme activation changes the role", async () => {
@@ -325,6 +347,7 @@ describe("MemberProgrammes", () => {
         recruiterClubMemberNumber: null,
         startedAt: "2026-07-26T10:00:00Z",
         status: "Awaiting joining payment",
+        statusCode: "AwaitingJoiningPayment",
       },
       onyx: null,
       pendingAQGreenCheckout: {
@@ -377,6 +400,7 @@ describe("MemberProgrammes", () => {
         recruiterClubMemberNumber: null,
         startedAt: "2026-08-09T10:00:00Z",
         status: "Declined",
+        statusCode: "Rejected",
       },
       onyx: null,
       pendingAQGreenCheckout: null,
@@ -393,6 +417,14 @@ describe("MemberProgrammes", () => {
   });
 
   it("preserves completion of a verified historical AQGreen instalment", async () => {
+    vi.mocked(useMyProgrammeJourney).mockReturnValue({
+      data: createJourneyResponse(createProgrammeJourney("AQGREEN", {
+        hasParticipation: true,
+        nextActionCode: "CompleteJoiningPayment",
+      })),
+      errorMessage: undefined,
+      isLoading: false,
+    });
     vi.mocked(httpClient.get).mockResolvedValue({
       entry: {
         activatedAt: null,
@@ -408,6 +440,7 @@ describe("MemberProgrammes", () => {
         recruiterClubMemberNumber: null,
         startedAt: "2026-07-26T10:00:00Z",
         status: "Awaiting activation payment",
+        statusCode: "AwaitingActivationPayment",
       },
       onyx: null,
       pendingAQGreenCheckout: null,
@@ -423,7 +456,120 @@ describe("MemberProgrammes", () => {
     ));
   });
 
+  it("fails closed when a stale participation snapshot still allows payment after confirmation", async () => {
+    vi.mocked(useMyProgrammeJourney).mockReturnValue({
+      data: createJourneyResponse(createProgrammeJourney("AQGREEN", {
+        activationSteps: [
+          { code: "Started", explanation: "Created.", label: "Joining started", state: "Complete" },
+          { code: "Payment", explanation: "Confirmed.", label: "Joining payment", state: "Complete" },
+          { code: "Approval", explanation: "Johannesburg Area Administrator review is pending.", label: "Area approval", state: "Current" },
+          { code: "Active", explanation: "Network progression begins after activation.", label: "Programme active", state: "Upcoming" },
+        ],
+        hasParticipation: true,
+        joining: {
+          completedAt: "2026-08-09T10:00:00Z",
+          isComplete: true,
+          kind: "One-time AQGreen joining requirement",
+          paidAmount: 1200,
+          progressPercent: 100,
+          remainingAmount: 0,
+          requiredAmount: 1200,
+          scheduleLabel: "One payment",
+        },
+        nextActionBody: "Your joining payment is complete. Do not pay it again; Area Administrator approval is next.",
+        nextActionCode: "AwaitApproval",
+        nextActionTitle: "Await Area approval",
+        participationStatus: "Awaiting Area approval",
+      })),
+      errorMessage: undefined,
+      isLoading: false,
+    });
+    vi.mocked(httpClient.get).mockResolvedValue({
+      areaId: "a0000000-0000-0000-0000-000000000001",
+      areaName: "Johannesburg",
+      entry: {
+        activatedAt: null,
+        canRecruitForThisProgramme: false,
+        currency: "ZAR",
+        isActive: false,
+        joinedIndependently: true,
+        joiningPaidAmount: 0,
+        joiningSchedule: null,
+        joiningTotalAmount: 1200,
+        nextPaymentAmount: 1200,
+        nextPaymentDescription: "AQGreen joining payment",
+        programmeName: "AQGreen",
+        recruiterClubMemberNumber: null,
+        startedAt: "2026-08-09T09:00:00Z",
+        status: "Awaiting joining payment",
+        statusCode: "AwaitingJoiningPayment",
+      },
+      onyx: null,
+      pendingAQGreenCheckout: null,
+      pendingDirectOnyxCheckout: null,
+      funeralCover: null,
+      travelBenefit: null,
+    });
+
+    render(<MemberProgrammes />);
+
+    expect(await screen.findByText("Area: Johannesburg")).toBeInTheDocument();
+    expect(screen.getByText("Joining payment confirmed")).toBeInTheDocument();
+    expect(screen.getByText(/Do not pay it again/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Pay|Complete joining/i }))
+      .not.toBeInTheDocument();
+  });
+
+  it("does not invent a continuation amount when the API omits it", async () => {
+    vi.mocked(useMyProgrammeJourney).mockReturnValue({
+      data: createJourneyResponse(createProgrammeJourney("AQGREEN", {
+        hasParticipation: true,
+        nextActionCode: "CompleteJoiningPayment",
+      })),
+      errorMessage: undefined,
+      isLoading: false,
+    });
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: {
+        activatedAt: null,
+        canRecruitForThisProgramme: false,
+        currency: "ZAR",
+        isActive: false,
+        joinedIndependently: true,
+        joiningPaidAmount: 600,
+        joiningSchedule: 1,
+        joiningTotalAmount: 1200,
+        nextPaymentAmount: null,
+        nextPaymentDescription: null,
+        programmeName: "AQGreen",
+        recruiterClubMemberNumber: null,
+        startedAt: "2026-08-09T09:00:00Z",
+        status: "Awaiting activation payment",
+        statusCode: "AwaitingActivationPayment",
+      },
+      onyx: null,
+      pendingAQGreenCheckout: null,
+      pendingDirectOnyxCheckout: null,
+      funeralCover: null,
+      travelBenefit: null,
+    });
+
+    render(<MemberProgrammes />);
+
+    expect(await screen.findByText(/authoritative amount/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Complete joining/i }))
+      .not.toBeInTheDocument();
+  });
+
   it("offers both AQGreen schedules before the first checkout", async () => {
+    vi.mocked(useMyProgrammeJourney).mockReturnValue({
+      data: createJourneyResponse(createProgrammeJourney("AQGREEN", {
+        hasParticipation: true,
+        nextActionCode: "CompleteJoiningPayment",
+      })),
+      errorMessage: undefined,
+      isLoading: false,
+    });
     vi.mocked(httpClient.get).mockResolvedValue({
       entry: {
         activatedAt: null,
@@ -439,6 +585,7 @@ describe("MemberProgrammes", () => {
         recruiterClubMemberNumber: null,
         startedAt: "2026-07-26T10:00:00Z",
         status: "Awaiting joining payment",
+        statusCode: "AwaitingJoiningPayment",
       },
       onyx: null,
       pendingAQGreenCheckout: null,
@@ -521,7 +668,7 @@ describe("MemberProgrammes", () => {
           currency: "ZAR",
           description: "Included with completed joining. This does not represent insurer activation or enrolment.",
           name: "Funeral-cover inclusion",
-          state: "Unlocked",
+          state: "Included",
           unlockedAt: "2026-08-09T10:00:00Z",
         }],
       })),
@@ -544,7 +691,7 @@ describe("MemberProgrammes", () => {
 
     expect(await screen.findByText("Funeral-cover inclusion"))
       .toBeInTheDocument();
-    expect(screen.getByText("Unlocked")).toBeInTheDocument();
+    expect(screen.getByText("Included")).toBeInTheDocument();
     expect(screen.getByText(/R\s*30[\s,\u00a0]*000/)).toBeInTheDocument();
     expect(screen.getByText(/does not represent insurer activation or enrolment/i))
       .toBeInTheDocument();

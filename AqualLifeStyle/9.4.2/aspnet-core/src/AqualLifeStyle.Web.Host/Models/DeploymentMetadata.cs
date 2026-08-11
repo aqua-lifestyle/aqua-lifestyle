@@ -16,6 +16,7 @@ namespace AqualLifeStyle.Web.Host.Models
         {
             "aqgreen-flexible-joining-v1",
             "programme-approval-queue-v1",
+            "member-programme-journey-v1",
             "direct-onyx-checkout-v1",
             "admin-onyx-graduation-v1",
             "admin-checkout-recovery-v1"

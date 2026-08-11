@@ -105,33 +105,34 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             var projectedAt = UtcNow;
             var entryParticipation = await _entryParticipationRepository
                 .GetAllIncluding(item => item.ApprovalDecisions)
-                .FirstOrDefaultAsync(item => item.CustomerId == customer.Id);
+                .FirstOrDefaultAsync(item =>
+                    item.TenantId == tenantId && item.CustomerId == customer.Id);
             var onyxParticipation = await _onyxParticipationRepository
                 .GetAllIncluding(item => item.ApprovalDecisions)
-                .FirstOrDefaultAsync(item => item.CustomerId == customer.Id);
+                .FirstOrDefaultAsync(item =>
+                    item.TenantId == tenantId && item.CustomerId == customer.Id);
 
-            List<EntryParticipation> entryNetworkRows;
-            List<OnyxParticipation> onyxNetworkRows;
-            using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.MustHaveTenant))
-            {
-                entryNetworkRows = await _entryParticipationRepository
-                    .GetAllIncluding(item => item.RecruiterCorrections)
-                    .Where(item =>
-                        item.Status == EntryParticipationStatus.Active &&
-                        item.ActivatedAt <= projectedAt)
-                    .ToListAsync();
-                onyxNetworkRows = await _onyxParticipationRepository
-                    .GetAllIncluding(item => item.RecruiterCorrections)
-                    .Where(item =>
-                        item.Status == OnyxParticipationStatus.Active &&
-                        item.ActivatedAt <= projectedAt)
-                    .ToListAsync();
-            }
+            var entryNetworkRows = await _entryParticipationRepository
+                .GetAllIncluding(item => item.RecruiterCorrections)
+                .Where(item =>
+                    item.TenantId == tenantId &&
+                    item.Status == EntryParticipationStatus.Active &&
+                    item.ActivatedAt <= projectedAt)
+                .ToListAsync();
+            var onyxNetworkRows = await _onyxParticipationRepository
+                .GetAllIncluding(item => item.RecruiterCorrections)
+                .Where(item =>
+                    item.TenantId == tenantId &&
+                    item.Status == OnyxParticipationStatus.Active &&
+                    item.ActivatedAt <= projectedAt)
+                .ToListAsync();
 
             var entryNetwork = EffectiveProgrammeNetwork.BuildAQGreen(
+                tenantId,
                 entryNetworkRows,
                 projectedAt);
             var onyxNetwork = EffectiveProgrammeNetwork.BuildOnyx(
+                tenantId,
                 onyxNetworkRows,
                 projectedAt);
             var entryLevel = entryParticipation?.Status == EntryParticipationStatus.Active
@@ -221,8 +222,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 {
                     Code = "AQGREEN_FUNERAL_COVER",
                     Name = "Funeral-cover inclusion",
-                    State = "Unlocked",
-                    Description = "Earned when your AQGreen joining payment was completed. This does not represent insurer activation or enrolment.",
+                    State = "Included",
+                    Description = "The internal funeral-cover inclusion record is present following confirmed completion of the AQGreen joining requirement. This does not confirm insurer activation, enrolment, policy acceptance, or active cover.",
                     Amount = funeralCover.FuneralCoverAmount,
                     Currency = funeralCover.Currency,
                     UnlockedAt = funeralCover.IncludedAt
@@ -239,7 +240,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         : "Locked",
                     Description = joiningComplete
                         ? "Your joining payment is complete, but no funeral-cover inclusion record is available yet."
-                        : "Unlocks when the AQGreen joining payment is complete.",
+                        : "An internal inclusion record can be created after the full AQGreen joining payment is confirmed.",
                     Amount = funeralCoverTerms.FuneralCoverAmount,
                     Currency = programmeTerms.Currency
                 });
@@ -279,7 +280,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                     status?.IsActive ?? false,
                     level => RequiredPopulation(level),
                     level => null,
-                    level => $"R{commissionTerms.GetComponentAmount(level):0.00} weekly component",
+                    level => $"R{Enumerable.Range(1, level).Sum(commissionTerms.GetComponentAmount):0.00} cumulative weekly commission",
                     level => commissionTerms.GetComponentAmount(level)),
                 Joining = new MemberJoiningProgressDto
                 {
@@ -296,7 +297,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         _ => "Choose one payment or two instalments"
                     },
                     IsComplete = joiningComplete,
-                    CompletedAt = funeralCover?.IncludedAt
+                    CompletedAt = null
                 },
                 MonthlySubscription = new MemberMonthlyObligationSummaryDto
                 {
@@ -616,8 +617,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 ZeroReason = commission.PayoutStatus == WeeklyCommissionPayoutStatus.NotEarned
                     ? "No complete network level was achieved when this week closed."
                     : null,
-                QualifiedLevel = commission.HighestCompletedLevel,
-                CommissionedLevel = commission.HighestCompletedLevel,
+                QualifiedLevel = commission.HighestQualifiedNetworkLevel,
+                CommissionedLevel = commission.HighestCommissionedLevel,
                 Components = commission.Components
                     .OrderBy(item => item.Level)
                     .Select(item => new MemberEarningComponentDto
@@ -680,6 +681,14 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                     "AwaitApproval",
                     "Await Area approval",
                     "Your joining payment is complete. Do not pay it again; the Area team must approve activation next.");
+            }
+
+            if (participation.Status != EntryParticipationStatus.Active)
+            {
+                return new JourneyNextAction(
+                    "ReviewParticipation",
+                    "Review your participation status",
+                    ProgrammeParticipationStatusPresenter.Describe(participation).Status);
             }
 
             if (openObligation != null)
