@@ -91,11 +91,13 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 var recruiter = await _repository.GetAll()
                     .AsNoTracking()
                     .SingleOrDefaultAsync(item =>
+                        item.TenantId == tenantId &&
                         item.CustomerId == newRecruiterCustomerId.Value &&
                         item.Status == EntryParticipationStatus.Active);
                 if (recruiter == null) throw InvalidRecruiter("The new inviting Club Member must have active AQGreen participation.");
                 var placements = await _repository.GetAll()
                     .AsNoTracking()
+                    .Where(item => item.TenantId == tenantId)
                     .Select(item => new { item.CustomerId, item.RecruiterCustomerId })
                     .ToListAsync();
                 RecruiterPlacementCycleValidator.EnsureNoCycle(
@@ -155,12 +157,14 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 var recruiter = await _repository.GetAll()
                     .AsNoTracking()
                     .SingleOrDefaultAsync(item =>
+                        item.TenantId == tenantId &&
                         item.CustomerId == newRecruiterCustomerId.Value &&
                         item.Status == OnyxParticipationStatus.Active);
                 if (recruiter == null)
                     throw new UserFriendlyException("Network placement correction failed.", "The new inviting Club Member must have active Onyx participation.");
                 var placements = await _repository.GetAll()
                     .AsNoTracking()
+                    .Where(item => item.TenantId == tenantId)
                     .Select(item => new { item.CustomerId, item.RecruiterCustomerId })
                     .ToListAsync();
                 RecruiterPlacementCycleValidator.EnsureNoCycle(

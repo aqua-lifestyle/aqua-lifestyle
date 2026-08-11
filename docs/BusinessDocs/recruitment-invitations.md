@@ -76,12 +76,18 @@ or participation identifiers is not part of the normal customer experience.
 The backend is authoritative. On every acceptance it verifies that:
 
 - the invitation exists and its code is well formed;
+- the invitation, recruiter participation, and invitee belong to the same ABP
+  Tenant;
 - the invitation belongs to the requested programme;
 - the referenced participation still exists and remains eligible;
 - the recruiter's participation remains eligible under the selected programme;
-- an Area difference does not invalidate an otherwise valid recruitment;
 - the invitee is not accepting their own invitation; and
 - existing idempotency and recruiter-reassignment protections still hold.
+
+Tenant is the hard security and programme-network boundary. Recruitment and
+qualification never cross Tenants. The business Area model is a planned
+subdivision inside a Tenant and is not implemented here; when it is introduced,
+same-Tenant recruitment may cross Areas according to programme policy.
 
 The public lookup does not return customer IDs, participation IDs, entity IDs,
 payment information, network structure, qualification details, or commission
@@ -94,14 +100,13 @@ Administrators with the dedicated correction permission identify Club Members
 by immutable Club Member number, select AQGreen or Onyx, enter the corrected
 recruiter (or choose an independent network), and provide a mandatory reason.
 
-The backend validates active same-programme participation, administrator Area
-authority, self placement, and cycles. Cross-Area recruitment remains valid:
-an Area administrator can correct records only inside their Area, while a host
-administrator with all-Areas authority may select an eligible recruiter from
-another Area. A successful change appends an immutable history record
-containing the previous recruiter, new recruiter, reason, administrator, and
-timestamp. Repeating the already-applied correction is idempotent and does not
-create duplicate history.
+The backend validates active same-programme participation, same-Tenant
+placement, administrator authority, self placement, and cycles. Host authority
+may operate on more than one Tenant, but it cannot create a recruiter
+relationship across Tenants. A successful change appends an immutable history
+record containing the previous recruiter, new recruiter, reason,
+administrator, and timestamp. Repeating the already-applied correction is
+idempotent and does not create duplicate history.
 
 ## Operational notes and future improvements
 
@@ -117,5 +122,6 @@ create duplicate history.
   unique-constraint race to make the losing concurrent request transparent.
 - Revocation, expiry, delivery analytics, QR codes, and rate-limiting are useful
   future capabilities but are intentionally outside this first complete flow.
-- If cross-Area recruitment rules change, that decision belongs in programme
-  policy. It must not be inferred from an invitation code.
+- Future cross-Area recruitment rules belong in programme policy after the Area
+  aggregate exists. They must not be inferred from Tenant identity or an
+  invitation code.

@@ -55,11 +55,17 @@ namespace AqualLifeStyle.Application.Recruitment
                     expectedProgrammeKey,
                     StringComparison.Ordinal))
                 throw InvalidInvitation("The invitation is for a different programme.");
+            if (invitation.TenantId != inviteeTenantId)
+                throw InvalidInvitation(
+                    "The invitation belongs to a different organisation.");
 
             var source = await _policyResolver.Resolve(invitation.ProgrammeKey)
                 .FindByParticipationAsync(invitation.ProgrammeParticipationId);
             if (source == null || !source.IsEligible)
                 throw InvalidInvitation("The inviting Club Member is not currently eligible to invite members to this programme.");
+            if (source.TenantId != inviteeTenantId)
+                throw InvalidInvitation(
+                    "The inviting Club Member belongs to a different organisation.");
             if (source.CustomerId == inviteeCustomerId)
                 throw InvalidInvitation("You cannot accept your own invitation.");
 

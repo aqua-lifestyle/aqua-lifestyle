@@ -43,6 +43,7 @@ namespace AqualLifeStyle.Domain.Onyx
                 period,
                 terms,
                 EffectiveProgrammeNetwork.BuildAQGreen(
+                    participation.TenantId,
                     networkParticipations,
                     period.PeriodEnd),
                 customerObligations,
@@ -62,6 +63,12 @@ namespace AqualLifeStyle.Domain.Onyx
             if (customerObligations == null)
             {
                 throw new ArgumentNullException(nameof(customerObligations));
+            }
+            if (participation.TenantId != period.TenantId ||
+                network.TenantId != participation.TenantId)
+            {
+                throw new InvalidOperationException(
+                    "AQGreen commission inputs must belong to the same Tenant.");
             }
 
             var highestQualifiedNetworkLevel = _networkQualificationEvaluator.Evaluate(

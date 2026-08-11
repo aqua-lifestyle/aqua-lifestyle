@@ -47,6 +47,7 @@ namespace AqualLifeStyle.Tests.Application
             var eligibleAt =
                 new DateTime(2026, 8, 3, 10, 0, 0, DateTimeKind.Utc);
             var effectiveNetwork = EffectiveProgrammeNetwork.BuildOnyx(
+                1,
                 network,
                 eligibleAt);
 
@@ -121,6 +122,7 @@ namespace AqualLifeStyle.Tests.Application
                 0,
                 DateTimeKind.Utc);
             var effectiveNetwork = EffectiveProgrammeNetwork.BuildOnyx(
+                1,
                 network,
                 eligibleAt);
 

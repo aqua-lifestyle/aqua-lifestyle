@@ -208,6 +208,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             if (recruiterCustomerId.HasValue)
             {
                 var recruiter = await GetActiveEntryRecruiterAsync(
+                    customer.TenantId.Value,
                     customer.Id,
                     recruiterCustomerId.Value);
                 participation = EntryParticipation.StartUnderRecruiter(
@@ -373,6 +374,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 if (recruiterCustomerId.HasValue)
                 {
                     await GetActiveOnyxRecruiterAsync(
+                        customer.TenantId.Value,
                         customer.Id,
                         recruiterCustomerId.Value);
                 }
@@ -593,6 +595,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         }
 
         private async Task<EntryParticipation> GetActiveEntryRecruiterAsync(
+            int tenantId,
             int customerId,
             int recruiterCustomerId)
         {
@@ -601,6 +604,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             {
                 var recruiter = await _entryParticipationRepository.FirstOrDefaultAsync(
                     participation =>
+                        participation.TenantId == tenantId &&
                         participation.CustomerId == recruiterCustomerId &&
                         participation.Status == EntryParticipationStatus.Active);
                 if (recruiter == null)
@@ -614,6 +618,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         }
 
         private async Task<OnyxParticipation> GetActiveOnyxRecruiterAsync(
+            int tenantId,
             int customerId,
             int recruiterCustomerId)
         {
@@ -622,6 +627,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             {
                 var recruiter = await _onyxParticipationRepository.FirstOrDefaultAsync(
                     participation =>
+                        participation.TenantId == tenantId &&
                         participation.CustomerId == recruiterCustomerId &&
                         participation.Status == OnyxParticipationStatus.Active);
                 if (recruiter == null)

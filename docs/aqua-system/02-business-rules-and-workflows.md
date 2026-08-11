@@ -9,6 +9,7 @@ This is the precise business specification for the currently confirmed Aqua prog
 | A registered customer may have an AQGreen participation, an Onyx participation, both, or neither. | `BUSINESS DECISION` |
 | AQGreen and Onyx are separate programmes with separate participation, recruitment, payment, and commission records. | `BUSINESS DECISION` |
 | A recruiter must have Active participation in the same programme. No recruiter means an independent network root. | `VERIFIED IMPLEMENTATION` |
+| Recruiter, recruit, qualification graph, and commission ledger must remain inside one ABP Tenant. Host authority does not permit a cross-Tenant graph. | `VERIFIED IMPLEMENTATION` |
 | Payment-confirmed but unapproved participation is not Active and does not qualify for Active-only network or finance behaviour. | `VERIFIED IMPLEMENTATION` |
 | `Entry` is a retained technical/database name for AQGreen; it is not a third customer programme. | `SUPERSEDED` terminology boundary |
 | `Business Premier` is legacy catalogue/demo terminology and must not be used as the name of Onyx. | `SUPERSEDED` |
@@ -160,6 +161,12 @@ flowchart LR
 `BUSINESS DECISION`: AQGreen structurally continues through Levels 4 and 5 even though its currently authorised commission rates end at Level 3.
 
 `VERIFIED IMPLEMENTATION`: the AQGreen network enum and evaluator model structural Levels 1–5. Structural qualification and authorised commission depth are separate: current AQGreen terms still contain components only for Levels 1–3.
+
+`VERIFIED IMPLEMENTATION`: the qualification graph is bounded by Tenant and
+programme. Repository queries select the requested Tenant before graph
+construction, and the effective-network builder rejects mixed-Tenant input.
+Area is a future business/admin subdivision inside Tenant; no Area aggregate or
+temporary Tenant-to-Area mapping is introduced by this rule.
 
 ## 6. Commission rules
 

@@ -21,7 +21,15 @@ The worker wakes periodically, resolves the latest fully closed Friday-to-Thursd
 
 ## 2. Structure before money
 
-Only Active participants in the same programme form the qualifying network. Each selected branch needs five people at every required depth.
+Only Active participants in the same Tenant and programme form the qualifying
+network. The application scopes rows to the target Tenant before construction,
+and the domain network rejects mixed-Tenant input. Each selected branch needs
+five people at every required depth.
+
+Tenant is the hard security and programme-network boundary. Area is a planned
+business/admin subdivision inside Tenant and is not implemented by this
+calculation model. Future same-Tenant cross-Area recruitment may be permitted;
+cross-Tenant recruitment and qualification are always prohibited.
 
 Both AQGreen and Onyx have five structural levels. Each level requires five complete branches at every depth: 5, 25, 125, 625, and 3,125 people at Levels 1–5. An incomplete branch gives no partial level component.
 

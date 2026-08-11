@@ -31,6 +31,7 @@ namespace AqualLifeStyle.Domain.Onyx
                 period,
                 terms,
                 EffectiveProgrammeNetwork.BuildOnyx(
+                    participation.TenantId,
                     networkParticipations,
                     period.PeriodEnd));
         }
@@ -43,6 +44,12 @@ namespace AqualLifeStyle.Domain.Onyx
         {
             if (participation == null) throw new ArgumentNullException(nameof(participation));
             if (network == null) throw new ArgumentNullException(nameof(network));
+            if (participation.TenantId != period.TenantId ||
+                network.TenantId != participation.TenantId)
+            {
+                throw new InvalidOperationException(
+                    "Onyx commission inputs must belong to the same Tenant.");
+            }
 
             var highestQualifiedNetworkLevel = _networkQualificationEvaluator.Evaluate(
                 participation.CustomerId,

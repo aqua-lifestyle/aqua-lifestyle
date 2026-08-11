@@ -455,33 +455,35 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task HostAdministrator_CanCorrectAQGreenRecruiterAcrossAreas()
+        public async Task HostAdministrator_CannotCorrectAQGreenRecruiterAcrossTenants()
         {
-            var fixture = await CreateCrossAreaAQGreenPlacementAsync();
+            var fixture = await CreateCrossTenantAQGreenPlacementAsync();
             LoginAsHostAdmin();
 
-            await _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+            var exception = await Should.ThrowAsync<Abp.UI.UserFriendlyException>(() =>
+                _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
             {
                 Programme = AdminProgrammeType.Entry,
                 ClubMemberNumber = fixture.TargetNumber,
                 NewRecruiterClubMemberNumber = fixture.RecruiterNumber,
-                Reason = "Correcting a verified cross-Area placement"
-            });
+                Reason = "Attempting a cross-Tenant placement"
+            }));
+            exception.Details.ShouldContain("management authority");
 
             await UsingDbContextAsync(1, async context =>
             {
                 var participation = await context.EntryParticipations
                     .Include(item => item.RecruiterCorrections)
                     .SingleAsync(item => item.CustomerId == fixture.TargetCustomerId);
-                participation.RecruiterCustomerId.ShouldBe(fixture.RecruiterCustomerId);
-                participation.RecruiterCorrections.Count.ShouldBe(1);
+                participation.RecruiterCustomerId.ShouldBeNull();
+                participation.RecruiterCorrections.ShouldBeEmpty();
             });
         }
 
         [Fact]
-        public async Task TenantAdministrator_CannotCorrectRecruiterAcrossAreas()
+        public async Task TenantAdministrator_CannotCorrectRecruiterAcrossTenants()
         {
-            var fixture = await CreateCrossAreaAQGreenPlacementAsync();
+            var fixture = await CreateCrossTenantAQGreenPlacementAsync();
 
             var exception = await Should.ThrowAsync<Abp.UI.UserFriendlyException>(() =>
                 _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
@@ -489,7 +491,7 @@ namespace AqualLifeStyle.Tests.Application
                     Programme = AdminProgrammeType.Entry,
                     ClubMemberNumber = fixture.TargetNumber,
                     NewRecruiterClubMemberNumber = fixture.RecruiterNumber,
-                    Reason = "Attempting an unauthorised cross-Area placement"
+                    Reason = "Attempting an unauthorised cross-Tenant placement"
                 }));
             exception.Details.ShouldContain("management authority");
 
@@ -504,26 +506,28 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task HostAdministrator_CanCorrectOnyxRecruiterAcrossAreas()
+        public async Task HostAdministrator_CannotCorrectOnyxRecruiterAcrossTenants()
         {
-            var fixture = await CreateCrossAreaOnyxPlacementAsync();
+            var fixture = await CreateCrossTenantOnyxPlacementAsync();
             LoginAsHostAdmin();
 
-            await _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+            var exception = await Should.ThrowAsync<Abp.UI.UserFriendlyException>(() =>
+                _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
             {
                 Programme = AdminProgrammeType.Onyx,
                 ClubMemberNumber = fixture.TargetNumber,
                 NewRecruiterClubMemberNumber = fixture.RecruiterNumber,
-                Reason = "Correcting a verified cross-Area Onyx placement"
-            });
+                Reason = "Attempting a cross-Tenant Onyx placement"
+            }));
+            exception.Details.ShouldContain("management authority");
 
             await UsingDbContextAsync(1, async context =>
             {
                 var participation = await context.OnyxParticipations
                     .Include(item => item.RecruiterCorrections)
                     .SingleAsync(item => item.CustomerId == fixture.TargetCustomerId);
-                participation.RecruiterCustomerId.ShouldBe(fixture.RecruiterCustomerId);
-                participation.RecruiterCorrections.Count.ShouldBe(1);
+                participation.RecruiterCustomerId.ShouldBeNull();
+                participation.RecruiterCorrections.ShouldBeEmpty();
             });
         }
 
@@ -693,7 +697,7 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task TenantAdministrator_CannotApproveAnotherAreasParticipationByIdentifier()
         {
-            await EnsureCrossAreaTenantAsync();
+            await EnsureSecondTenantAsync();
             var fixture = await CreateAwaitingApprovalEntryAsync(
                 Guid.NewGuid().ToString("N"),
                 tenantId: 2);
@@ -980,18 +984,18 @@ namespace AqualLifeStyle.Tests.Application
             });
         }
 
-        private async Task<RecruitmentNetworkFixture> CreateCrossAreaAQGreenPlacementAsync()
+        private async Task<RecruitmentNetworkFixture> CreateCrossTenantAQGreenPlacementAsync()
         {
             var suffix = Guid.NewGuid().ToString("N");
-            await EnsureCrossAreaTenantAsync();
+            await EnsureSecondTenantAsync();
             var targetUserId = await CreateTestUserAsync(
                 1,
-                $"cross-area-target-{suffix}",
-                $"cross-area-target-{suffix}@example.com");
+                $"cross-tenant-target-{suffix}",
+                $"cross-tenant-target-{suffix}@example.com");
             var recruiterUserId = await CreateTestUserAsync(
                 2,
-                $"cross-area-recruiter-{suffix}",
-                $"cross-area-recruiter-{suffix}@example.com");
+                $"cross-tenant-recruiter-{suffix}",
+                $"cross-tenant-recruiter-{suffix}@example.com");
 
             Customer targetCustomer = null;
             await UsingDbContextAsync(1, async context =>
@@ -1000,7 +1004,7 @@ namespace AqualLifeStyle.Tests.Application
                     1,
                     targetUserId,
                     "Cross Area Target",
-                    new EmailAddress($"cross-area-target-customer-{suffix}@example.com"));
+                    new EmailAddress($"cross-tenant-target-customer-{suffix}@example.com"));
                 context.Customers.Add(targetCustomer);
                 await context.SaveChangesAsync();
                 context.EntryParticipations.Add(EntryParticipation.StartIndependently(
@@ -1018,7 +1022,7 @@ namespace AqualLifeStyle.Tests.Application
                     2,
                     recruiterUserId,
                     "Cross Area Recruiter",
-                    new EmailAddress($"cross-area-recruiter-customer-{suffix}@example.com"));
+                    new EmailAddress($"cross-tenant-recruiter-customer-{suffix}@example.com"));
                 context.Customers.Add(recruiterCustomer);
                 await context.SaveChangesAsync();
                 var recruiter = EntryParticipation.StartIndependently(
@@ -1029,7 +1033,7 @@ namespace AqualLifeStyle.Tests.Application
                 context.MemberPayments.AddRange(Activate(
                     recruiter,
                     recruiterCustomer.Id,
-                    $"cross-area-recruiter-{suffix}",
+                    $"cross-tenant-recruiter-{suffix}",
                     2));
                 context.EntryParticipations.Add(recruiter);
                 await context.SaveChangesAsync();
@@ -1044,18 +1048,18 @@ namespace AqualLifeStyle.Tests.Application
             };
         }
 
-        private async Task<RecruitmentNetworkFixture> CreateCrossAreaOnyxPlacementAsync()
+        private async Task<RecruitmentNetworkFixture> CreateCrossTenantOnyxPlacementAsync()
         {
             var suffix = Guid.NewGuid().ToString("N");
-            await EnsureCrossAreaTenantAsync();
+            await EnsureSecondTenantAsync();
             var targetUserId = await CreateTestUserAsync(
                 1,
-                $"cross-area-onyx-target-{suffix}",
-                $"cross-area-onyx-target-{suffix}@example.com");
+                $"cross-tenant-onyx-target-{suffix}",
+                $"cross-tenant-onyx-target-{suffix}@example.com");
             var recruiterUserId = await CreateTestUserAsync(
                 2,
-                $"cross-area-onyx-recruiter-{suffix}",
-                $"cross-area-onyx-recruiter-{suffix}@example.com");
+                $"cross-tenant-onyx-recruiter-{suffix}",
+                $"cross-tenant-onyx-recruiter-{suffix}@example.com");
             var terms = Resolve<ICurrentProgrammeTermsProvider>().GetDirectOnyxTerms();
 
             Customer targetCustomer = null;
@@ -1065,7 +1069,7 @@ namespace AqualLifeStyle.Tests.Application
                     1,
                     targetUserId,
                     "Cross Area Onyx Target",
-                    new EmailAddress($"cross-area-onyx-target-customer-{suffix}@example.com"));
+                    new EmailAddress($"cross-tenant-onyx-target-customer-{suffix}@example.com"));
                 var membership = Membership.Create(
                     1,
                     $"Cross-Area-Onyx-Target-{suffix}",
@@ -1083,7 +1087,7 @@ namespace AqualLifeStyle.Tests.Application
                 context.MemberPayments.Add(Activate(
                     target,
                     targetCustomer.Id,
-                    $"cross-area-onyx-target-{suffix}"));
+                    $"cross-tenant-onyx-target-{suffix}"));
                 context.OnyxParticipations.Add(target);
                 await context.SaveChangesAsync();
             });
@@ -1095,7 +1099,7 @@ namespace AqualLifeStyle.Tests.Application
                     2,
                     recruiterUserId,
                     "Cross Area Onyx Recruiter",
-                    new EmailAddress($"cross-area-onyx-recruiter-customer-{suffix}@example.com"));
+                    new EmailAddress($"cross-tenant-onyx-recruiter-customer-{suffix}@example.com"));
                 var membership = Membership.Create(
                     2,
                     $"Cross-Area-Onyx-Recruiter-{suffix}",
@@ -1113,7 +1117,7 @@ namespace AqualLifeStyle.Tests.Application
                 context.MemberPayments.Add(Activate(
                     recruiter,
                     recruiterCustomer.Id,
-                    $"cross-area-onyx-recruiter-{suffix}",
+                    $"cross-tenant-onyx-recruiter-{suffix}",
                     2));
                 context.OnyxParticipations.Add(recruiter);
                 await context.SaveChangesAsync();
@@ -1128,12 +1132,12 @@ namespace AqualLifeStyle.Tests.Application
             };
         }
 
-        private async Task EnsureCrossAreaTenantAsync()
+        private async Task EnsureSecondTenantAsync()
         {
             await UsingDbContextAsync(null, async context =>
             {
                 if (await context.Tenants.AnyAsync(tenant => tenant.Id == 2)) return;
-                context.Tenants.Add(new Tenant("CrossArea", "Cross Area"));
+                context.Tenants.Add(new Tenant("OtherTenant", "Other Tenant"));
                 await context.SaveChangesAsync();
             });
         }

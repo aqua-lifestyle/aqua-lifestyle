@@ -57,6 +57,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 networkParticipations = await _participationRepository
                     .GetAllIncluding(participation => participation.RecruiterCorrections)
                     .Where(participation =>
+                        participation.TenantId == tenantId &&
                         participation.Status == OnyxParticipationStatus.Active &&
                         (!participation.ActivatedAt.HasValue ||
                          participation.ActivatedAt <= closedWeek.PeriodEndUtc))
@@ -68,6 +69,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                     "Onyx travel synchronization cannot prove cutoff participation state because deleted network evidence exists.");
             }
             var effectiveNetwork = EffectiveProgrammeNetwork.BuildOnyx(
+                tenantId,
                 networkParticipations,
                 closedWeek.PeriodEndUtc);
 

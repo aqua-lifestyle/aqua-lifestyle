@@ -37,7 +37,8 @@ No status implies the status to its right.
 | Area approval queue and badge | `MERGED` | Backend/UI/tests on `main`; historical browser discovery, persistence and badge evidence carried forward. |
 | Approval/rejection and rejection reason | `MERGED` | Unique decision model, Area enforcement, customer projection/UI and tests on `main`; historical browser approval/rejection evidence carried forward. |
 | AQGreen funeral-cover inclusion | `MERGED` | Runtime and deterministic migration/backfill on `main`; current CI passed. The production migration is under active reconciliation and external insurer activation is not modelled. |
-| AQGreen network qualification | `MERGED` (Levels 1–3 only) | Current code, cutoff reconstruction, tests, and member progress model Levels 1–3 only. Owner-confirmed business structure continues through Levels 4–5, which are not yet implemented. |
+| AQGreen network qualification | `IMPLEMENTED — PR #72` | Structural Levels 1–5 are represented independently from the currently authorised Level 1–3 commission depth. Focused tests cover complete and incomplete same-Tenant structures. |
+| Programme network tenant boundary | `IMPLEMENTED — PR #72` | AQGreen and Onyx graph construction, recruitment placement, host calculation, ledgers, and projections are bounded by Tenant and programme. Mixed-Tenant graph input fails closed. Area remains a planned subdivision inside Tenant. |
 | Onyx qualification | `MERGED` | Levels 1–5 and 3,906-person deterministic simulation are on `main`. |
 | Effective-dated weekly commission engine | `MERGED` | Friday–Thursday resolver, terms registry/resolver, cutoff facts, locks, ledgers and tests on `main`. |
 | Weekly automatic calculation | `MERGED` | Worker code is merged; repository default is disabled. Not `ENABLED` or `PRODUCTION VERIFIED`. |

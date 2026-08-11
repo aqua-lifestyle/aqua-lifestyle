@@ -559,8 +559,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                                 customer.ClubMemberNumber == normalizedRecruiter &&
                                 !customer.IsDeleted);
                         if (newRecruiter == null ||
-                            (AbpSession.TenantId.HasValue &&
-                             newRecruiter.TenantId != target.TenantId) ||
+                            newRecruiter.TenantId != target.TenantId ||
                             !newRecruiter.IsActive)
                         {
                             throw new Abp.UI.UserFriendlyException(

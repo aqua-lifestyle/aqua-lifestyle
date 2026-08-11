@@ -43,7 +43,8 @@ namespace AqualLifeStyle.Domain.Onyx
             if (customerId <= 0) throw new ArgumentOutOfRangeException(nameof(customerId));
             if (participations == null) throw new ArgumentNullException(nameof(participations));
 
-            var qualified = participations
+            var supplied = participations.ToList();
+            var qualified = supplied
                 .Where(participation => participation.IsQualifiedForNetwork)
                 .ToList();
             var duplicateCustomer = qualified
@@ -59,19 +60,15 @@ namespace AqualLifeStyle.Domain.Onyx
             {
                 return EntryNetworkLevel.None;
             }
-
-            var byRecruiter = qualified
-                .Where(participation => participation.RecruiterCustomerId.HasValue)
-                .GroupBy(participation => participation.RecruiterCustomerId.Value)
-                .ToDictionary(
-                    group => group.Key,
-                    group => group
-                        .OrderBy(EffectiveProgrammeNetwork.CurrentQualifiedUnderRecruiterAt)
-                        .ThenBy(item => item.Id)
-                        .Take(BranchSize)
-                        .ToList());
-            return EvaluateHighestCompleteLevel(level =>
-                IsCompleteCurrentBranch(customerId, level, byRecruiter));
+            var expectedTenantId = qualified
+                .First(participation => participation.CustomerId == customerId)
+                .TenantId;
+            return Evaluate(
+                customerId,
+                EffectiveProgrammeNetwork.BuildAQGreen(
+                    expectedTenantId,
+                    supplied,
+                    DateTime.MaxValue));
         }
 
         public EntryNetworkLevel Evaluate(
@@ -131,20 +128,5 @@ namespace AqualLifeStyle.Domain.Onyx
                 IsCompleteBranch(recruit.CustomerId, remainingDepth - 1, network));
         }
 
-        private static bool IsCompleteCurrentBranch(
-            int customerId,
-            int remainingDepth,
-            IReadOnlyDictionary<int, List<EntryParticipation>> byRecruiter)
-        {
-            if (remainingDepth == 0) return true;
-            if (!byRecruiter.TryGetValue(customerId, out var directRecruits) ||
-                directRecruits.Count < BranchSize)
-            {
-                return false;
-            }
-
-            return directRecruits.All(recruit =>
-                IsCompleteCurrentBranch(recruit.CustomerId, remainingDepth - 1, byRecruiter));
-        }
     }
 }

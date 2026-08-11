@@ -87,6 +87,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 : await _entryParticipationRepository
                     .GetAllIncluding(item => item.RecruiterCorrections)
                     .Where(item =>
+                        item.TenantId == tenantId &&
                         item.Status == EntryParticipationStatus.Active)
                     .ToListAsync();
             var commissions = await _entryCommissionRepository
@@ -110,7 +111,10 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 ? EntryNetworkLevel.None
                 : new EntryNetworkQualificationEvaluator().Evaluate(
                     customer.Id,
-                    activeParticipations);
+                    EffectiveProgrammeNetwork.BuildAQGreen(
+                        tenantId,
+                        activeParticipations,
+                        DateTime.MaxValue));
 
             return BuildProgress(
                 participation,

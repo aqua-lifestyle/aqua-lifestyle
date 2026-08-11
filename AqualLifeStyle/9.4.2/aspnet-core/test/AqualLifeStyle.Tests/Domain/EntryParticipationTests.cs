@@ -48,7 +48,7 @@ namespace AqualLifeStyle.Tests.Domain
         public void RecordedRecruiter_MustHaveActiveEntryParticipation()
         {
             var inactiveRecruiter = EntryParticipation.StartIndependently(
-                tenantId: 2,
+                tenantId: 1,
                 customerId: 20,
                 Terms,
                 EffectiveFrom);
@@ -80,6 +80,28 @@ namespace AqualLifeStyle.Tests.Domain
 
             Assert.False(participation.JoinedIndependently);
             Assert.Equal(20, participation.RecruiterCustomerId);
+        }
+
+        [Fact]
+        public void ActiveRecruiter_FromAnotherTenant_IsRejected()
+        {
+            var recruiter = EntryParticipation.StartIndependently(
+                tenantId: 2,
+                customerId: 20,
+                Terms,
+                EffectiveFrom);
+            ApplyBothActivationPayments(recruiter);
+            recruiter.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
+
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+                EntryParticipation.StartUnderRecruiter(
+                    tenantId: 1,
+                    customerId: 10,
+                    recruiter,
+                    Terms,
+                    EffectiveFrom));
+
+            Assert.Contains("same Tenant", exception.Message);
         }
 
         [Fact]
@@ -352,7 +374,7 @@ namespace AqualLifeStyle.Tests.Domain
             ApplyBothActivationPayments(participation);
 
             var recruiter = EntryParticipation.StartIndependently(
-                tenantId: 2,
+                tenantId: 1,
                 customerId: 30,
                 Terms,
                 EffectiveFrom);
@@ -373,6 +395,32 @@ namespace AqualLifeStyle.Tests.Domain
             Assert.Equal("Corrected a registration capture error.", correction.Reason);
             Assert.Equal(30, participation.RecruiterCustomerId);
             Assert.True(participation.IsQualifiedForNetwork);
+        }
+
+        [Fact]
+        public void AdministrativeRecruiterCorrection_FromAnotherTenant_IsRejected()
+        {
+            var participation = StartParticipation();
+            ApplyBothActivationPayments(participation);
+            participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
+            var recruiter = EntryParticipation.StartIndependently(
+                tenantId: 2,
+                customerId: 30,
+                Terms,
+                EffectiveFrom);
+            ApplyBothActivationPayments(recruiter);
+            recruiter.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
+
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+                participation.CorrectRecruiter(
+                    recruiter,
+                    administratorUserId: 99,
+                    reason: "Attempted cross-Tenant correction.",
+                    correctedAt: EffectiveFrom.AddDays(1)));
+
+            Assert.Contains("same Tenant", exception.Message);
+            Assert.Null(participation.RecruiterCustomerId);
+            Assert.Empty(participation.RecruiterCorrections);
         }
 
         private static EntryParticipation StartParticipation()

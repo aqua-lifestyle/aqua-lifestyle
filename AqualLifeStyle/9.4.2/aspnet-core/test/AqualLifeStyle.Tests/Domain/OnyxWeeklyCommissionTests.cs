@@ -86,25 +86,49 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
-        public void ActiveCrossAreaDirectRecruit_ContributesToLevelOne()
+        public void ActiveCrossTenantDirectRecruit_IsRejected()
         {
             var network = OnyxNetworkTestBuilder.BuildLevelOneNetwork(
                 directRecruitCount: 4,
                 PlanTerms,
                 EffectiveFrom);
-            network.Add(OnyxNetworkTestBuilder.CreateActiveUnderRecruiter(
-                customerId: 20,
-                network[0],
+            var otherTenantRecruiter =
+                OnyxNetworkTestBuilder.CreateActiveIndependentParticipant(
+                20,
+                PlanTerms,
+                EffectiveFrom,
+                tenantId: 2);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                OnyxParticipation.StartDirectUnderRecruiter(
+                    1,
+                    21,
+                    otherTenantRecruiter,
+                    7,
+                    PlanTerms,
+                    EffectiveFrom));
+        }
+
+        [Fact]
+        public void MixedTenantNetworkInput_FailsClosed()
+        {
+            var network = OnyxNetworkTestBuilder.BuildLevelOneNetwork(
+                directRecruitCount: 4,
+                PlanTerms,
+                EffectiveFrom);
+            network.Add(OnyxNetworkTestBuilder.CreateActiveIndependentParticipant(
+                20,
                 PlanTerms,
                 EffectiveFrom,
                 tenantId: 2));
 
-            var commission = Calculate(network);
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+                EffectiveProgrammeNetwork.BuildOnyx(
+                    expectedTenantId: 1,
+                    network,
+                    EffectiveFrom.AddDays(7)));
 
-            Assert.Equal(1, commission.HighestQualifiedNetworkLevel);
-            Assert.Equal(1, commission.HighestCommissionedLevel);
-            Assert.Equal(250m, commission.TotalAmount);
-            Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
+            Assert.Contains("outside Tenant 1", exception.Message);
         }
 
         [Fact]
@@ -155,7 +179,7 @@ namespace AqualLifeStyle.Tests.Domain
                 reason: "Correct placement",
                 correctedAt: cutoff.AddMinutes(1));
 
-            var cutoffNetwork = EffectiveProgrammeNetwork.BuildOnyx(network, cutoff);
+            var cutoffNetwork = EffectiveProgrammeNetwork.BuildOnyx(1, network, cutoff);
             var evaluator = new OnyxNetworkQualificationEvaluator();
 
             Assert.Equal(
@@ -195,6 +219,7 @@ namespace AqualLifeStyle.Tests.Domain
             }
 
             var effectiveNetwork = EffectiveProgrammeNetwork.BuildOnyx(
+                1,
                 network,
                 EffectiveFrom.AddDays(7));
             var level = new OnyxNetworkQualificationEvaluator().Evaluate(

@@ -127,7 +127,7 @@ namespace AqualLifeStyle.Domain.Onyx
             EntryProgrammeTerms terms,
             DateTime startedAt)
         {
-            EnsureEligibleRecruiter(customerId, recruiterParticipation);
+            EnsureEligibleRecruiter(tenantId, customerId, recruiterParticipation);
             return new EntryParticipation(
                 tenantId,
                 customerId,
@@ -338,7 +338,7 @@ namespace AqualLifeStyle.Domain.Onyx
             string reason,
             DateTime correctedAt)
         {
-            EnsureEligibleRecruiter(CustomerId, newRecruiterParticipation);
+            EnsureEligibleRecruiter(TenantId, CustomerId, newRecruiterParticipation);
             RecordRecruiterCorrection(
                 newRecruiterParticipation.CustomerId,
                 administratorUserId,
@@ -460,6 +460,7 @@ namespace AqualLifeStyle.Domain.Onyx
         }
 
         private static void EnsureEligibleRecruiter(
+            int tenantId,
             int customerId,
             EntryParticipation recruiterParticipation)
         {
@@ -472,6 +473,12 @@ namespace AqualLifeStyle.Domain.Onyx
             {
                 throw new InvalidOperationException(
                     "The inviting Club Member must have active AQGreen participation.");
+            }
+
+            if (recruiterParticipation.TenantId != tenantId)
+            {
+                throw new InvalidOperationException(
+                    "The inviting Club Member must belong to the same Tenant.");
             }
 
             EnsureValidRecruiter(customerId, recruiterParticipation.CustomerId);

@@ -113,7 +113,7 @@ namespace AqualLifeStyle.Tests.Domain
         public void RecordedRecruiter_MustHaveActiveOnyxParticipation()
         {
             var recruiter = OnyxParticipation.StartDirectIndependently(
-                tenantId: 2,
+                tenantId: 1,
                 customerId: 20,
                 onyxMembershipId: 7,
                 Terms,
@@ -139,6 +139,29 @@ namespace AqualLifeStyle.Tests.Domain
 
             Assert.False(participation.JoinedIndependently);
             Assert.Equal(20, participation.RecruiterCustomerId);
+        }
+
+        [Fact]
+        public void ActiveRecruiter_FromAnotherTenant_IsRejected()
+        {
+            var recruiter = OnyxParticipation.StartDirectIndependently(
+                tenantId: 2,
+                customerId: 20,
+                onyxMembershipId: 7,
+                Terms,
+                EffectiveFrom);
+            Activate(recruiter, "cross-tenant-onyx-recruiter");
+
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+                OnyxParticipation.StartDirectUnderRecruiter(
+                    tenantId: 1,
+                    customerId: 10,
+                    recruiter,
+                    onyxMembershipId: 7,
+                    Terms,
+                    EffectiveFrom));
+
+            Assert.Contains("same Tenant", exception.Message);
         }
 
         [Fact]
@@ -171,6 +194,28 @@ namespace AqualLifeStyle.Tests.Domain
             Assert.Equal(999, correction.AdministratorUserId);
             Assert.Equal("Verified against the signed joining record", correction.Reason);
             Assert.Equal(30, participation.RecruiterCustomerId);
+        }
+
+        [Fact]
+        public void AdministrativeRecruiterCorrection_FromAnotherTenant_IsRejected()
+        {
+            var participation = OnyxParticipation.StartDirectIndependently(
+                1, 10, 7, Terms, EffectiveFrom);
+            var recruiter = OnyxParticipation.StartDirectIndependently(
+                2, 30, 7, Terms, EffectiveFrom);
+            Activate(participation, "onyx-correction-target");
+            Activate(recruiter, "onyx-cross-tenant-correction-recruiter");
+
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+                participation.CorrectRecruiter(
+                    recruiter,
+                    999,
+                    "Attempted cross-Tenant correction",
+                    EffectiveFrom.AddHours(1)));
+
+            Assert.Contains("same Tenant", exception.Message);
+            Assert.Null(participation.RecruiterCustomerId);
+            Assert.Empty(participation.RecruiterCorrections);
         }
 
         [Fact]

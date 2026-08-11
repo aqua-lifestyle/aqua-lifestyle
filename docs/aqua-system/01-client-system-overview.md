@@ -117,6 +117,12 @@ The network grows in groups of five. Both AQGreen and Onyx have five structural 
 
 AQGreen currently has authorised commission rates only for Levels 1–3; its Level 4 and Level 5 rates remain a business decision. The software evaluates AQGreen structure through Level 5 and records structural qualification separately from the currently commissioned depth. A structurally qualified Level 4 or Level 5 member therefore retains the authorised Level 1–3 components only; no Level 4/5 component exists. Onyx evaluates and has confirmed rates through Level 5. Only Active participation in the same programme contributes, and a payout hold does not remove network placement.
 
+Every programme network is also bounded by ABP Tenant. A participant from one
+Tenant cannot be placed into or contribute to another Tenant's qualification
+graph, including during host-admin calculation. Business Areas are planned as
+subdivisions inside a Tenant; the Area aggregate and Area assignment are not yet
+implemented, so this tenant boundary must not be described as an Area model.
+
 ## How weekly earnings work
 
 The business flow is:

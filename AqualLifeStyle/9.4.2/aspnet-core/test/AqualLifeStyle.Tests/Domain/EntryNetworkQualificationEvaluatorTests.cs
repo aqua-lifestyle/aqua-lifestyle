@@ -96,6 +96,7 @@ namespace AqualLifeStyle.Tests.Domain
         {
             var completeNetwork = BuildNetwork(maxDepth: 5);
             var cutoffNetwork = EffectiveProgrammeNetwork.BuildAQGreen(
+                expectedTenantId: 1,
                 completeNetwork,
                 EffectiveFrom.AddDays(7));
 
@@ -114,7 +115,7 @@ namespace AqualLifeStyle.Tests.Domain
             var network = BuildNetwork(maxDepth: 1);
             var root = network.Find(participation => participation.CustomerId == 1);
             var unqualified = EntryParticipation.StartUnderRecruiter(
-                tenantId: 2,
+                tenantId: 1,
                 customerId: 7,
                 root,
                 Terms,
@@ -150,7 +151,7 @@ namespace AqualLifeStyle.Tests.Domain
                 reason: "Correct placement",
                 correctedAt: cutoff.AddMinutes(1));
 
-            var cutoffNetwork = EffectiveProgrammeNetwork.BuildAQGreen(network, cutoff);
+            var cutoffNetwork = EffectiveProgrammeNetwork.BuildAQGreen(1, network, cutoff);
 
             Assert.Equal(
                 EntryNetworkLevel.Level1,
@@ -171,8 +172,26 @@ namespace AqualLifeStyle.Tests.Domain
 
             Assert.Throws<InvalidOperationException>(() =>
                 EffectiveProgrammeNetwork.BuildAQGreen(
+                    1,
                     network,
                     EffectiveFrom.AddDays(7)));
+        }
+
+        [Fact]
+        public void MixedTenantNetworkInput_FailsClosed()
+        {
+            var network = BuildNetwork(maxDepth: 1);
+            network.Add(CreateQualifiedIndependentParticipation(
+                customerId: 100,
+                tenantId: 2));
+
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+                EffectiveProgrammeNetwork.BuildAQGreen(
+                    expectedTenantId: 1,
+                    network,
+                    EffectiveFrom.AddDays(7)));
+
+            Assert.Contains("outside Tenant 1", exception.Message);
         }
 
         private static List<EntryParticipation> BuildNetwork(
@@ -209,9 +228,10 @@ namespace AqualLifeStyle.Tests.Domain
             return participations;
         }
 
-        private static EntryParticipation CreateQualifiedIndependentParticipation(int customerId)
+        private static EntryParticipation CreateQualifiedIndependentParticipation(
+            int customerId,
+            int tenantId = 1)
         {
-            var tenantId = customerId % 2 == 0 ? 1 : 2;
             var participation = EntryParticipation.StartIndependently(
                 tenantId,
                 customerId,
@@ -225,9 +245,8 @@ namespace AqualLifeStyle.Tests.Domain
             int customerId,
             EntryParticipation recruiterParticipation)
         {
-            var tenantId = customerId % 2 == 0 ? 1 : 2;
             var participation = EntryParticipation.StartUnderRecruiter(
-                tenantId,
+                tenantId: 1,
                 customerId,
                 recruiterParticipation,
                 Terms,

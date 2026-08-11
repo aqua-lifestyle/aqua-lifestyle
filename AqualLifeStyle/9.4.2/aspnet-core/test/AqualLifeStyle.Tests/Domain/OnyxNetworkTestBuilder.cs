@@ -85,13 +85,14 @@ namespace AqualLifeStyle.Tests.Domain
             return participation;
         }
 
-        private static OnyxParticipation CreateActiveIndependentParticipant(
+        public static OnyxParticipation CreateActiveIndependentParticipant(
             int customerId,
             OnyxPlanTerms terms,
-            DateTime startedAt)
+            DateTime startedAt,
+            int tenantId = 1)
         {
             var participation = OnyxParticipation.StartDirectIndependently(
-                1,
+                tenantId,
                 customerId,
                 7,
                 terms,

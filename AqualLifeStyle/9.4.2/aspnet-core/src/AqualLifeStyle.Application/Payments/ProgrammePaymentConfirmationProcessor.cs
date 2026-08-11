@@ -213,6 +213,7 @@ namespace AqualLifeStyle.Payments
                     using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
                     {
                         recruiter = await _onyxParticipationRepository.FirstOrDefaultAsync(candidateRecruiter =>
+                            candidateRecruiter.TenantId == intent.TenantId &&
                             candidateRecruiter.CustomerId == intent.RecruiterCustomerId.Value &&
                             candidateRecruiter.Status == OnyxParticipationStatus.Active);
                     }

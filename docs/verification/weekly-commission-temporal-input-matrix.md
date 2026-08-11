@@ -40,7 +40,7 @@ Weekly worker or host administrator
      -> target-Area cutoff-state resolution
      -> current commission terms provider (not cutoff-effective)
      -> existing EntryCommissionPeriod lookup
-     -> EntryParticipation rows across Areas
+     -> EntryParticipation rows scoped to the target Tenant
         -> current Status
         -> ActivatedAt
         -> current RecruiterCustomerId
@@ -73,7 +73,7 @@ Weekly worker or host administrator
      -> target-Area cutoff-state resolution
      -> current commission terms provider (not cutoff-effective)
      -> existing OnyxCommissionPeriod lookup
-     -> OnyxParticipation rows across Areas
+     -> OnyxParticipation rows scoped to the target Tenant
         -> current Status
         -> ActivatedAt
         -> current RecruiterCustomerId
@@ -243,6 +243,9 @@ result.
 9. Add append-only Area activation-state history from an explicitly observed
    baseline. Target-Area state governs ledger eligibility only; an active
    participation in an inactive source Area remains a cross-Area network node.
+   The current persistence uses Tenant identity for this legacy Area-labelled
+   capability; it is not the future Area aggregate. Qualification remains hard
+   bounded by Tenant and programme.
 10. Keep provider occurrence, receipt, processing, and business allocation times
     distinct. Monthly payment effectiveness uses verified provider occurrence;
     loan cure uses immutable allocation decision time.
@@ -311,9 +314,9 @@ workers can be enabled:
 5. An authorised observed Area-state rollout baseline for every existing Area.
    The capability and operator action are implemented, but no baseline is seeded;
    cutoffs before an Area's first row remain unknown and require reconciliation.
-6. An inventory confirming that all programme Areas share the host database, or
-   a separate central programme-network projection. A database-per-Tenant Area
-   cannot participate in the current cross-Area query.
+6. A future Area aggregate and assignment model inside the existing Tenant
+   security boundary. Same-Tenant Areas may share a programme network according
+   to policy; a different Tenant can never enter that network.
 7. A durable missed-cycle detection/reconciliation workflow for monthly
    obligations and travel qualification. The current workers process only the
    latest applicable month/cycle and must not invent historical state.

@@ -205,6 +205,39 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task HostCalculation_ExcludesCrossTenantFifthRecruitAndLedger()
+        {
+            var network = await CreateCrossTenantFifthRecruitEntryNetworkAsync();
+            LoginAsHostAdmin();
+
+            var result = await _service.CalculateLatestClosedWeekAsync(
+                new CalculateLatestClosedCommissionWeekInput
+                {
+                    TenantId = 1,
+                    Programme = AdminCommissionProgramme.Entry
+                });
+
+            result.RecordsCreated.ShouldBe(5);
+            result.EarnedCount.ShouldBe(0);
+            result.TotalEarnedAmount.ShouldBe(0m);
+            await UsingDbContextAsync(null, async context =>
+            {
+                var commissions = await context.EntryWeeklyCommissions
+                    .IgnoreQueryFilters()
+                    .Where(item => item.CommissionPeriodId == result.PeriodId)
+                    .ToListAsync();
+                commissions.Count.ShouldBe(5);
+                commissions.All(item => item.TenantId == 1).ShouldBeTrue();
+                commissions.ShouldNotContain(item =>
+                    item.EntryParticipationId == network.NewRecruiterParticipationId);
+                commissions.Single(item =>
+                        item.EntryParticipationId ==
+                        network.OriginalRecruiterParticipationId)
+                    .HighestQualifiedNetworkLevel.ShouldBe(0);
+            });
+        }
+
+        [Fact]
         public async Task TermsVersioning_ComposesWithCutoffEffectiveHolds()
         {
             var network = await CreateQualifiedLevelOneEntryNetworkAsync();
@@ -742,6 +775,122 @@ namespace AqualLifeStyle.Tests.Application
             });
         }
 
+        private async Task<CommissionNetworkIds>
+            CreateCrossTenantFifthRecruitEntryNetworkAsync()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            await UsingDbContextAsync(null, async context =>
+            {
+                if (!await context.Tenants.AnyAsync(tenant => tenant.Id == 2))
+                {
+                    context.Tenants.Add(new Tenant("OtherTenant", "Other Tenant"));
+                    await context.SaveChangesAsync();
+                }
+            });
+
+            var tenantOneUserIds = new List<long>();
+            for (var index = 0; index < 5; index++)
+            {
+                tenantOneUserIds.Add(await CreateTestUserAsync(
+                    1,
+                    $"tenant-one-{index}-{suffix}",
+                    $"tenant-one-{index}-{suffix}@example.com"));
+            }
+            var tenantTwoUserId = await CreateTestUserAsync(
+                2,
+                $"tenant-two-fifth-{suffix}",
+                $"tenant-two-fifth-{suffix}@example.com");
+            var closedWeek = Resolve<LatestClosedCommissionWeekResolver>()
+                .Resolve(DateTime.UtcNow);
+            var activatedAt = closedWeek.PeriodStartUtc.AddMinutes(1);
+
+            var rootAndCustomerId = await UsingDbContextAsync(1, async context =>
+            {
+                var customers = tenantOneUserIds.Select((userId, index) =>
+                    Customer.Create(
+                        1,
+                        userId,
+                        $"Tenant One Member {index}",
+                        new EmailAddress(
+                            $"tenant-one-{index}-{suffix}@example.com")))
+                    .ToList();
+                context.Customers.AddRange(customers);
+                await context.SaveChangesAsync();
+
+                var root = EntryParticipation.StartIndependently(
+                    1,
+                    customers[0].Id,
+                    LegacySplitPaymentTerms,
+                    activatedAt.AddMinutes(-1));
+                Activate(
+                    root,
+                    LegacySplitPaymentTerms,
+                    activatedAt,
+                    suffix,
+                    0,
+                    context);
+                context.EntryParticipations.Add(root);
+                for (var index = 1; index < 5; index++)
+                {
+                    var recruit = EntryParticipation.StartUnderRecruiter(
+                        1,
+                        customers[index].Id,
+                        root,
+                        LegacySplitPaymentTerms,
+                        activatedAt.AddMinutes(-1));
+                    Activate(
+                        recruit,
+                        LegacySplitPaymentTerms,
+                        activatedAt,
+                        suffix,
+                        index,
+                        context);
+                    context.EntryParticipations.Add(recruit);
+                }
+                await context.SaveChangesAsync();
+                return (root.Id, root.CustomerId);
+            });
+
+            var crossTenantParticipationId = await UsingDbContextAsync(
+                2,
+                async context =>
+                {
+                    var customer = Customer.Create(
+                        2,
+                        tenantTwoUserId,
+                        "Tenant Two Fifth Recruit",
+                        new EmailAddress(
+                            $"tenant-two-fifth-{suffix}@example.com"));
+                    context.Customers.Add(customer);
+                    await context.SaveChangesAsync();
+                    var participation = EntryParticipation.StartIndependently(
+                        2,
+                        customer.Id,
+                        LegacySplitPaymentTerms,
+                        activatedAt.AddMinutes(-1));
+                    var recruiterProperty = typeof(EntryParticipation)
+                        .GetProperty(nameof(EntryParticipation.RecruiterCustomerId));
+                    recruiterProperty.ShouldNotBeNull();
+                    recruiterProperty.SetValue(
+                        participation,
+                        rootAndCustomerId.CustomerId);
+                    Activate(
+                        participation,
+                        LegacySplitPaymentTerms,
+                        activatedAt,
+                        suffix,
+                        5,
+                        context);
+                    context.EntryParticipations.Add(participation);
+                    await context.SaveChangesAsync();
+                    return participation.Id;
+                });
+
+            return new CommissionNetworkIds(
+                rootAndCustomerId.Id,
+                crossTenantParticipationId);
+        }
+
         private async Task<CommissionNetworkIds> CreateQualifiedLevelOneOnyxNetworkAsync(
             bool correctOneRecruitAfterCutoff = false)
         {
@@ -849,12 +998,14 @@ namespace AqualLifeStyle.Tests.Application
             AqualLifeStyleDbContext context)
         {
             var registration = ConfirmPayment(
+                participation.TenantId,
                 participation.CustomerId,
                 MemberPaymentPurpose.EntryRegistration,
                 terms.RegistrationPaymentAmount,
                 confirmedAt,
                 $"commission-registration-{index}-{suffix}");
             var activation = ConfirmPayment(
+                participation.TenantId,
                 participation.CustomerId,
                 MemberPaymentPurpose.EntryActivation,
                 terms.ActivationPaymentAmount,
@@ -867,6 +1018,7 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         private static MemberPayment ConfirmPayment(
+            int tenantId,
             int customerId,
             MemberPaymentPurpose purpose,
             decimal amount,
@@ -874,7 +1026,7 @@ namespace AqualLifeStyle.Tests.Application
             string externalReference)
         {
             var payment = MemberPayment.CreatePending(
-                1,
+                tenantId,
                 customerId,
                 purpose,
                 amount,
