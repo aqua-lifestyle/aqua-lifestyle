@@ -18,6 +18,16 @@ namespace AqualLifeStyle.Migrations
             // joining model; it is not a funeral-cover or insurer commencement
             // date. Legacy members absent from these tables require a separate
             // authorised import and must never receive fabricated payments here.
+            //
+            // C08 exception: the 2026-07-26 single-joining migration rewrote
+            // pre-existing (legacy) participations to modern terms while the
+            // AQGreenMigrationBackup table preserved their original old-terms
+            // chronology. A participation whose StartAt precedes the rewritten
+            // TermsEffectiveFrom is only recognised as a proven legacy boundary
+            // when its backup row still exists with an old-terms effective date
+            // that is coherent with (no later than) the StartAt. Rows without a
+            // backup row, without the old-terms effective date, or whose StartAt
+            // predates their own old terms remain contradictions and fail closed.
             migrationBuilder.Sql(
                 """
                 DO $$
@@ -55,7 +65,17 @@ namespace AqualLifeStyle.Migrations
                                   participation."TermsVersion" = '2026-08-flexible-1200'
                                   AND participation."JoiningInstallmentAmount" <> 600.00
                               )
-                              OR participation."StartedAt" < participation."TermsEffectiveFrom"
+                              OR (
+                                  participation."StartedAt" < participation."TermsEffectiveFrom"
+                                  AND NOT EXISTS (
+                                      SELECT 1
+                                      FROM "AQGreenMigrationBackup" legacy_backup
+                                      WHERE legacy_backup."ParticipationId" = participation."Id"
+                                        AND legacy_backup."OldTermsEffectiveFrom" IS NOT NULL
+                                        AND participation."StartedAt" >=
+                                            legacy_backup."OldTermsEffectiveFrom"
+                                  )
+                              )
                               OR (
                                   participation."JoiningPaymentId" IS NOT NULL
                                   AND (

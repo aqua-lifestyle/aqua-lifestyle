@@ -55,7 +55,7 @@ One row per **scanned** participation: `JoiningPaymentAmount > 0.00` and
 | C05 | `TermsVersion` not in the 3 modern versions |
 | C06 | single-1200 terms with instalment `<> 0.00` |
 | C07 | flexible terms with instalment `<> 600.00` |
-| C08 | `StartedAt < TermsEffectiveFrom` |
+| C08 | `StartedAt < TermsEffectiveFrom` and **no recognised legacy provenance** (see below) |
 | C09 | `JoiningPaymentId` mixed with registration/activation refs |
 | C10 | `RegistrationPaymentId = ActivationPaymentId` |
 | C11 | Status 2/3/4 with no qualifying single and no qualifying pair payment |
@@ -65,6 +65,31 @@ One row per **scanned** participation: `JoiningPaymentAmount > 0.00` and
 | C15 | confirmed registration+activation pair but pair not qualifying |
 
 Note: C15 never fires alone — it always co-fires with C10 or C13/C14.
+
+### C08 legacy-recognition exception
+
+Migration `20260726162000_AddAQGreenSingleJoiningPayment` rewrote pre-existing
+legacy participations to modern terms (`2026-07-single-1200`, effective
+2026-07-26) while persisting their original old-terms chronology in
+`AQGreenMigrationBackup`. Such rows legitimately have
+`StartedAt < TermsEffectiveFrom` because the start predates the rewrite.
+
+C08 therefore fires **only** when the row has no coherent legacy provenance:
+
+```sql
+StartedAt < TermsEffectiveFrom
+AND NOT EXISTS (
+    SELECT 1 FROM "AQGreenMigrationBackup" legacy_backup
+    WHERE legacy_backup."ParticipationId" = participation."Id"
+      AND legacy_backup."OldTermsEffectiveFrom" IS NOT NULL
+      AND participation."StartedAt" >= legacy_backup."OldTermsEffectiveFrom"
+)
+```
+
+A backup row is recognised only when its old-terms effective date is present
+and is **no later than** `StartedAt`. Rows without a backup row, with a `NULL`
+`OldTermsEffectiveFrom`, or whose `StartedAt` predates their own old terms
+remain C08 contradictions and fail closed.
 
 ## Classification of results
 
@@ -112,9 +137,11 @@ psql "$READONLY_DATABASE_URL" -f inventory.sql -o aqgreen-inventory.csv
   rows pass the guard.
 - **Do not change `__EFMigrationsHistory`.** Do not delete, edit, or add
   migration rows to bypass P0001.
-- **Do not weaken the migration guard.** Do not modify
-  `20260809043240_AddAQGreenFuneralCoverEntitlements` or any migration that
-  contains the P0001 predicate.
+- **Do not weaken the migration guard further.** The C08 legacy-recognition
+  exception in `20260809043240_AddAQGreenFuneralCoverEntitlements` is the only
+  approved narrowing, and only for rows with a coherent `AQGreenMigrationBackup`
+  provenance. Do not extend it to any other condition or to rows lacking that
+  persisted evidence.
 
 ## What results must be returned before remediation is designed
 
@@ -129,11 +156,17 @@ psql "$READONLY_DATABASE_URL" -f inventory.sql -o aqgreen-inventory.csv
 
 The inventory was validated against PostgreSQL 16 on scratch data:
 
-- 107/107 checks passed;
+- 131/131 checks passed (previous 107/107 baseline plus the four legacy
+  recognition scenarios);
 - the healthy baseline did not raise the migration guard;
 - every C01–C15 class caused the real migration guard to raise with the exact
   P0001 message;
-- aggregate: 21 seeded rows / 17 flagged matched;
+- the two recognised-legacy scenarios (L1 unpaid awaiting joining, L2 active
+  with a qualifying joining payment — both with a coherent
+  `AQGreenMigrationBackup` row) did **not** raise;
+- the two fail-closed legacy scenarios (L3 backup with `NULL`
+  `OldTermsEffectiveFrom`, L4 `StartedAt` predating the old-terms date) did
+  raise with the exact P0001 message;
 - per-row `TriggerConditions` matched hand-computed expectations.
 
 This proves the query reproduces the guard predicate. It does **not** prove
@@ -143,8 +176,9 @@ this tool before any conclusion is drawn.
 ## Repository provenance
 
 - `inventory.sql` is byte-identical (sha256
-  `cc050a0011039781a2f5ab1fba79e675d2a38fb9730057c8a978b5c153ba8960`) to the
-  query that passed the 107/107 validation checks, preserved from
+  `9986a76abbc0b40157f30c8ce86b54d5f691e5a4b0681322a10cd99ce0b41a06`) to the
+  query that passed the 131/131 validation checks, preserved from
   `/tmp/opencode/inventory/inventory.sql`.
-- Scratch validation artifacts (`guard.sql`, `schema.sql`, `seed_all.sql`,
-  `validate.sh`) were consumed during Phase 2 and are not committed.
+- The scratch validation artifacts (`guard.sql`, `schema.sql`, `seed_all.sql`,
+  `validate.sh`, `production_shape.sql`) were consumed during Phase 2 and are
+  not committed.

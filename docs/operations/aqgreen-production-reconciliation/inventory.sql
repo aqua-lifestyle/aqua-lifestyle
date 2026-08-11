@@ -218,7 +218,14 @@ SELECT
     (p."TermsVersion" = '2026-08-flexible-1200'
      AND p."JoiningInstallmentAmount" <> 600.00)       AS "C07_FlexibleTermsWrongInstalment",
 
-    (p."StartedAt" < p."TermsEffectiveFrom")           AS "C08_StartedBeforeTermsEffective",
+    (p."StartedAt" < p."TermsEffectiveFrom"
+     AND NOT EXISTS (
+         SELECT 1
+         FROM "AQGreenMigrationBackup" legacy_backup
+         WHERE legacy_backup."ParticipationId" = p."Id"
+           AND legacy_backup."OldTermsEffectiveFrom" IS NOT NULL
+           AND p."StartedAt" >= legacy_backup."OldTermsEffectiveFrom"
+     ))                                         AS "C08_StartedBeforeTermsEffective",
 
     (p."JoiningPaymentId" IS NOT NULL
      AND (p."RegistrationPaymentId" IS NOT NULL
@@ -392,7 +399,14 @@ SELECT
             ('C05', (p."TermsVersion" NOT IN ('2026-07-single-1200','2026-08-single-1200','2026-08-flexible-1200'))),
             ('C06', (p."TermsVersion" IN ('2026-07-single-1200','2026-08-single-1200') AND p."JoiningInstallmentAmount" <> 0.00)),
             ('C07', (p."TermsVersion" = '2026-08-flexible-1200' AND p."JoiningInstallmentAmount" <> 600.00)),
-            ('C08', (p."StartedAt" < p."TermsEffectiveFrom")),
+            ('C08', (p."StartedAt" < p."TermsEffectiveFrom"
+                     AND NOT EXISTS (
+                         SELECT 1
+                         FROM "AQGreenMigrationBackup" legacy_backup
+                         WHERE legacy_backup."ParticipationId" = p."Id"
+                           AND legacy_backup."OldTermsEffectiveFrom" IS NOT NULL
+                           AND p."StartedAt" >= legacy_backup."OldTermsEffectiveFrom"
+                     ))),
             ('C09', (p."JoiningPaymentId" IS NOT NULL AND (p."RegistrationPaymentId" IS NOT NULL OR p."ActivationPaymentId" IS NOT NULL))),
             ('C10', (p."RegistrationPaymentId" IS NOT NULL AND p."ActivationPaymentId" = p."RegistrationPaymentId")),
             ('C11', (p."Status" IN (2,3,4) AND NOT (
