@@ -709,3 +709,16 @@ It is ready only when both:
 - the complete user workflow has sufficient evidence that it can be completed successfully.
 
 - Treat the complete user workflow as authoritative, not individual implementation tasks. A feature is not complete until every participating actor can successfully complete the end-to-end business process with appropriate evidence. Do not assume that satisfying the branch purpose alone proves workflow completion.
+
+## Evidence and Completion Rules
+
+* Never claim something is fixed, complete, tested, merged, deployed, enabled, or production-ready unless you directly verified that exact claim.
+* Distinguish clearly between: `IMPLEMENTED`, `TESTED`, `INTEGRATED`, `MERGE READY`, `MERGED`, `DEPLOYED`, `ENABLED`, and `PRODUCTION VERIFIED`. These are not interchangeable.
+* Never invent missing facts, command output, test results, production state, historical data, payments, approvals, timestamps, or session ownership. If unknown, say `UNKNOWN` or `NOT VERIFIED`.
+* Previous agent reports are context, not proof. Carry evidence forward as `CARRIED FORWARD — VERIFIED AT <commit>` and challenge prior conclusions when current evidence disagrees.
+* Tests only prove what they actually exercise. Do not use focused/unit/SQLite/mock tests as proof of broader PostgreSQL, provider, deployment, or production behaviour.
+* Never infer historical facts from current state or production state from repository state.
+* In multi-agent work, verify `worktree`, `branch`, `HEAD`, and dirty files before changing anything. Unexpected files/commits may belong to another session; do not modify, stash, reset, clean, or commit them until ownership is known.
+* Never make tests green by weakening assertions, bypassing validation, suppressing fail-closed behaviour, or fabricating data.
+* Before declaring completion, ask: **What did I verify? What remains unverified? What evidence could make my conclusion false?**
+* Final reports must state: `Verified`, `Not Verified`, `Known Blockers`, `Tests Run`, and `Git State`. Prefer an incomplete truthful result over an unsupported success claim.
