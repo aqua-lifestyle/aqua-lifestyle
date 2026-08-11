@@ -7,6 +7,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
     public interface IClubMemberProgrammeProgressAppService
         : IApplicationService
     {
+        Task<MyProgrammeJourneyDto> GetMyJourneyAsync();
         Task<MyProgrammeProgressDto> GetMyProgressAsync();
     }
 }

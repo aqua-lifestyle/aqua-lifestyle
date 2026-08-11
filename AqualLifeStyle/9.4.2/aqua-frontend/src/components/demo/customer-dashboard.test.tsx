@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -7,14 +7,9 @@ import {
   useCustomersState,
   useMembershipsActions,
   useMembershipsState,
-  useOrderIntentsActions,
-  useOrderIntentsState,
-  useProductsActions,
-  useProductsState,
 } from "@/src/providers";
 import type { CustomersState } from "@/src/providers/Customers/context";
 import type { MembershipsState } from "@/src/providers/Memberships/context";
-import type { ProductsState } from "@/src/providers/Products/context";
 import { useMyProgrammeParticipations } from "@/src/shared/hooks/use-my-programme-participations";
 
 import { CustomerDashboard } from "./customer-dashboard";
@@ -38,10 +33,6 @@ vi.mock("@/src/providers", async () => {
     useCustomersState: vi.fn(),
     useMembershipsActions: vi.fn(),
     useMembershipsState: vi.fn(),
-    useOrderIntentsActions: vi.fn(),
-    useOrderIntentsState: vi.fn(),
-    useProductsActions: vi.fn(),
-    useProductsState: vi.fn(),
   };
 });
 
@@ -142,44 +133,15 @@ const membershipsState: MembershipsState = {
   tierBenefitsErrorMessage: null,
 };
 
-const productsState: ProductsState = {
-  eligibleErrorMessage: null,
-  eligibleProducts: [
-    {
-      id: 5,
-      isActive: true,
-      membershipId: 1,
-      name: "Water filter",
-      price: 199,
-    },
-  ],
-  errorMessage: null,
-  isEligibleError: false,
-  isEligiblePending: false,
-  isEligibleSuccess: true,
-  isError: false,
-  isPending: false,
-  isSelectedError: false,
-  isSelectedPending: false,
-  isSelectedSuccess: false,
-  isSuccess: false,
-  products: [],
-  selectedErrorMessage: null,
-  selectedProduct: null,
-};
-
 describe("CustomerDashboard", () => {
   const changeMembership = vi.fn();
   const getActiveTiers = vi.fn();
-  const getEligibleProductsForCustomer = vi.fn();
   const getMyCustomer = vi.fn();
   const getSavingsWindowStatuses = vi.fn();
-  const createForCurrentCustomer = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     changeMembership.mockResolvedValue(customersState.myCustomer);
-    createForCurrentCustomer.mockResolvedValue(true);
 
     vi.mocked(useAuthState).mockReturnValue({
       isAuthenticated: true,
@@ -213,31 +175,6 @@ describe("CustomerDashboard", () => {
       getTierBenefits: vi.fn(),
     });
     vi.mocked(useMembershipsState).mockReturnValue(membershipsState);
-    vi.mocked(useOrderIntentsActions).mockReturnValue({
-      cancelOrderIntent: vi.fn(),
-      completeOrderIntent: vi.fn(),
-      createForCurrentCustomer,
-      createFromEnquiry: vi.fn(),
-      getOrderIntents: vi.fn(),
-      getMyOrderIntents: vi.fn(),
-    });
-    vi.mocked(useOrderIntentsState).mockReturnValue({
-      actionErrorMessage: null,
-      isActionError: false,
-      isActionPending: false,
-      isActionSuccess: false,
-      isLoadError: false,
-      isLoadPending: false,
-      isLoadSuccess: false,
-      loadErrorMessage: null,
-      orderIntents: [],
-    });
-    vi.mocked(useProductsActions).mockReturnValue({
-      getEligibleProductsForCustomer,
-      getProduct: vi.fn(),
-      getProducts: vi.fn(),
-    });
-    vi.mocked(useProductsState).mockReturnValue(productsState);
     vi.mocked(useMyProgrammeParticipations).mockReturnValue({
       data: undefined,
       errorMessage: undefined,
@@ -260,7 +197,6 @@ describe("CustomerDashboard", () => {
       expect(replace).toHaveBeenCalledWith("/login?redirect=%2Fdashboard");
     });
     expect(getMyCustomer).not.toHaveBeenCalled();
-    expect(getEligibleProductsForCustomer).not.toHaveBeenCalled();
   });
 
   it("loads and renders the signed-in customer's dashboard", async () => {
@@ -270,14 +206,14 @@ describe("CustomerDashboard", () => {
       expect(getMyCustomer).toHaveBeenCalledOnce();
       expect(getActiveTiers).toHaveBeenCalledOnce();
       expect(getSavingsWindowStatuses).toHaveBeenCalledOnce();
-      expect(getEligibleProductsForCustomer).toHaveBeenCalledWith(7);
     });
 
     expect(
       screen.getByRole("heading", { name: "Jane Customer" }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Jasper").length).toBeGreaterThan(0);
-    expect(screen.getByText("Water filter")).toBeInTheDocument();
+    expect(screen.queryByText("Products for you")).not.toBeInTheDocument();
+    expect(screen.queryByText("Products")).not.toBeInTheDocument();
     expect(screen.getByText("Monthly obligation").parentElement).toHaveTextContent(
       /R\s*0[,.]00/,
     );
@@ -384,13 +320,12 @@ describe("CustomerDashboard", () => {
     expect(screen.queryByText("Current plan")).not.toBeInTheDocument();
   });
 
-  it("reserves an eligible product", async () => {
+  it("does not render the stale product catalogue", () => {
     render(<CustomerDashboard />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Reserve/ }));
-
-    await waitFor(() => {
-      expect(createForCurrentCustomer).toHaveBeenCalledWith(5);
-    });
+    expect(screen.queryByRole("heading", { name: "Products for you" }))
+      .not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Reserve/ }))
+      .not.toBeInTheDocument();
   });
 });

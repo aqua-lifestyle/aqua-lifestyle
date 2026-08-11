@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
+using AqualLifeStyle.Domain.Enums;
+using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
 using Microsoft.EntityFrameworkCore;
@@ -167,6 +169,457 @@ namespace AqualLifeStyle.Tests.Application
             progress.Paid.ShouldBe(150m);
             progress.RecentEarnings.Single().Status.ShouldBe("Paid");
             progress.RecentEarnings.Single().Components.Count.ShouldBe(1);
+        }
+
+        [Fact]
+        public async Task Journey_UsesLevelSpecificNetworkProgressAfterLevelOne()
+        {
+            var userId = await CreateActiveMemberWithNetworkAsync();
+            SetCurrentUser(userId, 1);
+
+            var journey = await _progressService.GetMyJourneyAsync();
+            var aqGreen = journey.Programmes.Single(item => item.ProgrammeCode == "AQGREEN");
+
+            aqGreen.QualifiedLevel.ShouldBe(1);
+            aqGreen.Levels[0].State.ShouldBe("Complete");
+            aqGreen.Levels[0].AchievedCount.ShouldBe(5);
+            aqGreen.Levels[1].State.ShouldBe("Current");
+            aqGreen.Levels[1].AchievedCount.ShouldBe(0);
+            aqGreen.Levels[1].RequiredCount.ShouldBe(25);
+            aqGreen.Levels[1].RemainingCount.ShouldBe(25);
+            aqGreen.Earnings.LatestRecordedWeek.Components.Single().Amount
+                .ShouldBe(150m);
+            aqGreen.Benefits.Single().State.ShouldBe("Unlocked");
+
+            var onyx = journey.Programmes.Single(item => item.ProgrammeCode == "ONYX");
+            onyx.HasParticipation.ShouldBeFalse();
+            onyx.Levels.Count.ShouldBe(5);
+            onyx.Levels[0].CommissionRate.ShouldBe(50m);
+            onyx.Levels[4].RequiredCount.ShouldBe(3125);
+        }
+
+        [Fact]
+        public async Task Journey_NoParticipation_ShowsJoiningRequirementsWithoutInventingEarnings()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"journey-new-{suffix}",
+                $"journey-new-{suffix}@example.com");
+            await UsingDbContextAsync(1, async context =>
+            {
+                context.Customers.Add(Customer.Create(
+                    1,
+                    userId,
+                    "New Journey Member",
+                    new EmailAddress($"journey-customer-{suffix}@example.com")));
+                await context.SaveChangesAsync();
+            });
+            SetCurrentUser(userId, 1);
+
+            var journey = await _progressService.GetMyJourneyAsync();
+
+            journey.Programmes.Count.ShouldBe(2);
+            journey.Programmes.ShouldAllBe(item => !item.HasParticipation);
+            journey.Programmes.Single(item => item.ProgrammeCode == "AQGREEN")
+                .Joining.RequiredAmount.ShouldBe(1200m);
+            journey.Programmes.Single(item => item.ProgrammeCode == "ONYX")
+                .Joining.RequiredAmount.ShouldBe(6120m);
+            journey.Programmes.ShouldAllBe(item => item.Earnings.LatestRecordedWeek == null);
+        }
+
+        [Fact]
+        public async Task Journey_HistoricalAQGreenPayments_AreProjectedAsComplete()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"journey-historical-{suffix}",
+                $"journey-historical-{suffix}@example.com");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "Historical Journey Member",
+                    new EmailAddress($"journey-historical-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+
+                var historicalTerms = EntryProgrammeTerms.Create(
+                    "entry-historical",
+                    EffectiveFrom,
+                    registrationPaymentAmount: 600m,
+                    activationPaymentAmount: 600m,
+                    monthlyCommitmentAmount: 600m,
+                    gracePeriodDays: 7);
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    historicalTerms,
+                    EffectiveFrom);
+                var registration = ConfirmPayment(
+                    customer.Id,
+                    MemberPaymentPurpose.EntryRegistration,
+                    $"historical-registration-{suffix}",
+                    EffectiveFrom.AddMinutes(1));
+                var activation = ConfirmPayment(
+                    customer.Id,
+                    MemberPaymentPurpose.EntryActivation,
+                    $"historical-activation-{suffix}",
+                    EffectiveFrom.AddMinutes(2));
+                participation.ApplyConfirmedActivationPayment(registration);
+                participation.ApplyConfirmedActivationPayment(activation);
+                participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
+                context.EntryParticipations.Add(participation);
+                context.MemberPayments.AddRange(registration, activation);
+                await context.SaveChangesAsync();
+            });
+            SetCurrentUser(userId, 1);
+
+            var journey = await _progressService.GetMyJourneyAsync();
+            var aqGreen = journey.Programmes.Single(item => item.ProgrammeCode == "AQGREEN");
+
+            aqGreen.Joining.RequiredAmount.ShouldBe(1200m);
+            aqGreen.Joining.PaidAmount.ShouldBe(1200m);
+            aqGreen.Joining.IsComplete.ShouldBeTrue();
+            aqGreen.Joining.ScheduleLabel.ShouldBe("Historical two-stage payment");
+            aqGreen.ActivationSteps.Single(item => item.Code == "Payment").State
+                .ShouldBe("Complete");
+            aqGreen.NextActionCode.ShouldNotBe("CompleteJoiningPayment");
+            aqGreen.Benefits.Single().State.ShouldBe("Pending record");
+        }
+
+        [Fact]
+        public async Task Journey_ModernAQGreenFirstInstalment_ShowsHalfPaid()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var startedAt = new DateTime(2026, 7, 26, 0, 0, 0, DateTimeKind.Utc);
+            var userId = await CreateTestUserAsync(
+                1,
+                $"journey-instalment-{suffix}",
+                $"journey-instalment-{suffix}@example.com");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "AQGreen Instalment Journey Member",
+                    new EmailAddress($"journey-instalment-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+
+                var terms = EntryProgrammeTerms.CreateFlexibleJoiningPayment(
+                    "aqgreen-instalment-journey",
+                    startedAt,
+                    joiningPaymentAmount: 1200m,
+                    joiningInstallmentAmount: 600m,
+                    monthlyCommitmentAmount: 600m,
+                    gracePeriodDays: 7);
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    terms,
+                    startedAt);
+                participation.SelectJoiningPaymentSchedule(
+                    AQGreenJoiningPaymentSchedule.TwoInstallments);
+                var payment = ConfirmPayment(
+                    customer.Id,
+                    MemberPaymentPurpose.AQGreenJoining,
+                    $"first-instalment-{suffix}",
+                    startedAt.AddMinutes(1));
+                participation.ApplyConfirmedJoiningPayment(
+                    payment,
+                    AQGreenJoiningPaymentStage.FirstInstallment);
+                context.EntryParticipations.Add(participation);
+                context.MemberPayments.Add(payment);
+                await context.SaveChangesAsync();
+            });
+            SetCurrentUser(userId, 1);
+
+            var journey = await _progressService.GetMyJourneyAsync();
+            var aqGreen = journey.Programmes.Single(item => item.ProgrammeCode == "AQGREEN");
+
+            aqGreen.Joining.RequiredAmount.ShouldBe(1200m);
+            aqGreen.Joining.PaidAmount.ShouldBe(600m);
+            aqGreen.Joining.RemainingAmount.ShouldBe(600m);
+            aqGreen.Joining.ProgressPercent.ShouldBe(50);
+            aqGreen.Joining.IsComplete.ShouldBeFalse();
+            aqGreen.Levels.ShouldAllBe(item => item.State == "Locked");
+        }
+
+        [Fact]
+        public async Task Journey_DeclinedAQGreenApproval_IsTerminalAndIncludesReason()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"journey-declined-{suffix}",
+                $"journey-declined-{suffix}@example.com");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "Declined Journey Member",
+                    new EmailAddress($"journey-declined-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    EntryTerms,
+                    EffectiveFrom);
+                var payment = ConfirmPayment(
+                    customer.Id,
+                    MemberPaymentPurpose.AQGreenJoining,
+                    $"declined-joining-{suffix}",
+                    EffectiveFrom.AddMinutes(1),
+                    1200m);
+                participation.ApplyConfirmedJoiningPayment(payment);
+                participation.RejectByAdministrator(
+                    1L,
+                    "Identity evidence requires correction.",
+                    EffectiveFrom.AddMinutes(2));
+                context.EntryParticipations.Add(participation);
+                context.MemberPayments.Add(payment);
+                await context.SaveChangesAsync();
+            });
+            SetCurrentUser(userId, 1);
+
+            var journey = await _progressService.GetMyJourneyAsync();
+            var aqGreen = journey.Programmes.Single(item => item.ProgrammeCode == "AQGREEN");
+
+            aqGreen.ParticipationStatus.ShouldBe("Declined");
+            aqGreen.DecisionReason.ShouldBe("Identity evidence requires correction.");
+            aqGreen.ActivationSteps.Single(item => item.Code == "Approval").State
+                .ShouldBe("Declined");
+            aqGreen.ActivationSteps.Single(item => item.Code == "Active").State
+                .ShouldBe("Declined");
+            aqGreen.ActivationSteps.Single(item => item.Code == "Active").Explanation
+                .ShouldBe("Activation did not occur.");
+        }
+
+        [Fact]
+        public async Task Journey_OnyxGraduation_DoesNotPresentALoanAsDirectPayment()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"journey-graduate-{suffix}",
+                $"journey-graduate-{suffix}@example.com");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "Onyx Graduate Journey Member",
+                    new EmailAddress($"journey-graduate-customer-{suffix}@example.com"));
+                var membership = Membership.Create(
+                    1,
+                    $"Onyx-Graduate-{suffix}",
+                    "Onyx graduation journey projection test",
+                    MembershipType.Onyx);
+                context.Customers.Add(customer);
+                context.Memberships.Add(membership);
+                await context.SaveChangesAsync();
+
+                var historicalTerms = HistoricalEntryTerms();
+                var root = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    historicalTerms,
+                    EffectiveFrom);
+                var registration = ConfirmPayment(
+                    customer.Id,
+                    MemberPaymentPurpose.EntryRegistration,
+                    $"graduate-registration-{suffix}",
+                    EffectiveFrom.AddMinutes(1));
+                var activation = ConfirmPayment(
+                    customer.Id,
+                    MemberPaymentPurpose.EntryActivation,
+                    $"graduate-activation-{suffix}",
+                    EffectiveFrom.AddMinutes(2));
+                root.ApplyConfirmedActivationPayment(registration);
+                root.ApplyConfirmedActivationPayment(activation);
+                root.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
+
+                var transientNetwork = BuildTransientAQGreenNetwork(root, historicalTerms, 2);
+                var loanTerms = OnyxLoanTerms.Create(
+                    "onyx-loan-journey",
+                    EffectiveFrom,
+                    6120m,
+                    30m,
+                    3,
+                    4,
+                    200m);
+                var loan = OnyxLoanAgreement.OfferToEligibleEntryParticipant(
+                    root,
+                    transientNetwork,
+                    new EntryNetworkQualificationEvaluator(),
+                    loanTerms,
+                    EffectiveFrom.AddMinutes(4));
+                loan.AcceptByMember(userId, "I accept the Onyx loan terms.", EffectiveFrom.AddMinutes(5));
+                loan.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(6));
+                var onyx = OnyxParticipation.GraduateFromAQGreenIndependently(
+                    root,
+                    loan,
+                    membership.Id,
+                    OnyxPlanTerms.Create("onyx-journey", EffectiveFrom, 6120m),
+                    EffectiveFrom.AddMinutes(7));
+
+                context.EntryParticipations.Add(root);
+                context.MemberPayments.AddRange(registration, activation);
+                context.OnyxLoanAgreements.Add(loan);
+                context.OnyxParticipations.Add(onyx);
+                await context.SaveChangesAsync();
+            });
+            SetCurrentUser(userId, 1);
+
+            var journey = await _progressService.GetMyJourneyAsync();
+            var onyx = journey.Programmes.Single(item => item.ProgrammeCode == "ONYX");
+
+            onyx.Joining.Kind.ShouldBe("AQGreen graduation with an Onyx loan");
+            onyx.Joining.RequiredAmount.ShouldBe(0m);
+            onyx.Joining.PaidAmount.ShouldBe(0m);
+            onyx.Joining.RemainingAmount.ShouldBe(0m);
+            onyx.Joining.IsComplete.ShouldBeTrue();
+            onyx.ActivationSteps.Single(item => item.Code == "Payment").Label
+                .ShouldBe("Loan-backed admission");
+        }
+
+        [Fact]
+        public async Task Journey_OnyxTravelBenefit_UsesPersistedEntitlementState()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"journey-travel-{suffix}",
+                $"journey-travel-{suffix}@example.com");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "Onyx Travel Journey Member",
+                    new EmailAddress($"journey-travel-customer-{suffix}@example.com"));
+                var membership = Membership.Create(
+                    1,
+                    $"Onyx-Travel-Journey-{suffix}",
+                    "Onyx travel journey projection test",
+                    MembershipType.Onyx);
+                context.Customers.Add(customer);
+                context.Memberships.Add(membership);
+                await context.SaveChangesAsync();
+
+                var onyxTerms = OnyxPlanTerms.Create("onyx-travel-journey", EffectiveFrom, 6120m);
+                var participation = OnyxParticipation.StartDirectIndependently(
+                    1,
+                    customer.Id,
+                    membership.Id,
+                    onyxTerms,
+                    EffectiveFrom);
+                var payment = ConfirmPayment(
+                    customer.Id,
+                    MemberPaymentPurpose.OnyxDirectEntry,
+                    $"onyx-travel-joining-{suffix}",
+                    EffectiveFrom.AddMinutes(1),
+                    6120m);
+                participation.ApplyConfirmedDirectEntryPayment(payment);
+                participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(2));
+                var benefit = OnyxTravelBenefitEntitlement.GrantForQualifiedParticipant(
+                    participation,
+                    OnyxNetworkLevel.Level3,
+                    OnyxTravelBenefitTerms.Create(
+                        "onyx-travel-benefit-journey",
+                        EffectiveFrom,
+                        OnyxNetworkLevel.Level3,
+                        3,
+                        10m),
+                    EffectiveFrom.AddDays(1));
+
+                context.MemberPayments.Add(payment);
+                context.OnyxParticipations.Add(participation);
+                context.OnyxTravelBenefitEntitlements.Add(benefit);
+                await context.SaveChangesAsync();
+            });
+            SetCurrentUser(userId, 1);
+
+            var journey = await _progressService.GetMyJourneyAsync();
+            var benefitProjection = journey.Programmes
+                .Single(item => item.ProgrammeCode == "ONYX")
+                .Benefits.Single();
+
+            benefitProjection.State.ShouldBe("Waiting period");
+            benefitProjection.UnlockedAt.ShouldBe(EffectiveFrom.AddDays(1));
+            benefitProjection.AvailableAt.ShouldBe(EffectiveFrom.AddDays(1).AddMonths(3));
+            benefitProjection.Description.ShouldContain("contribute 10%");
+        }
+
+        [Fact]
+        public async Task Journey_ActiveCrossAreaRecruit_ContributesToNetworkProgress()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var tenantOneUserId = await CreateTestUserAsync(
+                1,
+                $"journey-tenant-one-{suffix}",
+                $"journey-tenant-one-{suffix}@example.com");
+            var tenantOneCustomerId = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    tenantOneUserId,
+                    "Tenant One Journey Member",
+                    new EmailAddress($"journey-tenant-one-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+                return customer.Id;
+            });
+            var tenantOneRoot = await CreateActiveParticipationAsync(
+                tenantOneCustomerId,
+                $"tenant-one-{suffix}");
+
+            var tenantTwoUserId = await CreateTestUserAsync(
+                2,
+                $"journey-tenant-two-{suffix}",
+                $"journey-tenant-two-{suffix}@example.com");
+            await UsingDbContextAsync(2, async context =>
+            {
+                var customer = Customer.Create(
+                    2,
+                    tenantTwoUserId,
+                    "Tenant Two Journey Member",
+                    new EmailAddress($"journey-tenant-two-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+
+                var crossTenantRecruit = EntryParticipation.StartUnderRecruiter(
+                    2,
+                    customer.Id,
+                    tenantOneRoot,
+                    EntryTerms,
+                    EffectiveFrom.AddMinutes(1));
+                var payment = ConfirmPayment(
+                    customer.Id,
+                    MemberPaymentPurpose.AQGreenJoining,
+                    $"tenant-two-joining-{suffix}",
+                    EffectiveFrom.AddMinutes(2),
+                    1200m,
+                    2);
+                crossTenantRecruit.ApplyConfirmedJoiningPayment(payment);
+                crossTenantRecruit.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
+                context.EntryParticipations.Add(crossTenantRecruit);
+                context.MemberPayments.Add(payment);
+                await context.SaveChangesAsync();
+            });
+            SetCurrentUser(tenantOneUserId, 1);
+
+            var journey = await _progressService.GetMyJourneyAsync();
+            var aqGreen = journey.Programmes.Single(item => item.ProgrammeCode == "AQGREEN");
+
+            aqGreen.Levels[0].AchievedCount.ShouldBe(1);
+            aqGreen.QualifiedLevel.ShouldBe(0);
         }
 
         private async Task<long> CreateActiveMemberWithNetworkAsync()
@@ -409,6 +862,78 @@ namespace AqualLifeStyle.Tests.Application
                 await context.SaveChangesAsync();
                 return participation;
             });
+        }
+
+        private static MemberPayment ConfirmPayment(
+            int customerId,
+            MemberPaymentPurpose purpose,
+            string reference,
+            DateTime confirmedAt,
+            decimal amount = 600m,
+            int tenantId = 1)
+        {
+            var payment = MemberPayment.CreatePending(
+                tenantId,
+                customerId,
+                purpose,
+                amount,
+                "Test",
+                reference,
+                confirmedAt.AddMinutes(-1));
+            payment.Confirm(confirmedAt);
+            return payment;
+        }
+
+        private static EntryProgrammeTerms HistoricalEntryTerms() =>
+            EntryProgrammeTerms.Create(
+                "entry-historical-journey",
+                EffectiveFrom,
+                registrationPaymentAmount: 600m,
+                activationPaymentAmount: 600m,
+                monthlyCommitmentAmount: 600m,
+                gracePeriodDays: 7);
+
+        private static IReadOnlyCollection<EntryParticipation> BuildTransientAQGreenNetwork(
+            EntryParticipation root,
+            EntryProgrammeTerms terms,
+            int maximumDepth)
+        {
+            var all = new List<EntryParticipation> { root };
+            var current = new List<EntryParticipation> { root };
+            var customerId = 100000;
+            for (var depth = 1; depth <= maximumDepth; depth++)
+            {
+                var next = new List<EntryParticipation>();
+                foreach (var recruiter in current)
+                {
+                    for (var index = 0; index < EntryNetworkQualificationEvaluator.BranchSize; index++)
+                    {
+                        var recruit = EntryParticipation.StartUnderRecruiter(
+                            1,
+                            customerId++,
+                            recruiter,
+                            terms,
+                            EffectiveFrom);
+                        var registration = ConfirmPayment(
+                            recruit.CustomerId,
+                            MemberPaymentPurpose.EntryRegistration,
+                            $"transient-registration-{recruit.CustomerId}",
+                            EffectiveFrom.AddMinutes(1));
+                        var activation = ConfirmPayment(
+                            recruit.CustomerId,
+                            MemberPaymentPurpose.EntryActivation,
+                            $"transient-activation-{recruit.CustomerId}",
+                            EffectiveFrom.AddMinutes(2));
+                        recruit.ApplyConfirmedActivationPayment(registration);
+                        recruit.ApplyConfirmedActivationPayment(activation);
+                        recruit.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
+                        all.Add(recruit);
+                        next.Add(recruit);
+                    }
+                }
+                current = next;
+            }
+            return all;
         }
 
         private async Task<List<int>> CreateDirectRecruitsAsync(

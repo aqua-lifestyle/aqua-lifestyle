@@ -123,6 +123,8 @@ export const apiEndpoints = {
       "/api/services/app/ClubMemberProgrammeParticipation/GetMyParticipations",
     getMyProgress:
       "/api/services/app/ClubMemberProgrammeProgress/GetMyProgress",
+    getMyJourney:
+      "/api/services/app/ClubMemberProgrammeProgress/GetMyJourney",
     getMyInvitations:
       "/api/services/app/ProgrammeInvitation/GetMyInvitations",
     getInvitationPreview: (inviteCode: string) =>

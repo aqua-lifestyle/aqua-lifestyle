@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -9,6 +9,11 @@ import {
 import { apiEndpoints, httpClient, refreshAccessToken } from "@/src/shared/api";
 import { MemberProgrammes } from "./member-programmes";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
+import { useMyProgrammeJourney } from "@/src/shared/hooks/use-my-programme-journey";
+import {
+  createJourneyResponse,
+  createProgrammeJourney,
+} from "./programme-journey-test-data";
 
 vi.mock("@/src/providers", () => ({
   useAuthState: vi.fn(),
@@ -16,6 +21,9 @@ vi.mock("@/src/providers", () => ({
   useSystemHealthState: vi.fn(),
 }));
 vi.mock("@/src/shared/browser/navigation", () => ({ navigateToExternalUrl: vi.fn() }));
+vi.mock("@/src/shared/hooks/use-my-programme-journey", () => ({
+  useMyProgrammeJourney: vi.fn(),
+}));
 vi.mock("@/src/shared/api", async () => {
   const actual = await vi.importActual<typeof import("@/src/shared/api")>(
     "@/src/shared/api",
@@ -97,6 +105,11 @@ describe("MemberProgrammes", () => {
       currency: "ZAR",
     });
     vi.mocked(refreshAccessToken).mockResolvedValue("renewed-token");
+    vi.mocked(useMyProgrammeJourney).mockReturnValue({
+      data: createJourneyResponse(),
+      errorMessage: undefined,
+      isLoading: false,
+    });
   });
 
   it("blocks payment actions when the API payment contract is incompatible", async () => {
@@ -173,21 +186,22 @@ describe("MemberProgrammes", () => {
     await waitFor(() => expect(refreshAccessToken).toHaveBeenCalledOnce());
     expect(
       await screen.findByText(
-        /sign out and sign in again to load your updated club member access/i,
+        /sign out and sign in again to load your updated invitation access/i,
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText(/session-ended/i)).not.toBeInTheDocument();
   });
 
-  it("shows both network placements without requiring an invitation", async () => {
+  it("shows both independent programme joining paths", async () => {
     render(<MemberProgrammes />);
 
-    await screen.findByRole("button", { name: "Join AQGreen" });
+    fireEvent.click(await screen.findByRole("button", { name: "Join AQGreen" }));
+    const dialog = screen.getByRole("dialog", { name: "Join AQGreen" });
+    expect(within(dialog).getByText("Start my own network")).toBeInTheDocument();
+    expect(within(dialog).getByText(/open the secure invitation link they shared/i))
+      .toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(screen.getByRole("button", { name: "Join Onyx" })).toBeInTheDocument();
-    expect(screen.getByText(/an invitation is optional/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/AQGreen and an invitation are not required/i),
-    ).toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: "Invite Club Members" }),
     ).not.toBeInTheDocument();
@@ -287,6 +301,17 @@ describe("MemberProgrammes", () => {
   });
 
   it("lets an awaiting AQGreen participant resume the same secure checkout", async () => {
+    vi.mocked(useMyProgrammeJourney).mockReturnValue({
+      data: createJourneyResponse(createProgrammeJourney("AQGREEN", {
+        hasParticipation: true,
+        nextActionBody: "Continue the existing secure checkout.",
+        nextActionCode: "CompleteJoiningPayment",
+        nextActionTitle: "Complete AQGreen joining",
+        participationStatus: "Awaiting joining payment",
+      })),
+      errorMessage: undefined,
+      isLoading: false,
+    });
     vi.mocked(httpClient.get).mockResolvedValue({
       entry: {
         activatedAt: null,
@@ -313,8 +338,8 @@ describe("MemberProgrammes", () => {
 
     render(<MemberProgrammes />);
 
-    expect(await screen.findByText("Awaiting joining payment"))
-      .toBeInTheDocument();
+    expect((await screen.findAllByText("Awaiting joining payment")).length)
+      .toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Continue secure payment" }))
       .toHaveAttribute(
         "href",
@@ -325,6 +350,18 @@ describe("MemberProgrammes", () => {
   });
 
   it("shows the recorded Area decision reason for a declined participation", async () => {
+    vi.mocked(useMyProgrammeJourney).mockReturnValue({
+      data: createJourneyResponse(createProgrammeJourney("AQGREEN", {
+        decisionReason: "Identity evidence requires correction before activation.",
+        hasParticipation: true,
+        nextActionBody: "Review the Area decision before taking another action.",
+        nextActionCode: "ReviewDecision",
+        nextActionTitle: "Review the Area decision",
+        participationStatus: "Declined",
+      })),
+      errorMessage: undefined,
+      isLoading: false,
+    });
     vi.mocked(httpClient.get).mockResolvedValue({
       entry: {
         activatedAt: null,
@@ -350,7 +387,7 @@ describe("MemberProgrammes", () => {
 
     render(<MemberProgrammes />);
 
-    expect(await screen.findByText("Not approved")).toBeInTheDocument();
+    expect((await screen.findAllByText("Declined")).length).toBeGreaterThan(0);
     expect(screen.getByText(/Identity evidence requires correction/))
       .toBeInTheDocument();
   });
@@ -378,7 +415,7 @@ describe("MemberProgrammes", () => {
     });
 
     render(<MemberProgrammes />);
-    fireEvent.click(await screen.findByRole("button", { name: /Pay.*600.*securely/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /Complete joining:.*600/i }));
 
     await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
       apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
@@ -433,6 +470,25 @@ describe("MemberProgrammes", () => {
   });
 
   it("shows a qualified Club Member's travel benefit without promising a booking", async () => {
+    vi.mocked(useMyProgrammeJourney).mockReturnValue({
+      data: createJourneyResponse(
+        createProgrammeJourney("AQGREEN"),
+        createProgrammeJourney("ONYX", {
+          benefits: [{
+            amount: null,
+            availableAt: "2026-10-20T10:00:00Z",
+            code: "ONYX_TRAVEL",
+            currency: null,
+            description: "After the waiting period, you contribute 10%. Trip selection, pricing, and booking remain separate.",
+            name: "Travel benefit",
+            state: "Waiting period",
+            unlockedAt: "2026-07-20T10:00:00Z",
+          }],
+        }),
+      ),
+      errorMessage: undefined,
+      isLoading: false,
+    });
     vi.mocked(httpClient.get).mockResolvedValue({
       entry: null,
       onyx: null,
@@ -456,6 +512,22 @@ describe("MemberProgrammes", () => {
   });
 
   it("shows the included AQGreen funeral-cover benefit without claiming activation", async () => {
+    vi.mocked(useMyProgrammeJourney).mockReturnValue({
+      data: createJourneyResponse(createProgrammeJourney("AQGREEN", {
+        benefits: [{
+          amount: 30000,
+          availableAt: null,
+          code: "AQGREEN_FUNERAL_COVER",
+          currency: "ZAR",
+          description: "Included with completed joining. This does not represent insurer activation or enrolment.",
+          name: "Funeral-cover inclusion",
+          state: "Unlocked",
+          unlockedAt: "2026-08-09T10:00:00Z",
+        }],
+      })),
+      errorMessage: undefined,
+      isLoading: false,
+    });
     vi.mocked(httpClient.get).mockResolvedValue({
       entry: null,
       funeralCover: {
@@ -472,7 +544,7 @@ describe("MemberProgrammes", () => {
 
     expect(await screen.findByText("Funeral-cover inclusion"))
       .toBeInTheDocument();
-    expect(screen.getByText("Included")).toBeInTheDocument();
+    expect(screen.getByText("Unlocked")).toBeInTheDocument();
     expect(screen.getByText(/R\s*30[\s,\u00a0]*000/)).toBeInTheDocument();
     expect(screen.getByText(/does not represent insurer activation or enrolment/i))
       .toBeInTheDocument();

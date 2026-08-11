@@ -6,9 +6,7 @@ import {
   Building2,
   Calendar,
   Crown,
-  Package,
   ShieldCheck,
-  ShoppingCart,
   User,
   Wallet,
   ArrowUpRight,
@@ -22,10 +20,6 @@ import {
   useCustomersState,
   useMembershipsActions,
   useMembershipsState,
-  useProductsActions,
-  useProductsState,
-  useOrderIntentsActions,
-  useOrderIntentsState,
 } from "@/src/providers";
 import { Badge, Button, Card, LinkButton, StatusMessage } from "@/src/shared/ui";
 import { useHydrated } from "@/src/shared/lib/use-hydrated";
@@ -76,14 +70,6 @@ export const CustomerDashboard = () => {
 
   const { changeMembership, getMyCustomer } = useCustomersActions();
   const { getActiveTiers, getSavingsWindowStatuses } = useMembershipsActions();
-  const { getEligibleProductsForCustomer } = useProductsActions();
-  const { createForCurrentCustomer } = useOrderIntentsActions();
-  const {
-    actionErrorMessage: orderErrorMessage,
-    isActionError: isOrderError,
-    isActionPending: isOrderPending,
-    isActionSuccess: isOrderSuccess,
-  } = useOrderIntentsState();
   const {
     changeMembershipErrorMessage,
     isChangeMembershipError,
@@ -106,13 +92,6 @@ export const CustomerDashboard = () => {
     isSavingsWindowStatusesSuccess,
     savingsWindowStatusesErrorMessage,
   } = useMembershipsState();
-  const {
-    eligibleProducts,
-    isEligibleError,
-    isEligiblePending,
-    isEligibleSuccess,
-    eligibleErrorMessage,
-  } = useProductsState();
 
   useEffect(() => {
     if (isReady && !isAuthenticated) {
@@ -131,20 +110,6 @@ export const CustomerDashboard = () => {
     getActiveTiers,
     getSavingsWindowStatuses,
     isAuthenticated,
-    isReady,
-  ]);
-
-  useEffect(() => {
-    if (!isReady || !isAuthenticated || !isMyCustomerSuccess || !myCustomer?.id) {
-      return;
-    }
-
-    void getEligibleProductsForCustomer(myCustomer.id);
-  }, [
-    myCustomer?.id,
-    getEligibleProductsForCustomer,
-    isAuthenticated,
-    isMyCustomerSuccess,
     isReady,
   ]);
 
@@ -200,18 +165,15 @@ export const CustomerDashboard = () => {
     isMyCustomerPending ||
     isSavingsWindowStatusesPending ||
     isProgrammesPending ||
-    isEligiblePending ||
     (!isMembershipsSuccess && !isMembershipsError) ||
     (!isMyCustomerSuccess && !isMyCustomerError) ||
-    (!isSavingsWindowStatusesSuccess && !isSavingsWindowStatusesError) ||
-    (Boolean(myCustomer?.id) && !isEligibleSuccess && !isEligibleError);
+    (!isSavingsWindowStatusesSuccess && !isSavingsWindowStatusesError);
   const hasError =
     isMembershipsError ||
     isMyCustomerError ||
     isChangeMembershipError ||
     isSavingsWindowStatusesError ||
-    Boolean(programmeErrorMessage) ||
-    isEligibleError;
+    Boolean(programmeErrorMessage);
   const errorMessages = Array.from(
     new Set(
       [
@@ -220,7 +182,6 @@ export const CustomerDashboard = () => {
         changeMembershipErrorMessage,
         savingsWindowStatusesErrorMessage,
         programmeErrorMessage,
-        eligibleErrorMessage,
       ].filter((message): message is string => Boolean(message)),
     ),
   );
@@ -305,21 +266,6 @@ export const CustomerDashboard = () => {
             </Card>
 
             <Card className="flex items-center gap-4">
-              <div className="rounded-full bg-info/10 p-3 text-info">
-                <Package className="size-6" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Products</p>
-                <p className="text-2xl font-bold">
-                  {eligibleProducts.length}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {eligibleProducts.length === 1 ? "Item available" : "Items available"}
-                </p>
-              </div>
-            </Card>
-
-            <Card className="flex items-center gap-4">
               <div className="rounded-full bg-warning/10 p-3 text-warning">
                 <ShieldCheck className="size-6" />
               </div>
@@ -360,20 +306,6 @@ export const CustomerDashboard = () => {
               variant="outline"
             >
               Complete {legacyProgrammeSelection.name} joining
-            </LinkButton>
-          </StatusMessage>
-        ) : null}
-
-        {isOrderError ? (
-          <StatusMessage tone="error">
-            {orderErrorMessage ?? "Unable to reserve this product."}
-          </StatusMessage>
-        ) : null}
-        {isOrderSuccess ? (
-          <StatusMessage tone="success">
-            <span>Product reserved successfully. Your new order is now visible to the Area Leader.</span>
-            <LinkButton className="ml-3" href="/member/orders" size="sm" variant="outline">
-              View my orders
             </LinkButton>
           </StatusMessage>
         ) : null}
@@ -524,55 +456,7 @@ export const CustomerDashboard = () => {
           </Card>
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <div className="flex items-center gap-3 border-b border-border pb-4">
-              <Package className="size-5 text-accent" />
-              <h2 className="text-lg font-semibold">Products for you</h2>
-            </div>
-            <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-              {eligibleProducts.length === 0 ? (
-                <div className="rounded-lg bg-muted/50 px-4 py-3">
-                  No eligible products available yet.
-                </div>
-              ) : (
-                eligibleProducts.map((product) => (
-                  <div
-                    key={product.id}
-                    className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3"
-                  >
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        {product.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {product.membershipId
-                          ? memberships.find(
-                              (membership) => membership.id === product.membershipId,
-                            )?.name ?? "Member product"
-                          : "Available to all customers"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-semibold text-foreground">
-                        {formatCurrency(product.price)}
-                      </span>
-                      <Button
-                        disabled={!currentMembership || isOrderPending}
-                        isLoading={isOrderPending}
-                        onClick={() => void createForCurrentCustomer(product.id)}
-                        size="sm"
-                      >
-                        <ShoppingCart className="size-4" />
-                        Reserve
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </Card>
-
+        <section>
           <Card>
             <div className="flex items-center gap-3 border-b border-border pb-4">
               <Building2 className="size-5 text-accent" />
