@@ -64,7 +64,7 @@ namespace AqualLifeStyle.Domain.Onyx
                 throw new ArgumentNullException(nameof(customerObligations));
             }
 
-            var highestCompletedLevel = (int)_networkQualificationEvaluator.Evaluate(
+            var highestQualifiedNetworkLevel = _networkQualificationEvaluator.Evaluate(
                 participation.CustomerId,
                 network);
             var hasOverdueOwnObligation = customerObligations.Any(obligation =>
@@ -91,7 +91,7 @@ namespace AqualLifeStyle.Domain.Onyx
                 participation,
                 period,
                 terms,
-                highestCompletedLevel,
+                highestQualifiedNetworkLevel,
                 holdReasons.Count == 0 ? null : string.Join(" ", holdReasons));
         }
     }

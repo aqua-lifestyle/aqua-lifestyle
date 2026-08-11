@@ -115,7 +115,7 @@ Aqua records its own inclusion entitlement. It does not claim insurer activation
 
 The network grows in groups of five. Both AQGreen and Onyx have five structural levels: 5, 25, 125, 625, and 3,125 qualifying people. A level is complete only when every required branch at that depth is complete; four direct recruits do not earn a partial Level 1.
 
-AQGreen currently has authorised commission rates only for Levels 1–3; its Level 4 and Level 5 rates remain a business decision. The current software also evaluates AQGreen structure only through Level 3, which is an implementation gap rather than the end of the business network. Onyx already evaluates and has confirmed rates through Level 5. Only Active participation in the same programme contributes, and a payout hold does not remove network placement.
+AQGreen currently has authorised commission rates only for Levels 1–3; its Level 4 and Level 5 rates remain a business decision. The software evaluates AQGreen structure through Level 5 and records structural qualification separately from the currently commissioned depth. A structurally qualified Level 4 or Level 5 member therefore retains the authorised Level 1–3 components only; no Level 4/5 component exists. Onyx evaluates and has confirmed rates through Level 5. Only Active participation in the same programme contributes, and a payout hold does not remove network placement.
 
 ## How weekly earnings work
 

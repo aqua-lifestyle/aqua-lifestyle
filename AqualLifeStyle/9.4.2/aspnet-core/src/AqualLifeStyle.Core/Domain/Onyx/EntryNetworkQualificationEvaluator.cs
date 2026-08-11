@@ -9,13 +9,32 @@ namespace AqualLifeStyle.Domain.Onyx
         None = 0,
         Level1 = 1,
         Level2 = 2,
-        Level3 = 3
+        Level3 = 3,
+        Level4 = 4,
+        Level5 = 5
     }
 
     public sealed class EntryNetworkQualificationEvaluator
     {
         public const int BranchSize = 5;
-        public const int MaximumLevel = 3;
+        public const int MaximumLevel = 5;
+
+        public static int GetRequiredPopulation(EntryNetworkLevel level)
+        {
+            if (level < EntryNetworkLevel.Level1 ||
+                level > EntryNetworkLevel.Level5)
+            {
+                throw new ArgumentOutOfRangeException(nameof(level));
+            }
+
+            var requiredPopulation = 1;
+            for (var depth = 0; depth < (int)level; depth++)
+            {
+                requiredPopulation *= BranchSize;
+            }
+
+            return requiredPopulation;
+        }
 
         public EntryNetworkLevel Evaluate(
             int customerId,
@@ -51,19 +70,8 @@ namespace AqualLifeStyle.Domain.Onyx
                         .ThenBy(item => item.Id)
                         .Take(BranchSize)
                         .ToList());
-            if (!IsCompleteCurrentBranch(customerId, 1, byRecruiter))
-            {
-                return EntryNetworkLevel.None;
-            }
-
-            if (!IsCompleteCurrentBranch(customerId, 2, byRecruiter))
-            {
-                return EntryNetworkLevel.Level1;
-            }
-
-            return IsCompleteCurrentBranch(customerId, 3, byRecruiter)
-                ? EntryNetworkLevel.Level3
-                : EntryNetworkLevel.Level2;
+            return EvaluateHighestCompleteLevel(level =>
+                IsCompleteCurrentBranch(customerId, level, byRecruiter));
         }
 
         public EntryNetworkLevel Evaluate(
@@ -82,19 +90,25 @@ namespace AqualLifeStyle.Domain.Onyx
                 return EntryNetworkLevel.None;
             }
 
-            if (!IsCompleteBranch(customerId, 1, network))
+            return EvaluateHighestCompleteLevel(level =>
+                IsCompleteBranch(customerId, level, network));
+        }
+
+        private static EntryNetworkLevel EvaluateHighestCompleteLevel(
+            Func<int, bool> isCompleteLevel)
+        {
+            var highestCompletedLevel = EntryNetworkLevel.None;
+            for (var level = 1; level <= MaximumLevel; level++)
             {
-                return EntryNetworkLevel.None;
+                if (!isCompleteLevel(level))
+                {
+                    break;
+                }
+
+                highestCompletedLevel = (EntryNetworkLevel)level;
             }
 
-            if (!IsCompleteBranch(customerId, 2, network))
-            {
-                return EntryNetworkLevel.Level1;
-            }
-
-            return IsCompleteBranch(customerId, 3, network)
-                ? EntryNetworkLevel.Level3
-                : EntryNetworkLevel.Level2;
+            return highestCompletedLevel;
         }
 
         private static bool IsCompleteBranch(

@@ -133,11 +133,10 @@ The owner-confirmed AQGreen Level 1–3 commission facts may be taken from the r
 These are not the same as business questions.
 
 1. **P0001 production migration incident** — production row classification/remediation is not merged or production verified. Agent 1 owns the active workstream.
-2. **AQGreen five-level implementation gap** — current code evaluates structure and terms only through Level 3, while confirmed business structure continues through Level 5. Level 4/5 rates also require an owner decision before they can be introduced as effective-dated terms.
-3. **Weekly enablement gates** — initial rows/baselines in production, topology, PostgreSQL application-path idempotency, E2E, recovery, observability and controlled arming remain open (#55–#60).
-4. **Monthly enablement gates** — business due day, due-policy, E2E, reconciliation resolution and Yoco acceptance remain open (#61–#66).
-5. **Provider acceptance** — real Yoco and Bird external outcomes remain unverified.
-6. **Automated full AQGreen E2E** — historical manual browser evidence exists, but recurring CI E2E is open (#67).
+2. **Weekly enablement gates** — initial rows/baselines in production, topology, PostgreSQL application-path idempotency, E2E, recovery, observability and controlled arming remain open (#55–#60).
+3. **Monthly enablement gates** — business due day, due-policy, E2E, reconciliation resolution and Yoco acceptance remain open (#61–#66).
+4. **Provider acceptance** — real Yoco and Bird external outcomes remain unverified.
+5. **Automated full AQGreen E2E** — historical manual browser evidence exists, but recurring CI E2E is open (#67).
 
 ## I. Open GitHub work
 
@@ -164,7 +163,7 @@ Current issue state was inspected on 11 August 2026.
 | Risk | Impact | Evidence | Status / owner | Required follow-up |
 | --- | --- | --- | --- | --- |
 | P0001 modern AQGreen contradiction blocks funeral migration | API deployment/schema may not advance; production facts may need classification | Merged fail-closed migration; active inventory branch, no merged production result | Blocking deployment incident; Agent 1 + Finance/Ops | Complete read-only inventory, classify from evidence, obtain authorised remediation, preserve audit. |
-| AQGreen engine stops at structural Level 3 | Member progress and qualification do not represent confirmed Levels 4–5; future rates could be mishandled if structure and commission depth remain conflated | `EntryNetworkLevel` and `EntryNetworkQualificationEvaluator.MaximumLevel` at baseline `6ba776b7`; owner clarification | Implementation gap; Engineering + Aqua programme owner | Model structural Levels 4–5 separately; do not add commission values until owner-authorised effective-dated rates exist. |
+| AQGreen structural depth exceeds currently authorised commission depth | Future rate changes could rewrite history or invent components if the two concepts are conflated | Five-level evaluator tests, separate qualified/commissioned projections, and Level 4/5 calculator regressions | Mitigated in the current implementation; Engineering | Keep Level 4/5 components absent until owner-authorised effective-dated rates exist. |
 | Weekly workers enabled before inputs are authoritative | False or duplicate financial ledgers | Workers default off; open issues #55–#60 | Blocking enablement; Ops/Engineering/Business | Complete prerequisites in document 06. |
 | Monthly worker enabled without due policy | Invented member obligation dates | Empty append-only policy and issue #61 | Blocking enablement; Business/Ops | Authorise due day and first month, then E2E and controlled rollout. |
 | Manual reconciliation resolution absent | Detected financial contradictions become operational dead ends | Read-only queries, no resolution API; #66 | Blocking monthly enablement; Product/Finance/Engineering | Define outcomes/evidence and implement immutable audit workflow. |
@@ -281,11 +280,11 @@ Current issue state was inspected on 11 August 2026.
 
 ### 10. AQGreen structural depth and commission depth
 
-- **Conflicting sources:** Earlier programme documents and current code stop AQGreen at Level 3; owner-confirmed business intent defines AQGreen structural Levels 1–5 while authorising commission rates only through Level 3.
-- **Current authoritative evidence:** Owner clarification confirms structural populations of 5, 25, 125, 625, and 3,125 and per-person rates of R30, R10, and R10 for Levels 1–3. Repository inspection at `6ba776b7` confirms the current evaluator, enum, terms, and ledger cap at Level 3.
-- **Status:** `CURRENT RULE CONFIRMED` for five structural levels; `UNRESOLVED` for Level 4/5 rates; `IMPLEMENTATION GAP` for current AQGreen Level 4/5 qualification.
+- **Conflicting sources:** Earlier programme documents and the pre-correction code stopped AQGreen at Level 3; owner-confirmed business intent defines AQGreen structural Levels 1–5 while authorising commission rates only through Level 3.
+- **Current authoritative evidence:** Owner clarification confirms structural populations of 5, 25, 125, 625, and 3,125 and per-person rates of R30, R10, and R10 for Levels 1–3. The current evaluator and enum represent Levels 1–5; weekly ledger and API projections record structural qualification separately from commissioned depth; focused Level 4/5 regressions retain only the Level 1–3 components.
+- **Status:** `IMPLEMENTED` for five structural levels; `UNRESOLVED` for Level 4/5 rates.
 - **Impact:** Conflating structural depth with authorised commission depth can hide valid network progress or invent unauthorised money.
-- **Required action:** Correct the engine in a separate reviewed workstream to represent Levels 4–5 structurally; add no Level 4/5 commission amount until Aqua authorises effective-dated rates.
+- **Required action:** Add no Level 4/5 commission amount until Aqua authorises effective-dated rates; introduce any future rate only through reviewed effective-dated terms.
 
 ## N. Superseded terminology and rules
 
@@ -304,7 +303,7 @@ Current issue state was inspected on 11 August 2026.
 
 ### Implementation
 
-The merged programme engine implements the intended modern joining, payment/approval, inclusion, monthly-obligation, and Level 1–3 AQGreen commission boundaries. It does not yet meet the newly clarified five-level AQGreen structural model: the current evaluator and level enum stop at Level 3.
+The programme engine implements the intended modern joining, payment/approval, inclusion, monthly-obligation, and AQGreen commission boundaries. AQGreen structural qualification now continues through Level 5 while currently authorised commission components remain limited to Levels 1–3.
 
 ### Workflow
 
@@ -312,4 +311,4 @@ The customer/Area Admin approval and rejection workflow has historical browser e
 
 ### Evidence
 
-Current main CI is green and feature-specific evidence is substantial for the implementation it exercised. It is not evidence that AQGreen Levels 4–5 are implemented. Production provider, deployment, worker enablement, external delivery, and historical reconciliation resolution must not be inferred from it.
+Focused repository tests cover AQGreen structural Levels 1–5, incomplete branches, the unchanged Level 1–3 amounts, Level 4/5 structural-versus-commissioned projections, and absence of Level 4/5 components. Authoritative CI remains the broad regression gate. Production provider, deployment, worker enablement, external delivery, and historical reconciliation resolution must not be inferred from repository tests.

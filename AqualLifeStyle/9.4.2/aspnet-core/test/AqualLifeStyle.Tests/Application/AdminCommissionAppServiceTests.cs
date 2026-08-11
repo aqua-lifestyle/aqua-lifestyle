@@ -119,6 +119,7 @@ namespace AqualLifeStyle.Tests.Application
                 item.TotalAmount > 0m);
             earnedCommission.ProgrammeName.ShouldBe("AQGreen");
             earnedCommission.HighestQualifiedLevel.ShouldBe(1);
+            earnedCommission.HighestCommissionedLevel.ShouldBe(1);
             earnedCommission.TotalAmount.ShouldBe(150m);
             earnedCommission.Currency.ShouldBe("ZAR");
             earnedCommission.Status.ShouldBe("Earned — awaiting release");

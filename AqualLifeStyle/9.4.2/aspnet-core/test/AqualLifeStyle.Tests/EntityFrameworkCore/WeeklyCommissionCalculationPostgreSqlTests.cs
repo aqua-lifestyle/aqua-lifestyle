@@ -98,6 +98,10 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     .Include(p => p.RecruiterCorrections)
                     .Where(p => p.TenantId == 1 && p.Status == EntryParticipationStatus.Active)
                     .ToListAsync();
+                CompleteInMemoryNetworkToLevelFive(
+                    participation,
+                    network,
+                    suffix);
                 var obligations = await context.EntryMonthlyObligations
                     .Where(o => network.Select(n => n.Id).Contains(o.EntryParticipationId))
                     .ToListAsync();
@@ -123,6 +127,17 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                         p.PeriodStart == periodStart &&
                         p.PeriodEnd == periodEnd);
                 existingPeriod.ShouldNotBeNull();
+
+                var persistedCommission = await context.EntryWeeklyCommissions
+                    .Include(commission => commission.Components)
+                    .SingleAsync();
+                persistedCommission.HighestQualifiedNetworkLevel.ShouldBe(5);
+                persistedCommission.HighestCommissionedLevel.ShouldBe(3);
+                persistedCommission.TotalAmount.ShouldBe(1650m);
+                persistedCommission.Components
+                    .Select(component => component.Level)
+                    .OrderBy(level => level)
+                    .ShouldBe(new[] { 1, 2, 3 });
             }
 
             await Assert.ThrowsAsync<DbUpdateException>(async () =>
@@ -403,6 +418,83 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             }
 
             return participation.Id;
+        }
+
+        private static void CompleteInMemoryNetworkToLevelFive(
+            EntryParticipation root,
+            List<EntryParticipation> network,
+            string suffix)
+        {
+            var structuralTerms = EntryProgrammeTerms.CreateSingleJoiningPayment(
+                version: $"entry-level-five-{suffix}",
+                effectiveFrom: new DateTime(
+                    2026,
+                    7,
+                    1,
+                    0,
+                    0,
+                    0,
+                    DateTimeKind.Utc),
+                joiningPaymentAmount: 1200m,
+                monthlyCommitmentAmount: 600m,
+                gracePeriodDays: 7);
+            var currentLevel = network
+                .Where(participation =>
+                    participation.RecruiterCustomerId == root.CustomerId)
+                .OrderBy(participation => participation.ActivatedAt)
+                .ThenBy(participation => participation.Id)
+                .Take(EntryNetworkQualificationEvaluator.BranchSize)
+                .ToList();
+            currentLevel.Count.ShouldBe(
+                EntryNetworkQualificationEvaluator.BranchSize);
+            var nextCustomerId = 100000;
+
+            for (var depth = 2;
+                 depth <= EntryNetworkQualificationEvaluator.MaximumLevel;
+                 depth++)
+            {
+                var nextLevel = new List<EntryParticipation>();
+                foreach (var recruiter in currentLevel)
+                {
+                    for (var index = 0;
+                         index < EntryNetworkQualificationEvaluator.BranchSize;
+                         index++)
+                    {
+                        var startedAt = new DateTime(
+                            2026,
+                            8,
+                            1,
+                            9,
+                            depth,
+                            0,
+                            DateTimeKind.Utc);
+                        var recruit = EntryParticipation.StartUnderRecruiter(
+                            1,
+                            nextCustomerId,
+                            recruiter,
+                            structuralTerms,
+                            startedAt);
+                        var payment = MemberPayment.CreatePending(
+                            1,
+                            nextCustomerId,
+                            MemberPaymentPurpose.AQGreenJoining,
+                            1200m,
+                            "Test",
+                            $"commission-level-five-{suffix}-{nextCustomerId}",
+                            startedAt.AddSeconds(1));
+                        payment.Confirm(startedAt.AddSeconds(2));
+                        recruit.ApplyConfirmedJoiningPayment(payment);
+                        recruit.ApproveByAdministrator(
+                            1,
+                            startedAt.AddSeconds(3));
+                        network.Add(recruit);
+                        nextLevel.Add(recruit);
+                        nextCustomerId++;
+                    }
+                }
+
+                currentLevel = nextLevel;
+            }
         }
 
         private async Task<Guid> CalculateAndPersistFirstRunAsync(Guid participationId)

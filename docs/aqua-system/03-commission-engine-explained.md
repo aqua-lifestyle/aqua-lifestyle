@@ -33,7 +33,7 @@ flowchart LR
     A4 --> A5[L5<br/>3,125]
 ```
 
-`IMPLEMENTATION GAP`: the current AQGreen evaluator and level enum stop at Level 3. The five-level AQGreen structure is now confirmed business intent, but this documentation task does not implement Levels 4–5. Onyx already evaluates through Level 5.
+`VERIFIED IMPLEMENTATION`: the AQGreen evaluator and level enum represent structural Levels 1–5. The commission terms remain intentionally limited to the currently authorised Level 1–3 components. Onyx also evaluates through Level 5.
 
 ```mermaid
 flowchart LR
@@ -108,7 +108,7 @@ Structural qualification, authorised commission depth, and payout status answer 
 - **Calculated amount**: which complete level components apply under the terms?
 - **Payout status**: is that amount Earned, Held, Released, or Paid?
 
-The current AQGreen engine answers both structural and commission depth only through Level 3. Future implementation must represent structural Levels 4–5 without assigning them a zero, guessed, or inherited rate. Future Level 4/5 rates must be explicitly authorised and effective-dated so they cannot rewrite old periods.
+The current AQGreen engine records structural qualification through Level 5 independently from commissioned depth. Under current terms, structurally qualified Levels 4–5 receive the known Level 1–3 components only, while their highest commissioned level remains Level 3. No zero, guessed, or inherited Level 4/5 component is recorded. Future Level 4/5 rates must be explicitly authorised and effective-dated so they cannot rewrite old periods.
 
 For AQGreen, an own monthly obligation or applicable Onyx loan can hold the member's payout when it was overdue at cutoff. A later cure affects future eligibility but not the closed week. The current implementation does not remove network placement and does not infer an upline penalty.
 

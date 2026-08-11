@@ -42,6 +42,8 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
             builder.Property(commission => commission.CustomerId).IsRequired();
             builder.Property(commission => commission.CommissionPeriodId).IsRequired();
             builder.Property(commission => commission.HighestCompletedLevel).IsRequired();
+            builder.Ignore(commission => commission.HighestQualifiedNetworkLevel);
+            builder.Ignore(commission => commission.HighestCommissionedLevel);
             builder.Property(commission => commission.TotalAmount).HasPrecision(18, 2).IsRequired();
             builder.Property(commission => commission.Currency).HasMaxLength(3).IsRequired();
             builder.Property(commission => commission.RulesVersion).HasMaxLength(32).IsRequired();

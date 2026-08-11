@@ -18,6 +18,21 @@ namespace AqualLifeStyle.Tests.Domain
             7);
         private readonly EntryNetworkQualificationEvaluator _evaluator = new();
 
+        [Theory]
+        [InlineData(EntryNetworkLevel.Level1, 5)]
+        [InlineData(EntryNetworkLevel.Level2, 25)]
+        [InlineData(EntryNetworkLevel.Level3, 125)]
+        [InlineData(EntryNetworkLevel.Level4, 625)]
+        [InlineData(EntryNetworkLevel.Level5, 3125)]
+        public void RequiredPopulation_UsesFivePersonStructuralDepth(
+            EntryNetworkLevel level,
+            int expectedPopulation)
+        {
+            Assert.Equal(
+                expectedPopulation,
+                EntryNetworkQualificationEvaluator.GetRequiredPopulation(level));
+        }
+
         [Fact]
         public void Level1_RequiresFiveQualifiedDirectRecruits()
         {
@@ -58,6 +73,39 @@ namespace AqualLifeStyle.Tests.Domain
             Assert.Equal(
                 EntryNetworkLevel.Level3,
                 _evaluator.Evaluate(customerId: 1, completeNetwork));
+        }
+
+        [Fact]
+        public void Level4_RequiresAllSixHundredAndTwentyFivePositions()
+        {
+            var incompleteNetwork = BuildNetwork(
+                maxDepth: 4,
+                incompleteRecruiterId: 32);
+            var completeNetwork = BuildNetwork(maxDepth: 4);
+
+            Assert.Equal(
+                EntryNetworkLevel.Level3,
+                _evaluator.Evaluate(customerId: 1, incompleteNetwork));
+            Assert.Equal(
+                EntryNetworkLevel.Level4,
+                _evaluator.Evaluate(customerId: 1, completeNetwork));
+        }
+
+        [Fact]
+        public void Level5_QualifiesDeterministicallyFromCutoffNetwork()
+        {
+            var completeNetwork = BuildNetwork(maxDepth: 5);
+            var cutoffNetwork = EffectiveProgrammeNetwork.BuildAQGreen(
+                completeNetwork,
+                EffectiveFrom.AddDays(7));
+
+            Assert.Equal(3906, completeNetwork.Count);
+            Assert.Equal(
+                EntryNetworkLevel.Level5,
+                _evaluator.Evaluate(customerId: 1, completeNetwork));
+            Assert.Equal(
+                EntryNetworkLevel.Level5,
+                _evaluator.Evaluate(customerId: 1, cutoffNetwork));
         }
 
         [Fact]

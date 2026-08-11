@@ -159,7 +159,7 @@ flowchart LR
 
 `BUSINESS DECISION`: AQGreen structurally continues through Levels 4 and 5 even though its currently authorised commission rates end at Level 3.
 
-`IMPLEMENTATION GAP`: the current AQGreen network enum and evaluator model only Levels 1–3. Onyx already models Levels 1–5. This documentation correction does not claim that AQGreen Levels 4–5 are implemented.
+`VERIFIED IMPLEMENTATION`: the AQGreen network enum and evaluator model structural Levels 1–5. Structural qualification and authorised commission depth are separate: current AQGreen terms still contain components only for Levels 1–3.
 
 ## 6. Commission rules
 
@@ -186,7 +186,7 @@ The underlying commission model is a business rule that existed independently of
 
 The Level 4 and Level 5 rows do **not** mean those levels pay ZAR 1,650. They mean the only currently authorised components remain Level 1 through Level 3; no Level 4 or Level 5 amount may be calculated until Aqua authorises an effective-dated rate.
 
-The current implementation stores the three derived component amounts—ZAR 150, ZAR 250, and ZAR 1,250—and evaluates AQGreen only through Level 3. For those implemented levels the result matches the confirmed per-person model. Incomplete levels have no partial component.
+The current implementation stores the three derived component amounts—ZAR 150, ZAR 250, and ZAR 1,250—and evaluates AQGreen structure through Level 5. Structurally qualified Levels 4–5 retain only those authorised Level 1–3 components, for a cumulative ZAR 1,650; no Level 4/5 component is created. Incomplete structural levels have no partial component.
 
 ### 6.3 Onyx rates
 

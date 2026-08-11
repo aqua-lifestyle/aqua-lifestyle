@@ -14,7 +14,13 @@ namespace AqualLifeStyle.Domain.Onyx
         public Guid EntryParticipationId { get; private set; }
         public int CustomerId { get; private set; }
         public Guid CommissionPeriodId { get; private set; }
+        // Retained column/property name for compatibility. This stores the
+        // structural network level proven at the commission-period cutoff.
         public int HighestCompletedLevel { get; private set; }
+        public int HighestQualifiedNetworkLevel => HighestCompletedLevel;
+        public int HighestCommissionedLevel => _components.Count == 0
+            ? 0
+            : _components.Max(component => component.Level);
         public decimal TotalAmount { get; private set; }
         public string Currency { get; private set; }
         public string RulesVersion { get; private set; }
@@ -36,7 +42,7 @@ namespace AqualLifeStyle.Domain.Onyx
             EntryParticipation participation,
             EntryCommissionPeriod period,
             EntryCommissionTerms terms,
-            int highestCompletedLevel,
+            EntryNetworkLevel highestQualifiedNetworkLevel,
             string holdReason)
         {
             if (participation == null)
@@ -72,23 +78,27 @@ namespace AqualLifeStyle.Domain.Onyx
                     "The commission terms do not match the period rules version.");
             }
 
-            if (highestCompletedLevel < 0 ||
-                highestCompletedLevel > EntryNetworkQualificationEvaluator.MaximumLevel)
+            if (highestQualifiedNetworkLevel < EntryNetworkLevel.None ||
+                highestQualifiedNetworkLevel > EntryNetworkLevel.Level5)
             {
-                throw new ArgumentOutOfRangeException(nameof(highestCompletedLevel));
+                throw new ArgumentOutOfRangeException(
+                    nameof(highestQualifiedNetworkLevel));
             }
+
+            var highestCommissionedLevel = terms.GetHighestCommissionedLevel(
+                highestQualifiedNetworkLevel);
 
             Id = Guid.NewGuid();
             TenantId = participation.TenantId;
             EntryParticipationId = participation.Id;
             CustomerId = participation.CustomerId;
             CommissionPeriodId = period.Id;
-            HighestCompletedLevel = highestCompletedLevel;
+            HighestCompletedLevel = (int)highestQualifiedNetworkLevel;
             Currency = terms.Currency;
             RulesVersion = terms.Version;
             CalculatedAt = period.CalculatedAt;
 
-            for (var level = 1; level <= highestCompletedLevel; level++)
+            for (var level = 1; level <= (int)highestCommissionedLevel; level++)
             {
                 _components.Add(EntryCommissionComponent.Create(
                     level,
@@ -96,7 +106,7 @@ namespace AqualLifeStyle.Domain.Onyx
             }
 
             TotalAmount = _components.Sum(component => component.Amount);
-            if (highestCompletedLevel == 0)
+            if (highestCommissionedLevel == EntryNetworkLevel.None)
             {
                 PayoutStatus = WeeklyCommissionPayoutStatus.NotEarned;
             }
@@ -115,14 +125,14 @@ namespace AqualLifeStyle.Domain.Onyx
             EntryParticipation participation,
             EntryCommissionPeriod period,
             EntryCommissionTerms terms,
-            int highestCompletedLevel,
+            EntryNetworkLevel highestQualifiedNetworkLevel,
             string holdReason)
         {
             return new EntryWeeklyCommission(
                 participation,
                 period,
                 terms,
-                highestCompletedLevel,
+                highestQualifiedNetworkLevel,
                 holdReason);
         }
 

@@ -97,6 +97,8 @@ namespace AqualLifeStyle.Tests.Application
             var earning = progress.RecentEarnings.Single();
             earning.TotalAmount.ShouldBe(150m);
             earning.HighestLevel.ShouldBe(1);
+            earning.HighestQualifiedLevel.ShouldBe(1);
+            earning.HighestCommissionedLevel.ShouldBe(1);
             earning.Status.ShouldBe("Earned — awaiting release");
             earning.Components.Single().Level.ShouldBe(1);
             earning.Components.Single().Amount.ShouldBe(150m);
@@ -111,6 +113,27 @@ namespace AqualLifeStyle.Tests.Application
             progress.FuneralCoverIncluded.ShouldBeTrue();
             progress.FuneralCoverBenefitAmount.ShouldBe(30000m);
             progress.Education.Count.ShouldBe(4);
+            progress.Education.Single(item => item.Title == "Build your network")
+                .Body.ShouldContain("3,125");
+            progress.Education.Single(item => item.Title == "Weekly earnings")
+                .Body.ShouldContain("not yet authorised");
+        }
+
+        [Fact]
+        public async Task StructuralLevelFiveEarning_ExposesCommissionedDepthSeparately()
+        {
+            var userId = await CreateActiveMemberWithLevelFiveEarningAsync();
+            SetCurrentUser(userId, 1);
+
+            var progress = await _progressService.GetMyProgressAsync();
+
+            var earning = progress.RecentEarnings.Single();
+            earning.HighestLevel.ShouldBe(3);
+            earning.HighestQualifiedLevel.ShouldBe(5);
+            earning.HighestCommissionedLevel.ShouldBe(3);
+            earning.TotalAmount.ShouldBe(1650m);
+            earning.Components.Select(component => component.Level)
+                .ShouldBe(new[] { 1, 2, 3 });
         }
 
         [Fact]
@@ -180,6 +203,110 @@ namespace AqualLifeStyle.Tests.Application
             await CreateFuneralCoverAsync(participation);
 
             return userId;
+        }
+
+        private async Task<long> CreateActiveMemberWithLevelFiveEarningAsync()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"progress-level-five-{suffix}",
+                $"progress-level-five-{suffix}@example.com");
+            var customerId = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "Level Five Progress Member",
+                    new EmailAddress(
+                        $"progress-level-five-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+                return customer.Id;
+            });
+            var participation = await CreateActiveParticipationAsync(
+                customerId,
+                $"progress-level-five-{suffix}");
+            var network = BuildInMemoryNetwork(
+                participation,
+                maxDepth: EntryNetworkQualificationEvaluator.MaximumLevel,
+                suffix);
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var periodStart = EffectiveFrom.AddDays(5);
+                var periodEnd = periodStart.AddDays(7).AddTicks(-1);
+                var period = EntryCommissionPeriod.CreateClosedPeriod(
+                    1,
+                    periodStart,
+                    periodEnd,
+                    "Africa/Johannesburg",
+                    periodEnd.AddMinutes(1),
+                    CommissionTerms);
+                var commission = new EntryWeeklyCommissionCalculator(
+                        new EntryNetworkQualificationEvaluator())
+                    .Calculate(
+                        participation,
+                        period,
+                        CommissionTerms,
+                        network,
+                        Array.Empty<EntryMonthlyObligation>());
+
+                context.EntryCommissionPeriods.Add(period);
+                context.EntryWeeklyCommissions.Add(commission);
+                await context.SaveChangesAsync();
+            });
+
+            return userId;
+        }
+
+        private static IReadOnlyCollection<EntryParticipation> BuildInMemoryNetwork(
+            EntryParticipation root,
+            int maxDepth,
+            string suffix)
+        {
+            var participations = new List<EntryParticipation> { root };
+            var currentLevel = new List<EntryParticipation> { root };
+            var nextCustomerId = 100000;
+
+            for (var depth = 1; depth <= maxDepth; depth++)
+            {
+                var nextLevel = new List<EntryParticipation>();
+                foreach (var recruiter in currentLevel)
+                {
+                    for (var index = 0;
+                         index < EntryNetworkQualificationEvaluator.BranchSize;
+                         index++)
+                    {
+                        var recruit = EntryParticipation.StartUnderRecruiter(
+                            1,
+                            nextCustomerId,
+                            recruiter,
+                            EntryTerms,
+                            EffectiveFrom.AddMinutes(depth));
+                        var payment = MemberPayment.CreatePending(
+                            1,
+                            nextCustomerId,
+                            MemberPaymentPurpose.AQGreenJoining,
+                            1200m,
+                            "Test",
+                            $"level-five-{suffix}-{nextCustomerId}",
+                            EffectiveFrom.AddMinutes(depth));
+                        payment.Confirm(EffectiveFrom.AddMinutes(depth + 1));
+                        recruit.ApplyConfirmedJoiningPayment(payment);
+                        recruit.ApproveByAdministrator(
+                            1L,
+                            EffectiveFrom.AddMinutes(depth + 2));
+                        participations.Add(recruit);
+                        nextLevel.Add(recruit);
+                        nextCustomerId++;
+                    }
+                }
+
+                currentLevel = nextLevel;
+            }
+
+            return participations;
         }
 
         private async Task<long> CreateActiveMemberWithOverdueObligationAsync()
