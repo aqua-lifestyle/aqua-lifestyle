@@ -13,6 +13,7 @@ using AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto;
 using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Customers;
+using AqualLifeStyle.Domain.Areas;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
@@ -41,6 +42,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         private readonly IRepository<EntryMonthlyObligation, Guid>
             _monthlyObligationRepository;
         private readonly IRepository<Tenant> _tenantRepository;
+        private readonly IRepository<Area, Guid> _areaRepository;
+        private readonly IRepository<AreaAdminAssignment, Guid> _areaAdminAssignmentRepository;
         private readonly IProgrammeRecruiterCorrectionPolicyResolver _correctionPolicyResolver;
         private readonly IProgrammeRecruiterCorrectionLock _correctionLock;
         private readonly IHostedPaymentCheckoutLock _hostedPaymentCheckoutLock;
@@ -63,6 +66,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 monthlyObligationCheckoutRepository,
             IRepository<EntryMonthlyObligation, Guid> monthlyObligationRepository,
             IRepository<Tenant> tenantRepository,
+            IRepository<Area, Guid> areaRepository,
+            IRepository<AreaAdminAssignment, Guid> areaAdminAssignmentRepository,
             IProgrammeRecruiterCorrectionPolicyResolver correctionPolicyResolver,
             IProgrammeRecruiterCorrectionLock correctionLock,
             IHostedPaymentCheckoutLock hostedPaymentCheckoutLock,
@@ -83,6 +88,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             _monthlyObligationCheckoutRepository = monthlyObligationCheckoutRepository;
             _monthlyObligationRepository = monthlyObligationRepository;
             _tenantRepository = tenantRepository;
+            _areaRepository = areaRepository;
+            _areaAdminAssignmentRepository = areaAdminAssignmentRepository;
             _correctionPolicyResolver = correctionPolicyResolver;
             _correctionLock = correctionLock;
             _hostedPaymentCheckoutLock = hostedPaymentCheckoutLock;
@@ -152,15 +159,16 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     from checkout in _aqGreenJoiningCheckoutRepository.GetAll()
                     join customer in _customerRepository.GetAll()
                         on checkout.CustomerId equals customer.Id
-                    join tenant in _tenantRepository.GetAll()
-                        on checkout.TenantId equals tenant.Id
+                    join area in _areaRepository.GetAll()
+                        on new { checkout.TenantId, customer.AreaId }
+                        equals new { area.TenantId, AreaId = (Guid?)area.Id }
                     where checkout.Status == HostedPaymentCheckoutStatus.PreparingCheckout ||
                           checkout.Status == HostedPaymentCheckoutStatus.AwaitingPayment
                     select new
                     {
                         Checkout = checkout,
                         Customer = customer,
-                        AreaName = tenant.TenancyName
+                        AreaName = area.Name
                     };
                 if (AbpSession.TenantId.HasValue)
                 {
@@ -449,16 +457,18 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 if (onyx == null)
                     throw Failed("Participation decision", "The participation was not found in your Area.");
                 ValidateRequestedTenant(onyx.TenantId, "Participation decision");
+                var onyxCustomer = await _customerRepository.GetAsync(onyx.CustomerId);
+                await EnsureCanAdministerAreaAsync(onyxCustomer);
                 if ((approve && onyx.Status == OnyxParticipationStatus.Active) ||
                     (!approve && onyx.Status == OnyxParticipationStatus.Rejected))
                 {
-                    return (await _customerRepository.GetAsync(onyx.CustomerId), onyx.Id, false);
+                    return (onyxCustomer, onyx.Id, false);
                 }
                 if (approve)
                     onyx.ApproveByAdministrator(AbpSession.GetUserId(), decidedAt);
                 else
                     onyx.RejectByAdministrator(AbpSession.GetUserId(), reason, decidedAt);
-                return (await _customerRepository.GetAsync(onyx.CustomerId), onyx.Id, true);
+                return (onyxCustomer, onyx.Id, true);
             }
 
             var entry = await _entryParticipationRepository.FirstOrDefaultAsync(
@@ -466,16 +476,18 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             if (entry == null)
                 throw Failed("Participation decision", "The participation was not found in your Area.");
             ValidateRequestedTenant(entry.TenantId, "Participation decision");
+            var entryCustomer = await _customerRepository.GetAsync(entry.CustomerId);
+            await EnsureCanAdministerAreaAsync(entryCustomer);
             if ((approve && entry.Status == EntryParticipationStatus.Active) ||
                 (!approve && entry.Status == EntryParticipationStatus.Rejected))
             {
-                return (await _customerRepository.GetAsync(entry.CustomerId), entry.Id, false);
+                return (entryCustomer, entry.Id, false);
             }
             if (approve)
                 entry.ApproveByAdministrator(AbpSession.GetUserId(), decidedAt);
             else
                 entry.RejectByAdministrator(AbpSession.GetUserId(), reason, decidedAt);
-            return (await _customerRepository.GetAsync(entry.CustomerId), entry.Id, true);
+            return (entryCustomer, entry.Id, true);
         }
 
         private async Task EnqueueDecisionEmailAsync(
@@ -619,22 +631,36 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 
             using (DisableAllTenantDataFiltersForHost())
             {
-                var entryQuery = _entryParticipationRepository.GetAll()
-                    .Where(participation =>
-                        participation.Status ==
-                        EntryParticipationStatus.PaymentConfirmedAwaitingApproval);
-                var onyxQuery = _onyxParticipationRepository.GetAll()
-                    .Where(participation =>
-                        participation.Status ==
-                        OnyxParticipationStatus.PaymentConfirmedAwaitingApproval);
+                var areaScope = await GetAuthorizedAreaScopeAsync(input.AreaId);
+                var entryQuery =
+                    from participation in _entryParticipationRepository.GetAll()
+                    join customer in _customerRepository.GetAll()
+                        on participation.CustomerId equals customer.Id
+                    where participation.Status ==
+                          EntryParticipationStatus.PaymentConfirmedAwaitingApproval
+                    select new { Participation = participation, Customer = customer };
+                var onyxQuery =
+                    from participation in _onyxParticipationRepository.GetAll()
+                    join customer in _customerRepository.GetAll()
+                        on participation.CustomerId equals customer.Id
+                    where participation.Status ==
+                          OnyxParticipationStatus.PaymentConfirmedAwaitingApproval
+                    select new { Participation = participation, Customer = customer };
 
                 var tenantId = AbpSession.TenantId ?? input.TenantId;
                 if (tenantId.HasValue)
                 {
-                    entryQuery = entryQuery.Where(participation =>
-                        participation.TenantId == tenantId.Value);
-                    onyxQuery = onyxQuery.Where(participation =>
-                        participation.TenantId == tenantId.Value);
+                    entryQuery = entryQuery.Where(row =>
+                        row.Participation.TenantId == tenantId.Value);
+                    onyxQuery = onyxQuery.Where(row =>
+                        row.Participation.TenantId == tenantId.Value);
+                }
+                if (areaScope != null)
+                {
+                    entryQuery = entryQuery.Where(row =>
+                        row.Customer.AreaId.HasValue && areaScope.Contains(row.Customer.AreaId.Value));
+                    onyxQuery = onyxQuery.Where(row =>
+                        row.Customer.AreaId.HasValue && areaScope.Contains(row.Customer.AreaId.Value));
                 }
 
                 return new PendingProgrammeApprovalSummaryDto
@@ -642,6 +668,32 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     AQGreenCount = await entryQuery.CountAsync(),
                     OnyxCount = await onyxQuery.CountAsync()
                 };
+            }
+        }
+
+        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.View)]
+        public async Task<IReadOnlyList<AssignedAreaDto>> GetAssignedAreasAsync()
+        {
+            using (DisableAllTenantDataFiltersForHost())
+            {
+                var areaScope = await GetAuthorizedAreaScopeAsync(requestedAreaId: null);
+                var query = _areaRepository.GetAll().Where(area => area.IsActive);
+                if (AbpSession.TenantId.HasValue)
+                {
+                    var tenantId = AbpSession.TenantId.Value;
+                    query = query.Where(area => area.TenantId == tenantId);
+                }
+                if (areaScope != null)
+                    query = query.Where(area => areaScope.Contains(area.Id));
+
+                return await query.OrderBy(area => area.Name)
+                    .Select(area => new AssignedAreaDto
+                    {
+                        AreaId = area.Id,
+                        Code = area.Code,
+                        Name = area.Name
+                    })
+                    .ToListAsync();
             }
         }
 
@@ -769,8 +821,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                         on checkout.EntryParticipationId equals participation.Id
                     join customer in _customerRepository.GetAll()
                         on checkout.CustomerId equals customer.Id
-                    join tenant in _tenantRepository.GetAll()
-                        on checkout.TenantId equals tenant.Id
+                    join area in _areaRepository.GetAll()
+                        on new { checkout.TenantId, customer.AreaId }
+                        equals new { area.TenantId, AreaId = (Guid?)area.Id }
                     where checkout.Status == HostedPaymentCheckoutStatus.Completed
                     select new MonthlyObligationCheckoutReconciliationRow
                     {
@@ -778,7 +831,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                         Obligation = obligation,
                         Participation = participation,
                         Customer = customer,
-                        AreaName = tenant.TenancyName
+                        AreaName = area.Name
                     };
                 if (AbpSession.TenantId.HasValue)
                 {
@@ -865,7 +918,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     Participation = participation,
                     Customer = customer
                 };
-            query = ApplyEntryScopeAndSearch(query, input);
+            var areaScope = await GetAuthorizedAreaScopeAsync(input.AreaId);
+            query = ApplyEntryScopeAndSearch(query, input, areaScope);
             var total = await query.CountAsync();
             var rows = await query
                 .OrderByDescending(row => row.Participation.StartedAt)
@@ -881,7 +935,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             var memberNumbers = await GetClubMemberNumbersAsync(
                 rows.Select(row => row.Participation.RecruiterCustomerId));
             var areaNames = await GetAreaNamesAsync(
-                rows.Select(row => row.Participation.TenantId));
+                rows.Select(row => row.Customer.AreaId));
 
             return new PagedResultDto<AdminProgrammeParticipationDto>(
                 total,
@@ -900,7 +954,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     Participation = participation,
                     Customer = customer
                 };
-            query = ApplyOnyxScopeAndSearch(query, input);
+            var areaScope = await GetAuthorizedAreaScopeAsync(input.AreaId);
+            query = ApplyOnyxScopeAndSearch(query, input, areaScope);
             var total = await query.CountAsync();
             var rows = await query
                 .OrderByDescending(row => row.Participation.StartedAt)
@@ -912,20 +967,20 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             var memberNumbers = await GetClubMemberNumbersAsync(
                 rows.Select(row => row.Participation.RecruiterCustomerId));
             var areaNames = await GetAreaNamesAsync(
-                rows.Select(row => row.Participation.TenantId));
+                rows.Select(row => row.Customer.AreaId));
 
             return new PagedResultDto<AdminProgrammeParticipationDto>(
                 total,
                 rows.Select(row => Map(row.Participation, row.Customer, payments, memberNumbers, areaNames)).ToList());
         }
 
-        private async Task<IReadOnlyDictionary<int, string>> GetAreaNamesAsync(
-            IEnumerable<int> tenantIds)
+        private async Task<IReadOnlyDictionary<Guid, string>> GetAreaNamesAsync(
+            IEnumerable<Guid?> areaIds)
         {
-            var ids = tenantIds.Distinct().ToArray();
-            return await _tenantRepository.GetAll()
-                .Where(tenant => ids.Contains(tenant.Id))
-                .ToDictionaryAsync(tenant => tenant.Id, tenant => tenant.TenancyName);
+            var ids = areaIds.Where(id => id.HasValue).Select(id => id.Value).Distinct().ToArray();
+            return await _areaRepository.GetAll()
+                .Where(area => ids.Contains(area.Id))
+                .ToDictionaryAsync(area => area.Id, area => area.Name);
         }
 
         private async Task<IReadOnlyDictionary<int, string>> GetClubMemberNumbersAsync(
@@ -944,13 +999,18 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 
         private IQueryable<EntryParticipationQueryRow> ApplyEntryScopeAndSearch(
             IQueryable<EntryParticipationQueryRow> query,
-            AdminProgrammeParticipationListInput input)
+            AdminProgrammeParticipationListInput input,
+            Guid[] areaScope)
         {
             if (AbpSession.TenantId.HasValue)
             {
                 var tenantId = AbpSession.TenantId.Value;
                 query = query.Where(row => row.Participation.TenantId == tenantId);
             }
+
+            if (areaScope != null)
+                query = query.Where(row => row.Customer.AreaId.HasValue &&
+                                           areaScope.Contains(row.Customer.AreaId.Value));
             else if (input.TenantId.HasValue)
             {
                 var tenantId = input.TenantId.Value;
@@ -977,13 +1037,18 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 
         private IQueryable<OnyxParticipationQueryRow> ApplyOnyxScopeAndSearch(
             IQueryable<OnyxParticipationQueryRow> query,
-            AdminProgrammeParticipationListInput input)
+            AdminProgrammeParticipationListInput input,
+            Guid[] areaScope)
         {
             if (AbpSession.TenantId.HasValue)
             {
                 var tenantId = AbpSession.TenantId.Value;
                 query = query.Where(row => row.Participation.TenantId == tenantId);
             }
+
+            if (areaScope != null)
+                query = query.Where(row => row.Customer.AreaId.HasValue &&
+                                           areaScope.Contains(row.Customer.AreaId.Value));
             else if (input.TenantId.HasValue)
             {
                 var tenantId = input.TenantId.Value;
@@ -1029,12 +1094,76 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 .ToDictionary(payment => payment.Id);
         }
 
+        private async Task<Guid[]> GetAuthorizedAreaScopeAsync(Guid? requestedAreaId)
+        {
+            if (!AbpSession.TenantId.HasValue)
+            {
+                if (!await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
+                    throw new AbpAuthorizationException("Host-wide Area access is not authorised.");
+                if (!requestedAreaId.HasValue) return null;
+
+                var requestedExists = await _areaRepository.GetAll().AnyAsync(area =>
+                    area.Id == requestedAreaId.Value && area.IsActive);
+                return requestedExists ? new[] { requestedAreaId.Value } : Array.Empty<Guid>();
+            }
+
+            var tenantId = AbpSession.TenantId.Value;
+            var userId = AbpSession.GetUserId();
+            var query =
+                from assignment in _areaAdminAssignmentRepository.GetAll()
+                join area in _areaRepository.GetAll()
+                    on new { assignment.TenantId, assignment.AreaId }
+                    equals new { area.TenantId, AreaId = area.Id }
+                where
+                    assignment.TenantId == tenantId &&
+                    assignment.UserId == userId &&
+                    !assignment.RevokedAt.HasValue &&
+                    area.IsActive
+                select assignment;
+            if (requestedAreaId.HasValue)
+                query = query.Where(assignment => assignment.AreaId == requestedAreaId.Value);
+            return await query.Select(assignment => assignment.AreaId).Distinct().ToArrayAsync();
+        }
+
+        private async Task EnsureCanAdministerAreaAsync(Customer customer)
+        {
+            if (customer == null || !customer.TenantId.HasValue || !customer.AreaId.HasValue)
+                throw new AbpAuthorizationException("The participation has no valid Area assignment.");
+
+            if (!AbpSession.TenantId.HasValue)
+            {
+                if (await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants)) return;
+                throw new AbpAuthorizationException("Host-wide Area administration is not authorised.");
+            }
+
+            var tenantId = AbpSession.TenantId.Value;
+            if (customer.TenantId.Value != tenantId)
+                throw new AbpAuthorizationException("The participation belongs to another Tenant.");
+
+            var userId = AbpSession.GetUserId();
+            var assigned = await (
+                    from assignment in _areaAdminAssignmentRepository.GetAll()
+                    join area in _areaRepository.GetAll()
+                        on new { assignment.TenantId, assignment.AreaId }
+                        equals new { area.TenantId, AreaId = area.Id }
+                    where
+                        assignment.TenantId == tenantId &&
+                        assignment.AreaId == customer.AreaId.Value &&
+                        assignment.UserId == userId &&
+                        !assignment.RevokedAt.HasValue &&
+                        area.IsActive
+                    select assignment)
+                .AnyAsync();
+            if (!assigned)
+                throw new AbpAuthorizationException("You are not assigned to administer this Area.");
+        }
+
         private static AdminProgrammeParticipationDto Map(
             EntryParticipation participation,
             Customer customer,
             IReadOnlyDictionary<Guid, MemberPayment> payments,
             IReadOnlyDictionary<int, string> memberNumbers,
-            IReadOnlyDictionary<int, string> areaNames)
+            IReadOnlyDictionary<Guid, string> areaNames)
         {
             var details = ProgrammeParticipationStatusPresenter.Describe(participation);
             return MapCommon(
@@ -1068,7 +1197,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             Customer customer,
             IReadOnlyDictionary<Guid, MemberPayment> payments,
             IReadOnlyDictionary<int, string> memberNumbers,
-            IReadOnlyDictionary<int, string> areaNames)
+            IReadOnlyDictionary<Guid, string> areaNames)
         {
             var details = ProgrammeParticipationStatusPresenter.Describe(participation);
             return MapCommon(
@@ -1104,14 +1233,16 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             IEnumerable<Guid?> paymentIds,
             IReadOnlyDictionary<Guid, MemberPayment> payments,
             IReadOnlyDictionary<int, string> memberNumbers,
-            IReadOnlyDictionary<int, string> areaNames)
+            IReadOnlyDictionary<Guid, string> areaNames)
         {
             return new AdminProgrammeParticipationDto
             {
                 ParticipationId = participationId,
-                AreaName = areaNames.TryGetValue(tenantId, out var areaName)
+                AreaId = customer.AreaId ?? Guid.Empty,
+                AreaName = customer.AreaId.HasValue &&
+                    areaNames.TryGetValue(customer.AreaId.Value, out var areaName)
                     ? areaName
-                    : "Area",
+                    : "Unassigned",
                 ClubMemberNumber = customer.ClubMemberNumber,
                 CustomerName = customer.Name,
                 Email = customer.Email.Value,

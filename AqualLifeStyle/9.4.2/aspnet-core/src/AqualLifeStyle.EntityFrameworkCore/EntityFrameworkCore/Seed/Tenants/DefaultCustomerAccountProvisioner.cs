@@ -89,6 +89,17 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
                             new EmailAddress(user.EmailAddress),
                             membershipId: null,
                             user: user);
+                        var activeAreas = _context.Areas.IgnoreQueryFilters()
+                            .Where(item => item.TenantId == tenantId && item.IsActive)
+                            .Take(2)
+                            .ToList();
+                        if (activeAreas.Count != 1)
+                            throw new InvalidOperationException(
+                                "Customer account provisioning requires exactly one active Area in the Tenant.");
+                        customer.AssignInitialArea(
+                            activeAreas[0],
+                            DateTime.UtcNow,
+                            "Customer account provisioning");
 
                         _context.Customers.Add(customer);
                         customersByEmail.Add(normalizedEmail, customer);

@@ -116,6 +116,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             return new MyProgrammeParticipationsDto
             {
                 ClubMemberNumber = customer.ClubMemberNumber,
+                AreaId = customer.AreaId,
+                AreaName = customer.Area?.Name,
                 Entry = entry == null
                     ? null
                     : Map(entry, await GetClubMemberNumberAsync(entry.RecruiterCustomerId)),
@@ -563,8 +565,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         {
             var tenantId = GetRequiredTenantId("Programme participation is unavailable.");
             var userId = AbpSession.GetUserId();
-            var customer = await _customerRepository.FirstOrDefaultAsync(
-                item => item.TenantId == tenantId && item.UserId == userId);
+            var customer = await _customerRepository.GetAllIncluding(item => item.Area)
+                .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.UserId == userId);
             if (customer == null)
             {
                 throw new UserFriendlyException(

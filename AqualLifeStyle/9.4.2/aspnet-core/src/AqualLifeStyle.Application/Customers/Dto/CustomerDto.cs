@@ -1,3 +1,5 @@
+using System;
+
 namespace AqualLifeStyle.Application.Customers.Dto
 {
     public class CustomerDto
@@ -7,5 +9,7 @@ namespace AqualLifeStyle.Application.Customers.Dto
         public string Email { get; set; }
         public int? MembershipId { get; set; }
         public bool IsActive { get; set; }
+        public Guid? AreaId { get; set; }
+        public string AreaName { get; set; }
     }
 }

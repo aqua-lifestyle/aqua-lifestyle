@@ -9,6 +9,7 @@ using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Accounts;
 using AqualLifeStyle.Domain.AreaLeaders;
+using AqualLifeStyle.Domain.Areas;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Email;
 using AqualLifeStyle.Domain.Enquiries;
@@ -30,6 +31,9 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<Membership> Memberships { get; set; }
         public virtual DbSet<MembershipBenefit> MembershipBenefits { get; set; }
         public virtual DbSet<Customer> Customers { get; set; }
+        public virtual DbSet<Area> Areas { get; set; }
+        public virtual DbSet<AreaAdminAssignment> AreaAdminAssignments { get; set; }
+        public virtual DbSet<CustomerAreaAssignment> CustomerAreaAssignments { get; set; }
         public virtual DbSet<Product> Products { get; set; }
         public virtual DbSet<Enquiry> Enquiries { get; set; }
         public virtual DbSet<EnquiryFollowUp> EnquiryFollowUps { get; set; }
@@ -171,6 +175,18 @@ namespace AqualLifeStyle.EntityFrameworkCore
                     .HasForeignKey<Customer>(e => e.UserId)
                     .OnDelete(DeleteBehavior.Restrict);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(128);
+                entity.Property(e => e.AreaId);
+                entity.HasOne(e => e.Area)
+                    .WithMany()
+                    .HasForeignKey(nameof(Customer.TenantId), nameof(Customer.AreaId))
+                    .HasPrincipalKey(nameof(Area.TenantId), nameof(Area.Id))
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasMany(e => e.AreaAssignments)
+                    .WithOne()
+                    .HasForeignKey(e => e.CustomerId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.Navigation(e => e.AreaAssignments)
+                    .UsePropertyAccessMode(PropertyAccessMode.Field);
                 entity.OwnsOne(e => e.Email, email =>
                 {
                     email.Property(p => p.Value).HasColumnName("Email").IsRequired().HasMaxLength(256);

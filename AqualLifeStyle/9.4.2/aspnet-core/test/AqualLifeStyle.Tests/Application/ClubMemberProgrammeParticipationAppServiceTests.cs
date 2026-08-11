@@ -334,6 +334,8 @@ namespace AqualLifeStyle.Tests.Application
 
             var initial = await _participationService.GetMyParticipationsAsync();
             initial.ClubMemberNumber.ShouldStartWith("CLB-");
+            initial.AreaId.ShouldNotBe(Guid.Empty);
+            initial.AreaName.ShouldBe("Johannesburg");
             initial.CanJoinEntry.ShouldBeTrue();
             initial.CanJoinOnyxDirectly.ShouldBeTrue();
 

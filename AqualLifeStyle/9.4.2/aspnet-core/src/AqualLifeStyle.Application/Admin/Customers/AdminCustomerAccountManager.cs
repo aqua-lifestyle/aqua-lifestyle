@@ -10,6 +10,7 @@ using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
+using AqualLifeStyle.Application.Areas;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,6 +28,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
         public bool AllowSystemGeneratedPassword { get; set; }
         public int? MembershipId { get; set; }
         public bool IsActive { get; set; }
+        public Guid? AreaId { get; set; }
     }
 
     public interface IAdminCustomerAccountManager
@@ -49,6 +51,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
         private readonly IRepository<User, long> _userRepository;
         private readonly UserManager _userManager;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        private readonly IAreaAssignmentResolver _areaAssignmentResolver;
 
         public AdminCustomerAccountManager(
             ICustomerRepository customerRepository,
@@ -56,7 +59,8 @@ namespace AqualLifeStyle.Application.Admin.Customers
             IAdminCustomerProfileUpdater customerProfileUpdater,
             IRepository<User, long> userRepository,
             UserManager userManager,
-            IUnitOfWorkManager unitOfWorkManager)
+            IUnitOfWorkManager unitOfWorkManager,
+            IAreaAssignmentResolver areaAssignmentResolver)
         {
             _customerRepository = customerRepository;
             _membershipPlanAssignmentValidator = membershipPlanAssignmentValidator;
@@ -64,6 +68,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
             _userRepository = userRepository;
             _userManager = userManager;
             _unitOfWorkManager = unitOfWorkManager;
+            _areaAssignmentResolver = areaAssignmentResolver;
         }
 
         public async Task<AdminCustomerAccountResult> CreateOrFindRemovedAsync(AdminCustomerAccountInput input)
@@ -131,6 +136,11 @@ namespace AqualLifeStyle.Application.Admin.Customers
                     new EmailAddress(email),
                     input.MembershipId,
                     user);
+                var area = await _areaAssignmentResolver.ResolveActiveAreaAsync(
+                    input.TenantId,
+                    input.AreaId,
+                    "Customer creation failed.");
+                customer.AssignInitialArea(area, DateTime.UtcNow, "Administrator customer creation");
                 if (!input.IsActive) customer.Deactivate();
                 await _customerRepository.InsertAsync(customer);
                 return new AdminCustomerAccountResult

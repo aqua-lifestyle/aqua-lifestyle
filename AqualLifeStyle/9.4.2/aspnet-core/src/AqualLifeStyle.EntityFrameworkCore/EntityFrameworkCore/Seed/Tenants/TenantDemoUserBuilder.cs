@@ -83,6 +83,17 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
                     new EmailAddress(email),
                     membershipId,
                     user);
+                var activeAreas = _context.Areas.IgnoreQueryFilters()
+                    .Where(item => item.TenantId == _tenantId && item.IsActive)
+                    .Take(2)
+                    .ToList();
+                if (activeAreas.Count != 1)
+                    throw new InvalidOperationException(
+                        "Demo customer creation requires exactly one active Area in the Tenant.");
+                customer.AssignInitialArea(
+                    activeAreas[0],
+                    DateTime.UtcNow,
+                    "Demo customer creation");
                 _context.Customers.Add(customer);
             }
             else if (membershipId.HasValue && !customer.MembershipId.HasValue)

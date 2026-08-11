@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using Abp.Auditing;
 using Abp.Authorization.Users;
@@ -46,6 +47,8 @@ namespace AqualLifeStyle.Authorization.Accounts.Dto
 
         [StringLength(2048)]
         public string RedirectPath { get; set; }
+
+        public Guid? AreaId { get; set; }
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {

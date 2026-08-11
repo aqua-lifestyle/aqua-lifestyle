@@ -24,12 +24,15 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
         public AdminProgrammeType Programme { get; set; }
 
         public bool AwaitingApprovalOnly { get; set; }
+
+        public Guid? AreaId { get; set; }
     }
 
     public class PendingProgrammeApprovalSummaryInput
     {
         [Range(1, int.MaxValue)]
         public int? TenantId { get; set; }
+        public Guid? AreaId { get; set; }
     }
 
     public class PendingProgrammeApprovalSummaryDto
@@ -52,6 +55,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
     public class AdminProgrammeParticipationDto
     {
         public Guid ParticipationId { get; set; }
+        public Guid AreaId { get; set; }
         public string AreaName { get; set; }
         public string ClubMemberNumber { get; set; }
         public string CustomerName { get; set; }
@@ -68,6 +72,13 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
         public string NextPaymentDescription { get; set; }
         public string Currency { get; set; }
         public IReadOnlyList<AdminProgrammePaymentDto> ConfirmedPayments { get; set; }
+    }
+
+    public class AssignedAreaDto
+    {
+        public Guid AreaId { get; set; }
+        public string Code { get; set; }
+        public string Name { get; set; }
     }
 
     public class CorrectProgrammeRecruiterInput

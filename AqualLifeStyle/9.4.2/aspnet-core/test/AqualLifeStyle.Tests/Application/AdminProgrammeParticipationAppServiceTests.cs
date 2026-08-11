@@ -10,6 +10,7 @@ using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
+using AqualLifeStyle.Domain.Areas;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Onyx;
@@ -18,6 +19,7 @@ using AqualLifeStyle.Email;
 using AqualLifeStyle.MultiTenancy;
 using AqualLifeStyle.Payments;
 using Microsoft.EntityFrameworkCore;
+using AqualLifeStyle.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
 using RolePermissionSetting = Abp.Authorization.Roles.RolePermissionSetting;
@@ -75,7 +77,7 @@ namespace AqualLifeStyle.Tests.Application
             result.TotalCount.ShouldBe(1);
             var participation = result.Items.Single();
             participation.ClubMemberNumber.ShouldStartWith("CLB-");
-            participation.AreaName.ShouldBe("Default");
+            participation.AreaName.ShouldBe("Johannesburg");
             participation.ProgrammeName.ShouldBe("AQGreen");
             participation.Status.ShouldBe("Awaiting activation payment");
             participation.NextPaymentAmount.ShouldBe(600m);
@@ -104,6 +106,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     $"Monthly Reconciliation {suffix}",
                     new EmailAddress($"monthly-reconciliation-customer-{suffix}@example.com"));
+                await AssignAreaAsync(context, customer, tenantId: 1);
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
 
@@ -203,7 +206,7 @@ namespace AqualLifeStyle.Tests.Application
             var allocated = result.Items.Single();
             allocated.CheckoutId.ShouldBe(checkoutIds[0]);
             allocated.TenantId.ShouldBe(1);
-            allocated.AreaName.ShouldBe("Default");
+            allocated.AreaName.ShouldBe("Johannesburg");
             allocated.ClubMemberNumber.ShouldStartWith("CLB-");
             allocated.CustomerName.ShouldBe($"Monthly Reconciliation {suffix}");
             allocated.PeriodYear.ShouldBe(2026);
@@ -724,6 +727,78 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task TenantAdministrator_OnlySeesAndDecidesExplicitlyAssignedAreas()
+        {
+            var fixture = await CreateAwaitingApprovalEntryAsync(
+                Guid.NewGuid().ToString("N"),
+                tenantId: 1,
+                areaCode: "PTA");
+
+            (await _service.GetPendingApprovalSummaryAsync(
+                new PendingProgrammeApprovalSummaryInput())).TotalCount.ShouldBe(0);
+            await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                _service.ApproveProgrammeParticipationAsync(
+                    new ApproveProgrammeParticipationInput
+                    {
+                        Programme = AdminProgrammeType.Entry,
+                        ParticipationId = fixture.ParticipationId
+                    }));
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var pretoria = await context.Areas.SingleAsync(area =>
+                    area.TenantId == 1 && area.Code == "PTA");
+                context.AreaAdminAssignments.Add(AreaAdminAssignment.Assign(
+                    pretoria,
+                    AbpSession.GetUserId(),
+                    1,
+                    EffectiveFrom));
+                await context.SaveChangesAsync();
+            });
+
+            (await _service.GetPendingApprovalSummaryAsync(
+                new PendingProgrammeApprovalSummaryInput())).TotalCount.ShouldBe(1);
+            await _service.ApproveProgrammeParticipationAsync(
+                new ApproveProgrammeParticipationInput
+                {
+                    Programme = AdminProgrammeType.Entry,
+                    ParticipationId = fixture.ParticipationId
+                });
+        }
+
+        [Fact]
+        public async Task TenantAdministrator_CannotDiscoverOrDecideForInactiveArea()
+        {
+            var fixture = await CreateAwaitingApprovalEntryAsync(
+                Guid.NewGuid().ToString("N"),
+                tenantId: 1,
+                areaCode: "PTA");
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var pretoria = await context.Areas.SingleAsync(area =>
+                    area.TenantId == 1 && area.Code == "PTA");
+                context.AreaAdminAssignments.Add(AreaAdminAssignment.Assign(
+                    pretoria,
+                    AbpSession.GetUserId(),
+                    1,
+                    EffectiveFrom));
+                pretoria.Deactivate();
+                await context.SaveChangesAsync();
+            });
+
+            (await _service.GetPendingApprovalSummaryAsync(
+                new PendingProgrammeApprovalSummaryInput())).TotalCount.ShouldBe(0);
+            await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                _service.ApproveProgrammeParticipationAsync(
+                    new ApproveProgrammeParticipationInput
+                    {
+                        Programme = AdminProgrammeType.Entry,
+                        ParticipationId = fixture.ParticipationId
+                    }));
+        }
+
+        [Fact]
         public async Task Administrator_CannotRejectAnAlreadyActiveParticipation()
         {
             var suffix = Guid.NewGuid().ToString("N");
@@ -738,6 +813,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     $"Approval Active {suffix}",
                     new EmailAddress($"approval-active-customer-{suffix}@example.com"));
+                await AssignAreaAsync(context, customer, tenantId: 1);
                 var membership = Membership.Create(
                     1,
                     $"Onyx-active-{suffix}",
@@ -885,6 +961,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     $"Checkout Recovery {suffix}",
                     new EmailAddress($"checkout-recovery-customer-{suffix}@example.com"));
+                await AssignAreaAsync(context, customer, tenantId: 1);
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
                 var terms = EntryProgrammeTerms.CreateFlexibleJoiningPayment(
@@ -934,6 +1011,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     $"Reconciliation {suffix}",
                     new EmailAddress($"reconciliation-{suffix}@example.com"));
+                await AssignAreaAsync(context, customer, tenantId: 1);
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
 
@@ -958,6 +1036,9 @@ namespace AqualLifeStyle.Tests.Application
                 var recruiterCustomer = Customer.Create(1, recruiterUserId, "Verified Recruiter", new EmailAddress($"recruiter-customer-{suffix}@example.com"));
                 var targetCustomer = Customer.Create(1, targetUserId, "Placed Member", new EmailAddress($"target-customer-{suffix}@example.com"));
                 var descendantCustomer = Customer.Create(1, descendantUserId, "Network Descendant", new EmailAddress($"descendant-customer-{suffix}@example.com"));
+                await AssignAreaAsync(context, recruiterCustomer, tenantId: 1);
+                await AssignAreaAsync(context, targetCustomer, tenantId: 1);
+                await AssignAreaAsync(context, descendantCustomer, tenantId: 1);
                 context.Customers.AddRange(recruiterCustomer, targetCustomer, descendantCustomer);
                 await context.SaveChangesAsync();
 
@@ -1005,6 +1086,7 @@ namespace AqualLifeStyle.Tests.Application
                     targetUserId,
                     "Cross Area Target",
                     new EmailAddress($"cross-tenant-target-customer-{suffix}@example.com"));
+                await AssignAreaAsync(context, targetCustomer, tenantId: 1);
                 context.Customers.Add(targetCustomer);
                 await context.SaveChangesAsync();
                 context.EntryParticipations.Add(EntryParticipation.StartIndependently(
@@ -1023,6 +1105,7 @@ namespace AqualLifeStyle.Tests.Application
                     recruiterUserId,
                     "Cross Area Recruiter",
                     new EmailAddress($"cross-tenant-recruiter-customer-{suffix}@example.com"));
+                await AssignAreaAsync(context, recruiterCustomer, tenantId: 2);
                 context.Customers.Add(recruiterCustomer);
                 await context.SaveChangesAsync();
                 var recruiter = EntryParticipation.StartIndependently(
@@ -1070,6 +1153,7 @@ namespace AqualLifeStyle.Tests.Application
                     targetUserId,
                     "Cross Area Onyx Target",
                     new EmailAddress($"cross-tenant-onyx-target-customer-{suffix}@example.com"));
+                await AssignAreaAsync(context, targetCustomer, tenantId: 1);
                 var membership = Membership.Create(
                     1,
                     $"Cross-Area-Onyx-Target-{suffix}",
@@ -1100,6 +1184,7 @@ namespace AqualLifeStyle.Tests.Application
                     recruiterUserId,
                     "Cross Area Onyx Recruiter",
                     new EmailAddress($"cross-tenant-onyx-recruiter-customer-{suffix}@example.com"));
+                await AssignAreaAsync(context, recruiterCustomer, tenantId: 2);
                 var membership = Membership.Create(
                     2,
                     $"Cross-Area-Onyx-Recruiter-{suffix}",
@@ -1153,6 +1238,9 @@ namespace AqualLifeStyle.Tests.Application
                 var recruiterCustomer = Customer.Create(1, recruiterUserId, "Verified Onyx Recruiter", new EmailAddress($"onyx-recruiter-customer-{suffix}@example.com"));
                 var targetCustomer = Customer.Create(1, targetUserId, "Placed Onyx Member", new EmailAddress($"onyx-target-customer-{suffix}@example.com"));
                 var descendantCustomer = Customer.Create(1, descendantUserId, "Onyx Network Descendant", new EmailAddress($"onyx-descendant-customer-{suffix}@example.com"));
+                await AssignAreaAsync(context, recruiterCustomer, tenantId: 1);
+                await AssignAreaAsync(context, targetCustomer, tenantId: 1);
+                await AssignAreaAsync(context, descendantCustomer, tenantId: 1);
                 var membership = Membership.Create(1, $"Onyx-{suffix}", "Onyx correction test", MembershipType.Onyx);
                 context.Customers.AddRange(recruiterCustomer, targetCustomer, descendantCustomer);
                 context.Memberships.Add(membership);
@@ -1219,7 +1307,8 @@ namespace AqualLifeStyle.Tests.Application
 
         private async Task<ApprovalFixture> CreateAwaitingApprovalEntryAsync(
             string suffix,
-            int tenantId = 1)
+            int tenantId = 1,
+            string areaCode = null)
         {
             var userId = await CreateTestUserAsync(
                 tenantId,
@@ -1232,6 +1321,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     $"Approval Entry {suffix}",
                     new EmailAddress($"approval-entry-customer-{suffix}@example.com"));
+                await AssignAreaAsync(context, customer, tenantId, areaCode);
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
 
@@ -1287,6 +1377,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     $"Approval Onyx {suffix}",
                     new EmailAddress($"approval-onyx-customer-{suffix}@example.com"));
+                await AssignAreaAsync(context, customer, tenantId: 1);
                 var membership = Membership.Create(
                     1,
                     $"Onyx-approval-{suffix}",
@@ -1324,6 +1415,28 @@ namespace AqualLifeStyle.Tests.Application
                     ParticipationId = onyx.Id
                 };
             });
+        }
+
+        private static async Task AssignAreaAsync(
+            AqualLifeStyleDbContext context,
+            Customer customer,
+            int tenantId,
+            string requestedCode = null)
+        {
+            var code = requestedCode ?? (tenantId == 1 ? "JHB" : $"T{tenantId}");
+            var area = context.Areas.Local.FirstOrDefault(item =>
+                           item.TenantId == tenantId && item.Code == code) ??
+                       await context.Areas.IgnoreQueryFilters().FirstOrDefaultAsync(item =>
+                           item.TenantId == tenantId && item.Code == code);
+            if (area == null)
+            {
+                area = Area.Create(
+                    tenantId,
+                    code,
+                    code == "JHB" ? "Johannesburg" : code == "PTA" ? "Pretoria" : $"Tenant {tenantId} Area");
+                context.Areas.Add(area);
+            }
+            customer.AssignInitialArea(area, EffectiveFrom, "Test Area assignment");
         }
 
         private sealed class RecruitmentNetworkFixture
