@@ -38,7 +38,10 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
         public decimal TotalAmount { get; set; }
         public string Status { get; set; }
         public string HoldReason { get; set; }
+        // Backward-compatible commissioned depth used by the existing UI.
         public int HighestLevel { get; set; }
+        public int HighestQualifiedLevel { get; set; }
+        public int HighestCommissionedLevel { get; set; }
         public DateTime CalculatedAt { get; set; }
         public IReadOnlyList<MemberEarningComponentDto> Components { get; set; }
     }

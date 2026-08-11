@@ -43,6 +43,7 @@ namespace AqualLifeStyle.Domain.Onyx
                 period,
                 terms,
                 EffectiveProgrammeNetwork.BuildAQGreen(
+                    participation.TenantId,
                     networkParticipations,
                     period.PeriodEnd),
                 customerObligations,
@@ -63,8 +64,14 @@ namespace AqualLifeStyle.Domain.Onyx
             {
                 throw new ArgumentNullException(nameof(customerObligations));
             }
+            if (participation.TenantId != period.TenantId ||
+                network.TenantId != participation.TenantId)
+            {
+                throw new InvalidOperationException(
+                    "AQGreen commission inputs must belong to the same Tenant.");
+            }
 
-            var highestCompletedLevel = (int)_networkQualificationEvaluator.Evaluate(
+            var highestQualifiedNetworkLevel = _networkQualificationEvaluator.Evaluate(
                 participation.CustomerId,
                 network);
             var hasOverdueOwnObligation = customerObligations.Any(obligation =>
@@ -91,7 +98,7 @@ namespace AqualLifeStyle.Domain.Onyx
                 participation,
                 period,
                 terms,
-                highestCompletedLevel,
+                highestQualifiedNetworkLevel,
                 holdReasons.Count == 0 ? null : string.Join(" ", holdReasons));
         }
     }

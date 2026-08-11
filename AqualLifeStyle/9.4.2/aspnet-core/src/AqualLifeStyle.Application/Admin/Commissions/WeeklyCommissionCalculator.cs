@@ -122,6 +122,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 networkParticipations = await _entryParticipationRepository
                     .GetAllIncluding(participation => participation.RecruiterCorrections)
                     .Where(participation =>
+                        participation.TenantId == tenantId &&
                         participation.Status == EntryParticipationStatus.Active &&
                         (!participation.ActivatedAt.HasValue ||
                          participation.ActivatedAt <= closedWeek.PeriodEndUtc))
@@ -129,11 +130,10 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             }
             EnsureNoDeletedParticipationEvidence(networkParticipations, "AQGreen");
             var effectiveNetwork = EffectiveProgrammeNetwork.BuildAQGreen(
+                tenantId,
                 networkParticipations,
                 closedWeek.PeriodEndUtc);
-            var targetParticipations = networkParticipations
-                .Where(participation => participation.TenantId == tenantId)
-                .ToList();
+            var targetParticipations = networkParticipations;
             var targetParticipationIds = targetParticipations
                 .Select(participation => participation.Id)
                 .ToList();
@@ -229,6 +229,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 networkParticipations = await _onyxParticipationRepository
                     .GetAllIncluding(participation => participation.RecruiterCorrections)
                     .Where(participation =>
+                        participation.TenantId == tenantId &&
                         participation.Status == OnyxParticipationStatus.Active &&
                         (!participation.ActivatedAt.HasValue ||
                          participation.ActivatedAt <= closedWeek.PeriodEndUtc))
@@ -236,12 +237,11 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             }
             EnsureNoDeletedParticipationEvidence(networkParticipations, "Onyx");
             var effectiveNetwork = EffectiveProgrammeNetwork.BuildOnyx(
+                tenantId,
                 networkParticipations,
                 closedWeek.PeriodEndUtc);
 
-            var targetParticipations = networkParticipations
-                .Where(participation => participation.TenantId == tenantId)
-                .ToList();
+            var targetParticipations = networkParticipations;
             var period = OnyxCommissionPeriod.CreateClosedPeriod(
                 tenantId,
                 closedWeek.PeriodStartUtc,

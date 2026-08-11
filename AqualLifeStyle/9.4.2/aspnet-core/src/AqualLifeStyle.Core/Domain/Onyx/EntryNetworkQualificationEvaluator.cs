@@ -17,6 +17,23 @@ namespace AqualLifeStyle.Domain.Onyx
         public const int BranchSize = 5;
         public const int MaximumLevel = 3;
 
+        public static int GetRequiredPopulation(EntryNetworkLevel level)
+        {
+            if (level < EntryNetworkLevel.Level1 ||
+                level > EntryNetworkLevel.Level3)
+            {
+                throw new ArgumentOutOfRangeException(nameof(level));
+            }
+
+            var requiredPopulation = 1;
+            for (var depth = 0; depth < (int)level; depth++)
+            {
+                requiredPopulation *= BranchSize;
+            }
+
+            return requiredPopulation;
+        }
+
         public EntryNetworkLevel Evaluate(
             int customerId,
             IEnumerable<EntryParticipation> participations)
@@ -24,7 +41,8 @@ namespace AqualLifeStyle.Domain.Onyx
             if (customerId <= 0) throw new ArgumentOutOfRangeException(nameof(customerId));
             if (participations == null) throw new ArgumentNullException(nameof(participations));
 
-            var qualified = participations
+            var supplied = participations.ToList();
+            var qualified = supplied
                 .Where(participation => participation.IsQualifiedForNetwork)
                 .ToList();
             var duplicateCustomer = qualified
@@ -40,30 +58,15 @@ namespace AqualLifeStyle.Domain.Onyx
             {
                 return EntryNetworkLevel.None;
             }
-
-            var byRecruiter = qualified
-                .Where(participation => participation.RecruiterCustomerId.HasValue)
-                .GroupBy(participation => participation.RecruiterCustomerId.Value)
-                .ToDictionary(
-                    group => group.Key,
-                    group => group
-                        .OrderBy(EffectiveProgrammeNetwork.CurrentQualifiedUnderRecruiterAt)
-                        .ThenBy(item => item.Id)
-                        .Take(BranchSize)
-                        .ToList());
-            if (!IsCompleteCurrentBranch(customerId, 1, byRecruiter))
-            {
-                return EntryNetworkLevel.None;
-            }
-
-            if (!IsCompleteCurrentBranch(customerId, 2, byRecruiter))
-            {
-                return EntryNetworkLevel.Level1;
-            }
-
-            return IsCompleteCurrentBranch(customerId, 3, byRecruiter)
-                ? EntryNetworkLevel.Level3
-                : EntryNetworkLevel.Level2;
+            var expectedTenantId = qualified
+                .First(participation => participation.CustomerId == customerId)
+                .TenantId;
+            return Evaluate(
+                customerId,
+                EffectiveProgrammeNetwork.BuildAQGreen(
+                    expectedTenantId,
+                    supplied,
+                    DateTime.MaxValue));
         }
 
         public EntryNetworkLevel Evaluate(
@@ -82,19 +85,25 @@ namespace AqualLifeStyle.Domain.Onyx
                 return EntryNetworkLevel.None;
             }
 
-            if (!IsCompleteBranch(customerId, 1, network))
+            return EvaluateHighestCompleteLevel(level =>
+                IsCompleteBranch(customerId, level, network));
+        }
+
+        private static EntryNetworkLevel EvaluateHighestCompleteLevel(
+            Func<int, bool> isCompleteLevel)
+        {
+            var highestCompletedLevel = EntryNetworkLevel.None;
+            for (var level = 1; level <= MaximumLevel; level++)
             {
-                return EntryNetworkLevel.None;
+                if (!isCompleteLevel(level))
+                {
+                    break;
+                }
+
+                highestCompletedLevel = (EntryNetworkLevel)level;
             }
 
-            if (!IsCompleteBranch(customerId, 2, network))
-            {
-                return EntryNetworkLevel.Level1;
-            }
-
-            return IsCompleteBranch(customerId, 3, network)
-                ? EntryNetworkLevel.Level3
-                : EntryNetworkLevel.Level2;
+            return highestCompletedLevel;
         }
 
         private static bool IsCompleteBranch(
@@ -117,20 +126,5 @@ namespace AqualLifeStyle.Domain.Onyx
                 IsCompleteBranch(recruit.CustomerId, remainingDepth - 1, network));
         }
 
-        private static bool IsCompleteCurrentBranch(
-            int customerId,
-            int remainingDepth,
-            IReadOnlyDictionary<int, List<EntryParticipation>> byRecruiter)
-        {
-            if (remainingDepth == 0) return true;
-            if (!byRecruiter.TryGetValue(customerId, out var directRecruits) ||
-                directRecruits.Count < BranchSize)
-            {
-                return false;
-            }
-
-            return directRecruits.All(recruit =>
-                IsCompleteCurrentBranch(recruit.CustomerId, remainingDepth - 1, byRecruiter));
-        }
     }
 }

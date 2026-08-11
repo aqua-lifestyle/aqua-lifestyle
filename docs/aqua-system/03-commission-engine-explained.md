@@ -21,19 +21,25 @@ The worker wakes periodically, resolves the latest fully closed Friday-to-Thursd
 
 ## 2. Structure before money
 
-Only Active participants in the same programme form the qualifying network. Each selected branch needs five people at every required depth.
+Only Active participants in the same Tenant and programme form the qualifying
+network. The application scopes rows to the target Tenant before construction,
+and the domain network rejects mixed-Tenant input. Each selected branch needs
+five people at every required depth.
 
-Both AQGreen and Onyx have five structural levels. Each level requires five complete branches at every depth: 5, 25, 125, 625, and 3,125 people at Levels 1–5. An incomplete branch gives no partial level component.
+Tenant is the hard security and programme-network boundary. Area is a planned
+business/admin subdivision inside Tenant and is not implemented by this
+calculation model. Future same-Tenant cross-Area recruitment may be permitted;
+cross-Tenant recruitment and qualification are always prohibited.
+
+AQGreen has three structural levels, requiring complete five-person branches at every depth: 5, 25, and 125 people at Levels 1–3. Level 3 is final. Onyx separately continues through Levels 4 and 5, requiring 625 and 3,125 people. An incomplete branch gives no partial level component.
 
 ```mermaid
 flowchart LR
     A1[AQGreen L1<br/>5] --> A2[L2<br/>25]
-    A2 --> A3[L3<br/>125]
-    A3 --> A4[L4<br/>625]
-    A4 --> A5[L5<br/>3,125]
+    A2 --> A3[L3<br/>125 — final]
 ```
 
-`IMPLEMENTATION GAP`: the current AQGreen evaluator and level enum stop at Level 3. The five-level AQGreen structure is now confirmed business intent, but this documentation task does not implement Levels 4–5. Onyx already evaluates through Level 5.
+`CLIENT CONFIRMED`: AQGreen ends at Level 3. The evaluator, level enum, and commission terms all enforce that boundary. Onyx remains unchanged through Level 5.
 
 ```mermaid
 flowchart LR
@@ -92,10 +98,10 @@ Both programmes use per-person commission models, with different rate schedules:
 | Level 1 | R30 | R50 |
 | Level 2 | R10 | R20 |
 | Level 3 | R10 | R12.62 |
-| Level 4 | `UNRESOLVED` | R5 |
-| Level 5 | `UNRESOLVED` | R4 |
+| Level 4 | Not an AQGreen level | R5 |
+| Level 5 | Not an AQGreen level | R4 |
 
-For AQGreen, the confirmed rates derive the implemented components exactly: 5 × R30 = R150; 25 × R10 = R250; and 125 × R10 = R1,250. Their cumulative weekly amount is R1,650. This is only the sum of authorised Levels 1–3; it is not a Level 4 or Level 5 rate or eventual total.
+For AQGreen, the confirmed rates derive the implemented components exactly: 5 × R30 = R150; 25 × R10 = R250; and 125 × R10 = R1,250. Their cumulative weekly amount is R1,650 at the final AQGreen level.
 
 `VERIFIED IMPLEMENTATION`: the bootstrap is idempotent and conflict-checked; it does not enable a worker. Repository presence does not prove those rows exist in production.
 
@@ -103,12 +109,12 @@ For AQGreen, the confirmed rates derive the implemented components exactly: 5 ×
 
 Structural qualification, authorised commission depth, and payout status answer different questions:
 
-- **Business structural level**: how much of the five-level network was complete at cutoff?
+- **Business structural level**: how much of that programme's network was complete at cutoff?
 - **Authorised commission depth**: which level rates are known and effective for the cycle?
 - **Calculated amount**: which complete level components apply under the terms?
 - **Payout status**: is that amount Earned, Held, Released, or Paid?
 
-The current AQGreen engine answers both structural and commission depth only through Level 3. Future implementation must represent structural Levels 4–5 without assigning them a zero, guessed, or inherited rate. Future Level 4/5 rates must be explicitly authorised and effective-dated so they cannot rewrite old periods.
+The current AQGreen engine records structural qualification and commissioned depth through Level 3. The two projections remain distinct for API and ledger clarity, but their AQGreen values are equal under the confirmed three-level model. Onyx retains its separate five-level qualification and commission rules.
 
 For AQGreen, an own monthly obligation or applicable Onyx loan can hold the member's payout when it was overdue at cutoff. A later cure affects future eligibility but not the closed week. The current implementation does not remove network placement and does not infer an upline penalty.
 

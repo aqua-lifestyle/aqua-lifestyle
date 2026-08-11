@@ -118,6 +118,12 @@ namespace AqualLifeStyle.Domain.Onyx
                     "The inviting Club Member must have active Onyx participation.");
             }
 
+            if (recruiterParticipation.TenantId != tenantId)
+            {
+                throw new InvalidOperationException(
+                    "The inviting Club Member must belong to the same Tenant.");
+            }
+
             EnsureValidRecruiter(customerId, recruiterParticipation.CustomerId);
             return new OnyxParticipation(
                 tenantId,
@@ -298,6 +304,9 @@ namespace AqualLifeStyle.Domain.Onyx
                 throw new ArgumentNullException(nameof(newRecruiterParticipation));
             if (newRecruiterParticipation.Status != OnyxParticipationStatus.Active)
                 throw new InvalidOperationException("The inviting Club Member must have active Onyx participation.");
+            if (newRecruiterParticipation.TenantId != TenantId)
+                throw new InvalidOperationException(
+                    "The inviting Club Member must belong to the same Tenant.");
 
             EnsureValidRecruiter(CustomerId, newRecruiterParticipation.CustomerId);
             RecordRecruiterCorrection(

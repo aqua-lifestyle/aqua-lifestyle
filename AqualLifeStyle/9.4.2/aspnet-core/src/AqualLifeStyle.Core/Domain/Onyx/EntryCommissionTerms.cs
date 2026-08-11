@@ -9,6 +9,8 @@ namespace AqualLifeStyle.Domain.Onyx
         public decimal LevelOneComponentAmount { get; }
         public decimal LevelTwoComponentAmount { get; }
         public decimal LevelThreeComponentAmount { get; }
+        public EntryNetworkLevel HighestAuthorisedCommissionLevel =>
+            EntryNetworkLevel.Level3;
         public string Currency { get; }
 
         private EntryCommissionTerms(
@@ -71,6 +73,21 @@ namespace AqualLifeStyle.Domain.Onyx
                 3 => LevelThreeComponentAmount,
                 _ => throw new ArgumentOutOfRangeException(nameof(level))
             };
+        }
+
+        public EntryNetworkLevel GetHighestCommissionedLevel(
+            EntryNetworkLevel highestQualifiedNetworkLevel)
+        {
+            if (highestQualifiedNetworkLevel < EntryNetworkLevel.None ||
+                highestQualifiedNetworkLevel > EntryNetworkLevel.Level3)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(highestQualifiedNetworkLevel));
+            }
+
+            return highestQualifiedNetworkLevel <= HighestAuthorisedCommissionLevel
+                ? highestQualifiedNetworkLevel
+                : HighestAuthorisedCommissionLevel;
         }
 
         private static void EnsurePositive(decimal amount, string parameterName)

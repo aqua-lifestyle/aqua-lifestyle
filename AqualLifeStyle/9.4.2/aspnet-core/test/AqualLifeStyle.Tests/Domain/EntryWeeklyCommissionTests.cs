@@ -79,6 +79,33 @@ namespace AqualLifeStyle.Tests.Domain
             Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
         }
 
+        [Theory]
+        [InlineData(1, 1, 150)]
+        [InlineData(2, 2, 400)]
+        [InlineData(3, 3, 1650)]
+        [InlineData(4, 3, 1650)]
+        public void NetworkDepth_CapsQualificationAndCommissionAtLevel3(
+            int networkDepth,
+            int expectedLevel,
+            decimal expectedTotal)
+        {
+            var network = BuildNetwork(maxDepth: networkDepth);
+
+            var commission = Calculate(network);
+
+            Assert.Equal(expectedLevel, commission.HighestCompletedLevel);
+            Assert.Equal(expectedLevel, commission.HighestQualifiedNetworkLevel);
+            Assert.Equal(expectedLevel, commission.HighestCommissionedLevel);
+            Assert.Equal(expectedLevel, commission.Components.Count);
+            Assert.All(commission.Components, component =>
+            {
+                Assert.InRange(component.Level, 1, 3);
+                Assert.True(component.Amount > 0m);
+            });
+            Assert.Equal(expectedTotal, commission.TotalAmount);
+            Assert.Equal(WeeklyCommissionPayoutStatus.Earned, commission.PayoutStatus);
+        }
+
         [Fact]
         public void QualifiedNetwork_EarnsAgainInEachSubsequentClosedCycle()
         {

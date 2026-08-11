@@ -117,5 +117,28 @@ namespace AqualLifeStyle.Tests.Domain
             terms.GetComponentAmount(3).ShouldBe(1250m);
             terms.Currency.ShouldBe("ZAR");
         }
+
+        [Fact]
+        public void ToTerms_UsesTheThreeLevelAQGreenBoundary()
+        {
+            var terms = EntryCommissionTermsVersion.Create(
+                    "entry-2026-07",
+                    FridayBoundary,
+                    150m,
+                    250m,
+                    1250m)
+                .ToTerms();
+
+            terms.HighestAuthorisedCommissionLevel.ShouldBe(
+                EntryNetworkLevel.Level3);
+            terms.GetHighestCommissionedLevel(EntryNetworkLevel.Level1)
+                .ShouldBe(EntryNetworkLevel.Level1);
+            terms.GetHighestCommissionedLevel(EntryNetworkLevel.Level3)
+                .ShouldBe(EntryNetworkLevel.Level3);
+            Should.Throw<ArgumentOutOfRangeException>(() =>
+                terms.GetHighestCommissionedLevel((EntryNetworkLevel)4));
+            Should.Throw<ArgumentOutOfRangeException>(() =>
+                terms.GetComponentAmount(4));
+        }
     }
 }

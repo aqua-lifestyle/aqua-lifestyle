@@ -9,6 +9,7 @@ This is the precise business specification for the currently confirmed Aqua prog
 | A registered customer may have an AQGreen participation, an Onyx participation, both, or neither. | `BUSINESS DECISION` |
 | AQGreen and Onyx are separate programmes with separate participation, recruitment, payment, and commission records. | `BUSINESS DECISION` |
 | A recruiter must have Active participation in the same programme. No recruiter means an independent network root. | `VERIFIED IMPLEMENTATION` |
+| Recruiter, recruit, qualification graph, and commission ledger must remain inside one ABP Tenant. Host authority does not permit a cross-Tenant graph. | `VERIFIED IMPLEMENTATION` |
 | Payment-confirmed but unapproved participation is not Active and does not qualify for Active-only network or finance behaviour. | `VERIFIED IMPLEMENTATION` |
 | `Entry` is a retained technical/database name for AQGreen; it is not a third customer programme. | `SUPERSEDED` terminology boundary |
 | `Business Premier` is legacy catalogue/demo terminology and must not be used as the name of Onyx. | `SUPERSEDED` |
@@ -144,22 +145,34 @@ flowchart TD
 
 | Programme | Structural levels | Population at the level |
 | --- | ---: | --- |
-| AQGreen | 1–5 | 5, 25, 125, 625, 3,125 |
+| AQGreen | 1–3 | 5, 25, 125 |
 | Onyx | 1–5 | 5, 25, 125, 625, 3,125 |
 
-The full five-level structure contains 3,906 participants including the root.
+AQGreen ends at Level 3. Onyx's full five-level structure contains 3,906 participants including the root.
 
 ```mermaid
 flowchart LR
-    L1[Level 1<br/>5] --> L2[Level 2<br/>25]
-    L2 --> L3[Level 3<br/>125]
-    L3 --> L4[Level 4<br/>625]
-    L4 --> L5[Level 5<br/>3,125]
+    A1[AQGreen Level 1<br/>5] --> A2[Level 2<br/>25]
+    A2 --> A3[Level 3<br/>125 — final]
 ```
 
-`BUSINESS DECISION`: AQGreen structurally continues through Levels 4 and 5 even though its currently authorised commission rates end at Level 3.
+```mermaid
+flowchart LR
+    O1[Onyx Level 1<br/>5] --> O2[Level 2<br/>25]
+    O2 --> O3[Level 3<br/>125]
+    O3 --> O4[Level 4<br/>625]
+    O4 --> O5[Level 5<br/>3,125]
+```
 
-`IMPLEMENTATION GAP`: the current AQGreen network enum and evaluator model only Levels 1–3. Onyx already models Levels 1–5. This documentation correction does not claim that AQGreen Levels 4–5 are implemented.
+`CLIENT CONFIRMED`: AQGreen ends at Level 3. Onyx remains a separate five-level programme.
+
+`VERIFIED IMPLEMENTATION`: the AQGreen network enum and evaluator model structural Levels 1–3. Its qualified and commissioned levels cannot exceed Level 3.
+
+`VERIFIED IMPLEMENTATION`: the qualification graph is bounded by Tenant and
+programme. Repository queries select the requested Tenant before graph
+construction, and the effective-network builder rejects mixed-Tenant input.
+Area is a future business/admin subdivision inside Tenant; no Area aggregate or
+temporary Tenant-to-Area mapping is introduced by this rule.
 
 ## 6. Commission rules
 
@@ -181,12 +194,8 @@ The underlying commission model is a business rule that existed independently of
 | Level 1 | 5 | ZAR 30 | ZAR 150 | ZAR 150 |
 | Level 2 | 25 | ZAR 10 | ZAR 250 | ZAR 400 |
 | Level 3 | 125 | ZAR 10 | ZAR 1,250 | ZAR 1,650 |
-| Level 4 | 625 | `UNRESOLVED` | `UNRESOLVED` | ZAR 1,650 from authorised Levels 1–3 only |
-| Level 5 | 3,125 | `UNRESOLVED` | `UNRESOLVED` | ZAR 1,650 from authorised Levels 1–3 only |
 
-The Level 4 and Level 5 rows do **not** mean those levels pay ZAR 1,650. They mean the only currently authorised components remain Level 1 through Level 3; no Level 4 or Level 5 amount may be calculated until Aqua authorises an effective-dated rate.
-
-The current implementation stores the three derived component amounts—ZAR 150, ZAR 250, and ZAR 1,250—and evaluates AQGreen only through Level 3. For those implemented levels the result matches the confirmed per-person model. Incomplete levels have no partial component.
+The current implementation stores the three derived component amounts—ZAR 150, ZAR 250, and ZAR 1,250—and evaluates AQGreen only through Level 3. The cumulative Level 3 weekly amount is ZAR 1,650. Incomplete structural levels have no partial component.
 
 ### 6.3 Onyx rates
 
@@ -260,7 +269,6 @@ Email is supplemental. The durable portal queue and participation state are auth
 
 | Decision | Current fail-closed behaviour |
 | --- | --- |
-| AQGreen Level 4 and Level 5 per-person commission rates | Structure is confirmed through Level 5, but no Level 4/5 value, zero rate, or extrapolation is invented; current authorised components end at Level 3. |
 | AQGreen monthly due day and first authorised due policy | No due-policy row is invented; monthly worker remains disabled. |
 | Effect of an overdue member on uplines | Only the member's own payout is held; network placement remains. |
 | External funeral-cover enrolment, waiting period, and cover dates | Aqua records inclusion only. |

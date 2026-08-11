@@ -71,7 +71,7 @@ Do not arm the worker until all are evidenced:
 
 - [ ] Current production schema is migrated and healthy.
 - [ ] `2026-08-14-entry-initial` and `2026-08-14-onyx-initial` terms bootstrap dry-run is conflict-free, then the authorised rows are inserted and re-read.
-- [ ] The AQGreen evaluator is reconciled with the confirmed five-level business structure. The current code stops at Level 3; Level 4/5 rates remain unauthorised and must not be added until separately decided and effective-dated.
+- [x] The AQGreen evaluator and commission terms enforce the client-confirmed three-level model. Level 3 is final; Onyx separately remains a five-level programme.
 - [ ] Every existing Area has an authorised activation baseline; no current-state guess is used.
 - [ ] All participating Areas share the database topology assumed by cross-Area network calculation.
 - [ ] Target Friday-to-Thursday cycle and Johannesburg boundary are correct.

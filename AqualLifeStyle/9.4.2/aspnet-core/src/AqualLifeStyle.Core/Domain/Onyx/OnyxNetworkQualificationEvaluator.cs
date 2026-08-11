@@ -55,7 +55,8 @@ namespace AqualLifeStyle.Domain.Onyx
                 return OnyxNetworkLevel.None;
             }
 
-            var active = networkParticipations
+            var supplied = networkParticipations.ToList();
+            var active = supplied
                 .Where(candidate => candidate.Status == OnyxParticipationStatus.Active)
                 .ToList();
             var duplicateCustomer = active
@@ -72,28 +73,12 @@ namespace AqualLifeStyle.Domain.Onyx
                 return OnyxNetworkLevel.None;
             }
 
-            var byRecruiter = active
-                .Where(candidate => candidate.RecruiterCustomerId.HasValue)
-                .GroupBy(candidate => candidate.RecruiterCustomerId.Value)
-                .ToDictionary(
-                    group => group.Key,
-                    group => group
-                        .OrderBy(EffectiveProgrammeNetwork.CurrentQualifiedUnderRecruiterAt)
-                        .ThenBy(item => item.Id)
-                        .Take(BranchSize)
-                        .ToList());
-            var highest = OnyxNetworkLevel.None;
-            for (var level = 1; level <= HighestConfirmedStructuralLevel; level++)
-            {
-                if (!IsCompleteCurrentBranch(participation.CustomerId, level, byRecruiter))
-                {
-                    break;
-                }
-
-                highest = (OnyxNetworkLevel)level;
-            }
-
-            return highest;
+            return Evaluate(
+                participation.CustomerId,
+                EffectiveProgrammeNetwork.BuildOnyx(
+                    participation.TenantId,
+                    supplied,
+                    DateTime.MaxValue));
         }
 
         public OnyxNetworkLevel Evaluate(
@@ -152,20 +137,5 @@ namespace AqualLifeStyle.Domain.Onyx
                     network));
         }
 
-        private static bool IsCompleteCurrentBranch(
-            int customerId,
-            int remainingDepth,
-            IReadOnlyDictionary<int, List<OnyxParticipation>> byRecruiter)
-        {
-            if (remainingDepth == 0) return true;
-            if (!byRecruiter.TryGetValue(customerId, out var directRecruits) ||
-                directRecruits.Count < BranchSize)
-            {
-                return false;
-            }
-
-            return directRecruits.All(recruit =>
-                IsCompleteCurrentBranch(recruit.CustomerId, remainingDepth - 1, byRecruiter));
-        }
     }
 }

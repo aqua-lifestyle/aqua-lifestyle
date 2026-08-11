@@ -414,8 +414,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 PeriodStart = period.PeriodStart,
                 PeriodEnd = period.PeriodEnd,
                 TimeZoneId = period.TimeZoneId,
-                HighestQualifiedLevel = commission.HighestCompletedLevel,
-                HighestCommissionedLevel = commission.HighestCompletedLevel,
+                HighestQualifiedLevel = commission.HighestQualifiedNetworkLevel,
+                HighestCommissionedLevel = commission.HighestCommissionedLevel,
                 TotalAmount = commission.TotalAmount,
                 Currency = commission.Currency,
                 Status = CommissionPayoutStatusPresenter.ToBusinessLabel(

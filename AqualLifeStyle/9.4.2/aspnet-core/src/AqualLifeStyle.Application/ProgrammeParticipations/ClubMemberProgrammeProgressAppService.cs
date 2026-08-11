@@ -87,6 +87,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 : await _entryParticipationRepository
                     .GetAllIncluding(item => item.RecruiterCorrections)
                     .Where(item =>
+                        item.TenantId == tenantId &&
                         item.Status == EntryParticipationStatus.Active)
                     .ToListAsync();
             var commissions = await _entryCommissionRepository
@@ -110,7 +111,10 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 ? EntryNetworkLevel.None
                 : new EntryNetworkQualificationEvaluator().Evaluate(
                     customer.Id,
-                    activeParticipations);
+                    EffectiveProgrammeNetwork.BuildAQGreen(
+                        tenantId,
+                        activeParticipations,
+                        DateTime.MaxValue));
 
             return BuildProgress(
                 participation,
@@ -226,7 +230,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 Status = CommissionPayoutStatusPresenter.ToBusinessLabel(
                     commission.PayoutStatus),
                 HoldReason = commission.HoldReason,
-                HighestLevel = commission.HighestCompletedLevel,
+                HighestLevel = commission.HighestCommissionedLevel,
+                HighestQualifiedLevel = commission.HighestQualifiedNetworkLevel,
+                HighestCommissionedLevel = commission.HighestCommissionedLevel,
                 CalculatedAt = commission.CalculatedAt,
                 Components = commission.Components
                     .OrderBy(component => component.Level)
@@ -324,7 +330,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         "level needs 5 active direct recruits, each of whom has " +
                         "completed their own joining: Level 1 needs 5 direct " +
                         $"recruits, Level 2 needs 25 across your network, and " +
-                        $"Level 3 needs 125. Progress counts only active " +
+                        $"Level 3 needs 125. Level 3 is the final AQGreen " +
+                        "level. Progress counts only active " +
                         "participations."
                 },
                 new()
@@ -335,7 +342,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         $"{commissionTerms.GetComponentAmount(1):0.00}, " +
                         $"{commissionTerms.GetComponentAmount(2):0.00}, and " +
                         $"{commissionTerms.GetComponentAmount(3):0.00} " +
-                        $"({currency}) for Levels 1, 2, and 3. Earnings are " +
+                        $"({currency}) for Levels 1, 2, and 3. AQGreen ends " +
+                        "at Level 3. Earnings are " +
                         "held until they are released for payment. While your " +
                         "own AQGreen subscription is overdue, your own weekly " +
                         "earnings are held."

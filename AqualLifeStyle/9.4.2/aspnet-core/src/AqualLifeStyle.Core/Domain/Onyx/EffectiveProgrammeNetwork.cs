@@ -37,10 +37,12 @@ namespace AqualLifeStyle.Domain.Onyx
             _selectedChildrenByRecruiter;
 
         private EffectiveProgrammeNetwork(
+            int tenantId,
             ProgrammeNetworkKind kind,
             DateTime cutoff,
             IReadOnlyCollection<EffectiveNetworkParticipation> participations)
         {
+            TenantId = tenantId;
             Kind = kind;
             Cutoff = cutoff;
             _byCustomer = participations.ToDictionary(item => item.CustomerId);
@@ -56,6 +58,7 @@ namespace AqualLifeStyle.Domain.Onyx
                         .ToList());
         }
 
+        public int TenantId { get; }
         public ProgrammeNetworkKind Kind { get; }
         public DateTime Cutoff { get; }
 
@@ -67,13 +70,16 @@ namespace AqualLifeStyle.Domain.Onyx
                 : Array.Empty<EffectiveNetworkParticipation>();
 
         public static EffectiveProgrammeNetwork BuildAQGreen(
+            int expectedTenantId,
             IEnumerable<EntryParticipation> participations,
             DateTime cutoff)
         {
             if (participations == null) throw new ArgumentNullException(nameof(participations));
             ValidateCutoff(cutoff);
+            var supplied = participations.ToList();
+            ValidateTenant(expectedTenantId, supplied, "AQGreen");
 
-            var active = participations
+            var active = supplied
                 .Where(item => item.Status == EntryParticipationStatus.Active)
                 .ToList();
             if (active.Any(item => !item.ActivatedAt.HasValue))
@@ -97,17 +103,20 @@ namespace AqualLifeStyle.Domain.Onyx
                     cutoff,
                     "AQGreen"))
                 .ToList();
-            return Create(ProgrammeNetworkKind.AQGreen, cutoff, rows);
+            return Create(expectedTenantId, ProgrammeNetworkKind.AQGreen, cutoff, rows);
         }
 
         public static EffectiveProgrammeNetwork BuildOnyx(
+            int expectedTenantId,
             IEnumerable<OnyxParticipation> participations,
             DateTime cutoff)
         {
             if (participations == null) throw new ArgumentNullException(nameof(participations));
             ValidateCutoff(cutoff);
+            var supplied = participations.ToList();
+            ValidateTenant(expectedTenantId, supplied, "Onyx");
 
-            var active = participations
+            var active = supplied
                 .Where(item => item.Status == OnyxParticipationStatus.Active)
                 .ToList();
             if (active.Any(item => !item.ActivatedAt.HasValue))
@@ -131,7 +140,7 @@ namespace AqualLifeStyle.Domain.Onyx
                     cutoff,
                     "Onyx"))
                 .ToList();
-            return Create(ProgrammeNetworkKind.Onyx, cutoff, rows);
+            return Create(expectedTenantId, ProgrammeNetworkKind.Onyx, cutoff, rows);
         }
 
         internal static DateTime CurrentQualifiedUnderRecruiterAt(
@@ -183,6 +192,7 @@ namespace AqualLifeStyle.Domain.Onyx
         }
 
         private static EffectiveProgrammeNetwork Create(
+            int tenantId,
             ProgrammeNetworkKind kind,
             DateTime cutoff,
             IReadOnlyCollection<EffectiveNetworkParticipation> rows)
@@ -216,7 +226,33 @@ namespace AqualLifeStyle.Domain.Onyx
             }
 
             EnsureAcyclic(rows, kind);
-            return new EffectiveProgrammeNetwork(kind, cutoff, rows);
+            return new EffectiveProgrammeNetwork(tenantId, kind, cutoff, rows);
+        }
+
+        private static void ValidateTenant<TParticipation>(
+            int expectedTenantId,
+            IReadOnlyCollection<TParticipation> participations,
+            string programme)
+            where TParticipation : class, Abp.Domain.Entities.IMustHaveTenant
+        {
+            if (expectedTenantId <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(expectedTenantId));
+            }
+
+            if (participations.Any(item => item == null))
+            {
+                throw new InvalidOperationException(
+                    $"The {programme} network contains a missing participation.");
+            }
+
+            var unexpected = participations.FirstOrDefault(item =>
+                item.TenantId != expectedTenantId);
+            if (unexpected != null)
+            {
+                throw new InvalidOperationException(
+                    $"The {programme} network contains participation data outside Tenant {expectedTenantId}.");
+            }
         }
 
         private static EffectiveNetworkParticipation BuildNode(

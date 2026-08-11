@@ -98,6 +98,10 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     .Include(p => p.RecruiterCorrections)
                     .Where(p => p.TenantId == 1 && p.Status == EntryParticipationStatus.Active)
                     .ToListAsync();
+                CompleteInMemoryNetworkToLevelThree(
+                    participation,
+                    network,
+                    suffix);
                 var obligations = await context.EntryMonthlyObligations
                     .Where(o => network.Select(n => n.Id).Contains(o.EntryParticipationId))
                     .ToListAsync();
@@ -123,6 +127,17 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                         p.PeriodStart == periodStart &&
                         p.PeriodEnd == periodEnd);
                 existingPeriod.ShouldNotBeNull();
+
+                var persistedCommission = await context.EntryWeeklyCommissions
+                    .Include(commission => commission.Components)
+                    .SingleAsync();
+                persistedCommission.HighestQualifiedNetworkLevel.ShouldBe(3);
+                persistedCommission.HighestCommissionedLevel.ShouldBe(3);
+                persistedCommission.TotalAmount.ShouldBe(1650m);
+                persistedCommission.Components
+                    .Select(component => component.Level)
+                    .OrderBy(level => level)
+                    .ShouldBe(new[] { 1, 2, 3 });
             }
 
             await Assert.ThrowsAsync<DbUpdateException>(async () =>
@@ -134,6 +149,93 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             var secondCommissionCount = await CountAsync("EntryWeeklyCommissions");
             secondPeriodCount.ShouldBe(firstPeriodCount);
             secondCommissionCount.ShouldBe(firstCommissionCount);
+        }
+
+        [Fact]
+        public async Task TenantScopedQuery_ExcludesCrossTenantFifthRecruitAndLedger()
+        {
+            var suffix = Guid.NewGuid().ToString("N")[..8];
+            var customerId = await SeedCustomerAndUserAsync(suffix);
+            var participationId = await SeedQualifiedEntryParticipationAsync(
+                customerId,
+                suffix,
+                directRecruitCount: EntryNetworkQualificationEvaluator.BranchSize - 1);
+            var rootCustomerId = await GetParticipationCustomerIdAsync(participationId);
+            var crossTenantParticipationId = await SeedCrossTenantRecruitAsync(
+                rootCustomerId,
+                suffix);
+            var periodStart = new DateTime(2026, 8, 7, 0, 0, 0, DateTimeKind.Utc);
+            var periodEnd = new DateTime(2026, 8, 13, 23, 59, 59, 999, DateTimeKind.Utc);
+
+            await using (var context = CreateDbContext())
+            {
+                var network = await context.EntryParticipations
+                    .Include(participation => participation.RecruiterCorrections)
+                    .Where(participation =>
+                        participation.TenantId == 1 &&
+                        participation.Status == EntryParticipationStatus.Active)
+                    .ToListAsync();
+                network.Count.ShouldBe(5);
+                network.ShouldNotContain(participation =>
+                    participation.Id == crossTenantParticipationId);
+
+                var termsVersion = EntryCommissionTermsVersion.Create(
+                    $"tenant-safe-{suffix}",
+                    new DateTime(2026, 7, 16, 22, 0, 0, DateTimeKind.Utc),
+                    150m,
+                    250m,
+                    1250m);
+                context.EntryCommissionTermsVersions.Add(termsVersion);
+                var period = EntryCommissionPeriod.CreateClosedPeriod(
+                    1,
+                    periodStart,
+                    periodEnd,
+                    "Africa/Johannesburg",
+                    periodEnd.AddMinutes(1),
+                    termsVersion.ToTerms());
+                context.EntryCommissionPeriods.Add(period);
+
+                var effectiveNetwork = EffectiveProgrammeNetwork.BuildAQGreen(
+                    1,
+                    network,
+                    periodEnd);
+                var obligations = await context.EntryMonthlyObligations
+                    .Where(obligation => network
+                        .Select(participation => participation.Id)
+                        .Contains(obligation.EntryParticipationId))
+                    .ToListAsync();
+                var calculator = new EntryWeeklyCommissionCalculator(
+                    new EntryNetworkQualificationEvaluator());
+                var commissions = network
+                    .Select(participation => calculator.Calculate(
+                        participation,
+                        period,
+                        termsVersion.ToTerms(),
+                        effectiveNetwork,
+                        obligations))
+                    .ToList();
+                context.EntryWeeklyCommissions.AddRange(commissions);
+                await context.SaveChangesAsync();
+            }
+
+            await using (var context = CreateDbContext())
+            {
+                var period = await context.EntryCommissionPeriods
+                    .SingleAsync(item =>
+                        item.TenantId == 1 &&
+                        item.PeriodStart == periodStart &&
+                        item.PeriodEnd == periodEnd);
+                var commissions = await context.EntryWeeklyCommissions
+                    .Where(item => item.CommissionPeriodId == period.Id)
+                    .ToListAsync();
+                commissions.Count.ShouldBe(5);
+                commissions.All(item => item.TenantId == 1).ShouldBeTrue();
+                commissions.ShouldNotContain(item =>
+                    item.EntryParticipationId == crossTenantParticipationId);
+                commissions.Single(item =>
+                        item.EntryParticipationId == participationId)
+                    .HighestQualifiedNetworkLevel.ShouldBe(0);
+            }
         }
 
         private async Task StartPostgreSqlContainerAsync()
@@ -293,7 +395,10 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             return customer.Id;
         }
 
-        private async Task<Guid> SeedQualifiedEntryParticipationAsync(int customerId, string suffix)
+        private async Task<Guid> SeedQualifiedEntryParticipationAsync(
+            int customerId,
+            string suffix,
+            int directRecruitCount = EntryNetworkQualificationEvaluator.BranchSize)
         {
             await using var context = CreateDbContext();
             var terms = EntryProgrammeTerms.Create(
@@ -338,7 +443,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             context.EntryParticipations.Add(participation);
             await context.SaveChangesAsync();
 
-            for (var index = 0; index < EntryNetworkQualificationEvaluator.BranchSize; index++)
+            for (var index = 0; index < directRecruitCount; index++)
             {
                 var recruitUserName = $"wc-r{index}-{suffix}";
                 var recruitUser = new User
@@ -403,6 +508,167 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             }
 
             return participation.Id;
+        }
+
+        private async Task<int> GetParticipationCustomerIdAsync(Guid participationId)
+        {
+            await using var context = CreateDbContext();
+            return await context.EntryParticipations
+                .Where(participation => participation.Id == participationId)
+                .Select(participation => participation.CustomerId)
+                .SingleAsync();
+        }
+
+        private async Task<Guid> SeedCrossTenantRecruitAsync(
+            int recruiterCustomerId,
+            string suffix)
+        {
+            await using var context = CreateDbContext();
+            var tenant = new Tenant($"OtherTenant{suffix}", $"Other Tenant {suffix}");
+            context.Tenants.Add(tenant);
+            await context.SaveChangesAsync();
+
+            var userName = $"wc-cross-{suffix}";
+            var user = new User
+            {
+                TenantId = tenant.Id,
+                UserName = userName,
+                EmailAddress = $"{userName}@t.test",
+                Name = "Cross",
+                Surname = "Tenant",
+                IsEmailConfirmed = true,
+                IsActive = true
+            };
+            user.SetNormalizedNames();
+            var passwordHasher = new PasswordHasher<User>(
+                new OptionsWrapper<PasswordHasherOptions>(
+                    new PasswordHasherOptions()));
+            user.Password = passwordHasher.HashPassword(user, User.DefaultPassword);
+            context.Users.Add(user);
+            await context.SaveChangesAsync();
+
+            var customer = Customer.Create(
+                tenant.Id,
+                user.Id,
+                $"Cross Tenant Recruit {suffix}",
+                new AqualLifeStyle.Domain.Common.EmailAddress($"{userName}@t.test"));
+            context.Customers.Add(customer);
+            await context.SaveChangesAsync();
+
+            var terms = EntryProgrammeTerms.CreateSingleJoiningPayment(
+                $"entry-cross-tenant-{suffix}",
+                new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc),
+                1200m,
+                600m,
+                7);
+            var participation = EntryParticipation.StartIndependently(
+                tenant.Id,
+                customer.Id,
+                terms,
+                new DateTime(2026, 8, 1, 9, 0, 0, DateTimeKind.Utc));
+
+            // Simulate an already-corrupt stored relationship. New domain and
+            // application paths reject this cross-tenant placement before it is set.
+            var recruiterProperty = typeof(EntryParticipation)
+                .GetProperty(nameof(EntryParticipation.RecruiterCustomerId));
+            recruiterProperty.ShouldNotBeNull();
+            recruiterProperty.SetValue(participation, recruiterCustomerId);
+
+            var payment = MemberPayment.CreatePending(
+                tenant.Id,
+                customer.Id,
+                MemberPaymentPurpose.AQGreenJoining,
+                1200m,
+                "Test",
+                $"commission-cross-tenant-{suffix}",
+                new DateTime(2026, 8, 1, 9, 1, 0, DateTimeKind.Utc));
+            payment.Confirm(new DateTime(2026, 8, 1, 9, 2, 0, DateTimeKind.Utc));
+            participation.ApplyConfirmedJoiningPayment(payment);
+            participation.ApproveByAdministrator(
+                1,
+                new DateTime(2026, 8, 1, 9, 3, 0, DateTimeKind.Utc));
+
+            context.MemberPayments.Add(payment);
+            context.EntryParticipations.Add(participation);
+            await context.SaveChangesAsync();
+            return participation.Id;
+        }
+
+        private static void CompleteInMemoryNetworkToLevelThree(
+            EntryParticipation root,
+            List<EntryParticipation> network,
+            string suffix)
+        {
+            var structuralTerms = EntryProgrammeTerms.CreateSingleJoiningPayment(
+                version: $"entry-level-three-{suffix}",
+                effectiveFrom: new DateTime(
+                    2026,
+                    7,
+                    1,
+                    0,
+                    0,
+                    0,
+                    DateTimeKind.Utc),
+                joiningPaymentAmount: 1200m,
+                monthlyCommitmentAmount: 600m,
+                gracePeriodDays: 7);
+            var currentLevel = network
+                .Where(participation =>
+                    participation.RecruiterCustomerId == root.CustomerId)
+                .OrderBy(participation => participation.ActivatedAt)
+                .ThenBy(participation => participation.Id)
+                .Take(EntryNetworkQualificationEvaluator.BranchSize)
+                .ToList();
+            currentLevel.Count.ShouldBe(
+                EntryNetworkQualificationEvaluator.BranchSize);
+            var nextCustomerId = 100000;
+
+            for (var depth = 2;
+                 depth <= EntryNetworkQualificationEvaluator.MaximumLevel;
+                 depth++)
+            {
+                var nextLevel = new List<EntryParticipation>();
+                foreach (var recruiter in currentLevel)
+                {
+                    for (var index = 0;
+                         index < EntryNetworkQualificationEvaluator.BranchSize;
+                         index++)
+                    {
+                        var startedAt = new DateTime(
+                            2026,
+                            8,
+                            1,
+                            9,
+                            depth,
+                            0,
+                            DateTimeKind.Utc);
+                        var recruit = EntryParticipation.StartUnderRecruiter(
+                            1,
+                            nextCustomerId,
+                            recruiter,
+                            structuralTerms,
+                            startedAt);
+                        var payment = MemberPayment.CreatePending(
+                            1,
+                            nextCustomerId,
+                            MemberPaymentPurpose.AQGreenJoining,
+                            1200m,
+                            "Test",
+                            $"commission-level-three-{suffix}-{nextCustomerId}",
+                            startedAt.AddSeconds(1));
+                        payment.Confirm(startedAt.AddSeconds(2));
+                        recruit.ApplyConfirmedJoiningPayment(payment);
+                        recruit.ApproveByAdministrator(
+                            1,
+                            startedAt.AddSeconds(3));
+                        network.Add(recruit);
+                        nextLevel.Add(recruit);
+                        nextCustomerId++;
+                    }
+                }
+
+                currentLevel = nextLevel;
+            }
         }
 
         private async Task<Guid> CalculateAndPersistFirstRunAsync(Guid participationId)

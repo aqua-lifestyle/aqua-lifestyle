@@ -113,6 +113,36 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task CrossTenantInvitation_CannotCreateAQGreenPlacement()
+        {
+            var recruiterCustomerId = await CreateActiveEntryParticipantAsync(2);
+            var inviteCode = await UsingDbContextAsync(2, async context =>
+            {
+                var participationId = await context.EntryParticipations
+                    .Where(item => item.CustomerId == recruiterCustomerId)
+                    .Select(item => item.Id)
+                    .SingleAsync();
+                var invitation = ProgrammeInvitation.Create(
+                    2,
+                    RecruitmentProgrammeKeys.AQGreen,
+                    participationId);
+                context.ProgrammeInvitations.Add(invitation);
+                await context.SaveChangesAsync();
+                return invitation.Code;
+            });
+            var inviteeCustomerId = await RegisterAndSignInCustomerAsync();
+
+            var exception = await Should.ThrowAsync<UserFriendlyException>(() =>
+                _participationService.StartEntryAsync(
+                    new StartEntryParticipationInput { InviteCode = inviteCode }));
+
+            exception.Details.ShouldContain("different organisation");
+            await UsingDbContextAsync(1, async context =>
+                (await context.EntryParticipations.AnyAsync(item =>
+                    item.CustomerId == inviteeCustomerId)).ShouldBeFalse());
+        }
+
+        [Fact]
         public async Task OnyxInvitation_IsIdempotentAndCannotCreateAQGreenPlacement()
         {
             var recruiterCustomerId = await RegisterAndSignInCustomerAsync();
@@ -848,42 +878,44 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task AQGreenRecruitment_CanCrossAreaBoundaries()
+        public async Task AQGreenRecruitment_RejectsCrossTenantRecruiter()
         {
             var customerId = await RegisterAndSignInCustomerAsync();
             var recruiterCustomerId =
                 await CreateActiveEntryParticipantAsync(2);
 
-            await _participationService.StartEntryAsync(
+            var exception = await Should.ThrowAsync<UserFriendlyException>(() =>
+                _participationService.StartEntryAsync(
                 new StartEntryParticipationInput
                 {
                     RecruiterCustomerId = recruiterCustomerId
-                });
+                }));
 
+            exception.Details.ShouldContain("not currently participating in AQGreen");
             await UsingDbContextAsync(1, async context =>
-                (await context.EntryParticipations.SingleAsync(item =>
-                    item.CustomerId == customerId)).RecruiterCustomerId
-                    .ShouldBe(recruiterCustomerId));
+                (await context.EntryParticipations.AnyAsync(item =>
+                    item.CustomerId == customerId)).ShouldBeFalse());
         }
 
         [Fact]
-        public async Task OnyxRecruitment_CanCrossAreaBoundariesWithoutPrematurePlacement()
+        public async Task OnyxRecruitment_RejectsCrossTenantRecruiter()
         {
             var customerId = await RegisterAndSignInCustomerAsync();
             var recruiterCustomerId =
                 await CreateActiveOnyxParticipantAsync(2);
 
-            await _participationService.CreateDirectOnyxCheckoutAsync(
+            var exception = await Should.ThrowAsync<UserFriendlyException>(() =>
+                _participationService.CreateDirectOnyxCheckoutAsync(
                 new CreateDirectOnyxCheckoutInput
                 {
                     RecruiterCustomerId = recruiterCustomerId
-                });
+                }));
 
+            exception.Details.ShouldContain("not currently participating in Onyx");
             await UsingDbContextAsync(1, async context =>
             {
-                (await context.DirectOnyxCheckoutIntents.SingleAsync(item =>
-                    item.CustomerId == customerId)).RecruiterCustomerId
-                    .ShouldBe(recruiterCustomerId);
+                (await context.DirectOnyxCheckoutIntents.AnyAsync(item =>
+                    item.CustomerId == customerId)).ShouldBeFalse();
                 (await context.OnyxParticipations.AnyAsync(item =>
                     item.CustomerId == customerId)).ShouldBeFalse();
             });
@@ -1065,7 +1097,7 @@ namespace AqualLifeStyle.Tests.Application
                     tenantId,
                     customer.Id,
                     MemberPaymentPurpose.AQGreenJoining,
-                    $"cross-area-joining-{suffix}",
+                    $"cross-tenant-joining-{suffix}",
                     1200m);
                 participation.ApplyConfirmedJoiningPayment(joiningPayment);
                 participation.ApproveByAdministrator(1L, DateTime.UtcNow);
@@ -1113,7 +1145,7 @@ namespace AqualLifeStyle.Tests.Application
                 var membership = Membership.Create(
                     tenantId,
                     $"Onyx-{suffix}",
-                    "Onyx cross-Area recruiter test",
+                    "Onyx cross-Tenant recruiter test",
                     MembershipType.Onyx);
                 context.Customers.Add(customer);
                 context.Memberships.Add(membership);
@@ -1129,7 +1161,7 @@ namespace AqualLifeStyle.Tests.Application
                     tenantId,
                     customer.Id,
                     MemberPaymentPurpose.OnyxDirectEntry,
-                    $"cross-area-onyx-{suffix}",
+                    $"cross-tenant-onyx-{suffix}",
                     6120m);
                 participation.ApplyConfirmedDirectEntryPayment(payment);
                 participation.ApproveByAdministrator(1L, DateTime.UtcNow);
