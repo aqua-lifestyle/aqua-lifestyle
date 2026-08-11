@@ -414,6 +414,81 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             return (participation.Id, firstConfirmedAt, secondConfirmedAt);
         }
 
+        private async Task<Guid> SeedLegacyParticipationThroughJoiningMigrationAsync()
+        {
+            const string previousMigration =
+                "20260726145201_AddDirectOnyxCheckoutIntents";
+            await ResetDatabaseAsync();
+            await MigrateToAsync(previousMigration);
+            await SeedMinimalUserAsync();
+
+            var participationId = Guid.NewGuid();
+            await ExecuteAsync($$"""
+                INSERT INTO "EntryParticipations" (
+                    "Id", "TenantId", "CustomerId", "Status", "StartedAt",
+                    "TermsVersion", "TermsEffectiveFrom",
+                    "RegistrationPaymentAmount", "ActivationPaymentAmount",
+                    "MonthlyCommitmentAmount", "GracePeriodDays", "Currency",
+                    "CreationTime", "IsDeleted")
+                VALUES (
+                    '{{participationId}}', 1, 1, 0,
+                    TIMESTAMPTZ '2026-07-24 12:27:22.947458+00',
+                    '2026-07', TIMESTAMPTZ '2026-07-01 00:00:00+00',
+                    600.00, 600.00, 600.00, 7, 'ZAR',
+                    NOW(), FALSE);
+                """);
+            await MigrateToAsync("20260726162000_AddAQGreenSingleJoiningPayment");
+            await MigrateToAsync(BeforeFuneralCoverMigration);
+            return participationId;
+        }
+
+        private async Task ApplyLegacyJoiningPaymentAsync(
+            Guid participationId,
+            DateTime confirmedAt)
+        {
+            var paymentId = Guid.NewGuid();
+            await ExecuteAsync($$"""
+                INSERT INTO "MemberPayments" (
+                    "Id", "TenantId", "CustomerId", "Purpose", "Amount", "Currency",
+                    "Provider", "ExternalReference", "Status", "InitiatedAt", "ConfirmedAt",
+                    "CreationTime", "IsDeleted")
+                VALUES (
+                    '{{paymentId}}', 1, 1, 7, 1200.00, 'ZAR', 'Test',
+                    'legacy-joining-{{paymentId:N}}', 1,
+                    TIMESTAMPTZ '2026-08-04 19:01:42.097429+00',
+                    TIMESTAMPTZ '{{confirmedAt.ToString("yyyy-MM-dd HH:mm:ss")}}+00',
+                    NOW(), FALSE);
+
+                UPDATE "EntryParticipations"
+                SET "JoiningPaymentId" = '{{paymentId}}',
+                    "Status" = 2,
+                    "ActivatedAt" = TIMESTAMPTZ '{{confirmedAt.ToString("yyyy-MM-dd HH:mm:ss")}}+00'
+                WHERE "Id" = '{{participationId}}';
+                """);
+        }
+
+        private async Task<Guid> SeedLegacyShapedParticipationAsync()
+        {
+            var participationId = Guid.NewGuid();
+            await ExecuteAsync($$"""
+                INSERT INTO "EntryParticipations" (
+                    "Id", "TenantId", "CustomerId", "Status", "StartedAt",
+                    "TermsVersion", "TermsEffectiveFrom",
+                    "RegistrationPaymentAmount", "ActivationPaymentAmount",
+                    "MonthlyCommitmentAmount", "GracePeriodDays", "Currency",
+                    "JoiningPaymentAmount", "JoiningInstallmentAmount",
+                    "CreationTime", "IsDeleted")
+                VALUES (
+                    '{{participationId}}', 1, 1, 0,
+                    TIMESTAMPTZ '2026-07-24 09:00:00+00',
+                    '2026-07-single-1200', TIMESTAMPTZ '2026-07-26 00:00:00+00',
+                    600.00, 600.00, 600.00, 7, 'ZAR',
+                    1200.00, 0.00,
+                    NOW(), FALSE);
+                """);
+            return participationId;
+        }
+
         private async Task MigrateToAsync(string targetMigration)
         {
             await using var context = CreateDbContext();
@@ -688,6 +763,114 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 BuildTestConnectionString(),
                 "SELECT COUNT(*) FROM \"AQGreenFuneralCoverEntitlements\""))
                 .ShouldBe(0);
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_RecognisesProvenLegacyChronology_Unpaid()
+        {
+            await ResetDatabaseAsync();
+            var participationId = await SeedLegacyParticipationThroughJoiningMigrationAsync();
+
+            await MigrateToAsync(FuneralCoverMigration);
+
+            (await CountAsync(
+                BuildTestConnectionString(),
+                "SELECT COUNT(*) FROM \"AQGreenFuneralCoverEntitlements\""))
+                .ShouldBe(0);
+            (await CountAsync(
+                BuildTestConnectionString(),
+                $$"""
+                SELECT COUNT(*)
+                FROM "AQGreenMigrationBackup"
+                WHERE "ParticipationId" = '{{participationId}}'
+                  AND "OldTermsVersion" = '2026-07'
+                  AND "OldTermsEffectiveFrom" = TIMESTAMPTZ '2026-07-01 00:00:00+00'
+                """))
+                .ShouldBe(1);
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_RecognisesProvenLegacyChronology_AndBackfillsAtConfirmedPayment()
+        {
+            await ResetDatabaseAsync();
+            var participationId = await SeedLegacyParticipationThroughJoiningMigrationAsync();
+            var confirmedAt = new DateTime(
+                2026, 8, 4, 19, 1, 43, DateTimeKind.Utc);
+            await ApplyLegacyJoiningPaymentAsync(participationId, confirmedAt);
+
+            await MigrateToAsync(FuneralCoverMigration);
+
+            await using var context = CreateDbContext();
+            var entitlement = await context.AQGreenFuneralCoverEntitlements.SingleAsync();
+            entitlement.EntryParticipationId.ShouldBe(participationId);
+            entitlement.IncludedAt.ShouldBe(confirmedAt);
+            entitlement.FuneralCoverAmount.ShouldBe(30000m);
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_FailsClosedForModernStartWithoutLegacyProvenance()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(BeforeFuneralCoverMigration);
+            await SeedMinimalUserAsync();
+            await SeedModernAQGreenParticipationAsync(completeJoiningPayment: true);
+            await ExecuteAsync($$"""
+                UPDATE "EntryParticipations"
+                SET "StartedAt" = TIMESTAMPTZ '2026-07-24 09:00:00+00'
+                WHERE "JoiningPaymentId" IS NOT NULL;
+                """);
+
+            var exception = await Should.ThrowAsync<PostgresException>(() =>
+                MigrateToAsync(FuneralCoverMigration));
+
+            exception.SqlState.ShouldBe(PostgresErrorCodes.RaiseException);
+            exception.MessageText.ShouldContain(
+                "Contradictory historical AQGreen joining-payment data");
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_FailsClosedForLegacyBackupWithoutOldTermsEffectiveDate()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(BeforeFuneralCoverMigration);
+            await SeedMinimalUserAsync();
+            var participationId = await SeedLegacyShapedParticipationAsync();
+            await ExecuteAsync($$"""
+                INSERT INTO "AQGreenMigrationBackup" (
+                    "ParticipationId", "OldTermsVersion", "OldTermsEffectiveFrom")
+                VALUES (
+                    '{{participationId}}', '2026-07', NULL);
+                """);
+
+            var exception = await Should.ThrowAsync<PostgresException>(() =>
+                MigrateToAsync(FuneralCoverMigration));
+
+            exception.SqlState.ShouldBe(PostgresErrorCodes.RaiseException);
+            exception.MessageText.ShouldContain(
+                "Contradictory historical AQGreen joining-payment data");
+        }
+
+        [Fact]
+        public async Task FuneralCoverMigration_FailsClosedForLegacyChronologyContradiction()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToAsync(BeforeFuneralCoverMigration);
+            await SeedMinimalUserAsync();
+            var participationId = await SeedLegacyShapedParticipationAsync();
+            await ExecuteAsync($$"""
+                INSERT INTO "AQGreenMigrationBackup" (
+                    "ParticipationId", "OldTermsVersion", "OldTermsEffectiveFrom")
+                VALUES (
+                    '{{participationId}}', '2026-07',
+                    TIMESTAMPTZ '2026-07-25 00:00:00+00');
+                """);
+
+            var exception = await Should.ThrowAsync<PostgresException>(() =>
+                MigrateToAsync(FuneralCoverMigration));
+
+            exception.SqlState.ShouldBe(PostgresErrorCodes.RaiseException);
+            exception.MessageText.ShouldContain(
+                "Contradictory historical AQGreen joining-payment data");
         }
 
         [Fact]
