@@ -72,6 +72,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
     public class MyProgrammeParticipationsDto
     {
         public string ClubMemberNumber { get; set; }
+        public Guid? AreaId { get; set; }
+        public string AreaName { get; set; }
         public ProgrammeParticipationDto Entry { get; set; }
         public ProgrammeParticipationDto Onyx { get; set; }
         public PendingProgrammeCheckoutDto PendingAQGreenCheckout { get; set; }

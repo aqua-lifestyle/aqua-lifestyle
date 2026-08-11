@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto;
@@ -11,6 +12,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             AdminProgrammeParticipationListInput input);
         Task<PendingProgrammeApprovalSummaryDto> GetPendingApprovalSummaryAsync(
             PendingProgrammeApprovalSummaryInput input);
+        Task<IReadOnlyList<AssignedAreaDto>> GetAssignedAreasAsync();
         Task CorrectRecruiterAsync(CorrectProgrammeRecruiterInput input);
         Task<OnyxGraduationDecisionDto> GraduateAQGreenToOnyxAsync(
             GraduateAQGreenToOnyxInput input);

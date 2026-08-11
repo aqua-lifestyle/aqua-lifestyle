@@ -26,10 +26,13 @@ network. The application scopes rows to the target Tenant before construction,
 and the domain network rejects mixed-Tenant input. Each selected branch needs
 five people at every required depth.
 
-Tenant is the hard security and programme-network boundary. Area is a planned
-business/admin subdivision inside Tenant and is not implemented by this
-calculation model. Future same-Tenant cross-Area recruitment may be permitted;
-cross-Tenant recruitment and qualification are always prohibited.
+Tenant is the hard security and programme-network boundary. Area is an
+implemented business/admin subdivision inside Tenant, but is deliberately not
+part of the calculation graph. Same-Tenant cross-Area recruitment is permitted;
+cross-Tenant recruitment and qualification are always prohibited. Current
+commission ledgers do not snapshot the new business Area because no present
+reporting rule requires it; future Area-at-cutoff reporting must use effective
+history rather than today's Area.
 
 AQGreen has three structural levels, requiring complete five-person branches at every depth: 5, 25, and 125 people at Levels 1–3. Level 3 is final. Onyx separately continues through Levels 4 and 5, requiring 625 and 3,125 people. An incomplete branch gives no partial level component.
 

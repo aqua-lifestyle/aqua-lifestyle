@@ -1,5 +1,7 @@
 using System.Threading.Tasks;
+using System.Linq;
 using System.Linq.Expressions;
+using System.Threading;
 using Abp.Authorization;
 using Abp.Runtime.Session;
 using Moq;
@@ -11,6 +13,7 @@ using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
+using Microsoft.EntityFrameworkCore.Query;
 
 namespace AqualLifeStyle.Tests
 {
@@ -25,8 +28,9 @@ namespace AqualLifeStyle.Tests
 
             var customerRepo = new Mock<ICustomerRepository>();
             customerRepo
-                .Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<System.Func<Customer, bool>>>()))
-                .ReturnsAsync(customer);
+                .Setup(r => r.GetAllIncluding(
+                    It.IsAny<Expression<System.Func<Customer, object>>[]>()))
+                .Returns(CreateAsyncCustomerQuery(customer));
             customerRepo.Setup(r => r.UpdateAsync(customer)).ReturnsAsync(customer);
 
             var membershipRepo = new Mock<IMembershipRepository>();
@@ -65,6 +69,24 @@ namespace AqualLifeStyle.Tests
             Assert.Equal(2, result.MembershipId);
             Assert.False(result.IsActive);
             customerRepo.Verify(r => r.UpdateAsync(It.Is<Customer>(c => c.Name == "New Name" && c.Email.Value == "new@example.com" && c.MembershipId == 2 && c.IsActive == false)), Times.Once);
+        }
+
+        private static IQueryable<Customer> CreateAsyncCustomerQuery(Customer customer)
+        {
+            var source = new[] { customer }.AsQueryable();
+            var provider = new Mock<IAsyncQueryProvider>();
+            provider
+                .Setup(item => item.ExecuteAsync<Task<Customer>>(
+                    It.IsAny<Expression>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(customer));
+
+            var query = new Mock<IQueryable<Customer>>();
+            query.Setup(item => item.Provider).Returns(provider.Object);
+            query.Setup(item => item.Expression).Returns(source.Expression);
+            query.Setup(item => item.ElementType).Returns(source.ElementType);
+            query.Setup(item => item.GetEnumerator()).Returns(() => source.GetEnumerator());
+            return query.Object;
         }
 
         [Fact]

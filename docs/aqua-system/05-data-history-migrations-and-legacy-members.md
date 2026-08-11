@@ -141,9 +141,11 @@ Discovery endpoints expose legacy joining and monthly checkout reconciliation ro
 
 ## 9. Area activation baselines
 
+The new business `Area` aggregate is distinct from the older tenant-scoped commission activation terminology. Customer Area membership has its own effective-dated `CustomerAreaAssignment` history. The Johannesburg migration records a system-introduction baseline only; it does not claim an earlier movement or business activation date. See [document 08](08-area-and-tenant-boundaries.md).
+
 Commission calculation needs to know whether a target Area was active at the historical cutoff. “The Area is active now” cannot prove that fact.
 
-The append-only Area history supports prospective observation and change. It does not seed or backfill existing Areas from current state. Every existing-Area baseline must be explicitly authorised, and cutoffs before the first reliable record remain unknown.
+The older append-only commission activation history supports prospective observation and change at its tenant-scoped calculation boundary. It does not seed or backfill activation facts from current state. Every activation baseline must be explicitly authorised, and cutoffs before the first reliable record remain unknown. This is separate from the owner-authorised current Johannesburg customer assignment baseline.
 
 ```mermaid
 flowchart LR

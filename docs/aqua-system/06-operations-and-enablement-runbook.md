@@ -2,6 +2,10 @@
 
 This runbook answers: “The capability exists—what must happen before we operate it?” It does not authorise a deployment or production data change.
 
+## Area/Tenant migration gate
+
+Before programme operations, apply and verify `SeparateAreaFromTenantBoundary` using the checklist in [document 08](08-area-and-tenant-boundaries.md). The technical Tenant must remain `Default`; Johannesburg is the business Area `JHB`. Confirm customer and administrator assignment counts, and stop if any participation lacks a same-Tenant Customer Area. Do not manufacture historic movements. After production use, rollback destroys Area assignment history, so prefer a reviewed forward repair or controlled database restoration.
+
 ## 1. Readiness language
 
 ```mermaid

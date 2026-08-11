@@ -14,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using AqualLifeStyle.Email;
 using AqualLifeStyle.Domain.Email;
+using AqualLifeStyle.Application.Areas;
 
 namespace AqualLifeStyle.Authorization.Accounts
 {
@@ -28,6 +29,7 @@ namespace AqualLifeStyle.Authorization.Accounts
         private readonly IAccountEmailThrottleRepository _emailThrottleRepository;
         private readonly AccountEmailVerificationScheduler _emailVerificationScheduler;
         private readonly AccountPasswordResetScheduler _passwordResetScheduler;
+        private readonly IAreaAssignmentResolver _areaAssignmentResolver;
 
         public AccountAppService(
             UserRegistrationManager userRegistrationManager,
@@ -36,7 +38,8 @@ namespace AqualLifeStyle.Authorization.Accounts
             ITransactionalEmailOutbox emailOutbox,
             IAccountEmailThrottleRepository emailThrottleRepository,
             AccountEmailVerificationScheduler emailVerificationScheduler,
-            AccountPasswordResetScheduler passwordResetScheduler)
+            AccountPasswordResetScheduler passwordResetScheduler,
+            IAreaAssignmentResolver areaAssignmentResolver)
         {
             _userRegistrationManager = userRegistrationManager;
             _configuration = configuration;
@@ -45,6 +48,7 @@ namespace AqualLifeStyle.Authorization.Accounts
             _emailThrottleRepository = emailThrottleRepository;
             _emailVerificationScheduler = emailVerificationScheduler;
             _passwordResetScheduler = passwordResetScheduler;
+            _areaAssignmentResolver = areaAssignmentResolver;
         }
 
         public async Task<IsTenantAvailableOutput> IsTenantAvailable(IsTenantAvailableInput input)
@@ -128,6 +132,11 @@ namespace AqualLifeStyle.Authorization.Accounts
                 new EmailAddress(input.EmailAddress),
                 membershipId: null,
                 user: user);
+            var area = await _areaAssignmentResolver.ResolveActiveAreaAsync(
+                user.TenantId.Value,
+                input.AreaId,
+                "Registration is unavailable.");
+            customer.AssignInitialArea(area, DateTime.UtcNow, "Customer registration");
             await _customerRepository.InsertAsync(customer);
             using (CurrentUnitOfWork.SetTenantId(user.TenantId))
             {

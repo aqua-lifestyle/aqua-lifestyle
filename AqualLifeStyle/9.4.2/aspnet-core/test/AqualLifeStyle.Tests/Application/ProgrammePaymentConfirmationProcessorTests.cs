@@ -49,6 +49,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     "AQGreen Payment Test Member",
                     new EmailAddress($"aqgreen-payment-customer-{suffix}@example.com"));
+                await AssignJohannesburgAsync(context, customer);
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
 
@@ -194,6 +195,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     "Payment Test Member",
                     new EmailAddress($"payment-customer-{suffix}@example.com"));
+                await AssignJohannesburgAsync(context, customer);
                 var membership = Membership.Create(
                     1,
                     $"Onyx-{suffix}",
@@ -318,6 +320,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     $"Durable Queue {suffix}",
                     new EmailAddress($"approval-queue-customer-{suffix}@example.com"));
+                await AssignJohannesburgAsync(context, customer);
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
                 context.EntryParticipations.Add(EntryParticipation.StartIndependently(
@@ -383,6 +386,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     $"Approval Workflow {suffix}",
                     new EmailAddress($"approval-workflow-customer-{suffix}@example.com"));
+                await AssignJohannesburgAsync(context, customer);
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
                 var participation = EntryParticipation.StartIndependently(
@@ -476,6 +480,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     $"Approval Failure {suffix}",
                     new EmailAddress($"approval-failure-customer-{suffix}@example.com"));
+                await AssignJohannesburgAsync(context, customer);
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
                 var participation = EntryParticipation.StartIndependently(
@@ -592,6 +597,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     "Existing Facilitator",
                     new EmailAddress($"facilitator-customer-{suffix}@example.com"));
+                await AssignJohannesburgAsync(context, customer);
                 var membership = Membership.Create(
                     1,
                     $"Onyx-{suffix}",
@@ -641,6 +647,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     "AQGreen Early Webhook Test",
                     new EmailAddress($"aqgreen-early-{suffix}@example.com"));
+                await AssignJohannesburgAsync(context, customer);
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
 
@@ -705,6 +712,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     "Onyx Concurrent Test",
                     new EmailAddress($"onyx-concurrent-{suffix}@example.com"));
+                await AssignJohannesburgAsync(context, customer);
                 var membership = Membership.Create(
                     1,
                     $"Onyx-{suffix}",
@@ -794,6 +802,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     "AQGreen Webhook Test",
                     new EmailAddress($"aqgreen-webhook-customer-{suffix}@example.com"));
+                await AssignJohannesburgAsync(context, customer);
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
 
@@ -924,6 +933,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     "Onyx Webhook Test",
                     new EmailAddress($"onyx-webhook-customer-{suffix}@example.com"));
+                await AssignJohannesburgAsync(context, customer);
                 var membership = Membership.Create(
                     1,
                     $"Onyx-webhook-{suffix}",
@@ -1012,6 +1022,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     "AQGreen Failed Payment Test",
                     new EmailAddress($"aqgreen-failed-customer-{suffix}@example.com"));
+                await AssignJohannesburgAsync(context, customer);
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
                 var participation = EntryParticipation.StartIndependently(
@@ -1141,6 +1152,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     "Onyx Failed Payment Test",
                     new EmailAddress($"onyx-failed-customer-{suffix}@example.com"));
+                await AssignJohannesburgAsync(context, customer);
                 var membership = Membership.Create(
                     1,
                     $"Onyx-failed-{suffix}",
@@ -1238,6 +1250,15 @@ namespace AqualLifeStyle.Tests.Application
 
             await UsingDbContextAsync(1, async context =>
                 (await context.YocoWebhookReceipts.AnyAsync()).ShouldBeFalse());
+        }
+
+        private static async Task AssignJohannesburgAsync(
+            AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext context,
+            Customer customer)
+        {
+            var area = await context.Areas.SingleAsync(item =>
+                item.TenantId == 1 && item.Code == "JHB");
+            customer.AssignInitialArea(area, EffectiveFrom, "Test Area assignment");
         }
 
         private static VerifiedYocoPaymentNotification CreateNotification(

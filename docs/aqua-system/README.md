@@ -13,6 +13,7 @@ The pack explains Aqua at several levels without making one document carry every
 | Touching historical data, migrations, or legacy members | [05 — Data, history, migrations, and legacy members](05-data-history-migrations-and-legacy-members.md) |
 | Deploying or enabling automation | [06 — Operations and enablement runbook](06-operations-and-enablement-runbook.md) |
 | Checking evidence, decisions, risks, or readiness | [07 — Verification, decision, and risk register](07-verification-decision-and-risk-register.md) |
+| Understanding Tenant versus business Area | [08 — Tenant and Area boundaries](08-area-and-tenant-boundaries.md) |
 
 ## Authority and status
 

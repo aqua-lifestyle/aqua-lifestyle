@@ -98,6 +98,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
                 _context.SaveChanges();
             }
 
+            new DefaultBusinessAreaBuilder(_context, _tenantId).Create();
             new DefaultCustomerUserLinker(_context, passwordHasher: new PasswordHasher<User>(new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()))).Link(_tenantId);
             new DefaultCustomerAccountProvisioner(_context).Provision(_tenantId);
             if (_seedDemoData)

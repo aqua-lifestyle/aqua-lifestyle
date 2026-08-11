@@ -117,11 +117,13 @@ The network grows in groups of five. AQGreen has three structural levels: 5, 25,
 
 AQGreen has authorised commission rates for all three of its levels. It ends at Level 3 with a cumulative weekly commission of ZAR 1,650. Onyx evaluates and has confirmed rates through Level 5. Only Active participation in the same programme contributes, and a payout hold does not remove network placement.
 
-Every programme network is also bounded by ABP Tenant. A participant from one
-Tenant cannot be placed into or contribute to another Tenant's qualification
-graph, including during host-admin calculation. Business Areas are planned as
-subdivisions inside a Tenant; the Area aggregate and Area assignment are not yet
-implemented, so this tenant boundary must not be described as an Area model.
+Every programme network is bounded by ABP Tenant and programme. A participant
+from one Tenant cannot be placed into or contribute to another Tenant's
+qualification graph, including during host-admin calculation. Business Areas
+are implemented as subdivisions inside that hard boundary. Same-Tenant members
+may recruit across Johannesburg, Pretoria, or another Area; Area does not split
+the programme graph. The current technical Tenant is `Default`, while its
+business Area is Johannesburg. See [document 08](08-area-and-tenant-boundaries.md).
 
 ## How weekly earnings work
 

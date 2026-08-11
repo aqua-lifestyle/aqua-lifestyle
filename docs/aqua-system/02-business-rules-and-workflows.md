@@ -10,6 +10,8 @@ This is the precise business specification for the currently confirmed Aqua prog
 | AQGreen and Onyx are separate programmes with separate participation, recruitment, payment, and commission records. | `BUSINESS DECISION` |
 | A recruiter must have Active participation in the same programme. No recruiter means an independent network root. | `VERIFIED IMPLEMENTATION` |
 | Recruiter, recruit, qualification graph, and commission ledger must remain inside one ABP Tenant. Host authority does not permit a cross-Tenant graph. | `VERIFIED IMPLEMENTATION` |
+| Area is a business/admin subdivision inside Tenant. Same-Tenant, same-programme recruitment may cross Areas; Area does not partition the qualification graph. | `VERIFIED IMPLEMENTATION` |
+| Area administration requires an active persisted assignment to the customer's active Area, in the same Tenant. | `VERIFIED IMPLEMENTATION` |
 | Payment-confirmed but unapproved participation is not Active and does not qualify for Active-only network or finance behaviour. | `VERIFIED IMPLEMENTATION` |
 | `Entry` is a retained technical/database name for AQGreen; it is not a third customer programme. | `SUPERSEDED` terminology boundary |
 | `Business Premier` is legacy catalogue/demo terminology and must not be used as the name of Onyx. | `SUPERSEDED` |
@@ -22,7 +24,7 @@ This is the precise business specification for the currently confirmed Aqua prog
 - Supported schedule A: one **ZAR 1,200** payment.
 - Supported schedule B: two distinct **ZAR 600** AQGreen joining payments.
 - The schedule is selected before the first checkout and is locked once a verified payment is recorded.
-- A payment must be confirmed, match the customer and Area, have AQGreen joining purpose, use ZAR, and match the expected amount.
+- A payment must be confirmed, match the customer and Tenant, have AQGreen joining purpose, use ZAR, and match the expected amount. Area approval is resolved separately from the customer's persisted Area.
 - The same payment identifier cannot satisfy both instalment slots.
 - Current status or aggregate amount is not a substitute for the linked payment evidence.
 - Once the obligation is complete, another joining checkout is not required or permitted.
@@ -171,8 +173,9 @@ flowchart LR
 `VERIFIED IMPLEMENTATION`: the qualification graph is bounded by Tenant and
 programme. Repository queries select the requested Tenant before graph
 construction, and the effective-network builder rejects mixed-Tenant input.
-Area is a future business/admin subdivision inside Tenant; no Area aggregate or
-temporary Tenant-to-Area mapping is introduced by this rule.
+Area is an implemented business/admin subdivision inside Tenant. It scopes
+administration, not recruitment or qualification; same-Tenant cross-Area
+members therefore remain in one programme graph.
 
 ## 6. Commission rules
 

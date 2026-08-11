@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
 using Abp.ObjectMapping;
@@ -9,6 +10,8 @@ using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Memberships;
+using AqualLifeStyle.Application.Areas;
+using Microsoft.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Application.Customers
 {
@@ -17,19 +20,32 @@ namespace AqualLifeStyle.Application.Customers
         private readonly ICustomerRepository _customerRepository;
         private readonly IMembershipRepository _membershipRepository;
         private readonly IObjectMapper _objectMapper;
+        private readonly IAreaAssignmentResolver _areaAssignmentResolver;
 
         public CustomerAppService(ICustomerRepository customerRepository, IMembershipRepository membershipRepository, IObjectMapper objectMapper)
+            : this(customerRepository, membershipRepository, objectMapper, null)
+        {
+        }
+
+        public CustomerAppService(
+            ICustomerRepository customerRepository,
+            IMembershipRepository membershipRepository,
+            IObjectMapper objectMapper,
+            IAreaAssignmentResolver areaAssignmentResolver)
         {
             _customerRepository = customerRepository;
             _membershipRepository = membershipRepository;
             _objectMapper = objectMapper;
+            _areaAssignmentResolver = areaAssignmentResolver;
         }
 
         [AbpAuthorize(AquaPermissions.Members.View)]
         public async Task<IReadOnlyList<CustomerDto>> GetAllAsync()
         {
             var tenantId = GetRequiredTenantId("Customer lookup failed.");
-            var customers = await _customerRepository.GetAllListAsync(c => c.TenantId == tenantId);
+            var customers = await _customerRepository.GetAllIncluding(customer => customer.Area)
+                .Where(customer => customer.TenantId == tenantId)
+                .ToListAsync();
             return _objectMapper.Map<List<CustomerDto>>(customers);
         }
 
@@ -54,7 +70,8 @@ namespace AqualLifeStyle.Application.Customers
             }
 
             var tenantId = GetRequiredTenantId("Customer lookup failed.");
-            var customer = await _customerRepository.FirstOrDefaultAsync(c => c.UserId == AbpSession.UserId.Value && c.TenantId == tenantId);
+            var customer = await _customerRepository.GetAllIncluding(item => item.Area)
+                .FirstOrDefaultAsync(c => c.UserId == AbpSession.UserId.Value && c.TenantId == tenantId);
             if (customer == null)
             {
                 throw new UserFriendlyException("Customer lookup failed.", "No customer profile is linked to your account.");
@@ -218,6 +235,13 @@ namespace AqualLifeStyle.Application.Customers
 
                 var email = new EmailAddress(input.Email);
                 var customer = Customer.Create(tenantId, AbpSession.UserId.Value, input.Name, email, input.MembershipId);
+                if (_areaAssignmentResolver == null)
+                    throw new UserFriendlyException("Customer creation failed.", "Area assignment is unavailable.");
+                var area = await _areaAssignmentResolver.ResolveActiveAreaAsync(
+                    tenantId,
+                    input.AreaId,
+                    "Customer creation failed.");
+                customer.AssignInitialArea(area, DateTime.UtcNow, "Customer account creation");
                 await _customerRepository.InsertAsync(customer);
             }
             catch (UserFriendlyException)
@@ -233,7 +257,8 @@ namespace AqualLifeStyle.Application.Customers
         private async Task<Customer> GetCustomerForCurrentTenantAsync(int id)
         {
             var tenantId = GetRequiredTenantId("Customer lookup failed.");
-            var customer = await _customerRepository.FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId);
+            var customer = await _customerRepository.GetAllIncluding(item => item.Area)
+                .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId);
             if (customer == null)
             {
                 throw new UserFriendlyException("Customer lookup failed.", $"Customer with id {id} was not found.");
