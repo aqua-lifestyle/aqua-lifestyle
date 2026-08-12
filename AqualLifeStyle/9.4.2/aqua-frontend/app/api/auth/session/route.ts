@@ -4,10 +4,9 @@ import { deleteSessionCookies, projectSession, readSession } from "@/src/shared/
 
 export async function GET() {
   const session = await readSession();
-  const response = NextResponse.json(
-    session ? projectSession(session) : null,
-  );
+  const projected = session ? projectSession(session) : null;
+  const response = NextResponse.json(projected?.user ? projected : null);
   response.headers.set("Cache-Control", "no-store");
-  if (!session) deleteSessionCookies(response.cookies);
+  if (!session || !projected?.user) deleteSessionCookies(response.cookies);
   return response;
 }

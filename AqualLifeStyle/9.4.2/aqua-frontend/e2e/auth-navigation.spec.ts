@@ -97,3 +97,26 @@ test("expired sessions fail closed on protected deep links", async ({ page }) =>
   await expect(page).toHaveURL(/\/login\?redirect=%2Fmember%2Fprogrammes%3Fsource%3Dexpiry-test$/);
   await expect(page.getByRole("heading", { name: "Sign in to your account" })).toBeVisible();
 });
+
+test("session persists across browser close and reopen", async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const errors = observeBrowserErrors(page);
+
+  await signIn(page);
+  await expect(page.getByRole("heading", { name: "Test Member" })).toBeVisible();
+
+  await context.storageState({ path: "/tmp/aqua-auth-state.json" });
+  await context.close();
+
+  const newContext = await browser.newContext({ storageState: "/tmp/aqua-auth-state.json" });
+  const newPage = await newContext.newPage();
+  await newPage.goto("/");
+  await expect(newPage).toHaveURL("/dashboard");
+  await expect(newPage.getByRole("heading", { name: "Test Member" })).toBeVisible();
+
+  expect(errors.consoleErrors).toEqual([]);
+  expect(errors.pageErrors).toEqual([]);
+
+  await newContext.close();
+});

@@ -164,4 +164,54 @@ describe("session refresh failures", () => {
       }),
     ).rejects.toBe(transientFailure);
   });
+
+  it("returns a resolved response instead of throwing after a session-ended redirect", async () => {
+    const { apiClient, setRefreshTokenProvider } = await importAxiosInstance();
+    setRefreshTokenProvider(() => Promise.resolve(null));
+
+    const originalLocation = globalThis.location;
+    const locationMock = {
+      href: "http://localhost:3100/dashboard",
+      pathname: "/dashboard",
+      search: "",
+      assign: vi.fn(),
+      replace: vi.fn(),
+      reload: vi.fn(),
+    };
+    Object.defineProperty(globalThis, "location", {
+      value: locationMock,
+      writable: true,
+      configurable: true,
+    });
+
+    try {
+      const response = await apiClient.request({
+        adapter: async (config) => {
+          throw new AxiosError(
+            "Unauthorized",
+            "ERR_BAD_REQUEST",
+            config,
+            undefined,
+            {
+              config,
+              data: { error: { message: "Authentication required." } },
+              headers: new AxiosHeaders(),
+              status: 401,
+              statusText: "Unauthorized",
+            },
+          );
+        },
+        url: "/protected",
+      });
+
+      expect(response.status).toBe(401);
+      expect(locationMock.href).toContain("login?reason=session-ended");
+    } finally {
+      Object.defineProperty(globalThis, "location", {
+        value: originalLocation,
+        writable: true,
+        configurable: true,
+      });
+    }
+  });
 });

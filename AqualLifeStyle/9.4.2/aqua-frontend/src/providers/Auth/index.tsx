@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           return;
         }
         const session = (await response.json()) as AuthSession | null;
-        dispatch(session ? setAuthSession(session) : clearAuthSession());
+        dispatch(session?.user ? setAuthSession(session) : clearAuthSession());
       })
       .catch(() => {
         if (active && sessionMutation.current === initialMutation) dispatch(authSessionError());

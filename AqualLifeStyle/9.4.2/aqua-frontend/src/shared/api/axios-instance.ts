@@ -111,6 +111,14 @@ apiClient.interceptors.response.use(
         if (typeof window !== "undefined") {
           const returnPath = `${window.location.pathname}${window.location.search}`;
           window.location.href = getExpiredSessionLoginUrl(returnPath);
+          return {
+            data: undefined,
+            status: 401,
+            statusText: "Unauthorized",
+            headers: error.response.headers,
+            config: originalRequest,
+            request: error.request,
+          };
         }
       }
 

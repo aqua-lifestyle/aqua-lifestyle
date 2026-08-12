@@ -86,4 +86,21 @@ describe("AuthProvider cold-start session restoration", () => {
     expect(screen.getByTestId("authenticated")).toHaveTextContent("false");
     expect(screen.getByTestId("status")).toHaveTextContent("error");
   });
+
+  it("treats a session without a user profile as anonymous", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      user: null,
+    }), { status: 200 }));
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByTestId("ready")).toHaveTextContent("true");
+    expect(screen.getByTestId("authenticated")).toHaveTextContent("false");
+    expect(screen.getByTestId("email")).toHaveTextContent("none");
+  });
 });
