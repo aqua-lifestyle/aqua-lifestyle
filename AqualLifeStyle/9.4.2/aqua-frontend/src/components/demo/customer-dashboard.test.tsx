@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -270,14 +270,14 @@ describe("CustomerDashboard", () => {
       expect(getMyCustomer).toHaveBeenCalledOnce();
       expect(getActiveTiers).toHaveBeenCalledOnce();
       expect(getSavingsWindowStatuses).toHaveBeenCalledOnce();
-      expect(getEligibleProductsForCustomer).toHaveBeenCalledWith(7);
+      expect(getEligibleProductsForCustomer).not.toHaveBeenCalled();
     });
 
     expect(
       screen.getByRole("heading", { name: "Jane Customer" }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Jasper").length).toBeGreaterThan(0);
-    expect(screen.getByText("Water filter")).toBeInTheDocument();
+    expect(screen.queryByText("Water filter")).not.toBeInTheDocument();
     expect(screen.getByText("Monthly obligation").parentElement).toHaveTextContent(
       /R\s*0[,.]00/,
     );
@@ -389,13 +389,12 @@ describe("CustomerDashboard", () => {
     expect(screen.queryByText("Current plan")).not.toBeInTheDocument();
   });
 
-  it("reserves an eligible product", async () => {
+  it("does not render the retired member product reservation surface", async () => {
     render(<CustomerDashboard />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Reserve/ }));
-
-    await waitFor(() => {
-      expect(createForCurrentCustomer).toHaveBeenCalledWith(5);
-    });
+    expect(screen.queryByText("Products for you")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Reserve/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Business Premier Bundle")).not.toBeInTheDocument();
+    expect(createForCurrentCustomer).not.toHaveBeenCalled();
   });
 });

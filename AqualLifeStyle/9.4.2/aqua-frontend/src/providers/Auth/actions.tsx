@@ -2,6 +2,7 @@ import type { AuthSession } from "./context";
 
 export const AuthActionTypes = {
   clearSession: "auth/clearSession",
+  sessionError: "auth/sessionError",
   setReady: "auth/setReady",
   setSession: "auth/setSession",
 } as const;
@@ -9,6 +10,9 @@ export const AuthActionTypes = {
 export type AuthAction =
   | {
       type: typeof AuthActionTypes.clearSession;
+    }
+  | {
+      type: typeof AuthActionTypes.sessionError;
     }
   | {
       type: typeof AuthActionTypes.setReady;
@@ -21,6 +25,10 @@ export type AuthAction =
 
 export const clearAuthSession = (): AuthAction => ({
   type: AuthActionTypes.clearSession,
+});
+
+export const authSessionError = (): AuthAction => ({
+  type: AuthActionTypes.sessionError,
 });
 
 export const setReady = (ready: boolean): AuthAction => ({

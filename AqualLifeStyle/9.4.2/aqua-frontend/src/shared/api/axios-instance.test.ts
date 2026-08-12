@@ -34,7 +34,7 @@ describe("applyRequestContext", () => {
     expect(config.headers.__tenant).toBeUndefined();
   });
 
-  it("adds a bearer token when auth context is available", async () => {
+  it("never exposes the bearer token to browser requests", async () => {
     const { applyRequestContext, setAccessTokenProvider, setTenantProvider } =
       await importAxiosInstance();
 
@@ -43,7 +43,7 @@ describe("applyRequestContext", () => {
 
     const config = await applyRequestContext(createConfig());
 
-    expect(config.headers.Authorization).toBe("Bearer access-token");
+    expect(config.headers.Authorization).toBeUndefined();
   });
 
   it("adds the ABP tenant header when tenant context is available", async () => {
@@ -58,7 +58,7 @@ describe("applyRequestContext", () => {
     expect(config.headers.__tenant).toBe("national-club-aqgreen");
   });
 
-  it("waits for async auth and tenant providers", async () => {
+  it("waits for the async tenant provider without exposing auth", async () => {
     const { applyRequestContext, setAccessTokenProvider, setTenantProvider } =
       await importAxiosInstance();
 
@@ -67,7 +67,7 @@ describe("applyRequestContext", () => {
 
     const config = await applyRequestContext(createConfig());
 
-    expect(config.headers.Authorization).toBe("Bearer async-token");
+    expect(config.headers.Authorization).toBeUndefined();
     expect(config.headers.__tenant).toBe("area-space-1");
   });
 });

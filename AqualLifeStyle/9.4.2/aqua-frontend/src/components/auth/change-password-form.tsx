@@ -78,7 +78,7 @@ export const ChangePasswordForm = () => {
         title: "Password updated",
         type: "success",
       });
-      clearSession();
+      await clearSession();
       router.replace("/login");
     } catch (error) {
       setRequestError(getRequestErrorMessage(

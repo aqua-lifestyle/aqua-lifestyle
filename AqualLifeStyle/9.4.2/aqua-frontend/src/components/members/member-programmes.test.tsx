@@ -124,7 +124,7 @@ describe("MemberProgrammes", () => {
 
     render(<MemberProgrammes />);
 
-    expect(await screen.findByText(/cannot verify a compatible payment API/i))
+    expect(await screen.findByText(/health response did not match/i))
       .toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Join AQGreen" }))
       .toBeDisabled();

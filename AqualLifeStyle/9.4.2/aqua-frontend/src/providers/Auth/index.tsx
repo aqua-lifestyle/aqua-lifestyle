@@ -6,14 +6,11 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
 } from "react";
 
-import {
-  setAccessTokenProvider,
-  setRefreshTokenProvider,
-} from "@/src/shared/api";
-import { refreshToken as refreshTokenApi } from "@/src/shared/api/auth-service";
-import { clearAuthSession, setAuthSession, setReady } from "./actions";
+import { setRefreshTokenProvider } from "@/src/shared/api";
+import { authSessionError, clearAuthSession, setAuthSession, setReady } from "./actions";
 import {
   AuthActionsContext,
   AuthStateContext,
@@ -22,84 +19,50 @@ import {
 } from "./context";
 import { authReducer } from "./reducer";
 
-const STORAGE_KEY = "aqua.authSession";
-
 type AuthProviderProps = {
   children: ReactNode;
 };
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [state, dispatch] = useReducer(authReducer, initialAuthState);
+  const sessionMutation = useRef(0);
 
-  // Restore session from localStorage on mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const session = JSON.parse(stored) as AuthSession;
-        if (
-          session.expiresAt &&
-          new Date(session.expiresAt) > new Date()
-        ) {
-          setAccessTokenProvider(() => session.accessToken);
-          dispatch(setAuthSession(session));
-        } else {
-          setAccessTokenProvider(() => null);
-          localStorage.removeItem(STORAGE_KEY);
+    let active = true;
+    const initialMutation = sessionMutation.current;
+    void fetch("/api/auth/session", { cache: "no-store" })
+      .then(async (response) => {
+        if (!active || sessionMutation.current !== initialMutation) return;
+        if (!response.ok) {
+          dispatch(authSessionError());
+          return;
         }
-      }
-    } catch {
-      setAccessTokenProvider(() => null);
-      localStorage.removeItem(STORAGE_KEY);
-    } finally {
-      dispatch(setReady(true));
-    }
+        const session = (await response.json()) as AuthSession | null;
+        dispatch(session ? setAuthSession(session) : clearAuthSession());
+      })
+      .catch(() => {
+        if (active && sessionMutation.current === initialMutation) dispatch(authSessionError());
+      });
+    return () => { active = false; };
   }, []);
 
-  // Persist session to localStorage whenever it changes
   useEffect(() => {
-    if (state.session) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.session));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }, [state.session]);
-
-  // Provide the access token to the axios client
-  useEffect(() => {
-    setAccessTokenProvider(() => state.session?.accessToken ?? null);
-  }, [state.session?.accessToken]);
-
-  // Provide token refresh capability to the axios 401 interceptor
-  useEffect(() => {
-    setRefreshTokenProvider(async () => {
-      if (!state.session?.refreshToken) return null;
-      const result = await refreshTokenApi(state.session.refreshToken);
-      if (result.ok) {
-        setAccessTokenProvider(() => result.session.accessToken);
-        dispatch(setAuthSession(result.session));
-        return result.session.accessToken;
-      }
-      if (result.failure === "transient") {
-        throw new Error(result.message);
-      }
-      setAccessTokenProvider(() => null);
-      dispatch(clearAuthSession());
-      return null;
-    });
-  }, [state.session?.refreshToken]);
+    setRefreshTokenProvider(async () => null);
+  }, []);
 
   const actions = useMemo(
     () => ({
-      clearSession: () => {
-        setAccessTokenProvider(() => null);
-        localStorage.removeItem(STORAGE_KEY);
-        dispatch(clearAuthSession());
+      clearSession: async () => {
+        sessionMutation.current += 1;
+        try {
+          await fetch("/api/auth/logout", { method: "POST" });
+        } finally {
+          dispatch(clearAuthSession());
+        }
       },
       setReady: (ready: boolean) => dispatch(setReady(ready)),
       setSession: (session: AuthSession) => {
-        setAccessTokenProvider(() => session.accessToken);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+        sessionMutation.current += 1;
         dispatch(setAuthSession(session));
       },
     }),

@@ -33,6 +33,7 @@ import { landingContainerClassName } from "./landing-primitives";
 
 const mainLinks = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard", permission: null },
+  { href: "/member/programmes", icon: Network, label: "Programmes", permission: "Aqua.ProgrammeParticipations.ViewSelf" },
   { href: "/customers", icon: Users, label: "Customers", permission: "Pages.Customers" },
   { href: "/products", icon: Package, label: "Products", permission: "Pages.Products" },
   { href: "/enquiries", icon: MessageSquare, label: "Enquiries", permission: "Pages.Enquiries" },
@@ -45,7 +46,6 @@ const moreLinks = [
   { href: "/facilitator/dashboard", icon: LayoutDashboard, label: "Facilitator dashboard", permission: "Pages.Facilitators" },
   { href: "/facilitator/my-referrals", icon: DollarSign, label: "My referrals", permission: "Pages.Referrals" },
   { href: "/member", icon: User, label: "Club Member", permission: "Aqua.Orders.ViewSelf" },
-  { href: "/member/programmes", icon: Network, label: "Programme journey", permission: "Aqua.ProgrammeParticipations.ViewSelf" },
   { href: "/member/savings", icon: PiggyBank, label: "My savings", permission: "Aqua.Savings.ViewSelf" },
   { href: "/member/loans", icon: DollarSign, label: "My loans", permission: "Aqua.Loans.ViewSelf" },
   { href: "/member/entry-commitments", icon: DollarSign, label: "AQGreen commitments", permission: "Aqua.EntryMonthlyObligations.ViewSelf" },

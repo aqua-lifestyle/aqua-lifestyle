@@ -11,13 +11,11 @@ vi.mock("@/src/shared/api", async () => {
   );
   return {
     ...actual,
-    setAccessTokenProvider: vi.fn(),
     setRefreshTokenProvider: vi.fn(),
   };
 });
 
 const futureSession: AuthSession = {
-  accessToken: "restored-access-token",
   expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
   user: {
     email: "member@example.com",
@@ -29,23 +27,24 @@ const futureSession: AuthSession = {
 };
 
 const Probe = () => {
-  const { isAuthenticated, isReady, session } = useAuthState();
+  const { isAuthenticated, isReady, session, status } = useAuthState();
   return (
     <div>
       <span data-testid="ready">{String(isReady)}</span>
       <span data-testid="authenticated">{String(isAuthenticated)}</span>
       <span data-testid="email">{session?.user?.email ?? "none"}</span>
+      <span data-testid="status">{status}</span>
     </div>
   );
 };
 
 describe("AuthProvider cold-start session restoration", () => {
   beforeEach(() => {
-    window.localStorage.clear();
+    vi.stubGlobal("fetch", vi.fn());
   });
 
-  it("restores a valid stored session and completes readiness", async () => {
-    window.localStorage.setItem("aqua.authSession", JSON.stringify(futureSession));
+  it("restores the server-mediated session without reading browser credentials", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(futureSession), { status: 200 }));
 
     render(
       <AuthProvider>
@@ -56,16 +55,14 @@ describe("AuthProvider cold-start session restoration", () => {
     expect(await screen.findByTestId("ready")).toHaveTextContent("true");
     expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
     expect(screen.getByTestId("email")).toHaveTextContent("member@example.com");
+    expect(fetch).toHaveBeenCalledWith("/api/auth/session", { cache: "no-store" });
   });
 
-  it("clears an expired stored session", async () => {
-    window.localStorage.setItem(
-      "aqua.authSession",
-      JSON.stringify({
-        ...futureSession,
-        expiresAt: new Date(Date.now() - 1000).toISOString(),
-      }),
-    );
+  it("becomes anonymous when the server session is absent", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response("null", {
+      headers: { "Content-Type": "application/json" },
+      status: 200,
+    }));
 
     render(
       <AuthProvider>
@@ -75,10 +72,10 @@ describe("AuthProvider cold-start session restoration", () => {
 
     expect(await screen.findByTestId("ready")).toHaveTextContent("true");
     expect(screen.getByTestId("authenticated")).toHaveTextContent("false");
-    expect(window.localStorage.getItem("aqua.authSession")).toBeNull();
   });
 
-  it("completes readiness when no session is stored", async () => {
+  it("distinguishes session resolution failure from an anonymous session", async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error("network unavailable"));
     render(
       <AuthProvider>
         <Probe />
@@ -87,5 +84,6 @@ describe("AuthProvider cold-start session restoration", () => {
 
     expect(await screen.findByTestId("ready")).toHaveTextContent("true");
     expect(screen.getByTestId("authenticated")).toHaveTextContent("false");
+    expect(screen.getByTestId("status")).toHaveTextContent("error");
   });
 });

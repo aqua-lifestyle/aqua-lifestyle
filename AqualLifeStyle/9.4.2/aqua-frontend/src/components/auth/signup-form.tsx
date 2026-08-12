@@ -198,7 +198,6 @@ export const SignupForm = ({ redirectPath, tenancyName }: SignupFormProps) => {
     <div className="min-h-dvh bg-muted/30 px-4 py-12 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto grid min-h-[80vh] w-full max-w-6xl overflow-hidden rounded-2xl bg-card shadow-xl lg:grid-cols-2">
         <div className="relative hidden items-center justify-center bg-gradient-to-br from-primary to-primary-dark p-12 lg:flex">
-          <div className="absolute inset-0 bg-[url('/aqua-pattern.svg')] bg-cover opacity-10" />
           <div className="relative z-10 text-center text-white">
             <div className="mx-auto flex size-20 items-center justify-center rounded-2xl bg-white/10 backdrop-blur">
               <Droplets className="size-10 text-white" />
