@@ -369,6 +369,34 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task InvitationPolicy_ReReadsEligibilityAfterDatabaseStatusChange()
+        {
+            var recruiterCustomerId = await RegisterAndSignInCustomerAsync();
+            await ActivateCurrentAQGreenParticipationAsync(recruiterCustomerId);
+            var participationId = await UsingDbContextAsync(1, context =>
+                context.EntryParticipations
+                    .Where(item => item.CustomerId == recruiterCustomerId)
+                    .Select(item => item.Id)
+                    .SingleAsync());
+            using var uow = Resolve<IUnitOfWorkManager>().Begin(
+                new UnitOfWorkOptions { IsTransactional = true });
+            using (Resolve<IUnitOfWorkManager>().Current.SetTenantId(1))
+            {
+                var policy = Resolve<IProgrammeRecruitmentPolicyResolver>()
+                    .Resolve(RecruitmentProgrammeKeys.AQGreen);
+
+                (await policy.FindByParticipationAsync(participationId))
+                    .IsEligible.ShouldBeTrue();
+                await UsingDbContextAsync(1, context =>
+                    context.Database.ExecuteSqlInterpolatedAsync(
+                        $"UPDATE EntryParticipations SET Status = {(int)EntryParticipationStatus.Rejected} WHERE Id = {participationId}"));
+
+                (await policy.FindByParticipationAsync(participationId))
+                    .IsEligible.ShouldBeFalse();
+            }
+        }
+
+        [Fact]
         public async Task AQGreenInvitationJoin_ReResolvesRecruiterAreaAfterRegistration()
         {
             var pretoriaAreaId = await CreateAreaAsync("PTA", "Pretoria");
