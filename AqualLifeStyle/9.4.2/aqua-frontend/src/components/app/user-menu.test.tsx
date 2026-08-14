@@ -1,15 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuthActions } from "@/src/providers";
 
 import { UserMenu } from "./user-menu";
-
-const replace = vi.fn();
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace }),
-}));
 
 const SetSession = () => {
   const { setSession } = useAuthActions();
@@ -36,7 +30,10 @@ const SetSession = () => {
 };
 
 describe("UserMenu", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
+  });
 
   it("routes guests through member access when unauthenticated", () => {
     render(
@@ -64,7 +61,7 @@ describe("UserMenu", () => {
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
   });
 
-  it("signs out when the sign-out button is clicked", () => {
+  it("signs out when the sign-out button is clicked", async () => {
     render(
       <AuthProvider>
         <SetSession />
@@ -76,8 +73,9 @@ describe("UserMenu", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open user menu" }));
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
-    expect(screen.getByRole("link", { name: "Member access" })).toBeInTheDocument();
-    expect(replace).toHaveBeenCalledWith("/login");
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "Member access" })).toBeInTheDocument();
+    });
   });
 
   it("closes the user menu with Escape", () => {

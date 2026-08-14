@@ -63,4 +63,18 @@ describe("AuthenticatedPage", () => {
     expect(screen.getByText("Profile")).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
   });
+
+  it("does not redirect when the session projection is temporarily unavailable", () => {
+    vi.mocked(useAuthState).mockReturnValue({
+      isAuthenticated: false,
+      isReady: true,
+      session: null,
+      status: "error",
+    });
+
+    render(<AuthenticatedPage><p>Profile</p></AuthenticatedPage>);
+
+    expect(screen.getByText(/session could not be verified/i)).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+  });
 });

@@ -24,6 +24,15 @@ describe("authReducer", () => {
     expect(state.session).toEqual(session);
   });
 
+  it("treats a session without a user profile as anonymous", () => {
+    const state = authReducer(initialAuthState, setAuthSession({ ...session, user: null }));
+
+    expect(state.isAuthenticated).toBe(false);
+    expect(state.isReady).toBe(true);
+    expect(state.session).toBeNull();
+    expect(state.status).toBe("anonymous");
+  });
+
   it("clears an authenticated session", () => {
     const authenticatedState = authReducer(
       initialAuthState,

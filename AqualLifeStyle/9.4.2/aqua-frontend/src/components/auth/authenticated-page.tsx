@@ -14,13 +14,13 @@ type AuthenticatedPageProps = {
 export const AuthenticatedPage = ({ children }: AuthenticatedPageProps) => {
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated, isReady } = useAuthState();
+  const { isAuthenticated, isReady, status } = useAuthState();
 
   useEffect(() => {
-    if (isReady && !isAuthenticated) {
+    if (isReady && !isAuthenticated && status !== "error") {
       router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
     }
-  }, [isAuthenticated, isReady, pathname, router]);
+  }, [isAuthenticated, isReady, pathname, router, status]);
 
   if (!isReady || !isAuthenticated) {
     return (
@@ -29,7 +29,9 @@ export const AuthenticatedPage = ({ children }: AuthenticatedPageProps) => {
           <div className="mb-6 flex items-center gap-3 text-muted-foreground">
             <ShieldCheck className="size-5" />
             <span className="text-sm font-semibold">
-              {isReady ? "Taking you to sign in…" : "Checking your account…"}
+              {status === "error"
+                ? "Your account session could not be verified. Refresh to try again."
+                : isReady ? "Taking you to sign in…" : "Checking your account…"}
             </span>
           </div>
           <Skeleton className="h-48" />

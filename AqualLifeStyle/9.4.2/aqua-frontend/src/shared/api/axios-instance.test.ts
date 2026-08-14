@@ -34,7 +34,7 @@ describe("applyRequestContext", () => {
     expect(config.headers.__tenant).toBeUndefined();
   });
 
-  it("adds a bearer token when auth context is available", async () => {
+  it("never exposes the bearer token to browser requests", async () => {
     const { applyRequestContext, setAccessTokenProvider, setTenantProvider } =
       await importAxiosInstance();
 
@@ -43,7 +43,7 @@ describe("applyRequestContext", () => {
 
     const config = await applyRequestContext(createConfig());
 
-    expect(config.headers.Authorization).toBe("Bearer access-token");
+    expect(config.headers.Authorization).toBeUndefined();
   });
 
   it("adds the ABP tenant header when tenant context is available", async () => {
@@ -58,7 +58,7 @@ describe("applyRequestContext", () => {
     expect(config.headers.__tenant).toBe("national-club-aqgreen");
   });
 
-  it("waits for async auth and tenant providers", async () => {
+  it("waits for the async tenant provider without exposing auth", async () => {
     const { applyRequestContext, setAccessTokenProvider, setTenantProvider } =
       await importAxiosInstance();
 
@@ -67,7 +67,7 @@ describe("applyRequestContext", () => {
 
     const config = await applyRequestContext(createConfig());
 
-    expect(config.headers.Authorization).toBe("Bearer async-token");
+    expect(config.headers.Authorization).toBeUndefined();
     expect(config.headers.__tenant).toBe("area-space-1");
   });
 });
@@ -163,5 +163,55 @@ describe("session refresh failures", () => {
         url: "/protected",
       }),
     ).rejects.toBe(transientFailure);
+  });
+
+  it("returns a resolved response instead of throwing after a session-ended redirect", async () => {
+    const { apiClient, setRefreshTokenProvider } = await importAxiosInstance();
+    setRefreshTokenProvider(() => Promise.resolve(null));
+
+    const originalLocation = globalThis.location;
+    const locationMock = {
+      href: "http://localhost:3100/dashboard",
+      pathname: "/dashboard",
+      search: "",
+      assign: vi.fn(),
+      replace: vi.fn(),
+      reload: vi.fn(),
+    };
+    Object.defineProperty(globalThis, "location", {
+      value: locationMock,
+      writable: true,
+      configurable: true,
+    });
+
+    try {
+      const response = await apiClient.request({
+        adapter: async (config) => {
+          throw new AxiosError(
+            "Unauthorized",
+            "ERR_BAD_REQUEST",
+            config,
+            undefined,
+            {
+              config,
+              data: { error: { message: "Authentication required." } },
+              headers: new AxiosHeaders(),
+              status: 401,
+              statusText: "Unauthorized",
+            },
+          );
+        },
+        url: "/protected",
+      });
+
+      expect(response.status).toBe(401);
+      expect(locationMock.href).toContain("login?reason=session-ended");
+    } finally {
+      Object.defineProperty(globalThis, "location", {
+        value: originalLocation,
+        writable: true,
+        configurable: true,
+      });
+    }
   });
 });

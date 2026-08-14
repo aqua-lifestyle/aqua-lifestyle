@@ -11,6 +11,7 @@
     "start": "next start",
     "analyze": "next experimental-analyze --output",
     "lint": "eslint",
+    "test:e2e": "node e2e/prepare.mjs && playwright test",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "type-check": "tsc --noEmit"
@@ -28,6 +29,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

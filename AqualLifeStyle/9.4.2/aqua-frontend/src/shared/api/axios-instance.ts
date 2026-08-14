@@ -4,7 +4,6 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 
-import { publicEnv } from "@/src/shared/config";
 import {
   normalizeAbpError,
   normalizeNetworkError,
@@ -18,14 +17,13 @@ const TENANT_HEADER = "__tenant";
 
 type RequestContextProvider = () => string | null | Promise<string | null>;
 
-let accessTokenProvider: RequestContextProvider | null = null;
 let tenantProvider: RequestContextProvider | null = null;
 let refreshTokenProvider: (() => Promise<string | null>) | null = null;
 let activeRefreshProvider: (() => Promise<string | null>) | null = null;
 let activeRefreshRequest: Promise<string | null> | null = null;
 
 export const setAccessTokenProvider = (provider: RequestContextProvider) => {
-  accessTokenProvider = provider;
+  void provider;
 };
 
 export const setTenantProvider = (provider: RequestContextProvider) => {
@@ -62,7 +60,7 @@ export const getExpiredSessionLoginUrl = (path: string) => {
 };
 
 export const apiClient: AxiosInstance = axios.create({
-  baseURL: publicEnv.NEXT_PUBLIC_ABP_API_URL,
+  baseURL: "/api/backend",
   timeout: DEFAULT_TIMEOUT_MS,
   headers: {
     Accept: "application/json",
@@ -73,14 +71,7 @@ export const apiClient: AxiosInstance = axios.create({
 export const applyRequestContext = async (
   config: InternalAxiosRequestConfig,
 ) => {
-  const [accessToken, tenant] = await Promise.all([
-    accessTokenProvider?.() ?? null,
-    tenantProvider?.() ?? null,
-  ]);
-
-  if (accessToken) {
-    config.headers.Authorization = `Bearer ${accessToken}`;
-  }
+  const tenant = await (tenantProvider?.() ?? null);
 
   if (tenant) {
     config.headers[TENANT_HEADER] = tenant;
@@ -107,7 +98,6 @@ apiClient.interceptors.response.use(
         try {
           const newToken = await refreshAccessToken();
           if (newToken) {
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
             return apiClient(originalRequest);
           }
         } catch (refreshError) {
@@ -121,6 +111,14 @@ apiClient.interceptors.response.use(
         if (typeof window !== "undefined") {
           const returnPath = `${window.location.pathname}${window.location.search}`;
           window.location.href = getExpiredSessionLoginUrl(returnPath);
+          return {
+            data: undefined,
+            status: 401,
+            statusText: "Unauthorized",
+            headers: error.response.headers,
+            config: originalRequest,
+            request: error.request,
+          };
         }
       }
 
@@ -134,14 +132,6 @@ apiClient.interceptors.response.use(
     }
 
     // No HTTP response: DNS/port down, CORS blocked, or untrusted HTTPS cert.
-    if (process.env.NODE_ENV === "development") {
-      console.error(
-        "[apiClient] Network error reaching",
-        publicEnv.NEXT_PUBLIC_ABP_API_URL,
-        error.code ?? error.message,
-      );
-    }
-
     throw normalizeNetworkError(error);
   },
 );
