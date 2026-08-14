@@ -49,11 +49,14 @@ export const MemberProgrammes = () => {
     isLoading: loading,
   } = useMyProgrammeParticipations(canView);
   const journeyApiCompatible = isProgrammeJourneyApiCompatible(healthState.health);
+  const isJourneyContractResolved = healthState.isSuccess || healthState.isError;
   const {
     data: journey,
     errorMessage: journeyError,
     isLoading: journeyLoading,
-  } = useMyProgrammeJourney(canView && journeyApiCompatible);
+  } = useMyProgrammeJourney(
+    canView && isJourneyContractResolved && journeyApiCompatible,
+  );
   const [actionError, setActionError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [startingAQGreenPayment, setStartingAQGreenPayment] = useState(false);
@@ -70,7 +73,7 @@ export const MemberProgrammes = () => {
     ) ?? false;
   const paymentApiCompatible = isPaymentApiCompatible(healthState.health);
   const paymentActionsUnavailable =
-    healthState.isPending || !paymentApiCompatible;
+    !isJourneyContractResolved || healthState.isPending || !paymentApiCompatible;
   const entryCanAcceptJoiningPayment = [
     "AwaitingJoiningPayment",
     "AwaitingActivationPayment",
@@ -297,12 +300,18 @@ export const MemberProgrammes = () => {
           </StatusMessage>
         ) : null}
 
-        {!healthState.isPending && !paymentApiCompatible ? (
+        {healthState.isSuccess && !paymentApiCompatible ? (
           <StatusMessage tone="error">
             Payments are unavailable because this frontend cannot verify a
             compatible payment API deployment. No payment has been taken. Ask
             an operator to deploy and verify the matching database, API, and
             frontend versions.
+          </StatusMessage>
+        ) : null}
+
+        {healthState.isError ? (
+          <StatusMessage tone="error">
+            {healthState.errorMessage ?? "The API capability check could not be completed."}
           </StatusMessage>
         ) : null}
 

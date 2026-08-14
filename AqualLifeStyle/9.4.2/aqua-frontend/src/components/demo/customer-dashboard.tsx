@@ -62,7 +62,7 @@ export const CustomerDashboard = () => {
   const hasMounted = useHydrated();
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated, isReady, session } = useAuthState();
+  const { isAuthenticated, isReady, session, status } = useAuthState();
   const user = session?.user;
   const canViewProgrammes =
     user?.permissions?.includes("Aqua.ProgrammeParticipations.ViewSelf") ?? false;
@@ -115,10 +115,10 @@ export const CustomerDashboard = () => {
   } = useProductsState();
 
   useEffect(() => {
-    if (isReady && !isAuthenticated) {
+    if (isReady && !isAuthenticated && status !== "error") {
       router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
     }
-  }, [isAuthenticated, isReady, pathname, router]);
+  }, [isAuthenticated, isReady, pathname, router, status]);
 
   useEffect(() => {
     if (!isReady || !isAuthenticated) return;
@@ -229,7 +229,9 @@ export const CustomerDashboard = () => {
     return (
       <main className="min-h-dvh bg-muted/30 px-4 py-10 text-muted-foreground">
         <div className="mx-auto max-w-7xl text-sm font-semibold">
-          Verifying customer access…
+          {status === "error"
+            ? "Your account session could not be verified. Refresh to try again."
+            : "Verifying customer access…"}
         </div>
       </main>
     );

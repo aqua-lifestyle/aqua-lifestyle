@@ -2,14 +2,12 @@
 
 import { ChevronDown, LogOut, Settings, User } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { useAuthActions, useAuthState } from "@/src/providers";
 import { Avatar } from "@/src/shared/ui";
 
 export const UserMenu = ({ inverted = false }: { inverted?: boolean }) => {
-  const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -37,9 +35,9 @@ export const UserMenu = ({ inverted = false }: { inverted?: boolean }) => {
     };
   }, [isOpen]);
 
-  const handleSignOut = () => {
-    clearSession();
-    router.replace("/login");
+  const handleSignOut = async () => {
+    await clearSession();
+    window.location.replace("/");
   };
 
   const userLabel =

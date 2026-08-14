@@ -7,8 +7,9 @@ import { getLoginDestination } from "@/src/shared/auth/roles";
 
 import { LoginForm } from "./login-form";
 
-const { push, searchParams } = vi.hoisted(() => ({
+const { push, replace, searchParams } = vi.hoisted(() => ({
   push: vi.fn(),
+  replace: vi.fn(),
   searchParams: { current: new URLSearchParams() },
 }));
 
@@ -31,7 +32,7 @@ vi.mock("@/src/providers", async () => {
 });
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push, replace: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({ push, replace, prefetch: vi.fn() }),
   usePathname: () => "/login",
   useSearchParams: () => searchParams.current,
 }));
@@ -232,7 +233,7 @@ describe("LoginForm", () => {
         type: "success",
       }),
     );
-    expect(push).toHaveBeenCalledWith("/dashboard");
+    expect(replace).toHaveBeenCalledWith("/dashboard");
   });
 
   it("uses the Area carried by an account email link", async () => {
@@ -283,7 +284,7 @@ describe("LoginForm", () => {
     });
     submitForm();
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/admin/dashboard"));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/admin/dashboard"));
     expect(login).toHaveBeenCalledWith(
       expect.objectContaining({ email: "admin", password: "123qwe" }),
     );
@@ -342,7 +343,7 @@ describe("LoginForm", () => {
     submitForm();
 
     await waitFor(() =>
-      expect(push).toHaveBeenCalledWith("/area-leader/dashboard"),
+      expect(replace).toHaveBeenCalledWith("/area-leader/dashboard"),
     );
   });
 
@@ -374,7 +375,7 @@ describe("LoginForm", () => {
     submitForm();
 
     await waitFor(() =>
-      expect(push).toHaveBeenCalledWith("/facilitator/dashboard"),
+      expect(replace).toHaveBeenCalledWith("/facilitator/dashboard"),
     );
   });
 });

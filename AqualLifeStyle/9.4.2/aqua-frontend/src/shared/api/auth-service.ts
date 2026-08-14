@@ -14,7 +14,7 @@ import { publicEnv } from "@/src/shared/config";
  * signature. Used only to extract user claims that the ABP backend has already
  * signed inside the token.
  */
-const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
+export const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
   try {
     const payloadBase64 = token.split(".")[1];
     if (!payloadBase64) return null;
@@ -177,37 +177,13 @@ export const getAuthenticationErrorMessage = (
  */
 export const login = async (input: LoginInput): Promise<LoginResult> => {
   try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-
-    headers["__tenant"] = input.tenant ?? "";
-
-    const response = await axios.post<{
-      result: {
-        accessToken: string;
-        expireInSeconds: number;
-        userId: number;
-      };
-    }>(`${API_BASE}/api/TokenAuth/Authenticate`, {
-      userNameOrEmailAddress: input.email,
+    const response = await axios.post<AuthSession>("/api/auth/login", {
+      email: input.email,
       password: input.password,
-      rememberClient: input.rememberMe ?? false,
-    }, { headers });
-
-    const { accessToken, expireInSeconds } = response.data.result;
-
-    const claims = decodeJwtPayload(accessToken);
-    const user = claims ? claimsToUser(claims) : null;
-
-    const session: AuthSession = {
-      accessToken,
-      expiresAt: new Date(Date.now() + expireInSeconds * 1000).toISOString(),
-      refreshToken: null,
-      user,
-    };
-
-    return { ok: true, session };
+      rememberMe: input.rememberMe,
+      tenant: input.tenant,
+    });
+    return { ok: true, session: response.data };
   } catch (error: unknown) {
     if (axios.isAxiosError(error) && error.response) {
       return {

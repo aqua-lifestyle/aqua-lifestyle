@@ -10,20 +10,24 @@ export type AuthUser = {
 };
 
 export type AuthSession = {
-  accessToken: string;
+  accessToken?: string;
   expiresAt: string | null;
   refreshToken?: string | null;
+  tenant?: string | null;
   user: AuthUser | null;
 };
+
+export type AuthStatus = "bootstrapping" | "authenticated" | "anonymous" | "error";
 
 export type AuthState = {
   isAuthenticated: boolean;
   isReady: boolean;
   session: AuthSession | null;
+  status?: AuthStatus;
 };
 
 export type AuthActions = {
-  clearSession: () => void;
+  clearSession: () => Promise<void>;
   setReady: (ready: boolean) => void;
   setSession: (session: AuthSession) => void;
 };
@@ -32,6 +36,7 @@ export const initialAuthState: AuthState = {
   isAuthenticated: false,
   isReady: false,
   session: null,
+  status: "bootstrapping",
 };
 
 export const AuthStateContext = createContext<AuthState>(initialAuthState);
