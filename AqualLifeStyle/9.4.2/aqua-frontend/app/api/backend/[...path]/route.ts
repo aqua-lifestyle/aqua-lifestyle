@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { publicEnv } from "@/src/shared/config";
+import { isSameOrigin } from "@/src/shared/auth/origin";
 import { deleteSessionCookies, readSession } from "@/src/shared/auth/session";
 
 const forward = async (
@@ -14,9 +15,8 @@ const forward = async (
     return response;
   }
 
-  if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
-    const origin = request.headers.get("origin");
-    if (origin && origin !== request.nextUrl.origin) {
+  if (!["GET", "HEAD"].includes(request.method)) {
+    if (!isSameOrigin(request)) {
       return NextResponse.json({ message: "Invalid request origin." }, { status: 403 });
     }
   }
@@ -29,7 +29,12 @@ const forward = async (
   headers.set("Authorization", `Bearer ${session.accessToken}`);
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("Content-Type", contentType);
-  if (session.tenant) headers.set("__tenant", session.tenant);
+  const clientTenant = request.headers.get("__tenant");
+  if (clientTenant) {
+    headers.set("__tenant", clientTenant);
+  } else if (session.tenant) {
+    headers.set("__tenant", session.tenant);
+  }
 
   const backendResponse = await fetch(backendUrl, {
     body: ["GET", "HEAD"].includes(request.method) ? undefined : await request.arrayBuffer(),

@@ -33,13 +33,21 @@ export const authReducer = (
       };
 
     case AuthActionTypes.setSession:
-      return {
-        ...state,
-        isAuthenticated: true,
-        isReady: true,
-        session: action.payload,
-        status: "authenticated",
-      };
+      return action.payload.user
+        ? {
+            ...state,
+            isAuthenticated: true,
+            isReady: true,
+            session: action.payload,
+            status: "authenticated",
+          }
+        : {
+            ...state,
+            isAuthenticated: false,
+            isReady: true,
+            session: null,
+            status: "anonymous",
+          };
 
     default:
       return state;
