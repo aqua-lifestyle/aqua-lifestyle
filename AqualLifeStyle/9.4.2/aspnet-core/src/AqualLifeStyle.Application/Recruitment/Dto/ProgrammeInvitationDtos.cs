@@ -34,5 +34,6 @@ namespace AqualLifeStyle.Application.Recruitment.Dto
         public string ProgrammeName { get; set; }
         public bool RecruiterEligible { get; set; }
         public string AreaName { get; set; }
+        public string TenancyName { get; set; }
     }
 }

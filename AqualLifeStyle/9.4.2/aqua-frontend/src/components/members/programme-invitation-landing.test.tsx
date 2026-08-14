@@ -24,13 +24,14 @@ vi.mock("@/src/shared/api", async () => {
 });
 
 const preview = {
-  areaName: "Default",
+  areaName: "Johannesburg",
   inviteCode: "AQ7G2X9KLMNP",
   programmeKey: "AQGREEN",
   programmeName: "AQGreen",
   recruiterClubMemberNumber: "CLB-ABCDEFGH2345",
   recruiterEligible: true,
   recruiterName: "Ada Recruiter",
+  tenancyName: "Default",
 };
 
 describe("ProgrammeInvitationLanding", () => {
@@ -192,15 +193,15 @@ describe("ProgrammeInvitationLanding", () => {
     render(<ProgrammeInvitationLanding inviteCode="AQ7G2X9KLMNP" />);
 
     expect(await screen.findByRole("link", { name: /create my account/i }))
-      .toHaveAttribute("href", expect.stringContaining("/signup?area=Default"));
+      .toHaveAttribute("href", expect.stringContaining("/signup?area=Default&invite=AQ7G2X9KLMNP"));
     expect(screen.getByRole("link", { name: /sign in to continue/i }))
-      .toHaveAttribute("href", "/login?redirect=%2Fi%2FAQ7G2X9KLMNP");
+      .toHaveAttribute("href", "/login?area=Default&invite=AQ7G2X9KLMNP&redirect=%2Fi%2FAQ7G2X9KLMNP");
   });
 
   it("uses the safe signup page when the invitation has no Area name", async () => {
     vi.mocked(httpClient.get).mockResolvedValue({
       ...preview,
-      areaName: null,
+      tenancyName: null,
     });
     vi.mocked(useAuthState).mockReturnValue({
       isAuthenticated: false,

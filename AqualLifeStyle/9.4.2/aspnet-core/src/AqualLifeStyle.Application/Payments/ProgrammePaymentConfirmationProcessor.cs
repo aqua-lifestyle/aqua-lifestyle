@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Abp.Dependency;
 using Abp.Domain.Repositories;
@@ -69,10 +70,13 @@ namespace AqualLifeStyle.Payments
         private readonly IRepository<EntryMonthlyObligation, Guid> _monthlyObligationRepository;
         private readonly IEntryMonthlyObligationSchedulingLock _monthlyObligationLock;
         private readonly ICustomerRepository _customerRepository;
+        private readonly IRepository<CustomerAreaAssignment, Guid>
+            _customerAreaAssignmentRepository;
         private readonly IMembershipRepository _membershipRepository;
         private readonly IProgrammeInvitationResolver _invitationResolver;
         private readonly AQGreenFuneralCoverInclusionProcessor _funeralCoverInclusionProcessor;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        private readonly IHostedPaymentCheckoutLock _hostedPaymentCheckoutLock;
         private readonly ProgrammeApprovalNotificationScheduler _approvalNotificationScheduler;
 
         public ProgrammePaymentConfirmationProcessor(
@@ -85,8 +89,10 @@ namespace AqualLifeStyle.Payments
             IRepository<EntryMonthlyObligation, Guid> monthlyObligationRepository,
             IEntryMonthlyObligationSchedulingLock monthlyObligationLock,
             ICustomerRepository customerRepository,
+            IRepository<CustomerAreaAssignment, Guid> customerAreaAssignmentRepository,
             IMembershipRepository membershipRepository,
             IProgrammeInvitationResolver invitationResolver,
+            IHostedPaymentCheckoutLock hostedPaymentCheckoutLock,
             IUnitOfWorkManager unitOfWorkManager,
             ProgrammeApprovalNotificationScheduler approvalNotificationScheduler,
             AQGreenFuneralCoverInclusionProcessor funeralCoverInclusionProcessor)
@@ -100,8 +106,10 @@ namespace AqualLifeStyle.Payments
             _monthlyObligationRepository = monthlyObligationRepository;
             _monthlyObligationLock = monthlyObligationLock;
             _customerRepository = customerRepository;
+            _customerAreaAssignmentRepository = customerAreaAssignmentRepository;
             _membershipRepository = membershipRepository;
             _invitationResolver = invitationResolver;
+            _hostedPaymentCheckoutLock = hostedPaymentCheckoutLock;
             _funeralCoverInclusionProcessor = funeralCoverInclusionProcessor;
             _unitOfWorkManager = unitOfWorkManager;
             _approvalNotificationScheduler = approvalNotificationScheduler;
@@ -145,7 +153,7 @@ namespace AqualLifeStyle.Payments
                         currency);
 
                 EnsureCheckoutPaymentFacts(intent, providerCheckoutId, amount, currency, "Onyx");
-                await RevalidatePlacementAsync(intent);
+                var invitationPlacement = await RevalidatePlacementAsync(intent);
 
                 var candidate = MemberPayment.CreatePending(
                     intent.TenantId,
@@ -222,6 +230,26 @@ namespace AqualLifeStyle.Payments
                             "The Onyx payment cannot be completed.",
                             "The inviting Club Member is no longer eligible. Contact the club team for assistance.");
 
+                    if (invitationPlacement != null)
+                    {
+                        var customer = await _customerRepository.GetAllIncluding(
+                                item => item.AreaAssignments)
+                            .SingleAsync(item =>
+                                item.Id == intent.CustomerId &&
+                                item.TenantId == intent.TenantId);
+                        var previousAreaId = customer.AreaId;
+                        customer.MoveToArea(
+                            invitationPlacement.RecruiterArea,
+                            DateTime.UtcNow,
+                            "Onyx invitation placement");
+                        if (customer.AreaId != previousAreaId)
+                        {
+                            await _customerAreaAssignmentRepository.InsertAsync(
+                                customer.AreaAssignments.Single(assignment =>
+                                    assignment.IsCurrent));
+                        }
+                    }
+
                     participation = OnyxParticipation.StartDirectUnderRecruiter(
                         intent.TenantId,
                         intent.CustomerId,
@@ -284,19 +312,21 @@ namespace AqualLifeStyle.Payments
             }
         }
 
-        private async Task RevalidatePlacementAsync(DirectOnyxCheckoutIntent intent)
+        private async Task<ProgrammeInvitationPlacement> RevalidatePlacementAsync(
+            DirectOnyxCheckoutIntent intent)
         {
             if (string.IsNullOrWhiteSpace(intent.InviteCode))
-                return;
+                return null;
 
-            var resolvedRecruiter = await _invitationResolver.ResolveRecruiterForJoiningAsync(
+            var placement = await _invitationResolver.ResolveForJoiningAsync(
                 intent.InviteCode,
                 RecruitmentProgrammeKeys.Onyx,
                 intent.CustomerId,
                 intent.TenantId);
-            if (resolvedRecruiter != intent.RecruiterCustomerId)
+            if (placement.RecruiterCustomerId != intent.RecruiterCustomerId)
                 throw new InvalidOperationException(
                     "The checkout invitation no longer resolves to its recorded network placement.");
+            return placement;
         }
 
         private async Task ClearLegacyOnyxMembershipAssignmentAsync(int customerId)

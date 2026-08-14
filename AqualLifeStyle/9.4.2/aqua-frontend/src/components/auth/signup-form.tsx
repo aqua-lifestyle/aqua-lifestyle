@@ -37,11 +37,12 @@ const steps = [
 ];
 
 type SignupFormProps = {
+  inviteCode?: string;
   redirectPath?: string;
   tenancyName?: string;
 };
 
-export const SignupForm = ({ redirectPath, tenancyName }: SignupFormProps) => {
+export const SignupForm = ({ inviteCode, redirectPath, tenancyName }: SignupFormProps) => {
   const router = useRouter();
   const { currentTenant } = useTenantState();
   const { toast } = useToast();
@@ -130,6 +131,7 @@ export const SignupForm = ({ redirectPath, tenancyName }: SignupFormProps) => {
       contactNumber: formData.contactNumber,
       email: formData.email,
       homeAddress: formData.homeAddress,
+      inviteCode,
       password: formData.password,
       redirectPath,
       name: formData.firstName,

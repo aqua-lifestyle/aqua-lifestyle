@@ -28,6 +28,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         : AqualLifeStyleAppServiceBase, IClubMemberProgrammeParticipationAppService
     {
         private readonly ICustomerRepository _customerRepository;
+        private readonly IRepository<CustomerAreaAssignment, Guid>
+            _customerAreaAssignmentRepository;
         private readonly IMembershipRepository _membershipRepository;
         private readonly IRepository<EntryParticipation, Guid> _entryParticipationRepository;
         private readonly IRepository<OnyxParticipation, Guid> _onyxParticipationRepository;
@@ -50,6 +52,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
         public ClubMemberProgrammeParticipationAppService(
             ICustomerRepository customerRepository,
+            IRepository<CustomerAreaAssignment, Guid> customerAreaAssignmentRepository,
             IMembershipRepository membershipRepository,
             IRepository<EntryParticipation, Guid> entryParticipationRepository,
             IRepository<OnyxParticipation, Guid> onyxParticipationRepository,
@@ -65,6 +68,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             IConfiguration configuration)
         {
             _customerRepository = customerRepository;
+            _customerAreaAssignmentRepository = customerAreaAssignmentRepository;
             _membershipRepository = membershipRepository;
             _entryParticipationRepository = entryParticipationRepository;
             _onyxParticipationRepository = onyxParticipationRepository;
@@ -188,12 +192,16 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             StartEntryParticipationInput input)
         {
             input ??= new StartEntryParticipationInput();
-            var customer = await GetCurrentActiveCustomerAsync();
-            var recruiterCustomerId = await ResolveRequestedRecruiterAsync(
+            var customerId = await GetCurrentActiveCustomerIdAsync();
+            var tenantId = GetRequiredTenantId("Programme participation is unavailable.");
+            var requestedPlacement = await ResolveRequestedRecruiterAsync(
                 input.RecruiterCustomerId,
                 input.InviteCode,
                 RecruitmentProgrammeKeys.AQGreen,
-                customer);
+                customerId,
+                tenantId);
+            var customer = await GetCurrentActiveCustomerAsync();
+            var recruiterCustomerId = requestedPlacement.RecruiterCustomerId;
             await ClearLegacyProgrammeMembershipAssignmentAsync(
                 customer,
                 MembershipType.AQGreen,
@@ -213,6 +221,20 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                     customer.TenantId.Value,
                     customer.Id,
                     recruiterCustomerId.Value);
+                if (requestedPlacement.InvitationPlacement != null)
+                {
+                    var previousAreaId = customer.AreaId;
+                    customer.MoveToArea(
+                        requestedPlacement.InvitationPlacement.RecruiterArea,
+                        UtcNow,
+                        "AQGreen invitation placement");
+                    if (customer.AreaId != previousAreaId)
+                    {
+                        await _customerAreaAssignmentRepository.InsertAsync(
+                            customer.AreaAssignments.Single(assignment =>
+                                assignment.IsCurrent));
+                    }
+                }
                 participation = EntryParticipation.StartUnderRecruiter(
                     customer.TenantId.Value,
                     customer.Id,
@@ -368,11 +390,13 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 var customer = await GetCurrentActiveCustomerAsync();
                 await _hostedPaymentCheckoutLock.AcquireDirectOnyxCustomerAsync(
                     customer.Id);
-                var recruiterCustomerId = await ResolveRequestedRecruiterAsync(
+                var requestedPlacement = await ResolveRequestedRecruiterAsync(
                     input.RecruiterCustomerId,
                     input.InviteCode,
                     RecruitmentProgrammeKeys.Onyx,
-                    customer);
+                    customer.Id,
+                    customer.TenantId.Value);
+                var recruiterCustomerId = requestedPlacement.RecruiterCustomerId;
                 if (recruiterCustomerId.HasValue)
                 {
                     await GetActiveOnyxRecruiterAsync(
@@ -541,11 +565,12 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 $"Cleared legacy {programmeName} membership assignment tenant={customer.TenantId} customer={customer.Id}");
         }
 
-        private async Task<int?> ResolveRequestedRecruiterAsync(
+        private async Task<RequestedRecruiterPlacement> ResolveRequestedRecruiterAsync(
             int? recruiterCustomerId,
             string inviteCode,
             string programmeKey,
-            Customer customer)
+            int customerId,
+            int tenantId)
         {
             if (recruiterCustomerId.HasValue && !string.IsNullOrWhiteSpace(inviteCode))
             {
@@ -553,19 +578,39 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                     "Use either an invitation code or an inviting Club Member reference, not both.");
             }
 
-            if (string.IsNullOrWhiteSpace(inviteCode)) return recruiterCustomerId;
-            return await _invitationResolver.ResolveRecruiterForJoiningAsync(
+            if (string.IsNullOrWhiteSpace(inviteCode))
+                return new RequestedRecruiterPlacement(recruiterCustomerId, null);
+            var placement = await _invitationResolver.ResolveForJoiningAsync(
                 inviteCode,
                 programmeKey,
-                customer.Id,
-                customer.TenantId.Value);
+                customerId,
+                tenantId);
+            return new RequestedRecruiterPlacement(
+                placement.RecruiterCustomerId,
+                placement);
+        }
+
+        private sealed class RequestedRecruiterPlacement
+        {
+            public int? RecruiterCustomerId { get; }
+            public ProgrammeInvitationPlacement InvitationPlacement { get; }
+
+            public RequestedRecruiterPlacement(
+                int? recruiterCustomerId,
+                ProgrammeInvitationPlacement invitationPlacement)
+            {
+                RecruiterCustomerId = recruiterCustomerId;
+                InvitationPlacement = invitationPlacement;
+            }
         }
 
         private async Task<Customer> GetCurrentActiveCustomerAsync()
         {
             var tenantId = GetRequiredTenantId("Programme participation is unavailable.");
             var userId = AbpSession.GetUserId();
-            var customer = await _customerRepository.GetAllIncluding(item => item.Area)
+            var customer = await _customerRepository.GetAllIncluding(
+                    item => item.Area,
+                    item => item.AreaAssignments)
                 .FirstOrDefaultAsync(item => item.TenantId == tenantId && item.UserId == userId);
             if (customer == null)
             {
@@ -582,6 +627,26 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             }
 
             return customer;
+        }
+
+        private async Task<int> GetCurrentActiveCustomerIdAsync()
+        {
+            var tenantId = GetRequiredTenantId("Programme participation is unavailable.");
+            var userId = AbpSession.GetUserId();
+            var customer = await _customerRepository.GetAll()
+                .AsNoTracking()
+                .Where(item => item.TenantId == tenantId && item.UserId == userId)
+                .Select(item => new { item.Id, item.IsActive })
+                .FirstOrDefaultAsync();
+            if (customer == null)
+                throw new UserFriendlyException(
+                    "Programme participation is unavailable.",
+                    "No Club Member account is linked to your sign-in.");
+            if (!customer.IsActive)
+                throw new UserFriendlyException(
+                    "Programme participation is unavailable.",
+                    "Your Club Member account is inactive. Contact the club team for assistance.");
+            return customer.Id;
         }
 
         private async Task<string> GetClubMemberNumberAsync(int? customerId)

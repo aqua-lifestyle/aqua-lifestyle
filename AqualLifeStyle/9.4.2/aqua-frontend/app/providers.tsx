@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { AuthProvider, useAuthState } from "@/src/providers/Auth";
+import { SystemHealthProvider } from "@/src/providers/SystemHealth";
 import { TenantProvider, useTenantState } from "@/src/providers/Tenant";
 import { ToastProvider } from "@/src/providers/Toast";
 
@@ -54,6 +55,10 @@ const RouteProviders = ({ children }: { children: ReactNode }) => {
   const tenant = currentTenant ?? "host";
   const dataScope = getDataScopeKey(tenant, session?.user?.id);
   const providerScope = getProviderScope(pathname);
+
+  if (pathname.startsWith("/i/")) {
+    return <SystemHealthProvider>{children}</SystemHealthProvider>;
+  }
 
   if (providerScope === "shell") {
     return children;

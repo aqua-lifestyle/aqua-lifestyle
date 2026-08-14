@@ -22,11 +22,11 @@ The lifecycle remains deliberately separated:
 `Customer → Programme participation → Recruitment relationship → Network placement → Activation → Qualification → Commission eligibility → Commission payment`
 
 Accepting an AQGreen invitation creates its pre-activation participation and
-records the recruiter placement; one confirmed R1,200 joining payment then governs
-activation. Confirming a direct-Onyx invitation records only the member's joining
+records the recruiter placement; confirmed joining payment moves the participation
+to Area Administrator review, and only approval activates it. Confirming a direct-Onyx invitation records only the member's joining
 intent for checkout. It does not create an Onyx participation or placement.
 After Yoco confirms the R6,120 payment, the backend revalidates the invitation
-and atomically creates the active Onyx participation and recruiter placement.
+and atomically creates the awaiting-approval Onyx participation and recruiter placement.
 Neither flow directly qualifies a network or pays a commission.
 
 ## Customer workflow
@@ -36,15 +36,19 @@ Neither flow directly qualifies a network or pays a commission.
 3. The Club Member copies its code or link, or uses the device share action.
 4. The invitee opens `/i/{inviteCode}`.
 5. The public preview shows only the recruiter name, immutable Club Member
-   number, Area, programme, and current recruitment eligibility.
+   number, current business Area, programme, and current recruitment eligibility.
 6. An unauthenticated invitee creates an account or signs in and returns to the
-   same invitation.
+   same invitation. Registration inherits the inviting Club Member's current
+   active business Area but does not create programme placement.
 7. The invitee explicitly confirms the programme and intended recruiter.
 8. For AQGreen, the normal joining workflow creates the participation and
-   recruiter placement in its pre-activation state; Yoco confirmation of the full
-   R1,200 joining payment activates it. For direct Onyx, confirmation proceeds to the
-   R6,120 checkout without creating programme state. Only a confirmed payment
-   creates the active Onyx participation and recruiter placement.
+   recruiter placement in its pre-activation state and re-resolves the inviting
+   Club Member's current Area. Yoco confirmation of the full R1,200 joining
+   obligation moves it to Area Administrator review; only approval activates it.
+   For direct Onyx, confirmation proceeds to the R6,120 checkout without creating
+   programme state. Verified payment creates the awaiting-approval Onyx
+   participation and placement using the recruiter's current Area; Area
+   Administrator approval activates it.
 
 Joining independently remains supported. Manually entering internal customer
 or participation identifiers is not part of the normal customer experience.
@@ -52,7 +56,11 @@ or participation identifiers is not part of the normal customer experience.
 ## Domain and application design
 
 - `ProgrammeInvitation` stores a unique, stable, 12-character public code,
-  programme key, Area, and programme-participation reference.
+  programme key, Tenant, and programme-participation reference. Business Area is
+  resolved from the recruiter Customer when the invitation is used, not copied
+  into the invitation. For host-context registration, the invitation's persisted
+  Tenant is the server-authoritative registration Tenant; browser workspace
+  routing does not grant Tenant authority.
 - Codes use a cryptographically secure random-number generator and an
   unambiguous uppercase alphabet. Internal IDs are never encoded into a code.
 - A unique database constraint on `(ProgrammeKey, ProgrammeParticipationId)`
@@ -81,13 +89,17 @@ The backend is authoritative. On every acceptance it verifies that:
 - the invitation belongs to the requested programme;
 - the referenced participation still exists and remains eligible;
 - the recruiter's participation remains eligible under the selected programme;
+- the recruiter Customer is Active and has a current active Area in the same
+  Tenant;
+- the invitee inherits that server-resolved Area at the programme placement
+  transition, with effective-dated Area history preserved;
 - the invitee is not accepting their own invitation; and
 - existing idempotency and recruiter-reassignment protections still hold.
 
 Tenant is the hard security and programme-network boundary. Recruitment and
-qualification never cross Tenants. The business Area model is a planned
-subdivision inside a Tenant and is not implemented here; when it is introduced,
-same-Tenant recruitment may cross Areas according to programme policy.
+qualification never cross Tenants. Area is the business and administrative
+subdivision inside a Tenant. Invitation recruits inherit the recruiter's current
+Area, while the qualification graph remains Tenant-and-programme scoped.
 
 The public lookup does not return customer IDs, participation IDs, entity IDs,
 payment information, network structure, qualification details, or commission
@@ -122,6 +134,6 @@ idempotent and does not create duplicate history.
   unique-constraint race to make the losing concurrent request transparent.
 - Revocation, expiry, delivery analytics, QR codes, and rate-limiting are useful
   future capabilities but are intentionally outside this first complete flow.
-- Future cross-Area recruitment rules belong in programme policy after the Area
-  aggregate exists. They must not be inferred from Tenant identity or an
+- Future programme-specific cross-Area recruitment restrictions belong in
+  programme policy. They must not be inferred from Tenant identity or an
   invitation code.

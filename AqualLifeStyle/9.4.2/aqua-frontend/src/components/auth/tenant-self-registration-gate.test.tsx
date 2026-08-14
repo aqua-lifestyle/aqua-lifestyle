@@ -48,13 +48,19 @@ describe("TenantSelfRegistrationGate", () => {
       ok: true,
     });
 
-    render(<TenantSelfRegistrationGate />);
+    render(
+      <TenantSelfRegistrationGate
+        inviteCode="AQ7G2X9KLMNP"
+        redirectPath="/i/AQ7G2X9KLMNP"
+        requestedTenancyName="Default"
+      />,
+    );
 
     expect(await screen.findByText(/created by an authorised/i)).toBeInTheDocument();
     expect(screen.queryByText("Create your account")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Return to sign in" })).toHaveAttribute(
       "href",
-      "/login",
+      "/login?area=Default&invite=AQ7G2X9KLMNP&redirect=%2Fi%2FAQ7G2X9KLMNP",
     );
   });
 

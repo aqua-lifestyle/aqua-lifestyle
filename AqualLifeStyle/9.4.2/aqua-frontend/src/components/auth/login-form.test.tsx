@@ -144,6 +144,23 @@ describe("LoginForm", () => {
     );
   });
 
+  it("preserves invitation context when switching to registration", async () => {
+    searchParams.current = new URLSearchParams(
+      "area=Default&invite=AQ7G2X9KLMNP&redirect=%2Fi%2FAQ7G2X9KLMNP",
+    );
+    vi.mocked(getTenantSelfRegistrationAvailability).mockResolvedValue({
+      isSelfRegistrationEnabled: true,
+      ok: true,
+    });
+
+    render(<LoginForm />);
+
+    expect(await screen.findByRole("link", { name: "Sign up" })).toHaveAttribute(
+      "href",
+      "/signup?area=Default&invite=AQ7G2X9KLMNP&redirect=%2Fi%2FAQ7G2X9KLMNP",
+    );
+  });
+
   it("provides a verification recovery path for unconfirmed accounts", async () => {
     render(<LoginForm />);
 

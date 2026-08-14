@@ -49,6 +49,17 @@ const getSafeRedirect = () => {
     : null;
 };
 
+const getSignupUrl = (searchParams: URLSearchParams, workspace: string) => {
+  const params = new URLSearchParams({ area: workspace });
+  const inviteCode = searchParams.get("invite");
+  const redirect = searchParams.get("redirect");
+  if (inviteCode) params.set("invite", inviteCode);
+  if (redirect?.startsWith("/") && !redirect.startsWith("//")) {
+    params.set("redirect", redirect);
+  }
+  return `/signup?${params.toString()}`;
+};
+
 export const LoginForm = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -266,7 +277,7 @@ export const LoginForm = () => {
               <p className="mt-6 text-center text-sm text-muted-foreground">
                 Don’t have an account?{" "}
                 <LinkButton
-                  href={`/signup?area=${encodeURIComponent(selectedWorkspace)}`}
+                  href={getSignupUrl(searchParams, selectedWorkspace)}
                   variant="ghost"
                 >
                   Sign up

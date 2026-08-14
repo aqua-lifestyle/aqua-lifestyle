@@ -11,6 +11,7 @@ using AqualLifeStyle.Application.Recruitment;
 using AqualLifeStyle.Application.Recruitment.Dto;
 using AqualLifeStyle.Authorization.Accounts;
 using AqualLifeStyle.Authorization.Accounts.Dto;
+using AqualLifeStyle.Domain.Areas;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
@@ -18,8 +19,10 @@ using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Recruitment;
+using AqualLifeStyle.MultiTenancy;
 using AqualLifeStyle.Payments;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Shouldly;
 using Xunit;
 
@@ -61,7 +64,8 @@ namespace AqualLifeStyle.Tests.Application
             preview.ProgrammeName.ShouldBe("AQGreen");
             preview.RecruiterEligible.ShouldBeTrue();
             preview.RecruiterClubMemberNumber.ShouldBe(invitation.ClubMemberNumber);
-            preview.AreaName.ShouldBe("Default");
+            preview.AreaName.ShouldBe("Johannesburg");
+            preview.TenancyName.ShouldBe("Default");
 
             await UsingDbContextAsync(1, async context =>
             {
@@ -80,7 +84,8 @@ namespace AqualLifeStyle.Tests.Application
             var inviteCode = (await _invitationService.GetMyInvitationsAsync())
                 .Invitations.Single().Code;
 
-            var inviteeCustomerId = await RegisterAndSignInCustomerAsync();
+            var inviteeCustomerId = await RegisterAndSignInCustomerAsync(
+                areaId: await GetAreaIdAsync("JHB"));
             var first = await _participationService.StartEntryAsync(
                 new StartEntryParticipationInput { InviteCode = inviteCode });
             var repeated = await _participationService.StartEntryAsync(
@@ -110,6 +115,353 @@ namespace AqualLifeStyle.Tests.Application
                 _participationService.StartEntryAsync(
                     new StartEntryParticipationInput { InviteCode = inviteCode }));
             selfException.Details.ShouldContain("own invitation");
+        }
+
+        [Fact]
+        public async Task AQGreenInvitationJoin_InheritsRecruiterCurrentAreaAndOnlyCountsAfterActivation()
+        {
+            var pretoriaAreaId = await CreateAreaAsync("PTA", "Pretoria");
+            var recruiterCustomerId = await RegisterAndSignInCustomerAsync(
+                areaId: pretoriaAreaId);
+            await ActivateCurrentAQGreenParticipationAsync(recruiterCustomerId);
+            var inviteCode = (await _invitationService.GetMyInvitationsAsync())
+                .Invitations.Single().Code;
+
+            var inviteeCustomerId = await RegisterAndSignInCustomerAsync(
+                areaId: await GetAreaIdAsync("JHB"));
+            await _participationService.StartEntryAsync(
+                new StartEntryParticipationInput { InviteCode = inviteCode });
+            await _participationService.StartEntryAsync(
+                new StartEntryParticipationInput { InviteCode = inviteCode });
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var invitee = await context.Customers
+                    .Include(customer => customer.AreaAssignments)
+                    .SingleAsync(customer => customer.Id == inviteeCustomerId);
+                invitee.AreaId.ShouldBe(pretoriaAreaId);
+                invitee.AreaAssignments.Count.ShouldBe(2);
+                invitee.AreaAssignments.Count(assignment => assignment.IsCurrent).ShouldBe(1);
+            });
+
+            SetCurrentUser(await GetCustomerUserIdAsync(recruiterCustomerId), 1);
+            var progress = await Resolve<IClubMemberProgrammeProgressAppService>()
+                .GetMyProgressAsync();
+            progress.DirectRecruits.ShouldBe(0);
+
+            SetCurrentUser(await GetCustomerUserIdAsync(inviteeCustomerId), 1);
+            await _participationService.CreateAQGreenJoiningCheckoutAsync(
+                new CreateAQGreenJoiningCheckoutInput
+                {
+                    Schedule = AQGreenJoiningPaymentSchedule.Full
+                });
+            var checkout = await UsingDbContextAsync(1, context =>
+                context.AQGreenJoiningCheckouts.SingleAsync(
+                    item => item.CustomerId == inviteeCustomerId));
+            await Resolve<ProgrammePaymentConfirmationProcessor>()
+                .ProcessAQGreenJoiningCheckoutAsync(
+                    checkout.Id,
+                    "Test",
+                    $"area-inheritance-{Guid.NewGuid():N}",
+                    checkout.ProviderCheckoutId,
+                    1200m,
+                    "ZAR",
+                    DateTime.UtcNow);
+
+            SetCurrentUser(await GetCustomerUserIdAsync(recruiterCustomerId), 1);
+            progress = await Resolve<IClubMemberProgrammeProgressAppService>()
+                .GetMyProgressAsync();
+            progress.DirectRecruits.ShouldBe(0);
+
+            SetCurrentUser(await GetCustomerUserIdAsync(inviteeCustomerId), 1);
+            await ApproveAndPromoteAsync(inviteeCustomerId, onyx: false);
+            SetCurrentUser(await GetCustomerUserIdAsync(recruiterCustomerId), 1);
+            progress = await Resolve<IClubMemberProgrammeProgressAppService>()
+                .GetMyProgressAsync();
+            progress.DirectRecruits.ShouldBe(1);
+            progress.DirectRecruitsRequired.ShouldBe(5);
+            progress.RecruitsRemaining.ShouldBe(4);
+            progress.RecruitmentProgressPercent.ShouldBe(20);
+        }
+
+        [Fact]
+        public async Task InvitationRegistration_InheritsAreaWithoutCreatingPlacement()
+        {
+            var pretoriaAreaId = await CreateAreaAsync("PTA", "Pretoria");
+            var recruiterCustomerId = await RegisterAndSignInCustomerAsync(
+                areaId: pretoriaAreaId);
+            await ActivateCurrentAQGreenParticipationAsync(recruiterCustomerId);
+            var inviteCode = (await _invitationService.GetMyInvitationsAsync())
+                .Invitations.Single().Code;
+
+            await Resolve<ISettingManager>().ChangeSettingForTenantAsync(
+                1,
+                "Abp.Account.IsSelfRegistrationEnabled",
+                "true");
+            var configuration = Resolve<IConfiguration>();
+            var configuredTenantName = configuration["App:DefaultTenantName"];
+            var suffix = Guid.NewGuid().ToString("N");
+            try
+            {
+                configuration["App:DefaultTenantName"] = null;
+                using (UsingTenantId(null))
+                {
+                    await _accountAppService.Register(new RegisterInput
+                    {
+                        EmailAddress = $"host-invite-{suffix}@example.com",
+                        ContactNumber = "+27 74 567 8901",
+                        HomeAddress = "40 Programme Lane, Johannesburg",
+                        InviteCode = inviteCode,
+                        Name = "Host",
+                        Password = "Customer!101",
+                        Surname = "Invitee",
+                        UserName = $"host-invite-{suffix}"
+                    });
+                }
+            }
+            finally
+            {
+                configuration["App:DefaultTenantName"] = configuredTenantName;
+            }
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var user = await context.Users.SingleAsync(item =>
+                    item.UserName == $"host-invite-{suffix}");
+                user.TenantId.ShouldBe(1);
+                var invitee = await context.Customers
+                    .Include(customer => customer.AreaAssignments)
+                    .SingleAsync(customer => customer.UserId == user.Id);
+                invitee.AreaId.ShouldBe(pretoriaAreaId);
+                invitee.AreaAssignments.Single().AreaId.ShouldBe(pretoriaAreaId);
+                (await context.EntryParticipations.AnyAsync(participation =>
+                    participation.CustomerId == invitee.Id)).ShouldBeFalse();
+            });
+        }
+
+        [Fact]
+        public async Task InvitationRegistration_WithInactiveInvitationTenantFailsWithoutMutation()
+        {
+            var recruiterCustomerId = await RegisterAndSignInCustomerAsync();
+            await ActivateCurrentAQGreenParticipationAsync(recruiterCustomerId);
+            var inviteCode = (await _invitationService.GetMyInvitationsAsync())
+                .Invitations.Single().Code;
+            var before = await UsingDbContextAsync(1, async context => new
+            {
+                AreaAssignments = await context.CustomerAreaAssignments.CountAsync(),
+                Customers = await context.Customers.CountAsync(),
+                EntryParticipations = await context.EntryParticipations.CountAsync(),
+                Invitations = await context.ProgrammeInvitations.CountAsync(),
+                OnyxParticipations = await context.OnyxParticipations.CountAsync()
+            });
+            var configuration = Resolve<IConfiguration>();
+            var configuredTenantName = configuration["App:DefaultTenantName"];
+            var suffix = Guid.NewGuid().ToString("N");
+
+            try
+            {
+                configuration["App:DefaultTenantName"] = null;
+                await UsingDbContextAsync(async context =>
+                {
+                    var tenant = await context.Tenants.SingleAsync(item => item.Id == 1);
+                    tenant.IsActive = false;
+                    await context.SaveChangesAsync();
+                });
+                var previewException = await Should.ThrowAsync<UserFriendlyException>(() =>
+                    _invitationService.GetPreviewAsync(
+                        new ProgrammeInvitationCodeInput { InviteCode = inviteCode }));
+                previewException.Message.ShouldBe("Invitation unavailable.");
+                previewException.Details.ShouldContain("organisation is unavailable");
+                using (UsingTenantId(null))
+                {
+                    var exception = await Should.ThrowAsync<UserFriendlyException>(() =>
+                        _accountAppService.Register(new RegisterInput
+                        {
+                            EmailAddress = $"missing-tenant-{suffix}@example.com",
+                            ContactNumber = "+27 74 567 8901",
+                            HomeAddress = "40 Programme Lane, Johannesburg",
+                            InviteCode = inviteCode,
+                            Name = "Missing",
+                            Password = "Customer!101",
+                            Surname = "Tenant",
+                            UserName = $"missing-tenant-{suffix}"
+                        }));
+                    exception.Message.ShouldBe("The invitation could not be accepted.");
+                    exception.Details.ShouldContain("organisation is unavailable");
+                }
+            }
+            finally
+            {
+                configuration["App:DefaultTenantName"] = configuredTenantName;
+                await UsingDbContextAsync(async context =>
+                {
+                    var tenant = await context.Tenants.SingleAsync(item => item.Id == 1);
+                    tenant.IsActive = true;
+                    await context.SaveChangesAsync();
+                });
+            }
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.Users.AnyAsync(user =>
+                    user.UserName == $"missing-tenant-{suffix}")).ShouldBeFalse();
+                (await context.Customers.CountAsync()).ShouldBe(before.Customers);
+                (await context.CustomerAreaAssignments.CountAsync())
+                    .ShouldBe(before.AreaAssignments);
+                (await context.EntryParticipations.CountAsync())
+                    .ShouldBe(before.EntryParticipations);
+                (await context.OnyxParticipations.CountAsync())
+                    .ShouldBe(before.OnyxParticipations);
+                (await context.ProgrammeInvitations.CountAsync())
+                    .ShouldBe(before.Invitations);
+                (await context.ProgrammeInvitations.SingleAsync(invitation =>
+                    invitation.Code == inviteCode)).ShouldNotBeNull();
+            });
+        }
+
+        [Fact]
+        public async Task InvitationRegistration_RejectsDifferentAmbientTenantWithoutMutation()
+        {
+            var recruiterCustomerId = await RegisterAndSignInCustomerAsync();
+            await ActivateCurrentAQGreenParticipationAsync(recruiterCustomerId);
+            var inviteCode = (await _invitationService.GetMyInvitationsAsync())
+                .Invitations.Single().Code;
+            var suffix = Guid.NewGuid().ToString("N");
+            var otherTenantId = await UsingDbContextAsync(async context =>
+            {
+                var tenant = new Tenant($"Other{suffix}", $"Other {suffix}");
+                context.Tenants.Add(tenant);
+                await context.SaveChangesAsync();
+                return tenant.Id;
+            });
+            var before = await UsingDbContextAsync(otherTenantId, async context => new
+            {
+                AreaAssignments = await context.CustomerAreaAssignments.CountAsync(),
+                Customers = await context.Customers.CountAsync()
+            });
+
+            AbpSession.UserId = null;
+            using (UsingTenantId(otherTenantId))
+            {
+                var exception = await Should.ThrowAsync<UserFriendlyException>(() =>
+                    _accountAppService.Register(new RegisterInput
+                    {
+                        EmailAddress = $"wrong-tenant-{suffix}@example.com",
+                        ContactNumber = "+27 74 567 8901",
+                        HomeAddress = "40 Programme Lane, Johannesburg",
+                        InviteCode = inviteCode,
+                        Name = "Wrong",
+                        Password = "Customer!101",
+                        Surname = "Tenant",
+                        UserName = $"wrong-tenant-{suffix}"
+                    }));
+                exception.Details.ShouldContain("different organisation");
+            }
+
+            await UsingDbContextAsync(otherTenantId, async context =>
+            {
+                (await context.Users.AnyAsync(user =>
+                    user.UserName == $"wrong-tenant-{suffix}")).ShouldBeFalse();
+                (await context.Customers.CountAsync()).ShouldBe(before.Customers);
+                (await context.CustomerAreaAssignments.CountAsync())
+                    .ShouldBe(before.AreaAssignments);
+            });
+        }
+
+        [Fact]
+        public async Task AQGreenInvitationJoin_ReResolvesRecruiterAreaAfterRegistration()
+        {
+            var pretoriaAreaId = await CreateAreaAsync("PTA", "Pretoria");
+            var capeTownAreaId = await CreateAreaAsync("CPT", "Cape Town");
+            var recruiterCustomerId = await RegisterAndSignInCustomerAsync(
+                areaId: pretoriaAreaId);
+            await ActivateCurrentAQGreenParticipationAsync(recruiterCustomerId);
+            var inviteCode = (await _invitationService.GetMyInvitationsAsync())
+                .Invitations.Single().Code;
+
+            var inviteeCustomerId = await RegisterAndSignInCustomerAsync(inviteCode);
+            (await GetCustomerAreaIdAsync(inviteeCustomerId)).ShouldBe(pretoriaAreaId);
+            await MoveCustomerToAreaAsync(
+                recruiterCustomerId,
+                capeTownAreaId,
+                DateTime.UtcNow,
+                "Recruiter relocated");
+
+            await _participationService.StartEntryAsync(
+                new StartEntryParticipationInput { InviteCode = inviteCode });
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var invitee = await context.Customers
+                    .Include(customer => customer.AreaAssignments)
+                    .SingleAsync(customer => customer.Id == inviteeCustomerId);
+                invitee.AreaId.ShouldBe(capeTownAreaId);
+                invitee.AreaAssignments.Count.ShouldBe(2);
+                invitee.AreaAssignments.Count(assignment => assignment.IsCurrent).ShouldBe(1);
+                (await context.EntryParticipations.SingleAsync(participation =>
+                    participation.CustomerId == inviteeCustomerId))
+                    .RecruiterCustomerId.ShouldBe(recruiterCustomerId);
+            });
+        }
+
+        [Fact]
+        public async Task InactiveRecruiterCustomer_CannotCreateOrMoveInvitationPlacement()
+        {
+            var recruiterCustomerId = await RegisterAndSignInCustomerAsync();
+            await ActivateCurrentAQGreenParticipationAsync(recruiterCustomerId);
+            var inviteCode = (await _invitationService.GetMyInvitationsAsync())
+                .Invitations.Single().Code;
+            await UsingDbContextAsync(1, async context =>
+            {
+                var recruiter = await context.Customers.SingleAsync(customer =>
+                    customer.Id == recruiterCustomerId);
+                recruiter.Deactivate();
+                await context.SaveChangesAsync();
+            });
+
+            (await _invitationService.GetPreviewAsync(
+                new ProgrammeInvitationCodeInput { InviteCode = inviteCode }))
+                .RecruiterEligible.ShouldBeFalse();
+            var inviteeCustomerId = await RegisterAndSignInCustomerAsync();
+            var originalAreaId = await GetCustomerAreaIdAsync(inviteeCustomerId);
+
+            await Should.ThrowAsync<UserFriendlyException>(() =>
+                _participationService.StartEntryAsync(
+                    new StartEntryParticipationInput { InviteCode = inviteCode }));
+
+            (await GetCustomerAreaIdAsync(inviteeCustomerId)).ShouldBe(originalAreaId);
+            await UsingDbContextAsync(1, async context =>
+                (await context.EntryParticipations.AnyAsync(participation =>
+                    participation.CustomerId == inviteeCustomerId)).ShouldBeFalse());
+        }
+
+        [Fact]
+        public async Task InactiveRecruiterArea_FailsClosedWithoutMovingInvitee()
+        {
+            var recruiterCustomerId = await RegisterAndSignInCustomerAsync();
+            await ActivateCurrentAQGreenParticipationAsync(recruiterCustomerId);
+            var inviteCode = (await _invitationService.GetMyInvitationsAsync())
+                .Invitations.Single().Code;
+            var inviteeCustomerId = await RegisterAndSignInCustomerAsync();
+            var originalAreaId = await GetCustomerAreaIdAsync(inviteeCustomerId);
+            await UsingDbContextAsync(1, async context =>
+            {
+                var recruiter = await context.Customers.SingleAsync(customer =>
+                    customer.Id == recruiterCustomerId);
+                var area = await context.Areas.SingleAsync(candidate =>
+                    candidate.Id == recruiter.AreaId);
+                area.Deactivate();
+                await context.SaveChangesAsync();
+            });
+            (await _invitationService.GetPreviewAsync(
+                new ProgrammeInvitationCodeInput { InviteCode = inviteCode }))
+                .RecruiterEligible.ShouldBeFalse();
+
+            await Should.ThrowAsync<UserFriendlyException>(() =>
+                _participationService.StartEntryAsync(
+                    new StartEntryParticipationInput { InviteCode = inviteCode }));
+
+            (await GetCustomerAreaIdAsync(inviteeCustomerId)).ShouldBe(originalAreaId);
         }
 
         [Fact]
@@ -182,6 +534,116 @@ namespace AqualLifeStyle.Tests.Application
                 checkout.RecruiterCustomerId.ShouldBe(recruiterCustomerId);
                 (await context.EntryParticipations.AnyAsync(item =>
                     item.CustomerId == inviteeCustomerId)).ShouldBeFalse();
+            });
+        }
+
+        [Fact]
+        public async Task OnyxInvitation_InheritsRecruiterAreaOnlyAfterVerifiedPayment()
+        {
+            var pretoriaAreaId = await CreateAreaAsync("PTA", "Pretoria");
+            var recruiterCustomerId = await RegisterAndSignInCustomerAsync(
+                areaId: pretoriaAreaId);
+            await ActivateCurrentOnyxParticipationAsync(recruiterCustomerId);
+            var inviteCode = (await _invitationService.GetMyInvitationsAsync())
+                .Invitations.Single(invitation =>
+                    invitation.ProgrammeKey == RecruitmentProgrammeKeys.Onyx).Code;
+            var johannesburgAreaId = await GetAreaIdAsync("JHB");
+            var inviteeCustomerId = await RegisterAndSignInCustomerAsync(
+                areaId: johannesburgAreaId);
+
+            await _participationService.CreateDirectOnyxCheckoutAsync(
+                new CreateDirectOnyxCheckoutInput { InviteCode = inviteCode });
+            (await GetCustomerAreaIdAsync(inviteeCustomerId))
+                .ShouldBe(johannesburgAreaId);
+            var intent = await UsingDbContextAsync(1, context =>
+                context.DirectOnyxCheckoutIntents.SingleAsync(checkout =>
+                    checkout.CustomerId == inviteeCustomerId));
+
+            var result = await Resolve<ProgrammePaymentConfirmationProcessor>()
+                .ProcessDirectOnyxCheckoutAsync(
+                    intent.Id,
+                    "Test",
+                    $"onyx-area-inheritance-{Guid.NewGuid():N}",
+                    intent.ProviderCheckoutId,
+                    6120m,
+                    "ZAR",
+                    DateTime.UtcNow);
+
+            result.AwaitingAdministrativeApproval.ShouldBeTrue();
+            await UsingDbContextAsync(1, async context =>
+            {
+                var invitee = await context.Customers
+                    .Include(customer => customer.AreaAssignments)
+                    .SingleAsync(customer => customer.Id == inviteeCustomerId);
+                invitee.AreaId.ShouldBe(pretoriaAreaId);
+                invitee.AreaAssignments.Count.ShouldBe(2);
+                var participation = await context.OnyxParticipations.SingleAsync(
+                    item => item.CustomerId == inviteeCustomerId);
+                participation.RecruiterCustomerId.ShouldBe(recruiterCustomerId);
+                participation.Status.ShouldBe(
+                    OnyxParticipationStatus.PaymentConfirmedAwaitingApproval);
+            });
+        }
+
+        [Fact]
+        public async Task OnyxInvitation_DelayedConfirmationKeepsAreaHistoryMonotonic()
+        {
+            var pretoriaAreaId = await CreateAreaAsync("PTA", "Pretoria");
+            var durbanAreaId = await CreateAreaAsync("DBN", "Durban");
+            var recruiterCustomerId = await RegisterAndSignInCustomerAsync(
+                areaId: pretoriaAreaId);
+            await ActivateCurrentOnyxParticipationAsync(recruiterCustomerId);
+            var inviteCode = (await _invitationService.GetMyInvitationsAsync())
+                .Invitations.Single(invitation =>
+                    invitation.ProgrammeKey == RecruitmentProgrammeKeys.Onyx).Code;
+            var inviteeCustomerId = await RegisterAndSignInCustomerAsync(
+                areaId: await GetAreaIdAsync("JHB"));
+            await _participationService.CreateDirectOnyxCheckoutAsync(
+                new CreateDirectOnyxCheckoutInput { InviteCode = inviteCode });
+            var intent = await UsingDbContextAsync(1, context =>
+                context.DirectOnyxCheckoutIntents.SingleAsync(checkout =>
+                    checkout.CustomerId == inviteeCustomerId));
+            var observedAt = DateTime.UtcNow;
+            var confirmedAt = new DateTime(
+                observedAt.Ticks - observedAt.Ticks % TimeSpan.TicksPerMillisecond,
+                DateTimeKind.Utc);
+            await Task.Delay(20);
+            await MoveCustomerToAreaAsync(
+                inviteeCustomerId,
+                durbanAreaId,
+                DateTime.UtcNow,
+                "Area changed before delayed webhook");
+
+            await Resolve<ProgrammePaymentConfirmationProcessor>()
+                .ProcessDirectOnyxCheckoutAsync(
+                    intent.Id,
+                    "Test",
+                    $"onyx-delayed-area-{Guid.NewGuid():N}",
+                    intent.ProviderCheckoutId,
+                    6120m,
+                    "ZAR",
+                    confirmedAt);
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var invitee = await context.Customers
+                    .Include(customer => customer.AreaAssignments)
+                    .SingleAsync(customer => customer.Id == inviteeCustomerId);
+                invitee.AreaId.ShouldBe(pretoriaAreaId);
+                var history = invitee.AreaAssignments
+                    .OrderBy(assignment => assignment.EffectiveFrom)
+                    .ToArray();
+                history.Length.ShouldBe(3);
+                history.Count(assignment => assignment.IsCurrent).ShouldBe(1);
+                history[0].EffectiveTo.ShouldBe(history[1].EffectiveFrom);
+                history[1].EffectiveTo.ShouldBe(history[2].EffectiveFrom);
+                history.All(assignment =>
+                    !assignment.EffectiveTo.HasValue ||
+                    assignment.EffectiveTo.Value >= assignment.EffectiveFrom)
+                    .ShouldBeTrue();
+                (await context.MemberPayments.SingleAsync(payment =>
+                    payment.ExternalReference.StartsWith("onyx-delayed-area-")))
+                    .ConfirmedAt.ShouldBe(confirmedAt);
             });
         }
 
@@ -923,7 +1385,9 @@ namespace AqualLifeStyle.Tests.Application
             });
         }
 
-        private async Task<int> RegisterAndSignInCustomerAsync()
+        private async Task<int> RegisterAndSignInCustomerAsync(
+            string inviteCode = null,
+            Guid? areaId = null)
         {
             var suffix = Guid.NewGuid().ToString("N");
             var userName = $"programme-{suffix}";
@@ -937,8 +1401,10 @@ namespace AqualLifeStyle.Tests.Application
                 await _accountAppService.Register(new RegisterInput
                 {
                     EmailAddress = email,
+                    AreaId = areaId,
                     ContactNumber = "+27 74 567 8901",
                     HomeAddress = "40 Programme Lane, Johannesburg",
+                    InviteCode = inviteCode,
                     Name = "Programme",
                     Password = "Customer!101",
                     Surname = "Member",
@@ -955,6 +1421,50 @@ namespace AqualLifeStyle.Tests.Application
                 });
             }
         }
+
+        private async Task<Guid> CreateAreaAsync(
+            string code,
+            string name)
+        {
+            return await UsingDbContextAsync(1, async context =>
+            {
+                var area = Area.Create(1, $"{code}{Guid.NewGuid():N}"[..10], name);
+                context.Areas.Add(area);
+                await context.SaveChangesAsync();
+                return area.Id;
+            });
+        }
+
+        private Task<long> GetCustomerUserIdAsync(int customerId) =>
+            UsingDbContextAsync(1, async context =>
+                (await context.Customers.SingleAsync(customer =>
+                    customer.Id == customerId)).UserId);
+
+        private Task<Guid?> GetCustomerAreaIdAsync(int customerId) =>
+            UsingDbContextAsync(1, async context =>
+                (await context.Customers.SingleAsync(customer =>
+                    customer.Id == customerId)).AreaId);
+
+        private Task<Guid> GetAreaIdAsync(string code) =>
+            UsingDbContextAsync(1, async context =>
+                (await context.Areas.SingleAsync(area => area.Code == code)).Id);
+
+        private Task MoveCustomerToAreaAsync(
+            int customerId,
+            Guid areaId,
+            DateTime effectiveFrom,
+            string reason) =>
+            UsingDbContextAsync(1, async context =>
+            {
+                var customer = await context.Customers
+                    .Include(item => item.AreaAssignments)
+                    .SingleAsync(item => item.Id == customerId);
+                var area = await context.Areas.SingleAsync(item => item.Id == areaId);
+                customer.MoveToArea(area, effectiveFrom, reason);
+                context.CustomerAreaAssignments.Add(
+                    customer.AreaAssignments.Single(assignment => assignment.IsCurrent));
+                await context.SaveChangesAsync();
+            });
 
         private async Task ActivateCurrentAQGreenParticipationAsync(int customerId)
         {

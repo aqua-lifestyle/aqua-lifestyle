@@ -3,6 +3,7 @@ import { TenantSelfRegistrationGate } from "@/src/components/auth/tenant-self-re
 type SignupPageProps = {
   searchParams: Promise<{
     area?: string | string[];
+    invite?: string | string[];
     redirect?: string | string[];
   }>;
 };
@@ -10,8 +11,10 @@ type SignupPageProps = {
 export default async function SignupPage({ searchParams }: SignupPageProps) {
   const resolvedSearchParams = await searchParams;
   const area = resolvedSearchParams.area;
+  const invite = resolvedSearchParams.invite;
   const redirect = resolvedSearchParams.redirect;
   const requestedTenancyName = typeof area === "string" ? area : undefined;
+  const requestedInviteCode = typeof invite === "string" ? invite : undefined;
   const requestedRedirect =
     typeof redirect === "string" &&
     redirect.startsWith("/") &&
@@ -22,6 +25,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
   return (
     <TenantSelfRegistrationGate
       redirectPath={requestedRedirect}
+      inviteCode={requestedInviteCode}
       requestedTenancyName={requestedTenancyName}
     />
   );

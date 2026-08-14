@@ -106,10 +106,26 @@ namespace AqualLifeStyle.Tests.Domain
                 customer.AssignInitialArea(pretoria, Baseline, "Test");
                 var recruit = EntryParticipation.StartUnderRecruiter(
                     1, customer.Id, sponsor, terms, Baseline);
+                if (index == 4)
+                {
+                    network.Add(recruit);
+                    new EntryNetworkQualificationEvaluator()
+                        .Evaluate(sponsor.CustomerId, network)
+                        .ShouldBe(EntryNetworkLevel.None);
+                    network.Remove(recruit);
+                }
                 Activate(recruit);
                 network.Add(recruit);
             }
 
+            new EntryNetworkQualificationEvaluator()
+                .Evaluate(sponsor.CustomerId, network)
+                .ShouldBe(EntryNetworkLevel.Level1);
+
+            var sixth = EntryParticipation.StartUnderRecruiter(
+                1, 7, sponsor, terms, Baseline.AddMinutes(1));
+            Activate(sixth);
+            network.Add(sixth);
             new EntryNetworkQualificationEvaluator()
                 .Evaluate(sponsor.CustomerId, network)
                 .ShouldBe(EntryNetworkLevel.Level1);
