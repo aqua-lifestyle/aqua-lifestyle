@@ -130,6 +130,13 @@ const responses = new Map([
     tenantId: 7,
     userId: 42,
   }],
+  ["/api/services/app/Product/GetAllForCustomer", [{
+    id: 5,
+    isActive: true,
+    membershipId: null,
+    name: "Water filter",
+    price: 149,
+  }]],
   ["/api/services/app/Membership/GetActiveTiers", []],
   ["/api/services/app/Membership/GetSavingsWindowStatuses", []],
   ["/api/services/app/ClubMemberProgrammeParticipation/GetMyParticipations", participation],
