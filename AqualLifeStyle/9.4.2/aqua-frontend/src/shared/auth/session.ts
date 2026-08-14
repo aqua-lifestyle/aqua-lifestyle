@@ -2,7 +2,7 @@ import "server-only";
 
 import { cookies } from "next/headers";
 
-import { serverEnv } from "@/src/shared/config/server-env";
+import { getServerEnv } from "@/src/shared/config/server-env";
 import { claimsToUser, decodeJwtPayload } from "@/src/shared/api/auth-service";
 import {
   readSessionCookie,
@@ -33,7 +33,7 @@ const fromBase64Url = (value: string) => new Uint8Array(Buffer.from(value, "base
 const getEncryptionKey = async () => {
   const digest = await crypto.subtle.digest(
     "SHA-256",
-    encoder.encode(serverEnv.NEXTAUTH_SECRET),
+    encoder.encode(getServerEnv().NEXTAUTH_SECRET),
   );
   return crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["encrypt", "decrypt"]);
 };
