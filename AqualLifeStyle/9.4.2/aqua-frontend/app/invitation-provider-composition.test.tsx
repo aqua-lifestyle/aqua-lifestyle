@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProgrammeInvitationLanding } from "@/src/components/members/programme-invitation-landing";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
@@ -69,6 +69,10 @@ describe("invitation provider composition", () => {
     );
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("renders an anonymous invitation and attempts preview with the real provider tree", async () => {
     render(
       <AppProviders>
@@ -92,17 +96,28 @@ describe("invitation provider composition", () => {
   });
 
   it("keeps authenticated payment fail-closed until compatible health is verified", async () => {
-    localStorage.setItem("aqua.authSession", JSON.stringify({
-      accessToken: "token",
-      expiresAt: new Date(Date.now() + 60_000).toISOString(),
-      user: {
-        email: "invitee@example.test",
-        id: 2,
-        name: "Invitee",
-        permissions: [],
-        role: "Guest",
-      },
-    }));
+    // Sessions are server-authoritative: the AuthProvider restores authenticated
+    // state from the /api/auth/session endpoint (encrypted HttpOnly cookies), so
+    // the authenticated invitation path is exercised through that restore flow.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            expiresAt: new Date(Date.now() + 60_000).toISOString(),
+            tenant: null,
+            user: {
+              email: "invitee@example.test",
+              id: 2,
+              name: "Invitee",
+              permissions: [],
+              role: "Guest",
+            },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      ),
+    );
 
     render(
       <AppProviders>
