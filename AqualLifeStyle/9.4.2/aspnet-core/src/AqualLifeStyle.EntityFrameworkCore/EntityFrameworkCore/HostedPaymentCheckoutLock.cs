@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Abp.Dependency;
 using Abp.EntityFrameworkCore;
@@ -28,6 +29,18 @@ namespace AqualLifeStyle.EntityFrameworkCore
         {
             if (customerId <= 0) throw new ArgumentOutOfRangeException(nameof(customerId));
             return AcquireAsync($"direct-onyx-checkout-creation:{customerId}");
+        }
+
+        public async Task AcquireCustomerAreaTransitionsAsync(params int[] customerIds)
+        {
+            if (customerIds == null || customerIds.Length == 0)
+                throw new ArgumentException(
+                    "At least one customer identifier is required.",
+                    nameof(customerIds));
+            if (customerIds.Any(customerId => customerId <= 0))
+                throw new ArgumentOutOfRangeException(nameof(customerIds));
+            foreach (var customerId in customerIds.Distinct().OrderBy(customerId => customerId))
+                await AcquireAsync($"customer-area-transition:{customerId}");
         }
 
         public Task AcquireProgrammeParticipationDecisionAsync(Guid participationId)

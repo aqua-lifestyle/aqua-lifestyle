@@ -110,6 +110,7 @@ export type RegisterInput = {
   contactNumber: string;
   email: string;
   homeAddress: string;
+  inviteCode?: string;
   password: string;
   redirectPath?: string;
   name: string;
@@ -219,6 +220,7 @@ export const register = async (input: RegisterInput): Promise<RegisterResult> =>
         emailAddress: input.email,
         contactNumber: input.contactNumber,
         homeAddress: input.homeAddress,
+        inviteCode: input.inviteCode,
         password: input.password,
         redirectPath: input.redirectPath,
       },

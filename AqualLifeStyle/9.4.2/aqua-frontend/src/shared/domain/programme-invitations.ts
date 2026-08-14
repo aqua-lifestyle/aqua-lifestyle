@@ -17,4 +17,5 @@ export type ProgrammeInvitationPreview = {
   recruiterClubMemberNumber: string;
   recruiterEligible: boolean;
   recruiterName: string;
+  tenancyName: string | null;
 };

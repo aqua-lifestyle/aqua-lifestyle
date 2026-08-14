@@ -53,7 +53,7 @@ describe("SignupForm", () => {
     const { register } = await import("@/src/shared/api/auth-service");
     vi.mocked(register).mockResolvedValue({ ok: true });
 
-    render(<SignupForm />);
+    render(<SignupForm inviteCode="AQ7G2X9KLMNP" />);
 
     fireEvent.change(screen.getByLabelText("Email address"), {
       target: { value: "jane@example.com" },
@@ -90,6 +90,9 @@ describe("SignupForm", () => {
     await waitFor(() => expect(push).toHaveBeenCalledOnce(), {
       timeout: 2000,
     });
+    expect(register).toHaveBeenCalledWith(
+      expect.objectContaining({ inviteCode: "AQ7G2X9KLMNP" }),
+    );
     expect(push).toHaveBeenCalledWith(
       "/verify-email-sent?area=Default",
     );

@@ -959,6 +959,40 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         }
 
         [Fact]
+        public async Task CustomerAreaTransitionLock_SerializesReversedCustomerOrder()
+        {
+            await ResetDatabaseAsync();
+            await MigrateToLatestAsync();
+
+            await using var firstContext = CreateDbContext();
+            await using var secondContext = CreateDbContext();
+            await using var firstTransaction =
+                await firstContext.Database.BeginTransactionAsync();
+            await using var secondTransaction =
+                await secondContext.Database.BeginTransactionAsync();
+
+            var firstProvider =
+                Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>();
+            firstProvider.GetDbContext().Returns(firstContext);
+            var secondProvider =
+                Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>();
+            secondProvider.GetDbContext().Returns(secondContext);
+            var firstLock = new HostedPaymentCheckoutLock(firstProvider);
+            var secondLock = new HostedPaymentCheckoutLock(secondProvider);
+
+            await firstLock.AcquireCustomerAreaTransitionsAsync(2, 1);
+            var competingAcquisition =
+                secondLock.AcquireCustomerAreaTransitionsAsync(1, 2);
+
+            await Task.Delay(250);
+            competingAcquisition.IsCompleted.ShouldBeFalse();
+
+            await firstTransaction.CommitAsync();
+            await competingAcquisition.WaitAsync(TimeSpan.FromSeconds(5));
+            await secondTransaction.CommitAsync();
+        }
+
+        [Fact]
         public async Task Database_AllowsDirectOnyxRetryOnlyAfterTerminalFailure()
         {
             await ResetDatabaseAsync();

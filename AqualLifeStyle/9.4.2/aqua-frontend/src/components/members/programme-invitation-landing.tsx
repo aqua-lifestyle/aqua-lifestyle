@@ -122,10 +122,12 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
   };
 
   const redirect = `/i/${encodeURIComponent(inviteCode)}`;
-  const signupUrl = preview && typeof preview.areaName === "string"
-    ? `/signup?area=${encodeURIComponent(preview.areaName)}&redirect=${encodeURIComponent(redirect)}`
+  const signupUrl = preview && typeof preview.tenancyName === "string"
+    ? `/signup?area=${encodeURIComponent(preview.tenancyName)}&invite=${encodeURIComponent(preview.inviteCode)}&redirect=${encodeURIComponent(redirect)}`
     : "/signup";
-  const loginUrl = `/login?redirect=${encodeURIComponent(redirect)}`;
+  const loginUrl = preview && typeof preview.tenancyName === "string"
+    ? `/login?area=${encodeURIComponent(preview.tenancyName)}&invite=${encodeURIComponent(preview.inviteCode)}&redirect=${encodeURIComponent(redirect)}`
+    : `/login?redirect=${encodeURIComponent(redirect)}`;
   const programmeJoinEndpoint = preview
     ? getProgrammeJoinEndpoint(preview.programmeKey)
     : undefined;
@@ -158,6 +160,11 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
               <p className="mt-1 font-mono text-sm text-muted-foreground">
                 {preview.recruiterClubMemberNumber}
               </p>
+              {preview.areaName ? (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Business Area: {preview.areaName}
+                </p>
+              ) : null}
               <div className="mt-4 flex items-center gap-2 text-sm font-medium text-success">
                 <ShieldCheck className="size-4" />
                 {preview.recruiterEligible

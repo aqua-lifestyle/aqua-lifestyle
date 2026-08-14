@@ -10,6 +10,7 @@ using Abp.Runtime.Session;
 using Abp.UI;
 using AqualLifeStyle.Application.Recruitment.Dto;
 using AqualLifeStyle.Authorization;
+using AqualLifeStyle.Domain.Areas;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Recruitment;
 using AqualLifeStyle.MultiTenancy;
@@ -23,17 +24,20 @@ namespace AqualLifeStyle.Application.Recruitment
     {
         private readonly ICustomerRepository _customerRepository;
         private readonly IRepository<ProgrammeInvitation, Guid> _invitationRepository;
+        private readonly IRepository<Area, Guid> _areaRepository;
         private readonly IRepository<Tenant> _tenantRepository;
         private readonly IProgrammeRecruitmentPolicyResolver _policyResolver;
 
         public ProgrammeInvitationAppService(
             ICustomerRepository customerRepository,
             IRepository<ProgrammeInvitation, Guid> invitationRepository,
+            IRepository<Area, Guid> areaRepository,
             IRepository<Tenant> tenantRepository,
             IProgrammeRecruitmentPolicyResolver policyResolver)
         {
             _customerRepository = customerRepository;
             _invitationRepository = invitationRepository;
+            _areaRepository = areaRepository;
             _tenantRepository = tenantRepository;
             _policyResolver = policyResolver;
         }
@@ -87,18 +91,32 @@ namespace AqualLifeStyle.Application.Recruitment
             if (participation == null)
                 throw new UserFriendlyException("Invitation unavailable.", "The programme participation no longer exists.");
 
+            var tenant = await _tenantRepository.FirstOrDefaultAsync(invitation.TenantId);
+            if (participation.TenantId != invitation.TenantId || tenant == null || !tenant.IsActive)
+                throw new UserFriendlyException("Invitation unavailable.", "The inviting organisation is unavailable.");
+
             Customer recruiter;
             using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
             {
                 recruiter = await _customerRepository.GetAll()
                     .SingleOrDefaultAsync(item =>
                         item.Id == participation.CustomerId &&
-                        item.TenantId == participation.TenantId);
+                        item.TenantId == invitation.TenantId);
             }
             if (recruiter == null)
                 throw new UserFriendlyException("Invitation unavailable.", "The inviting Club Member account is unavailable.");
 
-            var area = await _tenantRepository.FirstOrDefaultAsync(participation.TenantId);
+            Area area = null;
+            if (recruiter.AreaId.HasValue)
+            {
+                using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.MustHaveTenant))
+                {
+                    area = await _areaRepository.FirstOrDefaultAsync(candidate =>
+                        candidate.Id == recruiter.AreaId.Value &&
+                        candidate.TenantId == invitation.TenantId &&
+                        candidate.IsActive);
+                }
+            }
             return new ProgrammeInvitationPreviewDto
             {
                 InviteCode = invitation.Code,
@@ -106,8 +124,9 @@ namespace AqualLifeStyle.Application.Recruitment
                 RecruiterClubMemberNumber = recruiter.ClubMemberNumber,
                 ProgrammeKey = policy.ProgrammeKey,
                 ProgrammeName = policy.ProgrammeName,
-                RecruiterEligible = recruiter.IsActive && participation.IsEligible,
-                AreaName = area?.TenancyName
+                RecruiterEligible = recruiter.IsActive && participation.IsEligible && area != null,
+                AreaName = area?.Name,
+                TenancyName = tenant?.TenancyName
             };
         }
 

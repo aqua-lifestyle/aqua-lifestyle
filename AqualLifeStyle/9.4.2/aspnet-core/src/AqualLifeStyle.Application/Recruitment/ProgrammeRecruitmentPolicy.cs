@@ -7,6 +7,7 @@ using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
 using Abp.UI;
 using AqualLifeStyle.Domain.Onyx;
+using Microsoft.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Application.Recruitment
 {
@@ -95,7 +96,9 @@ namespace AqualLifeStyle.Application.Recruitment
         {
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
             {
-                return Map(await _repository.FirstOrDefaultAsync(participationId));
+                return Map(await _repository.GetAll()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(item => item.Id == participationId));
             }
         }
 
@@ -140,7 +143,9 @@ namespace AqualLifeStyle.Application.Recruitment
         {
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
             {
-                return Map(await _repository.FirstOrDefaultAsync(participationId));
+                return Map(await _repository.GetAll()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(item => item.Id == participationId));
             }
         }
 

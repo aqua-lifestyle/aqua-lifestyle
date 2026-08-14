@@ -6,6 +6,7 @@ using Abp.Authorization.Users;
 using Abp.Extensions;
 using AqualLifeStyle.Validation;
 using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.Domain.Recruitment;
 
 namespace AqualLifeStyle.Authorization.Accounts.Dto
 {
@@ -49,6 +50,10 @@ namespace AqualLifeStyle.Authorization.Accounts.Dto
         public string RedirectPath { get; set; }
 
         public Guid? AreaId { get; set; }
+
+        [StringLength(ProgrammeInvitation.CodeLength, MinimumLength = ProgrammeInvitation.CodeLength)]
+        [RegularExpression("^[2-9A-HJ-NP-Za-hj-np-z]+$")]
+        public string InviteCode { get; set; }
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {

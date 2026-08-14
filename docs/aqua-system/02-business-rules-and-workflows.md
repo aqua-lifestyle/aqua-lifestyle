@@ -11,6 +11,7 @@ This is the precise business specification for the currently confirmed Aqua prog
 | A recruiter must have Active participation in the same programme. No recruiter means an independent network root. | `VERIFIED IMPLEMENTATION` |
 | Recruiter, recruit, qualification graph, and commission ledger must remain inside one ABP Tenant. Host authority does not permit a cross-Tenant graph. | `VERIFIED IMPLEMENTATION` |
 | Area is a business/admin subdivision inside Tenant. Same-Tenant, same-programme recruitment may cross Areas; Area does not partition the qualification graph. | `VERIFIED IMPLEMENTATION` |
+| A customer joining through a programme invitation inherits the inviting Club Member's current active business Area. Registration may use the invitation to establish the initial Area, but recruiter placement is recorded only at the programme-specific placement transition and re-resolves the current Area then. | `BUSINESS DECISION` |
 | Area administration requires an active persisted assignment to the customer's active Area, in the same Tenant. | `VERIFIED IMPLEMENTATION` |
 | Payment-confirmed but unapproved participation is not Active and does not qualify for Active-only network or finance behaviour. | `VERIFIED IMPLEMENTATION` |
 | `Entry` is a retained technical/database name for AQGreen; it is not a third customer programme. | `SUPERSEDED` terminology boundary |

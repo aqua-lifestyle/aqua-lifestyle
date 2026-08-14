@@ -34,7 +34,11 @@ An empty database receives no Area from the migration. Normal seeding provisions
 
 `Customer.AreaId` is the authoritative current Area. AQGreen and Onyx participation Area context is derived through the Customer, avoiding a second mutable Area value that could diverge.
 
+Area is customer-wide rather than programme-specific. An authoritative Area move through either programme therefore changes the operational Area used for all of that Customer's participation administration, while each programme's placement and qualification graph remains independent and Tenant-scoped.
+
 Every assignment and move is tenant-checked. A move closes the current effective-dated `CustomerAreaAssignment` and starts another; it does not erase the prior relationship. The production backfill is explicitly marked as a migration baseline because no authoritative earlier movement history exists.
+
+An invited customer inherits the inviting Club Member's current active business Area. The backend derives that Area from the invitation's source participation and recruiter Customer; URL values, browser state, and client-supplied Area identifiers are not authoritative. Registration may use the invitation to create the customer's initial Area assignment, but it does not create programme placement. AQGreen records placement and re-resolves the current recruiter Area at `StartEntry`; direct Onyx does so only after verified payment creates the participation. Missing, inactive, or cross-Tenant Area evidence fails closed.
 
 Current commission ledgers do not require a business-Area snapshot, so this change does not redesign them. If reporting later requires Area-at-cutoff, it must resolve the effective assignment or store an immutable snapshot deliberately; current Area must not be projected backward.
 
@@ -50,7 +54,7 @@ The durable portal queue remains authoritative. Notification recipients are acti
 
 Member/customer projections expose `AreaId` and `AreaName`. Administration exposes assigned Areas and Area-scoped participation filtering. Customer creation and registration accept an optional Area identifier; omission is accepted only when the Tenant has exactly one active Area.
 
-Some existing authentication and invitation contracts still use a legacy `area` URL/query label for the technical Tenant workspace (`Default`). That compatibility label is not the business `Area` aggregate and must not be used for Area authorization. Replacing that public routing contract requires coordinated frontend/API migration and is outside this backend boundary change.
+Some authentication contracts still use a legacy `area` URL/query label for the technical Tenant workspace (`Default`). Programme invitation preview exposes this workspace separately from the recruiter's business Area so authentication routing cannot be mistaken for Area assignment or authorization. Invitation registration derives its authoritative Tenant from the persisted invitation and rejects a conflicting ambient Tenant; the browser query does not select the security boundary.
 
 ## Operational checks
 

@@ -8,11 +8,13 @@ import { Card, LinkButton } from "@/src/shared/ui";
 
 type TenantSelfRegistrationGateProps = {
   redirectPath?: string;
+  inviteCode?: string;
   requestedTenancyName?: string;
 };
 
 export const TenantSelfRegistrationGate = ({
   redirectPath,
+  inviteCode,
   requestedTenancyName,
 }: TenantSelfRegistrationGateProps) => {
   const { currentTenant } = useTenantState();
@@ -22,11 +24,24 @@ export const TenantSelfRegistrationGate = ({
   const availability = useTenantSelfRegistrationAvailability(tenancyName);
 
   if (availability === "enabled") {
-    return <SignupForm redirectPath={redirectPath} tenancyName={tenancyName} />;
+    return (
+      <SignupForm
+        inviteCode={inviteCode}
+        redirectPath={redirectPath}
+        tenancyName={tenancyName}
+      />
+    );
   }
 
   const isLoading = availability === "loading";
   const isUnavailable = availability === "unavailable";
+  const loginUrl = inviteCode || redirectPath
+    ? `/login?${new URLSearchParams({
+        area: tenancyName,
+        ...(inviteCode ? { invite: inviteCode } : {}),
+        ...(redirectPath ? { redirect: redirectPath } : {}),
+      }).toString()}`
+    : "/login";
 
   return (
     <main className="min-h-dvh bg-muted/30 px-4 py-12 text-foreground sm:px-6">
@@ -41,7 +56,7 @@ export const TenantSelfRegistrationGate = ({
         </p>
         {!isLoading ? (
           <div className="mt-6">
-            <LinkButton href="/login" variant="primary">Return to sign in</LinkButton>
+            <LinkButton href={loginUrl} variant="primary">Return to sign in</LinkButton>
           </div>
         ) : null}
       </Card>

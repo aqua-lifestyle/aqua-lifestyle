@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using AqualLifeStyle.Email;
 using AqualLifeStyle.Domain.Email;
 using AqualLifeStyle.Application.Areas;
+using AqualLifeStyle.Application.Recruitment;
 
 namespace AqualLifeStyle.Authorization.Accounts
 {
@@ -30,6 +31,7 @@ namespace AqualLifeStyle.Authorization.Accounts
         private readonly AccountEmailVerificationScheduler _emailVerificationScheduler;
         private readonly AccountPasswordResetScheduler _passwordResetScheduler;
         private readonly IAreaAssignmentResolver _areaAssignmentResolver;
+        private readonly IProgrammeInvitationResolver _invitationResolver;
 
         public AccountAppService(
             UserRegistrationManager userRegistrationManager,
@@ -39,7 +41,8 @@ namespace AqualLifeStyle.Authorization.Accounts
             IAccountEmailThrottleRepository emailThrottleRepository,
             AccountEmailVerificationScheduler emailVerificationScheduler,
             AccountPasswordResetScheduler passwordResetScheduler,
-            IAreaAssignmentResolver areaAssignmentResolver)
+            IAreaAssignmentResolver areaAssignmentResolver,
+            IProgrammeInvitationResolver invitationResolver)
         {
             _userRegistrationManager = userRegistrationManager;
             _configuration = configuration;
@@ -49,6 +52,7 @@ namespace AqualLifeStyle.Authorization.Accounts
             _emailVerificationScheduler = emailVerificationScheduler;
             _passwordResetScheduler = passwordResetScheduler;
             _areaAssignmentResolver = areaAssignmentResolver;
+            _invitationResolver = invitationResolver;
         }
 
         public async Task<IsTenantAvailableOutput> IsTenantAvailable(IsTenantAvailableInput input)
@@ -92,7 +96,15 @@ namespace AqualLifeStyle.Authorization.Accounts
         public async Task<RegisterOutput> Register(RegisterInput input)
         {
             int? targetTenantId = AbpSession.TenantId;
-            if (!targetTenantId.HasValue)
+            ProgrammeInvitationPlacement invitationPlacement = null;
+            if (!string.IsNullOrWhiteSpace(input.InviteCode))
+            {
+                invitationPlacement = await _invitationResolver.ResolveForRegistrationAsync(
+                    input.InviteCode,
+                    targetTenantId);
+                targetTenantId = invitationPlacement.TenantId;
+            }
+            else if (!targetTenantId.HasValue)
             {
                 var defaultTenantName = _configuration["App:DefaultTenantName"];
                 if (!string.IsNullOrWhiteSpace(defaultTenantName))
@@ -100,15 +112,32 @@ namespace AqualLifeStyle.Authorization.Accounts
                     var tenant = await TenantManager.FindByTenancyNameAsync(defaultTenantName);
                     if (tenant != null && tenant.IsActive)
                     {
-                        _userRegistrationManager.DefaultTenantId = tenant.Id;
                         targetTenantId = tenant.Id;
                     }
                 }
             }
 
-            var isSelfRegistrationEnabled = targetTenantId.HasValue
-                ? await SettingManager.GetSettingValueForTenantAsync<bool>(AppSettingNames.IsSelfRegistrationEnabled, targetTenantId.Value)
-                : await SettingManager.GetSettingValueAsync<bool>(AppSettingNames.IsSelfRegistrationEnabled);
+            if (!targetTenantId.HasValue)
+            {
+                throw new UserFriendlyException(
+                    "Registration is unavailable.",
+                    "The registration organisation could not be confirmed. Return to the registration link and try again.");
+            }
+
+            var targetTenant = await TenantManager.FindByIdAsync(targetTenantId.Value);
+            if (targetTenant == null || !targetTenant.IsActive)
+            {
+                throw new UserFriendlyException(
+                    "Registration is unavailable.",
+                    "The registration organisation could not be confirmed. Return to the registration link and try again.");
+            }
+            if (!AbpSession.TenantId.HasValue)
+                _userRegistrationManager.DefaultTenantId = targetTenant.Id;
+
+            var isSelfRegistrationEnabled =
+                await SettingManager.GetSettingValueForTenantAsync<bool>(
+                    AppSettingNames.IsSelfRegistrationEnabled,
+                    targetTenantId.Value);
             if (!isSelfRegistrationEnabled)
             {
                 throw new UserFriendlyException("Registration is disabled.", "Public self-registration is disabled.");
@@ -132,10 +161,11 @@ namespace AqualLifeStyle.Authorization.Accounts
                 new EmailAddress(input.EmailAddress),
                 membershipId: null,
                 user: user);
-            var area = await _areaAssignmentResolver.ResolveActiveAreaAsync(
-                user.TenantId.Value,
-                input.AreaId,
-                "Registration is unavailable.");
+            var area = invitationPlacement?.RecruiterArea ??
+                await _areaAssignmentResolver.ResolveActiveAreaAsync(
+                    user.TenantId.Value,
+                    input.AreaId,
+                    "Registration is unavailable.");
             customer.AssignInitialArea(area, DateTime.UtcNow, "Customer registration");
             await _customerRepository.InsertAsync(customer);
             using (CurrentUnitOfWork.SetTenantId(user.TenantId))
