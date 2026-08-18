@@ -36,6 +36,22 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public void FirstAuthorisedCycle_IsNotSelectedUntilTheExactSafeBoundary()
+        {
+            var resolver = new LatestClosedCommissionWeekResolver();
+            var targetStart =
+                new DateTime(2026, 8, 13, 22, 0, 0, DateTimeKind.Utc);
+            var safeBoundary = targetStart.AddDays(7);
+
+            var justBefore = resolver.Resolve(safeBoundary.AddTicks(-1));
+            var exactlyAt = resolver.Resolve(safeBoundary);
+
+            justBefore.PeriodStartUtc.ShouldBe(targetStart.AddDays(-7));
+            exactlyAt.PeriodStartUtc.ShouldBe(targetStart);
+            exactlyAt.PeriodEndUtc.ShouldBe(safeBoundary.AddTicks(-1));
+        }
+
+        [Fact]
         public void Classifiers_DistinguishCanonicalLegacyAndMalformedPeriods()
         {
             var resolver = new LatestClosedCommissionWeekResolver();

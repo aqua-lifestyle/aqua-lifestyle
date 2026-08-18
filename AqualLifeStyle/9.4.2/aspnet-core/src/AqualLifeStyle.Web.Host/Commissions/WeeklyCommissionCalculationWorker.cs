@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp;
@@ -99,11 +100,17 @@ namespace AqualLifeStyle.Web.Host.Commissions
             }
 
             var nowUtc = DateTime.UtcNow;
+            var stopwatch = Stopwatch.StartNew();
             var closedWeek = _closedWeekResolver.Resolve(nowUtc);
             var calculatedAt = nowUtc;
             var attempted = 0;
             var skipped = 0;
             var failed = 0;
+            var evaluated = 0;
+            var created = 0;
+            var notEarned = 0;
+            var earned = 0;
+            var held = 0;
             var travelGranted = 0;
             var travelActivated = 0;
             var travelFailed = 0;
@@ -154,6 +161,25 @@ namespace AqualLifeStyle.Web.Host.Commissions
                             {
                                 skipped++;
                             }
+                            evaluated += result.EvaluatedCount;
+                            created += result.RecordsCreated;
+                            notEarned += result.NotEarnedCount;
+                            earned += result.EarnedCount;
+                            held += result.HeldCount;
+                            _logger.LogInformation(
+                                "ProgrammeEngineAlert {AlertType}: weekly commission programme completed tenant={TenantId} programme={Programme} period={PeriodStart}..{PeriodEnd} rulesVersion={RulesVersion} alreadyProcessed={AlreadyProcessed} evaluated={Evaluated} created={Created} notEarned={NotEarned} positive={Positive} held={Held}",
+                                "weekly_commission_programme_completed",
+                                tenantId,
+                                programme,
+                                result.PeriodStart,
+                                result.PeriodEnd,
+                                result.RulesVersion,
+                                result.WasAlreadyCalculated,
+                                result.EvaluatedCount,
+                                result.RecordsCreated,
+                                result.NotEarnedCount,
+                                result.EarnedCount,
+                                result.HeldCount);
                         }
                         catch (Exception exception)
                         {
@@ -191,26 +217,37 @@ namespace AqualLifeStyle.Web.Host.Commissions
                     }
                 }
 
+                stopwatch.Stop();
                 _logger.LogInformation(
-                    "ProgrammeEngineAlert {AlertType}: weekly commission engine processed period {PeriodStart}..{PeriodEnd}; programmeAttempts={Attempted}, skipped={Skipped}, failed={Failed}, inactiveAreas={InactiveAreas}, unknownAreas={UnknownAreas}, travelGranted={TravelGranted}, travelActivated={TravelActivated}, travelFailed={TravelFailed}",
+                    "ProgrammeEngineAlert {AlertType}: weekly commission engine processed period {PeriodStart}..{PeriodEnd}; programmeAttempts={Attempted}, alreadyProcessed={AlreadyProcessed}, failed={Failed}, evaluated={Evaluated}, created={Created}, notEarned={NotEarned}, positive={Positive}, held={Held}, inactiveTenants={InactiveTenants}, unknownTenants={UnknownTenants}, travelGranted={TravelGranted}, travelActivated={TravelActivated}, travelFailed={TravelFailed}, durationMs={DurationMs}",
                     "weekly_commission_calculation_run",
                     closedWeek.PeriodStartUtc,
                     closedWeek.PeriodEndUtc,
                     attempted,
                     skipped,
                     failed,
+                    evaluated,
+                    created,
+                    notEarned,
+                    earned,
+                    held,
                     inactiveAreas,
                     unknownAreas,
                     travelGranted,
                     travelActivated,
-                    travelFailed);
+                    travelFailed,
+                    stopwatch.ElapsedMilliseconds);
             }
             catch (Exception exception)
             {
+                stopwatch.Stop();
                 _logger.LogError(
                     exception,
-                    "ProgrammeEngineAlert {AlertType}: weekly commission engine run failed",
-                    "weekly_commission_calculation_run_failed");
+                    "ProgrammeEngineAlert {AlertType}: weekly commission engine run failed period={PeriodStart}..{PeriodEnd} durationMs={DurationMs}",
+                    "weekly_commission_calculation_run_failed",
+                    closedWeek.PeriodStartUtc,
+                    closedWeek.PeriodEndUtc,
+                    stopwatch.ElapsedMilliseconds);
                 throw;
             }
         }

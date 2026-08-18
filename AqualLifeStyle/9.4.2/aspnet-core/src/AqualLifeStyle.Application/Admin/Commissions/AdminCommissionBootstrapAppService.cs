@@ -6,6 +6,7 @@ using Abp.Auditing;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
+using Abp.Timing;
 using AqualLifeStyle.Application.Admin.Commissions.Dto;
 using AqualLifeStyle.Application.EntryMonthlyObligations;
 using AqualLifeStyle.Authorization;
@@ -193,28 +194,44 @@ namespace AqualLifeStyle.Application.Admin.Commissions
 
             var periodStart = FirstAutomatedCycleBoundaryUtc();
             var periodEnd = periodStart.AddDays(7).AddTicks(-1);
-            var boundary = _cycleResolver.ResolveFirstCycleStartAfter(periodEnd);
+            var checkedAt = Clock.Now.ToUniversalTime();
+            var latestClosed = _cycleResolver.Resolve(checkedAt);
+            var earliestSafeExecution = periodEnd.AddTicks(1);
 
             var output = new WeeklyEnablementPreflightOutput
             {
                 TargetPeriodStartUtc = periodStart,
                 TargetPeriodEndUtc = periodEnd,
+                EarliestSafeExecutionUtc = earliestSafeExecution,
+                CheckedAtUtc = checkedAt,
+                LatestClosedPeriodStartUtc = latestClosed.PeriodStartUtc,
+                LatestClosedPeriodEndUtc = latestClosed.PeriodEndUtc,
                 TimeZoneId = LatestClosedCommissionWeekResolver.CommissionTimeZoneId,
                 WorkerEnabled = _configuration.GetValue<bool>(
                     "App:WeeklyCommissions:Enabled"),
-                TopologyStatus = "NOT CONFIRMED",
-                TopologyDetail = "Repository code assumes all programme Areas share the host database for cross-Area network queries (tenant filters disabled during calculation). Confirm from actual deployment/database configuration that every programme Area uses this host database before enabling."
+                MonthlyWorkerEnabled = _configuration.GetValue<bool>(
+                    "App:EntryMonthlyObligations:Enabled"),
+                TargetCycleClosed = checkedAt >= earliestSafeExecution,
+                StartupWouldTargetExpectedCycle =
+                    latestClosed.PeriodStartUtc == periodStart &&
+                    latestClosed.PeriodEndUtc == periodEnd,
+                RecoveryVerified = _configuration.GetValue<bool>(
+                    "App:WeeklyCommissions:RecoveryVerified"),
+                ObservabilityReady = _configuration.GetValue<bool>(
+                    "App:WeeklyCommissions:ObservabilityReady"),
+                BuildId = _configuration["Deployment:BuildId"] ?? "unavailable"
             };
 
-            output.Terms.Add(StageEntryTermsPreflight(periodStart, boundary));
-            output.Terms.Add(StageOnyxTermsPreflight(periodStart, boundary));
+            output.Terms.Add(StageEntryTermsPreflight(periodStart));
+            output.Terms.Add(StageOnyxTermsPreflight(periodStart));
 
-            output.Areas = await BuildAreaBaselineRowsAsync(periodEnd);
+            await BuildTopologyStatusAsync(output);
 
             using (_unitOfWorkManager.Current.DisableFilter(
                 AbpDataFilters.MayHaveTenant,
                 AbpDataFilters.MustHaveTenant))
             {
+                output.Areas = await BuildAreaBaselineRowsAsync(periodEnd);
                 output.ExistingTargetEntryPeriods =
                     await _entryPeriodRepository.GetAll()
                         .CountAsync(period =>
@@ -225,12 +242,17 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                         .CountAsync(period =>
                             period.PeriodStart == periodStart &&
                             period.PeriodEnd == periodEnd);
+                output.Projection = await BuildWeeklyProjectionAsync(
+                    periodStart,
+                    periodEnd,
+                    output.Areas);
             }
 
-            output.Projection = await BuildWeeklyProjectionAsync(
-                periodStart,
-                periodEnd,
-                output.Areas);
+            output.PaymentTimestampStatus =
+                output.Projection.MonthlyObligationsAtOrBeforeTarget == 0
+                    ? "NOT_APPLICABLE_TO_TARGET_CYCLE"
+                    : "BLOCKED_UNVERIFIED_PROVIDER_OCCURRENCE_TIME";
+            BuildWeeklyBlockers(output);
 
             return output;
         }
@@ -520,8 +542,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         }
 
         private CommissionTermsPreflightRow StageEntryTermsPreflight(
-            DateTime expectedEffectiveAt,
-            DateTime boundary)
+            DateTime expectedEffectiveAt)
         {
             var all = _entryTermsRepository.GetAll().ToList();
             var sameVersion = all
@@ -529,22 +550,28 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 .ToList();
             if (sameVersion.Count > 0)
             {
+                var exact = sameVersion.Count == 1 &&
+                    sameVersion[0].EffectiveAt == expectedEffectiveAt &&
+                    sameVersion[0].LevelOneComponentAmount == EntryLevelOneAmount &&
+                    sameVersion[0].LevelTwoComponentAmount == EntryLevelTwoAmount &&
+                    sameVersion[0].LevelThreeComponentAmount == EntryLevelThreeAmount &&
+                    string.Equals(sameVersion[0].Currency, Currency, StringComparison.Ordinal);
                 return new CommissionTermsPreflightRow
                 {
                     Programme = "Entry",
                     ExpectedVersion = InitialEntryTermsVersion,
                     ExpectedEffectiveAtUtc = expectedEffectiveAt,
-                    Status = sameVersion[0].EffectiveAt == expectedEffectiveAt
+                    Status = exact
                         ? CommissionTermsPreflightStatus.Present
                         : CommissionTermsPreflightStatus.Conflicting,
-                    Detail = sameVersion[0].EffectiveAt == expectedEffectiveAt
-                        ? "Authorised initial terms present."
-                        : "The expected version exists with a different effective boundary."
+                    Detail = exact
+                        ? "Authorised initial terms and exact financial rates are present."
+                        : "The expected version is duplicated or has different rates, currency, or effective boundary."
                 };
             }
 
             var applicable = all
-                .Where(version => version.EffectiveAt <= boundary)
+                .Where(version => version.EffectiveAt <= expectedEffectiveAt)
                 .OrderByDescending(version => version.EffectiveAt)
                 .FirstOrDefault();
             return new CommissionTermsPreflightRow
@@ -556,14 +583,13 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     ? CommissionTermsPreflightStatus.Missing
                     : CommissionTermsPreflightStatus.Conflicting,
                 Detail = applicable == null
-                    ? $"No Entry terms version is effective for the target cycle (boundary {boundary:O})."
+                    ? $"No Entry terms version is effective for the target cycle (boundary {expectedEffectiveAt:O})."
                     : "A different Entry terms version is effective for the target cycle; the authorised initial version is absent."
             };
         }
 
         private CommissionTermsPreflightRow StageOnyxTermsPreflight(
-            DateTime expectedEffectiveAt,
-            DateTime boundary)
+            DateTime expectedEffectiveAt)
         {
             var all = _onyxTermsRepository.GetAll().ToList();
             var sameVersion = all
@@ -571,22 +597,30 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 .ToList();
             if (sameVersion.Count > 0)
             {
+                var exact = sameVersion.Count == 1 &&
+                    sameVersion[0].EffectiveAt == expectedEffectiveAt &&
+                    sameVersion[0].LevelOnePerPersonRate == OnyxLevelOneRate &&
+                    sameVersion[0].LevelTwoPerPersonRate == OnyxLevelTwoRate &&
+                    sameVersion[0].LevelThreePerPersonRate == OnyxLevelThreeRate &&
+                    sameVersion[0].LevelFourPerPersonRate == OnyxLevelFourRate &&
+                    sameVersion[0].LevelFivePerPersonRate == OnyxLevelFiveRate &&
+                    string.Equals(sameVersion[0].Currency, Currency, StringComparison.Ordinal);
                 return new CommissionTermsPreflightRow
                 {
                     Programme = "Onyx",
                     ExpectedVersion = InitialOnyxTermsVersion,
                     ExpectedEffectiveAtUtc = expectedEffectiveAt,
-                    Status = sameVersion[0].EffectiveAt == expectedEffectiveAt
+                    Status = exact
                         ? CommissionTermsPreflightStatus.Present
                         : CommissionTermsPreflightStatus.Conflicting,
-                    Detail = sameVersion[0].EffectiveAt == expectedEffectiveAt
-                        ? "Authorised initial terms present."
-                        : "The expected version exists with a different effective boundary."
+                    Detail = exact
+                        ? "Authorised initial terms and exact financial rates are present."
+                        : "The expected version is duplicated or has different rates, currency, or effective boundary."
                 };
             }
 
             var applicable = all
-                .Where(version => version.EffectiveAt <= boundary)
+                .Where(version => version.EffectiveAt <= expectedEffectiveAt)
                 .OrderByDescending(version => version.EffectiveAt)
                 .FirstOrDefault();
             return new CommissionTermsPreflightRow
@@ -598,7 +632,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     ? CommissionTermsPreflightStatus.Missing
                     : CommissionTermsPreflightStatus.Conflicting,
                 Detail = applicable == null
-                    ? $"No Onyx terms version is effective for the target cycle (boundary {boundary:O})."
+                    ? $"No Onyx terms version is effective for the target cycle (boundary {expectedEffectiveAt:O})."
                     : "A different Onyx terms version is effective for the target cycle; the authorised initial version is absent."
             };
         }
@@ -619,20 +653,21 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     .Where(record => record.TenantId == tenant.Id)
                     .OrderByDescending(record => record.EffectiveAt)
                     .ToList();
-                var latest = applicable.FirstOrDefault();
+                var latest = applicable
+                    .FirstOrDefault(record => record.EffectiveAt <= targetPeriodEndUtc);
 
                 AreaBaselinePreflightStatus status;
-                if (latest == null)
+                if (latest == null && applicable.Count == 0)
                 {
                     status = AreaBaselinePreflightStatus.Missing;
                 }
-                else if (latest.EffectiveAt <= targetPeriodEndUtc)
+                else if (latest == null)
                 {
-                    status = AreaBaselinePreflightStatus.Sufficient;
+                    status = AreaBaselinePreflightStatus.RecordedAfterTargetCutoff;
                 }
                 else
                 {
-                    status = AreaBaselinePreflightStatus.RecordedAfterTargetCutoff;
+                    status = AreaBaselinePreflightStatus.Sufficient;
                 }
 
                 rows.Add(new AreaBaselinePreflightRow
@@ -644,7 +679,6 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     BaselineEffectiveAtUtc = latest?.EffectiveAt,
                     WorkerWouldSkipAtCutoff =
                         latest == null ||
-                        latest.EffectiveAt > targetPeriodEndUtc ||
                         !latest.IsActive
                 });
             }
@@ -668,14 +702,16 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 AbpDataFilters.SoftDelete))
             {
                 var entryParticipations = await _entryParticipationRepository
-                    .GetAll()
+                    .GetAllIncluding(participation =>
+                        participation.RecruiterCorrections)
                     .Where(participation =>
                         participation.Status == EntryParticipationStatus.Active &&
                         (!participation.ActivatedAt.HasValue ||
                          participation.ActivatedAt <= periodEnd))
                     .ToListAsync();
                 var onyxParticipations = await _onyxParticipationRepository
-                    .GetAll()
+                    .GetAllIncluding(participation =>
+                        participation.RecruiterCorrections)
                     .Where(participation =>
                         participation.Status == OnyxParticipationStatus.Active &&
                         (!participation.ActivatedAt.HasValue ||
@@ -695,13 +731,49 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                         entryIds.Contains(agreement.EntryParticipationId))
                     .ToListAsync();
 
+                var postCutoffEntryActivations = await _entryParticipationRepository
+                    .GetAll()
+                    .CountAsync(participation =>
+                        participation.Status == EntryParticipationStatus.Active &&
+                        participation.ActivatedAt.HasValue &&
+                        participation.ActivatedAt > periodEnd);
+                var postCutoffOnyxActivations = await _onyxParticipationRepository
+                    .GetAll()
+                    .CountAsync(participation =>
+                        participation.Status == OnyxParticipationStatus.Active &&
+                        participation.ActivatedAt.HasValue &&
+                        participation.ActivatedAt > periodEnd);
+
                 projection.ActiveEntryParticipations = entryParticipations.Count;
                 projection.ActiveOnyxParticipations = onyxParticipations.Count;
+                projection.DeletedEntryParticipations = entryParticipations
+                    .Count(participation => participation.IsDeleted);
+                projection.DeletedOnyxParticipations = onyxParticipations
+                    .Count(participation => participation.IsDeleted);
+                projection.EntryActiveWithoutActivatedAt = entryParticipations
+                    .Count(participation => !participation.ActivatedAt.HasValue);
+                projection.OnyxActiveWithoutActivatedAt = onyxParticipations
+                    .Count(participation => !participation.ActivatedAt.HasValue);
+                projection.EntryPostCutoffActivationExcluded =
+                    postCutoffEntryActivations;
+                projection.OnyxPostCutoffActivationExcluded =
+                    postCutoffOnyxActivations;
+                projection.MonthlyObligationsAtOrBeforeTarget = obligations.Count(
+                    obligation =>
+                        obligation.PeriodYear < 2026 ||
+                        obligation.PeriodYear == 2026 && obligation.PeriodMonth <= 8);
                 projection.EntryOverdueObligationHolds = obligations
                     .Count(obligation => obligation.WasOverdueAt(periodEnd));
                 projection.EntryLoanHolds = loans
                     .Count(agreement =>
                         agreement.WasRequiringPayoutHoldAt(periodEnd));
+
+                BuildNetworkDryRun(
+                    projection,
+                    entryParticipations,
+                    onyxParticipations,
+                    periodEnd,
+                    areaRows);
 
                 foreach (var area in areaRows)
                 {
@@ -734,6 +806,166 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             }
 
             return projection;
+        }
+
+        private static void BuildNetworkDryRun(
+            WeeklyFirstRunProjection projection,
+            List<EntryParticipation> entryParticipations,
+            List<OnyxParticipation> onyxParticipations,
+            DateTime periodEnd,
+            List<AreaBaselinePreflightRow> areaRows)
+        {
+            var readyTenants = areaRows
+                .Where(row =>
+                    row.BaselineStatus == AreaBaselinePreflightStatus.Sufficient &&
+                    !row.WorkerWouldSkipAtCutoff)
+                .ToList();
+
+            var entryFailure = (string)null;
+            var onyxFailure = (string)null;
+            var entryQualified = 0;
+            var onyxQualified = 0;
+            foreach (var tenant in readyTenants)
+            {
+                var entryRows = entryParticipations
+                    .Where(participation =>
+                        participation.TenantId == tenant.TenantId)
+                    .ToList();
+                try
+                {
+                    var network = EffectiveProgrammeNetwork.BuildAQGreen(
+                        tenant.TenantId,
+                        entryRows,
+                        periodEnd);
+                    entryQualified += entryRows.Count(participation =>
+                        new EntryNetworkQualificationEvaluator()
+                            .Evaluate(participation.CustomerId, network) >
+                        EntryNetworkLevel.None);
+                }
+                catch (Exception exception)
+                {
+                    entryFailure ??=
+                        $"Tenant {tenant.TenantId}: {exception.Message}";
+                }
+
+                var onyxRows = onyxParticipations
+                    .Where(participation =>
+                        participation.TenantId == tenant.TenantId)
+                    .ToList();
+                try
+                {
+                    var network = EffectiveProgrammeNetwork.BuildOnyx(
+                        tenant.TenantId,
+                        onyxRows,
+                        periodEnd);
+                    onyxQualified += onyxRows.Count(participation =>
+                        new OnyxNetworkQualificationEvaluator()
+                            .Evaluate(participation.CustomerId, network) >
+                        OnyxNetworkLevel.None);
+                }
+                catch (Exception exception)
+                {
+                    onyxFailure ??=
+                        $"Tenant {tenant.TenantId}: {exception.Message}";
+                }
+            }
+
+            projection.EntryNetworkBuildable = entryFailure == null;
+            projection.EntryNetworkFailure = entryFailure;
+            projection.OnyxNetworkBuildable = onyxFailure == null;
+            projection.OnyxNetworkFailure = onyxFailure;
+            projection.EntryQualifiedPopulation = entryQualified;
+            projection.OnyxQualifiedPopulation = onyxQualified;
+        }
+
+        private async Task BuildTopologyStatusAsync(
+            WeeklyEnablementPreflightOutput output)
+        {
+            var separateTenantDatabases = await _tenantRepository.GetAll()
+                .CountAsync(tenant => tenant.ConnectionString != null && tenant.ConnectionString != "");
+            output.TopologyStatus = separateTenantDatabases == 0
+                ? "SUPPORTED_SINGLE_HOST_DATABASE"
+                : "BLOCKED_SEPARATE_TENANT_DATABASES";
+            output.TopologyDetail = separateTenantDatabases == 0
+                ? "All configured Tenants use the host database. Programme networks remain isolated by TenantId + Programme; business Areas do not fragment the graph. Multiple API instances are serialized by the PostgreSQL transaction advisory lock."
+                : $"{separateTenantDatabases} Tenant(s) configure a separate database. The current host worker does not prove cross-database enumeration and refuses enablement.";
+        }
+
+        private static void BuildWeeklyBlockers(
+            WeeklyEnablementPreflightOutput output)
+        {
+            AddBlocker(output, output.WorkerEnabled,
+                "weekly_worker_already_enabled",
+                "Weekly commissions must remain disabled while preflight evidence is captured.");
+            AddBlocker(output, output.MonthlyWorkerEnabled,
+                "monthly_worker_enabled",
+                "Monthly obligations must remain disabled during the controlled weekly test.");
+            AddBlocker(output, !output.TargetCycleClosed,
+                "target_cycle_open",
+                $"The target cycle is not closed. Earliest safe execution is {output.EarliestSafeExecutionUtc:O}.");
+            AddBlocker(output, output.TargetCycleClosed && !output.StartupWouldTargetExpectedCycle,
+                "startup_would_target_different_cycle",
+                "RunOnStart resolves only the latest closed cycle. Enabling now would not target the authorised 14-20 August cycle; missed-cycle reconciliation is required.");
+            AddBlocker(output, !output.RecoveryVerified,
+                "recovery_not_verified",
+                "A current restorable production backup and rollback decision have not been confirmed in configuration.");
+            AddBlocker(output, !output.ObservabilityReady,
+                "observability_not_ready",
+                "An owned alert destination and first-run evidence capture have not been confirmed in configuration.");
+            AddBlocker(output,
+                !string.Equals(output.TopologyStatus, "SUPPORTED_SINGLE_HOST_DATABASE", StringComparison.Ordinal),
+                "database_topology_unsupported",
+                output.TopologyDetail);
+            AddBlocker(output,
+                output.Terms.Any(row => row.Status != CommissionTermsPreflightStatus.Present),
+                "commission_terms_not_ready",
+                "The exact authorised AQGreen and Onyx terms must be present at the target cycle opening boundary.");
+            AddBlocker(output,
+                output.Areas.Any(row => row.BaselineStatus != AreaBaselinePreflightStatus.Sufficient),
+                "tenant_activation_state_unknown",
+                "Every Tenant requires cutoff-applicable activation evidence. Inactive evidence is an intentional worker skip, not an unknown state.");
+            AddBlocker(output,
+                output.ExistingTargetEntryPeriods != 0 || output.ExistingTargetOnyxPeriods != 0,
+                "target_cycle_already_processed",
+                "The controlled first-run target already has a programme period. Review the existing immutable ledger instead of recalculating it.");
+            AddBlocker(output,
+                output.Projection.DeletedEntryParticipations != 0 ||
+                output.Projection.DeletedOnyxParticipations != 0,
+                "deleted_network_evidence",
+                "Deleted participation evidence prevents authoritative cutoff reconstruction.");
+            AddBlocker(output,
+                output.Projection.EntryActiveWithoutActivatedAt != 0 ||
+                output.Projection.OnyxActiveWithoutActivatedAt != 0,
+                "missing_activation_evidence",
+                "Active participation(s) without ActivatedAt would make the network build fail closed at run time; resolve before enablement.");
+            AddBlocker(output,
+                !output.Projection.EntryNetworkBuildable ||
+                !output.Projection.OnyxNetworkBuildable,
+                "network_not_buildable",
+                output.Projection.EntryNetworkFailure ??
+                output.Projection.OnyxNetworkFailure);
+            AddBlocker(output,
+                output.Projection.MonthlyObligationsAtOrBeforeTarget != 0,
+                "unexpected_monthly_obligation_evidence",
+                "The first weekly target predates the authorised September monthly-obligation start. Existing earlier obligations require reconciliation and authoritative payment-time review.");
+        }
+
+        private static void AddBlocker(
+            WeeklyEnablementPreflightOutput output,
+            bool blocked,
+            string code,
+            string detail)
+        {
+            if (!blocked)
+            {
+                return;
+            }
+
+            output.Blockers.Add(new WeeklyEnablementPreflightBlocker
+            {
+                Code = code,
+                Detail = detail
+            });
         }
 
         private async Task BuildSeptemberProjectionAsync(

@@ -71,7 +71,12 @@ namespace AqualLifeStyle.Tests.Commissions
             return new CommissionCalculationResultDto
             {
                 WasAlreadyCalculated = wasAlreadyCalculated,
-                RecordsCreated = recordsCreated
+                RulesVersion = "worker-test-rules",
+                EvaluatedCount = recordsCreated,
+                RecordsCreated = recordsCreated,
+                NotEarnedCount = recordsCreated,
+                PeriodStart = new DateTime(2026, 8, 13, 22, 0, 0, DateTimeKind.Utc),
+                PeriodEnd = new DateTime(2026, 8, 20, 21, 59, 59, DateTimeKind.Utc)
             };
         }
 
@@ -356,6 +361,44 @@ namespace AqualLifeStyle.Tests.Commissions
         }
 
         [Fact]
+        public async Task FailedProgramme_EmitsCalculationFailedEvent_AndSummaryStillReports()
+        {
+            var activeTenantIds = await ResolveActiveTenantIdsAsync();
+            var calculator = new Mock<IWeeklyCommissionCalculator>();
+            calculator
+                .Setup(service => service.CalculateEntryAsync(
+                    It.IsAny<int>(),
+                    It.IsAny<ClosedCommissionWeek>(),
+                    It.IsAny<DateTime>()))
+                .ThrowsAsync(new InvalidOperationException("programme-exploded"));
+            calculator
+                .Setup(service => service.CalculateOnyxAsync(
+                    It.IsAny<int>(),
+                    It.IsAny<ClosedCommissionWeek>(),
+                    It.IsAny<DateTime>()))
+                .ReturnsAsync(BuildResult(wasAlreadyCalculated: false, recordsCreated: 0));
+            var logger = new Payments.TestLogger<WeeklyCommissionCalculationWorker>();
+            var worker = CreateWorker(
+                BuildConfiguration(true),
+                calculator.Object,
+                suppliedLogger: logger);
+
+            await worker.RunOnceAsync();
+
+            logger.Entries.ShouldContain(entry =>
+                entry.Level == Microsoft.Extensions.Logging.LogLevel.Error &&
+                entry.Message.Contains("weekly_commission_calculation_failed") &&
+                entry.Message.Contains("programme=AQGreen"));
+            logger.Entries.ShouldContain(entry =>
+                entry.Level == Microsoft.Extensions.Logging.LogLevel.Information &&
+                entry.Message.Contains("weekly_commission_calculation_run") &&
+                entry.Message.Contains($"failed={activeTenantIds.Length}"));
+            logger.Entries.ShouldAllBe(entry =>
+                !entry.Message.Contains("password", StringComparison.OrdinalIgnoreCase) &&
+                !entry.Message.Contains("token", StringComparison.OrdinalIgnoreCase));
+        }
+
+        [Fact]
         public async Task OnyxFailure_DoesNotSuppressAQGreenOrTravelSynchronization()
         {
             var calculator = new Mock<IWeeklyCommissionCalculator>();
@@ -446,6 +489,45 @@ namespace AqualLifeStyle.Tests.Commissions
         }
 
         [Fact]
+        public async Task SuccessfulRun_EmitsStructuredProgrammeAndSummaryEvidence()
+        {
+            var calculator = new Mock<IWeeklyCommissionCalculator>();
+            calculator
+                .Setup(service => service.CalculateEntryAsync(
+                    It.IsAny<int>(),
+                    It.IsAny<ClosedCommissionWeek>(),
+                    It.IsAny<DateTime>()))
+                .ReturnsAsync(BuildResult(false, 3));
+            calculator
+                .Setup(service => service.CalculateOnyxAsync(
+                    It.IsAny<int>(),
+                    It.IsAny<ClosedCommissionWeek>(),
+                    It.IsAny<DateTime>()))
+                .ReturnsAsync(BuildResult(true, 0));
+            var logger = new Payments.TestLogger<WeeklyCommissionCalculationWorker>();
+            var worker = CreateWorker(
+                BuildConfiguration(true),
+                calculator.Object,
+                suppliedLogger: logger);
+
+            await worker.RunOnceAsync();
+
+            logger.Entries.ShouldContain(entry =>
+                entry.Level == Microsoft.Extensions.Logging.LogLevel.Information &&
+                entry.Message.Contains("weekly_commission_programme_completed") &&
+                entry.Message.Contains("rulesVersion=worker-test-rules") &&
+                entry.Message.Contains("evaluated=3") &&
+                entry.Message.Contains("created=3"));
+            logger.Entries.ShouldContain(entry =>
+                entry.Level == Microsoft.Extensions.Logging.LogLevel.Information &&
+                entry.Message.Contains("weekly_commission_calculation_run") &&
+                entry.Message.Contains("durationMs="));
+            logger.Entries.ShouldAllBe(entry =>
+                !entry.Message.Contains("password", StringComparison.OrdinalIgnoreCase) &&
+                !entry.Message.Contains("token", StringComparison.OrdinalIgnoreCase));
+        }
+
+        [Fact]
         public void LockKey_IsDistinctFromObligationLockKey()
         {
             WeeklyCommissionCalculationLock.LockKey
@@ -458,13 +540,15 @@ namespace AqualLifeStyle.Tests.Commissions
             IConfiguration configuration,
             IWeeklyCommissionCalculator commissionCalculator,
             IOnyxTravelBenefitSynchronizer travelBenefitSynchronizer = null,
-            IAreaActivationStateResolver suppliedAreaStateResolver = null)
+            IAreaActivationStateResolver suppliedAreaStateResolver = null,
+            Payments.TestLogger<WeeklyCommissionCalculationWorker> suppliedLogger = null)
         {
             var timer = new AbpAsyncTimer();
             var lockMock = new Mock<IWeeklyCommissionCalculationLock>();
             lockMock.Setup(service => service.AcquireAsync())
                 .Returns(Task.CompletedTask);
-            var logger = new Payments.TestLogger<WeeklyCommissionCalculationWorker>();
+            var logger = suppliedLogger ??
+                new Payments.TestLogger<WeeklyCommissionCalculationWorker>();
             if (suppliedAreaStateResolver == null)
             {
                 var areaStateResolver = new Mock<IAreaActivationStateResolver>();

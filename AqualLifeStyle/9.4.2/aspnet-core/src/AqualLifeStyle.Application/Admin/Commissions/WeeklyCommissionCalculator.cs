@@ -101,6 +101,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     existingPeriod.PeriodStart,
                     existingPeriod.PeriodEnd,
                     existingPeriod.TimeZoneId,
+                    existingPeriod.RulesVersion,
                     existingCommissions.Select(commission =>
                         new CommissionSummaryRow(
                             commission.TotalAmount,
@@ -178,6 +179,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 period.PeriodStart,
                 period.PeriodEnd,
                 period.TimeZoneId,
+                period.RulesVersion,
                 commissions.Select(commission =>
                     new CommissionSummaryRow(
                         commission.TotalAmount,
@@ -208,6 +210,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     existingPeriod.PeriodStart,
                     existingPeriod.PeriodEnd,
                     existingPeriod.TimeZoneId,
+                    existingPeriod.RulesVersion,
                     existingCommissions.Select(commission =>
                         new CommissionSummaryRow(
                             commission.TotalAmount,
@@ -271,6 +274,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 period.PeriodStart,
                 period.PeriodEnd,
                 period.TimeZoneId,
+                period.RulesVersion,
                 commissions.Select(commission =>
                     new CommissionSummaryRow(
                         commission.TotalAmount,
@@ -286,6 +290,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             DateTime periodStart,
             DateTime periodEnd,
             string timeZoneId,
+            string rulesVersion,
             IEnumerable<CommissionSummaryRow> commissions,
             string currency,
             bool wasAlreadyCalculated,
@@ -299,8 +304,12 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 PeriodStart = periodStart,
                 PeriodEnd = periodEnd,
                 TimeZoneId = timeZoneId,
+                RulesVersion = rulesVersion,
                 WasAlreadyCalculated = wasAlreadyCalculated,
+                EvaluatedCount = rows.Count,
                 RecordsCreated = recordsCreated,
+                NotEarnedCount = rows.Count(row =>
+                    row.Status == WeeklyCommissionPayoutStatus.NotEarned),
                 EarnedCount = rows.Count(row => row.Amount > 0m),
                 HeldCount = rows.Count(row =>
                     row.Status == WeeklyCommissionPayoutStatus.Held),

@@ -76,11 +76,11 @@ Do not arm the worker until all are evidenced:
 - [ ] Current production schema is migrated and healthy.
 - [ ] `2026-08-14-entry-initial` and `2026-08-14-onyx-initial` terms bootstrap dry-run is conflict-free, then the authorised rows are inserted and re-read.
 - [x] The AQGreen evaluator and commission terms enforce the client-confirmed three-level model. Level 3 is final; Onyx separately remains a five-level programme.
-- [ ] Every existing Area has an authorised activation baseline; no current-state guess is used.
-- [ ] All participating Areas share the database topology assumed by cross-Area network calculation.
+- [ ] Every Tenant has authorised cutoff-applicable activation-state evidence under the legacy `AreaActivationStateRecord` name; no current-state guess is used.
+- [ ] Every configured Tenant uses the host database topology supported by the current worker. Same-Tenant business Areas do not split the programme graph.
 - [ ] Target Friday-to-Thursday cycle and Johannesburg boundary are correct.
 - [ ] Read-only enablement preflight reports no missing/ambiguous terms, unknown Area state, or existing conflicting target period.
-- [ ] PostgreSQL application-path idempotency has authoritative evidence.
+- [x] PostgreSQL application-path rollback/retry idempotency has local real-provider evidence for AQGreen L1. Production-like E2E and production state remain separate gates.
 - [ ] Production-like weekly E2E covers positive, hold, inactive/unknown Area, post-cutoff activation/placement, and retry cases.
 - [ ] Missed-cycle detection and authorised recovery runbook are approved.
 - [ ] Structured monitoring and an owned alert destination exist.
@@ -88,11 +88,13 @@ Do not arm the worker until all are evidenced:
 
 Open issues #55–#60 track these gates. Issue #59's text refers to archived WIP; current `main` contains a smaller bootstrap/preflight capability in `AdminCommissionBootstrapAppService`, but completion against the issue's full acceptance criteria has not been established.
 
+The focused [weekly production-readiness assessment](../operations/weekly-commission-production-readiness.md) defines current blocker codes, startup timing, structured evidence, and the boundary between a one-cycle controlled test and continuous operation.
+
 ### 3.2 Enablement
 
 1. Freeze unrelated financial/data changes during the window.
-2. Capture preflight output and approvals without PII or credentials.
-3. Enable `App__WeeklyCommissions__Enabled=true` in one controlled environment.
+2. Verify `App__EntryMonthlyObligations__Enabled=false`, capture preflight output and approvals without PII or credentials, and stop unless `Ready=true` with no blockers.
+3. Under a separate approval, enable `App__WeeklyCommissions__Enabled=true` in one controlled environment. `App__WeeklyCommissions__RecoveryVerified` and `App__WeeklyCommissions__ObservabilityReady` are evidence assertions, not worker switches; do not set them without retained restore and alert-delivery proof.
 4. Redeploy/restart only the required API service.
 5. Confirm exactly one worker execution owns the advisory lock.
 6. Verify period dates, terms versions, Area outcomes, counts, totals, and no duplicate rows.
@@ -107,7 +109,7 @@ Operators must retain:
 - resolved cycle start/end/timezone;
 - selected terms versions;
 - Area active/inactive/unknown summary;
-- periods and commission row counts per Area/programme;
+- periods and commission row counts per Tenant/programme;
 - Earned/Held/NotEarned totals;
 - idempotent repeat outcome;
 - alerts/failures and their owner;
@@ -133,7 +135,7 @@ Do not delete a ledger row and rerun. Historical correction needs an authorised 
 
 ### 3.5 Missed cycles
 
-The worker calculates only the latest closed cycle. Older missing cycles are not safely reconstructed from today's state. Until issue #58 is resolved, operators must detect and classify a missed cycle, preserve evidence, and obtain an authorised recovery decision. There is no approved manual SQL procedure in this pack.
+The worker calculates only the latest closed cycle. Older missing cycles are not safely reconstructed from today's state. Preflight blocks the controlled first run when `RunOnStart` would select a later cycle. Operators must detect and classify a missed cycle, preserve evidence, and obtain an authorised recovery decision. There is no approved manual SQL procedure in this pack, and automatic arbitrary backfill is not required for the first-cycle MVP.
 
 ## 4. AQGreen monthly automation
 

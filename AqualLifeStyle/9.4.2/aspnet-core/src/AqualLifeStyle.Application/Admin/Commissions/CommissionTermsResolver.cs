@@ -12,10 +12,9 @@ namespace AqualLifeStyle.Application.Admin.Commissions
     /// Resolves the single immutable commission terms version applicable to a
     /// closed commission cycle. The applicable version is the one whose
     /// effective boundary is the latest canonical Friday 00:00
-    /// Africa/Johannesburg cycle start at or before the cycle's closing
-    /// boundary; equality at the boundary is inclusive, so a version effective
-    /// exactly at a cycle's cutoff governs that cycle while the immediately
-    /// preceding cycle resolves the previous version.
+    /// Africa/Johannesburg cycle start at or before the cycle's opening
+    /// boundary. A version effective on the next Friday never rewrites the
+    /// preceding Friday-through-Thursday cycle.
     ///
     /// Resolution never consults current/configured terms and never falls back:
     /// a cycle without an applicable persisted version fails closed. Programmes
@@ -36,23 +35,18 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             _entryTermsRepository;
         private readonly IRepository<OnyxCommissionTermsVersion, Guid>
             _onyxTermsRepository;
-        private readonly LatestClosedCommissionWeekResolver _cycleResolver;
-
         public CommissionTermsResolver(
             IRepository<EntryCommissionTermsVersion, Guid> entryTermsRepository,
-            IRepository<OnyxCommissionTermsVersion, Guid> onyxTermsRepository,
-            LatestClosedCommissionWeekResolver cycleResolver)
+            IRepository<OnyxCommissionTermsVersion, Guid> onyxTermsRepository)
         {
             _entryTermsRepository = entryTermsRepository;
             _onyxTermsRepository = onyxTermsRepository;
-            _cycleResolver = cycleResolver;
         }
 
         public async Task<EntryCommissionTerms> ResolveEntryTermsAsync(
             ClosedCommissionWeek closedWeek)
         {
-            var boundary = _cycleResolver.ResolveFirstCycleStartAfter(
-                closedWeek.PeriodEndUtc);
+            var boundary = closedWeek.PeriodStartUtc;
             var version = await _entryTermsRepository.GetAll()
                 .Where(terms => terms.EffectiveAt <= boundary)
                 .OrderByDescending(terms => terms.EffectiveAt)
@@ -60,7 +54,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             if (version == null)
             {
                 throw new InvalidOperationException(
-                    "No AQGreen commission terms version is effective for the cycle closing at " +
+                    "No AQGreen commission terms version is effective for the cycle opening at " +
                     $"{boundary:O}. Authorised effective-dated terms are required; calculation refuses to use current terms.");
             }
 
@@ -70,8 +64,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         public async Task<OnyxCommissionTerms> ResolveOnyxTermsAsync(
             ClosedCommissionWeek closedWeek)
         {
-            var boundary = _cycleResolver.ResolveFirstCycleStartAfter(
-                closedWeek.PeriodEndUtc);
+            var boundary = closedWeek.PeriodStartUtc;
             var version = await _onyxTermsRepository.GetAll()
                 .Where(terms => terms.EffectiveAt <= boundary)
                 .OrderByDescending(terms => terms.EffectiveAt)
@@ -79,7 +72,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             if (version == null)
             {
                 throw new InvalidOperationException(
-                    "No Onyx commission terms version is effective for the cycle closing at " +
+                    "No Onyx commission terms version is effective for the cycle opening at " +
                     $"{boundary:O}. Authorised effective-dated terms are required; calculation refuses to use current terms.");
             }
 
