@@ -113,7 +113,10 @@ namespace AqualLifeStyle.Application.Admin.Commissions.Dto
         public DateTime PeriodEnd { get; set; }
         public string TimeZoneId { get; set; }
         public bool WasAlreadyCalculated { get; set; }
+        public string RulesVersion { get; set; }
+        public int EvaluatedCount { get; set; }
         public int RecordsCreated { get; set; }
+        public int NotEarnedCount { get; set; }
         public int EarnedCount { get; set; }
         public int HeldCount { get; set; }
         public decimal TotalEarnedAmount { get; set; }

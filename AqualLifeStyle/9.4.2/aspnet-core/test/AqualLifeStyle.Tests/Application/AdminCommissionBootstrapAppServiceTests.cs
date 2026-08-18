@@ -5,8 +5,12 @@ using Abp.Authorization;
 using Abp.Configuration.Startup;
 using AqualLifeStyle.Application.Admin.Commissions;
 using AqualLifeStyle.Application.Admin.Commissions.Dto;
+using AqualLifeStyle.Domain.Common;
+using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Onyx;
+using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.EntityFrameworkCore;
+using AqualLifeStyle.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Shouldly;
@@ -390,6 +394,47 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task WeeklyPreflight_FailsClosed_OnUnverifiedOperationalGates()
+        {
+            SeedEntryVersion(ExpectedEntryVersion);
+            SeedOnyxVersion(ExpectedOnyxVersion);
+            SeedTenantActivationBaseline();
+
+            var output = await _service.GetWeeklyEnablementPreflightAsync();
+
+            output.Ready.ShouldBeFalse();
+            output.WorkerEnabled.ShouldBeFalse();
+            output.MonthlyWorkerEnabled.ShouldBeFalse();
+            output.RecoveryVerified.ShouldBeFalse();
+            output.ObservabilityReady.ShouldBeFalse();
+            output.TopologyStatus.ShouldBe("SUPPORTED_SINGLE_HOST_DATABASE");
+            output.Terms.ShouldAllBe(row =>
+                row.Status == CommissionTermsPreflightStatus.Present);
+            output.Blockers.ShouldContain(blocker =>
+                blocker.Code == "recovery_not_verified");
+            output.Blockers.ShouldContain(blocker =>
+                blocker.Code == "observability_not_ready");
+            output.PaymentTimestampStatus.ShouldBe(
+                "NOT_APPLICABLE_TO_TARGET_CYCLE");
+        }
+
+        [Fact]
+        public async Task WeeklyPreflight_WrongFinancialRates_FailClosed()
+        {
+            SeedEntryVersion(ExpectedEntryVersion, levelOne: 151m);
+            SeedOnyxVersion(ExpectedOnyxVersion);
+            SeedTenantActivationBaseline();
+
+            var output = await _service.GetWeeklyEnablementPreflightAsync();
+
+            output.Ready.ShouldBeFalse();
+            output.Terms.Single(row => row.Programme == "Entry")
+                .Status.ShouldBe(CommissionTermsPreflightStatus.Conflicting);
+            output.Blockers.ShouldContain(blocker =>
+                blocker.Code == "commission_terms_not_ready");
+        }
+
+        [Fact]
         public async Task TenantSession_IsRejected()
         {
             LoginAsDefaultTenantAdmin();
@@ -401,6 +446,131 @@ namespace AqualLifeStyle.Tests.Application
             var (entryCount, onyxCount) = TermsCounts();
             entryCount.ShouldBe(0);
             onyxCount.ShouldBe(0);
+        }
+
+        [Fact]
+        public async Task WeeklyPreflight_NetworkDryRun_DetectsActiveParticipationWithoutActivatedAt()
+        {
+            SeedEntryVersion(ExpectedEntryVersion);
+            SeedOnyxVersion(ExpectedOnyxVersion);
+            SeedTenantActivationBaseline();
+
+            var participationId = await SeedActiveEntryParticipationAsync(
+                FirstAutomatedCycleBoundaryUtc.AddMinutes(1),
+                "noactivation");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations
+                    .SingleAsync(item => item.Id == participationId);
+                context.Entry(participation)
+                    .Property(item => item.ActivatedAt)
+                    .CurrentValue = null;
+                await context.SaveChangesAsync();
+            });
+
+            var output = await _service.GetWeeklyEnablementPreflightAsync();
+
+            output.Projection.EntryActiveWithoutActivatedAt.ShouldBe(1);
+            output.Projection.EntryNetworkBuildable.ShouldBeFalse();
+            output.Projection.EntryNetworkFailure.ShouldContain(
+                "missing activation evidence");
+            output.Blockers.ShouldContain(blocker =>
+                blocker.Code == "missing_activation_evidence");
+            output.Blockers.ShouldContain(blocker =>
+                blocker.Code == "network_not_buildable");
+        }
+
+        [Fact]
+        public async Task WeeklyPreflight_NetworkDryRun_BuildsLevelOneNetwork_AndCountsOneQualified()
+        {
+            SeedEntryVersion(ExpectedEntryVersion);
+            SeedOnyxVersion(ExpectedOnyxVersion);
+            SeedTenantActivationBaseline();
+
+            var rootId = await SeedActiveEntryParticipationAsync(
+                FirstAutomatedCycleBoundaryUtc.AddMinutes(1),
+                "l1root");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var root = await context.EntryParticipations
+                    .SingleAsync(item => item.Id == rootId);
+                var terms = EntryProgrammeTerms.CreateSingleJoiningPayment(
+                    "preflight-l1-terms",
+                    FirstAutomatedCycleBoundaryUtc.AddMonths(-1),
+                    1200m,
+                    600m,
+                    7);
+                for (var index = 1; index <= 5; index++)
+                {
+                    var userId = await CreateTestUserAsync(
+                        1,
+                        $"preflight-l1-{index}",
+                        $"preflight-l1-{index}@example.com");
+                    var customer = Customer.Create(
+                        1,
+                        userId,
+                        $"Preflight L1 {index}",
+                        new EmailAddress($"preflight-l1-{index}@example.com"));
+                    context.Customers.Add(customer);
+                    await context.SaveChangesAsync();
+                    var startedAt =
+                        FirstAutomatedCycleBoundaryUtc.AddMinutes(1 + index);
+                    var recruit = EntryParticipation.StartUnderRecruiter(
+                        1,
+                        customer.Id,
+                        root,
+                        terms,
+                        startedAt.AddMinutes(-1));
+                    var payment = MemberPayment.CreatePending(
+                        1,
+                        customer.Id,
+                        MemberPaymentPurpose.AQGreenJoining,
+                        1200m,
+                        "Test",
+                        $"preflight-l1-payment-{index}",
+                        startedAt.AddMinutes(-2));
+                    payment.Confirm(startedAt.AddMinutes(-1));
+                    recruit.ApplyConfirmedJoiningPayment(payment);
+                    recruit.ApproveByAdministrator(1L, startedAt);
+                    context.MemberPayments.Add(payment);
+                    context.EntryParticipations.Add(recruit);
+                }
+
+                await context.SaveChangesAsync();
+            });
+
+            var output = await _service.GetWeeklyEnablementPreflightAsync();
+
+            output.Projection.ActiveEntryParticipations.ShouldBe(6);
+            output.Projection.EntryNetworkBuildable.ShouldBeTrue();
+            output.Projection.EntryQualifiedPopulation.ShouldBe(1);
+            output.Blockers.ShouldNotContain(blocker =>
+                blocker.Code == "missing_activation_evidence");
+            output.Blockers.ShouldNotContain(blocker =>
+                blocker.Code == "network_not_buildable");
+        }
+
+        [Fact]
+        public async Task WeeklyPreflight_PostCutoffActivation_IsReportedButDoesNotBlock()
+        {
+            SeedEntryVersion(ExpectedEntryVersion);
+            SeedOnyxVersion(ExpectedOnyxVersion);
+            SeedTenantActivationBaseline();
+
+            await SeedActiveEntryParticipationAsync(
+                FirstAutomatedCycleBoundaryUtc.AddDays(7),
+                "postcutoff");
+
+            var output = await _service.GetWeeklyEnablementPreflightAsync();
+
+            output.Projection.EntryPostCutoffActivationExcluded.ShouldBe(1);
+            output.Projection.ActiveEntryParticipations.ShouldBe(0);
+            output.Projection.EntryNetworkBuildable.ShouldBeTrue();
+            output.Projection.EntryQualifiedPopulation.ShouldBe(0);
+            output.Blockers.ShouldNotContain(blocker =>
+                blocker.Code == "missing_activation_evidence");
+            output.Blockers.ShouldNotContain(blocker =>
+                blocker.Code == "network_not_buildable");
         }
 
         private void SeedEntryVersion(
@@ -440,6 +610,70 @@ namespace AqualLifeStyle.Tests.Application
                         levelThree,
                         levelFour,
                         levelFive));
+            });
+        }
+
+        private void SeedTenantActivationBaseline()
+        {
+            UsingDbContext(null, context =>
+            {
+                context.AreaActivationStateRecords.Add(
+                    AreaActivationStateRecord.Record(
+                        Guid.NewGuid(),
+                        1,
+                        true,
+                        FirstAutomatedCycleBoundaryUtc,
+                        FirstAutomatedCycleBoundaryUtc,
+                        null,
+                        "Weekly preflight test baseline",
+                        AreaActivationStateRecordKind.ObservedBaseline));
+            });
+        }
+
+        private async Task<Guid> SeedActiveEntryParticipationAsync(
+            DateTime activatedAtUtc,
+            string suffix)
+        {
+            var userId = await CreateTestUserAsync(
+                1,
+                $"preflight-{suffix}",
+                $"preflight-{suffix}@example.com");
+            return await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    $"Preflight {suffix}",
+                    new EmailAddress($"preflight-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+
+                var terms = EntryProgrammeTerms.CreateSingleJoiningPayment(
+                    $"preflight-terms-{suffix}",
+                    FirstAutomatedCycleBoundaryUtc.AddMonths(-1),
+                    1200m,
+                    600m,
+                    7);
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    terms,
+                    activatedAtUtc.AddMinutes(-1));
+                var payment = MemberPayment.CreatePending(
+                    1,
+                    customer.Id,
+                    MemberPaymentPurpose.AQGreenJoining,
+                    1200m,
+                    "Test",
+                    $"preflight-payment-{suffix}",
+                    activatedAtUtc.AddMinutes(-2));
+                payment.Confirm(activatedAtUtc.AddMinutes(-1));
+                participation.ApplyConfirmedJoiningPayment(payment);
+                participation.ApproveByAdministrator(1L, activatedAtUtc);
+                context.MemberPayments.Add(payment);
+                context.EntryParticipations.Add(participation);
+                await context.SaveChangesAsync();
+                return participation.Id;
             });
         }
 

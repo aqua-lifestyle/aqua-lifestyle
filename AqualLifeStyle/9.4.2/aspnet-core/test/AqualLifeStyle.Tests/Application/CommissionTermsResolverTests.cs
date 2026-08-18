@@ -15,11 +15,11 @@ namespace AqualLifeStyle.Tests.Application
         private static readonly DateTime FirstFridayBoundary =
             new(2026, 7, 16, 22, 0, 0, DateTimeKind.Utc);
 
-        private static ClosedCommissionWeek CycleClosingAt(DateTime boundaryUtc)
+        private static ClosedCommissionWeek CycleStartingAt(DateTime boundaryUtc)
         {
             return new ClosedCommissionWeek(
-                boundaryUtc.AddDays(-7),
-                boundaryUtc.AddTicks(-1),
+                boundaryUtc,
+                boundaryUtc.AddDays(7).AddTicks(-1),
                 LatestClosedCommissionWeekResolver.CommissionTimeZoneId);
         }
 
@@ -98,7 +98,7 @@ namespace AqualLifeStyle.Tests.Application
         {
             await AddEntryVersionAsync("entry-v1", FirstFridayBoundary, 150m);
             await AddEntryVersionAsync("entry-v2", FirstFridayBoundary.AddDays(7), 160m);
-            var v1Cycle = CycleClosingAt(FirstFridayBoundary);
+            var v1Cycle = CycleStartingAt(FirstFridayBoundary);
 
             var terms = await ResolveEntryTermsAsync(v1Cycle);
 
@@ -107,11 +107,11 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task CycleClosingExactlyAtV2Boundary_ResolvesV2()
+        public async Task CycleOpeningExactlyAtV2Boundary_ResolvesV2()
         {
             await AddEntryVersionAsync("entry-v1", FirstFridayBoundary, 150m);
             await AddEntryVersionAsync("entry-v2", FirstFridayBoundary.AddDays(7), 160m);
-            var v2Cycle = CycleClosingAt(FirstFridayBoundary.AddDays(7));
+            var v2Cycle = CycleStartingAt(FirstFridayBoundary.AddDays(7));
 
             var terms = await ResolveEntryTermsAsync(v2Cycle);
 
@@ -124,7 +124,7 @@ namespace AqualLifeStyle.Tests.Application
         {
             await AddEntryVersionAsync("entry-v1", FirstFridayBoundary, 150m);
             await AddEntryVersionAsync("entry-v2", FirstFridayBoundary.AddDays(7), 160m);
-            var laterCycle = CycleClosingAt(FirstFridayBoundary.AddDays(14));
+            var laterCycle = CycleStartingAt(FirstFridayBoundary.AddDays(14));
 
             var terms = await ResolveEntryTermsAsync(laterCycle);
 
@@ -136,7 +136,7 @@ namespace AqualLifeStyle.Tests.Application
         public async Task FutureVersionCannotRewriteAnEarlierClosedCycle()
         {
             await AddEntryVersionAsync("entry-v1", FirstFridayBoundary, 150m);
-            var historicalCycle = CycleClosingAt(FirstFridayBoundary.AddDays(7));
+            var historicalCycle = CycleStartingAt(FirstFridayBoundary.AddDays(7));
 
             var before = await ResolveEntryTermsAsync(historicalCycle);
             before.Version.ShouldBe("entry-v1");
@@ -151,9 +151,25 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task NextFridayVersionCannotRewriteThePrecedingCycle()
+        {
+            await AddEntryVersionAsync("entry-v1", FirstFridayBoundary, 150m);
+            await AddEntryVersionAsync(
+                "entry-v2",
+                FirstFridayBoundary.AddDays(7),
+                160m);
+
+            var terms = await ResolveEntryTermsAsync(
+                CycleStartingAt(FirstFridayBoundary));
+
+            terms.Version.ShouldBe("entry-v1");
+            terms.GetComponentAmount(1).ShouldBe(150m);
+        }
+
+        [Fact]
         public async Task MissingTermsVersion_FailsClosedWithoutCurrentTermsFallback()
         {
-            var cycle = CycleClosingAt(FirstFridayBoundary);
+            var cycle = CycleStartingAt(FirstFridayBoundary);
 
             var exception = await Should.ThrowAsync<InvalidOperationException>(
                 async () => await ResolveEntryTermsAsync(cycle));
@@ -164,7 +180,7 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task MissingOnyxTermsVersion_FailsClosedWithoutCurrentTermsFallback()
         {
-            var cycle = CycleClosingAt(FirstFridayBoundary);
+            var cycle = CycleStartingAt(FirstFridayBoundary);
 
             var exception = await Should.ThrowAsync<InvalidOperationException>(
                 async () => await ResolveOnyxTermsAsync(cycle));
@@ -196,7 +212,7 @@ namespace AqualLifeStyle.Tests.Application
         {
             await AddEntryVersionAsync("entry-v1", FirstFridayBoundary);
             await AddOnyxVersionAsync("onyx-v1", FirstFridayBoundary);
-            var cycle = CycleClosingAt(FirstFridayBoundary);
+            var cycle = CycleStartingAt(FirstFridayBoundary);
 
             var entryTerms = await ResolveEntryTermsAsync(cycle);
             var onyxTerms = await ResolveOnyxTermsAsync(cycle);
@@ -209,7 +225,7 @@ namespace AqualLifeStyle.Tests.Application
         public async Task EntryVersion_CannotResolveForOnyxAndViceVersa()
         {
             await AddEntryVersionAsync("entry-v1", FirstFridayBoundary);
-            var cycle = CycleClosingAt(FirstFridayBoundary);
+            var cycle = CycleStartingAt(FirstFridayBoundary);
 
             await Should.ThrowAsync<InvalidOperationException>(async () =>
                 await ResolveOnyxTermsAsync(cycle));
@@ -238,7 +254,7 @@ namespace AqualLifeStyle.Tests.Application
                 4m);
 
             var terms = await ResolveOnyxTermsAsync(
-                CycleClosingAt(FirstFridayBoundary));
+                CycleStartingAt(FirstFridayBoundary));
 
             terms.GetPerPersonRate(OnyxNetworkLevel.Level1).ShouldBe(50m);
             terms.GetPerPersonRate(OnyxNetworkLevel.Level3).ShouldBe(12.62m);
@@ -250,7 +266,7 @@ namespace AqualLifeStyle.Tests.Application
         public async Task CalculationNeverTouchesTheCurrentProvider()
         {
             await AddEntryVersionAsync("entry-v1", FirstFridayBoundary, 150m);
-            var cycle = CycleClosingAt(FirstFridayBoundary);
+            var cycle = CycleStartingAt(FirstFridayBoundary);
 
             var terms = await ResolveEntryTermsAsync(cycle);
 

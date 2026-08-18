@@ -49,6 +49,10 @@ services:
         sync: false
       - key: App__WeeklyCommissions__IntervalMinutes
         value: "1440"
+      - key: App__WeeklyCommissions__RecoveryVerified
+        sync: false
+      - key: App__WeeklyCommissions__ObservabilityReady
+        sync: false
       - key: App__ServerRootAddress
         value: https://aqualifestyle-api.onrender.com/
       - key: App__ClientRootAddress

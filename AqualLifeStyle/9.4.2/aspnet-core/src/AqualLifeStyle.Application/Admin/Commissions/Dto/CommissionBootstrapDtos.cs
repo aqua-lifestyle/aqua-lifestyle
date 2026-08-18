@@ -76,7 +76,26 @@ namespace AqualLifeStyle.Application.Admin.Commissions.Dto
         public int ActiveOnyxParticipations { get; set; }
         public int EntryOverdueObligationHolds { get; set; }
         public int EntryLoanHolds { get; set; }
+        public int DeletedEntryParticipations { get; set; }
+        public int DeletedOnyxParticipations { get; set; }
+        public int MonthlyObligationsAtOrBeforeTarget { get; set; }
+        public int EntryActiveWithoutActivatedAt { get; set; }
+        public int OnyxActiveWithoutActivatedAt { get; set; }
+        public int EntryPostCutoffActivationExcluded { get; set; }
+        public int OnyxPostCutoffActivationExcluded { get; set; }
+        public bool EntryNetworkBuildable { get; set; }
+        public bool OnyxNetworkBuildable { get; set; }
+        public string EntryNetworkFailure { get; set; }
+        public string OnyxNetworkFailure { get; set; }
+        public int EntryQualifiedPopulation { get; set; }
+        public int OnyxQualifiedPopulation { get; set; }
         public List<WeeklyFirstRunTenantProjection> Tenants { get; set; } = new();
+    }
+
+    public class WeeklyEnablementPreflightBlocker
+    {
+        public string Code { get; set; }
+        public string Detail { get; set; }
     }
 
     public class WeeklyFirstRunTenantProjection
@@ -95,22 +114,28 @@ namespace AqualLifeStyle.Application.Admin.Commissions.Dto
     {
         public DateTime TargetPeriodStartUtc { get; set; }
         public DateTime TargetPeriodEndUtc { get; set; }
+        public DateTime EarliestSafeExecutionUtc { get; set; }
+        public DateTime CheckedAtUtc { get; set; }
+        public DateTime LatestClosedPeriodStartUtc { get; set; }
+        public DateTime LatestClosedPeriodEndUtc { get; set; }
         public string TimeZoneId { get; set; }
         public List<CommissionTermsPreflightRow> Terms { get; set; } = new();
         public List<AreaBaselinePreflightRow> Areas { get; set; } = new();
         public bool WorkerEnabled { get; set; }
+        public bool MonthlyWorkerEnabled { get; set; }
+        public bool TargetCycleClosed { get; set; }
+        public bool StartupWouldTargetExpectedCycle { get; set; }
+        public bool RecoveryVerified { get; set; }
+        public bool ObservabilityReady { get; set; }
+        public string BuildId { get; set; }
+        public string PaymentTimestampStatus { get; set; }
         public string TopologyStatus { get; set; }
         public string TopologyDetail { get; set; }
         public int ExistingTargetEntryPeriods { get; set; }
         public int ExistingTargetOnyxPeriods { get; set; }
         public WeeklyFirstRunProjection Projection { get; set; }
-        public bool Ready => !WorkerEnabled &&
-            Terms.TrueForAll(row => row.Status == CommissionTermsPreflightStatus.Present) &&
-            Areas.TrueForAll(row =>
-                !row.WorkerWouldSkipAtCutoff &&
-                row.BaselineStatus == AreaBaselinePreflightStatus.Sufficient) &&
-            ExistingTargetEntryPeriods == 0 &&
-            ExistingTargetOnyxPeriods == 0;
+        public List<WeeklyEnablementPreflightBlocker> Blockers { get; set; } = new();
+        public bool Ready => Blockers.Count == 0;
     }
 
     public class MonthlyEnablementPreflightOutput

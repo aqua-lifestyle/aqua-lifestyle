@@ -133,11 +133,12 @@ The owner-confirmed AQGreen Level 1–3 commission facts may be taken from the r
 
 These are not the same as business questions.
 
-1. **P0001 production migration incident** — production row classification/remediation is not merged or production verified. Agent 1 owns the active workstream.
-2. **Weekly enablement gates** — initial rows/baselines in production, topology, PostgreSQL application-path idempotency, E2E, recovery, observability and controlled arming remain open (#55–#60).
-3. **Monthly enablement gates** — business due day, due-policy, E2E, reconciliation resolution and Yoco acceptance remain open (#61–#66).
-4. **Provider acceptance** — real Yoco and Bird external outcomes remain unverified.
-5. **Automated full AQGreen E2E** — historical manual browser evidence exists, but recurring CI E2E is open (#67).
+1. **Weekly enablement gates** — initial rows/activation evidence in production, production preflight, E2E, recovery, owned alert delivery and controlled arming remain open (#55–#60). The task branch adds real-PostgreSQL application-path rollback/retry evidence, but this is not production evidence.
+2. **Monthly enablement gates** — business due day, due-policy, obligation completeness, E2E, reconciliation resolution and Yoco occurrence/finality remain open (#61–#66).
+3. **Provider acceptance** — real Yoco and Bird external outcomes remain unverified.
+4. **Automated full AQGreen E2E** — historical manual browser evidence exists, but recurring CI E2E is open (#67).
+
+The user-supplied operational state on 18 August 2026 says production is healthy. The P0001 deployment report is therefore no longer treated as the current weekly enablement blocker. Current production rows and migrations were not queried in this readiness task.
 
 ## I. Open GitHub work
 
@@ -147,10 +148,10 @@ Current issue state was inspected on 11 August 2026.
 | --- | --- |
 | [#55 Weekly commission production enablement](https://github.com/aqua-lifestyle/aqua-lifestyle/issues/55) | Controlled terms/Area baseline and worker arming. |
 | [#56 Weekly commission production E2E acceptance](https://github.com/aqua-lifestyle/aqua-lifestyle/issues/56) | Full PostgreSQL business-path acceptance. |
-| [#57 PostgreSQL application-path commission idempotency](https://github.com/aqua-lifestyle/aqua-lifestyle/issues/57) | Invoke real application path twice and prove persisted idempotency. |
+| [#57 PostgreSQL application-path commission idempotency](https://github.com/aqua-lifestyle/aqua-lifestyle/issues/57) | Task-branch evidence now injects a PostgreSQL ledger failure, proves rollback, retries successfully, and proves a second execution reuses one stable period. Merge/CI status remains separate. |
 | [#58 Missed weekly cycle recovery/runbook](https://github.com/aqua-lifestyle/aqua-lifestyle/issues/58) | Safe authorised recovery without arbitrary automatic backfill. |
-| [#59 Weekly enablement preflight](https://github.com/aqua-lifestyle/aqua-lifestyle/issues/59) | Full read-only enablement gate. Its WIP file references are archived; current main has a smaller bootstrap/preflight service. |
-| [#60 Commission diagnostics/observability](https://github.com/aqua-lifestyle/aqua-lifestyle/issues/60) | Explain outcomes safely; implementation referenced by issue remains archived WIP. |
+| [#59 Weekly enablement preflight](https://github.com/aqua-lifestyle/aqua-lifestyle/issues/59) | Task branch expands the current read-only preflight with explicit blocker codes, cycle/startup checks, exact rates, host topology, deleted evidence, operational assertions and fail-closed readiness. Production output remains required. |
+| [#60 Commission diagnostics/observability](https://github.com/aqua-lifestyle/aqua-lifestyle/issues/60) | Task branch adds structured per-programme and whole-run evidence. Owned production alert delivery and broader historical diagnostics remain open. |
 | [#61 AQGreen monthly due-day decision](https://github.com/aqua-lifestyle/aqua-lifestyle/issues/61) | Business authority for the due day. |
 | [#62 Monthly obligation production enablement](https://github.com/aqua-lifestyle/aqua-lifestyle/issues/62) | Controlled policy/worker rollout. |
 | [#63 Monthly obligation E2E](https://github.com/aqua-lifestyle/aqua-lifestyle/issues/63) | Generation-to-provider-allocation lifecycle. |
@@ -163,7 +164,6 @@ Current issue state was inspected on 11 August 2026.
 
 | Risk | Impact | Evidence | Status / owner | Required follow-up |
 | --- | --- | --- | --- | --- |
-| P0001 modern AQGreen contradiction blocks funeral migration | API deployment/schema may not advance; production facts may need classification | Merged fail-closed migration; active inventory branch, no merged production result | Blocking deployment incident; Agent 1 + Finance/Ops | Complete read-only inventory, classify from evidence, obtain authorised remediation, preserve audit. |
 | Weekly workers enabled before inputs are authoritative | False or duplicate financial ledgers | Workers default off; open issues #55–#60 | Blocking enablement; Ops/Engineering/Business | Complete prerequisites in document 06. |
 | Monthly worker enabled without due policy | Invented member obligation dates | Empty append-only policy and issue #61 | Blocking enablement; Business/Ops | Authorise due day and first month, then E2E and controlled rollout. |
 | Manual reconciliation resolution absent | Detected financial contradictions become operational dead ends | Read-only queries, no resolution API; #66 | Blocking monthly enablement; Product/Finance/Engineering | Define outcomes/evidence and implement immutable audit workflow. |
@@ -180,7 +180,7 @@ Current issue state was inspected on 11 August 2026.
 - Successful provider events do not yet form a complete durable inbox with every failed attempt.
 - Release/payment recording lacks provider-verified transfer occurrence and globally unique payout identity.
 - Refund, dispute, chargeback and financial adjustment ledgers are not defined.
-- Weekly diagnostics and broad preflight WIP at archive commit `df70e6b` remain reference only.
+- Broad diagnostics WIP at archive commit `df70e6b` remains reference only. The task branch selectively implements blocker codes and structured run evidence against current Tenant/Area rules.
 - Legacy `Entry*` technical names remain for database/code compatibility.
 
 ## L. Existing documentation audit

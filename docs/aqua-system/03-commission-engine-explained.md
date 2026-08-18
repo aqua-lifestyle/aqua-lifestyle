@@ -17,7 +17,7 @@ flowchart LR
     Release --> Payment[External payment reference may be recorded]
 ```
 
-The worker wakes periodically, resolves the latest fully closed Friday-to-Thursday week, and calculates at most that latest week. It does not automatically backfill arbitrary older weeks.
+The worker runs immediately when an enabled API instance starts, then wakes on a completion-relative interval (daily by default), resolves the latest fully closed Friday-to-Thursday week, and calculates at most that latest week. It does not automatically backfill arbitrary older weeks. The controlled first-cycle startup and missed-cycle consequences are detailed in the [production-readiness assessment](../operations/weekly-commission-production-readiness.md).
 
 ## 2. Structure before money
 
@@ -80,7 +80,7 @@ Ambiguous, discontinuous, cyclic, dangling, or deleted evidence fails closed. Th
 
 Rates can change. Recalculating an old week with a newly deployed constant would silently alter financial history.
 
-Commission terms are therefore immutable, effective-dated database rows. A resolver selects the latest authorised row at or before the relevant canonical Friday boundary and fails if no unambiguous row exists.
+Commission terms are therefore immutable, effective-dated database rows. A resolver selects the latest authorised row at or before the cycle's opening Friday boundary and fails if no row exists. A version effective on the following Friday cannot rewrite the preceding cycle.
 
 ```mermaid
 flowchart LR
@@ -142,7 +142,7 @@ Some inputs remain insufficient for arbitrary historical reconstruction, includi
 
 ## 7. Idempotency
 
-Calculation first checks whether the programme/Area/cycle period already exists. Database uniqueness also prevents a second period and duplicate participation ledger rows.
+Calculation first checks whether the programme/Tenant/cycle period already exists. Database uniqueness also prevents a second period and duplicate participation ledger rows.
 
 ```mermaid
 sequenceDiagram
@@ -193,9 +193,13 @@ automatic worker enabled
 - `App:WeeklyCommissions:Enabled` defaults to `false`.
 - The intended first automatic cycle is Friday 14 August through Thursday 20 August 2026.
 - Earlier cycles are not automatically backfilled.
-- Each Area needs authorised historical baseline evidence.
+- Each Tenant needs authorised activation-state evidence under the legacy
+  `AreaActivationStateRecord` name. Business Areas remain inside the Tenant and
+  do not split the graph.
 - Initial terms rows must be bootstrapped and checked.
 - PostgreSQL application-path idempotency, production E2E, missed-cycle recovery, topology, observability, and controlled enablement remain tracked gates.
+
+The PostgreSQL application path now has local evidence for rollback after an injected ledger-write failure followed by a successful calculation and idempotent replay. This is not production E2E or production enablement evidence.
 
 The operational sequence is in [document 06](06-operations-and-enablement-runbook.md). Current issues and evidence are in [document 07](07-verification-decision-and-risk-register.md).
 
