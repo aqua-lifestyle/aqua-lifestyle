@@ -18,7 +18,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
             builder.Property(period => period.PeriodEnd).IsRequired();
             builder.Property(period => period.TimeZoneId).HasMaxLength(64).IsRequired();
             builder.Property(period => period.CalculatedAt).IsRequired();
-            builder.Property(period => period.RulesVersion).HasMaxLength(32).IsRequired();
+            builder.Property(period => period.RulesVersion).HasMaxLength(64).IsRequired();
 
             builder.HasIndex(period => new
                 {
@@ -46,7 +46,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
             builder.Ignore(commission => commission.HighestCommissionedLevel);
             builder.Property(commission => commission.TotalAmount).HasPrecision(18, 2).IsRequired();
             builder.Property(commission => commission.Currency).HasMaxLength(3).IsRequired();
-            builder.Property(commission => commission.RulesVersion).HasMaxLength(32).IsRequired();
+            builder.Property(commission => commission.RulesVersion).HasMaxLength(64).IsRequired();
             builder.Property(commission => commission.CalculatedAt).IsRequired();
             builder.Property(commission => commission.PayoutStatus).IsRequired();
             builder.Property(commission => commission.HoldReason).HasMaxLength(500);
