@@ -42,7 +42,21 @@ namespace AqualLifeStyle.Web.Tests.Integration
 
             WriteProvenanceMarker(programme);
             LoginAsHostAdmin();
-            var commissionId = await SeedReleasedCommissionAsync(programme);
+            var fixture = await SeedReleasedCommissionAsync(programme);
+            try
+            {
+                await AssertConcurrentPaymentRaceAsync(programme, fixture.CommissionId);
+            }
+            finally
+            {
+                await CleanupFixtureAsync(programme, fixture);
+            }
+        }
+
+        private async Task AssertConcurrentPaymentRaceAsync(
+            AdminCommissionProgramme programme,
+            Guid commissionId)
+        {
             var firstReference = $"pg-payout-first-{Guid.NewGuid():N}";
             var secondReference = $"pg-payout-second-{Guid.NewGuid():N}";
 
@@ -112,10 +126,16 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 "already recorded with a different payment reference");
         }
 
-        private async Task<Guid> SeedReleasedCommissionAsync(
+        private async Task<SeededCommissionFixture> SeedReleasedCommissionAsync(
             AdminCommissionProgramme programme)
         {
             var commissionId = Guid.NewGuid();
+            var participationId = Guid.Empty;
+            var paymentId = Guid.Empty;
+            var periodId = Guid.Empty;
+            int? membershipId = null;
+            long userId = 0;
+            var customerId = 0;
             var suffix = commissionId.ToString("N")[..12];
             var offsetSeconds = BitConverter.ToUInt32(commissionId.ToByteArray(), 0) %
                                 (180u * 24u * 60u * 60u);
@@ -156,6 +176,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                     User.DefaultPassword);
                 context.Users.Add(user);
                 await context.SaveChangesAsync();
+                userId = user.Id;
 
                 var customer = Customer.Create(
                     1,
@@ -164,6 +185,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                     new EmailAddress(user.EmailAddress));
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
+                customerId = customer.Id;
 
                 if (programme == AdminCommissionProgramme.Onyx)
                 {
@@ -174,6 +196,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                         MembershipType.Onyx);
                     context.Memberships.Add(membership);
                     await context.SaveChangesAsync();
+                    membershipId = membership.Id;
 
                     var planTerms = OnyxPlanTerms.Create(
                         $"onyx-plan-{suffix}",
@@ -200,6 +223,8 @@ namespace AqualLifeStyle.Web.Tests.Integration
                         periodStart.AddDays(-2).AddMinutes(3));
                     context.MemberPayments.Add(payment);
                     context.OnyxParticipations.Add(participation);
+                    participationId = participation.Id;
+                    paymentId = payment.Id;
 
                     var commissionTerms = OnyxCommissionTerms.Create(
                         rulesVersion,
@@ -218,6 +243,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                         commissionTerms);
                     context.OnyxCommissionPeriods.Add(period);
                     await context.SaveChangesAsync();
+                    periodId = period.Id;
 
                     await context.Database.ExecuteSqlInterpolatedAsync($"""
                         INSERT INTO "OnyxWeeklyCommissions" (
@@ -261,6 +287,8 @@ namespace AqualLifeStyle.Web.Tests.Integration
                         periodStart.AddDays(-2).AddMinutes(3));
                     context.MemberPayments.Add(payment);
                     context.EntryParticipations.Add(participation);
+                    participationId = participation.Id;
+                    paymentId = payment.Id;
 
                     var commissionTerms = EntryCommissionTerms.Create(
                         rulesVersion,
@@ -277,6 +305,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                         commissionTerms);
                     context.EntryCommissionPeriods.Add(period);
                     await context.SaveChangesAsync();
+                    periodId = period.Id;
 
                     await context.Database.ExecuteSqlInterpolatedAsync($"""
                         INSERT INTO "EntryWeeklyCommissions" (
@@ -293,7 +322,65 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 }
             });
 
-            return commissionId;
+            return new SeededCommissionFixture(
+                commissionId,
+                participationId,
+                paymentId,
+                periodId,
+                membershipId,
+                customerId,
+                userId);
+        }
+
+        private async Task CleanupFixtureAsync(
+            AdminCommissionProgramme programme,
+            SeededCommissionFixture fixture)
+        {
+            await WithTenantFiltersDisabledAsync(async context =>
+            {
+                if (programme == AdminCommissionProgramme.Onyx)
+                {
+                    await context.Database.ExecuteSqlInterpolatedAsync($"""
+                        DELETE FROM "OnyxCommissionComponents"
+                        WHERE "OnyxWeeklyCommissionId" = {fixture.CommissionId};
+                        DELETE FROM "OnyxWeeklyCommissions"
+                        WHERE "Id" = {fixture.CommissionId};
+                        DELETE FROM "OnyxParticipations"
+                        WHERE "Id" = {fixture.ParticipationId};
+                        DELETE FROM "OnyxCommissionPeriods"
+                        WHERE "Id" = {fixture.PeriodId};
+                        """);
+                    if (fixture.MembershipId.HasValue)
+                    {
+                        await context.Database.ExecuteSqlInterpolatedAsync($"""
+                            DELETE FROM "Memberships"
+                            WHERE "Id" = {fixture.MembershipId.Value};
+                            """);
+                    }
+                }
+                else
+                {
+                    await context.Database.ExecuteSqlInterpolatedAsync($"""
+                        DELETE FROM "EntryCommissionComponents"
+                        WHERE "EntryWeeklyCommissionId" = {fixture.CommissionId};
+                        DELETE FROM "EntryWeeklyCommissions"
+                        WHERE "Id" = {fixture.CommissionId};
+                        DELETE FROM "EntryParticipations"
+                        WHERE "Id" = {fixture.ParticipationId};
+                        DELETE FROM "EntryCommissionPeriods"
+                        WHERE "Id" = {fixture.PeriodId};
+                        """);
+                }
+
+                await context.Database.ExecuteSqlInterpolatedAsync($"""
+                    DELETE FROM "MemberPayments"
+                    WHERE "Id" = {fixture.PaymentId};
+                    DELETE FROM "Customers"
+                    WHERE "Id" = {fixture.CustomerId};
+                    DELETE FROM "AbpUsers"
+                    WHERE "Id" = {fixture.UserId};
+                    """);
+            });
         }
 
         private async Task<Exception> CapturePaymentCallAsync(
@@ -458,5 +545,14 @@ namespace AqualLifeStyle.Web.Tests.Integration
             WeeklyCommissionPayoutStatus Status,
             string Reference,
             DateTime? PaidAt);
+
+        private sealed record SeededCommissionFixture(
+            Guid CommissionId,
+            Guid ParticipationId,
+            Guid PaymentId,
+            Guid PeriodId,
+            int? MembershipId,
+            int CustomerId,
+            long UserId);
     }
 }
