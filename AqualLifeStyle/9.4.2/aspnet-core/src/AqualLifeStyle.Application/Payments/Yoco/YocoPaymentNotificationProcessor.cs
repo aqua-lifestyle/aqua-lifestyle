@@ -318,7 +318,8 @@ namespace AqualLifeStyle.Payments.Yoco
                     YocoCheckoutKind.DirectOnyx,
                     onyxCheckout.Amount,
                     onyxCheckout.Currency,
-                    YocoCheckoutMetadata.DirectOnyxPurpose);
+                    YocoCheckoutMetadata.DirectOnyxPurpose,
+                    YocoCheckoutMetadata.DirectOnyxCheckoutIntentId);
             if (aqGreenCheckout != null)
                 return new ResolvedYocoCheckout(
                     aqGreenCheckout.TenantId,
@@ -327,7 +328,8 @@ namespace AqualLifeStyle.Payments.Yoco
                     YocoCheckoutKind.AQGreenJoining,
                     aqGreenCheckout.Amount,
                     aqGreenCheckout.Currency,
-                    YocoCheckoutMetadata.AQGreenJoiningPurpose);
+                    YocoCheckoutMetadata.AQGreenJoiningPurpose,
+                    YocoCheckoutMetadata.AQGreenJoiningCheckoutId);
             if (aqGreenMonthlyCheckout != null)
                 return new ResolvedYocoCheckout(
                     aqGreenMonthlyCheckout.TenantId,
@@ -336,7 +338,8 @@ namespace AqualLifeStyle.Payments.Yoco
                     YocoCheckoutKind.AQGreenMonthlyObligation,
                     aqGreenMonthlyCheckout.Amount,
                     aqGreenMonthlyCheckout.Currency,
-                    YocoCheckoutMetadata.AQGreenMonthlyObligationPurpose);
+                    YocoCheckoutMetadata.AQGreenMonthlyObligationPurpose,
+                    YocoCheckoutMetadata.AQGreenMonthlyObligationCheckoutId);
 
             throw new YocoWebhookTransientException(
                 "The Yoco checkout has not been recorded locally yet.");
@@ -375,17 +378,22 @@ namespace AqualLifeStyle.Payments.Yoco
                     StringComparison.Ordinal))
                 throw new YocoWebhookValidationException(
                     "The Yoco payment purpose does not match the recorded checkout.");
-            if (checkout.Kind == YocoCheckoutKind.AQGreenMonthlyObligation)
+            if (notification.Metadata == null)
+                return;
+            foreach (var metadataItem in notification.Metadata)
             {
-                var reference = GetRequiredMetadataText(
-                    notification.Metadata,
-                    YocoCheckoutMetadata.AQGreenMonthlyObligationCheckoutId,
-                    "The Yoco monthly payment is missing its merchant checkout reference.");
-                if (!Guid.TryParseExact(reference, "N", out var referenceId) ||
-                    referenceId != checkout.ReferenceId)
+                if (YocoCheckoutMetadata.IsSupportedReference(metadataItem.Key) &&
+                    metadataItem.Key != checkout.MerchantReferenceKey)
                     throw new YocoWebhookValidationException(
-                        "The Yoco monthly payment merchant reference does not match the recorded checkout.");
+                        "The Yoco payment merchant reference does not match the recorded checkout.");
             }
+            if (!notification.Metadata.TryGetValue(checkout.MerchantReferenceKey, out var value))
+                return;
+            if (value.ValueKind != JsonValueKind.String ||
+                !Guid.TryParseExact(value.GetString()?.Trim(), "N", out var referenceId) ||
+                referenceId != checkout.ReferenceId)
+                throw new YocoWebhookValidationException(
+                    "The Yoco payment merchant reference does not match the recorded checkout.");
         }
 
         private static string GetRequiredMetadataText(
@@ -410,6 +418,7 @@ namespace AqualLifeStyle.Payments.Yoco
             public decimal Amount { get; }
             public string Currency { get; }
             public string ExpectedPurpose { get; }
+            public string MerchantReferenceKey { get; }
 
             public ResolvedYocoCheckout(
                 int tenantId,
@@ -418,7 +427,8 @@ namespace AqualLifeStyle.Payments.Yoco
                 YocoCheckoutKind kind,
                 decimal amount,
                 string currency,
-                string expectedPurpose)
+                string expectedPurpose,
+                string merchantReferenceKey)
             {
                 TenantId = tenantId;
                 ReferenceId = referenceId;
@@ -427,6 +437,7 @@ namespace AqualLifeStyle.Payments.Yoco
                 Amount = amount;
                 Currency = currency;
                 ExpectedPurpose = expectedPurpose;
+                MerchantReferenceKey = merchantReferenceKey;
             }
         }
 
