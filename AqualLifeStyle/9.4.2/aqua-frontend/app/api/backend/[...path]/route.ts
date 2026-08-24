@@ -4,12 +4,24 @@ import { publicEnv } from "@/src/shared/config";
 import { isSameOrigin } from "@/src/shared/auth/origin";
 import { deleteSessionCookies, readSession } from "@/src/shared/auth/session";
 
+const publicBackendRoutes: Readonly<Record<string, ReadonlySet<string>>> = {
+  GET: new Set([
+    "api/health",
+    "api/services/app/Account/GetTenantSelfRegistrationAvailability",
+    "api/services/app/ProgrammeInvitation/GetPreview",
+  ]),
+  POST: new Set(["api/services/app/Account/Register"]),
+};
+
 const forward = async (
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ) => {
+  const { path } = await params;
+  const backendPath = path.join("/");
+  const isPublicRoute = publicBackendRoutes[request.method]?.has(backendPath) ?? false;
   const session = await readSession();
-  if (!session) {
+  if (!session && !isPublicRoute) {
     const response = NextResponse.json({ message: "Authentication required." }, { status: 401 });
     deleteSessionCookies(response.cookies);
     return response;
@@ -21,18 +33,17 @@ const forward = async (
     }
   }
 
-  const { path } = await params;
-  const backendUrl = new URL(path.join("/"), `${publicEnv.NEXT_PUBLIC_ABP_API_URL}/`);
+  const backendUrl = new URL(backendPath, `${publicEnv.NEXT_PUBLIC_ABP_API_URL}/`);
   backendUrl.search = request.nextUrl.search;
   const headers = new Headers();
   headers.set("Accept", request.headers.get("accept") ?? "application/json");
-  headers.set("Authorization", `Bearer ${session.accessToken}`);
+  if (session) headers.set("Authorization", `Bearer ${session.accessToken}`);
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("Content-Type", contentType);
   const clientTenant = request.headers.get("__tenant");
   if (clientTenant) {
     headers.set("__tenant", clientTenant);
-  } else if (session.tenant) {
+  } else if (session?.tenant) {
     headers.set("__tenant", session.tenant);
   }
 
@@ -48,7 +59,7 @@ const forward = async (
     status: backendResponse.status,
   });
   response.headers.set("Cache-Control", "no-store");
-  if (backendResponse.status === 401) deleteSessionCookies(response.cookies);
+  if (session && backendResponse.status === 401) deleteSessionCookies(response.cookies);
   return response;
 };
 

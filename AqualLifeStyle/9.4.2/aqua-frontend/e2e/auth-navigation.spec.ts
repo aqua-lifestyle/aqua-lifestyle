@@ -38,6 +38,33 @@ test("anonymous route policy does not expose protected content", async ({ page }
   expect(errors.pageErrors).toEqual([]);
 });
 
+test("invitation context survives signup, login, and authentication", async ({ page }) => {
+  await page.goto("/i/AQ7G2X9KLMNP");
+  const signupLink = page.getByRole("link", { name: "Create my account" });
+  await expect(signupLink).toHaveAttribute(
+    "href",
+    "/signup?area=Default&invite=AQ7G2X9KLMNP&redirect=%2Fi%2FAQ7G2X9KLMNP",
+  );
+  await page.goto(await signupLink.getAttribute("href") ?? "/signup");
+  await expect(page).toHaveURL(
+    "/signup?area=Default&invite=AQ7G2X9KLMNP&redirect=%2Fi%2FAQ7G2X9KLMNP",
+  );
+
+  await page.getByRole("link", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(
+    "/login?area=Default&invite=AQ7G2X9KLMNP&redirect=%2Fi%2FAQ7G2X9KLMNP",
+  );
+
+  await page.getByLabel("Username or email").fill("member@example.test");
+  await page.getByLabel("Password", { exact: true }).fill("test-password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page).toHaveURL("/i/AQ7G2X9KLMNP");
+  await expect(
+    page.getByRole("button", { name: "Confirm and continue to payment" }),
+  ).toBeVisible();
+});
+
 test("session survives reload, a new tab, and programme navigation", async ({ context, page }) => {
   const errors = observeBrowserErrors(page);
   await signIn(page);

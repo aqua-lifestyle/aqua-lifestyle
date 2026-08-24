@@ -161,6 +161,9 @@ const sendJson = (response, status, body) => {
 createServer((request, response) => {
   const url = new URL(request.url ?? "/", `http://127.0.0.1:${port}`);
   if (request.method === "OPTIONS") return sendJson(response, 204, null);
+  if (url.pathname === "/api/health") {
+    return sendJson(response, 200, responses.get(url.pathname));
+  }
 
   if (request.method === "POST" && url.pathname === "/api/TokenAuth/Authenticate") {
     let body = "";
@@ -178,7 +181,20 @@ createServer((request, response) => {
   }
 
   if (url.pathname === "/api/services/app/Account/GetTenantSelfRegistrationAvailability") {
-    return sendJson(response, 200, { result: { isSelfRegistrationEnabled: false } });
+    return sendJson(response, 200, { result: { isSelfRegistrationEnabled: true } });
+  }
+
+  if (url.pathname === "/api/services/app/ProgrammeInvitation/GetPreview") {
+    return sendJson(response, 200, {
+      areaName: "Test Area",
+      inviteCode: url.searchParams.get("InviteCode"),
+      programmeKey: "AQGREEN",
+      programmeName: "AQGreen",
+      recruiterClubMemberNumber: "TEST-RECRUITER",
+      recruiterEligible: true,
+      recruiterName: "Test Recruiter",
+      tenancyName: "Default",
+    });
   }
 
   if (!request.headers.authorization?.startsWith("Bearer ")) {
