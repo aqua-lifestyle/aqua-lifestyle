@@ -178,6 +178,8 @@ stateDiagram-v2
 
 The current application releases only eligible Earned records. It does not send a transfer. Recording `Paid` requires an external reference and asserts that an outside transfer was completed; Aqua does not currently verify that transfer with a payout provider.
 
+Release and payment mutations use a dedicated transaction-scoped lock per programme and commission identifier. The lock is separate from the global calculation lock and is acquired before reading the ledger row under `READ COMMITTED`, so concurrent application instances re-evaluate the committed winner before applying another transition. A repeated payment with the same reference is idempotent; a different reference is rejected rather than overwriting the recorded payout facts. PostgreSQL behavior is integration-tested. The SQL Server application-lock branch follows the same transaction-owned design but is not execution-verified in this repository.
+
 An old period and its components are historical ledger facts. Soft deletion is not an authorised recalculation, reversal, or correction mechanism.
 
 ## 10. Worker state and automatic cutover

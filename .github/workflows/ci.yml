@@ -152,7 +152,7 @@ jobs:
       - name: Build web tests
         run: dotnet build test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --no-restore
       - name: Run transactional regressions on PostgreSQL
-        run: dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~InternalAccountInvitation|FullyQualifiedName~WeeklyCommissionPostgreSqlApplicationPathTests|FullyQualifiedName~WeeklyCommissionProductionLikeE2ETests" --logger "trx;LogFileName=pg-regressions.trx" --results-directory TestResults
+        run: dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~InternalAccountInvitation|FullyQualifiedName~WeeklyCommissionPostgreSqlApplicationPathTests|FullyQualifiedName~WeeklyCommissionProductionLikeE2ETests|FullyQualifiedName~AdminCommissionPayoutMutationPostgreSqlTests" --logger "trx;LogFileName=pg-regressions.trx" --results-directory TestResults
       - name: Verify the regressions really ran under PostgreSQL and were not skipped
         shell: bash
         run: |
@@ -167,6 +167,8 @@ jobs:
             || { echo "::error::weekly commission PostgreSQL application-path retry did not run and pass"; exit 1; }
           grep -qE '<UnitTestResult[^>]*testName="[^"]*QualifiedLevelOneNetwork_WorkerCalculatesLatestClosedWeek_ExactlyOnce"[^>]*outcome="Passed"' "$trx" \
             || { echo "::error::weekly commission production-like E2E did not run and pass"; exit 1; }
+          test "$(grep -cE '<UnitTestResult[^>]*testName="[^"]*ConcurrentDifferentPaymentReferences_OnlyOneApplicationCallWins[^"]*"[^>]*outcome="Passed"' "$trx")" -eq 2 \
+            || { echo "::error::AQGreen and Onyx payout mutation races did not both run and pass"; exit 1; }
           # Provenance proof: the rollback test only writes this marker when its transactional+PG body
           # actually executes (i.e. the guard did NOT short-circuit). Its absence means the regression
           # silently took the default non-transactional path and must fail the job.
@@ -177,6 +179,10 @@ jobs:
             || { echo "::error::weekly commission regression did not execute its PostgreSQL body (missing marker)"; exit 1; }
           test -f "$REPRO_MARKER_DIR/weekly-commission-e2e-pg.ran" \
             || { echo "::error::weekly commission production-like E2E did not execute its PostgreSQL body (missing marker)"; exit 1; }
+          test -f "$REPRO_MARKER_DIR/admin-commission-payout-entry-pg.ran" \
+            || { echo "::error::AQGreen payout mutation race did not execute its PostgreSQL body (missing marker)"; exit 1; }
+          test -f "$REPRO_MARKER_DIR/admin-commission-payout-onyx-pg.ran" \
+            || { echo "::error::Onyx payout mutation race did not execute its PostgreSQL body (missing marker)"; exit 1; }
           if grep -qE 'outcome="(Failed|Error|Aborted|Skipped|NotExecuted)"' "$trx"; then
             echo "::error::test failures present in the PostgreSQL regression results"
             exit 1
