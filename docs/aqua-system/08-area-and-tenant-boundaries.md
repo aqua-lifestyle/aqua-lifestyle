@@ -50,9 +50,13 @@ Inactive Areas and revoked assignments provide no approval access. Host-wide acc
 
 The durable portal queue remains authoritative. Notification recipients are active users who both have an active assignment to the Customer's active Area and hold the approval permission.
 
+The same resource-Area rule applies to programme administration beyond approval. Recruiter correction, checkout review and termination, Onyx graduation, loan administration, savings administration, monthly-obligation administration, and tenant reconciliation resolve the target Customer's current active Area and require an active assignment to it. Tenant membership or a role name alone does not grant access. Host access to these cross-Tenant paths additionally requires `Admin.AllTenants`.
+
+Recruiter correction authorises against the target participant's Area, not the proposed recruiter's current Area. A same-Tenant recruiter from another Area remains valid because programme placement is Tenant-scoped; cross-Tenant recruitment remains forbidden. Where an endpoint accepts both `TenantId` and `AreaId`, both filters narrow the result independently and a conflicting pair returns no data rather than allowing either filter to override the other.
+
 ## API and interface boundary
 
-Member/customer projections expose `AreaId` and `AreaName`. Administration exposes assigned Areas and Area-scoped participation filtering. Customer creation and registration accept an optional Area identifier; omission is accepted only when the Tenant has exactly one active Area.
+Member/customer projections expose `AreaId` and `AreaName`. Administration exposes assigned Areas and Area-scoped participation filtering. Customer creation and registration accept an optional Area identifier; omission is accepted only when the Tenant has exactly one active Area. Reconciliation projections preserve authorised completed checkout facts even if a dependent obligation, participation, Customer, or Area was later soft-deleted; nullable recorded state and explicit availability flags distinguish a missing dependency from an inferred business outcome.
 
 Some authentication contracts still use a legacy `area` URL/query label for the technical Tenant workspace (`Default`). Programme invitation preview exposes this workspace separately from the recruiter's business Area so authentication routing cannot be mistaken for Area assignment or authorization. Invitation registration derives its authoritative Tenant from the persisted invitation and rejects a conflicting ambient Tenant; the browser query does not select the security boundary.
 

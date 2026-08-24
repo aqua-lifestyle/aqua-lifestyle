@@ -244,6 +244,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
         public DateTime CreatedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
         public bool IsPaymentAllocated { get; set; }
-        public EntryMonthlyObligationStatus RecordedObligationStatus { get; set; }
+        public EntryMonthlyObligationStatus? RecordedObligationStatus { get; set; }
+        public bool ObligationAvailable { get; set; }
+        public bool ParticipationAvailable { get; set; }
+        public bool CustomerAvailable { get; set; }
+        public bool AreaAvailable { get; set; }
     }
 }

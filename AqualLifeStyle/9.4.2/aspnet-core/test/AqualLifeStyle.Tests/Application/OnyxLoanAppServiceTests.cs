@@ -3,15 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
+using Abp.Runtime.Session;
 using AqualLifeStyle.Application.Admin.Loans;
 using AqualLifeStyle.Application.Loans;
 using AqualLifeStyle.Application.Loans.Dto;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Roles;
+using AqualLifeStyle.Domain.Areas;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
+using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
 using RolePermissionSetting = Abp.Authorization.Roles.RolePermissionSetting;
@@ -125,6 +128,30 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task TenantAdministrator_OnlySeesLoansInAssignedAreas()
+        {
+            var johannesburg = await CreateActiveLoanAsync("JHB");
+            var pretoria = await CreateActiveLoanAsync("PTA");
+
+            var result = await _adminService.GetAllAsync(
+                new AdminOnyxLoanAgreementListInput
+                {
+                    MaxResultCount = 100
+                });
+
+            result.Items.ShouldContain(item => item.Email == johannesburg.Email);
+            result.Items.ShouldNotContain(item => item.Email == pretoria.Email);
+
+            await RevokeJohannesburgAssignmentAsync();
+            var afterRevocation = await _adminService.GetAllAsync(
+                new AdminOnyxLoanAgreementListInput
+                {
+                    MaxResultCount = 100
+                });
+            afterRevocation.Items.ShouldBeEmpty();
+        }
+
+        [Fact]
         public async Task HostReviewerWithoutAllAreasPermission_CannotRequestAreaLoans()
         {
             var suffix = Guid.NewGuid().ToString("N");
@@ -165,7 +192,7 @@ namespace AqualLifeStyle.Tests.Application
                     }));
         }
 
-        private async Task<LoanDetails> CreateActiveLoanAsync()
+        private async Task<LoanDetails> CreateActiveLoanAsync(string areaCode = null)
         {
             var suffix = Guid.NewGuid().ToString("N");
             var email = $"loan-{suffix}@example.com";
@@ -181,6 +208,20 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     "Loan Club Member",
                     new EmailAddress(email));
+                if (!string.IsNullOrWhiteSpace(areaCode))
+                {
+                    var area = await context.Areas.SingleOrDefaultAsync(item =>
+                        item.TenantId == 1 && item.Code == areaCode);
+                    if (area == null)
+                    {
+                        area = Area.Create(
+                            1,
+                            areaCode,
+                            areaCode == "JHB" ? "Johannesburg" : "Pretoria");
+                        context.Areas.Add(area);
+                    }
+                    customer.AssignInitialArea(area, EffectiveFrom, "Test Area assignment");
+                }
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
 
@@ -225,6 +266,20 @@ namespace AqualLifeStyle.Tests.Application
                 await context.SaveChangesAsync();
 
                 return new LoanDetails(userId, customer.Id, email);
+            });
+        }
+
+        private async Task RevokeJohannesburgAssignmentAsync()
+        {
+            await UsingDbContextAsync(1, async context =>
+            {
+                var assignment = await context.AreaAdminAssignments.SingleAsync(item =>
+                    item.UserId == AbpSession.GetUserId() &&
+                    !item.RevokedAt.HasValue &&
+                    context.Areas.Any(area =>
+                        area.Id == item.AreaId && area.Code == "JHB"));
+                assignment.Revoke(DateTime.UtcNow);
+                await context.SaveChangesAsync();
             });
         }
 

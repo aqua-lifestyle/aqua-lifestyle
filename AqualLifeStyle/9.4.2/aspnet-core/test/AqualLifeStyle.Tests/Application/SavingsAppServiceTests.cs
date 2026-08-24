@@ -2,15 +2,18 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
+using Abp.Runtime.Session;
 using AqualLifeStyle.Application.Admin.Savings;
 using AqualLifeStyle.Application.Savings;
 using AqualLifeStyle.Application.Savings.Dto;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Roles;
+using AqualLifeStyle.Domain.Areas;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.Domain.Savings;
+using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
 using RolePermissionSetting = Abp.Authorization.Roles.RolePermissionSetting;
@@ -99,6 +102,30 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task TenantAdministrator_OnlySeesSavingsInAssignedAreas()
+        {
+            var johannesburg = await CreateSavingsAccountAsync("JHB");
+            var pretoria = await CreateSavingsAccountAsync("PTA");
+
+            var result = await _adminService.GetAllAsync(
+                new AdminSavingsAccountListInput
+                {
+                    MaxResultCount = 100
+                });
+
+            result.Items.ShouldContain(item => item.Email == johannesburg.Email);
+            result.Items.ShouldNotContain(item => item.Email == pretoria.Email);
+
+            await RevokeJohannesburgAssignmentAsync();
+            var afterRevocation = await _adminService.GetAllAsync(
+                new AdminSavingsAccountListInput
+                {
+                    MaxResultCount = 100
+                });
+            afterRevocation.Items.ShouldBeEmpty();
+        }
+
+        [Fact]
         public async Task HostReviewerWithoutAllAreasPermission_CannotRequestAllSavings()
         {
             var suffix = Guid.NewGuid().ToString("N");
@@ -137,12 +164,13 @@ namespace AqualLifeStyle.Tests.Application
             await Should.ThrowAsync<AbpAuthorizationException>(() =>
                 _adminService.GetAllAsync(new AdminSavingsAccountListInput
                 {
+                    TenantId = 1,
                     MaxResultCount = 20
                 }));
         }
 
         private async Task<SavingsAccountDetails>
-            CreateSavingsAccountAsync()
+            CreateSavingsAccountAsync(string areaCode = null)
         {
             var suffix = Guid.NewGuid().ToString("N");
             var email = $"savings-{suffix}@example.com";
@@ -157,6 +185,23 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     "Savings Club Member",
                     new EmailAddress(email));
+                if (!string.IsNullOrWhiteSpace(areaCode))
+                {
+                    var area = await context.Areas.SingleOrDefaultAsync(item =>
+                        item.TenantId == 1 && item.Code == areaCode);
+                    if (area == null)
+                    {
+                        area = Area.Create(
+                            1,
+                            areaCode,
+                            areaCode == "JHB" ? "Johannesburg" : "Pretoria");
+                        context.Areas.Add(area);
+                    }
+                    customer.AssignInitialArea(
+                        area,
+                        new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc),
+                        "Test Area assignment");
+                }
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
 
@@ -192,6 +237,20 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     customer.Id,
                     email);
+            });
+        }
+
+        private async Task RevokeJohannesburgAssignmentAsync()
+        {
+            await UsingDbContextAsync(1, async context =>
+            {
+                var assignment = await context.AreaAdminAssignments.SingleAsync(item =>
+                    item.UserId == AbpSession.GetUserId() &&
+                    !item.RevokedAt.HasValue &&
+                    context.Areas.Any(area =>
+                        area.Id == item.AreaId && area.Code == "JHB"));
+                assignment.Revoke(DateTime.UtcNow);
+                await context.SaveChangesAsync();
             });
         }
 
