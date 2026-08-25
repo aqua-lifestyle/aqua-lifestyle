@@ -42,5 +42,17 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             context.Database.GetMigrations()
                 .ShouldContain("20260804040549_AddInternalAccountInvitations");
         }
+
+        [Fact]
+        public void AQGreenPlacementFoundationMigrationShouldBeDiscoverable()
+        {
+            using var context = new AqualLifeStyleDbContext(
+                new DbContextOptionsBuilder<AqualLifeStyleDbContext>()
+                    .UseNpgsql("Host=localhost;Database=discovery;Username=discovery;Password=discovery")
+                    .Options);
+
+            context.Database.GetMigrations()
+                .ShouldContain("20260825095740_AddAQGreenPlacementV2Foundation");
+        }
     }
 }

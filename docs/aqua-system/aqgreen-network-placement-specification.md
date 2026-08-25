@@ -405,6 +405,8 @@ Participant.PlacementTreeScopeId
 7. Normal allocation cannot cross PlacementTreeScope. Failure to resolve a valid credited sponsor, sponsor placement, or sponsor scope fails the complete approval/placement transaction closed; it never creates an implicit root.
 8. Cross-Tenant placement remains prohibited. Area remains administrative scope, not topology identity.
 
+`AQG-V2-D15 — RESOLVED CORE BUSINESS DECISION`: Tenant is the hard topology boundary and `PlacementTreeScope` is the placement-tree boundary. Area is administrative ownership and authorization/approval scope only; it must not participate in topology identity, parent/scope foreign keys, topology uniqueness, canonical paths, or allocator lock identity. Placement relationships between participants in different Areas remain structurally valid when the participants share the same Tenant and PlacementTreeScope, but cross-Area topology grants no cross-Area administrative access. Area reassignment does not mutate credited sponsor, PlacementTreeScope, placement parent, slot, canonical path, or structural ancestry. Cross-Tenant topology remains prohibited. `AQG-V2-D05` remains open for company-assisted initial Area assignment.
+
 `CURRENT IMPLEMENTATION EVIDENCE`: V1 supplies no durable root-admission fact. Null recruiter, independent start, and recruiter-clearing correction can each produce a historical root candidate, while qualification follows disconnected components independently. Those V1 mechanisms are not prospective V2 root creation.
 
 `AQG-V2-D03B — OPEN / CUTOVER-MIGRATION DECISION`, related to `AQG-V2-D09`: legacy classification and mapping remain unresolved. D03B/D09 must decide which historical recruiterless participants are legitimate roots versus anomalies, how accepted populations map to PlacementTreeScopes, and how malformed, ambiguous, dangling, cyclic, deleted, or cross-Tenant evidence is classified. Prospective D03A implementation is not blocked by D03B; authoritative legacy canonicalisation and migration remain blocked.
@@ -670,7 +672,7 @@ iff Level2Complete(X,T,R)
 
 ### 16.3 Cutoff projection
 
-`ENGINEERING DECISION`: V2 qualification consumes immutable placements whose `PlacedAt <= T`, plus the cutoff-effective participant eligibility rule. A later placement cannot qualify an earlier cycle. A later correction must not be projected backward.
+`ENGINEERING DECISION`: V2 qualification consumes immutable placements whose `PlacedAt <= T`, plus the cutoff-effective participant eligibility rule. A later placement cannot qualify an earlier cycle. A later correction must not be projected backward. Prospective V2 persistence therefore requires a child's `PlacedAt` to be no earlier than its parent's. This invariant does not authorize D09 migration to fabricate historical timestamps: legacy data must supply authoritative compatible times, use an explicitly approved migration treatment, or remain blocked.
 
 ### 16.4 Current eligibility evidence
 
@@ -1775,6 +1777,7 @@ Every decision has a stable identifier, status, and bounded dependency category.
 | `AQG-V2-D03B` | **OPEN / MIGRATION-BOUND** | **Legacy root-to-PlacementTreeScope mapping:** classify legitimate historical roots/anomalies and approve population/scope mapping. | Blocks authoritative legacy canonicalisation/migration only; related to D09. It does not block prospective D03A behavior. |
 | `AQG-V2-D14A` | **RESOLVED** | **Temporary sponsor restriction after confirmed attribution:** preserve sponsor and scope; after valid payment/approval, place normally in the original sponsor's subtree using D02. | Temporary financial/earning restriction alone no longer blocks prospective placement. Sponsor earning/release remains separate. |
 | `AQG-V2-D14B` | **OPEN** | **Terminal sponsor disposition:** treatment after death, permanent exit/termination, fraud removal, withdrawal, final refund/chargeback, or other irreversible state. | Blocks only pending placements that encounter a terminal state. Preserve history and fail closed without reassignment or an invented root. |
+| `AQG-V2-D15` | **RESOLVED** | **Topology boundaries:** Tenant is the hard topology boundary; PlacementTreeScope is the tree boundary; Area remains administrative only. Same-Tenant cross-Area topology is valid. | Topology persistence, uniqueness, parent/scope foreign keys, canonical paths, and future allocator locks must not include Area identity. |
 
 ### 34.2 Cutover and migration decisions
 
@@ -1809,9 +1812,9 @@ All decisions in sections 34.2 through 34.4 remain **OPEN** unless a later autho
 
 | Deliverable | Required decisions | Conditional decisions | Explicitly not required |
 | --- | --- | --- | --- |
-| Additive topology model, constraints, lock/idempotency mechanics | None; D02 and D03A are resolved | None | Open migration, company, correction, and terminal-state decisions |
-| Prospective parent-major allocator and explicit-root workflow | None; D02 and D03A are resolved | D14B only for an encountered terminal sponsor state | D03B/D09 legacy mapping, D04/D05/D13 company channel |
-| Normal member placement in an established scope | None; D02, D03A, and D14A are resolved | D14B after terminal sponsor state | D03B, D04-D13 otherwise |
+| Additive topology model, constraints, lock/idempotency mechanics | None; D02, D03A, and D15 are resolved | None | Open migration, company, correction, and terminal-state decisions |
+| Prospective parent-major allocator and explicit-root workflow | None; D02, D03A, and D15 are resolved | D14B only for an encountered terminal sponsor state | D03B/D09 legacy mapping, D04/D05/D13 company channel |
+| Normal member placement in an established scope | None; D02, D03A, D14A, and D15 are resolved | D14B after terminal sponsor state | D03B, D04-D13 otherwise |
 | V2 StructuralCompletionLevel and progress | None; D01 is resolved | D08 for affected post-Active states | D02, D03A/D03B, D04-D07, D09-D13, D14A/D14B unless that path also runs |
 | MVP weekly commission eligibility | No open decisions; D01 and `AQGreenWeeklySalesEligibilityV1` are resolved authorities | D08 for affected structural inputs; existing commission rules after the gate and payout controls after calculation | Unrelated optional decisions |
 | Company-assisted onboarding | D04, D05, D13 | D14B after terminal sponsor state | D01, D02, D03A, D14A |

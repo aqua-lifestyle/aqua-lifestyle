@@ -8,6 +8,7 @@ using Abp.Zero.EntityFrameworkCore;
 using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Accounts;
+using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Domain.AreaLeaders;
 using AqualLifeStyle.Domain.Areas;
 using AqualLifeStyle.Domain.Customers;
@@ -54,6 +55,8 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<AccountEmailThrottle> AccountEmailThrottles { get; set; }
         public virtual DbSet<InternalAccountInvitation> InternalAccountInvitations { get; set; }
         public virtual DbSet<EntryParticipation> EntryParticipations { get; set; }
+        public virtual DbSet<AQGreenPlacementTreeScope> AQGreenPlacementTreeScopes { get; set; }
+        public virtual DbSet<AQGreenNetworkPlacement> AQGreenNetworkPlacements { get; set; }
         public virtual DbSet<EntryRecruiterCorrection> EntryRecruiterCorrections { get; set; }
         public virtual DbSet<EntryParticipationApprovalDecision> EntryParticipationApprovalDecisions { get; set; }
         public virtual DbSet<EntryMonthlyObligationDuePolicy> EntryMonthlyObligationDuePolicies { get; set; }
@@ -89,6 +92,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureDuePoliciesAreAppendOnly();
             EnsureAreaActivationStateRecordsAreAppendOnly();
             EnsureCommissionTermsVersionsAreAppendOnly();
+            EnsureAQGreenPlacementTopologyIsAppendOnly();
             return base.SaveChanges();
         }
 
@@ -97,6 +101,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureDuePoliciesAreAppendOnly();
             EnsureAreaActivationStateRecordsAreAppendOnly();
             EnsureCommissionTermsVersionsAreAppendOnly();
+            EnsureAQGreenPlacementTopologyIsAppendOnly();
             return base.SaveChanges(acceptAllChangesOnSuccess);
         }
 
@@ -106,6 +111,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureDuePoliciesAreAppendOnly();
             EnsureAreaActivationStateRecordsAreAppendOnly();
             EnsureCommissionTermsVersionsAreAppendOnly();
+            EnsureAQGreenPlacementTopologyIsAppendOnly();
             return base.SaveChangesAsync(cancellationToken);
         }
 
@@ -116,6 +122,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureDuePoliciesAreAppendOnly();
             EnsureAreaActivationStateRecordsAreAppendOnly();
             EnsureCommissionTermsVersionsAreAppendOnly();
+            EnsureAQGreenPlacementTopologyIsAppendOnly();
             return base.SaveChangesAsync(
                 acceptAllChangesOnSuccess,
                 cancellationToken);
@@ -291,6 +298,20 @@ namespace AqualLifeStyle.EntityFrameworkCore
             {
                 throw new InvalidOperationException(
                     "Commission terms versions are append-only.");
+            }
+        }
+
+        private void EnsureAQGreenPlacementTopologyIsAppendOnly()
+        {
+            if (ChangeTracker.Entries<AQGreenPlacementTreeScope>().Any(entry =>
+                    entry.State == EntityState.Modified ||
+                    entry.State == EntityState.Deleted) ||
+                ChangeTracker.Entries<AQGreenNetworkPlacement>().Any(entry =>
+                    entry.State == EntityState.Modified ||
+                    entry.State == EntityState.Deleted))
+            {
+                throw new InvalidOperationException(
+                    "AQGreen placement topology is append-only.");
             }
         }
     }
