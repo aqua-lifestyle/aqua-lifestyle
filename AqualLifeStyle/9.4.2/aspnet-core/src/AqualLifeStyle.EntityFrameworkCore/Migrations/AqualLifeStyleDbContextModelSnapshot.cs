@@ -2628,8 +2628,8 @@ namespace AqualLifeStyle.Migrations
 
                     b.Property<string>("RulesVersion")
                         .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<int>("TenantId")
                         .HasColumnType("integer");
@@ -3087,8 +3087,8 @@ namespace AqualLifeStyle.Migrations
 
                     b.Property<string>("RulesVersion")
                         .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<int>("TenantId")
                         .HasColumnType("integer");
@@ -3173,8 +3173,8 @@ namespace AqualLifeStyle.Migrations
 
                     b.Property<string>("RulesVersion")
                         .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<int>("TenantId")
                         .HasColumnType("integer");
@@ -3836,8 +3836,8 @@ namespace AqualLifeStyle.Migrations
 
                     b.Property<string>("RulesVersion")
                         .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<int>("TenantId")
                         .HasColumnType("integer");

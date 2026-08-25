@@ -49,6 +49,33 @@ describe("SignupForm", () => {
     ).toBeInTheDocument();
   });
 
+  it("preserves safe invitation context when switching to sign in", () => {
+    const { rerender } = render(
+      <SignupForm
+        inviteCode="AQ7G2X9KLMNP"
+        redirectPath="/i/AQ7G2X9KLMNP"
+        tenancyName="Johannesburg"
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      "href",
+      "/login?area=Johannesburg&invite=AQ7G2X9KLMNP&redirect=%2Fi%2FAQ7G2X9KLMNP",
+    );
+
+    rerender(
+      <SignupForm
+        inviteCode="AQ7G2X9KLMNP"
+        redirectPath="//attacker.example/path"
+        tenancyName="Johannesburg"
+      />,
+    );
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      "href",
+      "/login?area=Johannesburg&invite=AQ7G2X9KLMNP",
+    );
+  });
+
   it("advances through the multi-step flow and creates an account", async () => {
     const { register } = await import("@/src/shared/api/auth-service");
     vi.mocked(register).mockResolvedValue({ ok: true });

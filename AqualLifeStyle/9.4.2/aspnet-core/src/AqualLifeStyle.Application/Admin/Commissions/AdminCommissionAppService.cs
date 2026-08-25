@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Transactions;
 using System.Threading.Tasks;
 using Abp.Application.Services.Dto;
 using Abp.Auditing;
@@ -30,7 +31,9 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         private readonly LatestClosedCommissionWeekResolver _closedWeekResolver;
         private readonly IWeeklyCommissionCalculator _commissionCalculator;
         private readonly IWeeklyCommissionCalculationLock _calculationLock;
+        private readonly IWeeklyCommissionPayoutMutationLock _payoutMutationLock;
         private readonly IRepository<Tenant, int> _tenantRepository;
+        private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public AdminCommissionAppService(
             ICustomerRepository customerRepository,
@@ -41,7 +44,9 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             LatestClosedCommissionWeekResolver closedWeekResolver,
             IWeeklyCommissionCalculator commissionCalculator,
             IWeeklyCommissionCalculationLock calculationLock,
-            IRepository<Tenant, int> tenantRepository)
+            IWeeklyCommissionPayoutMutationLock payoutMutationLock,
+            IRepository<Tenant, int> tenantRepository,
+            IUnitOfWorkManager unitOfWorkManager)
         {
             _customerRepository = customerRepository;
             _entryPeriodRepository = entryPeriodRepository;
@@ -51,7 +56,9 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             _closedWeekResolver = closedWeekResolver;
             _commissionCalculator = commissionCalculator;
             _calculationLock = calculationLock;
+            _payoutMutationLock = payoutMutationLock;
             _tenantRepository = tenantRepository;
+            _unitOfWorkManager = unitOfWorkManager;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Commissions.View)]
@@ -174,7 +181,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             }
         }
 
-        [UnitOfWork]
+        [UnitOfWork(IsDisabled = true)]
         [AbpAuthorize(
             AquaPermissions.Admin.Commissions.Release,
             AquaPermissions.Admin.AllTenants,
@@ -185,12 +192,17 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 input?.Id ?? Guid.Empty,
                 input?.Justification,
                 "Weekly earnings release");
-            var releasedAt = Clock.Now.ToUniversalTime();
-
+            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+                   {
+                       IsTransactional = true,
+                       IsolationLevel = IsolationLevel.ReadCommitted
+                   }))
             using (CurrentUnitOfWork.DisableFilter(
                        AbpDataFilters.MayHaveTenant,
                        AbpDataFilters.MustHaveTenant))
             {
+                await AcquirePayoutMutationLockAsync(input.Programme, input.Id);
+                var releasedAt = Clock.Now.ToUniversalTime();
                 if (input.Programme == AdminCommissionProgramme.Onyx)
                 {
                     var commission = await GetOnyxCommissionAsync(
@@ -235,10 +247,11 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 }
 
                 await CurrentUnitOfWork.SaveChangesAsync();
+                await uow.CompleteAsync();
             }
         }
 
-        [UnitOfWork]
+        [UnitOfWork(IsDisabled = true)]
         [AbpAuthorize(
             AquaPermissions.Admin.Commissions.RecordPayment,
             AquaPermissions.Admin.AllTenants,
@@ -259,11 +272,17 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             }
 
             var paymentReference = input.PaymentReference.Trim();
-            var paidAt = Clock.Now.ToUniversalTime();
+            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+                   {
+                       IsTransactional = true,
+                       IsolationLevel = IsolationLevel.ReadCommitted
+                   }))
             using (CurrentUnitOfWork.DisableFilter(
                        AbpDataFilters.MayHaveTenant,
                        AbpDataFilters.MustHaveTenant))
             {
+                await AcquirePayoutMutationLockAsync(input.Programme, input.Id);
+                var paidAt = Clock.Now.ToUniversalTime();
                 if (input.Programme == AdminCommissionProgramme.Onyx)
                 {
                     var commission = await GetOnyxCommissionAsync(
@@ -300,7 +319,17 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 }
 
                 await CurrentUnitOfWork.SaveChangesAsync();
+                await uow.CompleteAsync();
             }
+        }
+
+        private Task AcquirePayoutMutationLockAsync(
+            AdminCommissionProgramme programme,
+            Guid commissionId)
+        {
+            return programme == AdminCommissionProgramme.Onyx
+                ? _payoutMutationLock.AcquireOnyxAsync(commissionId)
+                : _payoutMutationLock.AcquireEntryAsync(commissionId);
         }
 
         private async Task<PagedResultDto<AdminWeeklyCommissionDto>>

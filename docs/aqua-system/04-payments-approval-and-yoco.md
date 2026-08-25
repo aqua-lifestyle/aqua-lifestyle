@@ -60,16 +60,25 @@ Before business state changes, Aqua verifies at least:
 - deployment mode and test/live separation;
 - successful provider event type/status;
 - provider checkout and payment identifiers;
-- merchant checkout reference;
 - exact amount and ZAR currency;
 - payment purpose;
 - customer, participation, obligation, and Area ownership;
 - whether the provider event or payment already exists;
 - whether a replay conflicts with previously stored facts.
 
+Custom merchant-reference metadata is additional correlation evidence, not a prerequisite for a valid Yoco notification. Joining, direct-Onyx, and monthly-obligation notifications accept the metadata field when it is absent, but reject it when present and malformed or inconsistent with the persisted checkout. The provider checkout identifier and the server-authoritative payment purpose remain required; metadata cannot replace them.
+
 The receipt retains the identifiers and payload hash needed for idempotency/conflict detection without exposing raw sensitive content. Checkout locks, receipt/payment uniqueness, and domain idempotency protect duplicate delivery. A duplicate with the same facts reuses the committed result; a conflicting replay fails.
 
 `INTEGRATED`, but not `PRODUCTION VERIFIED`: repository tests exercise signatures and payment processing. Real Yoco checkout/webhook delivery, provider occurrence semantics, retry signing, settlement, refund, dispute, and chargeback behaviour still require provider acceptance evidence.
+
+### Timestamp semantics
+
+`BLOCKED — PROVIDER EVIDENCE REQUIRED`
+
+Yoco's documented outer `createdDate` is the webhook event creation time, while `payload.createdDate` is the payment object's creation time. Neither field is documented as the instant successful payment occurred. Local HTTP receipt time and local processing/persistence time are separate Aqua facts and must not be relabelled as provider-effective payment time.
+
+The current webhook adapter maps `payload.createdDate` into `MemberPayment.ConfirmedAt`. That mapping is retained pending an authoritative provider field or API response, but it is not production-verified occurrence semantics. Any workflow that depends on exact financial chronology, including funeral-cover inclusion time, must treat this limitation as an enablement blocker rather than silently substituting receipt or processing time. A complete future model should preserve provider-effective occurrence when proven, local HTTP receipt, and local processing/persistence as distinct clocks.
 
 ## 4. AQGreen payment outcome
 
@@ -85,7 +94,7 @@ flowchart TD
     Queue -->|Reject with reason| Rejected[Rejected / non-Active]
 ```
 
-The final qualifying `MemberPayment.ConfirmedAt` is the funeral inclusion time. Approval time and activation time are not substitutes.
+The final qualifying `MemberPayment.ConfirmedAt` is the domain field used as the funeral inclusion time. Approval time and activation time are not substitutes. Its current Yoco source has the unresolved provider-occurrence limitation described above, so production chronology is not verified.
 
 ## 5. Area Administrator approval
 
@@ -167,6 +176,7 @@ The migration and historical boundary are explained in [document 05](05-data-his
 ## 11. Payment limitations that remain
 
 - Real Yoco production finality and webhook acceptance: open external gate.
+- Authoritative Yoco payment-success occurrence time and three-clock persistence: blocked on provider evidence and schema design.
 - Provider settlement into Aqua's bank account: not represented.
 - Refund, dispute, and chargeback state/policy: unresolved.
 - Full durable inbox/failure history and provider reconciliation: incomplete.

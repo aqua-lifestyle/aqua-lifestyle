@@ -868,6 +868,42 @@ namespace AqualLifeStyle.Tests.Application
             };
             var processor = Resolve<YocoPaymentNotificationProcessor>();
 
+            var mismatchedMerchantReference = CreateNotification(
+                $"evt_wrong_merchant_{suffix}",
+                $"pay_wrong_merchant_{suffix}",
+                persisted.ProviderCheckoutId,
+                120000);
+            var mismatchedMetadata = mismatchedMerchantReference.Metadata
+                .ToDictionary(item => item.Key, item => item.Value);
+            mismatchedMetadata[YocoCheckoutMetadata.AQGreenJoiningCheckoutId] =
+                JsonSerializer.SerializeToElement(Guid.NewGuid().ToString("N"));
+            mismatchedMerchantReference.Metadata = mismatchedMetadata;
+            await Should.ThrowAsync<YocoWebhookValidationException>(() =>
+                processor.ProcessAsync(mismatchedMerchantReference));
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.MemberPayments.AnyAsync()).ShouldBeFalse();
+                (await context.YocoWebhookReceipts.AnyAsync()).ShouldBeFalse();
+            });
+
+            var conflictingMerchantReference = CreateNotification(
+                $"evt_conflicting_merchant_{suffix}",
+                $"pay_conflicting_merchant_{suffix}",
+                persisted.ProviderCheckoutId,
+                120000);
+            var conflictingMetadata = conflictingMerchantReference.Metadata
+                .ToDictionary(item => item.Key, item => item.Value);
+            conflictingMetadata[YocoCheckoutMetadata.DirectOnyxCheckoutIntentId] =
+                JsonSerializer.SerializeToElement(Guid.NewGuid().ToString("N"));
+            conflictingMerchantReference.Metadata = conflictingMetadata;
+            await Should.ThrowAsync<YocoWebhookValidationException>(() =>
+                processor.ProcessAsync(conflictingMerchantReference));
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.MemberPayments.AnyAsync()).ShouldBeFalse();
+                (await context.YocoWebhookReceipts.AnyAsync()).ShouldBeFalse();
+            });
+
             await processor.ProcessAsync(notification);
             await processor.ProcessAsync(notification);
 
@@ -979,7 +1015,26 @@ namespace AqualLifeStyle.Tests.Application
                     JsonSerializer.SerializeToElement(YocoCheckoutMetadata.DirectOnyxPurpose)
             };
 
-            await Resolve<YocoPaymentNotificationProcessor>().ProcessAsync(notification);
+            var processor = Resolve<YocoPaymentNotificationProcessor>();
+            var mismatchedMerchantReference = CreateNotification(
+                $"evt_wrong_onyx_merchant_{suffix}",
+                $"pay_wrong_onyx_merchant_{suffix}",
+                persisted.ProviderCheckoutId,
+                612000);
+            var mismatchedMetadata = mismatchedMerchantReference.Metadata
+                .ToDictionary(item => item.Key, item => item.Value);
+            mismatchedMetadata[YocoCheckoutMetadata.DirectOnyxCheckoutIntentId] =
+                JsonSerializer.SerializeToElement(Guid.NewGuid().ToString("N"));
+            mismatchedMerchantReference.Metadata = mismatchedMetadata;
+            await Should.ThrowAsync<YocoWebhookValidationException>(() =>
+                processor.ProcessAsync(mismatchedMerchantReference));
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.MemberPayments.AnyAsync()).ShouldBeFalse();
+                (await context.YocoWebhookReceipts.AnyAsync()).ShouldBeFalse();
+            });
+
+            await processor.ProcessAsync(notification);
 
             await UsingDbContextAsync(1, async context =>
             {

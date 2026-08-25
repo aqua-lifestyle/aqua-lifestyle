@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Abp.Authorization;
@@ -185,6 +186,11 @@ namespace AqualLifeStyle.Tests.Application
                 providerCheckoutId,
                 "monthly-event-exact",
                 "monthly-payment-exact");
+            var metadataWithoutOptionalReference = notification.Metadata
+                .ToDictionary(item => item.Key, item => item.Value);
+            metadataWithoutOptionalReference.Remove(
+                YocoCheckoutMetadata.AQGreenMonthlyObligationCheckoutId);
+            notification.Metadata = metadataWithoutOptionalReference;
 
             await _notificationProcessor.ProcessAsync(notification);
             await _notificationProcessor.ProcessAsync(notification);

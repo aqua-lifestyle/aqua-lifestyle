@@ -2,15 +2,18 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
+using Abp.Runtime.Session;
 using AqualLifeStyle.Application.Admin.EntryMonthlyObligations;
 using AqualLifeStyle.Application.EntryMonthlyObligations;
 using AqualLifeStyle.Application.EntryMonthlyObligations.Dto;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Roles;
+using AqualLifeStyle.Domain.Areas;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
+using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Xunit;
 using RolePermissionSetting = Abp.Authorization.Roles.RolePermissionSetting;
@@ -39,83 +42,25 @@ namespace AqualLifeStyle.Tests.Application
         [Fact]
         public async Task MemberAndAdministrator_ReadPersistedCommitment()
         {
-            var suffix = Guid.NewGuid().ToString("N");
-            var email = $"commitment-{suffix}@example.com";
-            var userId = await CreateTestUserAsync(
-                1,
-                $"commitment-{suffix}",
-                email);
-            var customerId = await UsingDbContextAsync(1, async context =>
-            {
-                var customer = Customer.Create(
-                    1,
-                    userId,
-                    "Entry Club Member",
-                    new EmailAddress(email));
-                context.Customers.Add(customer);
-                await context.SaveChangesAsync();
-                var terms = EntryProgrammeTerms.Create(
-                    "2026-07",
-                    EffectiveFrom,
-                    600m,
-                    600m,
-                    600m,
-                    7);
-                var participation = EntryParticipation.StartIndependently(
-                    1,
-                    customer.Id,
-                    terms,
-                    EffectiveFrom);
-                var registration = ConfirmedPayment(
-                    customer.Id,
-                    MemberPaymentPurpose.EntryRegistration,
-                    "registration-" + suffix);
-                participation.ApplyConfirmedActivationPayment(registration);
-                var activation = ConfirmedPayment(
-                    customer.Id,
-                    MemberPaymentPurpose.EntryActivation,
-                    "activation-" + suffix);
-                participation.ApplyConfirmedActivationPayment(activation);
-                participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
-                context.EntryMonthlyObligationDuePolicies.Add(
-                    EntryMonthlyObligationDuePolicy.Create(
-                        "due-policy-v1",
-                        10,
-                        EntryMonthlyObligationDuePolicy.JohannesburgMonthStartUtc(2026, 8)));
-                var obligation = EntryMonthlyObligation.Create(
-                    participation,
-                    2026,
-                    8,
-                    new DateTime(
-                        2026, 8, 10, 0, 0, 0, DateTimeKind.Utc),
-                    "due-policy-v1");
-                obligation.AssessStatus(
-                    new DateTime(
-                        2026, 8, 18, 0, 0, 0, DateTimeKind.Utc));
-                context.MemberPayments.AddRange(registration, activation);
-                context.EntryParticipations.Add(participation);
-                context.EntryMonthlyObligations.Add(obligation);
-                await context.SaveChangesAsync();
-                return customer.Id;
-            });
+            var details = await CreateObligationAsync("JHB");
 
-            SetCurrentUser(userId, 1);
+            SetCurrentUser(details.UserId, 1);
             var memberResult = await _memberService.GetMyObligationsAsync();
             memberResult.Count.ShouldBe(1);
             memberResult[0].Status.ShouldBe("Overdue");
             memberResult[0].AmountDue.ShouldBe(600m);
             memberResult[0].IsOwnPayoutEligible.ShouldBeFalse();
 
-            LoginAsHostAdmin();
+            LoginAsDefaultTenantAdmin();
             var adminResult = await _adminService.GetAllAsync(
                 new AdminEntryMonthlyObligationListInput
                 {
                     TenantId = 1,
-                    Keyword = email,
+                    Keyword = details.Email,
                     MaxResultCount = 20
                 });
             adminResult.TotalCount.ShouldBe(1);
-            adminResult.Items[0].CustomerId.ShouldBe(customerId);
+            adminResult.Items[0].CustomerId.ShouldBe(details.CustomerId);
             adminResult.Items[0].CustomerName.ShouldBe("Entry Club Member");
         }
 
@@ -129,6 +74,30 @@ namespace AqualLifeStyle.Tests.Application
                         TenantId = 2,
                         MaxResultCount = 20
                     }));
+        }
+
+        [Fact]
+        public async Task TenantAdministrator_OnlySeesCommitmentsInAssignedAreas()
+        {
+            var johannesburg = await CreateObligationAsync("JHB");
+            var pretoria = await CreateObligationAsync("PTA");
+
+            var result = await _adminService.GetAllAsync(
+                new AdminEntryMonthlyObligationListInput
+                {
+                    MaxResultCount = 100
+                });
+
+            result.Items.ShouldContain(item => item.CustomerId == johannesburg.CustomerId);
+            result.Items.ShouldNotContain(item => item.CustomerId == pretoria.CustomerId);
+
+            await RevokeJohannesburgAssignmentAsync();
+            var afterRevocation = await _adminService.GetAllAsync(
+                new AdminEntryMonthlyObligationListInput
+                {
+                    MaxResultCount = 100
+                });
+            afterRevocation.Items.ShouldBeEmpty();
         }
 
 
@@ -173,6 +142,95 @@ namespace AqualLifeStyle.Tests.Application
                     }));
         }
 
+        private async Task<ObligationDetails> CreateObligationAsync(string areaCode)
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var email = $"commitment-{suffix}@example.com";
+            var userId = await CreateTestUserAsync(
+                1,
+                $"commitment-{suffix}",
+                email);
+            var customerId = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "Entry Club Member",
+                    new EmailAddress(email));
+                var area = await context.Areas.SingleOrDefaultAsync(item =>
+                    item.TenantId == 1 && item.Code == areaCode);
+                if (area == null)
+                {
+                    area = Area.Create(
+                        1,
+                        areaCode,
+                        areaCode == "JHB" ? "Johannesburg" : "Pretoria");
+                    context.Areas.Add(area);
+                }
+                customer.AssignInitialArea(area, EffectiveFrom, "Test Area assignment");
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+
+                var terms = EntryProgrammeTerms.Create(
+                    $"2026-07-{suffix}",
+                    EffectiveFrom,
+                    600m,
+                    600m,
+                    600m,
+                    7);
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    terms,
+                    EffectiveFrom);
+                var registration = ConfirmedPayment(
+                    customer.Id,
+                    MemberPaymentPurpose.EntryRegistration,
+                    "registration-" + suffix);
+                participation.ApplyConfirmedActivationPayment(registration);
+                var activation = ConfirmedPayment(
+                    customer.Id,
+                    MemberPaymentPurpose.EntryActivation,
+                    "activation-" + suffix);
+                participation.ApplyConfirmedActivationPayment(activation);
+                participation.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(3));
+                var policyVersion = $"due-policy-{suffix}";
+                context.EntryMonthlyObligationDuePolicies.Add(
+                    EntryMonthlyObligationDuePolicy.Create(
+                        policyVersion,
+                        10,
+                        EntryMonthlyObligationDuePolicy.JohannesburgMonthStartUtc(2026, 8)));
+                var obligation = EntryMonthlyObligation.Create(
+                    participation,
+                    2026,
+                    8,
+                    new DateTime(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc),
+                    policyVersion);
+                obligation.AssessStatus(
+                    new DateTime(2026, 8, 18, 0, 0, 0, DateTimeKind.Utc));
+                context.MemberPayments.AddRange(registration, activation);
+                context.EntryParticipations.Add(participation);
+                context.EntryMonthlyObligations.Add(obligation);
+                await context.SaveChangesAsync();
+                return customer.Id;
+            });
+            return new ObligationDetails(userId, customerId, email);
+        }
+
+        private async Task RevokeJohannesburgAssignmentAsync()
+        {
+            await UsingDbContextAsync(1, async context =>
+            {
+                var assignment = await context.AreaAdminAssignments.SingleAsync(item =>
+                    item.UserId == AbpSession.GetUserId() &&
+                    !item.RevokedAt.HasValue &&
+                    context.Areas.Any(area =>
+                        area.Id == item.AreaId && area.Code == "JHB"));
+                assignment.Revoke(DateTime.UtcNow);
+                await context.SaveChangesAsync();
+            });
+        }
+
         private static MemberPayment ConfirmedPayment(
             int customerId,
             MemberPaymentPurpose purpose,
@@ -188,6 +246,20 @@ namespace AqualLifeStyle.Tests.Application
                 EffectiveFrom);
             payment.Confirm(EffectiveFrom.AddHours(1));
             return payment;
+        }
+
+        private sealed class ObligationDetails
+        {
+            public long UserId { get; }
+            public int CustomerId { get; }
+            public string Email { get; }
+
+            public ObligationDetails(long userId, int customerId, string email)
+            {
+                UserId = userId;
+                CustomerId = customerId;
+                Email = email;
+            }
         }
     }
 }

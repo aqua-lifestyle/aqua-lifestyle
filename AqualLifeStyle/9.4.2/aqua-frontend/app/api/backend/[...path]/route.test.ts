@@ -68,6 +68,36 @@ describe("app/api/backend/[...path]", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("forwards only an explicitly public anonymous endpoint without credentials", async () => {
+    vi.mocked(readSession).mockResolvedValue(null);
+    const { request, handlerArgs } = routeRequest([
+      "api", "services", "app", "ProgrammeInvitation", "GetPreview",
+    ]);
+
+    const response = await GET(request, handlerArgs);
+
+    expect(response.status).toBe(200);
+    expect(deleteSessionCookies).not.toHaveBeenCalled();
+    expect(new Headers(forwardedFetch()[1].headers).has("Authorization")).toBe(false);
+  });
+
+  it("keeps anonymous registration same-origin", async () => {
+    vi.mocked(readSession).mockResolvedValue(null);
+    const { request, handlerArgs } = routeRequest(
+      ["api", "services", "app", "Account", "Register"],
+      {
+        method: "POST",
+        headers: { origin: "https://evil.example" },
+        body: "{}",
+      },
+    );
+
+    const response = await POST(request, handlerArgs);
+
+    expect(response.status).toBe(403);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("rejects a cross-origin mutation before contacting the backend", async () => {
     vi.mocked(readSession).mockResolvedValue(session);
     const { request, handlerArgs } = routeRequest(["api", "services", "app", "Customer", "Update"], {

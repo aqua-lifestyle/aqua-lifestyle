@@ -130,6 +130,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                         "AQGreen checkout termination failed.",
                         "The checkout was not found in your Area.");
                 ValidateRequestedTenant(checkout.TenantId, "AQGreen checkout termination");
+                var customer = await _customerRepository.FirstOrDefaultAsync(
+                    item => item.Id == checkout.CustomerId &&
+                            item.TenantId == checkout.TenantId);
+                await EnsureCanAdministerAreaAsync(customer);
                 checkout.TerminateByAdministrator(
                     AbpSession.GetUserId(),
                     DateTime.UtcNow,
@@ -155,6 +159,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 
             using (DisableAllTenantDataFiltersForHost())
             {
+                var areaScope = await GetAuthorizedAreaScopeAsync(requestedAreaId: null);
                 var query =
                     from checkout in _aqGreenJoiningCheckoutRepository.GetAll()
                     join customer in _customerRepository.GetAll()
@@ -179,6 +184,12 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 {
                     var tenantId = input.TenantId.Value;
                     query = query.Where(row => row.Checkout.TenantId == tenantId);
+                }
+                if (areaScope != null)
+                {
+                    query = query.Where(row =>
+                        row.Customer.AreaId.HasValue &&
+                        areaScope.Contains(row.Customer.AreaId.Value));
                 }
                 if (!string.IsNullOrWhiteSpace(input.Keyword))
                 {
@@ -249,6 +260,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 if (decision != null)
                 {
                     ValidateRequestedTenant(decision.TenantId, "Onyx graduation");
+                    var decidedCustomer = await _customerRepository.FirstOrDefaultAsync(
+                        item => item.Id == decision.CustomerId &&
+                                item.TenantId == decision.TenantId);
+                    await EnsureCanAdministerAreaAsync(decidedCustomer);
                     return Map(decision);
                 }
 
@@ -259,6 +274,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                         "Onyx graduation failed.",
                         "The approved loan agreement was not found in your Area.");
                 ValidateRequestedTenant(loan.TenantId, "Onyx graduation");
+                var customer = await _customerRepository.FirstOrDefaultAsync(
+                    item => item.Id == loan.CustomerId &&
+                            item.TenantId == loan.TenantId);
+                await EnsureCanAdministerAreaAsync(customer);
 
                 using (_unitOfWorkManager.Current.SetTenantId(loan.TenantId))
                 {
@@ -561,6 +580,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                             "The Club Member participation was not found.");
 
                     ValidateRequestedTenant(target.TenantId, "Network placement correction");
+                    await EnsureCanAdministerAreaAsync(target);
                     if (!string.IsNullOrWhiteSpace(input.NewRecruiterClubMemberNumber))
                     {
                         var normalizedRecruiter = input.NewRecruiterClubMemberNumber
@@ -711,6 +731,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 
             using (DisableAllTenantDataFiltersForHost())
             {
+                var areaScope = await GetAuthorizedAreaScopeAsync(requestedAreaId: null);
                 var query =
                     from participation in _entryParticipationRepository.GetAll()
                     join customer in _customerRepository.GetAll()
@@ -730,6 +751,12 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 {
                     var tenantId = input.TenantId.Value;
                     query = query.Where(row => row.Participation.TenantId == tenantId);
+                }
+                if (areaScope != null)
+                {
+                    query = query.Where(row =>
+                        row.Customer.AreaId.HasValue &&
+                        areaScope.Contains(row.Customer.AreaId.Value));
                 }
 
                 var total = await query.CountAsync();
@@ -812,58 +839,65 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     "Host-wide monthly obligation reconciliation access requires permission to view all Areas.");
 
             using (DisableAllTenantDataFiltersForHost())
+            using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.SoftDelete))
             {
-                var query =
-                    from checkout in _monthlyObligationCheckoutRepository.GetAll()
-                    join obligation in _monthlyObligationRepository.GetAll()
-                        on checkout.EntryMonthlyObligationId equals obligation.Id
-                    join participation in _entryParticipationRepository.GetAll()
-                        on checkout.EntryParticipationId equals participation.Id
-                    join customer in _customerRepository.GetAll()
-                        on checkout.CustomerId equals customer.Id
-                    join area in _areaRepository.GetAll()
-                        on new { checkout.TenantId, customer.AreaId }
-                        equals new { area.TenantId, AreaId = (Guid?)area.Id }
-                    where checkout.Status == HostedPaymentCheckoutStatus.Completed
-                    select new MonthlyObligationCheckoutReconciliationRow
-                    {
-                        Checkout = checkout,
-                        Obligation = obligation,
-                        Participation = participation,
-                        Customer = customer,
-                        AreaName = area.Name
-                    };
+                var query = _monthlyObligationCheckoutRepository.GetAll()
+                    .Where(checkout =>
+                        !checkout.IsDeleted &&
+                        checkout.Status == HostedPaymentCheckoutStatus.Completed);
                 if (AbpSession.TenantId.HasValue)
                 {
                     var tenantId = AbpSession.TenantId.Value;
-                    query = query.Where(row => row.Checkout.TenantId == tenantId);
+                    var areaScope = await GetAuthorizedAreaScopeAsync(requestedAreaId: null);
+                    var authorizedCustomerIds = _customerRepository.GetAll()
+                        .Where(customer =>
+                            !customer.IsDeleted &&
+                            customer.TenantId == tenantId &&
+                            customer.AreaId.HasValue &&
+                            areaScope.Contains(customer.AreaId.Value))
+                        .Select(customer => customer.Id);
+                    query = query.Where(checkout =>
+                        checkout.TenantId == tenantId &&
+                        authorizedCustomerIds.Contains(checkout.CustomerId));
                 }
                 else if (input.TenantId.HasValue)
                 {
                     var tenantId = input.TenantId.Value;
-                    query = query.Where(row => row.Checkout.TenantId == tenantId);
+                    query = query.Where(checkout => checkout.TenantId == tenantId);
                 }
                 if (input.PeriodYear.HasValue)
                 {
                     var periodYear = input.PeriodYear.Value;
-                    query = query.Where(row => row.Checkout.PeriodYear == periodYear);
+                    query = query.Where(checkout => checkout.PeriodYear == periodYear);
                 }
                 if (input.PeriodMonth.HasValue)
                 {
                     var periodMonth = input.PeriodMonth.Value;
-                    query = query.Where(row => row.Checkout.PeriodMonth == periodMonth);
+                    query = query.Where(checkout => checkout.PeriodMonth == periodMonth);
                 }
 
                 var total = await query.CountAsync();
                 var rows = await query
-                    .OrderByDescending(row => row.Checkout.CompletedAt)
-                    .ThenByDescending(row => row.Checkout.CreatedAt)
+                    .OrderByDescending(checkout => checkout.CompletedAt)
+                    .ThenByDescending(checkout => checkout.CreatedAt)
                     .Skip(input.SkipCount)
                     .Take(input.MaxResultCount)
                     .ToListAsync();
-                var paymentIds = rows.Select(row => row.Checkout.PaymentId)
+                var paymentIds = rows.Select(checkout => checkout.PaymentId)
                     .Where(paymentId => paymentId.HasValue)
                     .Select(paymentId => paymentId.Value)
+                    .Distinct()
+                    .ToArray();
+                var obligationIds = rows
+                    .Select(checkout => checkout.EntryMonthlyObligationId)
+                    .Distinct()
+                    .ToArray();
+                var participationIds = rows
+                    .Select(checkout => checkout.EntryParticipationId)
+                    .Distinct()
+                    .ToArray();
+                var customerIds = rows
+                    .Select(checkout => checkout.CustomerId)
                     .Distinct()
                     .ToArray();
                 var payments = paymentIds.Length == 0
@@ -871,37 +905,67 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     : await _paymentRepository.GetAll()
                         .Where(payment => paymentIds.Contains(payment.Id))
                         .ToDictionaryAsync(payment => payment.Id);
+                var obligations = await _monthlyObligationRepository.GetAll()
+                    .Where(obligation => obligationIds.Contains(obligation.Id))
+                    .ToDictionaryAsync(obligation => obligation.Id);
+                var participations = await _entryParticipationRepository.GetAll()
+                    .Where(participation => participationIds.Contains(participation.Id))
+                    .ToDictionaryAsync(participation => participation.Id);
+                var customers = await _customerRepository.GetAll()
+                    .Where(customer => customerIds.Contains(customer.Id))
+                    .ToDictionaryAsync(customer => customer.Id);
+                var areaIds = customers.Values
+                    .Where(customer => !customer.IsDeleted && customer.AreaId.HasValue)
+                    .Select(customer => customer.AreaId.Value)
+                    .Distinct()
+                    .ToArray();
+                var areas = await _areaRepository.GetAll()
+                    .Where(area => areaIds.Contains(area.Id))
+                    .ToDictionaryAsync(area => area.Id);
 
                 return new PagedResultDto<MonthlyObligationCheckoutReconciliationDto>(
                     total,
-                    rows.Select(row => new MonthlyObligationCheckoutReconciliationDto
+                    rows.Select(checkout =>
                     {
-                        CheckoutId = row.Checkout.Id,
-                        TenantId = row.Checkout.TenantId,
-                        AreaName = row.AreaName,
-                        ClubMemberNumber = row.Customer.ClubMemberNumber,
-                        CustomerName = row.Customer.Name,
-                        PeriodYear = row.Checkout.PeriodYear,
-                        PeriodMonth = row.Checkout.PeriodMonth,
-                        Amount = row.Checkout.Amount,
-                        Currency = row.Checkout.Currency,
-                        Status = row.Checkout.Status,
-                        ProviderCheckoutId = row.Checkout.ProviderCheckoutId,
-                        PaymentId = row.Checkout.PaymentId,
-                        ProviderPaymentReference =
-                            row.Checkout.PaymentId.HasValue &&
-                            payments.TryGetValue(row.Checkout.PaymentId.Value, out var payment)
-                                ? payment.ExternalReference
-                                : null,
-                        AllocationStatus = row.Checkout.AllocationStatus,
-                        AllocationEvidence = row.Checkout.AllocationEvidence,
-                        CreatedAt = row.Checkout.CreatedAt,
-                        CompletedAt = row.Checkout.CompletedAt,
-                        IsPaymentAllocated = row.Checkout.PaymentId.HasValue &&
-                                             row.Obligation.PaymentId.HasValue &&
-                                             row.Checkout.PaymentId.Value ==
-                                             row.Obligation.PaymentId.Value,
-                        RecordedObligationStatus = row.Obligation.Status
+                        obligations.TryGetValue(checkout.EntryMonthlyObligationId, out var obligation);
+                        participations.TryGetValue(checkout.EntryParticipationId, out var participation);
+                        customers.TryGetValue(checkout.CustomerId, out var customer);
+                        Area area = null;
+                        if (customer != null && !customer.IsDeleted && customer.AreaId.HasValue)
+                            areas.TryGetValue(customer.AreaId.Value, out area);
+
+                        return new MonthlyObligationCheckoutReconciliationDto
+                        {
+                            CheckoutId = checkout.Id,
+                            TenantId = checkout.TenantId,
+                            AreaName = area?.Name ?? "Area unavailable",
+                            ClubMemberNumber = customer?.ClubMemberNumber,
+                            CustomerName = customer?.Name ?? "Customer unavailable",
+                            PeriodYear = checkout.PeriodYear,
+                            PeriodMonth = checkout.PeriodMonth,
+                            Amount = checkout.Amount,
+                            Currency = checkout.Currency,
+                            Status = checkout.Status,
+                            ProviderCheckoutId = checkout.ProviderCheckoutId,
+                            PaymentId = checkout.PaymentId,
+                            ProviderPaymentReference =
+                                checkout.PaymentId.HasValue &&
+                                payments.TryGetValue(checkout.PaymentId.Value, out var payment)
+                                    ? payment.ExternalReference
+                                    : null,
+                            AllocationStatus = checkout.AllocationStatus,
+                            AllocationEvidence = checkout.AllocationEvidence,
+                            CreatedAt = checkout.CreatedAt,
+                            CompletedAt = checkout.CompletedAt,
+                            IsPaymentAllocated = checkout.PaymentId.HasValue &&
+                                                 obligation?.PaymentId.HasValue == true &&
+                                                 checkout.PaymentId.Value == obligation.PaymentId.Value,
+                            RecordedObligationStatus = obligation?.Status,
+                            ObligationAvailable = obligation != null && !obligation.IsDeleted,
+                            ParticipationAvailable = participation != null && !participation.IsDeleted,
+                            CustomerAvailable = customer != null && !customer.IsDeleted,
+                            AreaAvailable = area != null && !area.IsDeleted && area.IsActive
+                        };
                     }).ToList());
             }
         }
@@ -1011,7 +1075,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             if (areaScope != null)
                 query = query.Where(row => row.Customer.AreaId.HasValue &&
                                            areaScope.Contains(row.Customer.AreaId.Value));
-            else if (input.TenantId.HasValue)
+            if (input.TenantId.HasValue)
             {
                 var tenantId = input.TenantId.Value;
                 query = query.Where(row => row.Participation.TenantId == tenantId);
@@ -1049,7 +1113,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             if (areaScope != null)
                 query = query.Where(row => row.Customer.AreaId.HasValue &&
                                            areaScope.Contains(row.Customer.AreaId.Value));
-            else if (input.TenantId.HasValue)
+            if (input.TenantId.HasValue)
             {
                 var tenantId = input.TenantId.Value;
                 query = query.Where(row => row.Participation.TenantId == tenantId);
@@ -1103,7 +1167,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 if (!requestedAreaId.HasValue) return null;
 
                 var requestedExists = await _areaRepository.GetAll().AnyAsync(area =>
-                    area.Id == requestedAreaId.Value && area.IsActive);
+                    area.Id == requestedAreaId.Value &&
+                    !area.IsDeleted &&
+                    area.IsActive);
                 return requestedExists ? new[] { requestedAreaId.Value } : Array.Empty<Guid>();
             }
 
@@ -1117,7 +1183,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 where
                     assignment.TenantId == tenantId &&
                     assignment.UserId == userId &&
+                    !assignment.IsDeleted &&
                     !assignment.RevokedAt.HasValue &&
+                    !area.IsDeleted &&
                     area.IsActive
                 select assignment;
             if (requestedAreaId.HasValue)
@@ -1150,7 +1218,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                         assignment.TenantId == tenantId &&
                         assignment.AreaId == customer.AreaId.Value &&
                         assignment.UserId == userId &&
+                        !assignment.IsDeleted &&
                         !assignment.RevokedAt.HasValue &&
+                        !area.IsDeleted &&
                         area.IsActive
                     select assignment)
                 .AnyAsync();
@@ -1303,15 +1373,6 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             public EntryParticipation Participation { get; init; }
             public Customer Customer { get; init; }
-        }
-
-        private sealed class MonthlyObligationCheckoutReconciliationRow
-        {
-            public AQGreenMonthlyObligationCheckout Checkout { get; init; }
-            public EntryMonthlyObligation Obligation { get; init; }
-            public EntryParticipation Participation { get; init; }
-            public Customer Customer { get; init; }
-            public string AreaName { get; init; }
         }
 
         private sealed class OnyxParticipationQueryRow

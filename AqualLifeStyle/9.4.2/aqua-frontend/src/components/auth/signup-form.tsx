@@ -60,6 +60,15 @@ export const SignupForm = ({ inviteCode, redirectPath, tenancyName }: SignupForm
     surname: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const loginParams = new URLSearchParams();
+  if (tenancyName) loginParams.set("area", tenancyName);
+  if (inviteCode) loginParams.set("invite", inviteCode);
+  if (redirectPath?.startsWith("/") && !redirectPath.startsWith("//")) {
+    loginParams.set("redirect", redirectPath);
+  }
+  const loginHref = loginParams.size > 0
+    ? `/login?${loginParams.toString()}`
+    : "/login";
 
   const updateField = (field: keyof typeof formData, value: string) => {
     setFormData((current) => ({ ...current, [field]: value }));
@@ -449,7 +458,7 @@ export const SignupForm = ({ inviteCode, redirectPath, tenancyName }: SignupForm
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
               Already have an account?{" "}
-              <LinkButton href="/login" variant="ghost">
+              <LinkButton href={loginHref} variant="ghost">
                 Sign in
               </LinkButton>
             </p>

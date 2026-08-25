@@ -5,8 +5,10 @@ using Abp.Application.Services.Dto;
 using Abp.Auditing;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
+using Abp.Runtime.Session;
 using AqualLifeStyle.Application.EntryMonthlyObligations.Dto;
 using AqualLifeStyle.Authorization;
+using AqualLifeStyle.Domain.Areas;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Onyx;
 using Microsoft.EntityFrameworkCore;
@@ -20,13 +22,19 @@ namespace AqualLifeStyle.Application.Admin.EntryMonthlyObligations
         private readonly ICustomerRepository _customerRepository;
         private readonly IRepository<EntryMonthlyObligation, Guid>
             _obligationRepository;
+        private readonly IRepository<Area, Guid> _areaRepository;
+        private readonly IRepository<AreaAdminAssignment, Guid> _areaAdminAssignmentRepository;
 
         public AdminEntryMonthlyObligationAppService(
             ICustomerRepository customerRepository,
-            IRepository<EntryMonthlyObligation, Guid> obligationRepository)
+            IRepository<EntryMonthlyObligation, Guid> obligationRepository,
+            IRepository<Area, Guid> areaRepository,
+            IRepository<AreaAdminAssignment, Guid> areaAdminAssignmentRepository)
         {
             _customerRepository = customerRepository;
             _obligationRepository = obligationRepository;
+            _areaRepository = areaRepository;
+            _areaAdminAssignmentRepository = areaAdminAssignmentRepository;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.EntryMonthlyObligations.View)]
@@ -45,6 +53,7 @@ namespace AqualLifeStyle.Application.Admin.EntryMonthlyObligations
 
             using (DisableAllTenantDataFiltersForHost())
             {
+                var areaScope = await GetAuthorizedAreaScopeAsync();
                 var query =
                     from obligation in _obligationRepository.GetAll()
                     join customer in _customerRepository.GetAll()
@@ -65,6 +74,12 @@ namespace AqualLifeStyle.Application.Admin.EntryMonthlyObligations
                     var tenantId = input.TenantId.Value;
                     query = query.Where(row =>
                         row.Obligation.TenantId == tenantId);
+                }
+                if (areaScope != null)
+                {
+                    query = query.Where(row =>
+                        row.Customer.AreaId.HasValue &&
+                        areaScope.Contains(row.Customer.AreaId.Value));
                 }
                 if (!string.IsNullOrWhiteSpace(input.Keyword))
                 {
@@ -90,6 +105,26 @@ namespace AqualLifeStyle.Application.Admin.EntryMonthlyObligations
                                 row.Customer.Email.Value))
                         .ToList());
             }
+        }
+
+        private async Task<Guid[]> GetAuthorizedAreaScopeAsync()
+        {
+            if (!AbpSession.TenantId.HasValue) return null;
+
+            var tenantId = AbpSession.TenantId.Value;
+            var userId = AbpSession.GetUserId();
+            return await (
+                    from assignment in _areaAdminAssignmentRepository.GetAll()
+                    join area in _areaRepository.GetAll()
+                        on new { assignment.TenantId, assignment.AreaId }
+                        equals new { area.TenantId, AreaId = area.Id }
+                    where assignment.TenantId == tenantId &&
+                          assignment.UserId == userId &&
+                          !assignment.RevokedAt.HasValue &&
+                          area.IsActive
+                    select assignment.AreaId)
+                .Distinct()
+                .ToArrayAsync();
         }
 
         private sealed class QueryRow

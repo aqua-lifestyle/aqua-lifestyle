@@ -181,6 +181,8 @@ namespace AqualLifeStyle.Tests.Application
                     unallocatedPayment.Id,
                     EffectiveFrom.AddMinutes(2),
                     $"The monthly obligation for {suffix} could not be settled.");
+                unallocatedObligation.IsDeleted = true;
+                unallocatedObligation.DeletionTime = EffectiveFrom.AddMinutes(3);
 
                 context.MemberPayments.Add(payment);
                 context.MemberPayments.Add(unallocatedPayment);
@@ -223,6 +225,10 @@ namespace AqualLifeStyle.Tests.Application
             allocated.IsPaymentAllocated.ShouldBeTrue();
             allocated.RecordedObligationStatus.ShouldBe(
                 EntryMonthlyObligationStatus.Paid);
+            allocated.ObligationAvailable.ShouldBeTrue();
+            allocated.ParticipationAvailable.ShouldBeTrue();
+            allocated.CustomerAvailable.ShouldBeTrue();
+            allocated.AreaAvailable.ShouldBeTrue();
             allocated.PaymentId.ShouldNotBeNull();
             allocated.ProviderPaymentReference.ShouldBe(
                 $"monthly-payment-{suffix}");
@@ -240,6 +246,10 @@ namespace AqualLifeStyle.Tests.Application
             unallocated.IsPaymentAllocated.ShouldBeFalse();
             unallocated.RecordedObligationStatus.ShouldBe(
                 EntryMonthlyObligationStatus.Due);
+            unallocated.ObligationAvailable.ShouldBeFalse();
+            unallocated.ParticipationAvailable.ShouldBeTrue();
+            unallocated.CustomerAvailable.ShouldBeTrue();
+            unallocated.AreaAvailable.ShouldBeTrue();
             unallocated.ProviderPaymentReference.ShouldBe(
                 $"monthly-payment-unallocated-{suffix}");
         }
@@ -253,6 +263,99 @@ namespace AqualLifeStyle.Tests.Application
                     {
                         TenantId = 2
                     }));
+        }
+
+        [Fact]
+        public async Task TenantAdministrator_CannotSeeAnotherAreasMonthlyObligationReconciliation()
+        {
+            var checkoutId = await CreateCompletedMonthlyCheckoutAsync(
+                Guid.NewGuid().ToString("N"),
+                "PTA");
+
+            var tenantResult = await _service.GetMonthlyObligationCheckoutReconciliationAsync(
+                new MonthlyObligationCheckoutReconciliationListInput
+                {
+                    MaxResultCount = 100
+                });
+            tenantResult.Items.ShouldNotContain(item => item.CheckoutId == checkoutId);
+
+            LoginAsHostAdmin();
+            var hostResult = await _service.GetMonthlyObligationCheckoutReconciliationAsync(
+                new MonthlyObligationCheckoutReconciliationListInput
+                {
+                    TenantId = 1,
+                    MaxResultCount = 100
+                });
+            hostResult.Items.ShouldContain(item => item.CheckoutId == checkoutId);
+        }
+
+        [Fact]
+        public async Task DeletedCustomerHidesMonthlyReconciliationFromTenantButNotHost()
+        {
+            var checkoutId = await CreateCompletedMonthlyCheckoutAsync(
+                Guid.NewGuid().ToString("N"),
+                "JHB");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var customerId = await context.AQGreenMonthlyObligationCheckouts
+                    .Where(checkout => checkout.Id == checkoutId)
+                    .Select(checkout => checkout.CustomerId)
+                    .SingleAsync();
+                var customer = await context.Customers.SingleAsync(item =>
+                    item.Id == customerId);
+                customer.IsDeleted = true;
+                customer.DeletionTime = EffectiveFrom.AddMinutes(3);
+                await context.SaveChangesAsync();
+            });
+
+            var tenantResult = await _service.GetMonthlyObligationCheckoutReconciliationAsync(
+                new MonthlyObligationCheckoutReconciliationListInput
+                {
+                    MaxResultCount = 100
+                });
+            tenantResult.Items.ShouldNotContain(item => item.CheckoutId == checkoutId);
+
+            LoginAsHostAdmin();
+            var hostResult = await _service.GetMonthlyObligationCheckoutReconciliationAsync(
+                new MonthlyObligationCheckoutReconciliationListInput
+                {
+                    TenantId = 1,
+                    MaxResultCount = 100
+                });
+            var evidence = hostResult.Items.Single(item => item.CheckoutId == checkoutId);
+            evidence.CustomerAvailable.ShouldBeFalse();
+            evidence.AreaAvailable.ShouldBeFalse();
+            evidence.PaymentId.ShouldNotBeNull();
+            evidence.ProviderPaymentReference.ShouldNotBeNullOrWhiteSpace();
+        }
+
+        [Fact]
+        public async Task TenantAdministrator_CannotSeeAnotherAreasLegacyReconciliation()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var customerId = await CreateEntryParticipantAsync(suffix, "PTA");
+            var clubMemberNumber = await UsingDbContextAsync(1, context =>
+                context.Customers.Where(customer => customer.Id == customerId)
+                    .Select(customer => customer.ClubMemberNumber)
+                    .SingleAsync());
+
+            var tenantResult = await _service.GetLegacyAQGreenReconciliationAsync(
+                new LegacyAQGreenReconciliationListInput
+                {
+                    MaxResultCount = 100
+                });
+            tenantResult.Items.ShouldNotContain(item =>
+                item.ClubMemberNumber == clubMemberNumber);
+
+            LoginAsHostAdmin();
+            var hostResult = await _service.GetLegacyAQGreenReconciliationAsync(
+                new LegacyAQGreenReconciliationListInput
+                {
+                    TenantId = 1,
+                    MaxResultCount = 100
+                });
+            hostResult.Items.ShouldContain(item =>
+                item.ClubMemberNumber == clubMemberNumber);
         }
 
         [Fact]
@@ -304,6 +407,40 @@ namespace AqualLifeStyle.Tests.Application
                     TenantId = 1,
                     Programme = AdminProgrammeType.Entry
                 }));
+        }
+
+        [Fact]
+        public async Task HostAdministrator_ConflictingTenantAndAreaFiltersReturnNoParticipations()
+        {
+            await EnsureSecondTenantAsync();
+            await CreateAwaitingApprovalEntryAsync(
+                Guid.NewGuid().ToString("N"),
+                tenantId: 2);
+            await CreateAwaitingApprovalOnyxAsync(
+                Guid.NewGuid().ToString("N"),
+                tenantId: 2);
+            var tenantTwoAreaId = await UsingDbContextAsync(2, context =>
+                context.Areas.Where(area => area.TenantId == 2)
+                    .Select(area => area.Id)
+                    .SingleAsync());
+            LoginAsHostAdmin();
+
+            foreach (var programme in new[]
+                     {
+                         AdminProgrammeType.Entry,
+                         AdminProgrammeType.Onyx
+                     })
+            {
+                var result = await _service.GetAllAsync(
+                    new AdminProgrammeParticipationListInput
+                    {
+                        TenantId = 1,
+                        AreaId = tenantTwoAreaId,
+                        Programme = programme,
+                        MaxResultCount = 100
+                    });
+                result.TotalCount.ShouldBe(0);
+            }
         }
 
         [Fact]
@@ -409,6 +546,58 @@ namespace AqualLifeStyle.Tests.Application
                 target.RecruiterCorrections.All(item =>
                     item.AdministratorUserId > 0 &&
                     !string.IsNullOrWhiteSpace(item.Reason)).ShouldBeTrue();
+            });
+        }
+
+        [Fact]
+        public async Task TenantAdministrator_CannotCorrectRecruiterForAnotherAreasMember()
+        {
+            var network = await CreateActiveAQGreenNetworkAsync(targetAreaCode: "PTA");
+
+            await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+                {
+                    Programme = AdminProgrammeType.Entry,
+                    ClubMemberNumber = network.TargetNumber,
+                    NewRecruiterClubMemberNumber = "UNKNOWN12345",
+                    Reason = "Attempting correction outside assigned Area"
+                }));
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations
+                    .Include(item => item.RecruiterCorrections)
+                    .SingleAsync(item => item.CustomerId == network.TargetCustomerId);
+                participation.RecruiterCustomerId.ShouldBe(network.RecruiterCustomerId);
+                participation.RecruiterCorrections.ShouldBeEmpty();
+            });
+        }
+
+        [Fact]
+        public async Task TenantAdministrator_CanAssignCrossAreaRecruiterToMemberInAssignedArea()
+        {
+            var network = await CreateActiveAQGreenNetworkAsync(recruiterAreaCode: "PTA");
+
+            await _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+            {
+                Programme = AdminProgrammeType.Entry,
+                ClubMemberNumber = network.TargetNumber,
+                NewRecruiterClubMemberNumber = null,
+                Reason = "Resetting placement before cross-Area correction"
+            });
+            await _service.CorrectRecruiterAsync(new CorrectProgrammeRecruiterInput
+            {
+                Programme = AdminProgrammeType.Entry,
+                ClubMemberNumber = network.TargetNumber,
+                NewRecruiterClubMemberNumber = network.RecruiterNumber,
+                Reason = "Restoring valid same-Tenant cross-Area placement"
+            });
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations
+                    .SingleAsync(item => item.CustomerId == network.TargetCustomerId);
+                participation.RecruiterCustomerId.ShouldBe(network.RecruiterCustomerId);
             });
         }
 
@@ -573,6 +762,58 @@ namespace AqualLifeStyle.Tests.Application
                 checkout.TerminatedAt.ShouldNotBeNull();
                 checkout.TerminalEvidence.ShouldBe(input.Evidence);
                 (await context.MemberPayments.AnyAsync()).ShouldBeFalse();
+            });
+        }
+
+        [Fact]
+        public async Task TenantAdministrator_CannotInspectOrTerminateAnotherAreasAQGreenCheckout()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var checkoutId = await CreateLockedAQGreenCheckoutAsync(suffix, "PTA");
+
+            var locked = await _service.GetAQGreenJoiningCheckoutsAsync(
+                new AQGreenJoiningCheckoutListInput
+                {
+                    Keyword = suffix,
+                    MaxResultCount = 20
+                });
+
+            locked.TotalCount.ShouldBe(0);
+            await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                _service.TerminateAQGreenJoiningCheckoutAsync(
+                    new TerminateAQGreenJoiningCheckoutInput
+                    {
+                        CheckoutId = checkoutId,
+                        Evidence = "Attempted outside the administrator's assigned Area"
+                    }));
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                var checkout = await context.AQGreenJoiningCheckouts.SingleAsync(
+                    item => item.Id == checkoutId);
+                checkout.Status.ShouldBe(HostedPaymentCheckoutStatus.AwaitingPayment);
+            });
+        }
+
+        [Fact]
+        public async Task TenantAdministrator_CannotGraduateAnotherAreasLoanByIdentifier()
+        {
+            var loanAgreementId = await CreateOnyxGraduationLoanAsync(
+                Guid.NewGuid().ToString("N"),
+                "PTA");
+
+            await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                _service.GraduateAQGreenToOnyxAsync(
+                    new GraduateAQGreenToOnyxInput
+                    {
+                        LoanAgreementId = loanAgreementId,
+                        Justification = "Attempted outside the administrator's assigned Area"
+                    }));
+
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.OnyxGraduationDecisions.AnyAsync()).ShouldBeFalse();
+                (await context.OnyxParticipations.AnyAsync()).ShouldBeFalse();
             });
         }
 
@@ -948,7 +1189,9 @@ namespace AqualLifeStyle.Tests.Application
                     }));
         }
 
-        private async Task<Guid> CreateLockedAQGreenCheckoutAsync(string suffix)
+        private async Task<Guid> CreateLockedAQGreenCheckoutAsync(
+            string suffix,
+            string areaCode = null)
         {
             var userId = await CreateTestUserAsync(
                 1,
@@ -961,7 +1204,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     $"Checkout Recovery {suffix}",
                     new EmailAddress($"checkout-recovery-customer-{suffix}@example.com"));
-                await AssignAreaAsync(context, customer, tenantId: 1);
+                await AssignAreaAsync(context, customer, tenantId: 1, areaCode);
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
                 var terms = EntryProgrammeTerms.CreateFlexibleJoiningPayment(
@@ -998,7 +1241,9 @@ namespace AqualLifeStyle.Tests.Application
             });
         }
 
-        private async Task<int> CreateEntryParticipantAsync(string suffix)
+        private async Task<int> CreateEntryParticipantAsync(
+            string suffix,
+            string areaCode = null)
         {
             var userId = await CreateTestUserAsync(
                 1,
@@ -1011,7 +1256,7 @@ namespace AqualLifeStyle.Tests.Application
                     userId,
                     $"Reconciliation {suffix}",
                     new EmailAddress($"reconciliation-{suffix}@example.com"));
-                await AssignAreaAsync(context, customer, tenantId: 1);
+                await AssignAreaAsync(context, customer, tenantId: 1, areaCode);
                 context.Customers.Add(customer);
                 await context.SaveChangesAsync();
 
@@ -1025,7 +1270,9 @@ namespace AqualLifeStyle.Tests.Application
             });
         }
 
-        private async Task<RecruitmentNetworkFixture> CreateActiveAQGreenNetworkAsync()
+        private async Task<RecruitmentNetworkFixture> CreateActiveAQGreenNetworkAsync(
+            string recruiterAreaCode = null,
+            string targetAreaCode = null)
         {
             var suffix = Guid.NewGuid().ToString("N");
             var recruiterUserId = await CreateTestUserAsync(1, $"recruiter-{suffix}", $"recruiter-{suffix}@example.com");
@@ -1036,8 +1283,8 @@ namespace AqualLifeStyle.Tests.Application
                 var recruiterCustomer = Customer.Create(1, recruiterUserId, "Verified Recruiter", new EmailAddress($"recruiter-customer-{suffix}@example.com"));
                 var targetCustomer = Customer.Create(1, targetUserId, "Placed Member", new EmailAddress($"target-customer-{suffix}@example.com"));
                 var descendantCustomer = Customer.Create(1, descendantUserId, "Network Descendant", new EmailAddress($"descendant-customer-{suffix}@example.com"));
-                await AssignAreaAsync(context, recruiterCustomer, tenantId: 1);
-                await AssignAreaAsync(context, targetCustomer, tenantId: 1);
+                await AssignAreaAsync(context, recruiterCustomer, tenantId: 1, recruiterAreaCode);
+                await AssignAreaAsync(context, targetCustomer, tenantId: 1, targetAreaCode);
                 await AssignAreaAsync(context, descendantCustomer, tenantId: 1);
                 context.Customers.AddRange(recruiterCustomer, targetCustomer, descendantCustomer);
                 await context.SaveChangesAsync();
@@ -1062,6 +1309,158 @@ namespace AqualLifeStyle.Tests.Application
                     TargetNumber = targetCustomer.ClubMemberNumber,
                     DescendantNumber = descendantCustomer.ClubMemberNumber
                 };
+            });
+        }
+
+        private async Task<Guid> CreateCompletedMonthlyCheckoutAsync(
+            string suffix,
+            string areaCode)
+        {
+            var userId = await CreateTestUserAsync(
+                1,
+                $"monthly-area-{suffix}",
+                $"monthly-area-{suffix}@example.com");
+            return await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    $"Monthly Area {suffix}",
+                    new EmailAddress($"monthly-area-customer-{suffix}@example.com"));
+                await AssignAreaAsync(context, customer, tenantId: 1, areaCode);
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+
+                var participation = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    LegacySplitPaymentTerms,
+                    EffectiveFrom);
+                context.EntryParticipations.Add(participation);
+                context.MemberPayments.AddRange(Activate(
+                    participation,
+                    customer.Id,
+                    $"monthly-area-activation-{suffix}"));
+                await context.SaveChangesAsync();
+
+                context.EntryMonthlyObligationDuePolicies.Add(
+                    EntryMonthlyObligationDuePolicy.Create(
+                        $"monthly-area-policy-{suffix}",
+                        10,
+                        EntryMonthlyObligationDuePolicy
+                            .JohannesburgMonthStartUtc(2026, 7)));
+                var obligation = EntryMonthlyObligation.Create(
+                    participation,
+                    2026,
+                    7,
+                    new DateTime(2026, 7, 10, 0, 0, 0, DateTimeKind.Utc),
+                    $"monthly-area-policy-{suffix}");
+                var payment = MemberPayment.CreatePending(
+                    1,
+                    customer.Id,
+                    MemberPaymentPurpose.EntryMonthlyCommitment,
+                    600m,
+                    "Test",
+                    $"monthly-area-payment-{suffix}",
+                    EffectiveFrom);
+                payment.Confirm(EffectiveFrom.AddMinutes(1));
+                var checkout = AQGreenMonthlyObligationCheckout.Create(
+                    obligation,
+                    EffectiveFrom);
+                checkout.RecordCheckout(
+                    $"ch_monthly_area_{suffix}",
+                    $"https://payments.example.test/ch_monthly_area_{suffix}",
+                    EffectiveFrom.AddMinutes(1));
+                obligation.ApplyConfirmedPayment(payment);
+                checkout.CompleteAllocation(payment.Id, EffectiveFrom.AddMinutes(2));
+                context.MemberPayments.Add(payment);
+                context.EntryMonthlyObligations.Add(obligation);
+                context.AQGreenMonthlyObligationCheckouts.Add(checkout);
+                await context.SaveChangesAsync();
+                return checkout.Id;
+            });
+        }
+
+        private async Task<Guid> CreateOnyxGraduationLoanAsync(
+            string suffix,
+            string areaCode)
+        {
+            var userId = await CreateTestUserAsync(
+                1,
+                $"graduation-area-{suffix}",
+                $"graduation-area-{suffix}@example.com");
+            return await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    $"Graduation Area {suffix}",
+                    new EmailAddress($"graduation-area-customer-{suffix}@example.com"));
+                await AssignAreaAsync(context, customer, tenantId: 1, areaCode);
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+
+                var root = EntryParticipation.StartIndependently(
+                    1,
+                    customer.Id,
+                    LegacySplitPaymentTerms,
+                    EffectiveFrom);
+                var payments = Activate(root, customer.Id, $"graduation-root-{suffix}");
+                var network = new System.Collections.Generic.List<EntryParticipation> { root };
+                var firstLevel = new System.Collections.Generic.List<EntryParticipation>();
+                var nextCustomerId = 50000;
+                for (var index = 0;
+                     index < EntryNetworkQualificationEvaluator.BranchSize;
+                     index++)
+                {
+                    var recruit = EntryParticipation.StartUnderRecruiter(
+                        1,
+                        nextCustomerId++,
+                        root,
+                        LegacySplitPaymentTerms,
+                        EffectiveFrom);
+                    Activate(recruit, recruit.CustomerId, $"graduation-l1-{index}-{suffix}");
+                    network.Add(recruit);
+                    firstLevel.Add(recruit);
+                }
+                foreach (var recruiter in firstLevel)
+                {
+                    for (var index = 0;
+                         index < EntryNetworkQualificationEvaluator.BranchSize;
+                         index++)
+                    {
+                        var recruit = EntryParticipation.StartUnderRecruiter(
+                            1,
+                            nextCustomerId++,
+                            recruiter,
+                            LegacySplitPaymentTerms,
+                            EffectiveFrom);
+                        Activate(
+                            recruit,
+                            recruit.CustomerId,
+                            $"graduation-l2-{nextCustomerId}-{suffix}");
+                        network.Add(recruit);
+                    }
+                }
+
+                var loan = OnyxLoanAgreement.OfferToEligibleEntryParticipant(
+                    root,
+                    network,
+                    new EntryNetworkQualificationEvaluator(),
+                    OnyxLoanTerms.Create(
+                        $"graduation-{suffix.Substring(0, 8)}",
+                        EffectiveFrom,
+                        6120m,
+                        30m,
+                        3,
+                        4,
+                        200m),
+                    EffectiveFrom.AddDays(1));
+                context.MemberPayments.AddRange(payments);
+                context.EntryParticipations.Add(root);
+                context.OnyxLoanAgreements.Add(loan);
+                await context.SaveChangesAsync();
+                return loan.Id;
             });
         }
 
@@ -1364,22 +1763,25 @@ namespace AqualLifeStyle.Tests.Application
             });
         }
 
-        private async Task<ApprovalFixture> CreateAwaitingApprovalOnyxAsync(string suffix)
+        private async Task<ApprovalFixture> CreateAwaitingApprovalOnyxAsync(
+            string suffix,
+            int tenantId = 1,
+            string areaCode = null)
         {
             var userId = await CreateTestUserAsync(
-                1,
+                tenantId,
                 $"approval-onyx-{suffix}",
                 $"approval-onyx-{suffix}@example.com");
-            return await UsingDbContextAsync(1, async context =>
+            return await UsingDbContextAsync(tenantId, async context =>
             {
                 var customer = Customer.Create(
-                    1,
+                    tenantId,
                     userId,
                     $"Approval Onyx {suffix}",
                     new EmailAddress($"approval-onyx-customer-{suffix}@example.com"));
-                await AssignAreaAsync(context, customer, tenantId: 1);
+                await AssignAreaAsync(context, customer, tenantId, areaCode);
                 var membership = Membership.Create(
-                    1,
+                    tenantId,
                     $"Onyx-approval-{suffix}",
                     "Onyx approval test",
                     MembershipType.Onyx);
@@ -1388,7 +1790,7 @@ namespace AqualLifeStyle.Tests.Application
                 await context.SaveChangesAsync();
 
                 var onyx = OnyxParticipation.StartDirectIndependently(
-                    1,
+                    tenantId,
                     customer.Id,
                     membership.Id,
                     OnyxPlanTerms.Create("2026-07", EffectiveFrom, 6120m),
@@ -1397,7 +1799,7 @@ namespace AqualLifeStyle.Tests.Application
                 await context.SaveChangesAsync();
 
                 var payment = MemberPayment.CreatePending(
-                    1,
+                    tenantId,
                     customer.Id,
                     MemberPaymentPurpose.OnyxDirectEntry,
                     6120m,
