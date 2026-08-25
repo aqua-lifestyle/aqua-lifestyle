@@ -35,6 +35,8 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
 
             builder.HasIndex(participation => new { participation.TenantId, participation.CustomerId })
                 .IsUnique();
+            builder.HasAlternateKey(participation => new
+                { participation.TenantId, participation.Id });
             builder.HasIndex(participation => participation.RecruiterCustomerId);
 
             builder.HasOne<Customer>()
