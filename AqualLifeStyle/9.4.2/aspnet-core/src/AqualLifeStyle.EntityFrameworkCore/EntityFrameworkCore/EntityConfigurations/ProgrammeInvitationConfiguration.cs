@@ -19,6 +19,13 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
                 .HasMaxLength(ProgrammeInvitation.CodeLength)
                 .IsRequired();
 
+            builder.HasAlternateKey(invitation => new
+                {
+                    invitation.Id,
+                    invitation.TenantId,
+                    invitation.ProgrammeParticipationId
+                })
+                .HasName("AK_ProgrammeInvitations_Id_Tenant_Participation");
             builder.HasIndex(invitation => invitation.Code).IsUnique();
             builder.HasIndex(invitation => new
                 {
