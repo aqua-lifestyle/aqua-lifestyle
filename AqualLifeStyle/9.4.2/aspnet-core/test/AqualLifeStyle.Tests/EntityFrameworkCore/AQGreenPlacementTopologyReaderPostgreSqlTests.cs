@@ -1236,6 +1236,15 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     'entry-terms-v1', TIMESTAMPTZ '2026-08-01 00:00:00+00',
                     1200, 600, 600, 600, 600, 7, 'ZAR', NOW(), FALSE
                 FROM generate_series(1, 16) id;
+
+                INSERT INTO "ProgrammeInvitations" (
+                    "Id", "TenantId", "ProgrammeKey", "ProgrammeParticipationId",
+                    "Code", "CreationTime", "IsDeleted")
+                SELECT
+                    "Id", "TenantId", 'AQGREEN', "Id",
+                    'A' || "TenantId"::text || lpad("CustomerId"::text, 10, '0'),
+                    NOW(), FALSE
+                FROM "EntryParticipations";
                 """);
 
         private static async Task ExecuteAsync(string connectionString, string sql)

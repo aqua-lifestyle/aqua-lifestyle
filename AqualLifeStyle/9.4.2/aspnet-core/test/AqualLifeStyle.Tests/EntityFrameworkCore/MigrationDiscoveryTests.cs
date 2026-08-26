@@ -54,5 +54,17 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             context.Database.GetMigrations()
                 .ShouldContain("20260825095740_AddAQGreenPlacementV2Foundation");
         }
+
+        [Fact]
+        public void AQGreenRecruitmentAttributionMigrationShouldBeDiscoverable()
+        {
+            using var context = new AqualLifeStyleDbContext(
+                new DbContextOptionsBuilder<AqualLifeStyleDbContext>()
+                    .UseNpgsql("Host=localhost;Database=discovery;Username=discovery;Password=discovery")
+                    .Options);
+
+            context.Database.GetMigrations()
+                .ShouldContain("20260826011850_AddAQGreenRecruitmentAttributionFoundation");
+        }
     }
 }
