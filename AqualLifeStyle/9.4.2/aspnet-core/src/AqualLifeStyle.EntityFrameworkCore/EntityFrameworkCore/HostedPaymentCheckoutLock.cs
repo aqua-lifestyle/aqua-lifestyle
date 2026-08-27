@@ -43,6 +43,55 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 await AcquireAsync($"customer-area-transition:{customerId}");
         }
 
+        public async Task AcquireProgrammeApprovalUserSessionAsync(long userId)
+        {
+            if (userId <= 0) throw new ArgumentOutOfRangeException(nameof(userId));
+            var context = _dbContextProvider.GetDbContext();
+            var resource = $"programme-approval-user:{userId}";
+            if (context.Database.IsNpgsql())
+            {
+                await context.Database.OpenConnectionAsync();
+                await context.Database.ExecuteSqlRawAsync(
+                    "SELECT pg_advisory_lock(hashtextextended({0}, 0))",
+                    resource);
+                return;
+            }
+
+            if (context.Database.IsSqlServer())
+            {
+                await context.Database.OpenConnectionAsync();
+                await context.Database.ExecuteSqlRawAsync(
+                    "DECLARE @result int; " +
+                    "EXEC @result = sp_getapplock @Resource = {0}, @LockMode = 'Exclusive', " +
+                    "@LockOwner = 'Session', @LockTimeout = 10000; " +
+                    "IF @result < 0 THROW 51000, 'Unable to lock programme approval user.', 1;",
+                    resource);
+            }
+        }
+
+        public async Task ReleaseProgrammeApprovalUserSessionAsync(long userId)
+        {
+            if (userId <= 0) throw new ArgumentOutOfRangeException(nameof(userId));
+            var context = _dbContextProvider.GetDbContext();
+            var resource = $"programme-approval-user:{userId}";
+            if (context.Database.IsNpgsql())
+            {
+                await context.Database.ExecuteSqlRawAsync(
+                    "SELECT pg_advisory_unlock(hashtextextended({0}, 0))",
+                    resource);
+                await context.Database.CloseConnectionAsync();
+                return;
+            }
+
+            if (context.Database.IsSqlServer())
+            {
+                await context.Database.ExecuteSqlRawAsync(
+                    "EXEC sp_releaseapplock @Resource = {0}, @LockOwner = 'Session';",
+                    resource);
+                await context.Database.CloseConnectionAsync();
+            }
+        }
+
         public Task AcquireProgrammeParticipationDecisionAsync(Guid participationId)
         {
             if (participationId == Guid.Empty)
