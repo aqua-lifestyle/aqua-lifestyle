@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using AqualLifeStyle.Domain.AQGreen;
 
 namespace AqualLifeStyle.Domain.Onyx
 {
@@ -14,8 +15,8 @@ namespace AqualLifeStyle.Domain.Onyx
 
     public sealed class EntryNetworkQualificationEvaluator
     {
-        public const int BranchSize = 5;
-        public const int MaximumLevel = 3;
+        public const int BranchSize = AQGreenStructuralCompletionCalculator.BranchSize;
+        public const int MaximumLevel = AQGreenStructuralCompletionCalculator.MaximumLevel;
 
         public static int GetRequiredPopulation(EntryNetworkLevel level)
         {
@@ -25,13 +26,8 @@ namespace AqualLifeStyle.Domain.Onyx
                 throw new ArgumentOutOfRangeException(nameof(level));
             }
 
-            var requiredPopulation = 1;
-            for (var depth = 0; depth < (int)level; depth++)
-            {
-                requiredPopulation *= BranchSize;
-            }
-
-            return requiredPopulation;
+            return AQGreenStructuralCompletionCalculator.GetRequiredPopulation(
+                (int)level);
         }
 
         public EntryNetworkLevel Evaluate(
@@ -85,45 +81,10 @@ namespace AqualLifeStyle.Domain.Onyx
                 return EntryNetworkLevel.None;
             }
 
-            return EvaluateHighestCompleteLevel(level =>
-                IsCompleteBranch(customerId, level, network));
-        }
-
-        private static EntryNetworkLevel EvaluateHighestCompleteLevel(
-            Func<int, bool> isCompleteLevel)
-        {
-            var highestCompletedLevel = EntryNetworkLevel.None;
-            for (var level = 1; level <= MaximumLevel; level++)
-            {
-                if (!isCompleteLevel(level))
-                {
-                    break;
-                }
-
-                highestCompletedLevel = (EntryNetworkLevel)level;
-            }
-
-            return highestCompletedLevel;
-        }
-
-        private static bool IsCompleteBranch(
-            int customerId,
-            int remainingDepth,
-            EffectiveProgrammeNetwork network)
-        {
-            if (remainingDepth == 0)
-            {
-                return true;
-            }
-
-            var directRecruits = network.GetSelectedChildren(customerId);
-            if (directRecruits.Count < BranchSize)
-            {
-                return false;
-            }
-
-            return directRecruits.All(recruit =>
-                IsCompleteBranch(recruit.CustomerId, remainingDepth - 1, network));
+            return (EntryNetworkLevel)AQGreenStructuralCompletionCalculator.Evaluate(
+                relativeDepth => network.CountSelectedParticipantsAtDepth(
+                    customerId,
+                    relativeDepth));
         }
 
     }
