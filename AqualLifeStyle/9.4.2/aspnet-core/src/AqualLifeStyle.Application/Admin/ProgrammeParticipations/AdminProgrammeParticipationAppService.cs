@@ -12,6 +12,7 @@ using Abp.Runtime.Session;
 using AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto;
 using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Authorization;
+using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Areas;
 using AqualLifeStyle.Domain.Enums;
@@ -52,6 +53,16 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         private readonly ActiveProgrammeParticipantRoleSynchronizer _participantRoleSynchronizer;
         private readonly ITransactionalEmailOutbox _emailOutbox;
         private readonly TransactionalEmailTemplateBuilder _emailTemplates;
+        private readonly IAQGreenPlacementV2ApprovalGate _placementV2ApprovalGate;
+        private readonly IAQGreenApprovalAuthorityStabilizer _approvalAuthorityStabilizer;
+        private readonly IAQGreenPlacementTreeLock _placementTreeLock;
+        private readonly IAQGreenPlacementAllocator _placementAllocator;
+        private readonly IRepository<AQGreenRecruitmentAttribution, Guid>
+            _attributionRepository;
+        private readonly IRepository<AQGreenRecruitmentAttributionConfirmation, Guid>
+            _attributionConfirmationRepository;
+        private readonly IRepository<AQGreenNetworkPlacement, Guid> _networkPlacementRepository;
+        private readonly IRepository<AQGreenPlacementTreeScope, Guid> _placementTreeScopeRepository;
 
         public AdminProgrammeParticipationAppService(
             ICustomerRepository customerRepository,
@@ -75,7 +86,16 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             ICurrentProgrammeTermsProvider termsProvider,
             ActiveProgrammeParticipantRoleSynchronizer participantRoleSynchronizer,
             ITransactionalEmailOutbox emailOutbox,
-            TransactionalEmailTemplateBuilder emailTemplates)
+            TransactionalEmailTemplateBuilder emailTemplates,
+            IAQGreenPlacementV2ApprovalGate placementV2ApprovalGate,
+            IAQGreenApprovalAuthorityStabilizer approvalAuthorityStabilizer,
+            IAQGreenPlacementTreeLock placementTreeLock,
+            IAQGreenPlacementAllocator placementAllocator,
+            IRepository<AQGreenRecruitmentAttribution, Guid> attributionRepository,
+            IRepository<AQGreenRecruitmentAttributionConfirmation, Guid>
+                attributionConfirmationRepository,
+            IRepository<AQGreenNetworkPlacement, Guid> networkPlacementRepository,
+            IRepository<AQGreenPlacementTreeScope, Guid> placementTreeScopeRepository)
         {
             _customerRepository = customerRepository;
             _entryParticipationRepository = entryParticipationRepository;
@@ -98,6 +118,14 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             _participantRoleSynchronizer = participantRoleSynchronizer;
             _emailOutbox = emailOutbox;
             _emailTemplates = emailTemplates;
+            _placementV2ApprovalGate = placementV2ApprovalGate;
+            _approvalAuthorityStabilizer = approvalAuthorityStabilizer;
+            _placementTreeLock = placementTreeLock;
+            _placementAllocator = placementAllocator;
+            _attributionRepository = attributionRepository;
+            _attributionConfirmationRepository = attributionConfirmationRepository;
+            _networkPlacementRepository = networkPlacementRepository;
+            _placementTreeScopeRepository = placementTreeScopeRepository;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.TerminatePaymentCheckouts)]
@@ -380,35 +408,69 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 throw new AbpAuthorizationException(
                     "Cross-Area participation approval requires permission to manage all Areas.");
 
+            var usePlacementV2 = input.Programme == AdminProgrammeType.Entry &&
+                                 await _placementV2ApprovalGate.IsEnabledAsync(
+                                     AbpSession.TenantId,
+                                     input.ParticipationId);
             Customer customer;
             Guid participationId;
             bool decisionApplied;
-            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+            using (var userLockUow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
             {
-                IsTransactional = true,
-                IsolationLevel = IsolationLevel.Serializable
+                IsTransactional = false
             }))
             using (DisableAllTenantDataFiltersForHost())
             {
-                await _hostedPaymentCheckoutLock
-                    .AcquireProgrammeParticipationDecisionAsync(input.ParticipationId);
-                (customer, participationId, decisionApplied) = await ApplyDecisionAsync(
+                var approvalUserId = await ResolveApprovalUserIdHintAsync(
                     input.Programme,
-                    input.ParticipationId,
-                    approve: true,
-                    reason: null);
-                if (decisionApplied)
+                    input.ParticipationId);
+                await _hostedPaymentCheckoutLock
+                    .AcquireProgrammeApprovalUserSessionAsync(approvalUserId);
+                try
                 {
-                    await _participantRoleSynchronizer.PromoteGuestToMemberAsync(customer.Id);
-                    await EnqueueDecisionEmailAsync(
-                        customer,
-                        input.Programme,
-                        participationId,
-                        approved: true,
-                        reason: null);
+                    using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+                    {
+                        Scope = TransactionScopeOption.RequiresNew,
+                        IsTransactional = true,
+                        IsolationLevel = usePlacementV2
+                            ? IsolationLevel.ReadCommitted
+                            : IsolationLevel.Serializable
+                    }))
+                    using (DisableAllTenantDataFiltersForHost())
+                    {
+                        await _hostedPaymentCheckoutLock
+                            .AcquireProgrammeParticipationDecisionAsync(input.ParticipationId);
+                        (customer, participationId, decisionApplied) = usePlacementV2
+                            ? await ApplyAQGreenV2ApprovalAsync(input.ParticipationId)
+                            : await ApplyDecisionAsync(
+                                input.Programme,
+                                input.ParticipationId,
+                                approve: true,
+                                reason: null);
+                        if (customer.UserId != approvalUserId)
+                            throw new AQGreenPlacementConflictException(
+                                "The programme participant user changed before approval could be locked.");
+                        if (decisionApplied)
+                        {
+                            await _participantRoleSynchronizer
+                                .PromoteGuestToMemberAsync(customer.Id);
+                            await EnqueueDecisionEmailAsync(
+                                customer,
+                                input.Programme,
+                                participationId,
+                                approved: true,
+                                reason: null);
+                        }
+                        await CurrentUnitOfWork.SaveChangesAsync();
+                        await uow.CompleteAsync();
+                    }
                 }
-                await CurrentUnitOfWork.SaveChangesAsync();
-                await uow.CompleteAsync();
+                finally
+                {
+                    await _hostedPaymentCheckoutLock
+                        .ReleaseProgrammeApprovalUserSessionAsync(approvalUserId);
+                }
+                await userLockUow.CompleteAsync();
             }
 
             Logger.Info(
@@ -427,23 +489,33 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 throw new AbpAuthorizationException(
                     "Cross-Area participation rejection requires permission to manage all Areas.");
 
+            var usePlacementV2 = input.Programme == AdminProgrammeType.Entry &&
+                                 await _placementV2ApprovalGate.IsEnabledAsync(
+                                     AbpSession.TenantId,
+                                     input.ParticipationId);
             Customer customer;
             Guid participationId;
             bool decisionApplied;
             using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
             {
                 IsTransactional = true,
-                IsolationLevel = IsolationLevel.Serializable
+                IsolationLevel = usePlacementV2
+                    ? IsolationLevel.ReadCommitted
+                    : IsolationLevel.Serializable
             }))
             using (DisableAllTenantDataFiltersForHost())
             {
                 await _hostedPaymentCheckoutLock
                     .AcquireProgrammeParticipationDecisionAsync(input.ParticipationId);
-                (customer, participationId, decisionApplied) = await ApplyDecisionAsync(
-                    input.Programme,
-                    input.ParticipationId,
-                    approve: false,
-                    reason: input?.Reason);
+                (customer, participationId, decisionApplied) = usePlacementV2
+                    ? await ApplyAQGreenV2RejectionAsync(
+                        input.ParticipationId,
+                        input.Reason)
+                    : await ApplyDecisionAsync(
+                        input.Programme,
+                        input.ParticipationId,
+                        approve: false,
+                        reason: input.Reason);
                 if (decisionApplied)
                 {
                     await EnqueueDecisionEmailAsync(
@@ -459,6 +531,251 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 
             Logger.Warn(
                 $"Programme participation rejected programme={input.Programme} participation={participationId} administrator={AbpSession.GetUserId()}");
+        }
+
+        private async Task<(Customer Customer, Guid ParticipationId, bool DecisionApplied)>
+            ApplyAQGreenV2ApprovalAsync(Guid participationId)
+        {
+            var hint = await _entryParticipationRepository.GetAll()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == participationId);
+            if (hint == null)
+                throw Failed(
+                    "Participation approval",
+                    "The participation was not found in your Area.");
+            ValidateRequestedTenant(hint.TenantId, "Participation approval");
+
+            var administratorUserId = AbpSession.GetUserId();
+            var stabilizedAreaId = await _approvalAuthorityStabilizer.StabilizeAsync(
+                hint.TenantId,
+                hint.CustomerId,
+                AbpSession.TenantId.HasValue ? administratorUserId : (long?)null);
+
+            var entry = await _entryParticipationRepository.FirstOrDefaultAsync(
+                item => item.Id == participationId && item.TenantId == hint.TenantId);
+            var customer = await _customerRepository.FirstOrDefaultAsync(
+                item => item.Id == hint.CustomerId && item.TenantId == hint.TenantId);
+            if (entry == null || customer == null ||
+                entry.CustomerId != customer.Id ||
+                customer.AreaId != stabilizedAreaId)
+                throw new AQGreenPlacementConflictException(
+                    "AQGreen approval facts changed before authority could be stabilized.");
+
+            await EnsureCanAdministerAreaAsync(customer);
+            await ValidateAQGreenJoiningPaymentAsync(entry);
+            var scopeHint = await ResolveAQGreenPlacementScopeAsync(entry);
+            await _placementTreeLock.AcquireAsync(scopeHint);
+            var authoritativeScope = await ResolveAQGreenPlacementScopeAsync(entry);
+            if (authoritativeScope != scopeHint)
+                throw new AQGreenPlacementConflictException(
+                    "The credited sponsor placement-tree scope changed before approval.");
+
+            var existingPlacement = await _networkPlacementRepository.GetAll()
+                .AsNoTracking()
+                .SingleOrDefaultAsync(placement =>
+                    placement.TenantId == entry.TenantId &&
+                    placement.ParticipantId == entry.Id);
+
+            if (entry.Status == EntryParticipationStatus.Active)
+            {
+                if (existingPlacement == null)
+                    throw new AQGreenPlacementConflictException(
+                        "Active AQGreen participation is missing its permanent placement and requires reconciliation.");
+
+                var replay = await _placementAllocator.AllocateAsync(
+                    entry.TenantId,
+                    entry.Id);
+                if (!replay.WasAlreadyPlaced || replay.Placement.Id != existingPlacement.Id)
+                    throw new AQGreenPlacementConflictException(
+                        "Active AQGreen participation has conflicting placement evidence.");
+                return (customer, entry.Id, false);
+            }
+
+            if (entry.Status != EntryParticipationStatus.PaymentConfirmedAwaitingApproval)
+                throw Failed(
+                    "Participation approval",
+                    "The AQGreen participation is not awaiting administrative approval.");
+            if (existingPlacement != null)
+                throw new AQGreenPlacementConflictException(
+                    "An awaiting AQGreen participation already has a placement and requires reconciliation.");
+
+            var allocation = await _placementAllocator.AllocateAsync(
+                entry.TenantId,
+                entry.Id);
+            if (allocation.WasAlreadyPlaced)
+                throw new AQGreenPlacementConflictException(
+                    "An awaiting AQGreen participation acquired an unexpected pre-existing placement.");
+
+            entry.ApproveByAdministrator(administratorUserId, DateTime.UtcNow);
+            return (customer, entry.Id, true);
+        }
+
+        private async Task<(Customer Customer, Guid ParticipationId, bool DecisionApplied)>
+            ApplyAQGreenV2RejectionAsync(Guid participationId, string reason)
+        {
+            var hint = await _entryParticipationRepository.GetAll()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == participationId);
+            if (hint == null)
+                throw Failed(
+                    "Participation rejection",
+                    "The participation was not found in your Area.");
+            ValidateRequestedTenant(hint.TenantId, "Participation rejection");
+
+            var administratorUserId = AbpSession.GetUserId();
+            var stabilizedAreaId = await _approvalAuthorityStabilizer.StabilizeAsync(
+                hint.TenantId,
+                hint.CustomerId,
+                AbpSession.TenantId.HasValue ? administratorUserId : (long?)null);
+            var entry = await _entryParticipationRepository.FirstOrDefaultAsync(
+                item => item.Id == participationId && item.TenantId == hint.TenantId);
+            var customer = await _customerRepository.FirstOrDefaultAsync(
+                item => item.Id == hint.CustomerId && item.TenantId == hint.TenantId);
+            if (entry == null || customer == null || customer.AreaId != stabilizedAreaId)
+                throw new AQGreenPlacementConflictException(
+                    "AQGreen rejection facts changed before authority could be stabilized.");
+            await EnsureCanAdministerAreaAsync(customer);
+
+            if (entry.Status == EntryParticipationStatus.Rejected)
+                return (customer, entry.Id, false);
+            entry.RejectByAdministrator(administratorUserId, reason, DateTime.UtcNow);
+            return (customer, entry.Id, true);
+        }
+
+        private async Task<Guid> ResolveAQGreenPlacementScopeAsync(
+            EntryParticipation participant)
+        {
+            var attribution = await _attributionRepository.GetAll()
+                .AsNoTracking()
+                .SingleOrDefaultAsync(item =>
+                    item.TenantId == participant.TenantId &&
+                    item.ParticipantId == participant.Id);
+            if (attribution == null)
+                throw new AQGreenPlacementAllocationNotFoundException(
+                    AQGreenPlacementMissingFact.Attribution);
+            if (attribution.AttributionKind !=
+                AQGreenRecruitmentAttributionKind.SponsoredParticipant)
+                throw new AQGreenPlacementUnsupportedAttributionException(
+                    attribution.AttributionKind);
+            if (!attribution.CreditedSponsorParticipantId.HasValue)
+                throw new AQGreenPlacementConflictException(
+                    "Sponsored AQGreen attribution is missing its credited sponsor.");
+
+            var confirmation = await _attributionConfirmationRepository.GetAll()
+                .AsNoTracking()
+                .SingleOrDefaultAsync(item =>
+                    item.TenantId == participant.TenantId &&
+                    item.AttributionId == attribution.Id);
+            if (confirmation == null)
+                throw new AQGreenPlacementAttributionNotConfirmedException();
+            if (confirmation.ConfirmationMethod !=
+                AQGreenAttributionConfirmationMethod.MemberInvitationAcceptance)
+                throw new AQGreenPlacementConflictException(
+                    "AQGreen attribution confirmation conflicts with sponsored placement.");
+
+            var sponsor = await _entryParticipationRepository.GetAll()
+                .AsNoTracking()
+                .SingleOrDefaultAsync(item =>
+                    item.Id == attribution.CreditedSponsorParticipantId.Value);
+            if (sponsor == null)
+                throw new AQGreenPlacementAllocationNotFoundException(
+                    AQGreenPlacementMissingFact.SponsorParticipation);
+            if (sponsor.TenantId != participant.TenantId)
+                throw new AQGreenPlacementConflictException(
+                    "AQGreen sponsorship cannot cross the Tenant boundary.");
+
+            var sponsorPlacement = await _networkPlacementRepository.GetAll()
+                .AsNoTracking()
+                .SingleOrDefaultAsync(item =>
+                    item.ParticipantId == sponsor.Id);
+            if (sponsorPlacement == null)
+                throw new AQGreenPlacementAllocationNotFoundException(
+                    AQGreenPlacementMissingFact.SponsorPlacement);
+            if (sponsorPlacement.TenantId != participant.TenantId)
+                throw new AQGreenPlacementConflictException(
+                    "The credited sponsor placement crosses the Tenant boundary.");
+            if (!await _placementTreeScopeRepository.GetAll()
+                    .AsNoTracking()
+                    .AnyAsync(scope =>
+                        scope.Id == sponsorPlacement.PlacementTreeScopeId &&
+                        scope.TenantId == participant.TenantId))
+                throw new AQGreenPlacementAllocationNotFoundException(
+                    AQGreenPlacementMissingFact.PlacementTreeScope);
+            return sponsorPlacement.PlacementTreeScopeId;
+        }
+
+        private async Task ValidateAQGreenJoiningPaymentAsync(
+            EntryParticipation participation)
+        {
+            Guid[] paymentIds;
+            if (participation.JoiningPaymentAmount > 0m)
+            {
+                if (!participation.IsJoiningObligationSatisfied)
+                    throw new AQGreenPlacementConflictException(
+                        "AQGreen approval requires a fully satisfied joining obligation.");
+                paymentIds = participation.JoiningPaymentId.HasValue
+                    ? new[] { participation.JoiningPaymentId.Value }
+                    : new[]
+                    {
+                        participation.RegistrationPaymentId ?? Guid.Empty,
+                        participation.ActivationPaymentId ?? Guid.Empty
+                    };
+            }
+            else
+            {
+                paymentIds = new[]
+                {
+                    participation.RegistrationPaymentId ?? Guid.Empty,
+                    participation.ActivationPaymentId ?? Guid.Empty
+                };
+            }
+
+            if (paymentIds.Any(id => id == Guid.Empty) ||
+                paymentIds.Distinct().Count() != paymentIds.Length)
+                throw new AQGreenPlacementConflictException(
+                    "AQGreen approval payment evidence is incomplete or conflicting.");
+
+            var payments = await _paymentRepository.GetAll()
+                .AsNoTracking()
+                .Where(payment => paymentIds.Contains(payment.Id))
+                .ToListAsync();
+            if (payments.Count != paymentIds.Length || payments.Any(payment =>
+                    payment.TenantId != participation.TenantId ||
+                    payment.CustomerId != participation.CustomerId ||
+                    payment.Status != MemberPaymentStatus.Confirmed ||
+                    !payment.ConfirmedAt.HasValue ||
+                    !string.Equals(
+                        payment.Currency,
+                        participation.Currency,
+                        StringComparison.Ordinal)))
+                throw new AQGreenPlacementConflictException(
+                    "AQGreen approval payment evidence is not authoritative.");
+
+            if (participation.JoiningPaymentAmount > 0m)
+            {
+                if (payments.Any(payment =>
+                        payment.Purpose != MemberPaymentPurpose.AQGreenJoining) ||
+                    payments.Sum(payment => payment.Amount) !=
+                    participation.JoiningPaymentAmount)
+                    throw new AQGreenPlacementConflictException(
+                        "AQGreen joining payment evidence conflicts with programme terms.");
+                return;
+            }
+
+            if (payments.Single(payment =>
+                    payment.Id == participation.RegistrationPaymentId).Purpose !=
+                    MemberPaymentPurpose.EntryRegistration ||
+                payments.Single(payment =>
+                    payment.Id == participation.ActivationPaymentId).Purpose !=
+                    MemberPaymentPurpose.EntryActivation ||
+                payments.Single(payment =>
+                    payment.Id == participation.RegistrationPaymentId).Amount !=
+                    participation.RegistrationPaymentAmount ||
+                payments.Single(payment =>
+                    payment.Id == participation.ActivationPaymentId).Amount !=
+                    participation.ActivationPaymentAmount)
+                throw new AQGreenPlacementConflictException(
+                    "Historical AQGreen payment evidence conflicts with programme terms.");
         }
 
         private async Task<(Customer Customer, Guid ParticipationId, bool DecisionApplied)>
@@ -507,6 +824,35 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             else
                 entry.RejectByAdministrator(AbpSession.GetUserId(), reason, decidedAt);
             return (entryCustomer, entry.Id, true);
+        }
+
+        private async Task<long> ResolveApprovalUserIdHintAsync(
+            AdminProgrammeType programme,
+            Guid participationId)
+        {
+            var userId = programme == AdminProgrammeType.Onyx
+                    ? await (
+                            from participation in _onyxParticipationRepository.GetAll()
+                                .AsNoTracking()
+                            join customer in _customerRepository.GetAll().AsNoTracking()
+                                on participation.CustomerId equals customer.Id
+                            where participation.Id == participationId
+                            select (long?)customer.UserId)
+                        .SingleOrDefaultAsync()
+                    : await (
+                            from participation in _entryParticipationRepository.GetAll()
+                                .AsNoTracking()
+                            join customer in _customerRepository.GetAll().AsNoTracking()
+                                on participation.CustomerId equals customer.Id
+                            where participation.Id == participationId
+                            select (long?)customer.UserId)
+                        .SingleOrDefaultAsync();
+
+            if (!userId.HasValue)
+                throw Failed(
+                    "Participation approval",
+                    "The participation was not found in your Area.");
+            return userId.Value;
         }
 
         private async Task EnqueueDecisionEmailAsync(

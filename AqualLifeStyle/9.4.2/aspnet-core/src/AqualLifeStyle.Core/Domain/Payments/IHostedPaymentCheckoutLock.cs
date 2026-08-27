@@ -13,6 +13,8 @@ namespace AqualLifeStyle.Domain.Payments
         Task AcquireAQGreenParticipationAsync(Guid participationId);
         Task AcquireDirectOnyxCustomerAsync(int customerId);
         Task AcquireCustomerAreaTransitionsAsync(params int[] customerIds);
+        Task AcquireProgrammeApprovalUserSessionAsync(long userId);
+        Task ReleaseProgrammeApprovalUserSessionAsync(long userId);
         Task AcquireProgrammeParticipationDecisionAsync(Guid participationId);
     }
 }

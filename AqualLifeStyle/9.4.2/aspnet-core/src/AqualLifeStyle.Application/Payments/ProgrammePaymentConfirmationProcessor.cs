@@ -430,13 +430,29 @@ namespace AqualLifeStyle.Payments
             AQGreenJoiningCheckout checkout;
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))
             {
-                checkout = await _aqGreenJoiningCheckoutRepository.FirstOrDefaultAsync(checkoutId);
+                checkout = await _aqGreenJoiningCheckoutRepository.GetAll()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(item => item.Id == checkoutId);
             }
             if (checkout == null)
                 throw new UserFriendlyException("The AQGreen payment could not be matched to a checkout.");
 
             using (_unitOfWorkManager.Current.SetTenantId(checkout.TenantId))
             {
+                // Global order: checkout -> participation decision. The Yoco
+                // adapter already owns the checkout lock; PostgreSQL
+                // transaction advisory locks are safely re-entrant here.
+                await _hostedPaymentCheckoutLock.AcquireCheckoutAsync(checkout.Id);
+                checkout = await _aqGreenJoiningCheckoutRepository.GetAll()
+                    .AsNoTracking()
+                    .SingleAsync(item => item.Id == checkout.Id);
+                await _hostedPaymentCheckoutLock
+                    .AcquireProgrammeParticipationDecisionAsync(checkout.ParticipationId);
+                // This is the first tracked read. It therefore cannot be
+                // satisfied by EF's identity map and is authoritative after
+                // both locks have been acquired.
+                checkout = await _aqGreenJoiningCheckoutRepository.GetAsync(checkout.Id);
+
                 if (checkout.Status == HostedPaymentCheckoutStatus.Completed)
                 {
                     if (!checkout.PaymentId.HasValue)
@@ -725,6 +741,13 @@ namespace AqualLifeStyle.Payments
 
             using (_unitOfWorkManager.Current.SetTenantId(confirmation.TenantId))
             {
+                var participationId = await ResolvePaymentParticipationIdAsync(
+                    confirmation.TenantId,
+                    confirmation.CustomerId,
+                    confirmation.Purpose);
+                await _hostedPaymentCheckoutLock
+                    .AcquireProgrammeParticipationDecisionAsync(participationId);
+
                 var existingPayment = await _paymentRepository.FirstOrDefaultAsync(payment =>
                     payment.Provider == candidate.Provider &&
                     payment.ExternalReference == candidate.ExternalReference);
@@ -760,6 +783,35 @@ namespace AqualLifeStyle.Payments
                     wasAlreadyProcessed,
                     participation.IsAwaitingApproval);
             }
+        }
+
+        private async Task<Guid> ResolvePaymentParticipationIdAsync(
+            int tenantId,
+            int customerId,
+            MemberPaymentPurpose purpose)
+        {
+            if (purpose == MemberPaymentPurpose.OnyxDirectEntry)
+            {
+                var onyx = await _onyxParticipationRepository.GetAll()
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(participation =>
+                        participation.TenantId == tenantId &&
+                        participation.CustomerId == customerId);
+                if (onyx == null)
+                    throw new UserFriendlyException(
+                        "No Onyx participation was found for this customer.");
+                return onyx.Id;
+            }
+
+            var entry = await _entryParticipationRepository.GetAll()
+                .AsNoTracking()
+                .SingleOrDefaultAsync(participation =>
+                    participation.TenantId == tenantId &&
+                    participation.CustomerId == customerId);
+            if (entry == null)
+                throw new UserFriendlyException(
+                    "No AQGreen participation was found for this customer.");
+            return entry.Id;
         }
 
         private async Task<(
