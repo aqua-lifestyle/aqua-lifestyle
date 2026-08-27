@@ -1173,7 +1173,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     'TOPOLOGY-USER-' || id,
                     'TOPOLOGY-USER-' || id || '@EXAMPLE.TEST', 'test-password', 3,
                     TRUE, TRUE, NOW(), FALSE, 0, FALSE, FALSE, FALSE
-                FROM generate_series(1, 48) id;
+                FROM generate_series(1, 200) id;
 
                 INSERT INTO "AbpUsers" (
                     "Id", "TenantId", "UserName", "EmailAddress", "Name", "Surname",
@@ -1199,20 +1199,20 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                         THEN 'a0000000-0000-0000-0000-000000000001'::uuid
                         ELSE 'a0000000-0000-0000-0000-000000000002'::uuid END,
                     TRUE, NOW(), 'T1-CLB-' || id, id + 1000, FALSE
-                FROM generate_series(1, 48) id;
+                FROM generate_series(1, 200) id;
 
                 INSERT INTO "Customers" (
                     "Id", "TenantId", "Name", "Email", "AreaId", "IsActive",
                     "CreationTime", "ClubMemberNumber", "UserId", "IsDeleted")
                 SELECT
-                    id + 100, 2, 'Topology Tenant Two ' || id,
+                    id + 1000, 2, 'Topology Tenant Two ' || id,
                     'topology-tenant-two-' || id || '@example.test',
                     'a0000000-0000-0000-0000-000000000003'::uuid,
                     TRUE, NOW(), 'T2-CLB-' || id, id + 2000, FALSE
                 FROM generate_series(1, 16) id;
 
                 INSERT INTO "EntryParticipations" (
-                    "Id", "TenantId", "CustomerId", "Status", "StartedAt",
+                    "Id", "TenantId", "CustomerId", "Status", "StartedAt", "ActivatedAt",
                     "TermsVersion", "TermsEffectiveFrom", "JoiningPaymentAmount",
                     "JoiningInstallmentAmount", "RegistrationPaymentAmount",
                     "ActivationPaymentAmount", "MonthlyCommitmentAmount",
@@ -1220,19 +1220,21 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 SELECT
                     ('00000001-0000-0000-0000-' || lpad(id::text, 12, '0'))::uuid,
                     1, id, 2, TIMESTAMPTZ '2026-08-01 00:00:00+00',
+                    TIMESTAMPTZ '2026-08-01 00:00:00+00',
                     'entry-terms-v1', TIMESTAMPTZ '2026-08-01 00:00:00+00',
                     1200, 600, 600, 600, 600, 7, 'ZAR', NOW(), FALSE
-                FROM generate_series(1, 48) id;
+                FROM generate_series(1, 200) id;
 
                 INSERT INTO "EntryParticipations" (
-                    "Id", "TenantId", "CustomerId", "Status", "StartedAt",
+                    "Id", "TenantId", "CustomerId", "Status", "StartedAt", "ActivatedAt",
                     "TermsVersion", "TermsEffectiveFrom", "JoiningPaymentAmount",
                     "JoiningInstallmentAmount", "RegistrationPaymentAmount",
                     "ActivationPaymentAmount", "MonthlyCommitmentAmount",
                     "GracePeriodDays", "Currency", "CreationTime", "IsDeleted")
                 SELECT
                     ('00000002-0000-0000-0000-' || lpad(id::text, 12, '0'))::uuid,
-                    2, id + 100, 2, TIMESTAMPTZ '2026-08-01 00:00:00+00',
+                    2, id + 1000, 2, TIMESTAMPTZ '2026-08-01 00:00:00+00',
+                    TIMESTAMPTZ '2026-08-01 00:00:00+00',
                     'entry-terms-v1', TIMESTAMPTZ '2026-08-01 00:00:00+00',
                     1200, 600, 600, 600, 600, 7, 'ZAR', NOW(), FALSE
                 FROM generate_series(1, 16) id;
