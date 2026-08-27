@@ -120,13 +120,22 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 effectiveParticipantIds,
                 participantStates);
 
+            var qualifyingDepthCounts = Enumerable.Range(
+                    1,
+                    AQGreenStructuralCompletionCalculator.MaximumLevel)
+                .ToDictionary(
+                    relativeDepth => relativeDepth,
+                    relativeDepth => effectiveNodes.Count(node =>
+                        node.RelativeDepth == relativeDepth));
             var level = AQGreenStructuralCompletionCalculator.Evaluate(
-                relativeDepth => effectiveNodes.Count(node =>
-                    node.RelativeDepth == relativeDepth));
+                relativeDepth => qualifyingDepthCounts[relativeDepth]);
             return new AQGreenStructuralCompletionResult(
                 participantId,
                 anchorPlacement.PlacementTreeScopeId,
                 level,
+                qualifyingDepthCounts[1],
+                qualifyingDepthCounts[2],
+                qualifyingDepthCounts[3],
                 cutoff,
                 AQGreenPlacementRules.CurrentVersion);
         }

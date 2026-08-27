@@ -133,6 +133,41 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task DisabledV2Gate_PreservesLegacyMaxValueNetworkProjection()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"progress-v1-cutoff-{suffix}",
+                $"progress-v1-cutoff-{suffix}@example.com");
+            var customerId = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "V1 Cutoff Member",
+                    new EmailAddress($"progress-v1-cutoff-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+                return customer.Id;
+            });
+            var participation = await CreateActiveParticipationAsync(
+                customerId,
+                $"v1-cutoff-{suffix}");
+            await CreateDirectRecruitsAsync(
+                participation,
+                $"v1-cutoff-recruit-{suffix}",
+                DateTime.UtcNow.AddDays(1));
+            SetCurrentUser(userId, 1);
+
+            var progress = await _progressService.GetMyProgressAsync();
+
+            progress.QualifiedLevel.ShouldBe(1);
+            progress.StructuralProgress.ShouldBeNull();
+            progress.DirectRecruits.ShouldBe(5);
+        }
+
+        [Fact]
         public async Task LevelThreeEarning_ExposesTheAQGreenMaximum()
         {
             var userId = await CreateActiveMemberWithLevelThreeEarningAsync();
@@ -1145,7 +1180,8 @@ namespace AqualLifeStyle.Tests.Application
 
         private async Task<List<int>> CreateDirectRecruitsAsync(
             EntryParticipation recruiterParticipation,
-            string suffix)
+            string suffix,
+            DateTime? activationAtBase = null)
         {
             var recruitCustomerIds = new List<int>();
             for (var index = 0;
@@ -1171,12 +1207,19 @@ namespace AqualLifeStyle.Tests.Application
                     });
                 await UsingDbContextAsync(1, async context =>
                 {
+                    var startedAt = activationAtBase.HasValue
+                        ? activationAtBase.Value.AddMinutes(-3)
+                        : EffectiveFrom.AddMinutes(1);
+                    var confirmedAt = activationAtBase.HasValue
+                        ? activationAtBase.Value.AddMinutes(-1)
+                        : EffectiveFrom.AddMinutes(3);
+                    var approvedAt = activationAtBase ?? EffectiveFrom.AddMinutes(4);
                     var recruit = EntryParticipation.StartUnderRecruiter(
                         1,
                         recruitCustomerId,
                         recruiterParticipation,
                         EntryTerms,
-                        EffectiveFrom.AddMinutes(1));
+                        startedAt);
                     var payment = MemberPayment.CreatePending(
                         1,
                         recruitCustomerId,
@@ -1184,10 +1227,10 @@ namespace AqualLifeStyle.Tests.Application
                         1200m,
                         "Test",
                         $"recruit-joining-{index}-{suffix}",
-                        EffectiveFrom.AddMinutes(2));
-                    payment.Confirm(EffectiveFrom.AddMinutes(3));
+                        confirmedAt.AddMinutes(-1));
+                    payment.Confirm(confirmedAt);
                     recruit.ApplyConfirmedJoiningPayment(payment);
-                    recruit.ApproveByAdministrator(1L, EffectiveFrom.AddMinutes(4));
+                    recruit.ApproveByAdministrator(1L, approvedAt);
                     context.EntryParticipations.Add(recruit);
                     context.MemberPayments.Add(payment);
                     await context.SaveChangesAsync();

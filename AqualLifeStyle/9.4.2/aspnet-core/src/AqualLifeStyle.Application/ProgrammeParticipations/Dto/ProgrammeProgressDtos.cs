@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
 {
@@ -126,6 +127,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
         public int DirectRecruitsRequired { get; set; }
         public int RecruitsRemaining { get; set; }
         public int RecruitmentProgressPercent { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public AQGreenStructuralProgressDto StructuralProgress { get; set; }
         public string Currency { get; set; }
         public decimal TotalEarned { get; set; }
         public decimal EarnedAwaitingRelease { get; set; }
@@ -142,6 +145,24 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
         public bool FuneralCoverIncluded { get; set; }
         public decimal FuneralCoverBenefitAmount { get; set; }
         public IReadOnlyList<ProgrammeEducationItemDto> Education { get; set; }
+    }
+
+    /// <summary>
+    /// Current V2 placement-occupancy progress toward the next incomplete
+    /// AQGreen structural level. Recruitment and financial eligibility are
+    /// deliberately not represented by these fields.
+    /// </summary>
+    public class AQGreenStructuralProgressDto
+    {
+        public int CompletedLevel { get; set; }
+        public int? TargetLevel { get; set; }
+        public int AchievedCount { get; set; }
+        public int RequiredCount { get; set; }
+        public int RemainingCount { get; set; }
+        public int ProgressPercent { get; set; }
+        public string MeasureLabel { get; set; }
+        public DateTime Cutoff { get; set; }
+        public string RulesVersion { get; set; }
     }
 
     public class MemberWeeklyEarningDto

@@ -7,6 +7,7 @@ export type MyProgrammeProgress = {
   directRecruitsRequired: number;
   recruitsRemaining: number;
   recruitmentProgressPercent: number;
+  structuralProgress?: AQGreenStructuralProgress;
   currency: string;
   totalEarned: number;
   earnedAwaitingRelease: number;
@@ -23,6 +24,18 @@ export type MyProgrammeProgress = {
   funeralCoverIncluded: boolean;
   funeralCoverBenefitAmount: number;
   education: ProgrammeEducationItem[];
+};
+
+export type AQGreenStructuralProgress = {
+  completedLevel: number;
+  targetLevel: number | null;
+  achievedCount: number;
+  requiredCount: number;
+  remainingCount: number;
+  progressPercent: number;
+  measureLabel: "Qualifying placement occupants";
+  cutoff: string;
+  rulesVersion: string;
 };
 
 export type MemberWeeklyEarning = {

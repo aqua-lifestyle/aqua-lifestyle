@@ -45,6 +45,9 @@ namespace AqualLifeStyle.Domain.AQGreen
             Guid participantId,
             Guid placementTreeScopeId,
             AQGreenStructuralCompletionLevel structuralCompletionLevel,
+            int qualifyingDepth1Count,
+            int qualifyingDepth2Count,
+            int qualifyingDepth3Count,
             DateTime cutoff,
             string rulesVersion)
         {
@@ -59,8 +62,27 @@ namespace AqualLifeStyle.Domain.AQGreen
             if (structuralCompletionLevel < AQGreenStructuralCompletionLevel.Level0 ||
                 structuralCompletionLevel > AQGreenStructuralCompletionLevel.Level3)
             {
-                throw new ArgumentOutOfRangeException(
-                    nameof(structuralCompletionLevel));
+                throw new AQGreenPlacementTopologyIntegrityException(
+                    $"AQGreen structural evaluation returned unsupported completion " +
+                    $"level {(int)structuralCompletionLevel}.");
+            }
+            EnsureQualifyingCount(qualifyingDepth1Count, 1);
+            EnsureQualifyingCount(qualifyingDepth2Count, 2);
+            EnsureQualifyingCount(qualifyingDepth3Count, 3);
+
+            var calculatedLevel = AQGreenStructuralCompletionCalculator.Evaluate(
+                relativeDepth => relativeDepth switch
+                {
+                    1 => qualifyingDepth1Count,
+                    2 => qualifyingDepth2Count,
+                    3 => qualifyingDepth3Count,
+                    _ => throw new ArgumentOutOfRangeException(nameof(relativeDepth))
+                });
+            if (calculatedLevel != structuralCompletionLevel)
+            {
+                throw new AQGreenPlacementTopologyIntegrityException(
+                    "AQGreen structural completion level contradicts its " +
+                    "qualifying relative-depth evidence.");
             }
             if (cutoff == default || cutoff.Kind != DateTimeKind.Utc)
                 throw new ArgumentException(
@@ -74,6 +96,9 @@ namespace AqualLifeStyle.Domain.AQGreen
             ParticipantId = participantId;
             PlacementTreeScopeId = placementTreeScopeId;
             StructuralCompletionLevel = structuralCompletionLevel;
+            QualifyingDepth1Count = qualifyingDepth1Count;
+            QualifyingDepth2Count = qualifyingDepth2Count;
+            QualifyingDepth3Count = qualifyingDepth3Count;
             Cutoff = cutoff;
             RulesVersion = rulesVersion.Trim();
         }
@@ -83,12 +108,45 @@ namespace AqualLifeStyle.Domain.AQGreen
         public AQGreenStructuralCompletionLevel StructuralCompletionLevel { get; }
 
         /// <summary>
+        /// Cutoff-qualifying V2 placement occupants at relative depths one,
+        /// two, and three. These counts are produced from the same topology,
+        /// participant predicate, cutoff, Tenant/scope checks, and fail-closed
+        /// lifecycle/security evidence as <see cref="StructuralCompletionLevel"/>.
+        /// They are placement occupancy, not recruitment, sales, commission,
+        /// graduation, or Area counts.
+        /// </summary>
+        public int QualifyingDepth1Count { get; }
+        public int QualifyingDepth2Count { get; }
+        public int QualifyingDepth3Count { get; }
+
+        public int GetQualifyingCountAtRelativeDepth(int relativeDepth) =>
+            relativeDepth switch
+            {
+                1 => QualifyingDepth1Count,
+                2 => QualifyingDepth2Count,
+                3 => QualifyingDepth3Count,
+                _ => throw new ArgumentOutOfRangeException(nameof(relativeDepth))
+            };
+
+        /// <summary>
         /// The boundary applied to historically represented placement and
         /// participation-activation facts, not a snapshot time for current-only
         /// Customer, User, or unresolved D08 state.
         /// </summary>
         public DateTime Cutoff { get; }
         public string RulesVersion { get; }
+
+        private static void EnsureQualifyingCount(int count, int relativeDepth)
+        {
+            var maximum = AQGreenStructuralCompletionCalculator
+                .GetRequiredPopulation(relativeDepth);
+            if (count < 0 || count > maximum)
+            {
+                throw new AQGreenPlacementTopologyIntegrityException(
+                    $"AQGreen qualifying relative-depth-{relativeDepth} count " +
+                    $"{count} is outside the supported range 0..{maximum}.");
+            }
+        }
     }
 
     public sealed class AQGreenStructuralEvaluationNotPlacedException

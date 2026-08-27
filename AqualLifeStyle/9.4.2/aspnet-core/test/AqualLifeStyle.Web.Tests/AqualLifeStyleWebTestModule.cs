@@ -30,6 +30,12 @@ namespace AqualLifeStyle.Web.Tests
             Configuration.ReplaceService<
                 IAQGreenPlacementV2ApprovalGate,
                 AQGreenPlacementV2TestApprovalGate>(DependencyLifeStyle.Singleton);
+            Configuration.ReplaceService<
+                IAQGreenPlacementV2ProgressGate,
+                AQGreenPlacementV2TestProgressGate>(DependencyLifeStyle.Singleton);
+            Configuration.ReplaceService<
+                IAQGreenStructuralCompletionEvaluator,
+                AQGreenPlacementV2TestStructuralEvaluator>(DependencyLifeStyle.Singleton);
             // Allow enabling transactional UnitOfWork for reproduction via environment variable to avoid impacting other tests.
             var enableTransactional = string.Equals(Environment.GetEnvironmentVariable("REPRO_TRANSACTIONAL"), "true", StringComparison.OrdinalIgnoreCase);
             Configuration.UnitOfWork.IsTransactional = enableTransactional;
