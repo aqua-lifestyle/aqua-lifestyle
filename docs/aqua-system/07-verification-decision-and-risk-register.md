@@ -313,3 +313,47 @@ The customer/Area Admin approval and rejection workflow has historical browser e
 ### Evidence
 
 Focused repository tests cover AQGreen structural Levels 1–3, incomplete branches, the confirmed Level 1–3 amounts, the Level 3 cap for larger networks, and tenant isolation. Authoritative CI remains the broad regression gate. Production provider, deployment, worker enablement, external delivery, and historical reconciliation resolution must not be inferred from repository tests.
+
+## P. Business-decision authority convention
+
+This convention defines who may establish business-policy authority without
+retroactively reclassifying this register's historical entries.
+
+| Status | Meaning |
+| --- | --- |
+| `UNRESOLVED` | No confirmed policy currently governs the stated question. A proposal may exist, but the question remains unresolved until owner confirmation is durably recorded. |
+| `PROPOSED` | A candidate rule drafted for owner consideration. It is not authority and must not govern material behavior as though accepted. |
+| `CONFIRMED` | The business owner explicitly authorized the rule and its stated scope. Agents cannot create this status from inference, code, tests, precedent, or silence. |
+| `SUPERSEDED` | A newer `CONFIRMED` decision explicitly replaces the older rule for a stated scope or effective boundary. The older record remains traceable. |
+
+Agents may investigate ambiguity, compare evidence, recommend an outcome, and draft
+a `PROPOSED` record. They must not independently mark or change a material decision
+to `CONFIRMED`. A worklog, agent report, PR description, implementation state, or
+agent-authored chat summary is not business authority. A direct owner authorization
+is authority only for the scope actually authorized. A material `CONFIRMED` record
+must contain durable evidence for all of the following:
+
+- decision ID;
+- status;
+- scope;
+- decision text;
+- authorizing owner identity or role sufficient for repository traceability;
+- confirmation date;
+- durable source or evidence locator;
+- effective boundary when relevant; and
+- superseded decision ID when applicable.
+
+If any required confirmation evidence is unavailable, do not invent it or
+retroactively upgrade the record. Keep the question `UNRESOLVED`, or the candidate
+`PROPOSED`, until explicit owner authorization and its durable evidence exist.
+
+Record a new material decision in the narrowest current authority: document 02 for
+cross-system business rules, this register for decision/status boundaries, the
+Placement V2 specification for V2 design decisions, or an accepted ADR for an
+engineering architecture decision. Do not duplicate the rule across all of them.
+Each new record must preserve the fields above. A newer confirmed rule must mark the
+older one `SUPERSEDED` and link both decision IDs; never silently rewrite history.
+
+These decision statuses are separate from `IMPLEMENTED`, `TESTED`, `INTEGRATED`,
+`MERGE READY`, `MERGED`, `DEPLOYED`, `ENABLED`, and `PRODUCTION VERIFIED`. A confirmed
+policy may be unimplemented, and merged code may lack business authority.

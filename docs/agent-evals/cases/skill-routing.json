@@ -1,0 +1,314 @@
+{
+  "version": 2,
+  "authority_drift_policy": "A case that depends on mutable Aqua semantics must require current-authority resolution and must not assert a fixed business outcome.",
+  "cases": [
+    {
+      "id": "resolve-authority-positive-conflicting-term",
+      "trigger_expectation": "positive",
+      "skills_under_test": ["resolve-authority"],
+      "expected_skills": ["resolve-authority"],
+      "forbidden_skills": [],
+      "authority_mode": "current-authority",
+      "prompt": "Make a mechanical-looking label change for an Aqua business term, but the ticket and an older repository document conflict. Determine the current term before editing; do not assume either source wins.",
+      "expected_assertions": [
+        {
+          "id": "resolves-current-authority",
+          "text": "Locates and applies the current authority rather than selecting a term from the prompt."
+        },
+        {
+          "id": "identifies-stale-conflict",
+          "text": "Identifies the conflicting or stale source and records the governing source."
+        },
+        {
+          "id": "does-not-invent-policy",
+          "text": "Does not convert an inference into a confirmed policy."
+        }
+      ]
+    },
+    {
+      "id": "resolve-authority-negative-unambiguous-entity",
+      "trigger_expectation": "negative",
+      "skills_under_test": ["resolve-authority"],
+      "expected_skills": [],
+      "forbidden_skills": ["resolve-authority"],
+      "authority_mode": "stable-synthetic",
+      "prompt": "Rename a private variable that references a business entity whose meaning is already unambiguous in the supplied contract. Do not change behavior.",
+      "expected_assertions": [
+        {
+          "id": "avoids-authority-overtrigger",
+          "text": "Does not start authority resolution merely because a settled business entity is named."
+        }
+      ]
+    },
+    {
+      "id": "diagnose-bug-positive-competing-causes",
+      "trigger_expectation": "positive",
+      "skills_under_test": ["diagnose-bug"],
+      "expected_skills": ["diagnose-bug"],
+      "forbidden_skills": [],
+      "authority_mode": "stable-synthetic",
+      "prompt": "An approval test intermittently fails. The two plausible causes are leaked transaction state and a shared fixture race. Establish which cause is real before patching.",
+      "expected_assertions": [
+        {
+          "id": "reproduces-observed-failure",
+          "text": "Separates the observed symptom from explanations and establishes a reproduction."
+        },
+        {
+          "id": "discriminates-hypotheses",
+          "text": "Runs or proposes an experiment that discriminates the two plausible causes."
+        },
+        {
+          "id": "does-not-claim-unsupported-cause",
+          "text": "Reports unknown or inconclusive unless the causal chain is established."
+        }
+      ]
+    },
+    {
+      "id": "diagnose-bug-negative-proven-cause",
+      "trigger_expectation": "negative",
+      "skills_under_test": ["diagnose-bug"],
+      "expected_skills": [],
+      "forbidden_skills": ["diagnose-bug"],
+      "authority_mode": "stable-synthetic",
+      "prompt": "The regression root cause is already proven by a minimal reproduction: the event handler is registered twice. Apply the requested smallest fix and regression test.",
+      "expected_assertions": [
+        {
+          "id": "avoids-restarting-diagnosis",
+          "text": "Does not restart broad hypothesis generation when the causal chain is already established."
+        }
+      ]
+    },
+    {
+      "id": "review-change-positive-correctness",
+      "trigger_expectation": "positive",
+      "skills_under_test": ["review-change"],
+      "expected_skills": ["review-change"],
+      "forbidden_skills": ["validate-evidence"],
+      "authority_mode": "stable-synthetic",
+      "prompt": "Review whether this branch correctly implements the supplied specification. Existing test results are available; do not run a generic validation campaign.",
+      "expected_assertions": [
+        {
+          "id": "reconstructs-intended-outcome",
+          "text": "Reconstructs the intended outcome and applicable contracts."
+        },
+        {
+          "id": "finds-branch-owned-defects",
+          "text": "Assesses implementation correctness and branch-owned semantic, security, and regression risks."
+        },
+        {
+          "id": "inspects-existing-evidence-only",
+          "text": "Inspects available evidence without taking ownership of generic test orchestration."
+        }
+      ]
+    },
+    {
+      "id": "review-change-negative-validation-only",
+      "trigger_expectation": "negative",
+      "skills_under_test": ["review-change"],
+      "expected_skills": ["validate-evidence"],
+      "forbidden_skills": ["review-change"],
+      "authority_mode": "stable-synthetic",
+      "prompt": "The change has already been independently reviewed. Run the required checks and determine whether the evidence is sufficient for commit.",
+      "expected_assertions": [
+        {
+          "id": "avoids-repeating-correctness-review",
+          "text": "Does not repeat the independent correctness review when only current validation evidence is requested."
+        },
+        {
+          "id": "routes-to-evidence-validation",
+          "text": "Routes validation execution and commit evidence to validate-evidence."
+        }
+      ]
+    },
+    {
+      "id": "validate-evidence-positive-reviewed-change",
+      "trigger_expectation": "positive",
+      "skills_under_test": ["validate-evidence"],
+      "expected_skills": ["validate-evidence"],
+      "forbidden_skills": ["review-change"],
+      "authority_mode": "stable-synthetic",
+      "prompt": "The change has already been independently reviewed. Run the required checks and determine whether the evidence is sufficient for commit.",
+      "expected_assertions": [
+        {
+          "id": "selects-current-required-checks",
+          "text": "Selects and executes the required checks from current repository configuration."
+        },
+        {
+          "id": "classifies-evidence-strength",
+          "text": "Distinguishes evidence types, failures, skips, unavailable checks, and Git readiness."
+        },
+        {
+          "id": "does-not-replay-full-review",
+          "text": "Does not independently replay the already-completed semantic/spec review."
+        }
+      ]
+    },
+    {
+      "id": "validate-evidence-negative-correctness-review",
+      "trigger_expectation": "negative",
+      "skills_under_test": ["validate-evidence"],
+      "expected_skills": ["review-change"],
+      "forbidden_skills": ["validate-evidence"],
+      "authority_mode": "stable-synthetic",
+      "prompt": "Review whether this branch correctly implements the supplied specification. Existing test results are available; do not run a generic validation campaign.",
+      "expected_assertions": [
+        {
+          "id": "avoids-validation-overtrigger",
+          "text": "Does not turn a correctness review with existing evidence into generic validation orchestration."
+        }
+      ]
+    },
+    {
+      "id": "composition-unreviewed-commit-readiness",
+      "trigger_expectation": "composition",
+      "skills_under_test": ["review-change", "validate-evidence"],
+      "expected_skills": ["review-change", "validate-evidence"],
+      "forbidden_skills": [],
+      "authority_mode": "stable-synthetic",
+      "prompt": "Is this unreviewed branch commit-ready? Establish both whether it correctly implements the supplied specification and whether current validation evidence is sufficient.",
+      "expected_assertions": [
+        {
+          "id": "reviews-correctness",
+          "text": "Uses review-change to establish correctness and branch-owned defects."
+        },
+        {
+          "id": "validates-readiness-evidence",
+          "text": "Uses validate-evidence to execute or inspect required checks and Git readiness."
+        },
+        {
+          "id": "keeps-verdicts-distinct",
+          "text": "Does not treat correctness inspection and validation evidence as interchangeable."
+        }
+      ]
+    },
+    {
+      "id": "verify-stateful-positive-specified-transition",
+      "trigger_expectation": "positive",
+      "skills_under_test": ["verify-stateful-change"],
+      "expected_skills": ["verify-stateful-change"],
+      "forbidden_skills": ["review-change"],
+      "authority_mode": "stable-synthetic",
+      "prompt": "Implement the already-specified approval transition so duplicate and retried requests are safe under concurrent execution.",
+      "expected_assertions": [
+        {
+          "id": "applies-stateful-mechanics",
+          "text": "Checks transaction ownership, constraints, concurrency, idempotency, retries, and rollback."
+        },
+        {
+          "id": "does-not-force-independent-review",
+          "text": "Does not automatically turn already-specified implementation into an independent correctness review."
+        }
+      ]
+    },
+    {
+      "id": "verify-stateful-negative-static-copy",
+      "trigger_expectation": "negative",
+      "skills_under_test": ["verify-stateful-change"],
+      "expected_skills": [],
+      "forbidden_skills": ["verify-stateful-change"],
+      "authority_mode": "stable-synthetic",
+      "prompt": "Change static explanatory copy without changing any action, state, API, or persistence behavior.",
+      "expected_assertions": [
+        {
+          "id": "avoids-stateful-overtrigger",
+          "text": "Does not load stateful mechanics for presentation-only copy."
+        }
+      ]
+    },
+    {
+      "id": "composition-stateful-correctness-review",
+      "trigger_expectation": "composition",
+      "skills_under_test": ["review-change", "verify-stateful-change"],
+      "expected_skills": ["review-change", "verify-stateful-change"],
+      "forbidden_skills": [],
+      "authority_mode": "stable-synthetic",
+      "prompt": "Independently review the semantics and concurrency correctness of an already-implemented approval transition.",
+      "expected_assertions": [
+        {
+          "id": "reviews-transition-semantics",
+          "text": "Uses review-change for intended behavior, authorization, and branch-owned defects."
+        },
+        {
+          "id": "reviews-durable-mechanics",
+          "text": "Uses verify-stateful-change for transactions, uniqueness, concurrency, idempotency, and retries."
+        }
+      ]
+    },
+    {
+      "id": "verify-workflow-positive-multi-actor",
+      "trigger_expectation": "positive",
+      "skills_under_test": ["verify-workflow"],
+      "expected_skills": ["verify-workflow"],
+      "forbidden_skills": [],
+      "authority_mode": "stable-synthetic",
+      "prompt": "Using the supplied workflow specification, verify a customer request through an administrator decision to the terminal visible outcome from both actors' perspectives.",
+      "expected_assertions": [
+        {
+          "id": "maps-both-actors",
+          "text": "Maps both actors, discoverability, authorization, reachable transitions, and terminal outcome."
+        },
+        {
+          "id": "checks-interruption-recovery",
+          "text": "Checks interruption and recovery at product-journey level."
+        }
+      ]
+    },
+    {
+      "id": "verify-workflow-negative-isolated-rollback",
+      "trigger_expectation": "negative",
+      "skills_under_test": ["verify-workflow"],
+      "expected_skills": ["verify-stateful-change"],
+      "forbidden_skills": ["verify-workflow"],
+      "authority_mode": "stable-synthetic",
+      "prompt": "Verify one isolated transaction's rollback behavior after a database write fails.",
+      "expected_assertions": [
+        {
+          "id": "routes-to-stateful-specialist",
+          "text": "Uses stateful verification without expanding into a product-level actor journey."
+        }
+      ]
+    },
+    {
+      "id": "composition-current-payment-workflow",
+      "trigger_expectation": "composition",
+      "skills_under_test": ["verify-workflow", "verify-stateful-change"],
+      "expected_skills": ["verify-workflow", "verify-stateful-change"],
+      "forbidden_skills": [],
+      "authority_mode": "current-authority",
+      "prompt": "Using the repository's current payment and activation authority rather than a hard-coded lifecycle, verify the customer and administrator journey from provider-confirmed payment to the current terminal participation outcome, including durable transition recovery.",
+      "expected_assertions": [
+        {
+          "id": "resolves-current-authority",
+          "text": "Reads the current payment and activation authority and does not assert a fixture-pinned lifecycle."
+        },
+        {
+          "id": "verifies-actor-journey",
+          "text": "Uses verify-workflow for actors, discoverability, reachable states, and terminal outcome."
+        },
+        {
+          "id": "verifies-durable-transitions",
+          "text": "Uses verify-stateful-change for relevant durable transition, retry, idempotency, and recovery mechanics."
+        }
+      ]
+    },
+    {
+      "id": "composition-authority-correctness",
+      "trigger_expectation": "composition",
+      "skills_under_test": ["resolve-authority", "review-change"],
+      "expected_skills": ["resolve-authority", "review-change"],
+      "forbidden_skills": [],
+      "authority_mode": "current-authority",
+      "prompt": "Independently review a branch that follows an older business document while a newer repository source appears to conflict. Resolve current authority before judging correctness.",
+      "expected_assertions": [
+        {
+          "id": "resolves-current-authority",
+          "text": "Uses resolve-authority to establish the governing source without inventing policy."
+        },
+        {
+          "id": "reviews-against-governing-rule",
+          "text": "Uses review-change to judge the implementation against the resolved current authority."
+        }
+      ]
+    }
+  ]
+}
