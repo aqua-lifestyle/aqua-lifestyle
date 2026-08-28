@@ -28,15 +28,23 @@ AQGreen, Onyx, or payment behavior.
 ## Assumptions
 
 - Official documentation describes compatible root `AGENTS.md` and
-  `.agents/skills` conventions. No adapter is included in this candidate. Whether
-  Codex or OpenCode needs one remains a runtime hypothesis.
+  `.agents/skills` conventions. No adapter is included, and focused acceptance
+  passed without one in the tested Codex and OpenCode harnesses. Future harness
+  versions remain outside this evidence.
 
 ## Current state
 
-The local correction pass is complete in the isolated instruction-system worktree.
-The original main worktree was clean at task start and remains outside this task's
-edits. Deterministic checks pass on the corrected dirty worktree. Cross-harness
-behavioral acceptance remains pending and the skills are still hypotheses.
+The instruction-system implementation workstream is complete and archived with this
+record. Final status:
+
+- `IMPLEMENTED`
+- `STRUCTURALLY VALIDATED`
+- `FOCUSED CODEX ACCEPTANCE PASSED`
+- `FOCUSED OPENCODE ACCEPTANCE PASSED`
+- `BEHAVIORALLY ACCEPTED FOR INITIAL REPOSITORY USE`
+
+This status does not mean `FULL MULTI-TRIAL A-D EVALUATED`. The original main
+worktree remained outside this workstream's edits.
 
 ## Evidence
 
@@ -74,17 +82,33 @@ behavioral acceptance remains pending and the skills are still hypotheses.
 
 ### RUN ON COMMITTED CANDIDATE
 
-- Post-commit results are intentionally not embedded in the commit that they verify.
-  Resolve the candidate with `git rev-parse HEAD`, rerun deterministic validation,
-  and report the exact SHA and result in the handoff.
+- Candidate `abc9dc56c1a65dfe3ff3583159cc5c56a59a1006` passed the post-commit
+  deterministic validator, all six structural skill checks, JSON parsing, Python
+  compilation, reference and retired-skill scans, whitespace checks, and clean
+  worktree verification.
+- OpenCode focused behavioral acceptance reported for the exact candidate in the
+  release-preparation handoff: `PASS`.
+  - root no-skill safety: `PASS`;
+  - all six repository skills discovered natively;
+  - routing cases A-F: `PASS`;
+  - frontend root plus nested instruction behavior: `PASS`; and
+  - governance refusal to establish unsupported `CONFIRMED` authority: `PASS`.
+- Codex CLI 0.147.0 focused behavioral acceptance: `PASS`.
+  - root no-skill safety: `PASS`, with the probe reporting no skill body loaded;
+  - all six repository skills discovered from native initial-context metadata,
+    without filesystem inspection;
+  - six isolated routing cases A-F: `PASS`;
+  - frontend root plus nested instruction behavior and all-six skill discovery:
+    `PASS`; and
+  - governance refusal to establish unsupported `CONFIRMED` authority: `PASS`.
 
-### NOT RUN
+### NOT RUN / DEFERRED FOLLOW-UP EVIDENCE
 
-- OpenCode runtime discovery or behavior.
-- Isolated Codex native discovery.
-- Implicit positive/negative routing cases.
-- Controlled A-D behavioral comparison.
-- Any claim that the six skills improve task outcomes.
+- Controlled, repeated A-D comparison of the old root, concise root without skills,
+  explicit skills, and implicit skills.
+- Statistical or multi-trial evidence that the skills improve task outcomes.
+- Nemotron behavior.
+- Future Codex/OpenCode versions, other models, and other harnesses.
 
 ### DOCUMENTATION-ONLY CLAIM
 
@@ -92,11 +116,10 @@ behavioral acceptance remains pending and the skills are still hypotheses.
   `AGENTS.md` and `.agents/skills` conventions. This supports documented
   compatibility only, not either runtime result.
 
-## Open questions
+## Deferred evidence
 
-- Cross-harness behavioral acceptance remains pending. OpenCode is unavailable and
-  the task explicitly defers expensive model-backed A-D runs until an immutable
-  candidate exists.
+- Full multi-trial A-D skill-effectiveness evaluation remains useful follow-up. It
+  is not part of the focused initial repository-use acceptance recorded here.
 
 ## Completed work
 
@@ -112,13 +135,17 @@ behavioral acceptance remains pending and the skills are still hypotheses.
   governance, eval fixtures/coherence enforcement, and overstated evidence claims.
 - Ran the deterministic checks recorded above on the final corrected dirty
   worktree.
+- Created immutable candidate
+  `abc9dc56c1a65dfe3ff3583159cc5c56a59a1006` and reran deterministic checks on
+  that clean snapshot.
+- Completed matching focused OpenCode and Codex acceptance for root safety, native
+  skill discovery, routing A-F, frontend instruction composition, and governance.
 
 ## Next action
 
-The commit containing this plan is the intended immutable eval candidate. Resolve
-its SHA, rerun deterministic validation on the clean candidate, then run matching
-Codex/OpenCode routing and composition tests against that exact SHA before treating
-the system as behaviorally accepted.
+Release the accepted initial-use foundation through review and CI. Run the deferred
+multi-trial A-D effectiveness experiment separately if comparative benefit or
+future routing calibration is required.
 
 ## Git/branch context
 
@@ -128,4 +155,5 @@ the system as behaviorally accepted.
   candidate identity is the commit containing this plan
 - Pre-commit scope: twenty instruction/documentation/eval files only, with no
   unrelated staged, unstaged, or untracked file
-- Push/PR state: no push or PR
+- Acceptance-record identity: the follow-up commit containing this archived plan
+- Push/PR state at archival edit: pending release-preparation push and PR

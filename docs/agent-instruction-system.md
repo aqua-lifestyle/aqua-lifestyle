@@ -1,6 +1,7 @@
 # Repository agent-instruction architecture
 
-**Status:** Initial implementation hypothesis, pending cross-harness evaluation
+**Status:** Behaviorally accepted for initial repository use; full multi-trial A-D
+effectiveness evaluation deferred
 
 **Scope:** Repository instructions, skills, governance, workstream memory, and evals
 
@@ -35,10 +36,10 @@ The following are documentation-only findings from primary sources reviewed on
 
 The candidate is **format portable** because it uses the common Agent Skills
 directory and required frontmatter fields. It is **documented compatible** with the
-referenced Codex and OpenCode conventions. No `opencode.json` or
-`.codex/config.toml` adapter is included in this candidate; whether one is needed is
-a runtime hypothesis. OpenCode is not installed locally, so its actual
-version-specific behavior remains untested.
+referenced Codex and OpenCode conventions. Focused runtime acceptance on candidate
+`abc9dc56c1a65dfe3ff3583159cc5c56a59a1006` passed in both harnesses without an
+`opencode.json` or `.codex/config.toml` adapter. This does not establish behavior for
+all future harness versions or models.
 
 ## Local smoke evidence
 
@@ -50,14 +51,29 @@ worktree, in ephemeral read-only subprocesses with low reasoning:
 - One prompt explicitly named all six skills, and its response described their
   intended boundaries.
 
-This is an **explicit-name smoke**, not isolated proof of native discovery or full
+This was an **explicit-name smoke**, not isolated proof of native discovery or full
 skill-body loading. The subprocesses could inspect the files directly, and no
-per-case implicit routing assertions were evaluated. Therefore Codex native
-discovery remains not isolated, positive/negative cases remain not run, and the
-skills remain behaviorally unaccepted. The CLI emitted a local model-cache warning
-about `supports_parallel_tool_calls`, but all three subprocesses exited
-successfully. OpenCode discovery, explicit load, and implicit behavior were not run
-because its CLI is unavailable.
+per-case implicit routing assertions were evaluated in that early smoke. The CLI
+emitted a local model-cache warning about `supports_parallel_tool_calls`, but all
+three subprocesses exited successfully.
+
+## Focused cross-harness acceptance
+
+The immutable candidate
+`abc9dc56c1a65dfe3ff3583159cc5c56a59a1006` subsequently passed the same focused
+behavioral acceptance in OpenCode and Codex:
+
+- root safety remained effective with no explicit skill invocation;
+- all six repository skills were discovered natively;
+- routing cases A-F matched the intended boundaries;
+- frontend sessions retained root plus nested instructions and all six skills; and
+- unsupported business policy was not promoted to `CONFIRMED`.
+
+The Codex discovery probes used native initial-context metadata and prohibited shell
+or file inspection, separating native discovery from manual reads. These results
+support **behavioral acceptance for initial repository use**. They do not constitute
+a repeated, statistically meaningful A-D comparison of skill effectiveness,
+Nemotron evidence, or verification of future harness/model versions.
 
 At task start the original main worktree was clean, contrary to the older discovery
 audit embedded in the task brief: the owner had explicitly discarded the previous
@@ -77,7 +93,8 @@ the original worktree.
 - Document 07 owns the `UNRESOLVED` / `PROPOSED` / `CONFIRMED` / `SUPERSEDED`
   decision-state convention and the durable confirmation fields.
 - `docs/agent-evals` and `tools/agent-evals` define deterministic structure and
-  routing cases. Behavioral usefulness still requires Codex/OpenCode comparisons.
+  routing cases. Focused Codex/OpenCode acceptance passed; full comparative
+  effectiveness evaluation remains deferred.
 
 No backend nested `AGENTS.md` is added. It remains a deferred hypothesis until a
 scope experiment proves useful context reduction while preserving root invariants.
