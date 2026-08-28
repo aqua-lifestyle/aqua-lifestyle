@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Aqua agent skill evaluation result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id",
+    "case_definition_sha256",
+    "trigger_expectation",
+    "harness",
+    "model",
+    "reasoning_level",
+    "commit",
+    "snapshot_identity",
+    "worktree_dirty",
+    "skills_under_test",
+    "expected_skills",
+    "skills_loaded",
+    "assertions",
+    "outcome",
+    "notes"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "case_definition_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "trigger_expectation": {
+      "enum": ["positive", "negative", "composition"]
+    },
+    "harness": {
+      "enum": ["codex", "opencode"]
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reasoning_level": {
+      "type": "string",
+      "minLength": 1
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "snapshot_identity": {
+      "type": "string",
+      "minLength": 44
+    },
+    "worktree_dirty": {
+      "type": "boolean"
+    },
+    "skills_under_test": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      }
+    },
+    "expected_skills": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      }
+    },
+    "skills_loaded": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      }
+    },
+    "assertions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "outcome", "evidence"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "outcome": {
+            "enum": ["PASS", "FAIL", "NOT_CHECKED"]
+          },
+          "evidence": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "outcome": {
+      "enum": ["PASS", "FAIL", "INCONCLUSIVE", "NOT_RUN"]
+    },
+    "notes": {
+      "type": "string"
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "input_tokens": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "cost": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "elapsed_seconds": {
+          "type": ["number", "null"],
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

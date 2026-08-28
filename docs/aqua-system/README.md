@@ -15,6 +15,10 @@ The pack explains Aqua at several levels without making one document carry every
 | Checking evidence, decisions, risks, or readiness | [07 — Verification, decision, and risk register](07-verification-decision-and-risk-register.md) |
 | Understanding Tenant versus business Area | [08 — Tenant and Area boundaries](08-area-and-tenant-boundaries.md) |
 | Reviewing resolved AQGreen Placement V2 design semantics | [AQGreen Network Placement V2 specification](aqgreen-network-placement-specification.md) |
+| Resolving decision authority or status | [07 — Business-decision authority convention](07-verification-decision-and-risk-register.md#p-business-decision-authority-convention) |
+| Choosing repository validation | [Repository validation commands](../development/validation.md) |
+| Performing an engineering review | [Review benchmark](../review-benchmark.md) and the repository [`review-change` skill](../../.agents/skills/review-change/SKILL.md) |
+| Resuming a long-running agent workstream | [Execution plans and worklogs](../exec-plans/README.md) |
 
 ## Authority and status
 
@@ -29,3 +33,9 @@ The documents have different jobs:
 7. Current repository behavior and historical decisions remain governed by AQGreen V1 unless separately evidenced. The [AQGreen Network Placement V2 specification](aqgreen-network-placement-specification.md) is authoritative only for resolved V2 design semantics; the document does not implement or enable V2. `AQG-V2-D03B`, `D09`, and `D10` migration and cutover work remains unresolved.
 
 Status labels used throughout the pack are `BUSINESS DECISION`, `VERIFIED IMPLEMENTATION`, `ENGINEERING INFERENCE`, `HISTORICAL`, `SUPERSEDED`, `UNRESOLVED`, and `PLANNED / NOT ENABLED`.
+
+Business-policy records use `UNRESOLVED`, `PROPOSED`, `CONFIRMED`, and `SUPERSEDED`.
+`UNRESOLVED` means no confirmed policy currently exists; a `PROPOSED` candidate does
+not change that. Only explicit owner authorization with the durable evidence defined
+in document 07 can establish `CONFIRMED`. This lifecycle does not replace the
+implementation/evidence status ladder.
