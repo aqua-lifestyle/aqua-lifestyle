@@ -42,6 +42,9 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 result.PlacementTreeScopeId.ShouldBe(topology.ScopeId);
                 result.StructuralCompletionLevel.ShouldBe(
                     AQGreenStructuralCompletionLevel.Level0);
+                result.QualifyingDepth1Count.ShouldBe(0);
+                result.QualifyingDepth2Count.ShouldBe(0);
+                result.QualifyingDepth3Count.ShouldBe(0);
                 result.RulesVersion.ShouldBe(AQGreenPlacementRules.CurrentVersion);
                 await Should.ThrowAsync<AQGreenStructuralEvaluationNotPlacedException>(() =>
                     evaluator.EvaluateAsync(1, P(200), Cutoff));
@@ -64,12 +67,17 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                         laterPlacement);
                 }
 
-                (await evaluator.EvaluateAsync(1, P(1), Cutoff))
-                    .StructuralCompletionLevel.ShouldBe(
-                        AQGreenStructuralCompletionLevel.Level0);
-                (await evaluator.EvaluateAsync(1, P(1), laterPlacement.AddMinutes(1)))
-                    .StructuralCompletionLevel.ShouldBe(
-                        AQGreenStructuralCompletionLevel.Level1);
+                var before = await evaluator.EvaluateAsync(1, P(1), Cutoff);
+                before.StructuralCompletionLevel.ShouldBe(
+                    AQGreenStructuralCompletionLevel.Level0);
+                before.QualifyingDepth1Count.ShouldBe(0);
+                var after = await evaluator.EvaluateAsync(
+                    1,
+                    P(1),
+                    laterPlacement.AddMinutes(1));
+                after.StructuralCompletionLevel.ShouldBe(
+                    AQGreenStructuralCompletionLevel.Level1);
+                after.QualifyingDepth1Count.ShouldBe(5);
             });
         }
 
@@ -86,6 +94,9 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
 
                 result.StructuralCompletionLevel.ShouldBe(
                     AQGreenStructuralCompletionLevel.Level3);
+                result.QualifyingDepth1Count.ShouldBe(5);
+                result.QualifyingDepth2Count.ShouldBe(25);
+                result.QualifyingDepth3Count.ShouldBe(125);
             });
         }
 
@@ -104,9 +115,11 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     firstParticipantNumber: 7,
                     childCount: 24);
 
-                (await evaluator.EvaluateAsync(1, P(1), Cutoff))
-                    .StructuralCompletionLevel.ShouldBe(
-                        AQGreenStructuralCompletionLevel.Level1);
+                var result = await evaluator.EvaluateAsync(1, P(1), Cutoff);
+                result.StructuralCompletionLevel.ShouldBe(
+                    AQGreenStructuralCompletionLevel.Level1);
+                result.QualifyingDepth1Count.ShouldBe(5);
+                result.QualifyingDepth2Count.ShouldBe(24);
             });
         }
 
@@ -129,9 +142,12 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     firstParticipantNumber: 32,
                     childCount: 124);
 
-                (await evaluator.EvaluateAsync(1, P(1), Cutoff))
-                    .StructuralCompletionLevel.ShouldBe(
-                        AQGreenStructuralCompletionLevel.Level2);
+                var result = await evaluator.EvaluateAsync(1, P(1), Cutoff);
+                result.StructuralCompletionLevel.ShouldBe(
+                    AQGreenStructuralCompletionLevel.Level2);
+                result.QualifyingDepth1Count.ShouldBe(5);
+                result.QualifyingDepth2Count.ShouldBe(25);
+                result.QualifyingDepth3Count.ShouldBe(124);
             });
         }
 
@@ -151,9 +167,12 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     await topology.AddChildAsync(P(7), P(slot + 11), slot);
                 }
 
-                (await evaluator.EvaluateAsync(1, P(1), Cutoff))
-                    .StructuralCompletionLevel.ShouldBe(
-                        AQGreenStructuralCompletionLevel.Level0);
+                var root = await evaluator.EvaluateAsync(1, P(1), Cutoff);
+                root.StructuralCompletionLevel.ShouldBe(
+                    AQGreenStructuralCompletionLevel.Level0);
+                root.QualifyingDepth1Count.ShouldBe(4);
+                root.QualifyingDepth2Count.ShouldBe(5);
+                root.QualifyingDepth3Count.ShouldBe(5);
                 (await evaluator.EvaluateAsync(1, P(2), Cutoff))
                     .StructuralCompletionLevel.ShouldBe(
                         AQGreenStructuralCompletionLevel.Level1);
@@ -209,12 +228,15 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 context.EntryMonthlyObligations.Add(overdueObligation);
                 await context.SaveChangesAsync();
 
-                (await evaluator.EvaluateAsync(1, P(2), Cutoff))
-                    .StructuralCompletionLevel.ShouldBe(
-                        AQGreenStructuralCompletionLevel.Level1);
-                (await evaluator.EvaluateAsync(1, P(1), Cutoff))
-                    .StructuralCompletionLevel.ShouldBe(
-                        AQGreenStructuralCompletionLevel.Level2);
+                var relative = await evaluator.EvaluateAsync(1, P(2), Cutoff);
+                relative.StructuralCompletionLevel.ShouldBe(
+                    AQGreenStructuralCompletionLevel.Level1);
+                relative.QualifyingDepth1Count.ShouldBe(5);
+                var root = await evaluator.EvaluateAsync(1, P(1), Cutoff);
+                root.StructuralCompletionLevel.ShouldBe(
+                    AQGreenStructuralCompletionLevel.Level2);
+                root.QualifyingDepth1Count.ShouldBe(5);
+                root.QualifyingDepth2Count.ShouldBe(25);
             });
         }
 

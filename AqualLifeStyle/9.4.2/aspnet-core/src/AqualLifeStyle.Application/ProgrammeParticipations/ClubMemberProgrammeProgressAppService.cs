@@ -11,6 +11,7 @@ using Abp.UI;
 using AqualLifeStyle.Application.Admin.Commissions;
 using AqualLifeStyle.Application.ProgrammeParticipations.Dto;
 using AqualLifeStyle.Authorization;
+using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Onyx;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +35,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         private readonly ICustomerRepository _customerRepository;
         private readonly IRepository<EntryParticipation, Guid>
             _entryParticipationRepository;
+        private readonly IRepository<AQGreenRecruitmentAttribution, Guid>
+            _attributionRepository;
         private readonly IRepository<EntryWeeklyCommission, Guid>
             _entryCommissionRepository;
         private readonly IRepository<EntryCommissionPeriod, Guid>
@@ -54,12 +57,15 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         private readonly ICurrentCommissionTermsProvider _commissionTermsProvider;
         private readonly ICurrentAQGreenFuneralCoverTermsProvider
             _funeralCoverTermsProvider;
+        private readonly IAQGreenPlacementV2ProgressGate _v2ProgressGate;
+        private readonly IAQGreenStructuralCompletionEvaluator _v2StructuralEvaluator;
 
         protected virtual DateTime UtcNow => DateTime.UtcNow;
 
         public ClubMemberProgrammeProgressAppService(
             ICustomerRepository customerRepository,
             IRepository<EntryParticipation, Guid> entryParticipationRepository,
+            IRepository<AQGreenRecruitmentAttribution, Guid> attributionRepository,
             IRepository<EntryWeeklyCommission, Guid> entryCommissionRepository,
             IRepository<EntryCommissionPeriod, Guid> entryPeriodRepository,
             IRepository<EntryMonthlyObligation, Guid> obligationRepository,
@@ -70,10 +76,13 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             IRepository<OnyxTravelBenefitEntitlement, Guid> travelBenefitRepository,
             ICurrentProgrammeTermsProvider programmeTermsProvider,
             ICurrentCommissionTermsProvider commissionTermsProvider,
-            ICurrentAQGreenFuneralCoverTermsProvider funeralCoverTermsProvider)
+            ICurrentAQGreenFuneralCoverTermsProvider funeralCoverTermsProvider,
+            IAQGreenPlacementV2ProgressGate v2ProgressGate,
+            IAQGreenStructuralCompletionEvaluator v2StructuralEvaluator)
         {
             _customerRepository = customerRepository;
             _entryParticipationRepository = entryParticipationRepository;
+            _attributionRepository = attributionRepository;
             _entryCommissionRepository = entryCommissionRepository;
             _entryPeriodRepository = entryPeriodRepository;
             _obligationRepository = obligationRepository;
@@ -85,6 +94,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             _programmeTermsProvider = programmeTermsProvider;
             _commissionTermsProvider = commissionTermsProvider;
             _funeralCoverTermsProvider = funeralCoverTermsProvider;
+            _v2ProgressGate = v2ProgressGate;
+            _v2StructuralEvaluator = v2StructuralEvaluator;
         }
 
         [AbpAuthorize(AquaPermissions.ProgrammeParticipations.ViewSelf)]
@@ -135,9 +146,23 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 tenantId,
                 onyxNetworkRows,
                 projectedAt);
-            var entryLevel = entryParticipation?.Status == EntryParticipationStatus.Active
-                ? new EntryNetworkQualificationEvaluator().Evaluate(customer.Id, entryNetwork)
-                : EntryNetworkLevel.None;
+
+            var v2Enabled = entryParticipation != null
+                && await _v2ProgressGate.IsEnabledAsync(tenantId, entryParticipation.Id);
+            var v2StructuralResult = v2Enabled
+                ? await EvaluateV2StructuralProgressAsync(
+                    tenantId,
+                    entryParticipation.Id,
+                    projectedAt)
+                : null;
+            var entryLevel = v2StructuralResult == null
+                ? entryParticipation?.Status == EntryParticipationStatus.Active
+                    ? new EntryNetworkQualificationEvaluator().Evaluate(
+                        customer.Id,
+                        entryNetwork)
+                    : EntryNetworkLevel.None
+                : MapV2StructuralLevel(
+                    v2StructuralResult.StructuralCompletionLevel);
             var onyxLevel = onyxParticipation?.Status == OnyxParticipationStatus.Active
                 ? new OnyxNetworkQualificationEvaluator().Evaluate(customer.Id, onyxNetwork)
                 : OnyxNetworkLevel.None;
@@ -178,7 +203,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         entryCommissions,
                         entryPeriods,
                         obligations,
-                        funeralCover),
+                        funeralCover,
+                        v2StructuralResult),
                     BuildOnyxJourney(
                         onyxParticipation,
                         onyxNetwork,
@@ -197,7 +223,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             IReadOnlyCollection<EntryWeeklyCommission> commissions,
             IReadOnlyDictionary<Guid, EntryCommissionPeriod> periods,
             IReadOnlyList<EntryMonthlyObligation> obligations,
-            AQGreenFuneralCoverEntitlement funeralCover)
+            AQGreenFuneralCoverEntitlement funeralCover,
+            AQGreenStructuralCompletionResult v2StructuralResult)
         {
             var programmeTerms = _programmeTermsProvider.GetEntryTerms();
             var commissionTerms = _commissionTermsProvider.GetEntryTerms();
@@ -278,10 +305,12 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                     levelNumber,
                     EntryNetworkQualificationEvaluator.MaximumLevel,
                     status?.IsActive ?? false,
-                    level => RequiredPopulation(level),
+                    level => AQGreenStructuralCompletionCalculator
+                        .GetRequiredPopulation(level),
                     level => null,
                     level => $"R{Enumerable.Range(1, level).Sum(commissionTerms.GetComponentAmount):0.00} cumulative weekly commission",
-                    level => commissionTerms.GetComponentAmount(level)),
+                    level => commissionTerms.GetComponentAmount(level),
+                    v2StructuralResult),
                 Joining = new MemberJoiningProgressDto
                 {
                     Kind = "One-time AQGreen joining requirement",
@@ -486,15 +515,20 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             Func<int, int> requiredCount,
             Func<int, decimal?> commissionRate,
             Func<int, string> commissionRateLabel,
-            Func<int, decimal> componentAmount)
+            Func<int, decimal> componentAmount,
+            AQGreenStructuralCompletionResult v2StructuralResult = null)
         {
             return Enumerable.Range(1, maximumLevel)
                 .Select(level =>
                 {
                     var required = requiredCount(level);
-                    var achieved = customerId.HasValue
-                        ? network.CountSelectedParticipantsAtDepth(customerId.Value, level)
-                        : 0;
+                    var achieved = v2StructuralResult != null
+                        ? v2StructuralResult.GetQualifyingCountAtRelativeDepth(level)
+                        : customerId.HasValue
+                            ? network.CountSelectedParticipantsAtDepth(
+                                customerId.Value,
+                                level)
+                            : 0;
                     return new MemberLevelProgressDto
                     {
                         Level = level,
@@ -502,7 +536,11 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         State = progressionActive
                             ? LevelState(level, qualifiedLevel, maximumLevel)
                             : "Locked",
-                        MeasureLabel = level == 1 ? "Direct recruits" : "Qualifying network members",
+                        MeasureLabel = v2StructuralResult != null
+                            ? "Qualifying placement occupants"
+                            : level == 1
+                                ? "Direct recruits"
+                                : "Qualifying network members",
                         AchievedCount = achieved,
                         RequiredCount = required,
                         RemainingCount = Math.Max(0, required - achieved),
@@ -522,13 +560,6 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             if (level == qualifiedLevel + 1) return "Current";
             if (level == qualifiedLevel + 2 && level <= maximumLevel) return "Next";
             return "Locked";
-        }
-
-        private static int RequiredPopulation(int level)
-        {
-            var required = 1;
-            for (var depth = 0; depth < level; depth++) required *= 5;
-            return required;
         }
 
         private static int Percent(decimal achieved, decimal required) =>
@@ -822,18 +853,51 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
             var programmeTerms = _programmeTermsProvider.GetEntryTerms();
             var commissionTerms = _commissionTermsProvider.GetEntryTerms();
-            var level = participation == null
-                ? EntryNetworkLevel.None
-                : new EntryNetworkQualificationEvaluator().Evaluate(
-                    customer.Id,
-                    EffectiveProgrammeNetwork.BuildAQGreen(
-                        tenantId,
-                        activeParticipations,
-                        DateTime.MaxValue));
+            var v2Enabled = participation != null
+                && await _v2ProgressGate.IsEnabledAsync(tenantId, participation.Id);
+            AQGreenStructuralCompletionResult v2StructuralResult = null;
+            EntryNetworkLevel entryLevel;
+            int? v2CreditedRecruitCount = null;
+            if (v2Enabled)
+            {
+                v2StructuralResult = await EvaluateV2StructuralProgressAsync(
+                    tenantId,
+                    participation.Id,
+                    UtcNow);
+                entryLevel = MapV2StructuralLevel(
+                    v2StructuralResult.StructuralCompletionLevel);
+                v2CreditedRecruitCount = await (
+                        from attribution in _attributionRepository.GetAll()
+                        join recruit in _entryParticipationRepository.GetAll()
+                            on attribution.ParticipantId equals recruit.Id
+                        where attribution.TenantId == tenantId &&
+                              attribution.CreditedSponsorParticipantId == participation.Id &&
+                              attribution.AttributionKind ==
+                                  AQGreenRecruitmentAttributionKind.SponsoredParticipant &&
+                              recruit.TenantId == tenantId &&
+                              recruit.Status == EntryParticipationStatus.Active
+                        select attribution.Id)
+                    .CountAsync();
+            }
+            else
+            {
+                // This is the exact legacy V1 projection boundary. V2's current
+                // cutoff must not change the disabled-gate read path.
+                entryLevel = participation == null
+                    ? EntryNetworkLevel.None
+                    : new EntryNetworkQualificationEvaluator().Evaluate(
+                        customer.Id,
+                        EffectiveProgrammeNetwork.BuildAQGreen(
+                            tenantId,
+                            activeParticipations,
+                            DateTime.MaxValue));
+            }
 
             return BuildProgress(
                 participation,
-                level,
+                entryLevel,
+                v2StructuralResult,
+                v2CreditedRecruitCount,
                 activeParticipations,
                 commissions,
                 periods,
@@ -846,6 +910,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         private static MyProgrammeProgressDto BuildProgress(
             EntryParticipation participation,
             EntryNetworkLevel qualifiedLevel,
+            AQGreenStructuralCompletionResult v2StructuralResult,
+            int? v2CreditedRecruitCount,
             IReadOnlyCollection<EntryParticipation> activeParticipations,
             IReadOnlyCollection<EntryWeeklyCommission> commissions,
             IReadOnlyDictionary<Guid, EntryCommissionPeriod> periods,
@@ -854,10 +920,11 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             EntryProgrammeTerms programmeTerms,
             EntryCommissionTerms commissionTerms)
         {
-            var directRecruits = participation == null
-                ? 0
-                : activeParticipations.Count(item =>
-                    item.RecruiterCustomerId == participation.CustomerId);
+            var directRecruits = v2CreditedRecruitCount ??
+                (participation == null
+                    ? 0
+                    : activeParticipations.Count(item =>
+                        item.RecruiterCustomerId == participation.CustomerId));
             var nextLevel = NextLevel(qualifiedLevel);
             var progressPercent = directRecruits <= 0
                 ? 0
@@ -904,6 +971,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                     EntryNetworkQualificationEvaluator.BranchSize -
                     directRecruits),
                 RecruitmentProgressPercent = progressPercent,
+                StructuralProgress = v2StructuralResult == null
+                    ? null
+                    : BuildV2StructuralProgress(v2StructuralResult),
                 Currency = programmeTerms.Currency,
                 TotalEarned = totalEarned,
                 EarnedAwaitingRelease = earned,
@@ -930,7 +1000,10 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 NextActionAmount = openObligation?.OutstandingAmount,
                 FuneralCoverIncluded = funeralCover != null,
                 FuneralCoverBenefitAmount = funeralCover?.FuneralCoverAmount ?? 0m,
-                Education = EducationItems(programmeTerms, commissionTerms)
+                Education = EducationItems(
+                    programmeTerms,
+                    commissionTerms,
+                    v2StructuralResult != null)
             };
         }
 
@@ -1029,9 +1102,106 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 .ToDictionaryAsync(period => period.Id);
         }
 
+        private async Task<AQGreenStructuralCompletionResult>
+            EvaluateV2StructuralProgressAsync(
+            int tenantId,
+            Guid participantId,
+            DateTime cutoff)
+        {
+            try
+            {
+                var result = await _v2StructuralEvaluator.EvaluateAsync(
+                    tenantId,
+                    participantId,
+                    cutoff);
+                _ = MapV2StructuralLevel(result.StructuralCompletionLevel);
+                return result;
+            }
+            catch (AQGreenStructuralEvaluationNotPlacedException)
+            {
+                throw new UserFriendlyException(
+                    "Your AQGreen structural progress cannot be evaluated.",
+                    "You do not have an authoritative V2 placement. Contact your Area administrator.");
+            }
+            catch (AQGreenStructuralContributionPolicyRequiredException)
+            {
+                throw new UserFriendlyException(
+                    "Your AQGreen structural progress cannot be evaluated.",
+                    "Your participation has a lifecycle state that requires a business policy decision (AQG-V2-D08). Contact your Area administrator.");
+            }
+            catch (AQGreenPlacementTopologyIntegrityException ex)
+            {
+                throw new UserFriendlyException(
+                    "Your AQGreen structural progress cannot be evaluated.",
+                    ex.Message);
+            }
+        }
+
+        private static EntryNetworkLevel MapV2StructuralLevel(AQGreenStructuralCompletionLevel v2Level)
+        {
+            return v2Level switch
+            {
+                AQGreenStructuralCompletionLevel.Level0 => EntryNetworkLevel.None,
+                AQGreenStructuralCompletionLevel.Level1 => EntryNetworkLevel.Level1,
+                AQGreenStructuralCompletionLevel.Level2 => EntryNetworkLevel.Level2,
+                AQGreenStructuralCompletionLevel.Level3 => EntryNetworkLevel.Level3,
+                _ => throw new AQGreenPlacementTopologyIntegrityException(
+                    $"AQGreen structural progress returned unsupported completion " +
+                    $"level {(int)v2Level}.")
+            };
+        }
+
+        private static AQGreenStructuralProgressDto BuildV2StructuralProgress(
+            AQGreenStructuralCompletionResult result)
+        {
+            int? targetLevel;
+            int targetRelativeDepth;
+            switch (result.StructuralCompletionLevel)
+            {
+                case AQGreenStructuralCompletionLevel.Level0:
+                    targetLevel = 1;
+                    targetRelativeDepth = 1;
+                    break;
+                case AQGreenStructuralCompletionLevel.Level1:
+                    targetLevel = 2;
+                    targetRelativeDepth = 2;
+                    break;
+                case AQGreenStructuralCompletionLevel.Level2:
+                    targetLevel = 3;
+                    targetRelativeDepth = 3;
+                    break;
+                case AQGreenStructuralCompletionLevel.Level3:
+                    targetLevel = null;
+                    targetRelativeDepth = 3;
+                    break;
+                default:
+                    throw new AQGreenPlacementTopologyIntegrityException(
+                        $"AQGreen structural progress returned unsupported completion " +
+                        $"level {(int)result.StructuralCompletionLevel}.");
+            }
+
+            var required = AQGreenStructuralCompletionCalculator
+                .GetRequiredPopulation(targetRelativeDepth);
+            var achieved = result.GetQualifyingCountAtRelativeDepth(
+                targetRelativeDepth);
+            return new AQGreenStructuralProgressDto
+            {
+                CompletedLevel = (int)result.StructuralCompletionLevel,
+                TargetLevel = targetLevel,
+                AchievedCount = achieved,
+                RequiredCount = required,
+                RemainingCount = Math.Max(0, required - achieved),
+                ProgressPercent = Percent(achieved, required),
+                MeasureLabel = "Qualifying placement occupants",
+                Cutoff = result.Cutoff,
+                RulesVersion = result.RulesVersion
+            };
+        }
+
         private static IReadOnlyList<ProgrammeEducationItemDto> EducationItems(
             EntryProgrammeTerms programmeTerms,
-            EntryCommissionTerms commissionTerms)
+            EntryCommissionTerms commissionTerms,
+            bool v2StructuralProgress = false)
         {
             var currency = programmeTerms.Currency;
             return new List<ProgrammeEducationItemDto>
@@ -1049,7 +1219,14 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 new()
                 {
                     Title = "Build your network",
-                    Body =
+                    Body = v2StructuralProgress
+                        ? "AQGreen V2 structural progress counts qualifying " +
+                          "placement occupants at relative depths 1, 2, and 3. " +
+                          "Spillover can contribute even when you did not " +
+                          "personally recruit the occupant. Personal recruitment " +
+                          "credit remains a separate fact. Level 3 is the final " +
+                          "AQGreen structural level."
+                        :
                         "Invite Club Members to join AQGreen under you. Every " +
                         "level needs 5 active direct recruits, each of whom has " +
                         "completed their own joining: Level 1 needs 5 direct " +

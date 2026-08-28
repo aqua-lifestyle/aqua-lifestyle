@@ -141,7 +141,12 @@ const LevelRail = ({ headingId, levels }: { headingId: string; levels: Programme
             <p className="text-lg font-bold">{level.label}</p>
             <Badge tone={stateTone(level.state)}>{level.state}</Badge>
             <p className="mt-2 text-sm text-muted-foreground">
-              {level.requiredCount.toLocaleString("en-ZA")} {level.level === 1 ? "direct recruits" : "network members"}
+              {level.requiredCount.toLocaleString("en-ZA")}{" "}
+              {level.measureLabel === "Qualifying placement occupants"
+                ? "qualifying placement occupants"
+                : level.level === 1
+                  ? "direct recruits"
+                  : "network members"}
             </p>
           </div>
         </li>
@@ -183,7 +188,7 @@ const CurrentTarget = ({
           <p className="mt-3 text-sm text-muted-foreground">
             {level.remainingCount === 0
               ? `You achieved the full ${level.label} network requirement.`
-              : `${level.remainingCount.toLocaleString("en-ZA")} more qualifying ${level.level === 1 ? "recruits" : "network members"} needed.`}
+              : `${level.remainingCount.toLocaleString("en-ZA")} more ${level.measureLabel === "Qualifying placement occupants" ? "qualifying placement occupants" : level.level === 1 ? "qualifying recruits" : "qualifying network members"} needed.`}
           </p>
         </div>
       </div>

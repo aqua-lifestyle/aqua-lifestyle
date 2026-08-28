@@ -59,6 +59,28 @@ describe("ProgrammeJourneyOverview", () => {
       .toBeInTheDocument();
   });
 
+  it("labels V2 AQGreen journey counts as placement occupancy", () => {
+    const journey = createProgrammeJourney("AQGREEN", {
+      hasParticipation: true,
+      isActive: true,
+      levels: aqGreenLevelTwoPartial.levels.map((level) => ({
+        ...level,
+        measureLabel: "Qualifying placement occupants",
+      })),
+      qualifiedLevel: 1,
+    });
+
+    render(<ProgrammeJourneyOverview canInvite={false} journey={journey} />);
+
+    const programme = screen.getByRole("article", { name: "AQGreen" });
+    expect(within(programme).getAllByText(/qualifying placement occupants/i).length)
+      .toBeGreaterThan(0);
+    expect(within(programme).getByText(/more qualifying placement occupants needed/))
+      .toBeInTheDocument();
+    expect(within(programme).queryByText(/more qualifying network members needed/))
+      .not.toBeInTheDocument();
+  });
+
   it("shows a paid earning with its authoritative level components", () => {
     const journey = createProgrammeJourney("AQGREEN", {
       earnings: {

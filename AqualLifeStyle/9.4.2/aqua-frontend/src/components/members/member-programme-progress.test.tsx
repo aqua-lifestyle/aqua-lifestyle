@@ -69,6 +69,35 @@ describe("MemberProgrammeProgress", () => {
     expect(screen.getByText("Overdue")).toBeInTheDocument();
   });
 
+  it("keeps V2 placement occupancy separate from personal recruitment", async () => {
+    vi.mocked(httpClient.get).mockResolvedValue({
+      ...levelOneProgress,
+      directRecruits: 2,
+      structuralProgress: {
+        achievedCount: 18,
+        completedLevel: 1,
+        cutoff: "2026-08-11T10:00:00Z",
+        measureLabel: "Qualifying placement occupants",
+        progressPercent: 72,
+        remainingCount: 7,
+        requiredCount: 25,
+        rulesVersion: "AQG-V2-1",
+        targetLevel: 2,
+      },
+    });
+
+    render(<MemberProgrammeProgress />);
+
+    expect(await screen.findByText(
+      "Structural progress: 18 of 25 qualifying placement occupants",
+    )).toBeInTheDocument();
+    expect(screen.getByText(/Personal recruits: 2\./)).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", {
+      name: "72% of the current AQGreen structural target",
+    })).toHaveAttribute("aria-valuenow", "72");
+    expect(screen.queryByText("2 of 5 direct recruits")).not.toBeInTheDocument();
+  });
+
   it("does not request progress without self-view permission", () => {
     vi.mocked(useAuthState).mockReturnValue(authState([]));
 

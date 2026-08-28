@@ -21,9 +21,15 @@ const formatCurrency = (amount: number, currency: string) =>
     style: "currency",
   }).format(amount);
 
-const ProgressBar = ({ percent }: { percent: number }) => (
+const ProgressBar = ({
+  percent,
+  label = `${percent}% of the required direct recruits`,
+}: {
+  label?: string;
+  percent: number;
+}) => (
   <div
-    aria-label={`${percent}% of the required direct recruits`}
+    aria-label={label}
     className="h-2 w-full overflow-hidden rounded-full bg-muted"
     role="progressbar"
     aria-valuenow={percent}
@@ -93,6 +99,7 @@ export const MemberProgrammeProgress = () => {
   const canView =
     session?.user?.permissions?.includes(VIEW_PERMISSION) ?? false;
   const { data, errorMessage, isLoading } = useMyProgrammeProgress(canView);
+  const structuralProgress = data?.structuralProgress;
 
   if (!canView) {
     return (
@@ -160,20 +167,46 @@ export const MemberProgrammeProgress = () => {
                   ) : null}
                 </div>
 
-                <div>
-                  <div className="mb-2 flex items-center justify-between text-sm">
-                    <span className="font-semibold">
-                      Direct recruits: {data.directRecruits} of{" "}
-                      {data.directRecruitsRequired}
-                    </span>
-                    <span className="text-muted-foreground">
-                      {data.recruitsRemaining > 0
-                        ? `${data.recruitsRemaining} more needed for ${data.qualifiedLevel === 0 ? "Level 1" : `the next level`}`
-                        : "Complete"}
-                    </span>
+                {structuralProgress ? (
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <div className="mb-2 flex items-center justify-between text-sm">
+                        <span className="font-semibold">
+                          Structural progress: {structuralProgress.achievedCount} of{" "}
+                          {structuralProgress.requiredCount} qualifying placement occupants
+                        </span>
+                        <span className="text-muted-foreground">
+                          {structuralProgress.targetLevel === null
+                            ? "Structurally complete"
+                            : `${structuralProgress.remainingCount} more toward Level ${structuralProgress.targetLevel}`}
+                        </span>
+                      </div>
+                      <ProgressBar
+                        label={`${structuralProgress.progressPercent}% of the current AQGreen structural target`}
+                        percent={structuralProgress.progressPercent}
+                      />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Personal recruits: {data.directRecruits}. Recruitment credit is
+                      separate from placement-based structural progress.
+                    </p>
                   </div>
-                  <ProgressBar percent={data.recruitmentProgressPercent} />
-                </div>
+                ) : (
+                  <div>
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <span className="font-semibold">
+                        Direct recruits: {data.directRecruits} of{" "}
+                        {data.directRecruitsRequired}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {data.recruitsRemaining > 0
+                          ? `${data.recruitsRemaining} more needed for ${data.qualifiedLevel === 0 ? "Level 1" : `the next level`}`
+                          : "Complete"}
+                      </span>
+                    </div>
+                    <ProgressBar percent={data.recruitmentProgressPercent} />
+                  </div>
+                )}
               </Card>
             )}
 
