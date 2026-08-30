@@ -134,6 +134,11 @@ namespace AqualLifeStyle.Domain.AQGreen
         /// Customer, User, or unresolved D08 state.
         /// </summary>
         public DateTime Cutoff { get; }
+        /// <summary>
+        /// The version of the participant predicate and structural completion
+        /// semantics. Placement creation versions remain on the immutable placement
+        /// rows and are not represented by this value.
+        /// </summary>
         public string RulesVersion { get; }
 
         private static void EnsureQualifyingCount(int count, int relativeDepth)

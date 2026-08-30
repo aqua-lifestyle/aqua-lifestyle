@@ -258,7 +258,7 @@ namespace AqualLifeStyle.Tests.Domain
                 aqGreenParticipation,
                 loanAgreement,
                 onyxMembershipId: 7,
-                Terms,
+                OnyxPlanTerms.FromCanonicalAcceptedAgreement(loanAgreement),
                 graduatedAt);
 
             Assert.Equal(OnyxAdmissionRoute.EntryGraduation, participation.AdmissionRoute);
@@ -283,27 +283,26 @@ namespace AqualLifeStyle.Tests.Domain
                     aqGreenParticipation,
                     loanAgreement,
                     onyxMembershipId: 7,
-                    Terms,
+                    OnyxPlanTerms.FromCanonicalAcceptedAgreement(loanAgreement),
                     loanAgreement.EffectiveAt.Value));
         }
 
         [Fact]
-        public void AQGreenGraduation_RejectsALoanThatDoesNotMatchOnyxTerms()
+        public void AQGreenGraduation_UsesTheAcceptedLoanTermsWithoutCurrentCatalogCoupling()
         {
             var aqGreenParticipation = CreateActiveAQGreenParticipation();
             var loanAgreement = CreateActiveLoanAgreement(aqGreenParticipation);
-            var differentOnyxTerms = OnyxPlanTerms.Create(
-                "onyx-future",
-                EffectiveFrom,
-                directEntryAmount: 7000m);
 
-            Assert.Throws<InvalidOperationException>(() =>
-                OnyxParticipation.GraduateFromAQGreenIndependently(
-                    aqGreenParticipation,
-                    loanAgreement,
-                    onyxMembershipId: 7,
-                    differentOnyxTerms,
-                    loanAgreement.EffectiveAt.Value));
+            var participation = OnyxParticipation.GraduateFromAQGreenIndependently(
+                aqGreenParticipation,
+                loanAgreement,
+                onyxMembershipId: 7,
+                OnyxPlanTerms.FromCanonicalAcceptedAgreement(loanAgreement),
+                loanAgreement.EffectiveAt.Value);
+
+            Assert.Equal(loanAgreement.TermsVersion, participation.TermsVersion);
+            Assert.Equal(loanAgreement.PrincipalAmount, participation.DirectEntryAmount);
+            Assert.Equal(loanAgreement.Currency, participation.Currency);
         }
 
         private static EntryParticipation CreateActiveAQGreenParticipation(

@@ -24,6 +24,13 @@ namespace AqualLifeStyle.Domain.AQGreen
             Guid placementTreeScopeId,
             Guid sponsorParticipantId,
             CancellationToken cancellationToken = default);
+
+        Task<IReadOnlyList<AQGreenPlacementTopologyNode>> GetSubtreeInCanonicalOrderAsync(
+            int tenantId,
+            Guid placementTreeScopeId,
+            Guid sponsorParticipantId,
+            int maximumRelativeDepth,
+            CancellationToken cancellationToken = default);
     }
 
     public sealed class AQGreenPlacementTopologyIntegrityException

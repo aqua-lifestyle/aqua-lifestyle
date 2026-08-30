@@ -45,7 +45,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 result.QualifyingDepth1Count.ShouldBe(0);
                 result.QualifyingDepth2Count.ShouldBe(0);
                 result.QualifyingDepth3Count.ShouldBe(0);
-                result.RulesVersion.ShouldBe(AQGreenPlacementRules.CurrentVersion);
+                result.RulesVersion.ShouldBe(
+                    AQGreenStructuralQualificationRules.CurrentVersion);
                 await Should.ThrowAsync<AQGreenStructuralEvaluationNotPlacedException>(() =>
                     evaluator.EvaluateAsync(1, P(200), Cutoff));
             });
@@ -148,6 +149,57 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 result.QualifyingDepth1Count.ShouldBe(5);
                 result.QualifyingDepth2Count.ShouldBe(25);
                 result.QualifyingDepth3Count.ShouldBe(124);
+            });
+        }
+
+        [Fact]
+        public async Task GraduationEvaluation_IsBoundedToThirtyOneNodes_EvenForLevelThreeTree()
+        {
+            await InTransactionAsync(async (connection, transaction, evaluator) =>
+            {
+                var topology = await CreateTopologyAsync(connection, transaction, 1, P(1));
+                await topology.AddCompleteGenerationsAsync(P(1), 3, 2);
+                await ApplyLifecycleStateAsync(
+                    connection,
+                    transaction,
+                    "user-disabled",
+                    P(32));
+
+                var result = await ((IAQGreenGraduationStructuralEvidenceEvaluator)evaluator)
+                    .EvaluateAsync(1, P(1), Cutoff);
+
+                result.StructuralCompletionLevel.ShouldBe(
+                    AQGreenStructuralCompletionLevel.Level2);
+                result.QualifyingDepth1Count.ShouldBe(5);
+                result.QualifyingDepth2Count.ShouldBe(25);
+                result.Observations.Count.ShouldBe(31);
+                result.Observations.Select(item => item.CanonicalOrdinal)
+                    .ShouldBe(Enumerable.Range(0, 31));
+                result.StructuralQualificationRulesVersion.ShouldBe(
+                    AQGreenStructuralQualificationRules.CurrentVersion);
+            });
+        }
+
+        [Theory]
+        [InlineData(1)]
+        [InlineData(31)]
+        public async Task GraduationEvaluation_D08AtDepthZeroThroughTwoFailsClosed(
+            int participantNumber)
+        {
+            await InTransactionAsync(async (connection, transaction, evaluator) =>
+            {
+                var topology = await CreateTopologyAsync(connection, transaction, 1, P(1));
+                await topology.AddCompleteGenerationsAsync(P(1), 2, 2);
+                await ApplyLifecycleStateAsync(
+                    connection,
+                    transaction,
+                    "customer-inactive",
+                    P(participantNumber));
+
+                await Should.ThrowAsync<
+                    AQGreenStructuralContributionPolicyRequiredException>(() =>
+                    ((IAQGreenGraduationStructuralEvidenceEvaluator)evaluator)
+                        .EvaluateAsync(1, P(1), Cutoff));
             });
         }
 
@@ -621,6 +673,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         public void Evaluator_IsResolvableThroughAbpConventionRegistration()
         {
             Resolve<IAQGreenStructuralCompletionEvaluator>()
+                .ShouldBeOfType<AQGreenStructuralCompletionEvaluator>();
+            Resolve<IAQGreenGraduationStructuralEvidenceEvaluator>()
                 .ShouldBeOfType<AQGreenStructuralCompletionEvaluator>();
         }
     }

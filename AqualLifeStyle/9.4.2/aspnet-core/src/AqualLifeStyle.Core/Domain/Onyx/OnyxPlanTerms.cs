@@ -49,5 +49,35 @@ namespace AqualLifeStyle.Domain.Onyx
         {
             return new OnyxPlanTerms(version, effectiveFrom, directEntryAmount, currency);
         }
+
+        public static OnyxPlanTerms FromCanonicalAcceptedAgreement(
+            OnyxLoanAgreement loanAgreement)
+        {
+            if (loanAgreement == null)
+                throw new ArgumentNullException(nameof(loanAgreement));
+            if (!loanAgreement.EffectiveAt.HasValue)
+                throw new InvalidOperationException(
+                    "The accepted loan agreement has no effective date.");
+
+            var canonicalTerms = Create(
+                loanAgreement.TermsVersion,
+                loanAgreement.EffectiveAt.Value,
+                loanAgreement.PrincipalAmount,
+                loanAgreement.Currency);
+            if (!string.Equals(
+                    loanAgreement.TermsVersion,
+                    canonicalTerms.Version,
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    loanAgreement.Currency,
+                    canonicalTerms.Currency,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "The persisted accepted loan agreement terms are not canonical.");
+            }
+
+            return canonicalTerms;
+        }
     }
 }

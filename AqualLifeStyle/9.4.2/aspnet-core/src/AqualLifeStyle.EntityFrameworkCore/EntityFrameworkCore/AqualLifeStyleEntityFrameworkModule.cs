@@ -2,7 +2,9 @@
 using Abp.Modules;
 using Abp.Reflection.Extensions;
 using Abp.Zero.EntityFrameworkCore;
+using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.EntityFrameworkCore.Seed;
+using Castle.MicroKernel.Registration;
 
 namespace AqualLifeStyle.EntityFrameworkCore
 {
@@ -37,6 +39,11 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public override void Initialize()
         {
             IocManager.RegisterAssemblyByConvention(typeof(AqualLifeStyleEntityFrameworkModule).GetAssembly());
+            IocManager.IocContainer.Register(
+                Component.For<IAQGreenGraduationStructuralEvidenceEvaluator>()
+                    .ImplementedBy<AQGreenStructuralCompletionEvaluator>()
+                    .Named("AQGreenGraduationStructuralEvidenceEvaluator")
+                    .LifestyleTransient());
         }
 
         public override void PostInitialize()

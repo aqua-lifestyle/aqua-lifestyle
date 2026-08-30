@@ -30,14 +30,23 @@ namespace AqualLifeStyle.Domain.AQGreen
         /// </summary>
         public static AQGreenStructuralCompletionLevel Evaluate(
             Func<int, int> getQualifyingPopulationAtRelativeDepth)
+            => EvaluateThrough(
+                MaximumLevel,
+                getQualifyingPopulationAtRelativeDepth);
+
+        public static AQGreenStructuralCompletionLevel EvaluateThrough(
+            int maximumLevel,
+            Func<int, int> getQualifyingPopulationAtRelativeDepth)
         {
+            if (maximumLevel < 1 || maximumLevel > MaximumLevel)
+                throw new ArgumentOutOfRangeException(nameof(maximumLevel));
             if (getQualifyingPopulationAtRelativeDepth == null)
                 throw new ArgumentNullException(
                     nameof(getQualifyingPopulationAtRelativeDepth));
 
             var highestCompleteLevel = AQGreenStructuralCompletionLevel.Level0;
             for (var relativeDepth = 1;
-                 relativeDepth <= MaximumLevel;
+                 relativeDepth <= maximumLevel;
                  relativeDepth++)
             {
                 var qualifyingPopulation =
