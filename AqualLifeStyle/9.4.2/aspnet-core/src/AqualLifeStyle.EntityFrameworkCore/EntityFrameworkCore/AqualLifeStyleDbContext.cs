@@ -79,6 +79,8 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<OnyxLoanWeeklyRequirement> OnyxLoanWeeklyRequirements { get; set; }
         public virtual DbSet<OnyxLoanRepaymentAllocation> OnyxLoanRepaymentAllocations { get; set; }
         public virtual DbSet<OnyxGraduationDecision> OnyxGraduationDecisions { get; set; }
+        public virtual DbSet<AQGreenV2GraduationEvidence> AQGreenV2GraduationEvidence { get; set; }
+        public virtual DbSet<AQGreenV2GraduationEvidenceNode> AQGreenV2GraduationEvidenceNodes { get; set; }
         public virtual DbSet<SavingsAccount> SavingsAccounts { get; set; }
         public virtual DbSet<SavingsContribution> SavingsContributions { get; set; }
         public virtual DbSet<EntryCommissionTermsVersion> EntryCommissionTermsVersions { get; set; }
@@ -96,6 +98,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureCommissionTermsVersionsAreAppendOnly();
             EnsureAQGreenPlacementTopologyIsAppendOnly();
             EnsureAQGreenRecruitmentAttributionIsAppendOnly();
+            EnsureAQGreenV2GraduationEvidenceIsAppendOnly();
             return base.SaveChanges();
         }
 
@@ -106,6 +109,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureCommissionTermsVersionsAreAppendOnly();
             EnsureAQGreenPlacementTopologyIsAppendOnly();
             EnsureAQGreenRecruitmentAttributionIsAppendOnly();
+            EnsureAQGreenV2GraduationEvidenceIsAppendOnly();
             return base.SaveChanges(acceptAllChangesOnSuccess);
         }
 
@@ -117,6 +121,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureCommissionTermsVersionsAreAppendOnly();
             EnsureAQGreenPlacementTopologyIsAppendOnly();
             EnsureAQGreenRecruitmentAttributionIsAppendOnly();
+            EnsureAQGreenV2GraduationEvidenceIsAppendOnly();
             return base.SaveChangesAsync(cancellationToken);
         }
 
@@ -129,6 +134,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureCommissionTermsVersionsAreAppendOnly();
             EnsureAQGreenPlacementTopologyIsAppendOnly();
             EnsureAQGreenRecruitmentAttributionIsAppendOnly();
+            EnsureAQGreenV2GraduationEvidenceIsAppendOnly();
             return base.SaveChangesAsync(
                 acceptAllChangesOnSuccess,
                 cancellationToken);
@@ -332,6 +338,20 @@ namespace AqualLifeStyle.EntityFrameworkCore
             {
                 throw new InvalidOperationException(
                     "AQGreen recruitment attribution evidence is append-only.");
+            }
+        }
+
+        private void EnsureAQGreenV2GraduationEvidenceIsAppendOnly()
+        {
+            if (ChangeTracker.Entries<AQGreenV2GraduationEvidence>().Any(entry =>
+                    entry.State == EntityState.Modified ||
+                    entry.State == EntityState.Deleted) ||
+                ChangeTracker.Entries<AQGreenV2GraduationEvidenceNode>().Any(entry =>
+                    entry.State == EntityState.Modified ||
+                    entry.State == EntityState.Deleted))
+            {
+                throw new InvalidOperationException(
+                    "AQGreen V2 graduation evidence is append-only.");
             }
         }
     }

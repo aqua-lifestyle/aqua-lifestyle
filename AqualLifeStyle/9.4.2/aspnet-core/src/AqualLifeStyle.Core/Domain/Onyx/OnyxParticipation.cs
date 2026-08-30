@@ -141,7 +141,7 @@ namespace AqualLifeStyle.Domain.Onyx
             EntryParticipation aqGreenParticipation,
             OnyxLoanAgreement loanAgreement,
             int onyxMembershipId,
-            OnyxPlanTerms terms,
+            OnyxPlanTerms acceptedAgreementTerms,
             DateTime graduatedAt)
         {
             if (aqGreenParticipation == null)
@@ -154,9 +154,9 @@ namespace AqualLifeStyle.Domain.Onyx
                 throw new ArgumentNullException(nameof(loanAgreement));
             }
 
-            if (terms == null)
+            if (acceptedAgreementTerms == null)
             {
-                throw new ArgumentNullException(nameof(terms));
+                throw new ArgumentNullException(nameof(acceptedAgreementTerms));
             }
 
             if (aqGreenParticipation.Status != EntryParticipationStatus.Active)
@@ -184,14 +184,19 @@ namespace AqualLifeStyle.Domain.Onyx
                     "The loan agreement does not belong to this AQGreen participation.");
             }
 
-            if (loanAgreement.PrincipalAmount != terms.DirectEntryAmount ||
+            if (!string.Equals(
+                    loanAgreement.TermsVersion,
+                    acceptedAgreementTerms.Version,
+                    StringComparison.Ordinal) ||
+                loanAgreement.EffectiveAt.Value != acceptedAgreementTerms.EffectiveFrom ||
+                loanAgreement.PrincipalAmount != acceptedAgreementTerms.DirectEntryAmount ||
                 !string.Equals(
                     loanAgreement.Currency,
-                    terms.Currency,
+                    acceptedAgreementTerms.Currency,
                     StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
-                    "The loan agreement does not match the Onyx participation terms.");
+                    "The canonical accepted terms do not match the persisted loan agreement.");
             }
 
             if (graduatedAt < loanAgreement.EffectiveAt.Value)
@@ -206,7 +211,7 @@ namespace AqualLifeStyle.Domain.Onyx
                 aqGreenParticipation.CustomerId,
                 recruiterCustomerId: null,
                 onyxMembershipId,
-                terms,
+                acceptedAgreementTerms,
                 graduatedAt)
             {
                 Id = Guid.NewGuid(),

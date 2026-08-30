@@ -79,6 +79,11 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
             builder.HasAlternateKey(placement => new
             {
                 placement.TenantId,
+                placement.Id
+            });
+            builder.HasAlternateKey(placement => new
+            {
+                placement.TenantId,
                 placement.PlacementTreeScopeId,
                 placement.ParticipantId
             });

@@ -537,7 +537,7 @@ namespace AqualLifeStyle.Tests.Application
                     root,
                     loan,
                     membership.Id,
-                    OnyxPlanTerms.Create("onyx-journey", EffectiveFrom, 6120m),
+                    OnyxPlanTerms.FromCanonicalAcceptedAgreement(loan),
                     EffectiveFrom.AddMinutes(7));
 
                 context.EntryParticipations.Add(root);

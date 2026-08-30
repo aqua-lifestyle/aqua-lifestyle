@@ -129,7 +129,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
         public long AdministratorUserId { get; set; }
         public DateTime DecidedAt { get; set; }
         public string Justification { get; set; }
-        public EntryNetworkLevel EvaluatedNetworkLevel { get; set; }
+        public AQGreenGraduationStructuralModel StructuralModel { get; set; }
+        public EntryNetworkLevel? EvaluatedNetworkLevel { get; set; }
     }
 
     public class TerminateAQGreenJoiningCheckoutInput

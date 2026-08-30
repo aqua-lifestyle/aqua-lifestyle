@@ -247,6 +247,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
                   ON child."PlacementParentParticipantId" = parent."ParticipantId"
                  AND child."PlacementParentParticipantId" IS NOT NULL
                 WHERE NOT parent."HasCycle"
+                  AND parent."RelativeDepth" < @maximumRelativeDepth
             )
             SELECT
                 topology."TenantId",
@@ -339,6 +340,35 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 tenantId,
                 placementTreeScopeId,
                 sponsorParticipantId,
+                int.MaxValue,
+                cancellationToken);
+
+            EnsureSingleAnchor(rows, sponsorParticipantId);
+            EnsureTopologyIsValid(rows, tenantId, placementTreeScopeId);
+            return rows.Select(Map).ToList();
+        }
+
+        public async Task<IReadOnlyList<AQGreenPlacementTopologyNode>>
+            GetSubtreeInCanonicalOrderAsync(
+                int tenantId,
+                Guid placementTreeScopeId,
+                Guid sponsorParticipantId,
+                int maximumRelativeDepth,
+                CancellationToken cancellationToken = default)
+        {
+            EnsureTenant(tenantId);
+            EnsureScope(placementTreeScopeId);
+            EnsureParticipant(sponsorParticipantId, nameof(sponsorParticipantId));
+            if (maximumRelativeDepth < 0)
+                throw new ArgumentOutOfRangeException(nameof(maximumRelativeDepth));
+            var context = GetPostgreSqlContext();
+            var rows = await QueryAsync(
+                context,
+                SubtreeSql,
+                tenantId,
+                placementTreeScopeId,
+                sponsorParticipantId,
+                maximumRelativeDepth,
                 cancellationToken);
 
             EnsureSingleAnchor(rows, sponsorParticipantId);
@@ -365,6 +395,23 @@ namespace AqualLifeStyle.EntityFrameworkCore
             Guid? placementTreeScopeId,
             Guid participantId,
             CancellationToken cancellationToken)
+            => await QueryAsync(
+                context,
+                sql,
+                tenantId,
+                placementTreeScopeId,
+                participantId,
+                maximumRelativeDepth: null,
+                cancellationToken);
+
+        private static async Task<List<TopologyQueryRow>> QueryAsync(
+            AqualLifeStyleDbContext context,
+            string sql,
+            int tenantId,
+            Guid? placementTreeScopeId,
+            Guid participantId,
+            int? maximumRelativeDepth,
+            CancellationToken cancellationToken)
         {
             var parameters = new List<object>
             {
@@ -376,6 +423,12 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 parameters.Add(new NpgsqlParameter(
                     "placementTreeScopeId",
                     placementTreeScopeId.Value));
+            }
+            if (maximumRelativeDepth.HasValue)
+            {
+                parameters.Add(new NpgsqlParameter(
+                    "maximumRelativeDepth",
+                    maximumRelativeDepth.Value));
             }
 
             return await context.Database

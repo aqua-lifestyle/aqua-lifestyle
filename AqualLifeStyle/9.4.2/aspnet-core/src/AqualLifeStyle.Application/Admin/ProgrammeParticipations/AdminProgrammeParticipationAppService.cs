@@ -30,11 +30,14 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
     public class AdminProgrammeParticipationAppService
         : AdminAppServiceBase, IAdminProgrammeParticipationAppService
     {
+        private const int MaximumGraduationTransactionAttempts = 3;
         private readonly ICustomerRepository _customerRepository;
         private readonly IRepository<EntryParticipation, Guid> _entryParticipationRepository;
         private readonly IRepository<OnyxParticipation, Guid> _onyxParticipationRepository;
         private readonly IRepository<OnyxLoanAgreement, Guid> _onyxLoanAgreementRepository;
         private readonly IRepository<OnyxGraduationDecision, Guid> _graduationDecisionRepository;
+        private readonly IRepository<AQGreenV2GraduationEvidence, Guid>
+            _graduationEvidenceRepository;
         private readonly IRepository<Membership> _membershipRepository;
         private readonly IRepository<MemberPayment, Guid> _paymentRepository;
         private readonly IRepository<AQGreenJoiningCheckout, Guid> _aqGreenJoiningCheckoutRepository;
@@ -49,7 +52,6 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         private readonly IProgrammeRecruiterCorrectionLock _correctionLock;
         private readonly IHostedPaymentCheckoutLock _hostedPaymentCheckoutLock;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
-        private readonly ICurrentProgrammeTermsProvider _termsProvider;
         private readonly ActiveProgrammeParticipantRoleSynchronizer _participantRoleSynchronizer;
         private readonly ITransactionalEmailOutbox _emailOutbox;
         private readonly TransactionalEmailTemplateBuilder _emailTemplates;
@@ -63,6 +65,14 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             _attributionConfirmationRepository;
         private readonly IRepository<AQGreenNetworkPlacement, Guid> _networkPlacementRepository;
         private readonly IRepository<AQGreenPlacementTreeScope, Guid> _placementTreeScopeRepository;
+        private readonly IAQGreenGraduationStructuralModelSelector
+            _graduationStructuralModelSelector;
+        private readonly IAQGreenGraduationStructuralEvidenceEvaluator
+            _graduationStructuralEvidenceEvaluator;
+        private readonly IAQGreenV2GraduationEvidenceReplayValidator
+            _graduationEvidenceReplayValidator;
+        private readonly IOnyxGraduationTransactionFailureClassifier
+            _graduationFailureClassifier;
 
         public AdminProgrammeParticipationAppService(
             ICustomerRepository customerRepository,
@@ -70,6 +80,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             IRepository<OnyxParticipation, Guid> onyxParticipationRepository,
             IRepository<OnyxLoanAgreement, Guid> onyxLoanAgreementRepository,
             IRepository<OnyxGraduationDecision, Guid> graduationDecisionRepository,
+            IRepository<AQGreenV2GraduationEvidence, Guid> graduationEvidenceRepository,
             IRepository<Membership> membershipRepository,
             IRepository<MemberPayment, Guid> paymentRepository,
             IRepository<AQGreenJoiningCheckout, Guid> aqGreenJoiningCheckoutRepository,
@@ -83,7 +94,6 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             IProgrammeRecruiterCorrectionLock correctionLock,
             IHostedPaymentCheckoutLock hostedPaymentCheckoutLock,
             IUnitOfWorkManager unitOfWorkManager,
-            ICurrentProgrammeTermsProvider termsProvider,
             ActiveProgrammeParticipantRoleSynchronizer participantRoleSynchronizer,
             ITransactionalEmailOutbox emailOutbox,
             TransactionalEmailTemplateBuilder emailTemplates,
@@ -95,13 +105,18 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             IRepository<AQGreenRecruitmentAttributionConfirmation, Guid>
                 attributionConfirmationRepository,
             IRepository<AQGreenNetworkPlacement, Guid> networkPlacementRepository,
-            IRepository<AQGreenPlacementTreeScope, Guid> placementTreeScopeRepository)
+            IRepository<AQGreenPlacementTreeScope, Guid> placementTreeScopeRepository,
+            IAQGreenGraduationStructuralModelSelector graduationStructuralModelSelector,
+            IAQGreenGraduationStructuralEvidenceEvaluator graduationStructuralEvidenceEvaluator,
+            IAQGreenV2GraduationEvidenceReplayValidator graduationEvidenceReplayValidator,
+            IOnyxGraduationTransactionFailureClassifier graduationFailureClassifier)
         {
             _customerRepository = customerRepository;
             _entryParticipationRepository = entryParticipationRepository;
             _onyxParticipationRepository = onyxParticipationRepository;
             _onyxLoanAgreementRepository = onyxLoanAgreementRepository;
             _graduationDecisionRepository = graduationDecisionRepository;
+            _graduationEvidenceRepository = graduationEvidenceRepository;
             _membershipRepository = membershipRepository;
             _paymentRepository = paymentRepository;
             _aqGreenJoiningCheckoutRepository = aqGreenJoiningCheckoutRepository;
@@ -114,7 +129,6 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             _correctionLock = correctionLock;
             _hostedPaymentCheckoutLock = hostedPaymentCheckoutLock;
             _unitOfWorkManager = unitOfWorkManager;
-            _termsProvider = termsProvider;
             _participantRoleSynchronizer = participantRoleSynchronizer;
             _emailOutbox = emailOutbox;
             _emailTemplates = emailTemplates;
@@ -126,6 +140,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             _attributionConfirmationRepository = attributionConfirmationRepository;
             _networkPlacementRepository = networkPlacementRepository;
             _placementTreeScopeRepository = placementTreeScopeRepository;
+            _graduationStructuralModelSelector = graduationStructuralModelSelector;
+            _graduationStructuralEvidenceEvaluator = graduationStructuralEvidenceEvaluator;
+            _graduationEvidenceReplayValidator = graduationEvidenceReplayValidator;
+            _graduationFailureClassifier = graduationFailureClassifier;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.TerminatePaymentCheckouts)]
@@ -274,127 +292,414 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 throw new AbpAuthorizationException(
                     "Cross-Area Onyx graduation requires permission to manage all Areas.");
 
-            OnyxGraduationDecision decision;
+            for (var attempt = 1;
+                 attempt <= MaximumGraduationTransactionAttempts;
+                 attempt++)
+            {
+                var commitWasAttempted = false;
+                try
+                {
+                    OnyxGraduationDecision decision;
+                    using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+                    {
+                        Scope = TransactionScopeOption.RequiresNew,
+                        IsTransactional = true,
+                        IsolationLevel = IsolationLevel.Serializable
+                    }))
+                    using (DisableAllTenantDataFiltersForHost())
+                    {
+                        await _correctionLock.AcquireAsync(ProgrammeRecruiterNetwork.Onyx);
+                        decision = await _graduationDecisionRepository.FirstOrDefaultAsync(
+                            item => item.LoanAgreementId == input.LoanAgreementId);
+                        if (decision != null)
+                        {
+                            await ValidateExistingGraduationAsync(
+                                decision,
+                                input.LoanAgreementId);
+                            await uow.CompleteAsync();
+                            return Map(decision);
+                        }
+
+                        var loan = await _onyxLoanAgreementRepository.FirstOrDefaultAsync(
+                            item => item.Id == input.LoanAgreementId);
+                        if (loan == null)
+                            throw new Abp.UI.UserFriendlyException(
+                                "Onyx graduation failed.",
+                                "The approved loan agreement was not found in your Area.");
+                        ValidateRequestedTenant(loan.TenantId, "Onyx graduation");
+                        var customer = await _customerRepository.FirstOrDefaultAsync(
+                            item => item.Id == loan.CustomerId &&
+                                    item.TenantId == loan.TenantId);
+                        await EnsureCanAdministerAreaAsync(customer);
+
+                        using (_unitOfWorkManager.Current.SetTenantId(loan.TenantId))
+                        {
+                            var aqGreen = await _entryParticipationRepository.FirstOrDefaultAsync(
+                                item => item.Id == loan.EntryParticipationId &&
+                                        item.CustomerId == loan.CustomerId &&
+                                        item.TenantId == loan.TenantId);
+                            var acceptedAgreementTerms =
+                                ValidateGraduationEligibility(aqGreen, loan);
+
+                            var existingOnyx = await _onyxParticipationRepository
+                                .FirstOrDefaultAsync(
+                                    item => item.TenantId == loan.TenantId &&
+                                            item.CustomerId == loan.CustomerId);
+                            if (existingOnyx != null)
+                                throw ReconciliationRequired(
+                                    "An Onyx participation already exists without this graduation decision.");
+
+                            Membership membership;
+                            using (CurrentUnitOfWork.DisableFilter(
+                                       AbpDataFilters.MayHaveTenant))
+                            {
+                                membership = await _membershipRepository.GetAll()
+                                    .Where(item => item.IsActive &&
+                                                   item.MembershipType == MembershipType.Onyx &&
+                                                   (!item.TenantId.HasValue ||
+                                                    item.TenantId == loan.TenantId))
+                                    .OrderByDescending(item => item.TenantId.HasValue)
+                                    .FirstOrDefaultAsync();
+                            }
+                            if (membership == null)
+                                throw new Abp.UI.UserFriendlyException(
+                                    "Onyx graduation failed.",
+                                    "The Onyx programme has not been configured for this Area.");
+
+                            var decidedAt = DateTime.UtcNow;
+                            var model = await _graduationStructuralModelSelector.SelectAsync(
+                                loan.TenantId,
+                                aqGreen.Id);
+                            var onyx = OnyxParticipation.GraduateFromAQGreenIndependently(
+                                aqGreen,
+                                loan,
+                                membership.Id,
+                                acceptedAgreementTerms,
+                                decidedAt);
+                            AQGreenV2GraduationEvidence evidence = null;
+                            if (model == AQGreenGraduationStructuralModel.LegacyV1)
+                            {
+                                var network = await _entryParticipationRepository
+                                    .GetAllIncluding(item => item.RecruiterCorrections)
+                                    .Where(item => item.TenantId == loan.TenantId &&
+                                                   item.Status == EntryParticipationStatus.Active)
+                                    .ToListAsync();
+                                var evaluatedLevel = new EntryNetworkQualificationEvaluator()
+                                    .Evaluate(aqGreen.CustomerId, network);
+                                if (evaluatedLevel < EntryNetworkLevel.Level2)
+                                    throw IneligibleForGraduation();
+                                decision = OnyxGraduationDecision.RecordApproval(
+                                    aqGreen,
+                                    loan,
+                                    onyx,
+                                    evaluatedLevel,
+                                    AbpSession.GetUserId(),
+                                    input.Justification,
+                                    decidedAt);
+                            }
+                            else if (model == AQGreenGraduationStructuralModel.PlacementV2)
+                            {
+                                var structuralEvidence =
+                                    await _graduationStructuralEvidenceEvaluator.EvaluateAsync(
+                                        loan.TenantId,
+                                        aqGreen.Id,
+                                        decidedAt);
+                                if (structuralEvidence.StructuralCompletionLevel <
+                                    AQGreenStructuralCompletionLevel.Level2)
+                                    throw IneligibleForGraduation();
+                                decision = OnyxGraduationDecision.RecordPlacementV2Approval(
+                                    aqGreen,
+                                    loan,
+                                    onyx,
+                                    structuralEvidence,
+                                    AbpSession.GetUserId(),
+                                    input.Justification,
+                                    decidedAt);
+                                evidence = AQGreenV2GraduationEvidence.Capture(
+                                    decision,
+                                    structuralEvidence);
+                            }
+                            else
+                            {
+                                throw new InvalidOperationException(
+                                    $"AQGreen graduation structural model '{model}' is unsupported.");
+                            }
+
+                            await _onyxParticipationRepository.InsertAsync(onyx);
+                            await _graduationDecisionRepository.InsertAsync(decision);
+                            if (evidence != null)
+                                await _graduationEvidenceRepository.InsertAsync(evidence);
+                            await CurrentUnitOfWork.SaveChangesAsync();
+                        }
+
+                        commitWasAttempted = true;
+                        await uow.CompleteAsync();
+                    }
+
+                    Logger.Info(
+                        $"Onyx graduation approved tenant={decision.TenantId} decision={decision.Id} participation={decision.OnyxParticipationId} model={decision.StructuralModel}");
+                    return Map(decision);
+                }
+                catch (Exception exception)
+                {
+                    var failure = _graduationFailureClassifier.Classify(
+                        exception,
+                        commitWasAttempted);
+                    if (failure.Kind ==
+                            OnyxGraduationTransactionFailureKind.SerializationFailure &&
+                        attempt < MaximumGraduationTransactionAttempts)
+                        continue;
+                    if (failure.Kind ==
+                            OnyxGraduationTransactionFailureKind.KnownGraduationUniqueCollision ||
+                        failure.Kind ==
+                            OnyxGraduationTransactionFailureKind.CommitOutcomeUnknown)
+                    {
+                        var reconciled = await ReconcileGraduationAfterFailureAsync(
+                            input.LoanAgreementId);
+                        if (reconciled != null) return Map(reconciled);
+                        if (failure.Kind ==
+                                OnyxGraduationTransactionFailureKind.CommitOutcomeUnknown &&
+                            attempt < MaximumGraduationTransactionAttempts)
+                            continue;
+                        throw ReconciliationRequired(
+                            "No coherent durable graduation could be recovered after the transaction failure.");
+                    }
+
+                    throw;
+                }
+            }
+
+            throw ReconciliationRequired(
+                "The graduation transaction could not be completed after bounded retries.");
+        }
+
+        private static OnyxPlanTerms ValidateGraduationEligibility(
+            EntryParticipation aqGreen,
+            OnyxLoanAgreement loan)
+        {
+            if (aqGreen == null || aqGreen.Status != EntryParticipationStatus.Active)
+                throw new Abp.UI.UserFriendlyException(
+                    "Onyx graduation failed.",
+                    "The linked AQGreen participation is no longer active.");
+            if (loan.Status != OnyxLoanAgreementStatus.Active ||
+                !loan.EffectiveAt.HasValue ||
+                !loan.MemberAcceptedAt.HasValue ||
+                !loan.MemberAcceptedByUserId.HasValue ||
+                !loan.ApprovedAt.HasValue ||
+                !loan.ApprovedByAdministratorUserId.HasValue)
+                throw new Abp.UI.UserFriendlyException(
+                    "Onyx graduation failed.",
+                    "The loan must be active, member-accepted, and administrator-approved.");
+            if (loan.TenantId != aqGreen.TenantId ||
+                loan.CustomerId != aqGreen.CustomerId ||
+                loan.EntryParticipationId != aqGreen.Id)
+                throw new Abp.UI.UserFriendlyException(
+                    "Onyx graduation failed.",
+                    "The accepted loan agreement terms or AQGreen linkage are invalid.");
+
+            try
+            {
+                return OnyxPlanTerms.FromCanonicalAcceptedAgreement(loan);
+            }
+            catch (Exception exception) when (
+                exception is ArgumentException ||
+                exception is InvalidOperationException)
+            {
+                throw new Abp.UI.UserFriendlyException(
+                    "Onyx graduation failed.",
+                    "The accepted loan agreement terms are invalid.");
+            }
+        }
+
+        private async Task ValidateExistingGraduationAsync(
+            OnyxGraduationDecision decision,
+            Guid requestedLoanAgreementId)
+        {
+            if (decision.LoanAgreementId != requestedLoanAgreementId)
+                throw new Abp.UI.UserFriendlyException(
+                    "Onyx graduation retry conflict.",
+                    "The durable graduation belongs to a different accepted agreement.");
+
+            ValidateRequestedTenant(decision.TenantId, "Onyx graduation");
+            var customer = await _customerRepository.FirstOrDefaultAsync(
+                item => item.Id == decision.CustomerId &&
+                        item.TenantId == decision.TenantId);
+            await EnsureCanAdministerAreaAsync(customer);
+
+            var isHistoricalLegacy =
+                decision.StructuralModel == AQGreenGraduationStructuralModel.LegacyV1 &&
+                decision.GraduationRulesVersion == null &&
+                decision.EvaluatedLoanTermsVersion == null;
+            if (decision.StructuralModel != AQGreenGraduationStructuralModel.LegacyV1 &&
+                decision.StructuralModel != AQGreenGraduationStructuralModel.PlacementV2)
+                throw ReconciliationRequired(
+                    "The durable graduation uses an unsupported structural model.");
+            if (!isHistoricalLegacy && !OnyxGraduationRules.IsSupportedVersion(
+                    decision.GraduationRulesVersion))
+                throw ReconciliationRequired(
+                    "The durable graduation uses an unsupported graduation rules version.");
+
+            if (!isHistoricalLegacy &&
+                ((decision.StructuralModel == AQGreenGraduationStructuralModel.LegacyV1 &&
+                 (!decision.EvaluatedNetworkLevel.HasValue ||
+                  decision.EvaluatedNetworkLevel.Value < EntryNetworkLevel.Level2)) ||
+                (decision.StructuralModel == AQGreenGraduationStructuralModel.PlacementV2 &&
+                 decision.EvaluatedNetworkLevel.HasValue) ||
+                !decision.AQGreenWasActive ||
+                !decision.LoanWasActive ||
+                !decision.LoanWasAccepted ||
+                !decision.LoanWasAdministratorApproved))
+                throw ReconciliationRequired(
+                    "The durable graduation decision is incomplete.");
+
+            var loan = await _onyxLoanAgreementRepository.FirstOrDefaultAsync(
+                item => item.Id == decision.LoanAgreementId);
+            var aqGreen = await _entryParticipationRepository.FirstOrDefaultAsync(
+                item => item.Id == decision.EntryParticipationId);
+            var onyx = await _onyxParticipationRepository.FirstOrDefaultAsync(
+                item => item.Id == decision.OnyxParticipationId);
+            var customerOnyx = await _onyxParticipationRepository.FirstOrDefaultAsync(
+                item => item.TenantId == decision.TenantId &&
+                        item.CustomerId == decision.CustomerId);
+            if (loan == null || aqGreen == null || onyx == null || customerOnyx == null ||
+                customerOnyx.Id != onyx.Id ||
+                loan.TenantId != decision.TenantId ||
+                loan.CustomerId != decision.CustomerId ||
+                loan.EntryParticipationId != decision.EntryParticipationId ||
+                aqGreen.TenantId != decision.TenantId ||
+                aqGreen.CustomerId != decision.CustomerId ||
+                onyx.TenantId != decision.TenantId ||
+                onyx.CustomerId != decision.CustomerId ||
+                onyx.AdmissionRoute != OnyxAdmissionRoute.EntryGraduation ||
+                onyx.Status != OnyxParticipationStatus.Active ||
+                onyx.StartedAt != decision.DecidedAt ||
+                onyx.ActivatedAt != decision.DecidedAt ||
+                onyx.EntryParticipationId != decision.EntryParticipationId ||
+                onyx.LoanAgreementId != decision.LoanAgreementId)
+                throw ReconciliationRequired(
+                    "The durable graduation terminal graph is inconsistent.");
+
+            if (isHistoricalLegacy)
+            {
+                if (!loan.EffectiveAt.HasValue ||
+                    loan.EffectiveAt.Value > decision.DecidedAt ||
+                    onyx.TermsEffectiveFrom > onyx.StartedAt ||
+                    decision.EvaluatedFundingAmount != loan.PrincipalAmount ||
+                    !string.Equals(
+                        decision.EvaluatedFundingCurrency,
+                        loan.Currency,
+                        StringComparison.Ordinal) ||
+                    onyx.DirectEntryAmount != loan.PrincipalAmount ||
+                    !string.Equals(onyx.Currency, loan.Currency, StringComparison.Ordinal))
+                    throw ReconciliationRequired(
+                        "The historical Legacy V1 graduation terminal graph is inconsistent.");
+
+                return;
+            }
+
+            OnyxPlanTerms acceptedAgreementTerms;
+            try
+            {
+                acceptedAgreementTerms =
+                    OnyxPlanTerms.FromCanonicalAcceptedAgreement(loan);
+            }
+            catch (Exception exception) when (
+                exception is ArgumentException ||
+                exception is InvalidOperationException)
+            {
+                throw ReconciliationRequired(
+                    "The durable graduation accepted agreement is not canonical.");
+            }
+
+            if (decision.EvaluatedFundingAmount !=
+                    acceptedAgreementTerms.DirectEntryAmount ||
+                !string.Equals(
+                    decision.EvaluatedFundingCurrency,
+                    acceptedAgreementTerms.Currency,
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    decision.EvaluatedLoanTermsVersion,
+                    acceptedAgreementTerms.Version,
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    onyx.TermsVersion,
+                    acceptedAgreementTerms.Version,
+                    StringComparison.Ordinal) ||
+                onyx.TermsEffectiveFrom != acceptedAgreementTerms.EffectiveFrom ||
+                onyx.DirectEntryAmount != acceptedAgreementTerms.DirectEntryAmount ||
+                !string.Equals(
+                    onyx.Currency,
+                    acceptedAgreementTerms.Currency,
+                    StringComparison.Ordinal))
+                throw ReconciliationRequired(
+                    "The durable graduation graph conflicts with its accepted agreement.");
+
+            if (decision.StructuralModel == AQGreenGraduationStructuralModel.LegacyV1)
+                return;
+
+            try
+            {
+                await _graduationEvidenceReplayValidator.ValidateAsync(decision.Id);
+            }
+            catch (Exception exception) when (
+                exception is AQGreenGraduationEvidenceReplayException ||
+                exception is AQGreenGraduationEvidenceVersionNotSupportedException)
+            {
+                throw ReconciliationRequired(
+                    "The durable Placement V2 evidence cannot reproduce the graduation decision.");
+            }
+        }
+
+        private async Task<OnyxGraduationDecision> ReconcileGraduationAfterFailureAsync(
+            Guid loanAgreementId)
+        {
             using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
             {
+                Scope = TransactionScopeOption.RequiresNew,
                 IsTransactional = true,
-                IsolationLevel = IsolationLevel.Serializable
+                IsolationLevel = IsolationLevel.ReadCommitted
             }))
             using (DisableAllTenantDataFiltersForHost())
             {
-                await _correctionLock.AcquireAsync(ProgrammeRecruiterNetwork.Onyx);
-                decision = await _graduationDecisionRepository.FirstOrDefaultAsync(
-                    item => item.LoanAgreementId == input.LoanAgreementId);
+                var decision = await _graduationDecisionRepository.FirstOrDefaultAsync(
+                    item => item.LoanAgreementId == loanAgreementId);
                 if (decision != null)
                 {
-                    ValidateRequestedTenant(decision.TenantId, "Onyx graduation");
-                    var decidedCustomer = await _customerRepository.FirstOrDefaultAsync(
-                        item => item.Id == decision.CustomerId &&
-                                item.TenantId == decision.TenantId);
-                    await EnsureCanAdministerAreaAsync(decidedCustomer);
-                    return Map(decision);
+                    await ValidateExistingGraduationAsync(decision, loanAgreementId);
+                    await uow.CompleteAsync();
+                    return decision;
                 }
 
                 var loan = await _onyxLoanAgreementRepository.FirstOrDefaultAsync(
-                    item => item.Id == input.LoanAgreementId);
+                    item => item.Id == loanAgreementId);
                 if (loan == null)
-                    throw new Abp.UI.UserFriendlyException(
-                        "Onyx graduation failed.",
-                        "The approved loan agreement was not found in your Area.");
+                    throw ReconciliationRequired(
+                        "The accepted agreement disappeared during graduation reconciliation.");
                 ValidateRequestedTenant(loan.TenantId, "Onyx graduation");
                 var customer = await _customerRepository.FirstOrDefaultAsync(
                     item => item.Id == loan.CustomerId &&
                             item.TenantId == loan.TenantId);
                 await EnsureCanAdministerAreaAsync(customer);
+                var conflictingOnyx = await _onyxParticipationRepository.FirstOrDefaultAsync(
+                    item => item.TenantId == loan.TenantId &&
+                            item.CustomerId == loan.CustomerId);
+                if (conflictingOnyx != null)
+                    throw ReconciliationRequired(
+                        "An Onyx participation committed without the requested graduation decision.");
 
-                using (_unitOfWorkManager.Current.SetTenantId(loan.TenantId))
-                {
-                    var aqGreen = await _entryParticipationRepository.FirstOrDefaultAsync(
-                        item => item.Id == loan.EntryParticipationId &&
-                                item.CustomerId == loan.CustomerId &&
-                                item.TenantId == loan.TenantId);
-                    if (aqGreen == null || aqGreen.Status != EntryParticipationStatus.Active)
-                        throw new Abp.UI.UserFriendlyException(
-                            "Onyx graduation failed.",
-                            "The linked AQGreen participation is no longer active.");
-                    if (loan.Status != OnyxLoanAgreementStatus.Active ||
-                        !loan.EffectiveAt.HasValue ||
-                        !loan.MemberAcceptedAt.HasValue ||
-                        !loan.MemberAcceptedByUserId.HasValue ||
-                        !loan.ApprovedAt.HasValue ||
-                        !loan.ApprovedByAdministratorUserId.HasValue)
-                        throw new Abp.UI.UserFriendlyException(
-                            "Onyx graduation failed.",
-                            "The loan must be active, member-accepted, and administrator-approved.");
-
-                    var existingOnyx = await _onyxParticipationRepository.FirstOrDefaultAsync(
-                        item => item.TenantId == loan.TenantId &&
-                                item.CustomerId == loan.CustomerId);
-                    if (existingOnyx != null)
-                        throw new Abp.UI.UserFriendlyException(
-                            "Onyx graduation requires reconciliation.",
-                            "An Onyx participation already exists without this graduation decision.");
-
-                    var network = await _entryParticipationRepository
-                        .GetAllIncluding(item => item.RecruiterCorrections)
-                        .Where(item => item.TenantId == loan.TenantId &&
-                                       item.Status == EntryParticipationStatus.Active)
-                        .ToListAsync();
-                    var evaluatedLevel = new EntryNetworkQualificationEvaluator()
-                        .Evaluate(aqGreen.CustomerId, network);
-                    if (evaluatedLevel < EntryNetworkLevel.Level2)
-                        throw new Abp.UI.UserFriendlyException(
-                            "Onyx graduation failed.",
-                            "The member no longer satisfies AQGreen Level 2 qualification.");
-
-                    var terms = _termsProvider.GetDirectOnyxTerms();
-                    if (loan.PrincipalAmount != terms.DirectEntryAmount ||
-                        !string.Equals(loan.Currency, terms.Currency, StringComparison.Ordinal))
-                        throw new Abp.UI.UserFriendlyException(
-                            "Onyx graduation failed.",
-                            $"The approved funding must be {terms.Currency} {terms.DirectEntryAmount:0.00}.");
-
-                    Membership membership;
-                    using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
-                    {
-                        membership = await _membershipRepository.GetAll()
-                            .Where(item => item.IsActive &&
-                                           item.MembershipType == MembershipType.Onyx &&
-                                           (!item.TenantId.HasValue || item.TenantId == loan.TenantId))
-                            .OrderByDescending(item => item.TenantId.HasValue)
-                            .FirstOrDefaultAsync();
-                    }
-                    if (membership == null)
-                        throw new Abp.UI.UserFriendlyException(
-                            "Onyx graduation failed.",
-                            "The Onyx programme has not been configured for this Area.");
-
-                    var decidedAt = DateTime.UtcNow;
-                    var onyx = OnyxParticipation.GraduateFromAQGreenIndependently(
-                        aqGreen,
-                        loan,
-                        membership.Id,
-                        terms,
-                        decidedAt);
-                    decision = OnyxGraduationDecision.RecordApproval(
-                        aqGreen,
-                        loan,
-                        onyx,
-                        evaluatedLevel,
-                        AbpSession.GetUserId(),
-                        input.Justification,
-                        decidedAt);
-                    await _onyxParticipationRepository.InsertAsync(onyx);
-                    await _graduationDecisionRepository.InsertAsync(decision);
-                    await CurrentUnitOfWork.SaveChangesAsync();
-                }
                 await uow.CompleteAsync();
+                return null;
             }
-
-            Logger.Info(
-                $"Onyx graduation approved tenant={decision.TenantId} decision={decision.Id} participation={decision.OnyxParticipationId}");
-            return Map(decision);
         }
+
+        private static Abp.UI.UserFriendlyException IneligibleForGraduation() =>
+            new(
+                "Onyx graduation failed.",
+                "The member no longer satisfies AQGreen Level 2 qualification.");
+
+        private static Abp.UI.UserFriendlyException ReconciliationRequired(
+            string details) =>
+            new("Onyx graduation requires reconciliation.", details);
 
         [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.Approve)]
         [UnitOfWork(IsDisabled = true)]
@@ -1712,6 +2017,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 AdministratorUserId = decision.AdministratorUserId,
                 DecidedAt = decision.DecidedAt,
                 Justification = decision.Justification,
+                StructuralModel = decision.StructuralModel,
                 EvaluatedNetworkLevel = decision.EvaluatedNetworkLevel
             };
 

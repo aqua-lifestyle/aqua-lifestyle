@@ -22,6 +22,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
 
     public sealed class AQGreenPlacementAllocatorPostgreSqlFixture : IAsyncLifetime
     {
+        public static AQGreenPlacementAllocatorPostgreSqlFixture Current { get; private set; }
+
         private readonly string _containerName =
             $"aqgreen-placement-allocator-pg-{Guid.NewGuid():N}";
         private readonly string _templateDatabase =
@@ -38,6 +40,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
 
         public async Task InitializeAsync()
         {
+            Current = this;
             await RunDockerAsync(
                 $"run -d --name {_containerName} -e POSTGRES_DB=postgres " +
                 "-e POSTGRES_USER=aqualifestyle -e POSTGRES_PASSWORD=aqualifestyle " +
@@ -70,8 +73,11 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await SeedParticipantsAsync(BuildConnectionString(_templateDatabase));
         }
 
-        public Task DisposeAsync() =>
-            RunDockerAsync($"rm -fv {_containerName}", throwOnFailure: false);
+        public async Task DisposeAsync()
+        {
+            if (ReferenceEquals(Current, this)) Current = null;
+            await RunDockerAsync($"rm -fv {_containerName}", throwOnFailure: false);
+        }
 
         public async Task<DatabaseLease> CreateDatabaseAsync()
         {
