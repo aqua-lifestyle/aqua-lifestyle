@@ -176,7 +176,8 @@ namespace AqualLifeStyle.Authorization
                 host,
                 AquaPermissions.Admin.Commissions.Calculate,
                 AquaPermissions.Admin.Commissions.Release,
-                AquaPermissions.Admin.Commissions.RecordPayment);
+                AquaPermissions.Admin.Commissions.RecordPayment,
+                AquaPermissions.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility);
 
             var savings = admin.CreateChildPermission(
                 AquaPermissions.Admin.Savings.Default,

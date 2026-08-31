@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Abp.AutoMapper;
+using Abp.Authorization;
 using Abp.Configuration.Startup;
 using Abp.Dependency;
 using Abp.EntityFrameworkCore.Configuration;
@@ -12,6 +13,7 @@ using Abp.TestBase;
 using Abp.Zero.Configuration;
 using Abp.Zero.EntityFrameworkCore;
 using AqualLifeStyle.Application.Admin.ProgrammeParticipations;
+using AqualLifeStyle.Application.Admin.Commissions;
 using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Email;
@@ -19,6 +21,7 @@ using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.Identity;
 using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Tests.Payments;
+using AqualLifeStyle.Tests.Application;
 using Castle.MicroKernel.Registration;
 using Castle.Windsor.MsDependencyInjection;
 using Microsoft.AspNetCore.DataProtection;
@@ -36,6 +39,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
     public sealed class AQGreenGraduationPostgreSqlApplicationTestModule : AbpModule
     {
         private AQGreenPlacementAllocatorPostgreSqlFixture.DatabaseLease _database;
+        internal static AQGreenPlacementAllocatorPostgreSqlFixture.DatabaseLease
+            CurrentDatabase { get; private set; }
 
         public AQGreenGraduationPostgreSqlApplicationTestModule(
             AqualLifeStyleEntityFrameworkModule entityFrameworkModule)
@@ -50,6 +55,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 throw new InvalidOperationException(
                     "The PostgreSQL collection fixture must be initialized first.");
             _database = server.CreateDatabaseAsync().GetAwaiter().GetResult();
+            CurrentDatabase = _database;
             AQGreenGraduationPostgreSqlFailureState.Shared.Reset(
                 _database.ConnectionString("b52-application"));
 
@@ -104,7 +110,15 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 IocManager.IocContainer,
                 services);
 
+            var permissionChecker = Substitute.For<IPermissionChecker>();
+            permissionChecker.IsGrantedAsync(Arg.Any<string>())
+                .Returns(Task.FromResult(true));
+
             IocManager.IocContainer.Register(
+                Component.For<IPermissionChecker>()
+                    .Instance(permissionChecker)
+                    .Named("b53-postgresql-permission-checker")
+                    .IsDefault(),
                 Component.For<IYocoCheckoutGateway>()
                     .ImplementedBy<FakeYocoCheckoutGateway>()
                     .LifestyleSingleton(),
@@ -115,6 +129,10 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 Component.For<IAQGreenGraduationStructuralEvidenceEvaluator>()
                     .Instance(AQGreenGraduationPostgreSqlEvaluator.Shared)
                     .Named("b52-postgresql-evaluator")
+                    .IsDefault(),
+                Component.For<IAQGreenWeeklySalesReviewGate>()
+                    .Instance(new AQGreenWeeklySalesReviewTestGate())
+                    .Named("b53-postgresql-review-gate")
                     .IsDefault());
         }
 
@@ -122,6 +140,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             _database?.DisposeAsync().AsTask().GetAwaiter().GetResult();
             _database = null;
+            CurrentDatabase = null;
         }
 
         private void RegisterFakeService<TService>() where TService : class

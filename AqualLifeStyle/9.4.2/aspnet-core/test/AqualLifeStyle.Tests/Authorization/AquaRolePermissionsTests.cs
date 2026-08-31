@@ -38,8 +38,12 @@ namespace AqualLifeStyle.Tests.Authorization
                 AquaPermissions.Admin.Commissions.Release);
             AquaPermissions.GetAll().ShouldContain(
                 AquaPermissions.Admin.Commissions.RecordPayment);
+            AquaPermissions.GetAll().ShouldContain(
+                AquaPermissions.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility);
             AquaRolePermissions.GetFor(AquaUserRole.SystemAdmin).ShouldContain(
                 AquaPermissions.Admin.Commissions.Calculate);
+            AquaRolePermissions.GetFor(AquaUserRole.SystemAdmin).ShouldContain(
+                AquaPermissions.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility);
         }
 
         [Fact]
@@ -96,6 +100,7 @@ namespace AqualLifeStyle.Tests.Authorization
 
         [Theory]
         [InlineData(AquaUserRole.AreaLeader, AquaPermissions.Admin.AllTenants)]
+        [InlineData(AquaUserRole.AreaLeader, AquaPermissions.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility)]
         [InlineData(AquaUserRole.AreaLeader, AquaPermissions.Savings.Withdraw)]
         [InlineData(AquaUserRole.Facilitator, AquaPermissions.AreaSpaces.Approve)]
         [InlineData(AquaUserRole.Facilitator, AquaPermissions.Orders.Approve)]
@@ -126,6 +131,7 @@ namespace AqualLifeStyle.Tests.Authorization
         [InlineData(AquaPermissions.Admin.Commissions.Calculate, AquaPermissions.Admin.Commissions.Default)]
         [InlineData(AquaPermissions.Admin.Commissions.Release, AquaPermissions.Admin.Commissions.Default)]
         [InlineData(AquaPermissions.Admin.Commissions.RecordPayment, AquaPermissions.Admin.Commissions.Default)]
+        [InlineData(AquaPermissions.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility, AquaPermissions.Admin.Commissions.Default)]
         [InlineData(AquaPermissions.Admin.Savings.View, AquaPermissions.Admin.Savings.Default)]
         [InlineData(AquaPermissions.Loans.ViewSelf, AquaPermissions.Loans.Default)]
         [InlineData(AquaPermissions.Admin.Loans.View, AquaPermissions.Admin.Loans.Default)]
