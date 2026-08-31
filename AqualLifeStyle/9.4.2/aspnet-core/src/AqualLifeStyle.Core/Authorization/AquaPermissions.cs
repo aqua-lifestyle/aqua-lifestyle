@@ -212,6 +212,8 @@ namespace AqualLifeStyle.Authorization
                 public const string Calculate = Default + ".Calculate";
                 public const string Release = Default + ".Release";
                 public const string RecordPayment = Default + ".RecordPayment";
+                public const string ReviewAQGreenWeeklySalesEligibility =
+                    Default + ".ReviewAQGreenWeeklySalesEligibility";
             }
 
             public static class Savings

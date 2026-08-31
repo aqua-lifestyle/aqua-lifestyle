@@ -59,6 +59,8 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<AQGreenNetworkPlacement> AQGreenNetworkPlacements { get; set; }
         public virtual DbSet<AQGreenRecruitmentAttribution> AQGreenRecruitmentAttributions { get; set; }
         public virtual DbSet<AQGreenRecruitmentAttributionConfirmation> AQGreenRecruitmentAttributionConfirmations { get; set; }
+        public virtual DbSet<AQGreenWeeklySalesEligibilityDecision> AQGreenWeeklySalesEligibilityDecisions { get; set; }
+        public virtual DbSet<AQGreenWeeklySalesEvidenceReference> AQGreenWeeklySalesEvidenceReferences { get; set; }
         public virtual DbSet<EntryRecruiterCorrection> EntryRecruiterCorrections { get; set; }
         public virtual DbSet<EntryParticipationApprovalDecision> EntryParticipationApprovalDecisions { get; set; }
         public virtual DbSet<EntryMonthlyObligationDuePolicy> EntryMonthlyObligationDuePolicies { get; set; }
@@ -99,6 +101,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureAQGreenPlacementTopologyIsAppendOnly();
             EnsureAQGreenRecruitmentAttributionIsAppendOnly();
             EnsureAQGreenV2GraduationEvidenceIsAppendOnly();
+            EnsureAQGreenWeeklySalesEligibilityIsImmutable();
             return base.SaveChanges();
         }
 
@@ -110,6 +113,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureAQGreenPlacementTopologyIsAppendOnly();
             EnsureAQGreenRecruitmentAttributionIsAppendOnly();
             EnsureAQGreenV2GraduationEvidenceIsAppendOnly();
+            EnsureAQGreenWeeklySalesEligibilityIsImmutable();
             return base.SaveChanges(acceptAllChangesOnSuccess);
         }
 
@@ -122,6 +126,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureAQGreenPlacementTopologyIsAppendOnly();
             EnsureAQGreenRecruitmentAttributionIsAppendOnly();
             EnsureAQGreenV2GraduationEvidenceIsAppendOnly();
+            EnsureAQGreenWeeklySalesEligibilityIsImmutable();
             return base.SaveChangesAsync(cancellationToken);
         }
 
@@ -135,6 +140,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureAQGreenPlacementTopologyIsAppendOnly();
             EnsureAQGreenRecruitmentAttributionIsAppendOnly();
             EnsureAQGreenV2GraduationEvidenceIsAppendOnly();
+            EnsureAQGreenWeeklySalesEligibilityIsImmutable();
             return base.SaveChangesAsync(
                 acceptAllChangesOnSuccess,
                 cancellationToken);
@@ -352,6 +358,59 @@ namespace AqualLifeStyle.EntityFrameworkCore
             {
                 throw new InvalidOperationException(
                     "AQGreen V2 graduation evidence is append-only.");
+            }
+        }
+
+        private void EnsureAQGreenWeeklySalesEligibilityIsImmutable()
+        {
+            var invalidEvidenceMutation =
+                ChangeTracker.Entries<AQGreenWeeklySalesEvidenceReference>().Any(entry =>
+                    entry.State == EntityState.Modified ||
+                    entry.State == EntityState.Deleted);
+            var invalidDecisionMutation =
+                ChangeTracker.Entries<AQGreenWeeklySalesEligibilityDecision>().Any(entry =>
+                {
+                    if (entry.State == EntityState.Deleted) return true;
+                    if (entry.State != EntityState.Modified) return false;
+                    var originalStatus = entry.OriginalValues
+                        .GetValue<AQGreenWeeklySalesReviewStatus>(
+                            nameof(AQGreenWeeklySalesEligibilityDecision.ReviewStatus));
+                    var currentStatus = entry.CurrentValues
+                        .GetValue<AQGreenWeeklySalesReviewStatus>(
+                            nameof(AQGreenWeeklySalesEligibilityDecision.ReviewStatus));
+                    if (originalStatus !=
+                            AQGreenWeeklySalesReviewStatus.HeldForEvidence ||
+                        currentStatus ==
+                            AQGreenWeeklySalesReviewStatus.HeldForEvidence)
+                    {
+                        return true;
+                    }
+
+                    var permittedFinalizationProperties = new[]
+                    {
+                        nameof(AQGreenWeeklySalesEligibilityDecision.ReviewStatus),
+                        nameof(AQGreenWeeklySalesEligibilityDecision.ReviewedSprayQuantity),
+                        nameof(AQGreenWeeklySalesEligibilityDecision.ReviewedOneLitreQuantity),
+                        nameof(AQGreenWeeklySalesEligibilityDecision.ReviewedFiveLitreQuantity),
+                        nameof(AQGreenWeeklySalesEligibilityDecision.ThresholdResult),
+                        nameof(AQGreenWeeklySalesEligibilityDecision.ReviewedAt),
+                        nameof(AQGreenWeeklySalesEligibilityDecision.ReviewedByUserId),
+                        nameof(AQGreenWeeklySalesEligibilityDecision.RejectionReason)
+                    };
+                    return entry.Properties.Any(property =>
+                        property.IsModified &&
+                        !permittedFinalizationProperties.Contains(
+                            property.Metadata.Name));
+                });
+            if (invalidEvidenceMutation)
+            {
+                throw new InvalidOperationException(
+                    "AQGreen weekly-sales evidence is append-only.");
+            }
+            if (invalidDecisionMutation)
+            {
+                throw new InvalidOperationException(
+                    "Finalized AQGreen weekly-sales decisions are immutable.");
             }
         }
     }

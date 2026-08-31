@@ -642,7 +642,8 @@ This structural result is intentionally not automatic earning entitlement:
 
 ```text
 StructuralCompletionLevel = Level 2
-WeeklySalesEligibility    = NotMet
+ReviewStatus              = Confirmed
+ThresholdResult           = NotMet
 PaidAsLevel               = None
 ```
 
@@ -995,11 +996,13 @@ Each commission week stands on its own. There is no MVP carry-forward, banking, 
 ```text
 Week 1: StructuralCompletionLevel = Level 2
         Sprays = 5, 1L = 6, 5L = 5
-        WeeklySalesEligibility = Confirmed
+        ReviewStatus = Confirmed
+        ThresholdResult = Met
 
 Week 2: StructuralCompletionLevel = Level 2
         Sprays = 4, 1L = 8, 5L = 5
-        WeeklySalesEligibility = NotMet
+        ReviewStatus = Confirmed
+        ThresholdResult = NotMet
 ```
 
 The Week-2 result does not remove Level 2, change placement, move descendants, or rewrite Week 1.
@@ -1024,11 +1027,13 @@ The conceptual `SalesEligibilityReview` supports repository-appropriate equivale
 
 | Outcome | Meaning |
 | --- | --- |
-| `Confirmed` | Evidence is acceptable and all three quantity thresholds are met. `WeeklySalesEligibility = Confirmed`. |
-| `HeldForEvidence` | Evidence is missing, ambiguous, or awaiting review. Eligibility is not confirmed and no commission becomes available while held. |
-| `Rejected` | Evidence is unacceptable, invalid, or does not support the claimed sales. `WeeklySalesEligibility = NotMet`. |
+| `Confirmed` | Evidence review is complete and the three authoritative reviewed quantities are stored. The versioned evaluator separately derives `ThresholdResult = Met` or `NotMet`. |
+| `HeldForEvidence` | Evidence is missing, ambiguous, or awaiting review. No authoritative quantities, threshold result, reviewer, or finalization time exist while held. |
+| `Rejected` | Evidence is unacceptable or cannot support an authoritative quantity decision. A reason and review audit facts are stored, but there are no authoritative quantities and no threshold result. |
 
-A verified quantity shortfall also produces `WeeklySalesEligibility = NotMet`; the admin cannot waive a product threshold or substitute quantities. Exact enum/entity allocation is an implementation-design choice, but these semantics are mandatory.
+A verified quantity shortfall is therefore `ReviewStatus = Confirmed` plus
+`ThresholdResult = NotMet`; it is not a rejected evidence review. The admin cannot
+submit a threshold result, waive a product threshold, or substitute quantities.
 
 The admin does not determine structural level, placement, commission formula, commission amount, placement parent, placement slot, or payout release. The system derives structure and calculates the financial result from versioned rules.
 
@@ -1042,11 +1047,11 @@ Placement topology at commission cutoff
             -> authorised admin performs SalesEligibilityReview
             -> sprays >= 5 AND 1L >= 5 AND 5L >= 5?
             -> evidence acceptable?
-            -> Confirmed
-                 -> system applies versioned commission rules
+            -> Confirmed + Met
+                 -> a future authorised consumer may apply versioned commission rules
                  -> PaidAsLevel / CommissionedLevel and amount recorded
                  -> existing release/payment controls operate separately
-            -> HeldForEvidence / Rejected
+            -> Confirmed + NotMet / HeldForEvidence / Rejected
                  -> no PaidAsLevel or commission amount becomes available
 ```
 
@@ -1075,7 +1080,9 @@ Sales-eligibility review and commission release/payment require separately grant
 - cycles/cutoffs at or after `V2EffectiveAt` use `AQGreenPlacementV2` only when cutover is authorised and canonicalisation is accepted;
 - the cutoff projection uses placements and structural contribution eligibility effective at that cutoff;
 - the commission result records `StructuralCompletionLevel`, `WeeklySalesEligibility`, `SalesEligibilityRulesVersion`, `PaidAsLevel`/`CommissionedLevel`, amount/components, commission week/cutoff, financial terms version, placement/qualification rules version, review actor/time/outcome, and durable evidence references/digests sufficient for reproduction without PII-heavy snapshots;
-- `WeeklySalesEligibility != Confirmed` cannot produce a PaidAsLevel or make a commission available for that week;
+- only a future authorised consumption path may treat `ReviewStatus = Confirmed`
+  plus `ThresholdResult = Met` as satisfying the weekly gate; confirmed-not-met,
+  rejected, held, missing, unsupported, or corrupt facts fail closed;
 - payout/release remains subject to existing holds, authorization, and payment controls after calculation;
 - no existing `Paid`, `Released`, `Held`, or `Earned` ledger is overwritten merely because V2 or later evidence gives a different result.
 
@@ -1087,7 +1094,12 @@ Current component/rate logic and own-payout hold mechanics remain independently 
 
 ### 24.7 Validation risk and scope boundaries
 
-The 5/5/5 rule is the authorised design rule for a future MVP weekly gate. This specification does not implement or enable it and does not legally or economically validate it; its long-term commercial economics remain a validation hypothesis rather than an eternal invariant.
+The B5.3 foundation persists and validates the 5/5/5 review facts, but its
+production review-write gate is disabled by default and it has no production
+financial consumer. It does not enable Placement V2, D10, a worker, a commission
+selector, or a V1 ledger rewrite. This implementation does not legally or
+economically validate the threshold; its long-term commercial economics remain a
+validation hypothesis rather than an eternal invariant.
 
 Commission source-of-funds and the relationship between participant payments, water/product sales, programme economics, and commission funding require separate business, legal, and economic validation. Weekly sales eligibility is not a substitute for that analysis. This specification makes no legal conclusion.
 
@@ -1563,7 +1575,8 @@ Sprays sold: 5 / 5  PASS
 1L sold:     7 / 5  PASS
 5L sold:     3 / 5  FAIL
 
-WeeklySalesEligibility = NotMet
+ReviewStatus = Confirmed
+ThresholdResult = NotMet
 PaidAsLevel = None
 Commission eligibility = not satisfied for W
 ```
@@ -1579,7 +1592,8 @@ Sprays sold: 8 / 5  PASS
 5L sold:     5 / 5  PASS
 
 SalesEligibilityReview = Confirmed
-WeeklySalesEligibility = Confirmed
+ReviewStatus = Confirmed
+ThresholdResult = Met
 PaidAsLevel = Level 2
 Commission = calculated by the system under the applicable commission rules
 ```
