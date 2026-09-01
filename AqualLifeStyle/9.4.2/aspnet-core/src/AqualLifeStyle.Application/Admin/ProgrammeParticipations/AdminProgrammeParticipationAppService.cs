@@ -58,6 +58,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         private readonly IAQGreenPlacementV2ApprovalGate _placementV2ApprovalGate;
         private readonly IAQGreenApprovalAuthorityStabilizer _approvalAuthorityStabilizer;
         private readonly IAQGreenPlacementTreeLock _placementTreeLock;
+        private readonly IAQGreenPlacementClock _placementClock;
         private readonly IAQGreenPlacementAllocator _placementAllocator;
         private readonly IRepository<AQGreenRecruitmentAttribution, Guid>
             _attributionRepository;
@@ -100,6 +101,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             IAQGreenPlacementV2ApprovalGate placementV2ApprovalGate,
             IAQGreenApprovalAuthorityStabilizer approvalAuthorityStabilizer,
             IAQGreenPlacementTreeLock placementTreeLock,
+            IAQGreenPlacementClock placementClock,
             IAQGreenPlacementAllocator placementAllocator,
             IRepository<AQGreenRecruitmentAttribution, Guid> attributionRepository,
             IRepository<AQGreenRecruitmentAttributionConfirmation, Guid>
@@ -135,6 +137,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             _placementV2ApprovalGate = placementV2ApprovalGate;
             _approvalAuthorityStabilizer = approvalAuthorityStabilizer;
             _placementTreeLock = placementTreeLock;
+            _placementClock = placementClock;
             _placementAllocator = placementAllocator;
             _attributionRepository = attributionRepository;
             _attributionConfirmationRepository = attributionConfirmationRepository;
@@ -868,6 +871,22 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 
             await EnsureCanAdministerAreaAsync(customer);
             await ValidateAQGreenJoiningPaymentAsync(entry);
+            var attribution = await GetAQGreenAttributionAsync(entry);
+            if (attribution.AttributionKind ==
+                AQGreenRecruitmentAttributionKind.AuthorisedProspectiveRoot)
+            {
+                await EnsureCanBootstrapAQGreenRootAsync();
+                return await ApplyAQGreenRootBootstrapAsync(
+                    customer,
+                    entry,
+                    attribution,
+                    administratorUserId);
+            }
+            if (attribution.AttributionKind !=
+                AQGreenRecruitmentAttributionKind.SponsoredParticipant)
+                throw new AQGreenPlacementUnsupportedAttributionException(
+                    attribution.AttributionKind);
+
             var scopeHint = await ResolveAQGreenPlacementScopeAsync(entry);
             await _placementTreeLock.AcquireAsync(scopeHint);
             var authoritativeScope = await ResolveAQGreenPlacementScopeAsync(entry);
@@ -916,6 +935,133 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         }
 
         private async Task<(Customer Customer, Guid ParticipationId, bool DecisionApplied)>
+            ApplyAQGreenRootBootstrapAsync(
+                Customer customer,
+                EntryParticipation entry,
+                AQGreenRecruitmentAttribution attribution,
+                long administratorUserId)
+        {
+            ValidateAQGreenRootAttribution(entry, attribution);
+            var confirmation = await _attributionConfirmationRepository.GetAll()
+                .AsNoTracking()
+                .SingleOrDefaultAsync(item =>
+                    item.TenantId == entry.TenantId &&
+                    item.AttributionId == attribution.Id);
+            ValidateAQGreenRootConfirmation(attribution, confirmation);
+
+            var existingPlacement = await _networkPlacementRepository.GetAll()
+                .AsNoTracking()
+                .SingleOrDefaultAsync(placement =>
+                    placement.TenantId == entry.TenantId &&
+                    placement.ParticipantId == entry.Id);
+            if (entry.Status == EntryParticipationStatus.Active)
+            {
+                await ValidateExistingAQGreenRootPlacementAsync(entry, existingPlacement);
+                return (customer, entry.Id, false);
+            }
+            if (entry.Status != EntryParticipationStatus.PaymentConfirmedAwaitingApproval)
+                throw Failed(
+                    "Participation approval",
+                    "The AQGreen participation is not awaiting administrative approval.");
+            if (existingPlacement != null)
+                throw new AQGreenPlacementConflictException(
+                    "An awaiting AQGreen prospective root already has a placement and requires reconciliation.");
+
+            var decidedAt = await _placementClock.GetUtcNowAsync();
+            var scope = AQGreenPlacementTreeScope.Create(entry.TenantId);
+            var root = AQGreenNetworkPlacement.CreateRoot(
+                scope,
+                entry.Id,
+                decidedAt,
+                AQGreenPlacementRules.CurrentVersion);
+            await _placementTreeScopeRepository.InsertAsync(scope);
+            await _networkPlacementRepository.InsertAsync(root);
+            entry.ApproveByAdministrator(administratorUserId, decidedAt);
+            return (customer, entry.Id, true);
+        }
+
+        private async Task ValidateExistingAQGreenRootPlacementAsync(
+            EntryParticipation entry,
+            AQGreenNetworkPlacement placement)
+        {
+            if (placement == null)
+                throw new AQGreenPlacementConflictException(
+                    "Active AQGreen prospective root is missing its permanent placement and requires reconciliation.");
+            if (placement.PlacementParentParticipantId.HasValue ||
+                placement.PlacementSlot.HasValue ||
+                !string.Equals(placement.CanonicalPath, string.Empty, StringComparison.Ordinal) ||
+                !entry.ActivatedAt.HasValue ||
+                entry.ActivatedAt.Value != placement.PlacedAt)
+                throw new AQGreenPlacementConflictException(
+                    "Active AQGreen prospective root has conflicting placement evidence.");
+            if (!await _placementTreeScopeRepository.GetAll()
+                    .AsNoTracking()
+                    .AnyAsync(scope =>
+                        scope.Id == placement.PlacementTreeScopeId &&
+                        scope.TenantId == entry.TenantId))
+                throw new AQGreenPlacementConflictException(
+                    "Active AQGreen prospective root is missing its placement-tree scope.");
+        }
+
+        private static void ValidateAQGreenRootAttribution(
+            EntryParticipation entry,
+            AQGreenRecruitmentAttribution attribution)
+        {
+            if (attribution.TenantId != entry.TenantId ||
+                attribution.ParticipantId != entry.Id ||
+                attribution.AttributionKind !=
+                    AQGreenRecruitmentAttributionKind.AuthorisedProspectiveRoot ||
+                attribution.CreditedSponsorParticipantId.HasValue ||
+                attribution.AcquisitionSource !=
+                    AQGreenAcquisitionSource.AuthorisedDirectAdmission ||
+                attribution.SourceReferenceId == Guid.Empty ||
+                !attribution.AttributedByUserId.HasValue ||
+                attribution.AttributedByUserId.Value <= 0 ||
+                string.IsNullOrWhiteSpace(attribution.AssignmentReason))
+                throw new AQGreenPlacementConflictException(
+                    "AQGreen prospective-root attribution is not valid bootstrap authority.");
+        }
+
+        private static void ValidateAQGreenRootConfirmation(
+            AQGreenRecruitmentAttribution attribution,
+            AQGreenRecruitmentAttributionConfirmation confirmation)
+        {
+            if (confirmation == null)
+                throw new AQGreenPlacementAttributionNotConfirmedException();
+            if (confirmation.TenantId != attribution.TenantId ||
+                confirmation.AttributionId != attribution.Id ||
+                confirmation.ConfirmationMethod !=
+                    AQGreenAttributionConfirmationMethod.AuthorisedProspectiveRootConfirmation ||
+                confirmation.EvidenceReferenceId == Guid.Empty ||
+                confirmation.ConfirmedAt < attribution.AttributedAt)
+                throw new AQGreenPlacementConflictException(
+                    "AQGreen prospective-root confirmation conflicts with bootstrap authority.");
+        }
+
+        private async Task EnsureCanBootstrapAQGreenRootAsync()
+        {
+            if (AbpSession.TenantId.HasValue ||
+                !await PermissionChecker.IsGrantedAsync(
+                    AquaPermissions.Admin.ProgrammeParticipations.BootstrapAQGreenRoot))
+                throw new AbpAuthorizationException(
+                    "AQGreen root bootstrap requires dedicated host authorization.");
+        }
+
+        private async Task<AQGreenRecruitmentAttribution> GetAQGreenAttributionAsync(
+            EntryParticipation participant)
+        {
+            var attribution = await _attributionRepository.GetAll()
+                .AsNoTracking()
+                .SingleOrDefaultAsync(item =>
+                    item.TenantId == participant.TenantId &&
+                    item.ParticipantId == participant.Id);
+            if (attribution == null)
+                throw new AQGreenPlacementAllocationNotFoundException(
+                    AQGreenPlacementMissingFact.Attribution);
+            return attribution;
+        }
+
+        private async Task<(Customer Customer, Guid ParticipationId, bool DecisionApplied)>
             ApplyAQGreenV2RejectionAsync(Guid participationId, string reason)
         {
             var hint = await _entryParticipationRepository.GetAll()
@@ -950,14 +1096,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         private async Task<Guid> ResolveAQGreenPlacementScopeAsync(
             EntryParticipation participant)
         {
-            var attribution = await _attributionRepository.GetAll()
-                .AsNoTracking()
-                .SingleOrDefaultAsync(item =>
-                    item.TenantId == participant.TenantId &&
-                    item.ParticipantId == participant.Id);
-            if (attribution == null)
-                throw new AQGreenPlacementAllocationNotFoundException(
-                    AQGreenPlacementMissingFact.Attribution);
+            var attribution = await GetAQGreenAttributionAsync(participant);
             if (attribution.AttributionKind !=
                 AQGreenRecruitmentAttributionKind.SponsoredParticipant)
                 throw new AQGreenPlacementUnsupportedAttributionException(

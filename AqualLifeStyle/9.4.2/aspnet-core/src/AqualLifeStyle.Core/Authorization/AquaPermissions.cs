@@ -203,6 +203,7 @@ namespace AqualLifeStyle.Authorization
                 public const string ViewLegacyPaymentReconciliation =
                     Default + ".ViewLegacyPaymentReconciliation";
                 public const string Approve = Default + ".Approve";
+                public const string BootstrapAQGreenRoot = Default + ".BootstrapAQGreenRoot";
             }
 
             public static class Commissions
