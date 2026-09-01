@@ -44,6 +44,11 @@ namespace AqualLifeStyle.EntityFrameworkCore
                     .ImplementedBy<AQGreenStructuralCompletionEvaluator>()
                     .Named("AQGreenGraduationStructuralEvidenceEvaluator")
                     .LifestyleTransient());
+            IocManager.IocContainer.Register(
+                Component.For<IAQGreenCommissionStructuralEvidenceEvaluator>()
+                    .ImplementedBy<AQGreenStructuralCompletionEvaluator>()
+                    .Named("AQGreenCommissionStructuralEvidenceEvaluator")
+                    .LifestyleTransient());
         }
 
         public override void PostInitialize()

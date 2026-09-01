@@ -204,6 +204,71 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task PlacementV2SalesFailure_ExplainsEligibilityWithoutErasingQualifiedLevel()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"progress-v2-not-earned-{suffix}",
+                $"progress-v2-not-earned-{suffix}@example.com");
+            var customerId = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "V2 Not Earned Member",
+                    new EmailAddress(
+                        $"progress-v2-not-earned-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+                return customer.Id;
+            });
+            var participation = await CreateActiveParticipationAsync(
+                customerId,
+                $"progress-v2-not-earned-{suffix}");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var periodStart = EffectiveFrom.AddDays(5);
+                var periodEnd = periodStart.AddDays(7).AddTicks(-1);
+                var period = EntryCommissionPeriod.CreateClosedPeriod(
+                    1,
+                    periodStart,
+                    periodEnd,
+                    "Africa/Johannesburg",
+                    periodEnd.AddMinutes(1),
+                    CommissionTerms);
+                var commission = new EntryWeeklyCommissionCalculator(
+                        new EntryNetworkQualificationEvaluator())
+                    .CalculatePlacementV2(
+                        participation,
+                        period,
+                        CommissionTerms,
+                        EntryNetworkLevel.Level2,
+                        EntryNetworkLevel.None,
+                        Array.Empty<EntryMonthlyObligation>());
+                context.EntryCommissionPeriods.Add(period);
+                context.EntryWeeklyCommissions.Add(commission);
+                await context.SaveChangesAsync();
+            });
+            SetCurrentUser(userId, 1);
+
+            var progress = await _progressService.GetMyProgressAsync();
+            var earning = progress.RecentEarnings.Single();
+            var journey = await _progressService.GetMyJourneyAsync();
+            var journeyEarning = journey.Programmes
+                .Single(item => item.ProgrammeCode == "AQGREEN")
+                .Earnings.LatestRecordedWeek;
+
+            earning.HighestQualifiedLevel.ShouldBe(2);
+            earning.HighestCommissionedLevel.ShouldBe(0);
+            earning.Status.ShouldBe("Not earned");
+            journeyEarning.QualifiedLevel.ShouldBe(2);
+            journeyEarning.CommissionedLevel.ShouldBe(0);
+            journeyEarning.ZeroReason.ShouldBe(
+                "No commission was earned because the weekly eligibility requirements were not met.");
+        }
+
+        [Fact]
         public async Task PaidCommission_ReportsReleasedAndPaidTotals()
         {
             var persisted = await CreateActiveMemberWithPaidCommissionAsync();

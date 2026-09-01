@@ -35,12 +35,30 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
     {
         public void Configure(EntityTypeBuilder<EntryWeeklyCommission> builder)
         {
-            builder.ToTable("EntryWeeklyCommissions");
+            builder.ToTable("EntryWeeklyCommissions", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_EntryWeeklyCommissions_StructuralModel_Range",
+                    "\"StructuralModel\" IN (1, 2)");
+                table.HasCheckConstraint(
+                    "CK_EntryWeeklyCommissions_DecisionVersion_Shape",
+                    "(\"StructuralModel\" = 1 AND " +
+                    "\"CommissionDecisionRulesVersion\" IS NULL) OR " +
+                    "(\"StructuralModel\" = 2 AND " +
+                    "\"CommissionDecisionRulesVersion\" IS NOT NULL AND " +
+                    $"\"CommissionDecisionRulesVersion\" = '{AQGreenCommissionDecisionRules.CurrentVersion}')");
+            });
 
             builder.Property(commission => commission.TenantId).IsRequired();
             builder.Property(commission => commission.EntryParticipationId).IsRequired();
             builder.Property(commission => commission.CustomerId).IsRequired();
             builder.Property(commission => commission.CommissionPeriodId).IsRequired();
+            builder.Property(commission => commission.StructuralModel)
+                .HasSentinel(AQGreenCommissionStructuralModel.LegacyV1)
+                .HasDefaultValue(AQGreenCommissionStructuralModel.LegacyV1)
+                .IsRequired();
+            builder.Property(commission => commission.CommissionDecisionRulesVersion)
+                .HasMaxLength(AQGreenCommissionDecisionRules.MaximumVersionLength);
             builder.Property(commission => commission.HighestCompletedLevel).IsRequired();
             builder.Ignore(commission => commission.HighestQualifiedNetworkLevel);
             builder.Ignore(commission => commission.HighestCommissionedLevel);
@@ -65,6 +83,8 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
                     commission.CustomerId,
                     commission.PayoutStatus
                 });
+            builder.HasAlternateKey(commission => new
+                { commission.TenantId, commission.Id });
 
             builder.HasOne<EntryParticipation>()
                 .WithMany()

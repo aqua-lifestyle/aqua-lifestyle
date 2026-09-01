@@ -92,6 +92,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions.Dto
         public string TimeZoneId { get; set; }
         public int HighestQualifiedLevel { get; set; }
         public int HighestCommissionedLevel { get; set; }
+        public string StructuralModel { get; set; }
+        public string CommissionDecisionRulesVersion { get; set; }
         public decimal TotalAmount { get; set; }
         public string Currency { get; set; }
         public string Status { get; set; }

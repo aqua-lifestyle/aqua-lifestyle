@@ -445,6 +445,9 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 TimeZoneId = period.TimeZoneId,
                 HighestQualifiedLevel = commission.HighestQualifiedNetworkLevel,
                 HighestCommissionedLevel = commission.HighestCommissionedLevel,
+                StructuralModel = commission.StructuralModel.ToString(),
+                CommissionDecisionRulesVersion =
+                    commission.CommissionDecisionRulesVersion,
                 TotalAmount = commission.TotalAmount,
                 Currency = commission.Currency,
                 Status = CommissionPayoutStatusPresenter.ToBusinessLabel(

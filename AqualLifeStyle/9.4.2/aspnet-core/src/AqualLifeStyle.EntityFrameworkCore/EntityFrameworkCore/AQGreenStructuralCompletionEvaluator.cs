@@ -14,6 +14,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
     public sealed class AQGreenStructuralCompletionEvaluator
         : IAQGreenStructuralCompletionEvaluator,
           IAQGreenGraduationStructuralEvidenceEvaluator,
+          IAQGreenCommissionStructuralEvidenceEvaluator,
           ITransientDependency
     {
         private const int GraduationMaximumRelativeDepth = 2;
@@ -90,6 +91,51 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 evaluation.Outcome.StructuralCompletionLevel,
                 evaluation.Outcome.QualifyingDepthCounts[1],
                 evaluation.Outcome.QualifyingDepthCounts[2],
+                AQGreenStructuralQualificationRules.CurrentVersion,
+                observations);
+        }
+
+        async Task<AQGreenCommissionStructuralEvidenceResult>
+            IAQGreenCommissionStructuralEvidenceEvaluator.EvaluateAsync(
+                int tenantId,
+                Guid participantId,
+                DateTime cutoff,
+                CancellationToken cancellationToken)
+        {
+            var evaluation = await EvaluateCoreAsync(
+                tenantId,
+                participantId,
+                cutoff,
+                AQGreenStructuralCompletionCalculator.MaximumLevel,
+                cancellationToken);
+            var observations = evaluation.Nodes
+                .Select((node, ordinal) =>
+                    new AQGreenCommissionStructuralEvidenceObservation
+                    {
+                        CanonicalOrdinal = ordinal,
+                        SourcePlacementId = node.SourcePlacementId,
+                        ParticipationStatusObserved = node.ParticipationStatus,
+                        ParticipationActivatedAtObserved = node.ParticipationActivatedAt,
+                        ParticipationIsDeletedObserved = node.ParticipationIsDeleted,
+                        CustomerIdObserved = node.CustomerId,
+                        CustomerTenantMatchedObserved = node.CustomerTenantId == tenantId,
+                        CustomerIsActiveObserved = node.CustomerIsActive,
+                        CustomerIsDeletedObserved = node.CustomerIsDeleted,
+                        UserIdObserved = node.UserId,
+                        UserTenantMatchedObserved = node.UserTenantId == tenantId,
+                        UserIsActiveObserved = node.UserIsActive,
+                        UserIsDeletedObserved = node.UserIsDeleted
+                    })
+                .ToList();
+            return new AQGreenCommissionStructuralEvidenceResult(
+                participantId,
+                evaluation.PlacementTreeScopeId,
+                cutoff,
+                evaluation.Outcome.StructuralCompletionLevel,
+                evaluation.Outcome.QualifyingDepthCounts[1],
+                evaluation.Outcome.QualifyingDepthCounts[2],
+                evaluation.Outcome.QualifyingDepthCounts[3],
+                AQGreenPlacementRules.CurrentVersion,
                 AQGreenStructuralQualificationRules.CurrentVersion,
                 observations);
         }
