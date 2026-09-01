@@ -23,6 +23,8 @@ namespace AqualLifeStyle.Tests.Authorization
                 AquaPermissions.Admin.ProgrammeParticipations.Default);
             AquaRolePermissions.GetFor(AquaUserRole.SystemAdmin).ShouldContain(
                 AquaPermissions.Admin.ProgrammeParticipations.View);
+            AquaRolePermissions.GetFor(AquaUserRole.SystemAdmin).ShouldContain(
+                AquaPermissions.Admin.ProgrammeParticipations.BootstrapAQGreenRoot);
         }
 
         [Fact]
@@ -100,6 +102,7 @@ namespace AqualLifeStyle.Tests.Authorization
 
         [Theory]
         [InlineData(AquaUserRole.AreaLeader, AquaPermissions.Admin.AllTenants)]
+        [InlineData(AquaUserRole.AreaLeader, AquaPermissions.Admin.ProgrammeParticipations.BootstrapAQGreenRoot)]
         [InlineData(AquaUserRole.AreaLeader, AquaPermissions.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility)]
         [InlineData(AquaUserRole.AreaLeader, AquaPermissions.Savings.Withdraw)]
         [InlineData(AquaUserRole.Facilitator, AquaPermissions.AreaSpaces.Approve)]
@@ -127,6 +130,7 @@ namespace AqualLifeStyle.Tests.Authorization
         [InlineData(AquaPermissions.Referrals.Confirm, AquaPermissions.Referrals.Default)]
         [InlineData(AquaPermissions.ProgrammeParticipations.Join, AquaPermissions.ProgrammeParticipations.Default)]
         [InlineData(AquaPermissions.Admin.ProgrammeParticipations.View, AquaPermissions.Admin.ProgrammeParticipations.Default)]
+        [InlineData(AquaPermissions.Admin.ProgrammeParticipations.BootstrapAQGreenRoot, AquaPermissions.Admin.ProgrammeParticipations.Default)]
         [InlineData(AquaPermissions.Admin.Commissions.View, AquaPermissions.Admin.Commissions.Default)]
         [InlineData(AquaPermissions.Admin.Commissions.Calculate, AquaPermissions.Admin.Commissions.Default)]
         [InlineData(AquaPermissions.Admin.Commissions.Release, AquaPermissions.Admin.Commissions.Default)]

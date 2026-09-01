@@ -4,12 +4,15 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Transactions;
+using Abp;
 using Abp.Authorization;
 using Abp.Authorization.Users;
 using Abp.Domain.Uow;
 using Abp.EntityFrameworkCore;
 using AqualLifeStyle.Application.Admin.ProgrammeParticipations;
 using AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto;
+using AqualLifeStyle.Authorization;
+using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Domain.Areas;
@@ -28,6 +31,7 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using Shouldly;
 using Xunit;
+using RolePermissionSetting = Abp.Authorization.Roles.RolePermissionSetting;
 
 namespace AqualLifeStyle.Web.Tests.Integration
 {
@@ -364,20 +368,269 @@ namespace AqualLifeStyle.Web.Tests.Integration
         }
 
         [Fact]
-        public async Task EnabledV2Approval_AuthorisedProspectiveRootRequiresBootstrap()
+        public async Task EnabledV2Approval_AuthorisedProspectiveRootCommitsExactRootAndRetryIsExact()
         {
             if (!IsPostgreSqlRegressionMode()) return;
 
             LoginAsDefaultTenantAdmin();
-            var fixture = await SeedSponsoredAwaitingApprovalAsync(prospectiveRoot: true);
+            var fixture = await SeedProspectiveRootAwaitingApprovalAsync();
+            LoginAsHostAdmin();
             using (EnableV2(fixture.ParticipantId))
             {
-                await Should.ThrowAsync<AQGreenPlacementUnsupportedAttributionException>(() =>
+                await ApproveAsync(fixture.ParticipantId);
+            }
+
+            Guid placementId = default;
+            Guid scopeId = default;
+            DateTime placedAt = default;
+            await UsingDbContextAsync(async context =>
+            {
+                var participation = await context.EntryParticipations.SingleAsync(item =>
+                    item.Id == fixture.ParticipantId);
+                participation.Status.ShouldBe(EntryParticipationStatus.Active);
+                var placement = await context.AQGreenNetworkPlacements.SingleAsync(item =>
+                    item.ParticipantId == fixture.ParticipantId);
+                placement.PlacementParentParticipantId.ShouldBeNull();
+                placement.PlacementSlot.ShouldBeNull();
+                placement.CanonicalPath.ShouldBe(string.Empty);
+                placement.RulesVersion.ShouldBe(AQGreenPlacementRules.CurrentVersion);
+                participation.ActivatedAt.ShouldBe(placement.PlacedAt);
+                (await context.AQGreenPlacementTreeScopes.CountAsync(scope =>
+                    scope.Id == placement.PlacementTreeScopeId && scope.TenantId == 1))
+                    .ShouldBe(1);
+                placementId = placement.Id;
+                scopeId = placement.PlacementTreeScopeId;
+                placedAt = placement.PlacedAt;
+            });
+
+            using (EnableV2(fixture.ParticipantId))
+            {
+                await ApproveAsync(fixture.ParticipantId);
+            }
+
+            await UsingDbContextAsync(async context =>
+            {
+                var placement = await context.AQGreenNetworkPlacements.SingleAsync(item =>
+                    item.ParticipantId == fixture.ParticipantId);
+                placement.Id.ShouldBe(placementId);
+                placement.PlacementTreeScopeId.ShouldBe(scopeId);
+                placement.PlacedAt.ShouldBe(placedAt);
+                (await context.AQGreenPlacementTreeScopes.CountAsync(scope =>
+                    scope.Id == scopeId)).ShouldBe(1);
+                (await context.EntryParticipationApprovalDecisions.CountAsync(item =>
+                    EF.Property<Guid>(item, "EntryParticipationId") == fixture.ParticipantId))
+                    .ShouldBe(1);
+                (await context.TransactionalEmailOutboxMessages.CountAsync(item =>
+                    item.IdempotencyKey == $"Entry:{fixture.ParticipantId}:approved"))
+                    .ShouldBe(1);
+                (await context.Users.SingleAsync(item => item.Id == fixture.UserId)).Role
+                    .ShouldBe(AquaUserRole.Member);
+                var roleNames = await (
+                        from userRole in context.UserRoles
+                        join role in context.Roles on userRole.RoleId equals role.Id
+                        where userRole.UserId == fixture.UserId && userRole.TenantId == 1
+                        select role.Name)
+                    .ToListAsync();
+                roleNames.ShouldBe(new[] { "Member" });
+            });
+            await AssertApprovalUserLockAvailableAsync(fixture.UserId);
+        }
+
+        [Fact]
+        public async Task EnabledV2Approval_ConcurrentSameProspectiveRootCreatesOneExactMutation()
+        {
+            if (!IsPostgreSqlRegressionMode()) return;
+
+            LoginAsDefaultTenantAdmin();
+            var fixture = await SeedProspectiveRootAwaitingApprovalAsync();
+            var scopeCount = await CountPlacementTreeScopesAsync();
+            LoginAsHostAdmin();
+            using (EnableV2(fixture.ParticipantId))
+            {
+                var outcomes = await Task.WhenAll(
+                    CaptureAsync(() => ApproveAsync(fixture.ParticipantId)),
+                    CaptureAsync(() => ApproveAsync(fixture.ParticipantId)));
+                outcomes.ShouldAllBe(outcome => outcome == null);
+            }
+
+            await AssertCommittedApprovalCountsAsync(fixture.ParticipantId, 1, 1, 1);
+            (await CountPlacementTreeScopesAsync()).ShouldBe(scopeCount + 1);
+            await UsingDbContextAsync(async context =>
+            {
+                var root = await context.AQGreenNetworkPlacements.SingleAsync(item =>
+                    item.ParticipantId == fixture.ParticipantId);
+                root.PlacementParentParticipantId.ShouldBeNull();
+                root.PlacementSlot.ShouldBeNull();
+                root.CanonicalPath.ShouldBe(string.Empty);
+            });
+        }
+
+        [Fact]
+        public async Task EnabledV2Approval_TenantAdministratorCannotBootstrapAuthorisedRoot()
+        {
+            if (!IsPostgreSqlRegressionMode()) return;
+
+            LoginAsDefaultTenantAdmin();
+            var fixture = await SeedProspectiveRootAwaitingApprovalAsync();
+            var scopeCount = await CountPlacementTreeScopesAsync();
+            using (EnableV2(fixture.ParticipantId))
+            {
+                await Should.ThrowAsync<AbpAuthorizationException>(() =>
                     ApproveAsync(fixture.ParticipantId));
             }
 
             await AssertNoApprovalSideEffectsAsync(fixture.ParticipantId, fixture.UserId);
-            await AssertApprovalUserLockAvailableAsync(fixture.UserId);
+            (await CountPlacementTreeScopesAsync()).ShouldBe(scopeCount);
+        }
+
+        [Fact]
+        public async Task EnabledV2Approval_HostWithoutDedicatedBootstrapPermissionCannotBootstrapAuthorisedRoot()
+        {
+            if (!IsPostgreSqlRegressionMode()) return;
+
+            LoginAsDefaultTenantAdmin();
+            var fixture = await SeedProspectiveRootAwaitingApprovalAsync();
+            var scopeCount = await CountPlacementTreeScopesAsync();
+            var hostReviewerUserId = await CreateHostApprovalReviewerWithoutBootstrapAsync();
+            AbpSession.TenantId = null;
+            AbpSession.UserId = hostReviewerUserId;
+
+            var permissionChecker = IocManager.Resolve<IPermissionChecker>();
+            (await permissionChecker.IsGrantedAsync(
+                AquaPermissions.Admin.ProgrammeParticipations.Approve)).ShouldBeTrue();
+            (await permissionChecker.IsGrantedAsync(
+                AquaPermissions.Admin.AllTenants)).ShouldBeTrue();
+            (await permissionChecker.IsGrantedAsync(
+                AquaPermissions.Admin.ProgrammeParticipations.BootstrapAQGreenRoot))
+                .ShouldBeFalse();
+
+            using (EnableV2(fixture.ParticipantId))
+            {
+                var exception = await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                    ApproveAsync(fixture.ParticipantId));
+                exception.Message.ShouldContain("dedicated host authorization");
+            }
+
+            await AssertNoApprovalSideEffectsAsync(fixture.ParticipantId, fixture.UserId);
+            (await CountPlacementTreeScopesAsync()).ShouldBe(scopeCount);
+        }
+
+        [Fact]
+        public async Task EnabledV2Approval_CrossTenantSessionCannotBootstrapAuthorisedRoot()
+        {
+            if (!IsPostgreSqlRegressionMode()) return;
+
+            LoginAsDefaultTenantAdmin();
+            var fixture = await SeedProspectiveRootAwaitingApprovalAsync();
+            var scopeCount = await CountPlacementTreeScopesAsync();
+            AbpSession.TenantId = 2;
+            try
+            {
+                using (EnableV2(fixture.ParticipantId))
+                {
+                    await Should.ThrowAsync<AbpException>(() =>
+                        ApproveAsync(fixture.ParticipantId));
+                }
+            }
+            finally
+            {
+                LoginAsDefaultTenantAdmin();
+            }
+
+            await AssertNoApprovalSideEffectsAsync(fixture.ParticipantId, fixture.UserId);
+            (await CountPlacementTreeScopesAsync()).ShouldBe(scopeCount);
+        }
+
+        [Fact]
+        public async Task EnabledV2Approval_AuthorisedRootLateFailureRollsBackScopeAndEveryEffectThenRetries()
+        {
+            if (!IsPostgreSqlRegressionMode()) return;
+
+            LoginAsDefaultTenantAdmin();
+            var fixture = await SeedProspectiveRootAwaitingApprovalAsync();
+            var scopeCount = await CountPlacementTreeScopesAsync();
+            LoginAsHostAdmin();
+            await using (await InstallFailureTriggerAsync(
+                             "TransactionalEmailOutboxMessages",
+                             "INSERT",
+                             fixture))
+            using (EnableV2(fixture.ParticipantId))
+            {
+                await Should.ThrowAsync<Exception>(() => ApproveAsync(fixture.ParticipantId));
+            }
+
+            await AssertNoApprovalSideEffectsAsync(fixture.ParticipantId, fixture.UserId);
+            (await CountPlacementTreeScopesAsync()).ShouldBe(scopeCount);
+
+            using (EnableV2(fixture.ParticipantId))
+            {
+                await ApproveAsync(fixture.ParticipantId);
+            }
+            await AssertCommittedApprovalCountsAsync(fixture.ParticipantId, 1, 1, 1);
+            (await CountPlacementTreeScopesAsync()).ShouldBe(scopeCount + 1);
+        }
+
+        [Fact]
+        public async Task EnabledV2Approval_FreshRootThenSponsoredChildUsesNormalAllocator()
+        {
+            if (!IsPostgreSqlRegressionMode()) return;
+
+            LoginAsDefaultTenantAdmin();
+            var rootFixture = await SeedProspectiveRootAwaitingApprovalAsync();
+            LoginAsHostAdmin();
+            using (EnableV2(rootFixture.ParticipantId))
+            {
+                await ApproveAsync(rootFixture.ParticipantId);
+            }
+
+            LoginAsDefaultTenantAdmin();
+            var childFixture = await SeedSponsoredChildAsync(rootFixture);
+            using (EnableV2(childFixture.ParticipantId))
+            {
+                await ApproveAsync(childFixture.ParticipantId);
+            }
+
+            await UsingDbContextAsync(async context =>
+            {
+                var root = await context.AQGreenNetworkPlacements.SingleAsync(item =>
+                    item.ParticipantId == rootFixture.ParticipantId);
+                var child = await context.AQGreenNetworkPlacements.SingleAsync(item =>
+                    item.ParticipantId == childFixture.ParticipantId);
+                root.PlacementParentParticipantId.ShouldBeNull();
+                root.PlacementSlot.ShouldBeNull();
+                root.CanonicalPath.ShouldBe(string.Empty);
+                child.PlacementTreeScopeId.ShouldBe(root.PlacementTreeScopeId);
+                child.PlacementParentParticipantId.ShouldBe(rootFixture.ParticipantId);
+                child.PlacementSlot.ShouldBe(1);
+                child.CanonicalPath.ShouldBe("1");
+                (await context.EntryParticipations.SingleAsync(item =>
+                    item.Id == rootFixture.ParticipantId)).Status.ShouldBe(
+                    EntryParticipationStatus.Active);
+                (await context.EntryParticipations.SingleAsync(item =>
+                    item.Id == childFixture.ParticipantId)).Status.ShouldBe(
+                    EntryParticipationStatus.Active);
+            });
+        }
+
+        [Fact]
+        public async Task EnabledV2Approval_SponsoredParticipantMissingSponsorPlacementStillFailsClosed()
+        {
+            if (!IsPostgreSqlRegressionMode()) return;
+
+            LoginAsDefaultTenantAdmin();
+            var fixture = await SeedSponsoredAwaitingApprovalAsync(
+                includeSponsorPlacement: false);
+            var scopeCount = await CountPlacementTreeScopesAsync();
+            using (EnableV2(fixture.ParticipantId))
+            {
+                var exception = await Should.ThrowAsync<
+                    AQGreenPlacementAllocationNotFoundException>(() =>
+                    ApproveAsync(fixture.ParticipantId));
+                exception.MissingFact.ShouldBe(AQGreenPlacementMissingFact.SponsorPlacement);
+            }
+
+            await AssertNoApprovalSideEffectsAsync(fixture.ParticipantId, fixture.UserId);
+            (await CountPlacementTreeScopesAsync()).ShouldBe(scopeCount);
         }
 
         [Theory]
@@ -662,9 +915,9 @@ namespace AqualLifeStyle.Web.Tests.Integration
 
         private async Task<ApprovalFixture> SeedSponsoredAwaitingApprovalAsync(
             bool includeAttribution = true,
-            bool prospectiveRoot = false,
             bool sponsorInDifferentArea = false,
-            bool targetPaymentConfirmed = true)
+            bool targetPaymentConfirmed = true,
+            bool includeSponsorPlacement = true)
         {
             var fixture = new ApprovalFixture();
             await UsingDbContextAsync(async context =>
@@ -746,53 +999,46 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 context.EntryParticipations.AddRange(sponsorParticipation, participant);
                 await context.SaveChangesAsync();
 
-                var scope = AQGreenPlacementTreeScope.Create(1);
-                var root = AQGreenNetworkPlacement.CreateRoot(
-                    scope,
-                    sponsorParticipation.Id,
-                    now.AddMinutes(2),
-                    AQGreenPlacementRules.CurrentVersion);
-                context.AQGreenPlacementTreeScopes.Add(scope);
-                context.AQGreenNetworkPlacements.Add(root);
+                AQGreenPlacementTreeScope scope = null;
+                if (includeSponsorPlacement)
+                {
+                    scope = AQGreenPlacementTreeScope.Create(1);
+                    var root = AQGreenNetworkPlacement.CreateRoot(
+                        scope,
+                        sponsorParticipation.Id,
+                        now.AddMinutes(2),
+                        AQGreenPlacementRules.CurrentVersion);
+                    context.AQGreenPlacementTreeScopes.Add(scope);
+                    context.AQGreenNetworkPlacements.Add(root);
+                }
 
                 if (includeAttribution)
                 {
-                    ProgrammeInvitation invitation = null;
-                    var sourceReferenceId = Guid.NewGuid();
-                    if (!prospectiveRoot)
-                    {
-                        invitation = ProgrammeInvitation.Create(
-                            1,
-                            "AQGREEN",
-                            sponsorParticipation.Id);
-                        sourceReferenceId = invitation.Id;
-                        context.ProgrammeInvitations.Add(invitation);
-                        await context.SaveChangesAsync();
-                    }
+                    var invitation = ProgrammeInvitation.Create(
+                        1,
+                        "AQGREEN",
+                        sponsorParticipation.Id);
+                    var sourceReferenceId = invitation.Id;
+                    context.ProgrammeInvitations.Add(invitation);
+                    await context.SaveChangesAsync();
                     var attribution = AQGreenRecruitmentAttribution.Create(
                         1,
                         participant.Id,
-                        prospectiveRoot ? null : sponsorParticipation.Id,
-                        prospectiveRoot
-                            ? AQGreenRecruitmentAttributionKind.AuthorisedProspectiveRoot
-                            : AQGreenRecruitmentAttributionKind.SponsoredParticipant,
-                        prospectiveRoot
-                            ? AQGreenAcquisitionSource.AuthorisedDirectAdmission
-                            : AQGreenAcquisitionSource.MemberInvitation,
+                        sponsorParticipation.Id,
+                        AQGreenRecruitmentAttributionKind.SponsoredParticipant,
+                        AQGreenAcquisitionSource.MemberInvitation,
                         sourceReferenceId,
                         now.AddMinutes(5),
-                        prospectiveRoot ? AbpSession.UserId : null,
-                        prospectiveRoot ? "B3.2 root bootstrap remains unsupported" : null,
+                        null,
+                        null,
                         AQGreenRecruitmentAttributionRules.CurrentVersion);
                     context.AQGreenRecruitmentAttributions.Add(attribution);
                     await context.SaveChangesAsync();
                     var confirmation = AQGreenRecruitmentAttributionConfirmation.Confirm(
                         attribution,
                         now.AddMinutes(6),
-                        prospectiveRoot ? AbpSession.UserId : target.User.Id,
-                        prospectiveRoot
-                            ? AQGreenAttributionConfirmationMethod.AuthorisedProspectiveRootConfirmation
-                            : AQGreenAttributionConfirmationMethod.MemberInvitationAcceptance,
+                        target.User.Id,
+                        AQGreenAttributionConfirmationMethod.MemberInvitationAcceptance,
                         sourceReferenceId,
                         AQGreenRecruitmentAttributionRules.CurrentVersion);
                     context.AQGreenRecruitmentAttributionConfirmations.Add(confirmation);
@@ -801,12 +1047,182 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 await context.SaveChangesAsync();
                 fixture.ParticipantId = participant.Id;
                 fixture.SponsorParticipantId = sponsorParticipation.Id;
-                fixture.ScopeId = scope.Id;
+                fixture.ScopeId = scope?.Id ?? Guid.Empty;
                 fixture.UserId = target.User.Id;
                 fixture.CustomerId = target.Customer.Id;
                 fixture.AreaId = area.Id;
                 fixture.SponsorAreaId = sponsorArea.Id;
                 fixture.AdministratorUserId = AbpSession.UserId.Value;
+            });
+            return fixture;
+        }
+
+        private async Task<ApprovalFixture> SeedProspectiveRootAwaitingApprovalAsync()
+        {
+            var fixture = new ApprovalFixture();
+            await UsingDbContextAsync(async context =>
+            {
+                context.Database.IsNpgsql().ShouldBeTrue();
+                var now = DateTime.UtcNow.AddMinutes(-10);
+                var area = await (
+                        from assignment in context.AreaAdminAssignments
+                        join candidate in context.Areas on assignment.AreaId equals candidate.Id
+                        where assignment.TenantId == 1 &&
+                              assignment.UserId == AbpSession.UserId.Value &&
+                              !assignment.RevokedAt.HasValue &&
+                              candidate.IsActive
+                        select candidate)
+                    .FirstAsync();
+                var hostAdministratorUserId = await context.Users
+                    .IgnoreQueryFilters()
+                    .Where(user => user.TenantId == null &&
+                                   user.UserName == AbpUserBase.AdminUserName)
+                    .Select(user => user.Id)
+                    .SingleAsync();
+                var guestRole = await context.Roles.SingleAsync(role =>
+                    role.TenantId == 1 && role.Name == "Guest");
+                var target = await CreateCustomerAsync(
+                    context,
+                    area,
+                    AquaUserRole.Guest,
+                    now,
+                    "prospective-root");
+                context.UserRoles.Add(new UserRole(1, target.User.Id, guestRole.Id));
+
+                var terms = EntryProgrammeTerms.CreateSingleJoiningPayment(
+                    $"root{Guid.NewGuid():N}"[..32],
+                    now.AddDays(-1),
+                    1200m,
+                    600m,
+                    7);
+                var participant = EntryParticipation.StartIndependently(
+                    1,
+                    target.Customer.Id,
+                    terms,
+                    now);
+                var payment = CreateConfirmedJoiningPayment(
+                    target.Customer.Id,
+                    now.AddMinutes(1),
+                    "prospective-root");
+                participant.ApplyConfirmedJoiningPayment(payment);
+                context.MemberPayments.Add(payment);
+                context.EntryParticipations.Add(participant);
+                await context.SaveChangesAsync();
+
+                var bootstrapReferenceId = Guid.NewGuid();
+                var attribution = AQGreenRecruitmentAttribution.Create(
+                    1,
+                    participant.Id,
+                    null,
+                    AQGreenRecruitmentAttributionKind.AuthorisedProspectiveRoot,
+                    AQGreenAcquisitionSource.AuthorisedDirectAdmission,
+                    bootstrapReferenceId,
+                    now.AddMinutes(3),
+                    hostAdministratorUserId,
+                    "Fresh AQGreen V2 network bootstrap",
+                    AQGreenRecruitmentAttributionRules.CurrentVersion);
+                context.AQGreenRecruitmentAttributions.Add(attribution);
+                await context.SaveChangesAsync();
+                context.AQGreenRecruitmentAttributionConfirmations.Add(
+                    AQGreenRecruitmentAttributionConfirmation.Confirm(
+                        attribution,
+                        now.AddMinutes(4),
+                        hostAdministratorUserId,
+                        AQGreenAttributionConfirmationMethod
+                            .AuthorisedProspectiveRootConfirmation,
+                        bootstrapReferenceId,
+                        AQGreenRecruitmentAttributionRules.CurrentVersion));
+                await context.SaveChangesAsync();
+
+                fixture.ParticipantId = participant.Id;
+                fixture.UserId = target.User.Id;
+                fixture.CustomerId = target.Customer.Id;
+                fixture.AreaId = area.Id;
+                fixture.SponsorAreaId = area.Id;
+                fixture.AdministratorUserId = hostAdministratorUserId;
+            });
+            return fixture;
+        }
+
+        private async Task<ApprovalFixture> SeedSponsoredChildAsync(ApprovalFixture rootFixture)
+        {
+            var fixture = new ApprovalFixture
+            {
+                SponsorParticipantId = rootFixture.ParticipantId,
+                AreaId = rootFixture.AreaId,
+                SponsorAreaId = rootFixture.AreaId,
+                AdministratorUserId = AbpSession.UserId.Value
+            };
+            await UsingDbContextAsync(async context =>
+            {
+                var now = DateTime.UtcNow.AddMinutes(-5);
+                var area = await context.Areas.SingleAsync(item =>
+                    item.Id == rootFixture.AreaId && item.TenantId == 1);
+                var sponsor = await context.EntryParticipations.SingleAsync(item =>
+                    item.Id == rootFixture.ParticipantId && item.TenantId == 1);
+                sponsor.Status.ShouldBe(EntryParticipationStatus.Active);
+                var guestRole = await context.Roles.SingleAsync(role =>
+                    role.TenantId == 1 && role.Name == "Guest");
+                var target = await CreateCustomerAsync(
+                    context,
+                    area,
+                    AquaUserRole.Guest,
+                    now,
+                    "first-root-child");
+                context.UserRoles.Add(new UserRole(1, target.User.Id, guestRole.Id));
+                var terms = EntryProgrammeTerms.CreateSingleJoiningPayment(
+                    $"child{Guid.NewGuid():N}"[..32],
+                    now.AddDays(-1),
+                    1200m,
+                    600m,
+                    7);
+                var participant = EntryParticipation.StartUnderRecruiter(
+                    1,
+                    target.Customer.Id,
+                    sponsor,
+                    terms,
+                    now);
+                var payment = CreateConfirmedJoiningPayment(
+                    target.Customer.Id,
+                    now.AddMinutes(1),
+                    "first-root-child");
+                participant.ApplyConfirmedJoiningPayment(payment);
+                context.MemberPayments.Add(payment);
+                context.EntryParticipations.Add(participant);
+
+                var invitation = ProgrammeInvitation.Create(1, "AQGREEN", sponsor.Id);
+                context.ProgrammeInvitations.Add(invitation);
+                await context.SaveChangesAsync();
+                var attribution = AQGreenRecruitmentAttribution.Create(
+                    1,
+                    participant.Id,
+                    sponsor.Id,
+                    AQGreenRecruitmentAttributionKind.SponsoredParticipant,
+                    AQGreenAcquisitionSource.MemberInvitation,
+                    invitation.Id,
+                    now.AddMinutes(2),
+                    null,
+                    null,
+                    AQGreenRecruitmentAttributionRules.CurrentVersion);
+                context.AQGreenRecruitmentAttributions.Add(attribution);
+                await context.SaveChangesAsync();
+                context.AQGreenRecruitmentAttributionConfirmations.Add(
+                    AQGreenRecruitmentAttributionConfirmation.Confirm(
+                        attribution,
+                        now.AddMinutes(3),
+                        target.User.Id,
+                        AQGreenAttributionConfirmationMethod.MemberInvitationAcceptance,
+                        invitation.Id,
+                        AQGreenRecruitmentAttributionRules.CurrentVersion));
+                await context.SaveChangesAsync();
+
+                fixture.ParticipantId = participant.Id;
+                fixture.ScopeId = await context.AQGreenNetworkPlacements
+                    .Where(item => item.ParticipantId == sponsor.Id)
+                    .Select(item => item.PlacementTreeScopeId)
+                    .SingleAsync();
+                fixture.UserId = target.User.Id;
+                fixture.CustomerId = target.Customer.Id;
             });
             return fixture;
         }
@@ -973,6 +1389,54 @@ namespace AqualLifeStyle.Web.Tests.Integration
             });
         }
 
+        private async Task<long> CreateHostApprovalReviewerWithoutBootstrapAsync()
+        {
+            return await UsingDbContextAsync(async context =>
+            {
+                var suffix = Guid.NewGuid().ToString("N");
+                var role = new Role(
+                    null,
+                    $"RootReview-{suffix[..20]}",
+                    $"Root Approval Reviewer {suffix}");
+                var user = new User
+                {
+                    TenantId = null,
+                    UserName = $"root-approval-reviewer-{suffix}",
+                    EmailAddress = $"root-approval-reviewer-{suffix}@example.test",
+                    Name = "Root",
+                    Surname = "Approval Reviewer",
+                    IsEmailConfirmed = true,
+                    IsActive = true
+                };
+                user.SetNormalizedNames();
+                user.Password = new PasswordHasher<User>(
+                        new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()))
+                    .HashPassword(user, User.DefaultPassword);
+                context.Roles.Add(role);
+                context.Users.Add(user);
+                await context.SaveChangesAsync();
+
+                context.UserRoles.Add(new UserRole(null, user.Id, role.Id));
+                context.Permissions.AddRange(
+                    new RolePermissionSetting
+                    {
+                        TenantId = null,
+                        Name = AquaPermissions.Admin.ProgrammeParticipations.Approve,
+                        IsGranted = true,
+                        RoleId = role.Id
+                    },
+                    new RolePermissionSetting
+                    {
+                        TenantId = null,
+                        Name = AquaPermissions.Admin.AllTenants,
+                        IsGranted = true,
+                        RoleId = role.Id
+                    });
+                await context.SaveChangesAsync();
+                return user.Id;
+            });
+        }
+
         private static async Task<(User User, Customer Customer)> CreateCustomerAsync(
             AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext context,
             Area area,
@@ -1085,6 +1549,9 @@ namespace AqualLifeStyle.Web.Tests.Integration
                     .ShouldBe(outboxMessages);
             });
         }
+
+        private Task<int> CountPlacementTreeScopesAsync() =>
+            UsingDbContextAsync(context => context.AQGreenPlacementTreeScopes.CountAsync());
 
         private async Task<FailureTrigger> InstallFailureTriggerAsync(
             string table,
@@ -1279,6 +1746,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                     .SingleAsync(item => item.Id == participantId);
                 participation.Status.ShouldBe(
                     EntryParticipationStatus.PaymentConfirmedAwaitingApproval);
+                participation.ActivatedAt.ShouldBeNull();
                 (await context.AQGreenNetworkPlacements.CountAsync(item =>
                     item.ParticipantId == participantId)).ShouldBe(0);
                 (await context.EntryParticipationApprovalDecisions.CountAsync(item =>

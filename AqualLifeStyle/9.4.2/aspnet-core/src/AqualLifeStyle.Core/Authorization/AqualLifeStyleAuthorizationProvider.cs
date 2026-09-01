@@ -152,6 +152,10 @@ namespace AqualLifeStyle.Authorization
                 AquaPermissions.Admin.ProgrammeParticipations.TerminatePaymentCheckouts,
                 AquaPermissions.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation,
                 AquaPermissions.Admin.ProgrammeParticipations.Approve);
+            CreateChildren(
+                programmeParticipations,
+                MultiTenancySides.Host,
+                AquaPermissions.Admin.ProgrammeParticipations.BootstrapAQGreenRoot);
 
             var diagnostics = admin.CreateChildPermission(
                 AquaPermissions.Admin.Diagnostics.Default,
