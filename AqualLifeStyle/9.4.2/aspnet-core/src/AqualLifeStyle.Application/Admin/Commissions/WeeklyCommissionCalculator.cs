@@ -6,6 +6,7 @@ using Abp.Dependency;
 using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
 using AqualLifeStyle.Application.Admin.Commissions.Dto;
+using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Onyx;
 using Microsoft.EntityFrameworkCore;
@@ -49,9 +50,17 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         private readonly IRepository<EntryCommissionPeriod, Guid> _entryPeriodRepository;
         private readonly IRepository<OnyxCommissionPeriod, Guid> _onyxPeriodRepository;
         private readonly IRepository<EntryWeeklyCommission, Guid> _entryCommissionRepository;
+        private readonly IRepository<AQGreenV2WeeklyCommissionEvidence, Guid>
+            _entryV2EvidenceRepository;
         private readonly IRepository<OnyxWeeklyCommission, Guid> _onyxCommissionRepository;
         private readonly ICommissionTermsResolver _termsResolver;
         private readonly IAreaActivationStateResolver _areaActivationStateResolver;
+        private readonly IAQGreenCommissionStructuralModelSelector
+            _entryStructuralModelSelector;
+        private readonly IAQGreenCommissionStructuralEvidenceEvaluator
+            _entryStructuralEvidenceEvaluator;
+        private readonly IAQGreenWeeklySalesEligibilityDecisionReader
+            _weeklySalesDecisionReader;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public WeeklyCommissionCalculator(
@@ -62,9 +71,13 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             IRepository<EntryCommissionPeriod, Guid> entryPeriodRepository,
             IRepository<OnyxCommissionPeriod, Guid> onyxPeriodRepository,
             IRepository<EntryWeeklyCommission, Guid> entryCommissionRepository,
+            IRepository<AQGreenV2WeeklyCommissionEvidence, Guid> entryV2EvidenceRepository,
             IRepository<OnyxWeeklyCommission, Guid> onyxCommissionRepository,
             ICommissionTermsResolver termsResolver,
             IAreaActivationStateResolver areaActivationStateResolver,
+            IAQGreenCommissionStructuralModelSelector entryStructuralModelSelector,
+            IAQGreenCommissionStructuralEvidenceEvaluator entryStructuralEvidenceEvaluator,
+            IAQGreenWeeklySalesEligibilityDecisionReader weeklySalesDecisionReader,
             IUnitOfWorkManager unitOfWorkManager)
         {
             _entryParticipationRepository = entryParticipationRepository;
@@ -74,9 +87,13 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             _entryPeriodRepository = entryPeriodRepository;
             _onyxPeriodRepository = onyxPeriodRepository;
             _entryCommissionRepository = entryCommissionRepository;
+            _entryV2EvidenceRepository = entryV2EvidenceRepository;
             _onyxCommissionRepository = onyxCommissionRepository;
             _termsResolver = termsResolver;
             _areaActivationStateResolver = areaActivationStateResolver;
+            _entryStructuralModelSelector = entryStructuralModelSelector;
+            _entryStructuralEvidenceEvaluator = entryStructuralEvidenceEvaluator;
+            _weeklySalesDecisionReader = weeklySalesDecisionReader;
             _unitOfWorkManager = unitOfWorkManager;
         }
 
@@ -117,11 +134,22 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 tenantId,
                 closedWeek.PeriodEndUtc);
             var terms = await _termsResolver.ResolveEntryTermsAsync(closedWeek);
+            var structuralModel = await _entryStructuralModelSelector.SelectAsync(
+                tenantId,
+                closedWeek.PeriodEndUtc);
+            if (structuralModel != AQGreenCommissionStructuralModel.LegacyV1 &&
+                structuralModel != AQGreenCommissionStructuralModel.PlacementV2)
+                throw new InvalidOperationException(
+                    "The selected AQGreen commission structural model is unsupported.");
             List<EntryParticipation> networkParticipations;
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.SoftDelete))
             {
-                networkParticipations = await _entryParticipationRepository
-                    .GetAllIncluding(participation => participation.RecruiterCorrections)
+                var participationQuery = structuralModel ==
+                        AQGreenCommissionStructuralModel.LegacyV1
+                    ? _entryParticipationRepository.GetAllIncluding(
+                        participation => participation.RecruiterCorrections)
+                    : _entryParticipationRepository.GetAll();
+                networkParticipations = await participationQuery
                     .Where(participation =>
                         participation.TenantId == tenantId &&
                         participation.Status == EntryParticipationStatus.Active &&
@@ -130,10 +158,6 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     .ToListAsync();
             }
             EnsureNoDeletedParticipationEvidence(networkParticipations, "AQGreen");
-            var effectiveNetwork = EffectiveProgrammeNetwork.BuildAQGreen(
-                tenantId,
-                networkParticipations,
-                closedWeek.PeriodEndUtc);
             var targetParticipations = networkParticipations;
             var targetParticipationIds = targetParticipations
                 .Select(participation => participation.Id)
@@ -148,6 +172,42 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     targetParticipationIds.Contains(agreement.EntryParticipationId))
                 .ToListAsync();
 
+            EffectiveProgrammeNetwork effectiveNetwork = null;
+            var placementV2Inputs = new List<PlacementV2CommissionInput>();
+            if (structuralModel == AQGreenCommissionStructuralModel.LegacyV1)
+            {
+                effectiveNetwork = EffectiveProgrammeNetwork.BuildAQGreen(
+                    tenantId,
+                    networkParticipations,
+                    closedWeek.PeriodEndUtc);
+            }
+            else
+            {
+                foreach (var participation in targetParticipations)
+                {
+                    var structuralEvidence = await _entryStructuralEvidenceEvaluator
+                        .EvaluateAsync(
+                            tenantId,
+                            participation.Id,
+                            closedWeek.PeriodEndUtc);
+                    AQGreenWeeklySalesEligibilitySnapshot salesDecision = null;
+                    if (structuralEvidence.StructuralCompletionLevel !=
+                        AQGreenStructuralCompletionLevel.Level0)
+                    {
+                        salesDecision = await _weeklySalesDecisionReader
+                            .GetFinalDecisionAsync(
+                                tenantId,
+                                participation.Id,
+                                closedWeek.PeriodStartUtc,
+                                AQGreenWeeklySalesEligibilityRules.CurrentVersion);
+                    }
+                    placementV2Inputs.Add(new PlacementV2CommissionInput(
+                        participation,
+                        structuralEvidence,
+                        salesDecision));
+                }
+            }
+
             var period = EntryCommissionPeriod.CreateClosedPeriod(
                 tenantId,
                 closedWeek.PeriodStartUtc,
@@ -158,18 +218,50 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             await _entryPeriodRepository.InsertAsync(period);
             var calculator = new EntryWeeklyCommissionCalculator(
                 new EntryNetworkQualificationEvaluator());
-            var commissions = targetParticipations
-                .Select(participation => calculator.Calculate(
-                    participation,
-                    period,
-                    terms,
-                    effectiveNetwork,
-                    obligations,
-                    loanAgreements))
-                .ToList();
-            foreach (var commission in commissions)
+            var commissions = new List<EntryWeeklyCommission>();
+            if (structuralModel == AQGreenCommissionStructuralModel.LegacyV1)
             {
-                await _entryCommissionRepository.InsertAsync(commission);
+                commissions.AddRange(targetParticipations.Select(participation =>
+                    calculator.Calculate(
+                        participation,
+                        period,
+                        terms,
+                        effectiveNetwork,
+                        obligations,
+                        loanAgreements)));
+                foreach (var commission in commissions)
+                    await _entryCommissionRepository.InsertAsync(commission);
+            }
+            else
+            {
+                foreach (var input in placementV2Inputs)
+                {
+                    var qualifiedLevel = (EntryNetworkLevel)(int)input
+                        .StructuralEvidence.StructuralCompletionLevel;
+                    var commissionedLevel = input.SalesDecision != null &&
+                                            input.SalesDecision.ReviewStatus ==
+                                                AQGreenWeeklySalesReviewStatus.Confirmed &&
+                                            input.SalesDecision.ThresholdResult ==
+                                                AQGreenWeeklySalesThresholdResult.Met
+                        ? qualifiedLevel
+                        : EntryNetworkLevel.None;
+                    var commission = calculator.CalculatePlacementV2(
+                        input.Participation,
+                        period,
+                        terms,
+                        qualifiedLevel,
+                        commissionedLevel,
+                        obligations,
+                        loanAgreements);
+                    var evidence = AQGreenV2WeeklyCommissionEvidence.Capture(
+                        commission,
+                        period,
+                        input.StructuralEvidence,
+                        input.SalesDecision);
+                    commissions.Add(commission);
+                    await _entryCommissionRepository.InsertAsync(commission);
+                    await _entryV2EvidenceRepository.InsertAsync(evidence);
+                }
             }
 
             await _unitOfWorkManager.Current.SaveChangesAsync();
@@ -340,6 +432,23 @@ namespace AqualLifeStyle.Application.Admin.Commissions
 
             public decimal Amount { get; }
             public WeeklyCommissionPayoutStatus Status { get; }
+        }
+
+        private sealed class PlacementV2CommissionInput
+        {
+            public PlacementV2CommissionInput(
+                EntryParticipation participation,
+                AQGreenCommissionStructuralEvidenceResult structuralEvidence,
+                AQGreenWeeklySalesEligibilitySnapshot salesDecision)
+            {
+                Participation = participation;
+                StructuralEvidence = structuralEvidence;
+                SalesDecision = salesDecision;
+            }
+
+            public EntryParticipation Participation { get; }
+            public AQGreenCommissionStructuralEvidenceResult StructuralEvidence { get; }
+            public AQGreenWeeklySalesEligibilitySnapshot SalesDecision { get; }
         }
     }
 }

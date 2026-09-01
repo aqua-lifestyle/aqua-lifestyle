@@ -646,7 +646,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 Status = CommissionPayoutStatusPresenter.ToBusinessLabel(commission.PayoutStatus),
                 HoldReason = commission.HoldReason,
                 ZeroReason = commission.PayoutStatus == WeeklyCommissionPayoutStatus.NotEarned
-                    ? "No complete network level was achieved when this week closed."
+                    ? commission.HighestQualifiedNetworkLevel == 0
+                        ? "No complete network level was achieved when this week closed."
+                        : "No commission was earned because the weekly eligibility requirements were not met."
                     : null,
                 QualifiedLevel = commission.HighestQualifiedNetworkLevel,
                 CommissionedLevel = commission.HighestCommissionedLevel,

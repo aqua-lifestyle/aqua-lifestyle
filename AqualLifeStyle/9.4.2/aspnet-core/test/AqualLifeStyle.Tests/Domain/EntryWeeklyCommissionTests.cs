@@ -46,6 +46,9 @@ namespace AqualLifeStyle.Tests.Domain
             var commission = Calculate(network);
 
             Assert.Equal(0, commission.HighestCompletedLevel);
+            Assert.Equal(AQGreenCommissionStructuralModel.LegacyV1,
+                commission.StructuralModel);
+            Assert.Null(commission.CommissionDecisionRulesVersion);
             Assert.Empty(commission.Components);
             Assert.Equal(0m, commission.TotalAmount);
             Assert.Equal(WeeklyCommissionPayoutStatus.NotEarned, commission.PayoutStatus);
@@ -505,6 +508,105 @@ namespace AqualLifeStyle.Tests.Domain
             var commission = CalculateForPeriod(network, period, loans: new[] { loan });
             Assert.Equal(WeeklyCommissionPayoutStatus.Held, commission.PayoutStatus);
             Assert.Equal("Onyx loan repayment is overdue.", commission.HoldReason);
+        }
+
+        [Theory]
+        [InlineData(0, 0)]
+        [InlineData(1, 150)]
+        [InlineData(2, 400)]
+        [InlineData(3, 1650)]
+        public void PlacementV2_ConfirmedMet_UsesExistingCumulativeCommissionTerms(
+            int qualifiedLevel,
+            decimal expectedTotal)
+        {
+            var network = BuildNetwork(maxDepth: 0);
+            var participation = network.Single();
+            var period = CreatePeriod(EffectiveFrom.AddDays(5));
+            var calculator = new EntryWeeklyCommissionCalculator(
+                new EntryNetworkQualificationEvaluator());
+
+            var commission = calculator.CalculatePlacementV2(
+                participation,
+                period,
+                CommissionTerms,
+                (EntryNetworkLevel)qualifiedLevel,
+                (EntryNetworkLevel)qualifiedLevel,
+                Array.Empty<EntryMonthlyObligation>());
+
+            Assert.Equal(AQGreenCommissionStructuralModel.PlacementV2,
+                commission.StructuralModel);
+            Assert.Equal(AQGreenCommissionDecisionRules.CurrentVersion,
+                commission.CommissionDecisionRulesVersion);
+            Assert.Equal(qualifiedLevel, commission.HighestQualifiedNetworkLevel);
+            Assert.Equal(qualifiedLevel, commission.HighestCommissionedLevel);
+            Assert.Equal(qualifiedLevel, commission.Components.Count);
+            Assert.Equal(expectedTotal, commission.TotalAmount);
+            Assert.Equal(
+                qualifiedLevel == 0
+                    ? WeeklyCommissionPayoutStatus.NotEarned
+                    : WeeklyCommissionPayoutStatus.Earned,
+                commission.PayoutStatus);
+        }
+
+        [Fact]
+        public void PlacementV2_ConfirmedNotMet_RetainsQualifiedLevelButRecordsNoAmountOrHold()
+        {
+            var network = BuildNetwork(maxDepth: 0);
+            var participation = network.Single();
+            var period = CreatePeriod(EffectiveFrom.AddDays(5));
+            var obligation = EntryMonthlyObligation.Create(
+                participation,
+                2026,
+                7,
+                EffectiveFrom.AddDays(1),
+                "due-policy-v1");
+            var calculator = new EntryWeeklyCommissionCalculator(
+                new EntryNetworkQualificationEvaluator());
+
+            var commission = calculator.CalculatePlacementV2(
+                participation,
+                period,
+                CommissionTerms,
+                EntryNetworkLevel.Level2,
+                EntryNetworkLevel.None,
+                new[] { obligation });
+
+            Assert.Equal(2, commission.HighestQualifiedNetworkLevel);
+            Assert.Equal(0, commission.HighestCommissionedLevel);
+            Assert.Empty(commission.Components);
+            Assert.Equal(0m, commission.TotalAmount);
+            Assert.Equal(WeeklyCommissionPayoutStatus.NotEarned, commission.PayoutStatus);
+            Assert.Null(commission.HoldReason);
+        }
+
+        [Fact]
+        public void PlacementV2_ConfirmedMet_AppliesExistingComplianceHoldWithoutChangingDecisionTruth()
+        {
+            var network = BuildNetwork(maxDepth: 0);
+            var participation = network.Single();
+            var period = CreatePeriod(EffectiveFrom.AddDays(5));
+            var obligation = EntryMonthlyObligation.Create(
+                participation,
+                2026,
+                7,
+                EffectiveFrom.AddDays(1),
+                "due-policy-v1");
+            var calculator = new EntryWeeklyCommissionCalculator(
+                new EntryNetworkQualificationEvaluator());
+
+            var commission = calculator.CalculatePlacementV2(
+                participation,
+                period,
+                CommissionTerms,
+                EntryNetworkLevel.Level2,
+                EntryNetworkLevel.Level2,
+                new[] { obligation });
+
+            Assert.Equal(2, commission.HighestQualifiedNetworkLevel);
+            Assert.Equal(2, commission.HighestCommissionedLevel);
+            Assert.Equal(400m, commission.TotalAmount);
+            Assert.Equal(WeeklyCommissionPayoutStatus.Held, commission.PayoutStatus);
+            Assert.Equal("AQGreen monthly commitment is overdue.", commission.HoldReason);
         }
 
         private static MemberPayment CreateConfirmedMonthlyPayment(

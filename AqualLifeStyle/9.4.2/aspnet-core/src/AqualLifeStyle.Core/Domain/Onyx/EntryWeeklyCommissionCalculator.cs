@@ -74,6 +74,56 @@ namespace AqualLifeStyle.Domain.Onyx
             var highestQualifiedNetworkLevel = _networkQualificationEvaluator.Evaluate(
                 participation.CustomerId,
                 network);
+            return CalculateWithResolvedLevels(
+                participation,
+                period,
+                terms,
+                highestQualifiedNetworkLevel,
+                highestQualifiedNetworkLevel,
+                customerObligations,
+                customerLoanAgreements,
+                isPlacementV2: false);
+        }
+
+        public EntryWeeklyCommission CalculatePlacementV2(
+            EntryParticipation participation,
+            EntryCommissionPeriod period,
+            EntryCommissionTerms terms,
+            EntryNetworkLevel highestQualifiedNetworkLevel,
+            EntryNetworkLevel highestCommissionedNetworkLevel,
+            IEnumerable<EntryMonthlyObligation> customerObligations,
+            IEnumerable<OnyxLoanAgreement> customerLoanAgreements = null)
+        {
+            if (participation == null) throw new ArgumentNullException(nameof(participation));
+            if (period == null) throw new ArgumentNullException(nameof(period));
+            if (terms == null) throw new ArgumentNullException(nameof(terms));
+            if (customerObligations == null)
+                throw new ArgumentNullException(nameof(customerObligations));
+            if (participation.TenantId != period.TenantId)
+                throw new InvalidOperationException(
+                    "AQGreen commission inputs must belong to the same Tenant.");
+
+            return CalculateWithResolvedLevels(
+                participation,
+                period,
+                terms,
+                highestQualifiedNetworkLevel,
+                highestCommissionedNetworkLevel,
+                customerObligations,
+                customerLoanAgreements,
+                isPlacementV2: true);
+        }
+
+        private static EntryWeeklyCommission CalculateWithResolvedLevels(
+            EntryParticipation participation,
+            EntryCommissionPeriod period,
+            EntryCommissionTerms terms,
+            EntryNetworkLevel highestQualifiedNetworkLevel,
+            EntryNetworkLevel highestCommissionedNetworkLevel,
+            IEnumerable<EntryMonthlyObligation> customerObligations,
+            IEnumerable<OnyxLoanAgreement> customerLoanAgreements,
+            bool isPlacementV2)
+        {
             var hasOverdueOwnObligation = customerObligations.Any(obligation =>
                 obligation.EntryParticipationId == participation.Id &&
                 obligation.WasOverdueAt(period.PeriodEnd));
@@ -94,12 +144,23 @@ namespace AqualLifeStyle.Domain.Onyx
                 holdReasons.Add("Onyx loan repayment is overdue.");
             }
 
-            return EntryWeeklyCommission.RecordCalculation(
-                participation,
-                period,
-                terms,
-                highestQualifiedNetworkLevel,
-                holdReasons.Count == 0 ? null : string.Join(" ", holdReasons));
+            var holdReason = holdReasons.Count == 0
+                ? null
+                : string.Join(" ", holdReasons);
+            return isPlacementV2
+                ? EntryWeeklyCommission.RecordPlacementV2Calculation(
+                    participation,
+                    period,
+                    terms,
+                    highestQualifiedNetworkLevel,
+                    highestCommissionedNetworkLevel,
+                    holdReason)
+                : EntryWeeklyCommission.RecordCalculation(
+                    participation,
+                    period,
+                    terms,
+                    highestQualifiedNetworkLevel,
+                    holdReason);
         }
     }
 }

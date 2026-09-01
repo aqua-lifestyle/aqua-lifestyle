@@ -14,6 +14,8 @@ namespace AqualLifeStyle.Domain.Onyx
         public Guid EntryParticipationId { get; private set; }
         public int CustomerId { get; private set; }
         public Guid CommissionPeriodId { get; private set; }
+        public AQGreenCommissionStructuralModel StructuralModel { get; private set; }
+        public string CommissionDecisionRulesVersion { get; private set; }
         // Retained column/property name for compatibility. This stores the
         // structural network level proven at the commission-period cutoff.
         public int HighestCompletedLevel { get; private set; }
@@ -43,6 +45,9 @@ namespace AqualLifeStyle.Domain.Onyx
             EntryCommissionPeriod period,
             EntryCommissionTerms terms,
             EntryNetworkLevel highestQualifiedNetworkLevel,
+            EntryNetworkLevel highestCommissionedNetworkLevel,
+            AQGreenCommissionStructuralModel structuralModel,
+            string commissionDecisionRulesVersion,
             string holdReason)
         {
             if (participation == null)
@@ -84,15 +89,36 @@ namespace AqualLifeStyle.Domain.Onyx
                 throw new ArgumentOutOfRangeException(
                     nameof(highestQualifiedNetworkLevel));
             }
+            if (highestCommissionedNetworkLevel < EntryNetworkLevel.None ||
+                highestCommissionedNetworkLevel > highestQualifiedNetworkLevel ||
+                (structuralModel == AQGreenCommissionStructuralModel.PlacementV2 &&
+                 highestCommissionedNetworkLevel != EntryNetworkLevel.None &&
+                 highestCommissionedNetworkLevel != highestQualifiedNetworkLevel))
+                throw new ArgumentOutOfRangeException(
+                    nameof(highestCommissionedNetworkLevel));
+            if (structuralModel != AQGreenCommissionStructuralModel.LegacyV1 &&
+                structuralModel != AQGreenCommissionStructuralModel.PlacementV2)
+                throw new ArgumentOutOfRangeException(nameof(structuralModel));
+            if ((structuralModel == AQGreenCommissionStructuralModel.LegacyV1 &&
+                 commissionDecisionRulesVersion != null) ||
+                (structuralModel == AQGreenCommissionStructuralModel.PlacementV2 &&
+                 !string.Equals(
+                     commissionDecisionRulesVersion,
+                     AQGreenCommissionDecisionRules.CurrentVersion,
+                     StringComparison.Ordinal)))
+                throw new InvalidOperationException(
+                    "The AQGreen commission decision rules version is unsupported.");
 
             var highestCommissionedLevel = terms.GetHighestCommissionedLevel(
-                highestQualifiedNetworkLevel);
+                highestCommissionedNetworkLevel);
 
             Id = Guid.NewGuid();
             TenantId = participation.TenantId;
             EntryParticipationId = participation.Id;
             CustomerId = participation.CustomerId;
             CommissionPeriodId = period.Id;
+            StructuralModel = structuralModel;
+            CommissionDecisionRulesVersion = commissionDecisionRulesVersion;
             HighestCompletedLevel = (int)highestQualifiedNetworkLevel;
             Currency = terms.Currency;
             RulesVersion = terms.Version;
@@ -133,6 +159,28 @@ namespace AqualLifeStyle.Domain.Onyx
                 period,
                 terms,
                 highestQualifiedNetworkLevel,
+                terms.GetHighestCommissionedLevel(highestQualifiedNetworkLevel),
+                AQGreenCommissionStructuralModel.LegacyV1,
+                null,
+                holdReason);
+        }
+
+        internal static EntryWeeklyCommission RecordPlacementV2Calculation(
+            EntryParticipation participation,
+            EntryCommissionPeriod period,
+            EntryCommissionTerms terms,
+            EntryNetworkLevel highestQualifiedNetworkLevel,
+            EntryNetworkLevel highestCommissionedNetworkLevel,
+            string holdReason)
+        {
+            return new EntryWeeklyCommission(
+                participation,
+                period,
+                terms,
+                highestQualifiedNetworkLevel,
+                highestCommissionedNetworkLevel,
+                AQGreenCommissionStructuralModel.PlacementV2,
+                AQGreenCommissionDecisionRules.CurrentVersion,
                 holdReason);
         }
 
