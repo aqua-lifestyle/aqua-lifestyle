@@ -30,6 +30,14 @@ const formatDate = (value: string) =>
     year: "numeric",
   });
 
+const formatCommissionPeriodDate = (value: string) =>
+  new Intl.DateTimeFormat("en-ZA", {
+    day: "numeric",
+    month: "short",
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+  }).format(new Date(value));
+
 const stateTone = (state: string) => {
   if (["Complete", "Included", "Available"].includes(state)) return "success";
   if (["Current", "Waiting period", "Pending record"].includes(state)) return "warning";
@@ -261,7 +269,7 @@ const EarningsCard = ({ journey }: { journey: MemberProgrammeJourney }) => {
           <div>
             <p className="text-3xl font-bold">{formatCurrency(latest.totalAmount, journey.earnings.currency)}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {formatDate(latest.periodStart)} – {formatDate(latest.periodEnd)}
+              {formatCommissionPeriodDate(latest.periodStart)} – {formatCommissionPeriodDate(latest.periodEnd)}
             </p>
             <p className="mt-2 text-xs font-semibold text-muted-foreground">
               Qualified depth: {latest.qualifiedLevel > 0 ? `Level ${latest.qualifiedLevel}` : "None"}
@@ -296,7 +304,7 @@ const EarningsCard = ({ journey }: { journey: MemberProgrammeJourney }) => {
                 {journey.earnings.recentWeeks.slice(1).map((week) => (
                   <li className="grid gap-2 px-4 py-3 sm:grid-cols-[1fr_auto] sm:items-center" key={`${week.periodStart}-${week.periodEnd}`}>
                     <div>
-                      <p className="text-sm font-semibold">{formatDate(week.periodStart)} – {formatDate(week.periodEnd)}</p>
+                      <p className="text-sm font-semibold">{formatCommissionPeriodDate(week.periodStart)} – {formatCommissionPeriodDate(week.periodEnd)}</p>
                       {week.holdReason || week.zeroReason ? (
                         <p className="mt-1 text-xs text-muted-foreground">{week.holdReason ?? week.zeroReason}</p>
                       ) : null}
