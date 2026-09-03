@@ -137,6 +137,8 @@ describe("AdminWeeklyEarnings", () => {
     expect(
       screen.getByText("Earned — awaiting release"),
     ).toBeInTheDocument();
+    expect(screen.getAllByText(/Commissioned level:/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Paid level:/)).not.toBeInTheDocument();
     expect(httpClient.get).toHaveBeenCalledWith(
       `${apiEndpoints.weeklyEarnings.getAll}?Programme=0&MaxResultCount=100`,
     );

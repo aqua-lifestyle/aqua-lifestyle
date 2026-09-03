@@ -242,7 +242,7 @@ export const AdminWeeklyEarnings = () => {
         <div>
           <p>Qualified: Level {item.highestQualifiedLevel}</p>
           <p className="text-xs text-muted-foreground">
-            Paid level: {item.highestCommissionedLevel}
+            Commissioned level: {item.highestCommissionedLevel}
           </p>
         </div>
       ),

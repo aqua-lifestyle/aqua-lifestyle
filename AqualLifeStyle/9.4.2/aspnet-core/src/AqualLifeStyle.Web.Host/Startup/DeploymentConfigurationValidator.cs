@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Web.Host.Email;
+using AqualLifeStyle.Web.Host.AQGreenV2Demo;
 
 namespace AqualLifeStyle.Web.Host.Startup
 {
@@ -15,6 +16,8 @@ namespace AqualLifeStyle.Web.Host.Startup
         {
             var environment = services.GetRequiredService<IWebHostEnvironment>();
             var configuration = services.GetRequiredService<IConfiguration>();
+
+            AQGreenV2DemoConfiguration.Validate(environment, configuration);
 
             var yocoMode = configuration["Yoco:Mode"]?.Trim().ToLowerInvariant();
             var yocoSecretKey = configuration["Yoco:SecretKey"]?.Trim();

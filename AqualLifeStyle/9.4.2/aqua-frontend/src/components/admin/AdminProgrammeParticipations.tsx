@@ -19,6 +19,7 @@ import {
   Card,
   DataTable,
   Dialog,
+  LinkButton,
   Skeleton,
   StatusMessage,
   Tabs,
@@ -55,6 +56,7 @@ type AdminProgrammeParticipation = {
   recruiterClubMemberNumber: string | null;
   startedAt: string;
   status: string;
+  tenantId: number;
 };
 
 type PagedParticipations = {
@@ -94,6 +96,8 @@ const VIEW_CHECKOUTS_PERMISSION =
   "Aqua.Admin.ProgrammeParticipations.ViewPaymentCheckouts";
 const TERMINATE_CHECKOUTS_PERMISSION =
   "Aqua.Admin.ProgrammeParticipations.TerminatePaymentCheckouts";
+const REVIEW_WEEKLY_SALES_PERMISSION =
+  "Aqua.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility";
 
 const AWAITING_APPROVAL_STATUS = "Awaiting Area approval";
 
@@ -112,6 +116,8 @@ export const AdminProgrammeParticipations = () => {
     session?.user?.permissions?.includes(VIEW_CHECKOUTS_PERMISSION) ?? false;
   const canTerminateCheckouts =
     session?.user?.permissions?.includes(TERMINATE_CHECKOUTS_PERMISSION) ?? false;
+  const canReviewWeeklySales =
+    session?.user?.permissions?.includes(REVIEW_WEEKLY_SALES_PERMISSION) ?? false;
   const { summary: pendingSummary } = usePendingProgrammeApprovals(canView);
   const [programme, setProgramme] = useState<ProgrammeType>("entry");
   const [participations, setParticipations] = useState<
@@ -462,7 +468,7 @@ export const AdminProgrammeParticipations = () => {
         </div>
       ),
     },
-    ...(canCorrect || canApprove
+    ...(canCorrect || canApprove || canReviewWeeklySales
       ? [{
           header: "Actions",
           key: "actions",
@@ -492,6 +498,15 @@ export const AdminProgrammeParticipations = () => {
                     Reject
                   </Button>
                 </div>
+              ) : null}
+              {canReviewWeeklySales && programme === "entry" && item.isActive ? (
+                <LinkButton
+                  href={`/admin/weekly-sales-reviews?tenantId=${item.tenantId}&participantId=${encodeURIComponent(item.participationId)}`}
+                  size="sm"
+                  variant="outline"
+                >
+                  Review weekly sales
+                </LinkButton>
               ) : null}
             </div>
           ),

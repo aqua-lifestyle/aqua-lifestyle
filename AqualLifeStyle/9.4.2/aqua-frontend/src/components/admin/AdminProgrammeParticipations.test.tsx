@@ -47,10 +47,12 @@ const participation = {
   joinedIndependently: true,
   nextPaymentAmount: 600,
   nextPaymentDescription: "AQGreen registration payment",
+  participationId: "1b4f6d8e-3a2c-4f9b-8d7e-0a1b2c3d4e5f",
   programmeName: "AQGreen",
   recruiterClubMemberNumber: null,
   startedAt: "2026-07-24T10:00:00Z",
   status: "Awaiting first payment",
+  tenantId: 1,
 };
 
 const lockedCheckout = {
@@ -124,6 +126,25 @@ describe("AdminProgrammeParticipations", () => {
       ),
     );
     expect(screen.getByText("101")).toBeInTheDocument();
+  });
+
+  it("links an authorised host reviewer from an active AQGreen participation", async () => {
+    vi.mocked(useAuthState).mockReturnValue(authState([
+      "Aqua.Admin.ProgrammeParticipations.View",
+      "Aqua.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility",
+    ]));
+    vi.mocked(httpClient.get).mockResolvedValue({
+      items: [{ ...participation, isActive: true, status: "Active" }],
+      totalCount: 1,
+    });
+
+    render(<AdminProgrammeParticipations />);
+
+    expect(await screen.findByRole("link", { name: "Review weekly sales" }))
+      .toHaveAttribute(
+        "href",
+        `/admin/weekly-sales-reviews?tenantId=1&participantId=${participation.participationId}`,
+      );
   });
 
   it("loads AQGreen records and switches to Onyx reconciliation", async () => {

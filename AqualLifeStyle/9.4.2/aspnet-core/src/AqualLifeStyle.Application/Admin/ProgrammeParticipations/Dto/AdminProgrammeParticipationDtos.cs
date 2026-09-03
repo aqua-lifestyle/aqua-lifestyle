@@ -55,6 +55,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
     public class AdminProgrammeParticipationDto
     {
         public Guid ParticipationId { get; set; }
+        public int TenantId { get; set; }
         public Guid AreaId { get; set; }
         public string AreaName { get; set; }
         public string ClubMemberNumber { get; set; }

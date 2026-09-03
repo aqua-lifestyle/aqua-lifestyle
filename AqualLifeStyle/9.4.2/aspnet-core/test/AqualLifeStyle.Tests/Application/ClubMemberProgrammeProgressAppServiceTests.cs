@@ -269,6 +269,68 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task PlacementV2LevelTwoEarning_JourneyExposesR150R250AndR400AsEarned()
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var userId = await CreateTestUserAsync(
+                1,
+                $"progress-v2-r400-{suffix}",
+                $"progress-v2-r400-{suffix}@example.com");
+            var customerId = await UsingDbContextAsync(1, async context =>
+            {
+                var customer = Customer.Create(
+                    1,
+                    userId,
+                    "V2 R400 Member",
+                    new EmailAddress(
+                        $"progress-v2-r400-customer-{suffix}@example.com"));
+                context.Customers.Add(customer);
+                await context.SaveChangesAsync();
+                return customer.Id;
+            });
+            var participation = await CreateActiveParticipationAsync(
+                customerId,
+                $"progress-v2-r400-{suffix}");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var periodStart = EffectiveFrom.AddDays(5);
+                var periodEnd = periodStart.AddDays(7).AddTicks(-1);
+                var period = EntryCommissionPeriod.CreateClosedPeriod(
+                    1,
+                    periodStart,
+                    periodEnd,
+                    "Africa/Johannesburg",
+                    periodEnd.AddMinutes(1),
+                    CommissionTerms);
+                var commission = new EntryWeeklyCommissionCalculator(
+                        new EntryNetworkQualificationEvaluator())
+                    .CalculatePlacementV2(
+                        participation,
+                        period,
+                        CommissionTerms,
+                        EntryNetworkLevel.Level2,
+                        EntryNetworkLevel.Level2,
+                        Array.Empty<EntryMonthlyObligation>());
+                context.EntryCommissionPeriods.Add(period);
+                context.EntryWeeklyCommissions.Add(commission);
+                await context.SaveChangesAsync();
+            });
+            SetCurrentUser(userId, 1);
+
+            var journey = await _progressService.GetMyJourneyAsync();
+            var earning = journey.Programmes
+                .Single(item => item.ProgrammeCode == "AQGREEN")
+                .Earnings.LatestRecordedWeek;
+
+            earning.QualifiedLevel.ShouldBe(2);
+            earning.CommissionedLevel.ShouldBe(2);
+            earning.Status.ShouldBe("Earned — awaiting release");
+            earning.TotalAmount.ShouldBe(400m);
+            earning.Components.Select(item => (item.Level, item.Amount))
+                .ShouldBe(new[] { (1, 150m), (2, 250m) });
+        }
+
+        [Fact]
         public async Task PaidCommission_ReportsReleasedAndPaidTotals()
         {
             var persisted = await CreateActiveMemberWithPaidCommissionAsync();

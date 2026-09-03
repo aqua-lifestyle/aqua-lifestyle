@@ -152,6 +152,42 @@ describe("ProgrammeJourneyOverview", () => {
     expect(screen.queryByText("Why this week is R0")).not.toBeInTheDocument();
   });
 
+  it("shows a Level 2 R400 ledger as earned awaiting release rather than paid", () => {
+    const journey = createProgrammeJourney("AQGREEN", {
+      earnings: {
+        currency: "ZAR",
+        earnedAwaitingRelease: 400,
+        latestRecordedWeek: {
+          commissionedLevel: 2,
+          components: [{ amount: 150, level: 1 }, { amount: 250, level: 2 }],
+          holdReason: null,
+          periodEnd: "2026-08-27T21:59:59.9999999Z",
+          periodStart: "2026-08-20T22:00:00Z",
+          qualifiedLevel: 2,
+          status: "Earned — awaiting release",
+          totalAmount: 400,
+          zeroReason: null,
+        },
+        onHold: 0,
+        recentWeeks: [],
+        recordedAsPaid: 0,
+        releasedAwaitingPayment: 0,
+        totalEarned: 400,
+      },
+      qualifiedLevel: 2,
+    });
+
+    render(<ProgrammeJourneyOverview canInvite={false} journey={journey} />);
+
+    expect(screen.getByText("Earned — awaiting release")).toBeInTheDocument();
+    expect(screen.getByText("Qualified depth: Level 2 · Commissioned depth: Level 2"))
+      .toBeInTheDocument();
+    expect(screen.getByText("Level 1 component")).toBeInTheDocument();
+    expect(screen.getByText("Level 2 component")).toBeInTheDocument();
+    expect(screen.getByText(/21 Aug 2026.*27 Aug 2026/)).toBeInTheDocument();
+    expect(screen.queryByText("Paid")).not.toBeInTheDocument();
+  });
+
   it.each([
     ["Not earned", null, "No structural level was qualified for this recorded week.", "Why this week is R0"],
     ["On hold", "Monthly subscription is overdue.", null, "Why this earning is held"],
