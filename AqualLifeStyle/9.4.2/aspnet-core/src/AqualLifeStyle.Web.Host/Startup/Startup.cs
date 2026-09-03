@@ -26,6 +26,7 @@ using Castle.Services.Logging.SerilogIntegration;
 using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Email;
 using AqualLifeStyle.Web.Host.Email;
+using AqualLifeStyle.Web.Host.AQGreenV2Demo;
 using System.Threading.RateLimiting;
 
 namespace AqualLifeStyle.Web.Host.Startup
@@ -42,6 +43,9 @@ namespace AqualLifeStyle.Web.Host.Startup
         {
             _environment = env;
             _appConfiguration = env.GetAppConfiguration();
+            // Run this before any other Production-only setup so an accidental
+            // demo request fails with the explicit non-production boundary.
+            AQGreenV2DemoConfiguration.Validate(_environment, _appConfiguration);
         }
 
         public void ConfigureServices(IServiceCollection services)

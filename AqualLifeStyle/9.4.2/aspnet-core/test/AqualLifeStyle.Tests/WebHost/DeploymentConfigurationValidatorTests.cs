@@ -63,6 +63,157 @@ namespace AqualLifeStyle.Tests.WebHost
         }
 
         [Fact]
+        public void Validate_DemoFlagInProduction_RefusesToStart()
+        {
+            var settings = CompleteProductionSettings();
+            settings["AQGreenV2Demo:Enabled"] = "true";
+            var services = BuildServiceProvider("Production", settings);
+
+            var exception = Should.Throw<InvalidOperationException>(
+                () => DeploymentConfigurationValidator.Validate(services));
+
+            exception.Message.ShouldContain("NON-PRODUCTION");
+            exception.Message.ShouldContain("Production");
+        }
+
+        [Theory]
+        [InlineData("Development")]
+        [InlineData("Staging")]
+        [InlineData("aqgreenv2demo")]
+        public void Validate_DemoFlagOutsideExactDemoEnvironment_RefusesToStart(
+            string environmentName)
+        {
+            var services = BuildServiceProvider(environmentName, new Dictionary<string, string>
+            {
+                ["AQGreenV2Demo:Enabled"] = "true",
+                ["ConnectionStrings:Default"] =
+                    "Host=localhost;Database=aqua_aqgreen_v2_demo;Username=demo;Password=demo"
+            });
+
+            var exception = Should.Throw<InvalidOperationException>(
+                () => DeploymentConfigurationValidator.Validate(services));
+
+            exception.Message.ShouldContain("ASPNETCORE_ENVIRONMENT=AQGreenV2Demo");
+        }
+
+        [Fact]
+        public void Validate_DemoEnvironmentWithoutExplicitFlag_RefusesToStart()
+        {
+            var services = BuildServiceProvider("AQGreenV2Demo", new Dictionary<string, string>
+            {
+                ["ConnectionStrings:Default"] =
+                    "Host=localhost;Database=aqua_aqgreen_v2_demo;Username=demo;Password=demo"
+            });
+
+            var exception = Should.Throw<InvalidOperationException>(
+                () => DeploymentConfigurationValidator.Validate(services));
+
+            exception.Message.ShouldContain("explicit");
+            exception.Message.ShouldContain("AQGreenV2Demo__Enabled=true");
+        }
+
+        [Theory]
+        [InlineData("production.example")]
+        [InlineData("db.internal")]
+        [InlineData("10.0.0.5")]
+        [InlineData("192.168.1.20")]
+        [InlineData("172.16.0.5")]
+        [InlineData("203.0.113.10")]
+        public void Validate_DemoEnvironmentWithRemoteHostAndCorrectDatabase_RefusesToStart(
+            string host)
+        {
+            const string password = "must-not-appear-in-error";
+            var services = BuildServiceProvider("AQGreenV2Demo", new Dictionary<string, string>
+            {
+                ["AQGreenV2Demo:Enabled"] = "true",
+                ["ConnectionStrings:Default"] =
+                    $"Host={host};Database=aqua_aqgreen_v2_demo;Username=demo;Password={password}"
+            });
+
+            var exception = Should.Throw<InvalidOperationException>(
+                () => DeploymentConfigurationValidator.Validate(services));
+
+            exception.Message.ShouldContain("every PostgreSQL host");
+            exception.Message.ShouldContain("loopback/local");
+            exception.ToString().ShouldNotContain(host);
+            exception.ToString().ShouldNotContain(password);
+        }
+
+        [Fact]
+        public void Validate_DemoEnvironmentWithMixedLocalAndRemoteHosts_RefusesToStart()
+        {
+            var services = BuildServiceProvider("AQGreenV2Demo", new Dictionary<string, string>
+            {
+                ["AQGreenV2Demo:Enabled"] = "true",
+                ["ConnectionStrings:Default"] =
+                    "Host= localhost, production.example ;" +
+                    "Database=aqua_aqgreen_v2_demo;Username=demo;Password=demo"
+            });
+
+            var exception = Should.Throw<InvalidOperationException>(
+                () => DeploymentConfigurationValidator.Validate(services));
+
+            exception.Message.ShouldContain("every PostgreSQL host");
+            exception.Message.ShouldContain("loopback/local");
+        }
+
+        [Fact]
+        public void Validate_DemoEnvironmentWithLocalHostAndNonDemoDatabase_RefusesToStart()
+        {
+            var services = BuildServiceProvider("AQGreenV2Demo", new Dictionary<string, string>
+            {
+                ["AQGreenV2Demo:Enabled"] = "true",
+                ["ConnectionStrings:Default"] =
+                    "Host=127.0.0.1;Database=aqualifestyle;Username=demo;Password=demo"
+            });
+
+            var exception = Should.Throw<InvalidOperationException>(
+                () => DeploymentConfigurationValidator.Validate(services));
+
+            exception.Message.ShouldContain("refuses databases");
+            exception.Message.ShouldContain("aqua_aqgreen_v2_demo");
+        }
+
+        [Theory]
+        [InlineData("localhost", 5432)]
+        [InlineData("LOCALHOST", 5432)]
+        [InlineData("127.0.0.1", 55434)]
+        [InlineData("::1", 5432)]
+        [InlineData("0:0:0:0:0:0:0:1", 5432)]
+        public void Validate_ExactDemoEnvironmentFlagLoopbackHostAndDatabase_AllowsStartup(
+            string host,
+            int port)
+        {
+            var services = BuildServiceProvider("AQGreenV2Demo", new Dictionary<string, string>
+            {
+                ["AQGreenV2Demo:Enabled"] = "true",
+                ["ConnectionStrings:Default"] =
+                    $"Host={host};Port={port};Database=aqua_aqgreen_v2_demo;" +
+                    "Username=demo;Password=demo"
+            });
+
+            Should.NotThrow(() => DeploymentConfigurationValidator.Validate(services));
+        }
+
+        [Fact]
+        public void Validate_DemoEnvironmentWithMalformedConnectionString_RefusesWithoutLeakingPassword()
+        {
+            const string password = "must-not-appear-in-error";
+            var services = BuildServiceProvider("AQGreenV2Demo", new Dictionary<string, string>
+            {
+                ["AQGreenV2Demo:Enabled"] = "true",
+                ["ConnectionStrings:Default"] =
+                    $"Host=\"unterminated;Database=aqua_aqgreen_v2_demo;Password={password}"
+            });
+
+            var exception = Should.Throw<InvalidOperationException>(
+                () => DeploymentConfigurationValidator.Validate(services));
+
+            exception.Message.ShouldContain("valid PostgreSQL connection string");
+            exception.ToString().ShouldNotContain(password);
+        }
+
+        [Fact]
         public void Validate_InStaging_DoesNotThrow()
         {
             var services = BuildServiceProvider("Staging", new Dictionary<string, string>());

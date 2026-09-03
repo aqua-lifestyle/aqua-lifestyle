@@ -2098,6 +2098,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             return new AdminProgrammeParticipationDto
             {
                 ParticipationId = participationId,
+                TenantId = tenantId,
                 AreaId = customer.AreaId ?? Guid.Empty,
                 AreaName = customer.AreaId.HasValue &&
                     areaNames.TryGetValue(customer.AreaId.Value, out var areaName)

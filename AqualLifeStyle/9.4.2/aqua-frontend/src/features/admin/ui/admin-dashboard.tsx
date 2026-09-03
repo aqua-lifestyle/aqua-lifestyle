@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Building2, Database, HandCoins, KeyRound, Network, RefreshCw, ShieldCheck, UserCheck, Users, UsersRound } from "lucide-react";
+import { Activity, Building2, ClipboardCheck, Database, HandCoins, KeyRound, Network, RefreshCw, ShieldCheck, UserCheck, Users, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
 
@@ -110,6 +110,7 @@ export const AdminDashboard = () => {
     { href: "/admin/area-leaders", icon: Network, label: "Area leaders", permission: "Aqua.Admin.AreaLeaders.View", summary: "Review applications and manage progression." },
     { href: "/admin/facilitators", icon: UserCheck, label: "Facilitators", permission: "Aqua.Admin.Facilitators.View", summary: "Approve facilitators and monitor their network." },
     { href: "/admin/members", icon: UsersRound, label: "Club members", permission: "Aqua.Admin.Members.View", summary: "Maintain profiles, plans, and account access." },
+    { href: "/admin/weekly-sales-reviews", icon: ClipboardCheck, label: "Weekly sales reviews", permission: "Aqua.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility", summary: "Verify closed-week AQGreen sales evidence and quantities." },
     { href: "/admin/weekly-earnings", icon: HandCoins, label: "Weekly earnings", permission: "Aqua.Admin.Commissions.View", summary: "Review calculated AQGreen and Onyx network earnings." },
   ].filter((item) => permissions.includes(item.permission));
 

@@ -2,6 +2,7 @@
 
 import {
   Building2,
+  ClipboardCheck,
   HandCoins,
   KeyRound,
   LayoutDashboard,
@@ -30,6 +31,7 @@ const adminLinks = [
   { href: "/admin/facilitators", icon: UserCheck, label: "Facilitators", permission: "Aqua.Admin.Facilitators.View" },
   { href: "/admin/members", icon: UsersRound, label: "Club members", permission: "Aqua.Admin.Members.View" },
   { href: "/admin/programme-participations", icon: Route, label: "Programme participation", permission: "Aqua.Admin.ProgrammeParticipations.View" },
+  { href: "/admin/weekly-sales-reviews", icon: ClipboardCheck, label: "Weekly sales reviews", permission: "Aqua.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility" },
   { href: "/admin/weekly-earnings", icon: HandCoins, label: "Weekly earnings", permission: "Aqua.Admin.Commissions.View" },
   { href: "/admin/savings", icon: PiggyBank, label: "Savings accounts", permission: "Aqua.Admin.Savings.View" },
   { href: "/admin/loans", icon: HandCoins, label: "Loan agreements", permission: "Aqua.Admin.Loans.View" },

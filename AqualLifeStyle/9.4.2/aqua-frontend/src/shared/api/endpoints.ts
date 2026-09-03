@@ -138,6 +138,18 @@ export const apiEndpoints = {
     startEntry:
       "/api/services/app/ClubMemberProgrammeParticipation/StartEntry",
   },
+  weeklySalesReviews: {
+    begin:
+      "/api/services/app/AdminAQGreenWeeklySalesEligibility/BeginReview",
+    confirm:
+      "/api/services/app/AdminAQGreenWeeklySalesEligibility/Confirm",
+    get: "/api/services/app/AdminAQGreenWeeklySalesEligibility/Get",
+    getAll: "/api/services/app/AdminAQGreenWeeklySalesEligibility/GetAll",
+    getLatestClosedWeek:
+      "/api/services/app/AdminAQGreenWeeklySalesEligibility/GetLatestClosedWeek",
+    reject:
+      "/api/services/app/AdminAQGreenWeeklySalesEligibility/Reject",
+  },
   savings: {
     getAdminAccounts: "/api/services/app/AdminSavings/GetAll",
     getMyAccount: "/api/services/app/ClubMemberSavings/GetMyAccount",

@@ -13,6 +13,11 @@ using AqualLifeStyle.Web.Host.Commissions;
 using Abp.Dependency;
 using Abp.Net.Mail;
 using Abp.Configuration.Startup;
+using AqualLifeStyle.Application.Admin.Commissions;
+using AqualLifeStyle.Application.Admin.ProgrammeParticipations;
+using AqualLifeStyle.Domain.AQGreen;
+using AqualLifeStyle.Domain.Onyx;
+using AqualLifeStyle.Web.Host.AQGreenV2Demo;
 
 namespace AqualLifeStyle.Web.Host.Startup
 {
@@ -37,6 +42,19 @@ namespace AqualLifeStyle.Web.Host.Startup
 
         public override void PreInitialize()
         {
+            if (AQGreenV2DemoConfiguration.Validate(_env, _appConfiguration))
+            {
+                Configuration.ReplaceService<
+                    IAQGreenPlacementV2ProgressGate,
+                    AQGreenV2DemoProgressGate>(DependencyLifeStyle.Singleton);
+                Configuration.ReplaceService<
+                    IAQGreenCommissionStructuralModelSelector,
+                    AQGreenV2DemoCommissionSelector>(DependencyLifeStyle.Singleton);
+                Configuration.ReplaceService<
+                    IAQGreenWeeklySalesReviewGate,
+                    AQGreenV2DemoSalesReviewGate>(DependencyLifeStyle.Singleton);
+            }
+
             Configuration.ReplaceService<IEmailSender, BirdAbpEmailSender>(DependencyLifeStyle.Transient);
             var redisConfiguration = _appConfiguration["Redis:Configuration"];
             if (string.IsNullOrWhiteSpace(redisConfiguration))
@@ -78,6 +96,11 @@ namespace AqualLifeStyle.Web.Host.Startup
                 IocManager.Resolve<EntryMonthlyObligationWorker>());
             IocManager.Resolve<IBackgroundWorkerManager>().Add(
                 IocManager.Resolve<WeeklyCommissionCalculationWorker>());
+
+            if (AQGreenV2DemoConfiguration.Validate(_env, _appConfiguration))
+            {
+                IocManager.Resolve<AQGreenV2DemoFixtureSeeder>().Seed();
+            }
         }
 
         private static string NormalizeRedisConfiguration(string configuration)
