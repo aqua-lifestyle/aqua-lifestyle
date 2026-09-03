@@ -5,7 +5,9 @@ using Abp.Configuration.Startup;
 using Abp.Modules;
 using Abp.Reflection.Extensions;
 using Abp.Dependency;
+using AqualLifeStyle.Application.Admin.Commissions;
 using AqualLifeStyle.Domain.AQGreen;
+using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.Tests;
 using AqualLifeStyle.Web.Startup;
@@ -36,6 +38,18 @@ namespace AqualLifeStyle.Web.Tests
             Configuration.ReplaceService<
                 IAQGreenStructuralCompletionEvaluator,
                 AQGreenPlacementV2TestStructuralEvaluator>(DependencyLifeStyle.Singleton);
+            Configuration.ReplaceService<
+                IAQGreenGraduationStructuralModelSelector,
+                AQGreenV2ContinuousGraduationSelector>(DependencyLifeStyle.Singleton);
+            Configuration.ReplaceService<
+                IAQGreenCommissionStructuralModelSelector,
+                AQGreenV2ContinuousCommissionSelector>(DependencyLifeStyle.Singleton);
+            Configuration.ReplaceService<
+                IAQGreenWeeklySalesReviewGate,
+                AQGreenV2ContinuousSalesReviewGate>(DependencyLifeStyle.Singleton);
+            Configuration.ReplaceService<
+                IAQGreenWeeklySalesEligibilityClock,
+                AQGreenV2ContinuousSalesClock>(DependencyLifeStyle.Singleton);
             // Allow enabling transactional UnitOfWork for reproduction via environment variable to avoid impacting other tests.
             var enableTransactional = string.Equals(Environment.GetEnvironmentVariable("REPRO_TRANSACTIONAL"), "true", StringComparison.OrdinalIgnoreCase);
             Configuration.UnitOfWork.IsTransactional = enableTransactional;
