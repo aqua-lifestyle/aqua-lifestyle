@@ -31,6 +31,14 @@ admission. None of that production surface is changed by this package.
 - `run-analysis.sh`: package-owned PostgreSQL 16 lifecycle, repeated Zone 3
   inventory, D09 population, D03B component, simulator, structural/impact, final
   manifest, verification, and receipt pipeline.
+- `authoritative-runner.sh`: the reviewed-Git-object bootstrap. Operators stream
+  its exact bytes from the selected commit into Bash; it materialises two private
+  independent clones with isolated Git configuration, disables replacement
+  objects/hooks/system and global attributes, verifies every materialized file against
+  its raw reviewed blob, and builds both canonically without B6 operational capabilities,
+  verifies exact Runner/Core/EntityFrameworkCore byte equality, selects the
+  private read-only build-A artifact, and only then releases operation-specific
+  authority.
 - `fixture/`, `tests/`, and `test-package.sh`: actual EF-migrated PostgreSQL fixture
   E2E plus malformed-snapshot negative tests for scope, relationships, identity,
   ordinals, permissions, symlinks, key strength, collisions, destination safety,
@@ -86,15 +94,39 @@ The toolchain identity hashes the executing `AqualLifeStyle.B6SnapshotRunner`,
 canonical ordinal order and binds their actual bytes to the repository commit.
 `PRECOMMIT_SYNTHETIC_VALIDATION` permits a dirty local tree for synthetic tests;
 those artifacts remain explicitly classified as precommit evidence.
-`OPERATIONAL_EVIDENCE` requires an exact clean tracked and untracked Git worktree
-before any command runs. It mechanically creates a detached worktree for the exact
-reviewed commit from Git objects inside a new private temporary directory, verifies
-that materialization is exact and clean, restores and builds there with source paths
-mapped to the reviewed checkout, and requires the executing first-party assembly
-bytes to match that reviewed-tree build. Ignored or otherwise untracked live-worktree source cannot
-enter the comparison build. The operator wrappers select operational mode, while
-the package test wrapper selects precommit mode; precommit evidence builds the
-dirty candidate and is never operational provenance.
+`OPERATIONAL_EVIDENCE` does not execute a live-worktree Runner or live repository
+script. The operator-controlled shell asks trusted Git for
+`<reviewed-commit>:docs/operations/aqgreen-v2-b6/snapshot-package/authoritative-runner.sh`
+and streams those exact reviewed bytes into Bash. That bootstrap verifies the full
+commit identity with replacement objects disabled, creates two independent private
+no-checkout clones with empty templates, and checks out the commit with repository
+hooks plus system/global Git configuration and attributes disabled. Mutable source
+repository hooks, `info/attributes`, filter configuration, replace objects, and
+working-tree files are not copied. The bootstrap rejects ignored/untracked state
+and compares the raw, no-filter hash of every regular materialized file to its
+reviewed Git blob before building. Restore and build receive a
+minimal environment with isolated `HOME`, `TMPDIR`, .NET, output, and intermediate
+state plus one new private package cache shared only by builds A and B; DSN,
+snapshot, output, key, and other B6 operational variables are absent. Both builds
+force restore reevaluation, non-incremental deterministic
+Release compilation, build-server suppression, explicit `NuGet.Config`, suppressed
+ambient parent `Directory.Build` imports, and a repository-relative isolated
+artifact root. Source-path normalisation makes Runner, Core, and
+EntityFrameworkCore bytes independent of the two physical checkout paths.
+
+The bootstrap requires exact byte equality for all three assemblies, makes the
+selected build-A tree read-only inside its owner-only temporary root, and rechecks
+the selected hashes immediately before launch. The exact reviewed
+`operator-extract.sh` or `run-analysis.sh` adapter then receives only its required
+operation environment and rechecks all three hashes before every Runner invocation.
+The Runner binds its captured commit and assembly hashes to that pre-authority
+selection. These environment bindings are defence-in-depth and evidence binding,
+not the root of trust; the root is the operator-selected commit, trusted Git object
+database/executable, operating system, Bash/core utilities, cryptographic hash
+implementation, and canonical .NET SDK/MSBuild/NuGet build base. Ignored, modified,
+or stale live-worktree source and build state are never selected. `test-package.sh`
+remains dirty-tree `PRECOMMIT_SYNTHETIC_VALIDATION` and cannot establish operational
+provenance.
 
 The reviewed root disposition binds `SnapshotId`, `SourceSnapshotDigest`, and
 `BaseManifestDigest`; reusing a review against another snapshot/base fails closed.
@@ -131,6 +163,16 @@ key is read only in Zone 2 and is never placed in the snapshot, manifest, receip
 ordinary logs, Git, or command arguments. Pseudonym collisions across delivered
 identifier domains are fatal; the tool never repairs a collision with an
 order-dependent counter.
+
+Before provenance, only the trusted operator shell, Git, reviewed bootstrap,
+system build tools, and package-restore network possess execution authority. The
+bootstrap removes every B6 operational variable before materialisation/restore/build
+children start. After provenance it constructs a new minimal environment for the
+exact reviewed adapter and selected artifact. Package restore network access is a
+build capability and receives no database, snapshot, output, key, provider, or B6
+test-sentinel authority. The operator must set `GIT_NO_REPLACE_OBJECTS=1` on the
+initial `git show` that supplies the bootstrap; the bootstrap keeps replacement
+objects disabled for its Git-object resolution and private materialisations.
 
 Analysis accepts no arbitrary destination DSN. The package creates a uniquely
 named, loopback-only PostgreSQL 16 container with generated credentials, verifies
@@ -188,4 +230,9 @@ AQGreen B6 operational and migration analysis tooling is .NET-native. This keeps
 the migration-critical behavior aligned with the ABP/.NET backend, reuses the
 authoritative C#/EF/domain semantics, avoids cross-language semantic duplication,
 and reduces the operational runtime surface. Shell remains thin orchestration.
-This decision is specific to B6 and is not a repository-wide prohibition on Python.
+The package's reviewed-Git-object `authoritative-runner.sh` is the one privileged
+bootstrap/build authority. Its mutable live-worktree path must not be executed for
+operational evidence. `run-analysis.sh` and `operator-extract.sh` are reviewed-tree
+operation adapters executed only after double-build provenance; they reject a
+missing pre-authority selection and never build or choose a Runner. This decision
+is specific to B6 and is not a repository-wide prohibition on Python.

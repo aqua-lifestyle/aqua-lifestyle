@@ -2,18 +2,39 @@
 set -euo pipefail
 umask 0077
 
+: "${B6_PREAUTHORITY_PROVENANCE:?Invoke through the exact reviewed Git-object bootstrap}"
+: "${B6_VERIFIED_ARTIFACT_ROOT:?Verified artifact root was not supplied}"
+: "${B6_PREAUTHORITY_RUNNER_SHA256:?Verified Runner digest was not supplied}"
+: "${B6_PREAUTHORITY_CORE_SHA256:?Verified Core digest was not supplied}"
+: "${B6_PREAUTHORITY_EF_SHA256:?Verified EF digest was not supplied}"
+[[ "${B6_PREAUTHORITY_PROVENANCE}" == GIT_OBJECT_DOUBLE_BUILD_EXACT_BYTES_V1 ]]
 : "${B6_SNAPSHOT_DIR:?Path to approved Zone 3 snapshot}"
 : "${B6_BASE_MANIFEST:?Path to its BASE_SNAPSHOT manifest}"
 : "${B6_ROOT_DISPOSITIONS:?Path to reviewed root dispositions}"
 
 package_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${package_dir}/../../../.." && pwd)"
-runner_project="${repo_root}/AqualLifeStyle/9.4.2/aspnet-core/tools/AqualLifeStyle.B6SnapshotRunner/AqualLifeStyle.B6SnapshotRunner.csproj"
-runner_dll="${repo_root}/AqualLifeStyle/9.4.2/aspnet-core/tools/AqualLifeStyle.B6SnapshotRunner/bin/Release/net8.0/AqualLifeStyle.B6SnapshotRunner.dll"
+[[ -d "${B6_VERIFIED_ARTIFACT_ROOT}" && ! -L "${B6_VERIFIED_ARTIFACT_ROOT}" ]]
+runner_dir="$(realpath -- "${B6_VERIFIED_ARTIFACT_ROOT}")"
+[[ "${runner_dir}" == "${B6_VERIFIED_ARTIFACT_ROOT}" ]]
+runner_dll="${runner_dir}/AqualLifeStyle.B6SnapshotRunner.dll"
 inventory_sql="${repo_root}/docs/operations/aqgreen-v2-b6/legacy-inventory.sql"
-export B6_EXECUTION_EVIDENCE_CLASSIFICATION=OPERATIONAL_EVIDENCE
-dotnet build "${runner_project}" --configuration Release
-b6() { dotnet "${runner_dll}" "$@"; }
+verify_artifact_set() {
+  local name expected path
+  while [[ "$#" -gt 0 ]]; do
+    name="$1"; expected="$2"; shift 2
+    path="${runner_dir}/${name}.dll"
+    [[ -f "${path}" && ! -L "${path}" ]]
+    [[ "$(sha256sum -- "${path}" | cut -d' ' -f1)" == "${expected}" ]]
+  done
+}
+b6() {
+  verify_artifact_set \
+    AqualLifeStyle.B6SnapshotRunner "${B6_PREAUTHORITY_RUNNER_SHA256}" \
+    AqualLifeStyle.Core "${B6_PREAUTHORITY_CORE_SHA256}" \
+    AqualLifeStyle.EntityFrameworkCore "${B6_PREAUTHORITY_EF_SHA256}"
+  dotnet "${runner_dll}" "$@"
+}
 
 if [[ -n "${B6_ANALYSIS_OUTPUT_DIR:-}" ]]; then
   [[ ! -e "${B6_ANALYSIS_OUTPUT_DIR}" && ! -L "${B6_ANALYSIS_OUTPUT_DIR}" ]]

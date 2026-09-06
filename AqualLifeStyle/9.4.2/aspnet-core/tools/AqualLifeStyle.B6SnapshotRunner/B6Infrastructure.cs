@@ -36,6 +36,7 @@ public static class B6Contract
     public const string EvidenceClassificationEnvironment = "B6_EXECUTION_EVIDENCE_CLASSIFICATION";
     public const string PrecommitEvidence = "PRECOMMIT_SYNTHETIC_VALIDATION";
     public const string OperationalEvidence = "OPERATIONAL_EVIDENCE";
+    public const string PreAuthorityProvenance = "GIT_OBJECT_DOUBLE_BUILD_EXACT_BYTES_V1";
 
     public static readonly Regex ControlledCode = new("^[A-Za-z0-9._:+/@-]{1,128}$", RegexOptions.CultureInvariant);
     public static readonly Regex MigrationCode = new("^[0-9]{14}_[A-Za-z0-9_]{1,180}$", RegexOptions.CultureInvariant);
@@ -461,7 +462,7 @@ public sealed record ToolchainIdentity(
         var result = new ToolchainIdentity(commit, classification, runner, dependencies);
         result.RequireComplete();
         if (classification == B6Contract.OperationalEvidence)
-            result.RequireMatchesReviewedTreeBuild(root, commit);
+            result.RequirePreAuthorityProvenance(root);
         return result;
     }
 
@@ -498,76 +499,33 @@ public sealed record ToolchainIdentity(
         foreach (var item in expected)
         {
             var path = Path.Combine(outputDirectory, item.Key + ".dll");
-            if (!File.Exists(path) || B6Values.Sha256Hex(File.ReadAllBytes(path)) != item.Value.AssemblySha256)
+            if (!File.Exists(path) || SecureFiles.IsLink(path) ||
+                B6Values.Sha256Hex(File.ReadAllBytes(path)) != item.Value.AssemblySha256)
                 throw new B6PackageException($"Executing first-party assembly {item.Key} does not match the fresh reviewed-source build from the reviewed Git object tree.");
         }
     }
 
-    internal void RequireMatchesReviewedTreeBuild(string root, string reviewedCommit)
+    internal void RequirePreAuthorityProvenance(string root)
     {
-        if (!B6Contract.GitSha.IsMatch(reviewedCommit))
-            throw new B6PackageException("Reviewed Git commit identity is invalid.");
-        var privateRoot = Directory.CreateTempSubdirectory("aqua-b6-toolchain-").FullName;
-        var source = Path.Combine(privateRoot, "source");
-        var output = Path.Combine(privateRoot, "output");
-        var packages = Path.Combine(privateRoot, "packages");
-        var worktreeCreated = false;
-        try
-        {
-            SetPrivateDirectoryMode(privateRoot);
-            CreatePrivateDirectory(output);
-            CreatePrivateDirectory(packages);
-            Run("git", ["-C", root, "worktree", "add", "--detach", source, reviewedCommit]);
-            worktreeCreated = true;
-            SetPrivateDirectoryMode(source);
-            var materializedCommit = Run("git", ["-C", source, "rev-parse", "HEAD"]).Trim();
-            var materializedStatus = Run("git", ["-C", source, "status", "--porcelain=v1", "--untracked-files=all"]);
-            if (materializedCommit != reviewedCommit || !string.IsNullOrWhiteSpace(materializedStatus))
-                throw new B6PackageException("Private reviewed Git object tree materialization is not exact and clean.");
-            var project = Path.Combine(source, "AqualLifeStyle", "9.4.2", "aspnet-core", "tools",
-                "AqualLifeStyle.B6SnapshotRunner", "AqualLifeStyle.B6SnapshotRunner.csproj");
-            if (!File.Exists(project) || SecureFiles.IsLink(project))
-                throw new B6PackageException("Reviewed Git object tree does not contain the B6 runner project as a regular file.");
-            var nugetConfig = Path.Combine(source, "AqualLifeStyle", "9.4.2", "aspnet-core", "NuGet.Config");
-            var restoreArguments = new List<string>
-            {
-                "restore", project, "--packages", packages,
-                "-p:ImportDirectoryBuildProps=false", "-p:ImportDirectoryBuildTargets=false"
-            };
-            if (File.Exists(nugetConfig))
-            {
-                if (SecureFiles.IsLink(nugetConfig))
-                    throw new B6PackageException("Reviewed NuGet configuration must not be a symlink.");
-                restoreArguments.Add("--configfile");
-                restoreArguments.Add(nugetConfig);
-            }
-            restoreArguments.Add("--disable-build-servers");
-            Run("dotnet", restoreArguments);
-            Run("dotnet", ["build", project, "--configuration", "Release", "--no-restore",
-                "--no-incremental", "--disable-build-servers", "--output", output,
-                "-p:ImportDirectoryBuildProps=false", "-p:ImportDirectoryBuildTargets=false",
-                $"-p:PathMap={source}={Path.GetFullPath(root)}"]);
-            RequireMatchesBuiltArtifacts(output);
-        }
-        finally
-        {
-            if (worktreeCreated)
-                Run("git", ["-C", root, "worktree", "remove", "--force", source]);
-            if (Directory.Exists(privateRoot) && !SecureFiles.IsLink(privateRoot))
-                Directory.Delete(privateRoot, recursive: true);
-        }
-    }
-
-    private static void CreatePrivateDirectory(string path)
-    {
-        if (!Directory.Exists(path)) Directory.CreateDirectory(path);
-        SetPrivateDirectoryMode(path);
-    }
-
-    private static void SetPrivateDirectoryMode(string path)
-    {
-        if (!OperatingSystem.IsWindows())
-            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        var artifactRoot = Environment.GetEnvironmentVariable("B6_VERIFIED_ARTIFACT_ROOT");
+        if (Environment.GetEnvironmentVariable("B6_PREAUTHORITY_PROVENANCE") != B6Contract.PreAuthorityProvenance ||
+            Environment.GetEnvironmentVariable("B6_PREAUTHORITY_REPOSITORY_COMMIT") != RepositoryCommit ||
+            Environment.GetEnvironmentVariable("B6_PREAUTHORITY_RUNNER_SHA256") != Runner.AssemblySha256 ||
+            Environment.GetEnvironmentVariable("B6_PREAUTHORITY_CORE_SHA256") !=
+            FirstPartyDependencies.Single(value => value.AssemblyName == "AqualLifeStyle.Core").AssemblySha256 ||
+            Environment.GetEnvironmentVariable("B6_PREAUTHORITY_EF_SHA256") !=
+            FirstPartyDependencies.Single(value => value.AssemblyName == "AqualLifeStyle.EntityFrameworkCore").AssemblySha256 ||
+            string.IsNullOrWhiteSpace(artifactRoot))
+            throw new B6PackageException("Operational evidence requires independently established pre-authority provenance.");
+        artifactRoot = Path.GetFullPath(artifactRoot);
+        var temporaryRoot = Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar) +
+                            Path.DirectorySeparatorChar;
+        if (SecureFiles.IsLink(artifactRoot) ||
+            !string.Equals(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), artifactRoot,
+                StringComparison.Ordinal) ||
+            !Path.GetFullPath(root).StartsWith(temporaryRoot, StringComparison.Ordinal))
+            throw new B6PackageException("Operational evidence is not executing the selected private reviewed artifact.");
+        RequireMatchesBuiltArtifacts(artifactRoot);
     }
 
     private static FirstPartyAssemblyIdentity CaptureAssembly(Assembly assembly)
@@ -592,20 +550,31 @@ public sealed record ToolchainIdentity(
         throw new B6PackageException("The B6 executable is not bound to a Git worktree.");
     }
 
-    public static string Run(string file, IReadOnlyList<string> arguments, IReadOnlyDictionary<string, string>? environment = null)
+    public static string Run(string file, IReadOnlyList<string> arguments,
+        IReadOnlyDictionary<string, string>? environment = null)
     {
-        var start = new ProcessStartInfo(file) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        var start = new ProcessStartInfo(file)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
-        if (environment != null) foreach (var item in environment) start.Environment[item.Key] = item.Value;
+        if (environment != null)
+            foreach (var item in environment) start.Environment[item.Key] = item.Value;
         using var process = Process.Start(start) ?? throw new B6PackageException($"Unable to start {file}.");
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
         process.WaitForExit();
         var standardError = stderr.GetAwaiter().GetResult();
-        if (process.ExitCode != 0) throw new B6PackageException($"Controlled {file} operation failed: {SanitizeDiagnostic(standardError)}");
+        if (process.ExitCode != 0)
+            throw new B6PackageException($"Controlled {file} operation failed: {SanitizeDiagnostic(standardError)}");
         return stdout.GetAwaiter().GetResult();
     }
 
     private static string SanitizeDiagnostic(string value) =>
-        string.IsNullOrWhiteSpace(value) ? "no diagnostic" : value.Split('\n', StringSplitOptions.RemoveEmptyEntries)[0].Trim();
+        string.IsNullOrWhiteSpace(value)
+            ? "no diagnostic"
+            : value.Split('\n', StringSplitOptions.RemoveEmptyEntries)[0].Trim();
+
 }

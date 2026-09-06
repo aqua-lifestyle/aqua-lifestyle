@@ -655,6 +655,106 @@ whitespace, and the zero-Python operational/test/implementation dependency audit
 passed. No production access, migration/apply, V2 enablement, commit, push, PR, or
 staging occurred.
 
+## Post-commit pre-authority provenance correction (2026-09-06)
+
+`e4a25bc773cacc3a03e86a0ec4fda6b8fbcfcfe1` retained a branch-introduced
+operational trust-boundary defect. The earlier C1-A/B/C correction established that
+ignored source, physical checkout roots, and prior build state could not become
+trusted evidence, but its live Runner started while the operator wrapper already
+exported DSN and output authority. An ignored SDK-consumed module initializer was
+observed executing before `ToolchainIdentity.Capture()`. Exact-byte rejection after
+process start was therefore too late to prove that unreviewed code lacked sensitive
+authority. The accepted engineering contract is C1-D,
+`TRUST-BEFORE-SENSITIVE-OPERATION`; it does not claim that no trusted bootstrap or
+build process executes before artifact verification.
+
+The selected correction removes the assumption that operational evidence must
+execute a live-worktree Runner. The operator-controlled shell streams the exact
+`authoritative-runner.sh` blob from the selected full reviewed Git commit into Bash.
+No mutable repository script is an operational entry point. The reviewed bootstrap
+validates the Git authority with replacement objects disabled, captures then
+unexports all B6 operational variables, creates two independent private clones
+without checkout, isolates their Git configuration/templates, disables hooks and
+replacement objects, checks out the reviewed commit, rejects ignored/untracked
+state, verifies every materialized regular file against its raw no-filter Git blob,
+and builds both. Mutable source-repository hooks, `info/attributes`, checkout
+filters, replace objects, and live files cannot enter either source tree.
+Restore/build use
+minimal isolated environments and one new private package cache shared only by the
+two builds; they receive no DSN, snapshot path, output path,
+pseudonym key, provider token, or synthetic sensitive sentinel. The retained
+canonical build contract still provides explicit `NuGet.Config`, forced restore
+reevaluation, no-incremental compilation, build-server suppression, isolated
+outputs/intermediates, and deterministic SourceLink/path normalisation.
+
+Runner, Core, and EntityFrameworkCore bytes must match exactly between reviewed
+build A and reviewed build B. Build A is selected inside the private owner-only
+temporary root, the selected tree is made read-only, and hashes are rechecked
+immediately before launch. The exact reviewed operation adapter receives only its
+operation-specific capability environment after provenance and rechecks all three
+assemblies before every Runner invocation. `ToolchainIdentity` records the actual
+selected bytes/commit and requires the bootstrap's matching pre-authority binding;
+that binding is defence-in-depth, not a substitute for the Git-object bootstrap.
+Ignored/live source and all live `bin`/`obj`/artifact state are outside the
+operational selection path.
+
+The minimum trusted base is the operating system and private-directory semantics,
+the operator-controlled invocation and `PATH`, Git executable/object database,
+Bash/core utilities and SHA-256 implementation, and the canonical .NET
+SDK/MSBuild/NuGet build base. Package restore network is classified separately from
+operational/database authority. The operator-selected reviewed SHA remains a human
+review/authorization input; the repository does not infer that a commit was
+reviewed merely because Git can resolve it.
+
+The evaluated alternatives were: B, a separately installed external verifier;
+C, an unprivileged candidate plus parent-mediated capability transfer; and D, the
+live candidate with stripped authority. B added a second distribution/trust truth
+without improving the Git-object bootstrap. C required a new secure IPC/capability
+protocol and still needed an independently trusted parent. D could not safely add
+authority to the same already-running candidate without such a protocol. Option A
+proved claims 2–5 directly: executed bytes derive from reviewed source, two physical
+roots reproduce them, trust precedes authority, and operational evidence is emitted
+by the selected artifact. Claim 1, live-filesystem equivalence, is not a B6
+requirement and is no longer asserted.
+
+All validation in this uncommitted state is `PRECOMMIT CORRECTION EVIDENCE`. A
+post-commit trusted bootstrap does not exist until these exact changes have a new
+reviewed SHA. The final correction fingerprint, reviewed A/B assembly hashes,
+C1-A/B/C/D adversarial results, path/TOCTOU evidence, complete package checks, and
+cleanup are recorded at handoff after fresh validation. No production or
+representative data, credentials, migration/apply, V2 enablement, D10, B7, commit,
+push, PR, or staging is authorised by this work.
+
+Controlled probes established that the canonical restore/build succeeds with an
+empty minimal environment and no B6 operational variables. A fully fresh restore
+also exposed transient MyGet/NuGet resets; the reviewed builds now share one newly
+created private package cache, while their independent clones and intermediate/output
+trees,
+tool homes, and no-incremental compilations remain independent. Unavailable feeds
+are ignored only when every exact required package can still be resolved; a missing
+package remains fatal. The current precommit implementation passed its focused
+synthetic capability regression, three replacement/symlink artifact-selection
+attacks, the 59-test primitive/provenance class, and the 90-test real-schema
+PostgreSQL package plus its separate fixture-authoring step. One disposable exact
+candidate-tree bootstrap also completed both real canonical builds, exact-byte
+comparison, selected-artifact execution, and structured TRX validation. Final
+fingerprints/hashes and a fresh exact-tree rerun remain the handoff evidence because
+subsequent test/document hardening changed the uncommitted correction bytes.
+
+The final narrow independent review then established a further branch-owned C1-A/C1-D
+blocker in the precommit correction: linked `git worktree add` ran mutable shared
+`post-checkout` hooks and honored shared repository checkout attributes/filters. An
+attacker could inject the same ignored SDK-consumed module initializer into A and B,
+leave both ordinary statuses clean, and obtain equal contaminated assemblies. The
+correction now uses independent no-checkout clones with empty templates and isolated
+Git configuration, hook-free checkout, replacement objects disabled, ignored-state
+rejection, and a raw no-filter hash comparison of every materialized file to its
+reviewed blob. Its regression first demonstrates that a mutable shared hook and
+`info/attributes` smudge filter both contaminate an ordinary linked worktree while
+status remains clean, then proves neither mechanism runs or enters either authoritative
+clone and the sentinel is released only to the verified reviewed artifact. This
+paragraph and all rerun evidence remain `PRECOMMIT CORRECTION EVIDENCE`.
+
 ## Current state
 
 - B6 policy/design: `DECISION-READY / CONFIRMED FOR D03B+D09`.
@@ -692,20 +792,19 @@ migration/cutover, D08 exceptions, D10, and B7 remain separately gated as above.
 
 ## Next action
 
-Obtain production/data-owner/security/privacy (including responsible Aqua review of
-any Information Officer or regulatory/prior-authorisation need) and database-
-operator authorization for the exact package allowlist/runbook. An authorised
-operator must create a transactionally consistent, deterministically pseudonymised
-PostgreSQL snapshot at an explicitly recorded `AnalysisSnapshotCutoff`, place it in
-the approved isolated analysis environment, and provide its verified SHA-256-sealed
-manifest. Then run inventory and simulation twice and return direct-identifier-free,
-pseudonymised consequence
-statistics and anomaly counts for review. This is not migration approval.
+Obtain one narrow independent review of the pre-authority provenance correction. If
+accepted, create a new commit on top of `e4a25bc`, then rerun complete
+`OPERATIONAL_EVIDENCE` from that clean new SHA. Do not push or open a PR unless that
+clean-SHA evidence passes. The separately gated representative-snapshot operation
+still requires production/data-owner/security/privacy and database-operator
+authorization; this correction grants none.
 
 ## Git/branch context
 
 - Repository/worktree: `/home/wtc/Downloads/newAqua/aqua-lifestyle-b6`
 - Branch: `feat/aqgreen-v2-b6-legacy-canonicalisation-analysis`
-- Base/current `HEAD`: `26803037d9923842db12de621ab6f87c3cd045cc`
-- Changes: local unstaged source, tests, operations documentation, and this worklog.
-- Commit/push/PR: none; prohibited for this task.
+- Base `origin/main`: `26803037d9923842db12de621ab6f87c3cd045cc`
+- Accepted B6/current `HEAD`: `e4a25bc773cacc3a03e86a0ec4fda6b8fbcfcfe1`
+- Changes: local unstaged narrow build/provenance correction, regression, affected
+  operations documentation, and this worklog.
+- Correction commit/push/PR: none; prohibited for this task.

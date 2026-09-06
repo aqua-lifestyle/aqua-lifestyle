@@ -64,18 +64,33 @@ transform, type, and why it is required. Section G of the parent
 patterns exclude direct identifiers, free text, provider/payment data, unrelated
 products, and combo data.
 
-Operational evidence must run from the exact reviewed clean Git commit. The runner
-rejects staged changes, unstaged tracked changes, and untracked material before
-execution, records the actual repository `HEAD`, and seals the executing runner,
-Core, and EntityFrameworkCore assembly digests. It then creates a detached worktree
-for the exact reviewed commit from Git objects in a private temporary directory,
-verifies that materialization is exact and clean, builds only that tree, and rejects any executing
-first-party DLL that is not byte-identical to the reviewed-tree build. Normal Git
-cleanliness remains mandatory but is not treated as source provenance: ignored
-live-worktree source is absent from the Git-object materialization. Dirty
-development execution is available only under the visibly distinct
-`PRECOMMIT_SYNTHETIC_VALIDATION` classification and must not be promoted as
-operational evidence.
+Operational evidence starts from an operator-selected full reviewed Git commit,
+not a mutable live-worktree executable or script. The operator-controlled shell
+streams the exact `authoritative-runner.sh` blob from that commit through trusted
+Git into Bash with replacement objects disabled. That already-reviewed bootstrap
+creates two independent private clones, isolates Git configuration and attributes,
+disables hooks and replacement objects, verifies every materialized file against
+its raw reviewed blob, and gives restore/build only a minimal environment with no B6 operational
+variables, builds both with the canonical isolated deterministic contract, and
+requires exact Runner/Core/EntityFrameworkCore byte equality. It selects build A
+inside the owner-only temporary tree, makes the selected tree read-only, and
+rechecks all three hashes immediately before launch. Only then does the exact
+reviewed operation adapter receive its DSN/snapshot/output/key environment, and the
+adapter rechecks all three hashes before every Runner invocation.
+
+This is a trust-before-sensitive-operation boundary. Trusted operating-system
+process isolation, the operator-controlled invocation and `PATH`, Git executable
+and object database, Bash/core utilities and SHA-256 implementation, and the .NET
+SDK/MSBuild/NuGet build base are the minimum trusted computing base. Mutable source
+repository hooks, `info/attributes`, checkout filters, replace objects, ignored files,
+and live worktree contents are explicitly outside that base. Package restore
+may use ordinary NuGet network access, but receives no production/representative
+DSN, snapshot location, output authority, pseudonym key, provider secret, or B6
+test sentinel. The pre-authority environment variables supplied to the Runner bind
+the selected commit and hashes for evidence; they do not make a live script trusted.
+Ignored, modified, or stale live-worktree source/build state is never selected.
+Dirty development execution remains only `PRECOMMIT_SYNTHETIC_VALIDATION` and must
+not be promoted as operational evidence.
 
 The extractor starts one PostgreSQL `REPEATABLE READ READ ONLY` transaction,
 records the approved `AnalysisSnapshotCutoff`, captures `transaction_timestamp()`
@@ -95,14 +110,17 @@ reports, or shell history:
 ```bash
 export B6_SOURCE_DSN='<authorised read-only DSN>'
 export B6_SOURCE_SYSTEM_ID='<approved opaque source-system ID>'
-export B6_REPOSITORY_COMMIT='<reviewed full lowercase Git SHA>'
 export B6_RAW_ZONE2_DIR='<new secure Zone-2 path>'
 export B6_PSEUDONYM_KEY_FILE='<Zone-2 key path>'
 export B6_ZONE3_DIR='<new approved Zone-3 path>'
 export B6_SNAPSHOT_ID='<approved opaque ID>'
 export B6_TENANT_ID='<explicitly authorised TenantId>'
 export B6_ANALYSIS_SNAPSHOT_CUTOFF='<approved UTC observation cutoff>'
-bash docs/operations/aqgreen-v2-b6/snapshot-package/operator-extract.sh
+repo_root="$(pwd -P)" # run from the repository root
+reviewed_commit='<reviewed full lowercase Git SHA>'
+set -o pipefail
+GIT_NO_REPLACE_OBJECTS=1 git -C "${repo_root}" show "${reviewed_commit}:docs/operations/aqgreen-v2-b6/snapshot-package/authoritative-runner.sh" |
+  bash -s -- --repository "${repo_root}" --reviewed-commit "${reviewed_commit}" operator-extract
 ```
 
 All destination directories must be new paths beneath an already trusted,
@@ -117,9 +135,12 @@ handoff. Never enable shell tracing around these commands.
 Generate the Zone 2 key, rather than typing a placeholder:
 
 ```bash
-B6_EXECUTION_EVIDENCE_CLASSIFICATION=OPERATIONAL_EVIDENCE \
-dotnet AqualLifeStyle/9.4.2/aspnet-core/tools/AqualLifeStyle.B6SnapshotRunner/bin/Release/net8.0/AqualLifeStyle.B6SnapshotRunner.dll \
-  generate-key --output '<new Zone-2 key path>'
+repo_root="$(pwd -P)"
+reviewed_commit='<reviewed full lowercase Git SHA>'
+set -o pipefail
+GIT_NO_REPLACE_OBJECTS=1 git -C "${repo_root}" show "${reviewed_commit}:docs/operations/aqgreen-v2-b6/snapshot-package/authoritative-runner.sh" |
+  bash -s -- --repository "${repo_root}" --reviewed-commit "${reviewed_commit}" runner \
+    generate-key --output '<new Zone-2 key path>'
 ```
 
 This creates 32 CSPRNG bytes. Sanitisation rejects weak/all-zero or shorter keys.
@@ -200,7 +221,11 @@ export B6_SNAPSHOT_DIR='<approved Zone-3 snapshot path>'
 export B6_BASE_MANIFEST='<verified BASE_SNAPSHOT manifest path>'
 export B6_ROOT_DISPOSITIONS='<reviewed root-disposition path>'
 export B6_ANALYSIS_OUTPUT_DIR='<new owner-only output path>' # optional
-bash docs/operations/aqgreen-v2-b6/snapshot-package/run-analysis.sh
+repo_root="$(pwd -P)"
+reviewed_commit='<same reviewed full lowercase Git SHA>'
+set -o pipefail
+GIT_NO_REPLACE_OBJECTS=1 git -C "${repo_root}" show "${reviewed_commit}:docs/operations/aqgreen-v2-b6/snapshot-package/authoritative-runner.sh" |
+  bash -s -- --repository "${repo_root}" --reviewed-commit "${reviewed_commit}" run-analysis
 ```
 
 There is no operator-supplied verification status. The receipt is created only when

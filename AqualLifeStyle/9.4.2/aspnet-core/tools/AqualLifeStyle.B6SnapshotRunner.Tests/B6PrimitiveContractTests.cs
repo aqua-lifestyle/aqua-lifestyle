@@ -63,63 +63,29 @@ public sealed class B6PrimitiveContractTests
     }
 
     [Fact]
-    public void OperationalProvenance_RejectsExecutingAssemblyBuiltFromIgnoredCompileSource()
+    public void C1A_B_C_D_OperationalBootstrapUsesReviewedDoubleBuildBeforeReleasingSensitiveCapability()
     {
-        var testRoot = Path.Combine(Path.GetTempPath(), "b6-reviewed-tree-test-" + Guid.NewGuid().ToString("N"));
+        if (OperatingSystem.IsWindows()) return;
+        var testRoot = Path.Combine(Path.GetTempPath(), "b6-preauthority-test-" + Guid.NewGuid().ToString("N"));
         var repository = Path.Combine(testRoot, "repository");
-        var reviewedOutput = Path.Combine(testRoot, "reviewed-output");
-        var liveOutput = Path.Combine(testRoot, "live-output");
+        var unverifiedMarker = Path.Combine(testRoot, "unverified-marker");
+        var verifiedMarker = Path.Combine(testRoot, "verified-marker");
+        var buildLeakMarker = Path.Combine(testRoot, "build-leak-marker");
+        var checkoutHookMarker = Path.Combine(testRoot, "checkout-hook-marker");
+        var checkoutFilterMarker = Path.Combine(testRoot, "checkout-filter-marker");
+        const string sentinel = "B6-SYNTHETIC-SENSITIVE-CAPABILITY";
         Directory.CreateDirectory(repository);
         try
         {
-            var backend = Path.Combine(repository, "AqualLifeStyle", "9.4.2", "aspnet-core");
-            var runnerProject = Path.Combine(backend, "tools", "AqualLifeStyle.B6SnapshotRunner");
-            var coreProject = Path.Combine(backend, "src", "AqualLifeStyle.Core");
-            var efProject = Path.Combine(backend, "src", "AqualLifeStyle.EntityFrameworkCore");
-            Directory.CreateDirectory(runnerProject);
-            Directory.CreateDirectory(coreProject);
-            Directory.CreateDirectory(efProject);
-            File.WriteAllText(Path.Combine(backend, ".gitignore"), "[Bb]in/\n[Oo]bj/\n[Rr]elease/\n");
-            File.WriteAllText(Path.Combine(backend, "NuGet.Config"),
-                "<configuration><packageSources><clear /></packageSources></configuration>\n");
-            File.WriteAllText(Path.Combine(coreProject, "AqualLifeStyle.Core.csproj"), MinimalProject("AqualLifeStyle.Core"));
-            File.WriteAllText(Path.Combine(coreProject, "Marker.cs"), "namespace FixtureCore; public sealed class Marker { }\n");
-            File.WriteAllText(Path.Combine(efProject, "AqualLifeStyle.EntityFrameworkCore.csproj"), MinimalProject("AqualLifeStyle.EntityFrameworkCore"));
-            File.WriteAllText(Path.Combine(efProject, "Marker.cs"), "namespace FixtureEf; public sealed class Marker { }\n");
-            File.WriteAllText(Path.Combine(runnerProject, "AqualLifeStyle.B6SnapshotRunner.csproj"),
-                """
-                <Project Sdk="Microsoft.NET.Sdk">
-                  <PropertyGroup>
-                    <OutputType>Exe</OutputType>
-                    <TargetFramework>net8.0</TargetFramework>
-                    <AssemblyName>AqualLifeStyle.B6SnapshotRunner</AssemblyName>
-                  </PropertyGroup>
-                  <ItemGroup>
-                    <ProjectReference Include="../../src/AqualLifeStyle.Core/AqualLifeStyle.Core.csproj" />
-                    <ProjectReference Include="../../src/AqualLifeStyle.EntityFrameworkCore/AqualLifeStyle.EntityFrameworkCore.csproj" />
-                  </ItemGroup>
-                </Project>
-                """);
-            File.WriteAllText(Path.Combine(runnerProject, "Program.cs"),
-                "System.Console.WriteLine(typeof(FixtureCore.Marker).FullName + typeof(FixtureEf.Marker).FullName);\n");
-
+            var runnerProject = CreateSourceLinkFixture(repository, buildLeakMarker);
             Run(repository, "git", "init");
+            Run(repository, "git", "remote", "add", "origin", "https://github.com/aqua-lifestyle/aqua-lifestyle.git");
             Run(repository, "git", "add", ".");
             Run(repository, "git", "-c", "user.name=B6 Test", "-c", "user.email=b6@example.test",
-                "commit", "-m", "reviewed tree");
+                "commit", "-m", "reviewed source");
             var reviewedCommit = Run(repository, "git", "rev-parse", "HEAD").Trim();
 
-            Run(repository, "dotnet", "build",
-                Path.Combine(runnerProject, "AqualLifeStyle.B6SnapshotRunner.csproj"),
-                "--configuration", "Release", "--output", reviewedOutput,
-                "--disable-build-servers");
-            var reviewedIdentity = new ToolchainIdentity(reviewedCommit, B6Contract.OperationalEvidence,
-                ReadAssembly(reviewedOutput, "AqualLifeStyle.B6SnapshotRunner"),
-                [ReadAssembly(reviewedOutput, "AqualLifeStyle.Core"),
-                    ReadAssembly(reviewedOutput, "AqualLifeStyle.EntityFrameworkCore")]);
-            reviewedIdentity.RequireMatchesReviewedTreeBuild(repository, reviewedCommit);
-
-            var ignoredSourceDirectory = Path.Combine(runnerProject, "Release");
+            var ignoredSourceDirectory = Path.Combine(Path.GetDirectoryName(runnerProject)!, "Release");
             Directory.CreateDirectory(ignoredSourceDirectory);
             File.WriteAllText(Path.Combine(ignoredSourceDirectory, "Injected.cs"),
                 """
@@ -127,25 +93,176 @@ public sealed class B6PrimitiveContractTests
                 internal static class IgnoredInjection
                 {
                     [ModuleInitializer]
-                    internal static void Initialize() => System.Console.Error.Write("B6_IGNORED_SOURCE_INJECTED");
+                    internal static void Initialize()
+                    {
+                        var sentinel = System.Environment.GetEnvironmentVariable("B6_TEST_SENSITIVE_DSN_SENTINEL");
+                        var marker = System.Environment.GetEnvironmentVariable("B6_TEST_UNVERIFIED_MARKER");
+                        if (sentinel != null && marker != null) System.IO.File.WriteAllText(marker, sentinel);
+                    }
                 }
                 """);
 
+            var injectedSource = Path.Combine(ignoredSourceDirectory, "Injected.cs");
+            var injectedRelativeDirectory = Path.GetRelativePath(repository, ignoredSourceDirectory);
+            var gitDirectory = Path.GetFullPath(Run(repository, "git", "rev-parse", "--git-common-dir").Trim(), repository);
+            var hook = Path.Combine(gitDirectory, "hooks", "post-checkout");
+            File.WriteAllText(hook,
+                $"#!/usr/bin/env bash\nset -eu\nprintf hook > '{checkoutHookMarker}'\n" +
+                $"mkdir -p \"$PWD/{injectedRelativeDirectory}\"\n" +
+                $"cp '{injectedSource}' \"$PWD/{injectedRelativeDirectory}/HookInjected.cs\"\n");
+            File.SetUnixFileMode(hook, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+            var filter = Path.Combine(testRoot, "checkout-filter.sh");
+            File.WriteAllText(filter,
+                $"#!/usr/bin/env bash\nset -eu\ncat\nprintf filter > '{checkoutFilterMarker}'\n" +
+                $"mkdir -p \"$PWD/{injectedRelativeDirectory}\"\n" +
+                $"cp '{injectedSource}' \"$PWD/{injectedRelativeDirectory}/FilterInjected.cs\"\n");
+            File.SetUnixFileMode(filter, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            File.WriteAllText(Path.Combine(gitDirectory, "info", "attributes"),
+                Path.GetRelativePath(repository, Path.Combine(Path.GetDirectoryName(runnerProject)!, "Program.cs")) +
+                " filter=b6-inject\n");
+            Run(repository, "git", "config", "filter.b6-inject.smudge", $"bash '{filter}'");
+            Run(repository, "git", "config", "filter.b6-inject.clean", "cat");
+
+            var ordinaryCheckout = Path.Combine(testRoot, "ordinary-checkout");
+            Run(repository, "git", "worktree", "add", "--detach", ordinaryCheckout, reviewedCommit);
+            File.ReadAllText(checkoutHookMarker).ShouldBe("hook");
+            File.ReadAllText(checkoutFilterMarker).ShouldBe("filter");
+            File.Exists(Path.Combine(ordinaryCheckout, injectedRelativeDirectory, "HookInjected.cs")).ShouldBeTrue();
+            File.Exists(Path.Combine(ordinaryCheckout, injectedRelativeDirectory, "FilterInjected.cs")).ShouldBeTrue();
+            Run(ordinaryCheckout, "git", "status", "--porcelain=v1", "--untracked-files=all").ShouldBeEmpty();
+            Run(repository, "git", "worktree", "remove", "--force", ordinaryCheckout);
+            File.Delete(checkoutHookMarker);
+            File.Delete(checkoutFilterMarker);
+
+            RunWithEnvironment(repository, "dotnet", new Dictionary<string, string>
+            {
+                ["B6_TEST_SENSITIVE_DSN_SENTINEL"] = sentinel
+            }, "build", runnerProject, "--configuration", "Release", "--disable-build-servers");
+            File.ReadAllText(buildLeakMarker).Trim().ShouldBe(sentinel);
+            File.Delete(buildLeakMarker);
+            var ordinaryRunner = Path.Combine(Path.GetDirectoryName(runnerProject)!, "bin", "Release", "net8.0",
+                "AqualLifeStyle.B6SnapshotRunner.dll");
+            RunWithEnvironment(repository, "dotnet", new Dictionary<string, string>
+            {
+                ["B6_TEST_SENSITIVE_DSN_SENTINEL"] = sentinel,
+                ["B6_TEST_UNVERIFIED_MARKER"] = unverifiedMarker
+            }, ordinaryRunner);
+            File.ReadAllText(unverifiedMarker).ShouldBe(sentinel);
+            File.Delete(unverifiedMarker);
+
+            Directory.CreateDirectory(Path.Combine(repository, "AqualLifeStyle", "9.4.2", "aspnet-core",
+                "artifacts", "aqgreen-b6-authoritative"));
+            File.WriteAllText(Path.Combine(repository, "AqualLifeStyle", "9.4.2", "aspnet-core",
+                "artifacts", "aqgreen-b6-authoritative", "stale-state"), "must not be selected");
             Run(repository, "git", "status", "--porcelain=v1", "--untracked-files=all").ShouldBeEmpty();
-            Run(repository, "dotnet", "build",
-                Path.Combine(runnerProject, "AqualLifeStyle.B6SnapshotRunner.csproj"),
-                "--configuration", "Release", "--output", liveOutput, "--disable-build-servers");
-            Run(repository, "dotnet", Path.Combine(liveOutput, "AqualLifeStyle.B6SnapshotRunner.dll"))
-                .ShouldContain("B6_IGNORED_SOURCE_INJECTED");
 
-            var identity = new ToolchainIdentity(reviewedCommit, B6Contract.OperationalEvidence,
-                ReadAssembly(liveOutput, "AqualLifeStyle.B6SnapshotRunner"),
-                [ReadAssembly(liveOutput, "AqualLifeStyle.Core"),
-                    ReadAssembly(liveOutput, "AqualLifeStyle.EntityFrameworkCore")]);
+            var result = RunBootstrap(repository, reviewedCommit, new Dictionary<string, string>
+            {
+                ["B6_TEST_SENSITIVE_DSN_SENTINEL"] = sentinel,
+                ["B6_TEST_UNVERIFIED_MARKER"] = unverifiedMarker,
+                ["B6_TEST_VERIFIED_MARKER"] = verifiedMarker
+            }, "runner", "sensitive-probe");
 
-            Should.Throw<B6PackageException>(() =>
-                    identity.RequireMatchesReviewedTreeBuild(repository, reviewedCommit))
-                .Message.ShouldContain("reviewed Git object tree");
+            result.ShouldContain("B6 pre-authority provenance: PASS");
+            result.ShouldContain("B6_VERIFIED_SENSITIVE_CAPABILITY_VISIBLE");
+            result.ShouldContain("/source-a/");
+            result.ShouldNotContain(ordinaryRunner);
+            result.ShouldContain("Runner SHA-256:");
+            result.ShouldContain("Core SHA-256:");
+            result.ShouldContain("EntityFrameworkCore SHA-256:");
+            File.Exists(unverifiedMarker).ShouldBeFalse();
+            File.Exists(buildLeakMarker).ShouldBeFalse();
+            File.Exists(checkoutHookMarker).ShouldBeFalse();
+            File.Exists(checkoutFilterMarker).ShouldBeFalse();
+            File.ReadAllText(verifiedMarker).ShouldBe(sentinel);
+        }
+        finally
+        {
+            if (Directory.Exists(testRoot)) Directory.Delete(testRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void OperationalWrappers_DelegateBuildAndRunnerSelectionToCanonicalEntrypoint()
+    {
+        var repository = SourceRepositoryRoot();
+        var package = Path.Combine(repository, "docs", "operations", "aqgreen-v2-b6", "snapshot-package");
+        foreach (var wrapper in new[] { "run-analysis.sh", "operator-extract.sh" })
+        {
+            var content = File.ReadAllText(Path.Combine(package, wrapper));
+            content.ShouldContain("B6_PREAUTHORITY_PROVENANCE");
+            content.ShouldContain("B6_VERIFIED_ARTIFACT_ROOT");
+            content.ShouldNotContain("dotnet build");
+            content.ShouldNotContain("ContinuousIntegrationBuild");
+            content.ShouldNotContain("bin/Release");
+        }
+
+        var runbook = File.ReadAllText(Path.Combine(package, "operator-runbook.md"));
+        runbook.ShouldContain("git -C");
+        runbook.ShouldContain("show");
+        runbook.ShouldContain("GIT_NO_REPLACE_OBJECTS=1");
+        runbook.ShouldContain("authoritative-runner.sh");
+        runbook.ShouldNotContain("-p:ContinuousIntegrationBuild");
+        runbook.ShouldNotContain("dotnet build AqualLifeStyle/9.4.2/aspnet-core/tools/AqualLifeStyle.B6SnapshotRunner");
+    }
+
+    [Theory]
+    [InlineData("replacement")]
+    [InlineData("runner-symlink")]
+    [InlineData("root-symlink")]
+    public void OperationalAdapter_RejectsReplaceableOrSymlinkedVerifiedArtifact(string attack)
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var testRoot = Path.Combine(Path.GetTempPath(), "b6-artifact-selection-test-" + Guid.NewGuid().ToString("N"));
+        var artifactRoot = Path.Combine(testRoot, "artifacts");
+        var linkRoot = Path.Combine(testRoot, "artifact-link");
+        Directory.CreateDirectory(artifactRoot);
+        try
+        {
+            var runner = Path.Combine(artifactRoot, "AqualLifeStyle.B6SnapshotRunner.dll");
+            var core = Path.Combine(artifactRoot, "AqualLifeStyle.Core.dll");
+            var ef = Path.Combine(artifactRoot, "AqualLifeStyle.EntityFrameworkCore.dll");
+            File.WriteAllText(runner, "runner");
+            File.WriteAllText(core, "core");
+            File.WriteAllText(ef, "ef");
+            var runnerHash = B6Values.Sha256Hex(File.ReadAllBytes(runner));
+            var coreHash = B6Values.Sha256Hex(File.ReadAllBytes(core));
+            var efHash = B6Values.Sha256Hex(File.ReadAllBytes(ef));
+
+            var selectedRoot = artifactRoot;
+            if (attack == "replacement") File.WriteAllText(core, "replacement");
+            if (attack == "runner-symlink")
+            {
+                File.Delete(runner);
+                File.CreateSymbolicLink(runner, ef);
+            }
+            if (attack == "root-symlink")
+            {
+                Directory.CreateSymbolicLink(linkRoot, artifactRoot);
+                selectedRoot = linkRoot;
+            }
+
+            var result = RunCaptured(SourceRepositoryRoot(), "bash", new Dictionary<string, string>
+            {
+                ["B6_PREAUTHORITY_PROVENANCE"] = B6Contract.PreAuthorityProvenance,
+                ["B6_VERIFIED_ARTIFACT_ROOT"] = selectedRoot,
+                ["B6_PREAUTHORITY_RUNNER_SHA256"] = runnerHash,
+                ["B6_PREAUTHORITY_CORE_SHA256"] = coreHash,
+                ["B6_PREAUTHORITY_EF_SHA256"] = efHash,
+                ["B6_SOURCE_DSN"] = "Host=synthetic.invalid",
+                ["B6_SOURCE_SYSTEM_ID"] = "SYNTHETIC",
+                ["B6_REPOSITORY_COMMIT"] = new string('d', 40),
+                ["B6_RAW_ZONE2_DIR"] = Path.Combine(testRoot, "raw"),
+                ["B6_PSEUDONYM_KEY_FILE"] = Path.Combine(testRoot, "key"),
+                ["B6_ZONE3_DIR"] = Path.Combine(testRoot, "zone3"),
+                ["B6_SNAPSHOT_ID"] = "B6-SYNTHETIC",
+                ["B6_TENANT_ID"] = "1",
+                ["B6_ANALYSIS_SNAPSHOT_CUTOFF"] = "2026-01-01T00:00:00Z"
+            }, Path.Combine(SourcePackageRoot(), "operator-extract.sh"));
+
+            result.ExitCode.ShouldNotBe(0);
+            Directory.Exists(Path.Combine(testRoot, "raw")).ShouldBeFalse();
         }
         finally
         {
@@ -562,15 +679,104 @@ public sealed class B6PrimitiveContractTests
         return new FirstPartyAssemblyIdentity(name, B6Values.Sha256Hex(content), "test");
     }
 
-    private static FirstPartyAssemblyIdentity ReadAssembly(string root, string name)
-    {
-        var content = File.ReadAllBytes(Path.Combine(root, name + ".dll"));
-        return new FirstPartyAssemblyIdentity(name, B6Values.Sha256Hex(content), "test");
-    }
-
     private static string MinimalProject(string assemblyName) =>
         $"<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net8.0</TargetFramework>" +
         $"<AssemblyName>{assemblyName}</AssemblyName></PropertyGroup></Project>\n";
+
+    private static string CreateSourceLinkFixture(string repository, string? buildLeakMarker = null)
+    {
+        var backend = Path.Combine(repository, "AqualLifeStyle", "9.4.2", "aspnet-core");
+        var runnerProject = Path.Combine(backend, "tools", "AqualLifeStyle.B6SnapshotRunner");
+        var coreProject = Path.Combine(backend, "src", "AqualLifeStyle.Core");
+        var efProject = Path.Combine(backend, "src", "AqualLifeStyle.EntityFrameworkCore");
+        var package = Path.Combine(repository, "docs", "operations", "aqgreen-v2-b6", "snapshot-package");
+        Directory.CreateDirectory(runnerProject);
+        Directory.CreateDirectory(coreProject);
+        Directory.CreateDirectory(efProject);
+        Directory.CreateDirectory(package);
+        File.WriteAllText(Path.Combine(backend, ".gitignore"), "[Bb]in/\n[Oo]bj/\n[Rr]elease/\nartifacts/\n");
+        File.WriteAllText(Path.Combine(backend, "NuGet.Config"),
+            "<configuration><packageSources><clear /></packageSources></configuration>\n");
+        File.Copy(SourceCanonicalBuilder(), Path.Combine(package, "authoritative-runner.sh"));
+        File.Copy(Path.Combine(SourcePackageRoot(), "operator-extract.sh"),
+            Path.Combine(package, "operator-extract.sh"));
+        File.Copy(Path.Combine(SourcePackageRoot(), "run-analysis.sh"),
+            Path.Combine(package, "run-analysis.sh"));
+        File.WriteAllText(Path.Combine(coreProject, "AqualLifeStyle.Core.csproj"),
+            MinimalProject("AqualLifeStyle.Core"));
+        File.WriteAllText(Path.Combine(coreProject, "Marker.cs"),
+            "namespace FixtureCore; public sealed class Marker { }\n");
+        File.WriteAllText(Path.Combine(efProject, "AqualLifeStyle.EntityFrameworkCore.csproj"),
+            MinimalProject("AqualLifeStyle.EntityFrameworkCore"));
+        File.WriteAllText(Path.Combine(efProject, "Marker.cs"),
+            "namespace FixtureEf; public sealed class Marker { }\n");
+        var buildLeakTarget = buildLeakMarker == null
+            ? string.Empty
+            : $"<Target Name=\"DetectSensitiveBuildEnvironment\" BeforeTargets=\"CoreCompile\" " +
+              $"Condition=\"'$(B6_TEST_SENSITIVE_DSN_SENTINEL)' != ''\"><WriteLinesToFile " +
+              $"File=\"{buildLeakMarker}\" Lines=\"$(B6_TEST_SENSITIVE_DSN_SENTINEL)\" Overwrite=\"true\" /></Target>";
+        File.WriteAllText(Path.Combine(runnerProject, "AqualLifeStyle.B6SnapshotRunner.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <OutputType>Exe</OutputType>
+                <TargetFramework>net8.0</TargetFramework>
+                <AssemblyName>AqualLifeStyle.B6SnapshotRunner</AssemblyName>
+              </PropertyGroup>
+              <ItemGroup>
+                <ProjectReference Include="../../src/AqualLifeStyle.Core/AqualLifeStyle.Core.csproj" />
+                <ProjectReference Include="../../src/AqualLifeStyle.EntityFrameworkCore/AqualLifeStyle.EntityFrameworkCore.csproj" />
+              </ItemGroup>
+            """ + buildLeakTarget + "\n</Project>\n");
+        File.WriteAllText(Path.Combine(runnerProject, "Program.cs"),
+            """
+            var sentinel = System.Environment.GetEnvironmentVariable("B6_TEST_SENSITIVE_DSN_SENTINEL");
+            var verifiedMarker = System.Environment.GetEnvironmentVariable("B6_TEST_VERIFIED_MARKER");
+            if (sentinel != null && verifiedMarker != null) System.IO.File.WriteAllText(verifiedMarker, sentinel);
+            System.Console.WriteLine(sentinel == "B6-SYNTHETIC-SENSITIVE-CAPABILITY"
+                ? "B6_VERIFIED_SENSITIVE_CAPABILITY_VISIBLE"
+                : "B6_SENSITIVE_CAPABILITY_ABSENT");
+            System.Console.WriteLine(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            System.Console.WriteLine(typeof(FixtureCore.Marker).FullName + typeof(FixtureEf.Marker).FullName);
+            """);
+        return Path.Combine(runnerProject, "AqualLifeStyle.B6SnapshotRunner.csproj");
+    }
+
+    private static string SourceRepositoryRoot()
+    {
+        DirectoryInfo? current = new(AppContext.BaseDirectory);
+        while (current != null)
+        {
+            var candidate = CanonicalBuilderPath(current.FullName);
+            if (File.Exists(candidate)) return current.FullName;
+            current = current.Parent;
+        }
+        throw new InvalidOperationException("Unable to locate the canonical B6 build entrypoint.");
+    }
+
+    private static string SourceCanonicalBuilder() => CanonicalBuilderPath(SourceRepositoryRoot());
+
+    private static string SourcePackageRoot() => Path.Combine(SourceRepositoryRoot(), "docs", "operations",
+        "aqgreen-v2-b6", "snapshot-package");
+
+    private static string CanonicalBuilderPath(string repository) =>
+        Path.Combine(repository, "docs", "operations", "aqgreen-v2-b6", "snapshot-package",
+            "authoritative-runner.sh");
+
+    private static string RunBootstrap(string repository, string reviewedCommit,
+        IReadOnlyDictionary<string, string> environment, params string[] arguments)
+    {
+        const string bootstrapPath =
+            "docs/operations/aqgreen-v2-b6/snapshot-package/authoritative-runner.sh";
+        var shellArguments = new List<string>
+        {
+            "-c",
+            "set -o pipefail; GIT_NO_REPLACE_OBJECTS=1 git -C \"$1\" show \"$2:$3\" | bash -s -- --repository \"$1\" --reviewed-commit \"$2\" \"${@:4}\"",
+            "b6-bootstrap", repository, reviewedCommit, bootstrapPath
+        };
+        shellArguments.AddRange(arguments);
+        return RunWithEnvironment(repository, "bash", environment, shellArguments.ToArray());
+    }
 
     private static string WriteTrx(int total, int executed, int passed, int failed, int skipped,
         string? outcome = "Completed", IReadOnlyDictionary<string, int>? counterOverrides = null,
@@ -646,4 +852,34 @@ public sealed class B6PrimitiveContractTests
             throw new InvalidOperationException($"{file} failed with exit code {process.ExitCode}: {stderr.GetAwaiter().GetResult()}");
         return stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult();
     }
+
+    private static string RunWithEnvironment(string workingDirectory, string file,
+        IReadOnlyDictionary<string, string> environment, params string[] arguments)
+    {
+        var result = RunCaptured(workingDirectory, file, environment, arguments);
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException($"{file} failed with exit code {result.ExitCode}: {result.StandardError}");
+        return result.StandardOutput + result.StandardError;
+    }
+
+    private static CommandResult RunCaptured(string workingDirectory, string file,
+        IReadOnlyDictionary<string, string> environment, params string[] arguments)
+    {
+        var start = new System.Diagnostics.ProcessStartInfo(file)
+        {
+            WorkingDirectory = workingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        foreach (var (name, value) in environment) start.Environment[name] = value;
+        using var process = System.Diagnostics.Process.Start(start) ?? throw new InvalidOperationException($"Unable to start {file}.");
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        process.WaitForExit();
+        return new CommandResult(process.ExitCode, stdout.GetAwaiter().GetResult(), stderr.GetAwaiter().GetResult());
+    }
+
+    private sealed record CommandResult(int ExitCode, string StandardOutput, string StandardError);
 }
