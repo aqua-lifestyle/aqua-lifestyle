@@ -150,7 +150,7 @@ The principal `CURRENT IMPLEMENTATION EVIDENCE` inspected for D02, D03A/D03B, an
 | Decision | Repository evidence | What it establishes / does not establish |
 | --- | --- | --- |
 | D02 | `EffectiveProgrammeNetwork.cs`, `EntryNetworkQualificationEvaluator.cs`, `EntryNetworkQualificationEvaluatorTests.cs`, `EntryParticipationConfiguration.cs`, and `20260723040005_PersistOnyxProgrammeParticipation.cs` | V1 derives earliest-five recruiter adjacency and has no V2 allocator, slot, scope, sequence, or canonical position. D02 now supplies the authoritative V2 ordering. |
-| D03A/D03B | `EntryParticipation.cs`, `ClubMemberProgrammeParticipationAppService.cs`, `AdminProgrammeParticipationAppService.cs`, `EffectiveProgrammeNetwork.cs`, `ProgrammeRecruiterCorrectionPolicies.cs`, and `08-area-and-tenant-boundaries.md` | V1 can start independently, can create effective roots through correction, evaluates disconnected components independently, and does not use Area as topology. Recruiter correction authorizes against the target participant's current active Area, while the same-Tenant replacement may be from another Area. D03A now governs prospective roots; this evidence still cannot classify legacy roots under D03B/D09. |
+| D03A/D03B | `EntryParticipation.cs`, `ClubMemberProgrammeParticipationAppService.cs`, `AdminProgrammeParticipationAppService.cs`, `EffectiveProgrammeNetwork.cs`, `ProgrammeRecruiterCorrectionPolicies.cs`, and `08-area-and-tenant-boundaries.md` | V1 can start independently, can create effective roots through correction, evaluates disconnected components independently, and does not use Area as topology. Recruiter correction authorizes against the target participant's current active Area, while the same-Tenant replacement may be from another Area. D03A governs prospective roots. Owner-confirmed D03B/D09 now govern legacy classification; repository evidence alone still cannot identify which real components pass those rules without the authorised representative snapshot. |
 | D14A/D14B | `ProgrammeInvitationResolver.cs`, `ProgrammeRecruitmentPolicy.cs`, `ClubMemberProgrammeParticipationAppService.cs`, `ProgrammePaymentConfirmationProcessor.cs`, `AdminProgrammeParticipationAppService.cs`, `EntryWeeklyCommissionCalculator.cs`, and `02-business-rules-and-workflows.md` | Sponsor checks differ by attribution path; later payment/approval does not uniformly recheck sponsor state; current financial holds affect own payout rather than topology. D14A now governs later temporary restriction; terminal disposition remains D14B. |
 
 The paths above are under `AqualLifeStyle/9.4.2/aspnet-core` unless shown as documentation. Exact implementation line numbers are intentionally not normative; authority comes from the classified rule/evidence, not a mutable source location.
@@ -342,7 +342,7 @@ A later temporary financial/earning restriction of the credited sponsor does not
 
 `ENGINEERING DECISION`: canonical position selection is deterministic for a committed topology. The baseline for two truly concurrent approvals is server-authoritative serialized lock/commit order, recorded by `PlacementSequence`; browser or provider timestamps never break the tie. The transaction that acquires the PlacementTreeScope lock and commits first receives the earlier sequence and first canonical vacancy. Once committed, later discovery of another event does not displace it.
 
-This decision favors immutable, auditable order over a false claim that distributed events have a perfectly knowable total wall-clock order. Under `AQG-V2-D12`, serialized commit order is the safe allocator design default and does not itself authorise implementation or production enablement. Production remains gated by implementation evidence and `AQG-V2-D03B`, `D09`, and `D10`. A different commercial priority requires an explicit subsequent decision and a durable server-side ordering fact; browser or provider timestamps are not an acceptable override.
+This decision favors immutable, auditable order over a false claim that distributed events have a perfectly knowable total wall-clock order. Under `AQG-V2-D12`, serialized commit order is the safe allocator design default and does not itself authorise implementation or production enablement. Production remains gated by representative legacy-data analysis, an approved final migration manifest and implementation evidence, and `AQG-V2-D10`. A different commercial priority requires an explicit subsequent decision and a durable server-side ordering fact; browser or provider timestamps are not an acceptable override.
 
 ### 9.4 Exceptional Active-but-unplaced reconciliation
 
@@ -409,7 +409,27 @@ Participant.PlacementTreeScopeId
 
 `CURRENT IMPLEMENTATION EVIDENCE`: V1 supplies no durable root-admission fact. Null recruiter, independent start, and recruiter-clearing correction can each produce a historical root candidate, while qualification follows disconnected components independently. Those V1 mechanisms are not prospective V2 root creation.
 
-`AQG-V2-D03B — OPEN / CUTOVER-MIGRATION DECISION`, related to `AQG-V2-D09`: legacy classification and mapping remain unresolved. D03B/D09 must decide which historical recruiterless participants are legitimate roots versus anomalies, how accepted populations map to PlacementTreeScopes, and how malformed, ambiguous, dangling, cyclic, deleted, or cross-Tenant evidence is classified. Prospective D03A implementation is not blocked by D03B; authoritative legacy canonicalisation and migration remain blocked.
+### 11.3 Legacy root and scope mapping (D03B)
+
+`AQG-V2-D03B — CONFIRMED MIGRATION-POLICY DECISION`, related to `AQG-V2-D09`: each accepted cutoff-effective legacy AQGreen V1 root-specific component maps to exactly one V2 `PlacementTreeScope`. The component must belong to one Tenant, have exactly one deterministic accepted root, be acyclic, contain no dangling or cross-Tenant sponsor edge, and have deterministic recruiter/correction evidence required for canonicalisation. Independent roots are not merged because they share a Tenant, Area, Aqua affiliation, unrelated history, or correction evidence that does not authoritatively connect the cutoff-effective components. No global, Tenant, Area, or company root may be manufactured.
+
+Any component with no deterministic root, competing or contradictory roots, a cycle, dangling sponsor, cross-Tenant relationship, irreconcilable recruiter/correction history, or unsupported topology-affecting lifecycle evidence enters `EXCEPTION REVIEW` and is excluded from the accepted migration manifest. Canonicalisation must not guess, merge, compress, skip a problematic ancestor and reflow descendants, invent a root, or search globally for a replacement sponsor. The generated rows are a proposed future V2 topology with `PlacementSource = LegacyCanonicalisation`; they are not a claim that this topology existed historically.
+
+### 11.4 Three distinct B6 populations (D09)
+
+`AQG-V2-D09 — CONFIRMED MIGRATION-POPULATION AND PROVENANCE DECISION`: B6 keeps three populations distinct:
+
+1. **Canonicalisation population.** A participant may enter only when it is an AQGreen participation, crossed the authoritative approval/activation gate, is effective at the approved B6 analysis cutoff, has deterministic Tenant, credited-sponsor/root, ordering/correction evidence, and belongs to an accepted D03B component. Current `AwaitingJoiningPayment`, `AwaitingActivationPayment`, `PaymentConfirmedAwaitingApproval`, and `Rejected` records are excluded. Payment confirmation and historical financial or graduation evidence do not establish inclusion.
+2. **Qualification eligibility.** The retained AQGreen rule is Active-only at the authoritative cutoff unless a later owner decision changes it. Eligibility is separate from permanent placement. A later eligibility change does not delete placement, reuse a slot, compress the tree, move descendants, or re-parent them.
+3. **Historical impact inventory.** Commission decisions and payout states, loans, graduations, resulting Onyx participations, deleted/problem records, and historically relevant qualification evidence are inventoried to measure impact only. They do not make a participant eligible for canonicalisation and must not be recalculated, overwritten, revoked, or rewritten as though V2 existed historically.
+
+D08 remains unresolved for post-Active lifecycle semantics. Soft-deleted, deleted, suspended, terminated, withdrawn, deceased, refunded, chargeback/dispute, and other unsupported post-Active terminal or restricted conditions enter `EXCEPTION REVIEW` wherever disposition changes topology. When such a participant is required as an ancestor, the entire affected component remains blocked; the participant is not removed and the tree is not closed or reflowed.
+
+`LegacyUnknownAcquisition` is the confirmed controlled analysis/migration meaning for an acquisition channel that cannot be reliably recovered from authoritative retained evidence. It applies only to acquisition provenance. It is not an unknown or inferred sponsor/root, `MemberInvitation`, `CompanyMarketing`, `AuthorisedDirectAdmission`, participant consent, placement, administrator assignment, or evidence waiver. Unknown acquisition plus a deterministic accepted credited sponsor and root may remain eligible; unknown or ambiguous sponsor/root, or corrupt/ambiguous recruiter correction, blocks the affected component. The required production representation remains a future schema/domain design surface and is not authorised by this decision record.
+
+```text
+Acquisition provenance != Credited sponsor != Placement parent != Current eligibility
+```
 
 `CURRENT IMPLEMENTATION EVIDENCE`: V1 sponsor admissibility is path-dependent. Invitation resolution rechecks an Active same-Tenant/programme participation, Active Customer, and active Area. The legacy raw recruiter-ID path checks only the Active same-Tenant programme participation. AQGreen stores attribution before payment/approval, payment confirmation does not revalidate the sponsor, and Area approval validates the invitee and approving Area authority rather than the sponsor's later state.
 
@@ -1128,7 +1148,7 @@ The same scope rule applies to monthly obligations: due-day, first-liability, wo
 
 ## 26. Migration and canonicalisation strategy
 
-No placement migration is authorised or migration-ready by this document alone. Read-only analysis may proceed, but authoritative canonicalisation or data application requires acceptance of `AQG-V2-D03B` and `D09`, followed by the applicable cutover controls.
+No placement migration is authorised or migration-ready by this document alone. `AQG-V2-D03B` and `D09` now define the confirmed classification rules, but the representative legacy population has not been inspected. Authoritative canonicalisation or data application still requires an authorised, transactionally consistent, sanitized production-like snapshot at an explicit `AnalysisSnapshotCutoff`, repeatable analysis, disposition of quarantined components, approval of the exact final manifest, and the applicable migration and cutover controls.
 
 ### 26.1 Phase 1: read-only analysis/dry-run
 
@@ -1193,11 +1213,11 @@ Do not assume PostgreSQL `uuid` and .NET `Guid` default comparators are equivale
 
 This is a deterministic Kahn topological traversal with a total-order priority queue. At each step the frozen sponsor graph and already-produced prefix determine the ready set; the canonical comparator selects one unique candidate; and the accepted allocator selects one unique vacancy. By induction, the next row and complete output are unique. Machine scheduling, input order, database return order, process count, batch size, and retry timing cannot alter output if they preserve this logical dequeue order.
 
-Separate scopes may be computed in parallel only after `AQG-V2-D03B`/`D09` accepts the legacy roots, populations, and scope ownership. Canonical reports sort scopes by an accepted immutable scope/root key. Within a scope, workers must not claim ready records independently outside the logical priority queue.
+Separate scopes may be computed in parallel only after representative data has been classified under confirmed `AQG-V2-D03B`/`D09` and the accepted roots, populations, and scope ownership have been frozen in a reviewed manifest. Canonical reports sort scopes by an accepted immutable scope/root key. Within a scope, workers must not claim ready records independently outside the logical priority queue.
 
 The manifest must use a fixed authorised canonicalisation effective timestamp distinct from recording time. Retries may have different `RecordedAt` values but must produce the same effective placement facts and manifest hash. A crash either recomputes from the frozen manifest and verifies the complete applied prefix, or resumes from a persisted prefix whose rows/hash exactly match recomputation.
 
-This output is a proposed V2 topology, not reconstruction of original historical placement. Unknown acquisition source remains unknown/legacy; do not fabricate `MemberInvitation`. Authoritative topology output requires population/provenance authority under `AQG-V2-D09` and legacy root mapping under `AQG-V2-D03B`; resolved D02 supplies the allocator order but does not authorise the migration population. Resolved `AQG-V2-D01` permits structural-completion simulation. `AQGreenWeeklySalesEligibilityV1` applies to post-V2 candidate periods; using it against V1 history is permitted only as explicitly labeled counterfactual analysis, never as a historical rule or result, and must not rewrite historical V1 results.
+This output is a proposed V2 topology, not reconstruction of original historical placement. An unrecoverable acquisition channel is represented only by the confirmed controlled `LegacyUnknownAcquisition` meaning; do not fabricate `MemberInvitation` or use that value for unknown sponsor/root evidence. Confirmed `AQG-V2-D09` and `D03B` govern population, provenance, and scope classification, but do not approve a concrete manifest or authorise application. Resolved D02 supplies the allocator order. Resolved `AQG-V2-D01` permits structural-completion simulation. `AQGreenWeeklySalesEligibilityV1` applies to post-V2 candidate periods; using it against V1 history is permitted only as explicitly labeled counterfactual analysis, never as a historical rule or result, and must not rewrite historical V1 results.
 
 ### 26.3 Phase 3: anomaly and impact review
 
@@ -1613,7 +1633,7 @@ Tenant T
 
 S belongs to R1 and F is credited to S. Therefore F must inherit R1. If S's placement or R1 cannot be resolved, F does not become a root, move to R2, or create a new PlacementTreeScope; approval/placement fails closed and remains retryable.
 
-This prospective rule does not classify V1 recruiterless participants. Historical root legitimacy and population-to-scope mapping remain open under `AQG-V2-D03B` and `AQG-V2-D09`.
+This prospective rule does not by itself classify V1 recruiterless participants. Confirmed `AQG-V2-D03B` and `D09` provide that classification policy; the authorised representative snapshot must establish which actual components satisfy it and which enter exception review.
 
 ## 30. Acceptance criteria
 
@@ -1626,13 +1646,13 @@ Resolved `AQG-V2-D01` now permits structural qualification work. The following c
 1. Acquisition provenance, credited sponsor, and placement parent are separate queryable/auditable facts.
 2. Attribution persistence and immutable participant-level company-assignment audit support the unresolved governance choices without selecting them.
 3. PlacementTreeScope, explicit-root, parent-plus-slot, and sponsor-scope invariants enforce one root per scope, at most five children per parent, and one permanent placement per participant.
-4. A sponsor-local allocator implements the resolved D02 parent-major order; production cutover remains separately gated by D09/D10.
+4. A sponsor-local allocator implements the resolved D02 parent-major order; production cutover remains separately gated by representative B6 analysis, final-manifest approval, and D10.
 5. Concurrent allocation cannot duplicate a slot or participant, and retry preserves the original placement.
 6. The disabled/non-production integration path proves normal final approval and placement commit atomically; failure leaves participation non-Active and retryable. Production use remains subject to the applicable decision IDs.
 7. Relative depth, occupancy, ancestry, and canonical order can be reproduced without treating them as qualification.
 8. Ordinary clients/admins cannot choose topology, and cross-Tenant placement fails closed.
 9. Audit history, exceptional Active-but-unplaced detection, and read-only V1 inventory tooling are available.
-10. Deterministic tree-wide replay mechanics produce identical manifests for identical frozen test inputs independent of process order, machine, batch size, or retry; final legacy population/scope inputs remain subject to D03B and D09.
+10. Deterministic tree-wide replay mechanics produce identical manifests for identical frozen test inputs independent of process order, machine, batch size, or retry; final legacy population/scope inputs must comply with confirmed D03B/D09 and remain subject to representative-data review and explicit manifest approval.
 11. StructuralCompletionLevel is calculated from qualifying placement positions at relative depth, including recursive spillover contribution, without changing sponsor credit.
 12. A CommissionCandidate's weekly commission calculation requires `AQGreenWeeklySalesEligibilityV1` and an auditable admin evidence review; the system then calculates PaidAsLevel/CommissionedLevel and amount, after which existing payout/release controls apply separately.
 13. An already-confirmed attribution continues through normal placement when the credited sponsor later has only a temporary financial/earning restriction under D14A; affected pending placements encountering a D14B terminal state fail closed until D14B is resolved.
@@ -1642,14 +1662,14 @@ Resolved `AQG-V2-D01` now permits structural qualification work. The following c
 - **Structural qualification, progress, and structural graduation input:** no longer blocked by D01; use the resolved relative-depth contribution rule. D08 still governs contribution at cutoffs involving its unresolved post-Active states.
 - **MVP weekly commission eligibility:** no longer blocked by D01; use StructuralCompletionLevel plus `AQGreenWeeklySalesEligibilityV1` and confirmed evidence, subject to existing commission and payout controls.
 - **Prospective allocator and root/scope model:** no longer blocked by D02 or D03A. Use the resolved parent-major order, explicit privileged root creation, and sponsor-scope inheritance. Production enablement remains subject to implementation evidence and D10.
-- **Legacy root classification and final placement-tree scope mapping:** blocked by `AQG-V2-D03B` and `AQG-V2-D09`; prospective root creation and normal placement are not.
+- **Legacy root classification and final placement-tree scope mapping:** D03B/D09 policy is confirmed. Actual roots/components remain blocked on authorised representative-snapshot analysis, anomaly disposition, and final-manifest approval; prospective root creation and normal placement are unaffected.
 - **Company-assisted production enablement:** blocked by `AQG-V2-D04`, `AQG-V2-D05`, `AQG-V2-D13`, and D14B only when a terminal sponsor case is encountered; keep the channel disabled without blocking ordinary member invitations.
 - **Sponsor reassignment after placement:** blocked by `AQG-V2-D06`.
 - **Manual topology repair:** blocked by `AQG-V2-D07` and `AQG-V2-D11` where historical decisions are affected.
 - **Post-Active contribution for affected states:** blocked by `AQG-V2-D08`; topology remains immutable.
 - **Pending placement after sponsor state changes:** temporary financial/earning restriction is resolved by D14A and does not block placement; terminal disposition remains blocked only for affected participants by D14B.
-- **Canonicalisation population and provenance:** blocked by `AQG-V2-D09`.
-- **Migration cutover and V2 financial effective boundary:** blocked by `AQG-V2-D10`, `AQG-V2-D03B`, and `D09`; resolved D01, D02, and D03A supply target semantics but do not authorise migration or cutover.
+- **Canonicalisation population and provenance:** D09 is confirmed; actual classification remains blocked on the authorised representative snapshot, and `LegacyUnknownAcquisition` still requires a future production representation before apply.
+- **Migration cutover and V2 financial effective boundary:** blocked by representative B6 analysis, final-manifest and migration approval, and `AQG-V2-D10`; confirmed D03B/D09 and resolved D01, D02, and D03A supply target semantics but do not authorise migration or cutover.
 - **Alternative concurrent commercial priority:** requires `AQG-V2-D12`; absent such a request, serialized commit order is the non-blocking default.
 
 Deferred loan/repayment and monthly-obligation automation are not Placement V2 acceptance criteria. Only an actually enabled consumer at cutover must be adapted so it cannot continue using contradictory V1 topology.
@@ -1744,7 +1764,7 @@ Preserve independently valid assertions for 5/25/125 completion, rates/component
 
 ## 32. Future migration validation prerequisites
 
-Before a future V2 migration can be considered for merge or application, after `AQG-V2-D03B` and `D09` acceptance:
+Before a future V2 migration can be considered for merge or application, with `AQG-V2-D03B` and `D09` confirmed:
 
 - run the read-only inventory against a sanitized production-like copy;
 - publish counts and hashes, not personal data;
@@ -1786,21 +1806,21 @@ Every decision has a stable identifier, status, and bounded dependency category.
 | ID | Status | Decision | Exact dependency / safe state |
 | --- | --- | --- | --- |
 | `AQG-V2-D01` | **RESOLVED FOR MVP** | **Spillover structural contribution:** every cutoff-qualifying occupied position contributes to each applicable placement ancestor according to relative depth, regardless of sponsor credit. Structural completion is separate from weekly earning eligibility. | Structural qualification/progress may proceed. MVP commission eligibility uses `AQGreenWeeklySalesEligibilityV1`; long-term threshold economics remain a non-blocking validation risk. |
-| `AQG-V2-D02` | **RESOLVED** | **Sponsor-local placement ordering:** deterministic parent-major BFS, A1-A5 then B1-B5, continuing breadth-first in canonical parent order within the credited sponsor's subtree. Earlier siblings receiving multiple spillovers before later siblings receive one is accepted. | Prospective allocator work may proceed; D09/D10 still govern migration/cutover. |
+| `AQG-V2-D02` | **RESOLVED** | **Sponsor-local placement ordering:** deterministic parent-major BFS, A1-A5 then B1-B5, continuing breadth-first in canonical parent order within the credited sponsor's subtree. Earlier siblings receiving multiple spillovers before later siblings receive one is accepted. | Prospective allocator work may proceed; representative B6 analysis/final-manifest approval and D10 still govern migration/cutover. |
 | `AQG-V2-D03A` | **RESOLVED** | **Prospective root/scope policy:** one explicit privileged/audited root per PlacementTreeScope; multiple scopes per Tenant/AQGreen programme are allowed; every normal non-root inherits the credited sponsor's scope. | Prospective root, scope, topology, locking, and normal allocation work may proceed. Missing sponsor/scope fails closed and cannot create a root. |
-| `AQG-V2-D03B` | **OPEN / MIGRATION-BOUND** | **Legacy root-to-PlacementTreeScope mapping:** classify legitimate historical roots/anomalies and approve population/scope mapping. | Blocks authoritative legacy canonicalisation/migration only; related to D09. It does not block prospective D03A behavior. |
+| `AQG-V2-D03B` | **CONFIRMED** | **Legacy root-to-PlacementTreeScope mapping:** one accepted cutoff-effective, deterministic, single-Tenant, acyclic root-specific component maps to exactly one scope; independent roots are not merged; topology-affecting anomalies quarantine the complete affected component. | Migration-bound policy governing B6 classification. It does not approve actual components, a final manifest, migration/apply, or cutover, and does not block prospective D03A behavior. |
 | `AQG-V2-D14A` | **RESOLVED** | **Temporary sponsor restriction after confirmed attribution:** preserve sponsor and scope; after valid payment/approval, place normally in the original sponsor's subtree using D02. | Temporary financial/earning restriction alone no longer blocks prospective placement. Sponsor earning/release remains separate. |
 | `AQG-V2-D14B` | **OPEN** | **Terminal sponsor disposition:** treatment after death, permanent exit/termination, fraud removal, withdrawal, final refund/chargeback, or other irreversible state. | Blocks only pending placements that encounter a terminal state. Preserve history and fail closed without reassignment or an invented root. |
 | `AQG-V2-D15` | **RESOLVED** | **Topology boundaries:** Tenant is the hard topology boundary; PlacementTreeScope is the tree boundary; Area remains administrative only. Same-Tenant cross-Area topology is valid. | Topology persistence, uniqueness, parent/scope foreign keys, canonical paths, and future allocator locks must not include Area identity. |
 
 ### 34.2 Cutover and migration decisions
 
-All decisions in sections 34.2 through 34.4 remain **OPEN** unless a later authoritative record explicitly resolves them.
+Statuses in sections 34.2 through 34.4 are independent. D09 is confirmed for B6 migration policy; D10 and the listed optional/exceptional decisions remain open unless a later authoritative record explicitly resolves them.
 
-| ID | Decision | Exact blocked scope | Safe state while open |
+| ID | Status | Decision | Exact blocked scope / safe state |
 | --- | --- | --- | --- |
-| `AQG-V2-D09` | **Legacy migration population and provenance:** accepted records, sponsor evidence, unknown source classification, ordering evidence, D03B root/scope mapping, and exception authority. | Authoritative legacy manifest and migration of unresolved records. | Run read-only inventory and synthetic/frozen-input replay tests only. |
-| `AQG-V2-D10` | **V2 effective cutover:** financial instant, Tenant/global scope, cycle alignment, and activation authority. | Production cutover and post-cutover financial use. | Keep V2 disabled; retain V1 authority. |
+| `AQG-V2-D09` | **CONFIRMED** | **Legacy migration population and provenance:** keep canonicalisation population, Active-only cutoff qualification eligibility, and historical impact inventory distinct. Canonicalisation requires the approval/activation gate plus deterministic Tenant, sponsor/root, ordering/correction, and an accepted D03B component. Use `LegacyUnknownAcquisition` only for an unrecoverable acquisition channel when sponsor/root evidence is deterministic. Post-Active topology-affecting cases enter exception review while D08 applies. | Migration-bound policy governing B6 classification. An authorised representative snapshot, anomaly disposition, production representation for legacy-unknown provenance, and an explicitly approved final manifest are still required. No migration/apply is authorised. |
+| `AQG-V2-D10` | **OPEN** | **V2 effective cutover:** financial instant, Tenant/global scope, cycle alignment, and activation authority. | Production cutover and post-cutover financial use remain blocked. Keep V2 disabled and retain V1 authority. |
 
 ### 34.3 Optional company-feature decisions
 
@@ -1832,8 +1852,8 @@ All decisions in sections 34.2 through 34.4 remain **OPEN** unless a later autho
 | V2 StructuralCompletionLevel and progress | None; D01 is resolved | D08 for affected post-Active states | D02, D03A/D03B, D04-D07, D09-D13, D14A/D14B unless that path also runs |
 | MVP weekly commission eligibility | No open decisions; D01 and `AQGreenWeeklySalesEligibilityV1` are resolved authorities | D08 for affected structural inputs; existing commission rules after the gate and payout controls after calculation | Unrelated optional decisions |
 | Company-assisted onboarding | D04, D05, D13 | D14B after terminal sponsor state | D01, D02, D03A, D14A |
-| Final legacy canonicalisation and structural comparison | D03B, D09 | D08 for affected cutoff contribution | D01, D02, D03A, D04-D07, D10, D14A/D14B otherwise |
-| Production cutover | D03B, D09, D10 | D04/D05/D13 for company channel; D08/D14B for affected lifecycle paths | D01, D02, D03A, D14A, D06, D07, D11, D12 when exceptional alternatives are disabled |
+| Final legacy canonicalisation and structural comparison | No open policy decision; D03B and D09 are confirmed. Operational prerequisites are an authorised representative snapshot, accepted exception dispositions, and final-manifest approval. | D08 for affected cutoff contribution | D01, D02, D03A, D04-D07, D10, D14A/D14B otherwise |
+| Production cutover | D10, plus the non-policy prerequisites of representative B6 analysis, approved final manifest, and authorised migration/apply | D04/D05/D13 for company channel; D08/D14B for affected lifecycle paths | D01, D02, D03A, D03B, D09, D14A, D06, D07, D11, D12 when exceptional alternatives are disabled |
 | Correction or repair workflow | None universally | D06, D07, D11 according to the requested action | Unrelated normal-placement decisions |
 
 Non-launch policy still requiring documentation: exact history-retention duration/evidence digest. It must be resolved before production retention is configured, but it does not prevent relational-model and allocator prototype work.
@@ -1857,7 +1877,7 @@ Additive model + invariants
           |                                      |
           |                    AQGreenWeeklySalesEligibilityV1 --> weekly commission gate
           |
-          +--> read-only inventory -- D03B + D09 --> final simulation
+          +--> read-only inventory -- confirmed D03B/D09 rules --> representative analysis/final simulation
                                                                   |
                              resolved structural + weekly rules --> financial comparison/sign-off
                                            D10 --> controlled production cutover
@@ -1903,9 +1923,10 @@ D12: serialized commit order is the default; decide only if an alternative comme
 
 ### Phase B6: simulation and controlled migration
 
-- after `AQG-V2-D03B` and `D09` approve legacy roots/population, run authoritative deterministic whole-scope canonicalisation dry-runs using resolved D02 ordering;
+- under confirmed `AQG-V2-D03B` and `D09`, obtain an authorised transactionally consistent sanitized snapshot, then run authoritative deterministic whole-scope canonicalisation dry-runs using resolved D02 ordering;
 - apply resolved D01 structural semantics to qualification/graduation comparison and the weekly sales rule to commission comparison;
-- implement and validate an additive, idempotent migration only after approval.
+- quarantine components that do not satisfy the confirmed rules and obtain any required owner disposition;
+- design, implement, and validate an additive, idempotent migration only after the exact final manifest and migration work are separately approved.
 
 ### Phase B7: cutover and operations
 

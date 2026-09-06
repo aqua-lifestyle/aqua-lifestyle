@@ -1,0 +1,213 @@
+# Operator runbook — AQGreen B6 representative snapshot
+
+> **DO NOT RUN WITHOUT PRODUCTION/DATA AUTHORIZATION.** This is a template for an
+> authorised DBA/platform operator. D03B/D09, repository content, and disposable
+> test success do not grant access.
+
+## Pre-extraction checkpoint
+
+Responsible Aqua personnel must record the processing purpose, minimum allowlist
+and Tenant scope, authorised operator, secure destination, access principals,
+retention/destruction treatment, and whether Information Officer/privacy or other
+regulatory/prior-authorisation review is required. This is a non-legal operational
+checkpoint; the tooling does not determine POPIA or other legal compliance.
+
+Production/data-owner and privacy/security authorization are distinct from B6
+business-policy approval. DBA/platform authorization must separately name the
+source, least-privilege role, window, load limits, observation-cutoff approach,
+Zone 2 path, abort/recovery procedure, and Zone 3 destination.
+
+## Three zones
+
+1. **Zone 1 — production:** authoritative raw data; only the authorised operator
+   connects, with a `CONNECT`/`SELECT`-only role.
+2. **Zone 2 — operator sanitisation environment:** temporary controlled processing.
+   It sees the minimum raw identifiers needed to create pseudonyms and ordering
+   metadata. The key and any mapping stay access-controlled here, outside Git,
+   logs, reports, and the handoff.
+3. **Zone 3 — B6 analysis environment:** receives only the pseudonymised,
+   data-minimised CSV set, metadata, manifests, reviewed root dispositions, and
+   receipt—no direct identifiers, key/mapping, production credentials, Aqua
+   application workers, or provider configuration.
+
+The data owner must specify retention/destruction triggers for Zone 2 raw files,
+key/mapping, Zone 3 snapshot, reports, and backups, and retain destruction evidence
+under Aqua policy. This package does not invent a corporate retention period.
+
+## Exact acquisition
+
+The safest practical option is **Option A**: an authorised operator first creates
+one transactionally consistent copy/restore inside the controlled operator zone,
+then runs this allowlist package against that copy and releases only Zone 3 output.
+It best confines production access, preserves PostgreSQL fidelity and referential
+integrity, and supports repeatable extraction, at moderate restore/storage burden.
+**Option B**, running the same single-transaction allowlisted extractor through a
+production read-only role, minimises raw columns and avoids a broad copy but has
+greater live-source and bespoke-export operational risk; use it only if separately
+approved. **Option C**, aggregate-only inventory, has lowest disclosure but cannot
+reproduce participant graph/simulation and is not a representative snapshot. The
+parent specification records the detailed security, exposure, fidelity,
+referential-integrity, repeatability, and burden comparison.
+
+`allowlist.json` is the export contract. The operator must supply one explicitly
+authorised Tenant and the versioned
+`ALL_TENANT_AQGREEN_PARTICIPATIONS` population scope. Every extraction query
+mechanically starts from that Tenant's AQGreen participations and includes only its
+minimum necessary referential closure: their Customer/recruiter/Area identity
+guards, corrections and approval decisions, relevant attribution confirmations
+and MemberInvitation evidence, existing V2 conflicts, and historical
+commission/loan/graduation/Onyx rows intersecting those AQGreen participations.
+Unrelated Tenants, customers, invitations, Onyx participations, commissions,
+loans, and graduations are excluded. Each field records purpose, classification,
+transform, type, and why it is required. Section G of the parent
+[specification](../representative-snapshot-specification.md) and the allowlist deny
+patterns exclude direct identifiers, free text, provider/payment data, unrelated
+products, and combo data.
+
+Operational evidence must run from the exact reviewed clean Git commit. The runner
+rejects staged changes, unstaged tracked changes, and untracked material before
+execution, records the actual repository `HEAD`, and seals the executing runner,
+Core, and EntityFrameworkCore assembly digests. It then creates a detached worktree
+for the exact reviewed commit from Git objects in a private temporary directory,
+verifies that materialization is exact and clean, builds only that tree, and rejects any executing
+first-party DLL that is not byte-identical to the reviewed-tree build. Normal Git
+cleanliness remains mandatory but is not treated as source provenance: ignored
+live-worktree source is absent from the Git-object materialization. Dirty
+development execution is available only under the visibly distinct
+`PRECOMMIT_SYNTHETIC_VALIDATION` classification and must not be promoted as
+operational evidence.
+
+The extractor starts one PostgreSQL `REPEATABLE READ READ ONLY` transaction,
+records the approved `AnalysisSnapshotCutoff`, captures `transaction_timestamp()`
+as separate source-observation evidence, and rejects a cutoff later than that
+observation. It runs only `SET LOCAL` and parameterized allowlisted `SELECT`
+commands through Npgsql, then rolls back. It neither discovers arbitrary
+tables nor runs production `CREATE`,
+`UPDATE`, `INSERT`, `DELETE`, `TRUNCATE`, `ALTER`, or `DROP`. Independently timed
+exports are prohibited. If later parallelised, one coordinator must use
+`pg_export_snapshot()` and every worker must import that snapshot before querying;
+V1 intentionally uses one connection. Broad `pg_dump` is prohibited because it
+would over-export disallowed columns.
+
+Supply placeholders only through the approved secret channel—never Git, prompts,
+reports, or shell history:
+
+```bash
+export B6_SOURCE_DSN='<authorised read-only DSN>'
+export B6_SOURCE_SYSTEM_ID='<approved opaque source-system ID>'
+export B6_REPOSITORY_COMMIT='<reviewed full lowercase Git SHA>'
+export B6_RAW_ZONE2_DIR='<new secure Zone-2 path>'
+export B6_PSEUDONYM_KEY_FILE='<Zone-2 key path>'
+export B6_ZONE3_DIR='<new approved Zone-3 path>'
+export B6_SNAPSHOT_ID='<approved opaque ID>'
+export B6_TENANT_ID='<explicitly authorised TenantId>'
+export B6_ANALYSIS_SNAPSHOT_CUTOFF='<approved UTC observation cutoff>'
+bash docs/operations/aqgreen-v2-b6/snapshot-package/operator-extract.sh
+```
+
+All destination directories must be new paths beneath an already trusted,
+operator-owned `0700` directory. Package entry points apply `umask 0077`, require
+directories to remain `0700`, create files as `0600`, and reject existing output,
+symlink, or non-regular targets. Source credentials are read from the named
+environment variable only; they are never copied to argv or output and must not be
+logged. A Zone 3 ownership handoff must make the receiving analysis OS account the
+owner while preserving these modes; shared group/world access is not a supported
+handoff. Never enable shell tracing around these commands.
+
+Generate the Zone 2 key, rather than typing a placeholder:
+
+```bash
+B6_EXECUTION_EVIDENCE_CLASSIFICATION=OPERATIONAL_EVIDENCE \
+dotnet AqualLifeStyle/9.4.2/aspnet-core/tools/AqualLifeStyle.B6SnapshotRunner/bin/Release/net8.0/AqualLifeStyle.B6SnapshotRunner.dll \
+  generate-key --output '<new Zone-2 key path>'
+```
+
+This creates 32 CSPRNG bytes. Sanitisation rejects weak/all-zero or shorter keys.
+The HMAC-SHA-256 key stays only in Zone 2 and is absent from Git, snapshots,
+manifests, receipts, stdout, and ordinary logs. Any pseudonym collision is fatal;
+there is no counter-based repair.
+
+`ParticipantSnapshotKey` is a deterministic namespaced keyed-HMAC UUID used
+consistently for a participation and every sponsor, placement, commission,
+graduation, loan, and Onyx FK. Acquisition evidence uses a shared namespace so a
+retained `MemberInvitation.SourceReferenceId` resolves to its AQGreen invitation;
+`AuthorisedDirectAdmission` uses its production-valid actor/reference shape and
+does not require an invitation. Namespace identity remains explicit in the
+allowlist, and collisions across delivered identifier domains fail closed. The key
+is never delivered.
+
+`LegacyOrderingTieBreakOrdinal` is independent. Before removing raw IDs, Zone 2
+ranks original Participation UUIDs per Tenant with the exact original immutable-ID
+comparator. Zone 3 uses `QualifiedUnderRecruiterAt`, then this ordinal. A
+pseudonymous UUID is never used as the ordering tie-breaker.
+
+## Verification and handoff
+
+The extract path emits and verifies a `BASE_SNAPSHOT` manifest. Before analysis,
+an authorised B6 root review supplies a root-disposition document. A recruiterless
+row is only `RootCandidate`; `AcceptedRoot` requires its snapshot participant key,
+`ReviewedLegacyRootEvidenceV1`, an evidence SHA-256, controlled decision reference,
+review time, and `AuthorisedB6RootReviewer` role. Independent start, a recruiter-
+clearing correction, or `LegacyUnknownAcquisition` is never root acceptance.
+The disposition document must also copy the verified base manifest's `SnapshotId`,
+`overallSnapshotDigest` as `SourceSnapshotDigest`, and `manifestHash` as
+`BaseManifestDigest`. Missing or cross-snapshot review evidence quarantines or
+rejects the component; it is never silently rebound.
+
+Run `run-analysis.sh` for Zone 3. It verifies the base manifest, creates and owns a
+unique loopback-only PostgreSQL 16 container with generated credentials, restores
+the bounded snapshot, and runs `verify-db`. It accepts no destination DSN,
+verifies its container labels/nonce and database identity, rejects source/destination
+identity equality, and cleans up only that verified package-owned resource. The
+precise worker claim is limited to: the package-owned Postgres-only runtime has no
+Aqua application worker attached by the package. The tool does not attest arbitrary
+external worker state. Npgsql reads generated credentials only from the verified
+owner-only runtime state; credentials are never command arguments.
+
+The current default Docker bridge permits outbound connectivity. That blocks use
+with representative controlled data until the approved Zone 3 environment enforces
+and verifies no outbound connectivity. The mutable `postgres:16-alpine` tag is a
+separate operational-environment reproducibility residual; it is not classified as
+a source-commit blocker in this correction.
+
+Verification rejects missing/extra tables or fields, prohibited field names,
+unknown versions, absent cutoff, bad keys/ordinals, broken or cross-Tenant
+relationships, invalid attribution source shapes, row/digest mismatch, and manifest
+tampering. It also rejects `AnalysisSnapshotCutoff > SourceObservedAt`. Sponsor/root components are constructed before exceptional ancestors
+are classified; any topology-affecting ancestor quarantines its whole component
+without removal or re-parenting. Missing/contradictory approval evidence is an
+explicit anomaly even when current status is Active.
+
+The restore writes a package-owned snapshot-authority marker containing the
+SnapshotId, source snapshot digest, and base-manifest digest. Inventory refuses a
+schema restored under different authority, verifies the base again, and hashes the
+exact repository inventory SQL because that external query remains executable
+semantics. The inventory artifact and final manifest bind its rules version,
+semantic version/digest, query digest, result digest, and complete digest.
+
+`AnalysisSnapshotCutoff` means only “legacy state observed at this instant.” It is
+not `V2EffectiveAt`, V2 activation, D10, financial authority, or consumer selection.
+
+The finalizer computes a `FINAL_ANALYSIS` manifest from the verified snapshot,
+verified inventory, reviewed root dispositions, three D09 populations, D03B
+components, fixed simulator input/output, and impact analysis. It does not accept
+caller-provided authoritative digests. Final verification independently reruns the
+inventory and that chain; impact reporting recomputes it.
+Create a receipt only after final verification by setting:
+
+```bash
+export B6_SNAPSHOT_DIR='<approved Zone-3 snapshot path>'
+export B6_BASE_MANIFEST='<verified BASE_SNAPSHOT manifest path>'
+export B6_ROOT_DISPOSITIONS='<reviewed root-disposition path>'
+export B6_ANALYSIS_OUTPUT_DIR='<new owner-only output path>' # optional
+bash docs/operations/aqgreen-v2-b6/snapshot-package/run-analysis.sh
+```
+
+There is no operator-supplied verification status. The receipt is created only when
+snapshot and final-manifest verification succeed and binds the SnapshotId, final
+manifest hash, cutoff, package/sanitisation versions, approved destination, and
+`PASSED` result. Authorization identity remains in Aqua's durable operational audit
+system if policy requires it. Inventory and all analysis artifacts run twice and
+must compare byte-for-byte. An anomaly does not reopen D03B/D09. Evidence of
+impossibility or catastrophic mismatch is reported explicitly as `OWNER DECISION
+RECONSIDERATION REQUIRED`.

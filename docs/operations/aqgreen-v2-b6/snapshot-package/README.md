@@ -1,0 +1,191 @@
+# AQGreen B6 representative snapshot acquisition package
+
+This package creates and verifies a **pseudonymised and data-minimised
+representative snapshot**. Stable pseudonymous keys remain linkable inside the
+dataset; the package does not claim anonymisation or determine legal compliance.
+
+It does not authorise production access, carry production credentials, apply a
+migration, add `LegacyUnknownAcquisition` to a production schema, enable V2, choose
+`V2EffectiveAt`, resolve D10, or start B7.
+
+If a later approved Phase 4 persists `LegacyUnknownAcquisition` in recruitment
+attribution, its reviewed change surface includes `AQGreenAcquisitionSource`, the
+domain source/source-shape guards, EF check constraints and model snapshot, an
+additive migration, and every consumer currently restricted to invitation/direct
+admission. None of that production surface is changed by this package.
+
+## Contents
+
+- `allowlist.json`: executable table/column allowlist. Every field records source,
+  purpose, classification, transform, type, and necessity. Unlisted data is not
+  exported.
+- `operator-runbook.md` and `operator-extract.sh`: authorization, three-zone
+  handling, and exact acquisition/handoff steps.
+- `AqualLifeStyle/9.4.2/aspnet-core/tools/AqualLifeStyle.B6SnapshotRunner/`:
+  authoritative .NET CLI containing the read-only extractor, sanitizer,
+  manifest/digests, fail-closed file/restore verifier, reviewed root-disposition
+  adapter, population/component analysis, impact recomputation, package-owned
+  PostgreSQL runtime, finalizer, and verified receipt generator.
+- `manifest-schema.json`, `root-disposition-schema.json`, and
+  `handoff-receipt-schema.json`: machine-readable contracts.
+- `run-analysis.sh`: package-owned PostgreSQL 16 lifecycle, repeated Zone 3
+  inventory, D09 population, D03B component, simulator, structural/impact, final
+  manifest, verification, and receipt pipeline.
+- `fixture/`, `tests/`, and `test-package.sh`: actual EF-migrated PostgreSQL fixture
+  E2E plus malformed-snapshot negative tests for scope, relationships, identity,
+  ordinals, permissions, symlinks, key strength, collisions, destination safety,
+  manifest identity, and simulation/impact binding.
+
+## Enforced scope and root evidence
+
+Extraction requires one explicit authorised Tenant plus the versioned
+`ALL_TENANT_AQGREEN_PARTICIPATIONS` analysis-population scope. Queries select that
+Tenant's AQGreen participations and only the referential closure needed to
+interpret them. In particular, unrelated Tenants and invitations are absent;
+`ProgrammeInvitations` contains only non-deleted AQGreen invitations referenced by
+retained `MemberInvitation` attribution. `AuthorisedDirectAdmission` is validated
+against its own production source shape and does not require an invitation.
+
+A recruiterless participant is a `RootCandidate`, never an accepted root. An
+`AcceptedRoot` requires one root-disposition row with the snapshot participant key,
+`ReviewedLegacyRootEvidenceV1`, a SHA-256 evidence digest, a controlled decision
+reference, review time, and the `AuthorisedB6RootReviewer` role. Missing review
+evidence quarantines the component. Sponsor evidence, root evidence, and
+`LegacyUnknownAcquisition` are separate typed dimensions. Components are built
+through sponsor ancestors before lifecycle exceptions are applied; an exceptional
+ancestor quarantines the whole affected component without compression or
+re-parenting.
+
+Frozen topology is cutoff-effective rather than current-status-based. A participant
+conclusively approved/activated after the cutoff is excluded when no cutoff-effective
+topology depends on them. If a cutoff-effective sponsor edge or recruiter-correction
+chain requires that post-cutoff participant, the complete affected component is
+quarantined without ancestor skipping, reconnection, or reflow. Their commission,
+loan, graduation, or resulting Onyx evidence remains historical-impact inventory
+only and never grants canonicalisation eligibility.
+
+## Canonical digest
+
+`B6CanonicalLengthPrefixedUtf8V1` uses allowlist field order and primary-key row
+order after canonical type normalisation. Each table begins `B6CANON1` plus LF. A
+row begins `R`; null is ASCII `N`; a value is `V`, its invariant decimal UTF-8 byte
+length, `:`, then its UTF-8 bytes. Rows end LF. Timestamps are UTC ISO-8601 with six
+fractional digits and `Z`; integers are invariant; booleans are lowercase; UUIDs
+and snapshot UUID keys are lowercase hyphenated. Table SHA-256 inputs never depend
+on JSON formatting, locale, local time, or source row order.
+
+The `BASE_SNAPSHOT` manifest seals the verified snapshot, Tenant/population scope,
+cutoff, source MVCC/database identity, transaction semantics, versions, repository
+commit, EF migration head, and first-party executable toolchain. The chronology is
+fail-closed: `AnalysisSnapshotCutoff` must be no later than `SourceObservedAt` at
+raw-source validation, sanitised verification, base construction/verification,
+restored-database verification, and final-chain reverification.
+
+The toolchain identity hashes the executing `AqualLifeStyle.B6SnapshotRunner`,
+`AqualLifeStyle.Core`, and `AqualLifeStyle.EntityFrameworkCore` assemblies in
+canonical ordinal order and binds their actual bytes to the repository commit.
+`PRECOMMIT_SYNTHETIC_VALIDATION` permits a dirty local tree for synthetic tests;
+those artifacts remain explicitly classified as precommit evidence.
+`OPERATIONAL_EVIDENCE` requires an exact clean tracked and untracked Git worktree
+before any command runs. It mechanically creates a detached worktree for the exact
+reviewed commit from Git objects inside a new private temporary directory, verifies
+that materialization is exact and clean, restores and builds there with source paths
+mapped to the reviewed checkout, and requires the executing first-party assembly
+bytes to match that reviewed-tree build. Ignored or otherwise untracked live-worktree source cannot
+enter the comparison build. The operator wrappers select operational mode, while
+the package test wrapper selects precommit mode; precommit evidence builds the
+dirty candidate and is never operational provenance.
+
+The reviewed root disposition binds `SnapshotId`, `SourceSnapshotDigest`, and
+`BaseManifestDigest`; reusing a review against another snapshot/base fails closed.
+Inventory executes only against a restored schema carrying the same three-part
+authority marker. Its artifact additionally seals the inventory rules and semantic
+versions, exact external SQL query digest, result digest, and complete inventory
+digest. The `FINAL_ANALYSIS` manifest is computed from the base snapshot, verified
+inventory, reviewed root disposition, all three D09 populations, D03B
+classification, package-generated simulator input/output, and recomputed impact.
+The impact artifact explicitly marks every quarantined-component participant as
+`STRUCTURALLY_AMBIGUOUS` / `QUARANTINED`, emits no simulated V2 level for that
+participant, and reports its commission, payout, loan, graduation, and resulting
+Onyx evidence as historical intersections only. Those intersections do not add the
+participant to the canonicalisation population.
+No authoritative analysis or inventory digest is caller-supplied. Both stages can
+be verified; final verification independently reruns the inventory query and the
+complete chain. A handoff receipt can be generated only from a successfully
+verified final manifest.
+
+The overall snapshot digest uses canonical compact JSON of stable manifest identity
+fields (sorted object keys, UTF-8, no insignificant whitespace) and excludes report
+creation time. `manifestHash` seals the complete manifest.
+
+## Security boundary
+
+Package entry points set `umask 0077`; controlled directories are `0700` and files
+are `0600`. Existing files, symlinks, non-regular paths, and the former predictable
+verification-temporary name are rejected. Temporary verification files use secure
+exclusive creation inside an owner-only directory.
+
+Generate a pseudonym key with the runner's `generate-key` command. Production use
+requires at least 32 CSPRNG bytes and rejects weak/all-zero input. The HMAC-SHA-256
+key is read only in Zone 2 and is never placed in the snapshot, manifest, receipt,
+ordinary logs, Git, or command arguments. Pseudonym collisions across delivered
+identifier domains are fatal; the tool never repairs a collision with an
+order-dependent counter.
+
+Analysis accepts no arbitrary destination DSN. The package creates a uniquely
+named, loopback-only PostgreSQL 16 container with generated credentials, verifies
+its ownership labels/nonce and database identity, refuses source/destination
+identity equality, and can destroy only that verified resource. This proves the
+narrow boundary that the package-owned Postgres-only container has no Aqua
+application worker attached by the package; it does not claim to inspect arbitrary
+external worker state. Npgsql receives generated credentials from the verified
+owner-only runtime state; credentials do not appear in process arguments or output.
+
+## Local validation
+
+With Docker, .NET 8, Bash, and `jq`:
+
+```bash
+bash docs/operations/aqgreen-v2-b6/snapshot-package/test-package.sh
+```
+
+The wrapper writes a TRX result and validates it before printing PASS. The exact
+TRX must have the repository VSTest 17.8 namespace
+`http://microsoft.com/schemas/VisualStudio/TeamTest/2010` and its document root
+must be `TestRun` in that namespace. Exactly one element in the entire document
+may have that namespace URI and local name `TestRun`, so any additional
+same-namespace `TestRun` fails closed regardless of prefix spelling. Exactly one
+`ResultSummary` in that namespace must be a direct child of the authoritative root,
+its `outcome` must be explicitly `Completed` (the successful value emitted by the
+repository's current VSTest), and exactly one `Counters` in that namespace must be
+a direct child of that authoritative summary. Foreign-namespace extension metadata,
+including an element whose local name is `TestRun`, may coexist but cannot
+substitute for the root, `ResultSummary`, or `Counters`. Namespace URI, not prefix
+spelling, determines authority. The emitted accounting/success counters are
+`total`, `executed`, and `passed`. Every emitted non-success counter—`failed`, `error`,
+`timeout`, `aborted`, `inconclusive`, `passedButRunAborted`, `notRunnable`,
+`notExecuted`, `disconnected`, `warning`, `completed`, `inProgress`, and
+`pending`—must be present and zero. B6 evidence permits no skipped/not-executed
+tests. Unknown unqualified `Counters` attributes fail closed as unsupported test
+execution states; namespace-qualified extension metadata does not become an
+execution counter merely because it is numeric. Discovery and execution must be
+nonzero, executed/pass/fail and total/executed/not-executed accounting must
+reconcile, and all executed tests must therefore pass. `B6_TEST_FILTER` may select
+a focused set. Evidence-sensitive focused runs may additionally set a positive
+`B6_EXPECTED_TEST_COUNT`, which must exactly match the TRX total. This avoids
+hard-coding identities for every future test while allowing review gates to bind a
+known focused suite.
+
+The test migrates a disposable PostgreSQL 16 source with the current EF migrations,
+inserts only production-schema-valid synthetic cases, and exercises the full
+scoped package twice. Conditions prevented by production constraints are tested as
+explicit malformed delivered-snapshot negatives. Its source update is intentional
+drift-test setup, not a production operation.
+
+## Architecture decision
+
+AQGreen B6 operational and migration analysis tooling is .NET-native. This keeps
+the migration-critical behavior aligned with the ABP/.NET backend, reuses the
+authoritative C#/EF/domain semantics, avoids cross-language semantic duplication,
+and reduces the operational runtime surface. Shell remains thin orchestration.
+This decision is specific to B6 and is not a repository-wide prohibition on Python.
