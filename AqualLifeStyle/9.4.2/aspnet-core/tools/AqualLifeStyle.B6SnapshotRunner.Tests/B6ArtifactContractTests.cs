@@ -74,13 +74,13 @@ public sealed class B6ArtifactContractTests : IDisposable
     }
 
     [Fact]
-    public void OperationalEvidence_IsRejectedForThisDirtyUnreviewedExecutionSet()
+    public void OperationalEvidence_RequiresIndependentlyEstablishedPreAuthorityProvenance()
     {
-        var result = RunCaptured(B6Contract.OperationalEvidence, "verify", "--snapshot", _snapshot,
+        var operationalEvidenceRejection = RunCaptured(B6Contract.OperationalEvidence, "verify", "--snapshot", _snapshot,
             "--manifest", _baseManifest);
 
-        result.ExitCode.ShouldBe(2);
-        result.Error.ShouldContain("exact clean reviewed Git worktree");
+        operationalEvidenceRejection.ExitCode.ShouldBe(2);
+        operationalEvidenceRejection.Error.ShouldContain("independently established pre-authority provenance");
     }
 
     [Fact]
