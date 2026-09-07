@@ -58,7 +58,7 @@ instruction dated 2026-09-03. That confirmation does not authorise production
 access, a concrete final manifest, production persistence for
 `LegacyUnknownAcquisition`, migration/apply, cutover, or historical remediation.
 D08 remains unresolved where post-Active lifecycle disposition affects topology or
-qualification, and D10 remains unresolved/disabled.
+qualification, and D10 remains `UNRESOLVED`.
 
 ## Assumptions
 
@@ -119,7 +119,7 @@ qualification, and D10 remains unresolved/disabled.
   readers/reporting/validators, and tests before apply. This task does not make
   those executable changes.
 - Production commission and graduation structural selectors return `LegacyV1`.
-  D10 remains disabled/unresolved.
+  D10 remains `UNRESOLVED`.
 
 ## Read-only inventory
 
@@ -460,7 +460,8 @@ topology- or qualification-affecting. If representative evidence proves a confir
 rule impossible or catastrophically mismatched, report `OWNER DECISION
 RECONSIDERATION REQUIRED` with exact evidence; do not silently change D03B/D09.
 
-D10 is intentionally not requested or resolved in B6 and V2 remains disabled.
+D10 is intentionally not requested in B6 and remains `UNRESOLVED`; V2 remains not
+enabled.
 
 ## Representative snapshot package (2026-09-04)
 
@@ -589,7 +590,7 @@ the full solution Release rebuild had 2,608 repository warnings, 0 B6-owned
 warnings, and 0 errors. Representative production data remains unavailable, real
 legacy counts remain `UNKNOWN`, the final migration manifest is not ready,
 migration/apply remains unauthorised, Docker egress still blocks representative-
-data operation, D10 remains disabled/unresolved, and B7 remains not started.
+data operation, D10 remains `UNRESOLVED`, and B7 remains not started.
 
 Final C2 fail-closed correction evidence on 2026-09-05: direct repository VSTest
 17.8 output established `Completed` as the successful `ResultSummary` outcome and
@@ -755,6 +756,59 @@ status remains clean, then proves neither mechanism runs or enters either author
 clone and the sentinel is released only to the verified reviewed artifact. This
 paragraph and all rerun evidence remain `PRECOMMIT CORRECTION EVIDENCE`.
 
+## Post-commit test source-location correction (2026-09-07)
+
+The clean-SHA operational gate at
+`75a5d3258aed5e33516b3473cecd079beba0a156` established the reviewed bootstrap,
+private Source A/B materialisations, exact-byte double build, artifact selection,
+immediate rehash, and post-provenance `generate-key` evidence recorded above. Its
+externally isolated primitive/provenance test build then executed 59 tests with 54
+passing and five failing before their intended assertions because the test-only
+`SourceRepositoryRoot()` helper walked upward from `AppContext.BaseDirectory`.
+The external test artifact tree was not a descendant of the reviewed source tree,
+so that helper could not find the canonical B6 entrypoint. This is partial
+clean-SHA evidence, not a passed operational gate.
+
+The demonstrated defect is classified as a test-harness location defect. The
+production bootstrap still builds and executes its verified Runner beneath private
+Source A and checks that exact artifact/source binding; no production caller uses
+the failing test helper. C1-E is adopted for this correction: `TEST SOURCE LOCATION
+IS EXPLICIT, NOT INFERRED FROM TEST ARTIFACT LOCATION`. The test project
+records its fully qualified test source materialisation as build-time assembly
+metadata, and the test helper accepts only that explicit binding plus the expected
+regular file at
+`docs/operations/aqgreen-v2-b6/snapshot-package/authoritative-runner.sh`. It has no
+current-directory, parent-walk, live-worktree, alternate-materialisation, or
+machine-search fallback. The metadata establishes only which physical test source
+materialisation produced the test assembly. Human review/authorization of the
+selected SHA and the Git-object bootstrap separately establish review authority and
+source provenance; the metadata is neither cryptographic identity nor proof that
+the directory remains reviewed, clean, unchanged, or Git-authoritative. This
+remains `PRECOMMIT CORRECTION EVIDENCE`.
+
+A controlled two-root build of this exact candidate mapped compiler source paths to
+the same deterministic root while leaving the explicit metadata values physical.
+The Source A test DLL SHA-256 was
+`f6cb7c2fc13752e20209d32a4e9b1a65a593525f86c1bab44b2b1a9282381280`; Source B was
+`8c5a18c76d589e46ee4eb2a7b56f14266efdd69da525c19d8c1179f3666390f1`.
+They were not equal, and inspection found the corresponding Source A/Source B
+metadata path in each assembly. In the same probe, Runner, Core, and
+EntityFrameworkCore were respectively byte-equal across the roots at
+`36afddcfbae90333a9a9d3d8560c6b401c8964d554da8541edf378e5c714a850`,
+`dd16d5f8ba408dcdf2a271c812818045b930ab5ab7a963a5e67c1be6796b5ded`, and
+`5a72b4fe2d21fc53b76aa18f92327f8ad345bf54a9309bad1911b3114f9a1712`.
+Exact-byte reproducibility is an operational invariant only for those three
+assemblies; the test assembly is intentionally source-location-bound. This
+physical-path dependence is test-harness-only, does not affect C1-B, and is an
+accepted trade-off. The surrounding reviewed-materialisation contract establishes
+test source identity; the metadata only locates that materialisation.
+
+After the authority-bearing identifiers were replaced with location-only names,
+the five tests that formerly failed because of artifact-relative discovery passed
+5/5. The broader isolated 59/59, ordinary 59/59, and package 90/90 evidence is
+carried forward because this final rename changes no executed behavior or validation
+assumption. No production project or operational bootstrap input changed.
+
 ## Current state
 
 - B6 policy/design: `DECISION-READY / CONFIRMED FOR D03B+D09`.
@@ -767,7 +821,7 @@ paragraph and all rerun evidence remain `PRECOMMIT CORRECTION EVIDENCE`.
 - Final migration manifest: `NOT READY`.
 - Migration implementation/apply: `NOT AUTHORISED`.
 - D08: `UNRESOLVED WHERE APPLICABLE`.
-- D10: `DISABLED / UNRESOLVED`.
+- D10: `UNRESOLVED`.
 - B7: `NOT STARTED`.
 
 The requested B6 .NET-native refactor is complete. B6 production-data analysis,
@@ -792,19 +846,17 @@ migration/cutover, D08 exceptions, D10, and B7 remain separately gated as above.
 
 ## Next action
 
-Obtain one narrow independent review of the pre-authority provenance correction. If
-accepted, create a new commit on top of `e4a25bc`, then rerun complete
-`OPERATIONAL_EVIDENCE` from that clean new SHA. Do not push or open a PR unless that
-clean-SHA evidence passes. The separately gated representative-snapshot operation
-still requires production/data-owner/security/privacy and database-operator
-authorization; this correction grants none.
+The narrow source-location correction review is complete and supports committing
+this exact correction on top of `75a5d325` when separately authorised. Do not push
+or open a PR without separate authorization. The representative-snapshot operation
+remains separately gated by production/data-owner/security/privacy and database-
+operator authorization; this correction grants none.
 
 ## Git/branch context
 
 - Repository/worktree: `/home/wtc/Downloads/newAqua/aqua-lifestyle-b6`
 - Branch: `feat/aqgreen-v2-b6-legacy-canonicalisation-analysis`
 - Base `origin/main`: `26803037d9923842db12de621ab6f87c3cd045cc`
-- Accepted B6/current `HEAD`: `e4a25bc773cacc3a03e86a0ec4fda6b8fbcfcfe1`
-- Changes: local unstaged narrow build/provenance correction, regression, affected
-  operations documentation, and this worklog.
+- Accepted B6/current `HEAD`: `75a5d3258aed5e33516b3473cecd079beba0a156`.
+- Changes: local unstaged test-only source-location correction and this worklog.
 - Correction commit/push/PR: none; prohibited for this task.

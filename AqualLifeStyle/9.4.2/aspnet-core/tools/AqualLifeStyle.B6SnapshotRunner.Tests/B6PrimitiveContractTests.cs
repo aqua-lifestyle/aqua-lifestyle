@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text;
 using Shouldly;
 using Xunit;
@@ -7,6 +8,8 @@ namespace AqualLifeStyle.B6SnapshotRunner.Tests;
 public sealed class B6PrimitiveContractTests
 {
     private const string TrxNamespace = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
+    private const string TestSourceMaterializationMetadataName =
+        "B6TestSourceMaterializationDirectory";
 
     [Fact]
     public void ToolchainIdentity_RejectsEveryRequiredAssemblyMismatchAndMissingDependency()
@@ -186,8 +189,9 @@ public sealed class B6PrimitiveContractTests
     [Fact]
     public void OperationalWrappers_DelegateBuildAndRunnerSelectionToCanonicalEntrypoint()
     {
-        var repository = SourceRepositoryRoot();
-        var package = Path.Combine(repository, "docs", "operations", "aqgreen-v2-b6", "snapshot-package");
+        var testSourceMaterializationDirectory = TestSourceMaterializationDirectory();
+        var package = Path.Combine(testSourceMaterializationDirectory, "docs", "operations",
+            "aqgreen-v2-b6", "snapshot-package");
         foreach (var wrapper in new[] { "run-analysis.sh", "operator-extract.sh" })
         {
             var content = File.ReadAllText(Path.Combine(package, wrapper));
@@ -243,7 +247,8 @@ public sealed class B6PrimitiveContractTests
                 selectedRoot = linkRoot;
             }
 
-            var result = RunCaptured(SourceRepositoryRoot(), "bash", new Dictionary<string, string>
+            var testSourceMaterializationDirectory = TestSourceMaterializationDirectory();
+            var result = RunCaptured(testSourceMaterializationDirectory, "bash", new Dictionary<string, string>
             {
                 ["B6_PREAUTHORITY_PROVENANCE"] = B6Contract.PreAuthorityProvenance,
                 ["B6_VERIFIED_ARTIFACT_ROOT"] = selectedRoot,
@@ -259,7 +264,7 @@ public sealed class B6PrimitiveContractTests
                 ["B6_SNAPSHOT_ID"] = "B6-SYNTHETIC",
                 ["B6_TENANT_ID"] = "1",
                 ["B6_ANALYSIS_SNAPSHOT_CUTOFF"] = "2026-01-01T00:00:00Z"
-            }, Path.Combine(SourcePackageRoot(), "operator-extract.sh"));
+            }, Path.Combine(TestSourcePackageDirectory(), "operator-extract.sh"));
 
             result.ExitCode.ShouldNotBe(0);
             Directory.Exists(Path.Combine(testRoot, "raw")).ShouldBeFalse();
@@ -697,10 +702,10 @@ public sealed class B6PrimitiveContractTests
         File.WriteAllText(Path.Combine(backend, ".gitignore"), "[Bb]in/\n[Oo]bj/\n[Rr]elease/\nartifacts/\n");
         File.WriteAllText(Path.Combine(backend, "NuGet.Config"),
             "<configuration><packageSources><clear /></packageSources></configuration>\n");
-        File.Copy(SourceCanonicalBuilder(), Path.Combine(package, "authoritative-runner.sh"));
-        File.Copy(Path.Combine(SourcePackageRoot(), "operator-extract.sh"),
+        File.Copy(CanonicalB6EntrypointFromTestSource(), Path.Combine(package, "authoritative-runner.sh"));
+        File.Copy(Path.Combine(TestSourcePackageDirectory(), "operator-extract.sh"),
             Path.Combine(package, "operator-extract.sh"));
-        File.Copy(Path.Combine(SourcePackageRoot(), "run-analysis.sh"),
+        File.Copy(Path.Combine(TestSourcePackageDirectory(), "run-analysis.sh"),
             Path.Combine(package, "run-analysis.sh"));
         File.WriteAllText(Path.Combine(coreProject, "AqualLifeStyle.Core.csproj"),
             MinimalProject("AqualLifeStyle.Core"));
@@ -742,26 +747,33 @@ public sealed class B6PrimitiveContractTests
         return Path.Combine(runnerProject, "AqualLifeStyle.B6SnapshotRunner.csproj");
     }
 
-    private static string SourceRepositoryRoot()
+    private static string TestSourceMaterializationDirectory()
     {
-        DirectoryInfo? current = new(AppContext.BaseDirectory);
-        while (current != null)
-        {
-            var candidate = CanonicalBuilderPath(current.FullName);
-            if (File.Exists(candidate)) return current.FullName;
-            current = current.Parent;
-        }
-        throw new InvalidOperationException("Unable to locate the canonical B6 build entrypoint.");
+        var testSourceMaterializationDirectory = typeof(B6PrimitiveContractTests).Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .SingleOrDefault(metadata => metadata.Key == TestSourceMaterializationMetadataName)?.Value;
+        if (string.IsNullOrWhiteSpace(testSourceMaterializationDirectory) ||
+            !Path.IsPathFullyQualified(testSourceMaterializationDirectory))
+            throw new InvalidOperationException("The B6 test source materialization was not bound at test build time.");
+
+        var expectedTestSourceRepositoryRoot = Path.GetFullPath(testSourceMaterializationDirectory);
+        var canonicalB6EntrypointPath = CanonicalB6EntrypointPath(expectedTestSourceRepositoryRoot);
+        if (!Directory.Exists(expectedTestSourceRepositoryRoot) || SecureFiles.IsLink(expectedTestSourceRepositoryRoot) ||
+            !File.Exists(canonicalB6EntrypointPath) || SecureFiles.IsLink(canonicalB6EntrypointPath))
+            throw new InvalidOperationException(
+                "The build-time B6 test source materialization does not contain the canonical regular-file entrypoint.");
+        return expectedTestSourceRepositoryRoot;
     }
 
-    private static string SourceCanonicalBuilder() => CanonicalBuilderPath(SourceRepositoryRoot());
+    private static string CanonicalB6EntrypointFromTestSource() =>
+        CanonicalB6EntrypointPath(TestSourceMaterializationDirectory());
 
-    private static string SourcePackageRoot() => Path.Combine(SourceRepositoryRoot(), "docs", "operations",
-        "aqgreen-v2-b6", "snapshot-package");
+    private static string TestSourcePackageDirectory() => Path.Combine(TestSourceMaterializationDirectory(),
+        "docs", "operations", "aqgreen-v2-b6", "snapshot-package");
 
-    private static string CanonicalBuilderPath(string repository) =>
-        Path.Combine(repository, "docs", "operations", "aqgreen-v2-b6", "snapshot-package",
-            "authoritative-runner.sh");
+    private static string CanonicalB6EntrypointPath(string testSourceMaterializationDirectory) =>
+        Path.Combine(testSourceMaterializationDirectory, "docs", "operations", "aqgreen-v2-b6",
+            "snapshot-package", "authoritative-runner.sh");
 
     private static string RunBootstrap(string repository, string reviewedCommit,
         IReadOnlyDictionary<string, string> environment, params string[] arguments)
