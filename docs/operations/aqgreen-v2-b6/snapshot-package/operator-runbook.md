@@ -70,8 +70,9 @@ streams the exact `authoritative-runner.sh` blob from that commit through truste
 Git into Bash with replacement objects disabled. That already-reviewed bootstrap
 creates two independent private clones, isolates Git configuration and attributes,
 disables hooks and replacement objects, verifies every materialized file against
-its raw reviewed blob, and gives restore/build only a minimal environment with no B6 operational
-variables, builds both with the canonical isolated deterministic contract, and
+its raw reviewed blob, and gives locked restore/build only a minimal environment
+with no B6 operational variables. It performs two independent B1-R locked
+reproductions and then two B2 no-restore builds, and
 requires exact Runner/Core/EntityFrameworkCore byte equality. It selects build A
 inside the owner-only temporary tree, makes the selected tree read-only, and
 rechecks all three hashes immediately before launch. Only then does the exact
@@ -83,14 +84,84 @@ process isolation, the operator-controlled invocation and `PATH`, Git executable
 and object database, Bash/core utilities and SHA-256 implementation, and the .NET
 SDK/MSBuild/NuGet build base are the minimum trusted computing base. Mutable source
 repository hooks, `info/attributes`, checkout filters, replace objects, ignored files,
-and live worktree contents are explicitly outside that base. Package restore
-may use ordinary NuGet network access, but receives no production/representative
-DSN, snapshot location, output authority, pseudonym key, provider secret, or B6
-test sentinel. The pre-authority environment variables supplied to the Runner bind
-the selected commit and hashes for evidence; they do not make a live script trusted.
+and live worktree contents are explicitly outside that base. The selected G197
+package seed is mandatory; a no-seed operational restore is rejected. Restore uses
+only its derived private filesystem source and receives no
+production/representative DSN, snapshot location, output authority, pseudonym key,
+provider secret, or B6 test sentinel. The pre-authority environment variables
+supplied to the Runner bind the selected commit and hashes for evidence; they do not
+make a live script trusted.
 Ignored, modified, or stale live-worktree source/build state is never selected.
 Dirty development execution remains only `PRECOMMIT_SYNTHETIC_VALIDATION` and must
 not be promoted as operational evidence.
+
+Dependency changes first require a separately approved **B1-Q resolution
+qualification**. B1-Q uses the reviewed SDK/NuGet/runtime and source policy to
+generate candidate native `packages.lock.json` files, assets, canonical graph, and
+the existing raw/archive/content/nuspec/tree/provenance evidence. It runs only for
+an approved dependency declaration, toolchain, source-policy, refresh, or other
+dependency-resolution event. Generated locks and resolved graphs are candidates,
+not authority. Separate review must approve their exact hashes and graph before
+B1-R.
+
+Normal operation does not rerun B1-Q. **A-L routine locked acquisition** starts
+from the already-approved exact locks, G197, toolchain and source policy, and uses a
+network-capable child plus native locked restore to obtain exactly those approved
+packages into a fresh cache. A-L makes no new dependency decision. Reconcile raw
+archive, canonical NuGet content, nuspec, installed-tree and source/provenance
+evidence; require missing and extra against G both to be zero; then terminate its
+network authority. It must not rely on an ambient cache, unlocked resolution,
+`--force-evaluate`, ResolverSupport, or unselected acquisition residue.
+
+For first adoption, an explicitly approved B1-Q may regenerate the candidate locks
+and compare them byte-for-byte with the repository copies. Once approved, the locks
+are recurring inputs; B1-Q runs again only after a legitimate dependency-authority
+trigger.
+
+Transfer A-L's content-bound G197 output into a separate selected-only
+global-packages directory, including the complete package directory for every
+selected pair. Do not hand the bootstrap a raw acquisition cache: S19/L1, L2,
+ResolverSupport, and other downloaded-but-unselected A-G versions are residue, not
+B1-R dependency authority. Place
+`--seed-nuget-packages-from '<absolute-canonical-selected-directory>'` immediately
+after `--reviewed-commit "${reviewed_commit}"`. This remains the sole external
+dependency input.
+
+The reviewed bootstrap validates the selected hierarchy and complete package
+material and records an ID/version/`.nupkg` SHA-256 manifest. It derives one
+read-only hierarchical local source, then gives B1-R run 1 and run 2 independently
+fresh empty global-packages caches and fresh assets. Each uses native
+`dotnet restore --locked-mode`, the three approved lock hashes, and the explicit
+private source; warnings, errors, NU1603, lock mutation, missing/extra packages, or
+a non-G inventory fail closed. The external seed and private source must remain
+unchanged. The existing C# graph tooling must independently establish that fresh
+assets represent exact G197; path-bound raw assets bytes are not conflated with the
+canonical graph.
+
+B2 is a separate `dotnet build --no-restore` stage over the B1-R result and G197
+only. It must not change locks, assets, or package inventory. The bootstrap sets
+`DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=true` to suppress workload advertising
+updates as configuration hygiene. Neither that variable, locked mode, no-restore,
+source clearing, nor proxy/environment sanitisation proves network absence. The
+future operational qualification harness must retain the established Bubblewrap
+mechanical network witness and launch the confined child without network capability.
+
+NuGet owns one lock and one assets decision per restored project. The project-local
+Core, EntityFrameworkCore, and Runner locks govern their corresponding assets and
+all three exact hashes are mandatory. A missing project lock is rejected by the
+bootstrap before NuGet runs; `--locked-mode` alone is not treated as that gate.
+Because Core and EF are also used by wider solution workflows, ordinary restores
+will consult those locks and can expose a proposed lock change when a dependency
+declaration changes. Do not accept that change as routine output; route it through
+B1-Q.
+
+Within each A/B lane, B1-R and B2 use the same namespace-visible source checkout,
+package cache and artifact coordinates, matching the path-bound values in
+`project.assets.json`. Distinct host directories do not create authority. If B1-R
+and B2 are placed in separate Bubblewrap children, bind their state to the same
+reviewed namespace-local coordinates and verify the assets `projectPath` and
+`packagesPath`. Compare canonical graphs across A/B unconditionally; compare raw
+assets bytes only when their namespace-visible coordinates are identical.
 
 The extractor starts one PostgreSQL `REPEATABLE READ READ ONLY` transaction,
 records the approved `AnalysisSnapshotCutoff`, captures `transaction_timestamp()`
@@ -118,9 +189,11 @@ export B6_TENANT_ID='<explicitly authorised TenantId>'
 export B6_ANALYSIS_SNAPSHOT_CUTOFF='<approved UTC observation cutoff>'
 repo_root="$(pwd -P)" # run from the repository root
 reviewed_commit='<reviewed full lowercase Git SHA>'
+selected_packages='<approved absolute canonical-G197 directory>'
 set -o pipefail
 GIT_NO_REPLACE_OBJECTS=1 git -C "${repo_root}" show "${reviewed_commit}:docs/operations/aqgreen-v2-b6/snapshot-package/authoritative-runner.sh" |
-  bash -s -- --repository "${repo_root}" --reviewed-commit "${reviewed_commit}" operator-extract
+  bash -s -- --repository "${repo_root}" --reviewed-commit "${reviewed_commit}" \
+    --seed-nuget-packages-from "${selected_packages}" operator-extract
 ```
 
 All destination directories must be new paths beneath an already trusted,
@@ -137,9 +210,11 @@ Generate the Zone 2 key, rather than typing a placeholder:
 ```bash
 repo_root="$(pwd -P)"
 reviewed_commit='<reviewed full lowercase Git SHA>'
+selected_packages='<approved absolute canonical-G197 directory>'
 set -o pipefail
 GIT_NO_REPLACE_OBJECTS=1 git -C "${repo_root}" show "${reviewed_commit}:docs/operations/aqgreen-v2-b6/snapshot-package/authoritative-runner.sh" |
-  bash -s -- --repository "${repo_root}" --reviewed-commit "${reviewed_commit}" runner \
+  bash -s -- --repository "${repo_root}" --reviewed-commit "${reviewed_commit}" \
+    --seed-nuget-packages-from "${selected_packages}" runner \
     generate-key --output '<new Zone-2 key path>'
 ```
 
@@ -223,9 +298,11 @@ export B6_ROOT_DISPOSITIONS='<reviewed root-disposition path>'
 export B6_ANALYSIS_OUTPUT_DIR='<new owner-only output path>' # optional
 repo_root="$(pwd -P)"
 reviewed_commit='<same reviewed full lowercase Git SHA>'
+selected_packages='<same approved absolute canonical-G197 directory>'
 set -o pipefail
 GIT_NO_REPLACE_OBJECTS=1 git -C "${repo_root}" show "${reviewed_commit}:docs/operations/aqgreen-v2-b6/snapshot-package/authoritative-runner.sh" |
-  bash -s -- --repository "${repo_root}" --reviewed-commit "${reviewed_commit}" run-analysis
+  bash -s -- --repository "${repo_root}" --reviewed-commit "${reviewed_commit}" \
+    --seed-nuget-packages-from "${selected_packages}" run-analysis
 ```
 
 There is no operator-supplied verification status. The receipt is created only when

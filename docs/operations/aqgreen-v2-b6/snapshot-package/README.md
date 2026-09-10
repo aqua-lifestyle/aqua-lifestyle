@@ -35,10 +35,17 @@ admission. None of that production surface is changed by this package.
   its exact bytes from the selected commit into Bash; it materialises two private
   independent clones with isolated Git configuration, disables replacement
   objects/hooks/system and global attributes, verifies every materialized file against
-  its raw reviewed blob, and builds both canonically without B6 operational capabilities,
+  its raw reviewed blob, performs two selected-only locked reproductions and then
+  builds both with `--no-restore` without B6 operational capabilities,
   verifies exact Runner/Core/EntityFrameworkCore byte equality, selects the
   private read-only build-A artifact, and only then releases operation-specific
   authority.
+- The three project-local `packages.lock.json` files are native NuGet candidate
+  approved-decision artifacts. Their exact hashes and canonical G197 union are
+  repository gates, but operational trust remains pending qualification.
+- `../dependency-qualification-history.md`: durable Attempts 1–16 and native-lock
+  architecture evidence. Failed experiments remain evidence rather than active
+  resolver authority.
 - `fixture/`, `tests/`, and `test-package.sh`: actual EF-migrated PostgreSQL fixture
   E2E plus malformed-snapshot negative tests for scope, relationships, identity,
   ordinals, permissions, symlinks, key strength, collisions, destination safety,
@@ -104,15 +111,91 @@ hooks plus system/global Git configuration and attributes disabled. Mutable sour
 repository hooks, `info/attributes`, filter configuration, replace objects, and
 working-tree files are not copied. The bootstrap rejects ignored/untracked state
 and compares the raw, no-filter hash of every regular materialized file to its
-reviewed Git blob before building. Restore and build receive a
+reviewed Git blob before dependency reproduction. Restore and build receive a
 minimal environment with isolated `HOME`, `TMPDIR`, .NET, output, and intermediate
-state plus one new private package cache shared only by builds A and B; DSN,
+state plus one reviewed selected dependency set; DSN,
 snapshot, output, key, and other B6 operational variables are absent. Both builds
-force restore reevaluation, non-incremental deterministic
-Release compilation, build-server suppression, explicit `NuGet.Config`, suppressed
-ambient parent `Directory.Build` imports, and a repository-relative isolated
-artifact root. Source-path normalisation makes Runner, Core, and
+use non-incremental deterministic Release compilation, build-server suppression,
+suppressed ambient parent `Directory.Build` imports, and repository-relative
+isolated artifact roots. Source-path normalisation makes Runner, Core, and
 EntityFrameworkCore bytes independent of the two physical checkout paths.
+
+Dependency handling has four separate responsibilities. **B1-Q (resolution
+qualification)** is an explicitly triggered, controlled dynamic resolution that generates candidate
+native `packages.lock.json` files, canonical graph and package/provenance evidence.
+Generated locks are not trusted locks; separate review must approve their exact
+hashes and graph. B1-Q is not a routine build step. The approved candidate locks for
+Core, EntityFrameworkCore, and Runner are stored beside their projects.
+For the pinned toolchain its native generation operation is `dotnet restore
+--use-lock-file --force-evaluate` (plus the controlled source/packages/artifact
+coordinates). B1-Q must retain the existing raw archive, canonical NuGet content,
+nuspec, installed-tree, and source/provenance validation and emit the toolchain,
+source, lock, and canonical-graph hashes. Dependency declaration, SDK/NuGet,
+approved source-policy, legitimate refresh, or another explicitly approved
+dependency-resolution change is required to trigger it.
+
+**A-L (routine locked acquisition)** obtains an already-approved dependency
+decision; it does not make a new one. Starting with the approved exact locks,
+canonical G, toolchain and source policy, a network-capable acquisition child uses
+native locked restore to populate a fresh cache with exactly the locked material.
+The existing archive/content/nuspec/tree/provenance checks must reconcile that
+cache to content-bound G197 before network authority terminates. A-L must not use
+ambient caches, unlocked resolution, `--force-evaluate`, ResolverSupport, or
+downloaded-but-unselected residue. Its selected, content-bound G197 output is the
+only acceptable input to `--seed-nuget-packages-from`.
+
+For the first adoption of these candidate locks, B1-Q may regenerate them and
+require exact byte equality with the reviewed repository candidates as part of the
+architecture qualification. That first-adoption comparison does not make B1-Q a
+prerequisite for later ordinary runs. After approval, the locks remain inputs until
+a legitimate dependency-authority trigger requires reconsideration.
+
+**B1-R (locked reproduction)** requires
+`--seed-nuget-packages-from <absolute-canonical-G-directory>`. The directory must
+contain exactly the 197 approved selected ID/version pairs. S19/L1, L2,
+ResolverSupport, and every other A-G acquisition residue are prohibited. The
+bootstrap validates the hierarchy, administrative files, and archive hashes; derives
+one read-only local source; and starts each reproduction with an independently empty
+global-packages cache and fresh assets. It verifies the three reviewed lock hashes,
+runs native `dotnet restore --locked-mode`, rejects every restore warning or error,
+requires the lock bytes to remain unchanged, and reconciles each materialized cache
+to the selected manifest. A global-packages folder is not treated as a package
+source. The reviewed `NuGet.Config` remains present as a reviewed input, while the
+explicit private source is the only viable package source.
+
+The two B1-R runs use separate source checkouts, package caches, tool homes,
+temporary directories, HTTP caches, and assets. Their selected package manifests
+must be equal. Raw `project.assets.json` bytes may contain physical paths, so the
+future qualification harness must use the existing C# graph tooling to require the
+canonical union and SHA rather than manufacture raw byte equality across different
+paths. **B2** then runs `dotnet build --no-restore` against each approved B1-R result,
+requires locks, assets, and package inventories to remain unchanged, and compares
+the three operational assemblies.
+
+Each current A/B lane preserves the same source checkout, package-cache and
+artifact paths from its B1-R restore into its B2 child, so the path-bound assets are
+consumed at the coordinates they record. If a future qualification uses separate
+mount namespaces for B1-R and B2, their distinct host locations must be mapped to
+the same reviewed namespace-local source, package and artifact coordinates; the
+qualification must inspect the assets `projectPath`/`packagesPath` and must not
+present host paths as sandbox authority. A and B may have different host roots;
+canonical graph equality is always required, while raw assets equality is required
+only when their namespace-visible coordinates are identical.
+
+The locks deliberately remain beside all three project files. NuGet creates assets
+and consults a lock per restored project, including project references: Core governs
+Core assets, EntityFrameworkCore governs EF assets, and Runner governs Runner
+assets. All three are therefore required and hash-gated before restore. Their
+presence also means ordinary wider-repository restores consult the Core and EF
+locks and may propose lock changes when declarations change unless locked mode is
+used. That maintenance visibility is intentional: such a diff is a B1-Q trigger,
+not authority to accept a silent lock update.
+
+`DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=true` is deliberately set for B1-R/B2
+configuration hygiene and determinism. It is not network confinement. Operational
+qualification must launch these stages in the established Bubblewrap model and
+prove network capability absent from the child. Locked mode, no-restore, a local
+source, proxy hygiene, and environment variables do not establish that property.
 
 The bootstrap requires exact byte equality for all three assemblies, makes the
 selected build-A tree read-only inside its owner-only temporary root, and rechecks
@@ -164,8 +247,11 @@ ordinary logs, Git, or command arguments. Pseudonym collisions across delivered
 identifier domains are fatal; the tool never repairs a collision with an
 order-dependent counter.
 
-Before provenance, only the trusted operator shell, Git, reviewed bootstrap,
-system build tools, and package-restore network possess execution authority. The
+Before provenance, only the trusted operator shell, Git, reviewed bootstrap, and
+system build tools possess execution authority. A-L may use only its approved
+package-source network while obtaining the locked material; that authority ends
+before its content-bound G197 output enters this bootstrap. The bootstrap rejects
+no-seed execution and uses only its derived private selected-package source. The
 bootstrap removes every B6 operational variable before materialisation/restore/build
 children start. After provenance it constructs a new minimal environment for the
 exact reviewed adapter and selected artifact. Package restore network access is a
