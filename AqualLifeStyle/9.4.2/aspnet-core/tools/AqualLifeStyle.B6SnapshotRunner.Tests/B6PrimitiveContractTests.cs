@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Shouldly;
 using Xunit;
 
@@ -15,6 +16,10 @@ public sealed class B6PrimitiveContractTests
         "B6TestSourceMaterializationDirectory";
     private const string CanonicalGraphSha256 =
         "a32d7081f7c687c9ece1511122dd772ac17e7cfc682943e5706ac0caef6fc4a0";
+    private const string QualificationGraphSha256 =
+        "d94d67e2dc223c42a69f3cf75e943919eeae26f8ef3ffe8b9f40f8ece1b9672b";
+    private static readonly DateTimeOffset SyntheticPackageEntryTimestamp =
+        new(1980, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     [Fact]
     public void DependencyLocksAndAuthoritativeRunner_EncodeNativeLockedReplayContract()
@@ -57,21 +62,116 @@ public sealed class B6PrimitiveContractTests
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalGraph)))
             .ToLowerInvariant().ShouldBe(CanonicalGraphSha256);
 
+        var testLockPath = Path.Combine(repository,
+            "AqualLifeStyle/9.4.2/aspnet-core/tools/AqualLifeStyle.B6SnapshotRunner.Tests/packages.lock.json");
+        Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(testLockPath)))
+            .ToLowerInvariant().ShouldBe("e575bab05aa361751f35ce31340880c0286e6133c7f36b7e3e1fb2ff8bbf0a47");
+        using (var testLock = JsonDocument.Parse(File.ReadAllBytes(testLockPath)))
+        {
+            var testPackages = testLock.RootElement.GetProperty("dependencies").EnumerateObject()
+                .SelectMany(framework => framework.Value.EnumerateObject())
+                .Where(dependency => dependency.Value.GetProperty("type").GetString() != "Project")
+                .Select(package => $"{package.Name.ToLowerInvariant()}\t" +
+                                   $"{package.Value.GetProperty("resolved").GetString()}\n")
+                .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+            testPackages.Length.ShouldBe(186);
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Concat(testPackages))))
+                .ToLowerInvariant().ShouldBe(QualificationGraphSha256);
+        }
+
+        var authorityDirectory = Path.Combine(repository,
+            "docs/operations/aqgreen-v2-b6/snapshot-package/authority");
+        var authorityContracts = new[]
+        {
+            (Name: "G197.tsv", Count: 197, Sha256: CanonicalGraphSha256),
+            (Name: "TQ186.tsv", Count: 186, Sha256: QualificationGraphSha256),
+            (Name: "U215.tsv", Count: 215, Sha256: "372c918aa794e976601ee292caa9c56a884784ebcfe04cd53981f76d3e982dd1"),
+            (Name: "U1.tsv", Count: 1, Sha256: "9598c6dd7cab8f0dc62a31be8c73a3c030c5d92d26d120689f06bf1b60b0980a"),
+            (Name: "U2.tsv", Count: 2, Sha256: "84ba6476727924aecc6b94207f6de1fdc1135804edbea4d32b7984ede77a6b35")
+        };
+        foreach (var contract in authorityContracts)
+        {
+            var bytes = File.ReadAllBytes(Path.Combine(authorityDirectory, contract.Name));
+            Encoding.UTF8.GetString(bytes).Split('\n', StringSplitOptions.RemoveEmptyEntries).Length
+                .ShouldBe(contract.Count);
+            B6Values.Sha256Hex(bytes).ShouldBe(contract.Sha256);
+        }
+        var g = File.ReadAllLines(Path.Combine(authorityDirectory, "G197.tsv"));
+        var tq = File.ReadAllLines(Path.Combine(authorityDirectory, "TQ186.tsv"));
+        var u = File.ReadAllLines(Path.Combine(authorityDirectory, "U215.tsv"));
+        g.Concat(tq).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray()
+            .ShouldBe(u);
+        File.ReadAllLines(Path.Combine(authorityDirectory, "U1.tsv"))
+            .Select(line => string.Join('\t', line.Split('\t').Take(2))).ToArray()
+            .ShouldBe(["configured.source.package\t1.0.0"]);
+        File.ReadAllLines(Path.Combine(authorityDirectory, "U2.tsv"))
+            .Select(line => string.Join('\t', line.Split('\t').Take(2))).ToArray()
+            .ShouldBe(["synthetic.b\t2.0.0", "synthetic.package\t1.0.0"]);
+        AssertApprovedFixtureDeterminism();
+
         var bootstrap = File.ReadAllText(CanonicalB6EntrypointFromTestSource());
         foreach (var contract in lockContracts)
             bootstrap.ShouldContain(contract.Sha256);
-        bootstrap.ShouldContain("verify_lock_set");
-        bootstrap.ShouldContain("dotnet restore");
+        bootstrap.ShouldContain("verify_locks");
+        bootstrap.ShouldContain("${frozen_dotnet}\" restore");
         bootstrap.ShouldContain("--locked-mode");
         bootstrap.ShouldNotContain("--force-evaluate");
         bootstrap.ShouldNotContain("--ignore-failed-sources");
         bootstrap.ShouldNotContain("ResolverSupport");
-        bootstrap.ShouldContain("dotnet build");
+        bootstrap.ShouldContain("${frozen_dotnet}\" build");
         bootstrap.ShouldContain("--no-restore");
         bootstrap.ShouldContain("DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=true");
-        bootstrap.ShouldContain("network-boundary=REQUIRED_EXTERNAL_WITNESS");
-        bootstrap.ShouldContain("Bubblewrap network namespace");
+        bootstrap.ShouldContain("mechanical-network-witness=PASS");
+        bootstrap.ShouldContain("--unshare-net");
+        bootstrap.ShouldContain("8.0.130");
+        bootstrap.ShouldContain("6.8.2.32767");
+        bootstrap.ShouldContain("NUGET_CERT_REVOCATION_MODE=offline");
+        bootstrap.ShouldContain("FullyQualifiedName~B6PrimitiveContractTests");
+        bootstrap.ShouldContain("verify-test-run");
+        bootstrap.ShouldContain("--expected-count 61");
+        bootstrap.ShouldContain("GATE_Q=PASS classification=SOURCE_QUALIFICATION_MECHANISM");
+        bootstrap.ShouldContain("GATE_A=PASS claim=BOUNDED_REPRODUCIBILITY_AND_BEHAVIOR");
+        bootstrap.ShouldContain("freshness_limit_seconds='3600'");
+        bootstrap.ShouldContain("transaction_id\\tid\\tversion");
+        bootstrap.ShouldContain("repository_signer_sha256");
+        bootstrap.ShouldContain("signer_policy_sha256");
+        bootstrap.ShouldContain("${frozen_dotnet}\" nuget verify --all");
+        bootstrap.ShouldContain("NUGET_CERT_REVOCATION_MODE=online");
+        bootstrap.ShouldContain("a-l-transaction-receipt.tsv");
+        bootstrap.ShouldContain("actual toolchain inventory differs from authority");
+        bootstrap.ShouldContain("--list-sdks");
+        bootstrap.ShouldContain("runtime inventory mismatch");
+        bootstrap.ShouldContain("/usr/bin/mawk");
+        bootstrap.ShouldContain("3850bf893d3f4f8ec462c8b59d6d66fdbbe8ddc0715b3d404d9cc574526b781c");
+        bootstrap.ShouldContain("qualification-SHA256SUMS");
+        bootstrap.ShouldContain("final-verdict.tsv");
+        bootstrap.ShouldContain("ElapsedDurationCentiseconds");
+        bootstrap.ShouldContain("--json-status-fd");
+        bootstrap.ShouldContain("--ro-bind-data");
+        bootstrap.ShouldContain("Bubblewrap wait interrupted before process exit");
+        bootstrap.ShouldContain("045a8891a4e84d5acec53b3650e2ea4210bc6d3fc4ddc2d6c8de63662afa56aa");
+        bootstrap.ShouldContain("747ec92ca0d9f50eccf82079bc8f878a97a3b59a270c6e10b7b1cd3b54ce728a");
+        bootstrap.ShouldNotContain("7f3ee778e07ef8cf720531f9e164870369a065f3223515483d68e4030227dc19");
+        bootstrap.ShouldNotContain("--ro-bind / /");
+        bootstrap.ShouldNotContain("--bind \"${private_root}\" \"${private_root}\"");
+        bootstrap.ShouldContain("--ro-bind /etc/ssl /etc/ssl");
+        bootstrap.ShouldContain("evidence directory overlaps repository");
+        bootstrap.ShouldContain("B6_PHASE_ERROR");
+        bootstrap.ShouldContain("B6_FIRST_GATE_FAILURE");
+        bootstrap.ShouldNotContain(" self-test");
+        bootstrap.ShouldNotContain("synthetic-contract-test");
+        bootstrap.ShouldNotContain("--online-trust-ledger");
+        bootstrap.ShouldNotContain("--transaction-id");
+        File.Exists(Path.Combine(repository, "docs/operations/aqgreen-v2-b6/snapshot-package",
+            "authoritative-runner-synthetic-contract-test.sh")).ShouldBeFalse();
         bootstrap.ToLowerInvariant().ShouldNotContain("python");
+
+        var policy = File.ReadAllText(Path.Combine(repository,
+            "docs/operations/aqgreen-v2-b6/snapshot-package/qualification-nuget.config"));
+        policy.ShouldContain("signatureValidationMode\" value=\"require");
+        policy.ShouldContain("0E5F38F57DC1BCC806D8494F4F90FBCEDD988B46760709CBEEC6F4219AA6157D");
+        policy.ShouldContain("1F4B311D9ACC115C8DC8018B5A49E00FCE6DA8E2855F9F014CA6F34570BC482D");
+        policy.ShouldContain("5A2901D6ADA3D18260B9C6DFE2133C95D74B9EEF6AE0E5DC334C8454D1477DF4");
     }
 
     [Fact]
@@ -131,403 +231,15 @@ public sealed class B6PrimitiveContractTests
     [Fact]
     public void C1A_B_C_D_OperationalBootstrapUsesReviewedDoubleBuildBeforeReleasingSensitiveCapability()
     {
-        if (OperatingSystem.IsWindows()) return;
-        var testRoot = Path.Combine(Path.GetTempPath(), "b6-preauthority-test-" + Guid.NewGuid().ToString("N"));
-        var repository = Path.Combine(testRoot, "repository");
-        var unverifiedMarker = Path.Combine(testRoot, "unverified-marker");
-        var verifiedMarker = Path.Combine(testRoot, "verified-marker");
-        var buildLeakMarker = Path.Combine(testRoot, "build-leak-marker");
-        var checkoutHookMarker = Path.Combine(testRoot, "checkout-hook-marker");
-        var checkoutFilterMarker = Path.Combine(testRoot, "checkout-filter-marker");
-        var configuredPackageSource = Path.Combine(testRoot, "configured-package-source");
-        var configuredPackage = new[] { (Id: "configured.source.package", Version: "1.0.0") };
-        const string sentinel = "B6-SYNTHETIC-SENSITIVE-CAPABILITY";
-        Directory.CreateDirectory(repository);
-        Directory.CreateDirectory(configuredPackageSource);
-        try
-        {
-            WriteSyntheticNuGetPackage(configuredPackageSource, configuredPackage[0].Id,
-                configuredPackage[0].Version);
-            var runnerProject = CreateSourceLinkFixture(repository, buildLeakMarker,
-                packageReferences: configuredPackage, configuredNugetSource: configuredPackageSource,
-                lockGenerationSource: configuredPackageSource);
-            Run(repository, "git", "init");
-            Run(repository, "git", "remote", "add", "origin", "https://github.com/aqua-lifestyle/aqua-lifestyle.git");
-            Run(repository, "git", "add", ".");
-            Run(repository, "git", "-c", "user.name=B6 Test", "-c", "user.email=b6@example.test",
-                "commit", "-m", "reviewed source");
-            var reviewedCommit = Run(repository, "git", "rev-parse", "HEAD").Trim();
-
-            var ignoredSourceDirectory = Path.Combine(Path.GetDirectoryName(runnerProject)!, "Release");
-            Directory.CreateDirectory(ignoredSourceDirectory);
-            File.WriteAllText(Path.Combine(ignoredSourceDirectory, "Injected.cs"),
-                """
-                using System.Runtime.CompilerServices;
-                internal static class IgnoredInjection
-                {
-                    [ModuleInitializer]
-                    internal static void Initialize()
-                    {
-                        var sentinel = System.Environment.GetEnvironmentVariable("B6_TEST_SENSITIVE_DSN_SENTINEL");
-                        var marker = System.Environment.GetEnvironmentVariable("B6_TEST_UNVERIFIED_MARKER");
-                        if (sentinel != null && marker != null) System.IO.File.WriteAllText(marker, sentinel);
-                    }
-                }
-                """);
-
-            var injectedSource = Path.Combine(ignoredSourceDirectory, "Injected.cs");
-            var injectedRelativeDirectory = Path.GetRelativePath(repository, ignoredSourceDirectory);
-            var gitDirectory = Path.GetFullPath(Run(repository, "git", "rev-parse", "--git-common-dir").Trim(), repository);
-            var hook = Path.Combine(gitDirectory, "hooks", "post-checkout");
-            File.WriteAllText(hook,
-                $"#!/usr/bin/env bash\nset -eu\nprintf hook > '{checkoutHookMarker}'\n" +
-                $"mkdir -p \"$PWD/{injectedRelativeDirectory}\"\n" +
-                $"cp '{injectedSource}' \"$PWD/{injectedRelativeDirectory}/HookInjected.cs\"\n");
-            File.SetUnixFileMode(hook, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-
-            var filter = Path.Combine(testRoot, "checkout-filter.sh");
-            File.WriteAllText(filter,
-                $"#!/usr/bin/env bash\nset -eu\ncat\nprintf filter > '{checkoutFilterMarker}'\n" +
-                $"mkdir -p \"$PWD/{injectedRelativeDirectory}\"\n" +
-                $"cp '{injectedSource}' \"$PWD/{injectedRelativeDirectory}/FilterInjected.cs\"\n");
-            File.SetUnixFileMode(filter, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-            File.WriteAllText(Path.Combine(gitDirectory, "info", "attributes"),
-                Path.GetRelativePath(repository, Path.Combine(Path.GetDirectoryName(runnerProject)!, "Program.cs")) +
-                " filter=b6-inject\n");
-            Run(repository, "git", "config", "filter.b6-inject.smudge", $"bash '{filter}'");
-            Run(repository, "git", "config", "filter.b6-inject.clean", "cat");
-
-            var ordinaryCheckout = Path.Combine(testRoot, "ordinary-checkout");
-            Run(repository, "git", "worktree", "add", "--detach", ordinaryCheckout, reviewedCommit);
-            File.ReadAllText(checkoutHookMarker).ShouldBe("hook");
-            File.ReadAllText(checkoutFilterMarker).ShouldBe("filter");
-            File.Exists(Path.Combine(ordinaryCheckout, injectedRelativeDirectory, "HookInjected.cs")).ShouldBeTrue();
-            File.Exists(Path.Combine(ordinaryCheckout, injectedRelativeDirectory, "FilterInjected.cs")).ShouldBeTrue();
-            Run(ordinaryCheckout, "git", "status", "--porcelain=v1", "--untracked-files=all").ShouldBeEmpty();
-            Run(repository, "git", "worktree", "remove", "--force", ordinaryCheckout);
-            File.Delete(checkoutHookMarker);
-            File.Delete(checkoutFilterMarker);
-
-            var ordinaryPackageCache = Path.Combine(testRoot, "ordinary-package-cache");
-            Directory.CreateDirectory(ordinaryPackageCache);
-            RunWithEnvironment(repository, "dotnet", new Dictionary<string, string>
-            {
-                ["B6_TEST_SENSITIVE_DSN_SENTINEL"] = sentinel,
-                ["NUGET_PACKAGES"] = ordinaryPackageCache,
-                ["DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE"] = "true"
-            }, "build", runnerProject, "--configuration", "Release", "--disable-build-servers");
-            File.ReadAllText(buildLeakMarker).Trim().ShouldBe(sentinel);
-            File.Delete(buildLeakMarker);
-            var ordinaryRunner = Path.Combine(Path.GetDirectoryName(runnerProject)!, "bin", "Release", "net8.0",
-                "AqualLifeStyle.B6SnapshotRunner.dll");
-            RunWithEnvironment(repository, "dotnet", new Dictionary<string, string>
-            {
-                ["B6_TEST_SENSITIVE_DSN_SENTINEL"] = sentinel,
-                ["B6_TEST_UNVERIFIED_MARKER"] = unverifiedMarker
-            }, ordinaryRunner);
-            File.ReadAllText(unverifiedMarker).ShouldBe(sentinel);
-            File.Delete(unverifiedMarker);
-
-            Directory.CreateDirectory(Path.Combine(repository, "AqualLifeStyle", "9.4.2", "aspnet-core",
-                "artifacts", "aqgreen-b6-authoritative"));
-            File.WriteAllText(Path.Combine(repository, "AqualLifeStyle", "9.4.2", "aspnet-core",
-                "artifacts", "aqgreen-b6-authoritative", "stale-state"), "must not be selected");
-            Run(repository, "git", "status", "--porcelain=v1", "--untracked-files=all").ShouldBeEmpty();
-
-            var result = RunBootstrap(repository, reviewedCommit, new Dictionary<string, string>
-            {
-                ["B6_TEST_SENSITIVE_DSN_SENTINEL"] = sentinel,
-                ["B6_TEST_UNVERIFIED_MARKER"] = unverifiedMarker,
-                ["B6_TEST_VERIFIED_MARKER"] = verifiedMarker
-            }, "--seed-nuget-packages-from", configuredPackageSource, "runner", "sensitive-probe");
-
-            result.ShouldContain("B6 pre-authority provenance: PASS");
-            result.ShouldContain("B6_VERIFIED_SENSITIVE_CAPABILITY_VISIBLE");
-            result.ShouldContain("/source-a/");
-            result.ShouldNotContain(ordinaryRunner);
-            result.ShouldContain("Runner SHA-256:");
-            result.ShouldContain("Core SHA-256:");
-            result.ShouldContain("EntityFrameworkCore SHA-256:");
-            result.ShouldContain("B1-R_a=PASS");
-            result.ShouldContain("B1-R_b=PASS");
-            result.ShouldContain("B1-R_DETERMINISM=PASS");
-            result.ShouldContain("B2_a=PASS");
-            result.ShouldContain("B2_b=PASS");
-            File.Exists(unverifiedMarker).ShouldBeFalse();
-            File.Exists(buildLeakMarker).ShouldBeFalse();
-            File.Exists(checkoutHookMarker).ShouldBeFalse();
-            File.Exists(checkoutFilterMarker).ShouldBeFalse();
-            File.ReadAllText(verifiedMarker).ShouldBe(sentinel);
-        }
-        finally
-        {
-            if (Directory.Exists(testRoot)) Directory.Delete(testRoot, recursive: true);
-        }
+        ExerciseGateASimulationVerifierPositive();
+        ExerciseCurrentRunnerSuccess();
     }
 
     [Fact]
     public void OperationalBootstrap_SeedsPrivateNuGetPackagesWithoutMutatingOrTrustingUnsafeInput()
     {
-        if (OperatingSystem.IsWindows()) return;
-        var testRoot = Path.Combine(Path.GetTempPath(), "b6-package-state-test-" + Guid.NewGuid().ToString("N"));
-        var repository = Path.Combine(testRoot, "repository");
-        var acquisitionState = Path.Combine(testRoot, "acquired-packages");
-        var packageState = Path.Combine(testRoot, "reconciled-packages");
-        var destinationMarker = Path.Combine(testRoot, "package-destination");
-        var destinationSnapshot = Path.Combine(testRoot, "package-destination-snapshot");
-        var sourceMarker = Path.Combine(testRoot, "package-source-destination");
-        var sourceSnapshot = Path.Combine(testRoot, "package-source-snapshot");
-        var restoreSourcesMarker = Path.Combine(testRoot, "restore-sources");
-        var selectedPackages = new[]
-        {
-            (Id: "synthetic.package", Version: "1.0.0"),
-            (Id: "synthetic.b", Version: "2.0.0")
-        };
-        var residuePackages = new[]
-        {
-            (Id: "synthetic.b", Version: "1.0.0"),
-            (Id: "synthetic.c", Version: "3.0.0")
-        };
-        Directory.CreateDirectory(repository);
-        Directory.CreateDirectory(acquisitionState);
-        Directory.CreateDirectory(packageState);
-        try
-        {
-            foreach (var package in selectedPackages.Concat(residuePackages))
-                WriteSyntheticNuGetPackage(acquisitionState, package.Id, package.Version);
-            foreach (var package in selectedPackages)
-                CopyDirectory(Path.Combine(acquisitionState, package.Id, package.Version),
-                    Path.Combine(packageState, package.Id, package.Version));
-
-            var runnerProject = CreateSourceLinkFixture(repository, packageStateMarker: destinationMarker,
-                packageStateSnapshot: destinationSnapshot, packageSourceMarker: sourceMarker,
-                packageSourceSnapshot: sourceSnapshot, restoreSourcesMarker: restoreSourcesMarker,
-                packageReferences: selectedPackages, lockGenerationSource: packageState);
-            Run(repository, "git", "init");
-            Run(repository, "git", "add", ".");
-            Run(repository, "git", "-c", "user.name=B6 Test", "-c", "user.email=b6@example.test",
-                "commit", "-m", "reviewed source");
-            var reviewedCommit = Run(repository, "git", "rev-parse", "HEAD").Trim();
-            var seedFiles = Directory.EnumerateFiles(packageState, "*", SearchOption.AllDirectories)
-                .ToDictionary(path => Path.GetRelativePath(packageState, path), File.ReadAllBytes);
-            var seedEntries = Directory.EnumerateFileSystemEntries(packageState, "*", SearchOption.AllDirectories)
-                .Select(path => Path.GetRelativePath(packageState, path)).Order().ToArray();
-
-            var result = RunBootstrap(repository, reviewedCommit, new Dictionary<string, string>(),
-                "--seed-nuget-packages-from", packageState, "runner", "sensitive-probe");
-
-            PackageVersions(acquisitionState).ShouldBe(selectedPackages.Concat(residuePackages).Order().ToArray());
-            PackageVersions(packageState).ShouldBe(selectedPackages.Order().ToArray());
-            result.ShouldContain("B6 selected NuGet seed validated: packages=2 archive-manifest-sha256=");
-            result.ShouldContain(
-                "B6 private local NuGet source derived from selected seed: 2 complete package versions, exact archive bytes, configured sources overridden.");
-            result.ShouldContain("B1-R_a=PASS packages=2 warnings=0 errors=0 NU1603=0 lock-mutation=NO assets=3");
-            result.ShouldContain("B1-R_b=PASS packages=2 warnings=0 errors=0 NU1603=0 lock-mutation=NO assets=3");
-            result.ShouldContain("B1-R_DETERMINISM=PASS");
-            result.ShouldContain("B2_a=PASS no-restore=true lock-mutation=NO assets-mutation=NO packages=2");
-            result.ShouldContain("B2_b=PASS no-restore=true lock-mutation=NO assets-mutation=NO packages=2");
-            result.ShouldContain("B6 selected NuGet seed and private source remained unchanged through B1-R/B2.");
-            foreach (var (relativePath, bytes) in seedFiles)
-            {
-                File.ReadAllBytes(Path.Combine(packageState, relativePath)).ShouldBe(bytes);
-                File.ReadAllBytes(Path.Combine(sourceSnapshot, relativePath)).ShouldBe(bytes);
-                var restoredPath = Path.Combine(destinationSnapshot, relativePath);
-                if (Path.GetFileName(relativePath) == ".nupkg.metadata")
-                {
-                    using var expectedMetadata = JsonDocument.Parse(bytes);
-                    using var restoredMetadata = JsonDocument.Parse(File.ReadAllBytes(restoredPath));
-                    restoredMetadata.RootElement.GetProperty("contentHash").GetString().ShouldBe(
-                        expectedMetadata.RootElement.GetProperty("contentHash").GetString());
-                    restoredMetadata.RootElement.GetProperty("version").GetInt32().ShouldBe(2);
-                    restoredMetadata.RootElement.GetProperty("source").GetString().ShouldEndWith("/package-source");
-                }
-                else
-                {
-                    File.ReadAllBytes(restoredPath).ShouldBe(bytes);
-                }
-            }
-            Directory.EnumerateFileSystemEntries(packageState, "*", SearchOption.AllDirectories)
-                .Select(path => Path.GetRelativePath(packageState, path)).Order().ShouldBe(seedEntries);
-            var destination = File.ReadAllText(destinationMarker).Trim().Split(':', 3);
-            destination[0].ShouldBe(Run(testRoot, "id", "-u").Trim());
-            destination[1].ShouldBe("700");
-            var destinationPath = destination[2].TrimEnd(Path.DirectorySeparatorChar);
-            destinationPath.ShouldNotBe(packageState);
-            destinationPath.ShouldStartWith(Path.Combine(Path.GetTempPath(), "aqua-b6-preauthority."));
-            destinationPath.ShouldEndWith("/packages-b");
-
-            var source = File.ReadAllText(sourceMarker).Trim().Split(':', 3);
-            source[0].ShouldBe(Run(testRoot, "id", "-u").Trim());
-            source[1].ShouldBe("500");
-            var sourcePath = source[2].TrimEnd(Path.DirectorySeparatorChar);
-            sourcePath.ShouldNotBe(packageState);
-            sourcePath.ShouldNotBe(destinationPath);
-            sourcePath.ShouldStartWith(Path.Combine(Path.GetTempPath(), "aqua-b6-preauthority."));
-            sourcePath.ShouldEndWith("/package-source");
-            File.ReadAllText(restoreSourcesMarker).Trim().ShouldBe(sourcePath);
-            File.ReadAllText(restoreSourcesMarker).ShouldNotContain("127.0.0.1:1");
-
-            var sourceFiles = Directory.EnumerateFiles(sourceSnapshot, "*", SearchOption.AllDirectories)
-                .Select(path => Path.GetRelativePath(sourceSnapshot, path)).Order().ToArray();
-            sourceFiles.ShouldBe(seedFiles.Keys.Order().ToArray());
-            Directory.EnumerateFileSystemEntries(sourceSnapshot, "*", SearchOption.AllDirectories)
-                .Select(path => Path.GetRelativePath(sourceSnapshot, path)).Order().ShouldBe(seedEntries);
-            File.Exists(Path.Combine(sourceSnapshot, "synthetic.package", "1.0.0",
-                "synthetic.package.1.0.0.nupkg")).ShouldBeTrue();
-            foreach (var package in selectedPackages)
-            {
-                var relativeArchive = $"{package.Id}/{package.Version}/{package.Id}.{package.Version}.nupkg";
-                File.ReadAllBytes(Path.Combine(sourceSnapshot, relativeArchive))
-                    .ShouldBe(File.ReadAllBytes(Path.Combine(packageState, relativeArchive)));
-            }
-            Directory.Exists(Path.Combine(packageState, "synthetic.b", "1.0.0")).ShouldBeFalse();
-            Directory.Exists(Path.Combine(packageState, "synthetic.c", "3.0.0")).ShouldBeFalse();
-            Directory.Exists(Path.Combine(sourceSnapshot, "synthetic.b", "1.0.0")).ShouldBeFalse();
-            Directory.Exists(Path.Combine(sourceSnapshot, "synthetic.c", "3.0.0")).ShouldBeFalse();
-
-            var isolatedPackages = Path.Combine(testRoot, "isolated-restore-packages");
-            var isolatedArtifacts = Path.Combine(testRoot, "isolated-restore-artifacts");
-            Directory.CreateDirectory(isolatedPackages);
-            var offlineRestore = RunCaptured(repository, "dotnet", new Dictionary<string, string>(),
-                "restore", runnerProject,
-                "--configfile", Path.Combine(repository, "AqualLifeStyle", "9.4.2", "aspnet-core", "NuGet.Config"),
-                "--packages", isolatedPackages, "--locked-mode",
-                "--disable-build-servers", "--source", sourceSnapshot,
-                $"-p:ArtifactsPath={isolatedArtifacts}", "-p:ImportDirectoryBuildProps=false",
-                "-p:ImportDirectoryBuildTargets=false");
-            if (offlineRestore.ExitCode != 0)
-                throw new InvalidOperationException(
-                    $"Offline restore failed: {offlineRestore.StandardOutput}{offlineRestore.StandardError}");
-            PackageVersions(isolatedPackages).ShouldBe(selectedPackages.Order().ToArray());
-
-            var missing = RunBootstrapCaptured(repository, reviewedCommit,
-                "--seed-nuget-packages-from", Path.Combine(testRoot, "missing"), "runner", "sensitive-probe");
-            missing.ExitCode.ShouldNotBe(0);
-            missing.StandardError.ShouldContain("existing absolute directory");
-
-            var relative = RunBootstrapCaptured(repository, reviewedCommit,
-                "--seed-nuget-packages-from", "reconciled-packages", "runner", "sensitive-probe");
-            relative.ExitCode.ShouldNotBe(0);
-            relative.StandardError.ShouldContain("existing absolute directory");
-
-            var regularFileSeed = Path.Combine(testRoot, "regular-file-seed");
-            File.WriteAllBytes(regularFileSeed, "not-a-directory"u8.ToArray());
-            var regularFile = RunBootstrapCaptured(repository, reviewedCommit,
-                "--seed-nuget-packages-from", regularFileSeed, "runner", "sensitive-probe");
-            regularFile.ExitCode.ShouldNotBe(0);
-            regularFile.StandardError.ShouldContain("existing absolute directory");
-
-            var emptyState = Path.Combine(testRoot, "empty-packages");
-            Directory.CreateDirectory(emptyState);
-            var empty = RunBootstrapCaptured(repository, reviewedCommit,
-                "--seed-nuget-packages-from", emptyState, "runner", "sensitive-probe");
-            empty.ExitCode.ShouldNotBe(0);
-            empty.StandardError.ShouldContain("contains no package versions");
-
-            var incompleteState = Path.Combine(testRoot, "incomplete-packages");
-            CopyDirectory(Path.Combine(packageState, "synthetic.package", "1.0.0"),
-                Path.Combine(incompleteState, "synthetic.package", "1.0.0"));
-            File.Delete(Path.Combine(incompleteState, "synthetic.package", "1.0.0", "synthetic.package.nuspec"));
-            var incomplete = RunBootstrapCaptured(repository, reviewedCommit,
-                "--seed-nuget-packages-from", incompleteState, "runner", "sensitive-probe");
-            incomplete.ExitCode.ShouldNotBe(0);
-            incomplete.StandardError.ShouldContain("package directory is incomplete");
-
-            var unsafePackageIdState = Path.Combine(testRoot, "unsafe-package-id");
-            CopyDirectory(Path.Combine(packageState, "synthetic.package", "1.0.0"),
-                Path.Combine(unsafePackageIdState, "Unsafe Package", "1.0.0"));
-            var unsafePackageId = RunBootstrapCaptured(repository, reviewedCommit,
-                "--seed-nuget-packages-from", unsafePackageIdState, "runner", "sensitive-probe");
-            unsafePackageId.ExitCode.ShouldNotBe(0);
-            unsafePackageId.StandardError.ShouldContain("unsafe or non-canonical package ID");
-
-            var nonCanonicalVersionState = Path.Combine(testRoot, "non-canonical-version");
-            CopyDirectory(Path.Combine(packageState, "synthetic.package", "1.0.0"),
-                Path.Combine(nonCanonicalVersionState, "synthetic.package", "1.00.0"));
-            var nonCanonicalVersion = RunBootstrapCaptured(repository, reviewedCommit,
-                "--seed-nuget-packages-from", nonCanonicalVersionState, "runner", "sensitive-probe");
-            nonCanonicalVersion.ExitCode.ShouldNotBe(0);
-            nonCanonicalVersion.StandardError.ShouldContain("unsafe or non-canonical package version");
-
-            var linkedState = Path.Combine(testRoot, "linked-packages");
-            Directory.CreateSymbolicLink(linkedState, packageState);
-            var linked = RunBootstrapCaptured(repository, reviewedCommit,
-                "--seed-nuget-packages-from", linkedState, "runner", "sensitive-probe");
-            linked.ExitCode.ShouldNotBe(0);
-            linked.StandardError.ShouldContain("existing absolute directory");
-
-            var unsafeState = Path.Combine(testRoot, "unsafe-packages");
-            Directory.CreateDirectory(unsafeState);
-            File.CreateSymbolicLink(Path.Combine(unsafeState, "package-link"), regularFileSeed);
-            var unsafeResult = RunBootstrapCaptured(repository, reviewedCommit,
-                "--seed-nuget-packages-from", unsafeState, "runner", "sensitive-probe");
-            unsafeResult.ExitCode.ShouldNotBe(0);
-            unsafeResult.StandardError.ShouldContain("must not contain symbolic links");
-
-            var specialState = Path.Combine(testRoot, "special-packages");
-            Directory.CreateDirectory(specialState);
-            Run(testRoot, "mkfifo", Path.Combine(specialState, "package-pipe"));
-            var specialResult = RunBootstrapCaptured(repository, reviewedCommit,
-                "--seed-nuget-packages-from", specialState, "runner", "sensitive-probe");
-            specialResult.ExitCode.ShouldNotBe(0);
-            specialResult.StandardError.ShouldContain("only directories and regular files");
-
-            var nonCanonicalState = Path.Combine(packageState, "..", Path.GetFileName(packageState));
-            var nonCanonical = RunBootstrapCaptured(repository, reviewedCommit,
-                "--seed-nuget-packages-from", nonCanonicalState, "runner", "sensitive-probe");
-            nonCanonical.ExitCode.ShouldNotBe(0);
-            nonCanonical.StandardError.ShouldContain("must already be canonical");
-
-            var overlapping = RunBootstrapCaptured(repository, reviewedCommit,
-                "--seed-nuget-packages-from", repository, "runner", "sensitive-probe");
-            overlapping.ExitCode.ShouldNotBe(0);
-            overlapping.StandardError.ShouldContain("must not overlap the live repository");
-
-            var duplicated = RunBootstrapCaptured(repository, reviewedCommit,
-                "--seed-nuget-packages-from", packageState, "--seed-nuget-packages-from", packageState,
-                "runner", "sensitive-probe");
-            duplicated.ExitCode.ShouldNotBe(0);
-            duplicated.StandardError.ShouldContain("may be supplied at most once");
-
-            var missingValue = RunBootstrapCaptured(repository, reviewedCommit,
-                "--seed-nuget-packages-from");
-            missingValue.ExitCode.ShouldNotBe(0);
-            missingValue.StandardError.ShouldContain("requires a directory value and an operation");
-
-            var misplaced = RunBootstrapCaptured(repository, reviewedCommit,
-                "runner", "sensitive-probe", "--seed-nuget-packages-from", packageState);
-            misplaced.ExitCode.ShouldNotBe(0);
-            misplaced.StandardError.ShouldContain("must immediately follow the reviewed commit");
-
-            var runnerTemp = Path.Combine(packageState, "runner-temp");
-            Directory.CreateDirectory(runnerTemp);
-            var privateOverlap = RunBootstrapCaptured(repository, reviewedCommit,
-                new Dictionary<string, string> { ["TMPDIR"] = runnerTemp },
-                "--seed-nuget-packages-from", packageState, "runner", "sensitive-probe");
-            privateOverlap.ExitCode.ShouldNotBe(0);
-            privateOverlap.StandardError.ShouldContain("must not contain the runner temporary root");
-            Directory.Delete(runnerTemp);
-
-            var coreLock = Path.Combine(repository, "AqualLifeStyle", "9.4.2", "aspnet-core", "src",
-                "AqualLifeStyle.Core", "packages.lock.json");
-            Run(repository, "git", "rm", Path.GetRelativePath(repository, coreLock));
-            Run(repository, "git", "-c", "user.name=B6 Test", "-c", "user.email=b6@example.test",
-                "commit", "-m", "remove required lock");
-            var missingLockCommit = Run(repository, "git", "rev-parse", "HEAD").Trim();
-            var missingLock = RunBootstrapCaptured(repository, missingLockCommit,
-                "--seed-nuget-packages-from", packageState, "runner", "sensitive-probe");
-            missingLock.ExitCode.ShouldNotBe(0);
-            missingLock.StandardError.ShouldContain("Reviewed B6 build/operation input must be a regular file");
-            missingLock.StandardError.ShouldContain("packages.lock.json");
-        }
-        finally
-        {
-            if (Directory.Exists(testRoot))
-            {
-                Run(testRoot, "chmod", "-R", "u+w", testRoot);
-                Directory.Delete(testRoot, recursive: true);
-            }
-        }
+        ExerciseGateASimulationVerifierNegativeMatrix();
+        ExerciseCurrentRunnerNegativeMatrix();
     }
 
     [Fact]
@@ -1053,15 +765,59 @@ public sealed class B6PrimitiveContractTests
         File.WriteAllText(Path.Combine(packageDirectory, $"{packageId}.nuspec"), nuspec);
         File.WriteAllText(archivePath + ".sha512", contentHash);
         File.WriteAllText(Path.Combine(packageDirectory, ".nupkg.metadata"),
-            $"{{\"version\":2,\"contentHash\":\"{contentHash}\",\"source\":\"B6 synthetic acquisition\"}}");
+            $"{{\"version\":2,\"contentHash\":\"{contentHash}\",\"source\":\"https://api.nuget.org/v3/index.json\"}}");
         File.WriteAllBytes(Path.Combine(payloadDirectory, "_._"), []);
     }
 
     private static void WriteZipEntry(ZipArchive archive, string path, string content)
     {
         var entry = archive.CreateEntry(path, CompressionLevel.NoCompression);
+        entry.LastWriteTime = SyntheticPackageEntryTimestamp;
         using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(false));
         writer.Write(content);
+    }
+
+    private static void AssertSyntheticNuGetPackageIdentity(
+        string root,
+        string packageId,
+        string version,
+        string expectedArchiveSha256)
+    {
+        var archivePath = Path.Combine(root, packageId, version, $"{packageId}.{version}.nupkg");
+        Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(archivePath)))
+            .ToLowerInvariant().ShouldBe(expectedArchiveSha256);
+        using var archive = ZipFile.OpenRead(archivePath);
+        archive.Entries.Select(entry => entry.FullName)
+            .ShouldBe(new[] { $"{packageId}.nuspec", "lib/net8.0/_._" });
+        archive.Entries.ShouldAllBe(entry =>
+            entry.LastWriteTime.DateTime == SyntheticPackageEntryTimestamp.DateTime);
+    }
+
+    private static void AssertApprovedFixtureDeterminism()
+    {
+        var roots = Enumerable.Range(0, 3)
+            .Select(_ => Path.Combine(Path.GetTempPath(), "b6-approved-fixture-" + Guid.NewGuid().ToString("N")))
+            .ToArray();
+        try
+        {
+            foreach (var root in roots)
+            {
+                WriteSyntheticNuGetPackage(root, "configured.source.package", "1.0.0");
+                WriteSyntheticNuGetPackage(root, "synthetic.b", "2.0.0");
+                WriteSyntheticNuGetPackage(root, "synthetic.package", "1.0.0");
+                AssertSyntheticNuGetPackageIdentity(root, "configured.source.package", "1.0.0",
+                    "213c7d72ea629e5c7d76bb4d1bad9b7496453b19dab1762d9be38e861a96a499");
+                AssertSyntheticNuGetPackageIdentity(root, "synthetic.b", "2.0.0",
+                    "5d4cf66d39eada41c20f070c552fc1652da5668156084d8c543335e1ea0c26c7");
+                AssertSyntheticNuGetPackageIdentity(root, "synthetic.package", "1.0.0",
+                    "c0415bd663818055158cfd326a3802f9416571320a2a7ad442663858cc01655f");
+            }
+        }
+        finally
+        {
+            foreach (var root in roots)
+                if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
     }
 
     private static void CopyDirectory(string source, string destination)
@@ -1079,149 +835,820 @@ public sealed class B6PrimitiveContractTests
                 .Select(versionDirectory => (Path.GetFileName(packageDirectory), Path.GetFileName(versionDirectory))))
             .Order().ToArray();
 
-    private static string CreateSourceLinkFixture(string repository, string? buildLeakMarker = null,
-        string? packageStateMarker = null, string? packageStateSnapshot = null,
-        string? packageSourceMarker = null, string? packageSourceSnapshot = null,
-        string? restoreSourcesMarker = null,
-        IReadOnlyCollection<(string Id, string Version)>? packageReferences = null,
-        string? configuredNugetSource = null, string? lockGenerationSource = null)
-    {
-        var backend = Path.Combine(repository, "AqualLifeStyle", "9.4.2", "aspnet-core");
-        var runnerProject = Path.Combine(backend, "tools", "AqualLifeStyle.B6SnapshotRunner");
-        var coreProject = Path.Combine(backend, "src", "AqualLifeStyle.Core");
-        var efProject = Path.Combine(backend, "src", "AqualLifeStyle.EntityFrameworkCore");
-        var package = Path.Combine(repository, "docs", "operations", "aqgreen-v2-b6", "snapshot-package");
-        Directory.CreateDirectory(runnerProject);
-        Directory.CreateDirectory(coreProject);
-        Directory.CreateDirectory(efProject);
-        Directory.CreateDirectory(package);
-        File.WriteAllText(Path.Combine(backend, ".gitignore"), "[Bb]in/\n[Oo]bj/\n[Rr]elease/\nartifacts/\n");
-        configuredNugetSource ??= packageReferences is null ? null : "https://127.0.0.1:1/v3/index.json";
-        File.WriteAllText(Path.Combine(backend, "NuGet.Config"), configuredNugetSource is null
-            ? "<configuration><packageSources><clear /></packageSources></configuration>\n"
-            : $"<configuration><packageSources><clear /><add key=\"configured\" " +
-              $"value=\"{configuredNugetSource}\" /></packageSources></configuration>\n");
-        File.Copy(CanonicalB6EntrypointFromTestSource(), Path.Combine(package, "authoritative-runner.sh"));
-        File.Copy(Path.Combine(TestSourcePackageDirectory(), "operator-extract.sh"),
-            Path.Combine(package, "operator-extract.sh"));
-        File.Copy(Path.Combine(TestSourcePackageDirectory(), "run-analysis.sh"),
-            Path.Combine(package, "run-analysis.sh"));
-        File.WriteAllText(Path.Combine(coreProject, "AqualLifeStyle.Core.csproj"),
-            MinimalProject("AqualLifeStyle.Core"));
-        File.WriteAllText(Path.Combine(coreProject, "Marker.cs"),
-            "namespace FixtureCore; public sealed class Marker { }\n");
-        File.WriteAllText(Path.Combine(efProject, "AqualLifeStyle.EntityFrameworkCore.csproj"),
-            MinimalProject("AqualLifeStyle.EntityFrameworkCore"));
-        File.WriteAllText(Path.Combine(efProject, "Marker.cs"),
-            "namespace FixtureEf; public sealed class Marker { }\n");
-        var buildLeakTarget = buildLeakMarker == null
-            ? string.Empty
-            : $"<Target Name=\"DetectSensitiveBuildEnvironment\" BeforeTargets=\"CoreCompile\" " +
-              $"Condition=\"'$(B6_TEST_SENSITIVE_DSN_SENTINEL)' != ''\"><WriteLinesToFile " +
-              $"File=\"{buildLeakMarker}\" Lines=\"$(B6_TEST_SENSITIVE_DSN_SENTINEL)\" Overwrite=\"true\" /></Target>";
-        var packageStateTarget = packageStateMarker == null
-            ? string.Empty
-            : $"<Target Name=\"RecordPackageState\" BeforeTargets=\"CoreCompile\"><Exec " +
-              $"Command=\"stat --format='%u:%a:%n' &quot;$(NuGetPackageRoot)&quot; " +
-              $"&gt; &quot;{packageStateMarker}&quot;\" />" +
-              $"<MakeDir Directories=\"{packageStateSnapshot}\" />" +
-              $"<Exec Command=\"cp -R --no-dereference -- &quot;$(NuGetPackageRoot)/.&quot; " +
-              $"&quot;{packageStateSnapshot}/&quot;\" /></Target>";
-        var restoreSourcesTarget = restoreSourcesMarker == null
-            ? string.Empty
-            : $"<Target Name=\"RecordRestoreSources\" BeforeTargets=\"_GenerateRestoreGraphProjectEntry\" " +
-              $"Condition=\"!Exists('{restoreSourcesMarker}')\"><WriteLinesToFile " +
-              $"File=\"{restoreSourcesMarker}\" Lines=\"$(RestoreSources)\" Overwrite=\"true\" /></Target>";
-        var packageSourceTarget = packageSourceMarker == null
-            ? string.Empty
-            : $"<Target Name=\"RecordPackageSource\" BeforeTargets=\"_GenerateRestoreGraphProjectEntry\" " +
-              $"Condition=\"!Exists('{packageSourceMarker}')\">" +
-              $"<Exec Command=\"stat --format='%u:%a:%n' &quot;$(RestoreSources)&quot; " +
-              $"&gt; &quot;{packageSourceMarker}&quot;\" />" +
-              $"<MakeDir Directories=\"{packageSourceSnapshot}\" />" +
-              $"<Exec Command=\"cp -R --no-dereference -- &quot;$(RestoreSources)/.&quot; " +
-              $"&quot;{packageSourceSnapshot}/&quot;\" /></Target>";
-        var packageReferenceItems = packageReferences is null
-            ? string.Empty
-            : "<ItemGroup>" + string.Concat(packageReferences.Select(package =>
-                $"<PackageReference Include=\"{package.Id}\" Version=\"{package.Version}\" />")) + "</ItemGroup>";
-        File.WriteAllText(Path.Combine(runnerProject, "AqualLifeStyle.B6SnapshotRunner.csproj"),
-            """
-            <Project Sdk="Microsoft.NET.Sdk">
-              <PropertyGroup>
-                <OutputType>Exe</OutputType>
-                <TargetFramework>net8.0</TargetFramework>
-                <AssemblyName>AqualLifeStyle.B6SnapshotRunner</AssemblyName>
-              </PropertyGroup>
-              <ItemGroup>
-                <ProjectReference Include="../../src/AqualLifeStyle.Core/AqualLifeStyle.Core.csproj" />
-                <ProjectReference Include="../../src/AqualLifeStyle.EntityFrameworkCore/AqualLifeStyle.EntityFrameworkCore.csproj" />
-              </ItemGroup>
-            """ + packageReferenceItems + buildLeakTarget + packageStateTarget + restoreSourcesTarget +
-            packageSourceTarget + "\n</Project>\n");
-        File.WriteAllText(Path.Combine(runnerProject, "Program.cs"),
-            """
-            var sentinel = System.Environment.GetEnvironmentVariable("B6_TEST_SENSITIVE_DSN_SENTINEL");
-            var verifiedMarker = System.Environment.GetEnvironmentVariable("B6_TEST_VERIFIED_MARKER");
-            if (sentinel != null && verifiedMarker != null) System.IO.File.WriteAllText(verifiedMarker, sentinel);
-            System.Console.WriteLine(sentinel == "B6-SYNTHETIC-SENSITIVE-CAPABILITY"
-                ? "B6_VERIFIED_SENSITIVE_CAPABILITY_VISIBLE"
-                : "B6_SENSITIVE_CAPABILITY_ABSENT");
-            System.Console.WriteLine(System.Reflection.Assembly.GetExecutingAssembly().Location);
-            System.Console.WriteLine(typeof(FixtureCore.Marker).FullName + typeof(FixtureEf.Marker).FullName);
-            """);
+    private sealed record CurrentRunnerFixture(
+        string Root,
+        string Repository,
+        string ReviewedCommit,
+        string EvidenceDirectory,
+        string BubblewrapLog,
+        string[] Arguments);
 
-        if (packageReferences is not null)
+    private static void ExerciseGateASimulationVerifierPositive()
+    {
+        var fixture = CreateGateASimulationVerifierFixture();
+        try
         {
-            lockGenerationSource.ShouldNotBeNullOrWhiteSpace();
-            var lockCache = Path.Combine(Path.GetTempPath(), "b6-lock-generation-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(lockCache);
+            var result = B6SimulationOutputVerifier.Verify(fixture.Output, fixture.ExpectedProvenance);
+            result.Result.ShouldBe("PASS");
+            result.ProjectionSchemaVersion.ShouldBe(B6Contract.GateASemanticProjectionVersion);
+            result.SemanticProjectionSha256.ShouldBe(B6Contract.ExpectedGateASemanticProjectionSha256);
+            result.SimulatorOutputDigest.ShouldBe(fixture.Root["simulatorOutputDigest"]!.GetValue<string>());
+            result.CurrentFullOutputSha256.ShouldBe(B6Values.Sha256Hex(File.ReadAllBytes(fixture.Output)));
+        }
+        finally { Directory.Delete(fixture.Directory, recursive: true); }
+    }
+
+    private static void ExerciseGateASimulationVerifierNegativeMatrix()
+    {
+        var fixture = CreateGateASimulationVerifierFixture();
+        try
+        {
+            var mutations = new (string Name, Action<JsonObject> Mutate)[]
+            {
+                ("semantic-field", root => root["snapshotId"] = "b6-gate-a-fixture-v2"),
+                ("placement", root => Placement(root)["canonicalPath"] = "5"),
+                ("impact", root => Impact(root)["classification"] = "Same"),
+                ("manifest-digest", root => Component(root)["manifestDigest"] = new string('0', 64)),
+                ("invalid-digest", root => Placement(root)["sourceEvidenceDigest"] = "invalid"),
+                ("unknown-top-level", root => root["unknown"] = true),
+                ("unknown-nested", root => Placement(root)["unknown"] = true),
+                ("missing-required", root => root.Remove("placementSource")),
+                ("wrong-scalar-type", root => root["analysisSnapshotCutoff"] = 1),
+                ("wrong-nullability", root => root["snapshotId"] = null),
+                ("wrong-component-count", root => root["components"]!.AsArray().Add(Component(root).DeepClone())),
+                ("wrong-placement-count", root => Component(root)["placements"]!.AsArray().RemoveAt(6)),
+                ("wrong-impact-count", root => Component(root)["impacts"]!.AsArray().RemoveAt(6)),
+                ("reordered-arrays", root =>
+                {
+                    Component(root)["placements"] = Reversed(Component(root)["placements"]!.AsArray());
+                    root["placements"] = Reversed(root["placements"]!.AsArray());
+                }),
+                ("duplicate-array-disagreement", root => root["placements"]!.AsArray()[0]!["canonicalPath"] = "1"),
+                ("repository-commit", root => Toolchain(root)["repositoryCommit"] = new string('e', 40)),
+                ("evidence-classification", root => Toolchain(root)["evidenceClassification"] = B6Contract.PrecommitEvidence),
+                ("runner-sha", root => Toolchain(root)["runner"]!["assemblySha256"] = new string('1', 64)),
+                ("core-sha", root => Dependency(root, 0)["assemblySha256"] = new string('2', 64)),
+                ("ef-sha", root => Dependency(root, 1)["assemblySha256"] = new string('3', 64)),
+                ("runner-informational-version", root => Toolchain(root)["runner"]!["informationalVersion"] = "wrong+" + fixture.ExpectedProvenance.RepositoryCommit),
+                ("core-informational-version", root => Dependency(root, 0)["informationalVersion"] = "wrong+" + fixture.ExpectedProvenance.RepositoryCommit),
+                ("ef-informational-version", root => Dependency(root, 1)["informationalVersion"] = "wrong+" + fixture.ExpectedProvenance.RepositoryCommit),
+                ("dependency-membership", root => Dependency(root, 0)["assemblyName"] = "Unexpected.Core"),
+                ("dependency-order", root => Toolchain(root)["firstPartyDependencies"] = Reversed(Toolchain(root)["firstPartyDependencies"]!.AsArray())),
+                ("simulator-output-digest", root => root["simulatorOutputDigest"] = new string('0', 64)),
+                ("semantic-projection-hash", root => root["placementSource"] = "LegacyCanonicalisationChanged")
+            };
+
+            foreach (var mutation in mutations)
+            {
+                var value = fixture.Root.DeepClone().AsObject();
+                mutation.Mutate(value);
+                var path = Path.Combine(fixture.Directory, mutation.Name + ".json");
+                CanonicalJson.WriteNew(path, value);
+                Should.Throw<B6PackageException>(() =>
+                        B6SimulationOutputVerifier.Verify(path, fixture.ExpectedProvenance), mutation.Name)
+                    .Message.ShouldNotBeNullOrWhiteSpace();
+            }
+
+            var wrongExpected = fixture.ExpectedProvenance with
+            {
+                RepositoryCommit = new string('f', 40),
+                Runner = fixture.ExpectedProvenance.Runner with
+                    { InformationalVersion = "runner+" + new string('f', 40) },
+                FirstPartyDependencies = fixture.ExpectedProvenance.FirstPartyDependencies
+                    .Select(value => value with { InformationalVersion = value.AssemblyName + "+" + new string('f', 40) })
+                    .ToList()
+            };
+            Should.Throw<B6PackageException>(() =>
+                B6SimulationOutputVerifier.Verify(fixture.Output, wrongExpected));
+        }
+        finally { Directory.Delete(fixture.Directory, recursive: true); }
+    }
+
+    private static GateASimulationFixture CreateGateASimulationVerifierFixture()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "b6-gate-a-verifier-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        if (!OperatingSystem.IsWindows())
+            File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        var input = Path.Combine(directory, "input.json");
+        File.Copy(Path.Combine(TestSourcePackageDirectory(), "fixture", "b2-simulate-input.json"), input);
+        if (!OperatingSystem.IsWindows())
+            File.SetUnixFileMode(input, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        var output = Path.Combine(directory, "output.json");
+        var previousClassification = Environment.GetEnvironmentVariable(B6Contract.EvidenceClassificationEnvironment);
+        try
+        {
+            Environment.SetEnvironmentVariable(B6Contract.EvidenceClassificationEnvironment, B6Contract.PrecommitEvidence);
+            new B6SnapshotPackage().RunSimulator(input, output);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(B6Contract.EvidenceClassificationEnvironment, previousClassification);
+        }
+
+        var commit = new string('d', 40);
+        var expected = new ToolchainIdentity(
+            commit,
+            B6Contract.OperationalEvidence,
+            new FirstPartyAssemblyIdentity("AqualLifeStyle.B6SnapshotRunner", new string('a', 64), "runner+" + commit),
+            [
+                new FirstPartyAssemblyIdentity("AqualLifeStyle.Core", new string('b', 64), "core+" + commit),
+                new FirstPartyAssemblyIdentity("AqualLifeStyle.EntityFrameworkCore", new string('c', 64), "ef+" + commit)
+            ]);
+        var root = CanonicalJson.Read(output).AsObject();
+        root["toolchainIdentity"] = CanonicalJson.ToNode(expected);
+        root["simulatorOutputDigest"] = CanonicalJson.Digest(new JsonObject
+        {
+            ["components"] = root["components"]!.DeepClone(),
+            ["toolchainIdentity"] = CanonicalJson.ToNode(expected),
+            ["simulationVersion"] = root["simulationVersion"]!.DeepClone(),
+            ["comparatorVersion"] = root["comparatorVersion"]!.DeepClone()
+        });
+        File.Delete(output);
+        CanonicalJson.WriteNew(output, root);
+        return new GateASimulationFixture(directory, output, root, expected);
+    }
+
+    private static JsonObject Component(JsonObject root) => root["components"]!.AsArray()[0]!.AsObject();
+    private static JsonObject Placement(JsonObject root) => Component(root)["placements"]!.AsArray()[0]!.AsObject();
+    private static JsonObject Impact(JsonObject root) => Component(root)["impacts"]!.AsArray()[0]!.AsObject();
+    private static JsonObject Toolchain(JsonObject root) => root["toolchainIdentity"]!.AsObject();
+    private static JsonObject Dependency(JsonObject root, int index) =>
+        Toolchain(root)["firstPartyDependencies"]!.AsArray()[index]!.AsObject();
+
+    private static JsonArray Reversed(JsonArray value) =>
+        new(value.Reverse().Select(item => item?.DeepClone()).ToArray());
+
+    private sealed record GateASimulationFixture(
+        string Directory,
+        string Output,
+        JsonObject Root,
+        ToolchainIdentity ExpectedProvenance);
+
+    private static void ExerciseCurrentRunnerSuccess()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var fixture = CreateCurrentRunnerFixture(3599, "success");
+        try
+        {
+            var result = RunBootstrapCaptured(fixture.Repository, fixture.ReviewedCommit, fixture.Arguments);
+            if (result.ExitCode != 0)
+                throw new InvalidOperationException($"Current B6 runner failed: {result.StandardError}\n" +
+                    $"Bubblewrap spy: {(File.Exists(fixture.BubblewrapLog) ? File.ReadAllText(fixture.BubblewrapLog) : "missing")}\n" +
+                    $"Gate log: {(File.Exists(Path.Combine(fixture.EvidenceDirectory, "gate-q-restore.log")) ? File.ReadAllText(Path.Combine(fixture.EvidenceDirectory, "gate-q-restore.log")) : "missing")}");
+
+            result.StandardError.ShouldContain("GATE_Q=PASS");
+            result.StandardError.ShouldContain("GATE_A=PASS");
+            result.StandardError.ShouldContain("B6_QUALIFICATION=PASS");
+            result.StandardError.ShouldNotContain("B6_QUALIFICATION=FAIL");
+            File.ReadAllText(Path.Combine(fixture.EvidenceDirectory, "trust-freshness.tsv"))
+                .ShouldContain("ElapsedDuration\t3599.00 seconds");
+            File.ReadAllText(Path.Combine(fixture.EvidenceDirectory, "final-verdict.tsv"))
+                .ShouldContain("final_transaction_result\tPASS");
+            File.ReadAllText(Path.Combine(fixture.EvidenceDirectory, "final-verdict.tsv"))
+                .ShouldContain("process_exit_code\t0");
+            File.ReadAllText(Path.Combine(fixture.EvidenceDirectory, "final-verdict.tsv"))
+                .ShouldContain("cleanup_reconciliation_result\tPASS");
+            Run(fixture.EvidenceDirectory, "sha256sum", "-c", "qualification-SHA256SUMS");
+            Run(fixture.EvidenceDirectory, "sha256sum", "-c", "SHA256SUMS");
+
+            var bwrap = File.ReadAllText(fixture.BubblewrapLog);
+            bwrap.ShouldContain("--unshare-net");
+            bwrap.ShouldContain("--json-status-fd");
+            bwrap.ShouldContain("--ro-bind-data");
+            bwrap.ShouldContain("/run/aqua/network-witness 8 7 env");
+            bwrap.ShouldNotContain("/run/aqua/network-witness 8 7 1000");
+            var privateRootMatch = System.Text.RegularExpressions.Regex.Match(bwrap,
+                @"--ro-bind (?<root>/tmp/aqua-b6-qualified\.[^ /]+)/source-q ");
+            privateRootMatch.Success.ShouldBeTrue();
+            var privateRoot = privateRootMatch.Groups["root"].Value;
+            bwrap.ShouldNotContain($"--bind {privateRoot} {privateRoot}");
+            bwrap.ShouldNotContain(fixture.EvidenceDirectory);
+            bwrap.ShouldNotContain($"{privateRoot}/network-witness.sh");
+            bwrap.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .ShouldAllBe(invocation => invocation.Contains("--ro-bind-data", StringComparison.Ordinal));
+            var witnesses = Directory.EnumerateFiles(fixture.EvidenceDirectory, "network-*.tsv").ToArray();
+            witnesses.Length.ShouldBe(12);
+            foreach (var witness in witnesses)
+            {
+                var content = File.ReadAllText(witness);
+                content.ShouldContain("uid_map\t65534 0 1\n");
+                content.ShouldContain("gid_map\t65534 0 1\n");
+            }
+        }
+        finally { RemoveCurrentRunnerFixture(fixture.Root); }
+    }
+
+    private static void ExerciseCurrentRunnerNegativeMatrix()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        var exactBoundary = CreateCurrentRunnerFixture(3600, "success");
+        try
+        {
+            var result = RunBootstrapCaptured(exactBoundary.Repository, exactBoundary.ReviewedCommit,
+                exactBoundary.Arguments);
+            result.ExitCode.ShouldBe(0, result.StandardError);
+            File.ReadAllText(Path.Combine(exactBoundary.EvidenceDirectory, "trust-freshness.tsv"))
+                .ShouldContain("ElapsedDuration\t3600.00 seconds");
+        }
+        finally { RemoveCurrentRunnerFixture(exactBoundary.Root); }
+
+        foreach (var scenario in new[]
+                 {
+                     "freshness-over", "toolchain-missing", "toolchain-unexpected", "runtime-extra",
+                     "package-substitution", "native-verify-failure", "native-verify-missing-success",
+                     "mawk-mismatch", "mawk-version-mismatch", "bootstrap-nonroot", "receipt-transaction", "receipt-missing-time",
+                     "receipt-malformed-time", "receipt-restart", "receipt-log-missing", "receipt-log-mismatch",
+                     "receipt-log-hash-mismatch", "clock-reversal", "clock-discontinuity", "monotonic-reversal",
+                     "promoted-tree-tamper", "witness-uid-dynamic", "witness-gid-dynamic",
+                     "witness-uid-map-extra", "witness-gid-map-extra", "witness-uid-map-missing",
+                     "witness-gid-map-missing", "witness-wrong-inside-uid", "witness-wrong-inside-gid",
+                     "witness-wrong-uid-range", "witness-wrong-gid-range", "witness-map-whitespace",
+                     "witness-pid", "witness-starttime", "witness-groups",
+                     "witness-capabilities", "witness-no-new-privileges", "qualification-evidence-tamper",
+                     "simulation-output-mismatch"
+                 })
+        {
+            var fixture = CreateCurrentRunnerFixture(scenario == "freshness-over" ? 3601 : 3599, scenario);
             try
             {
-                RunWithEnvironment(repository, "dotnet", new Dictionary<string, string>
+                var result = RunBootstrapCaptured(fixture.Repository, fixture.ReviewedCommit, fixture.Arguments);
+                result.ExitCode.ShouldNotBe(0, $"Scenario {scenario} unexpectedly passed.");
+                result.StandardError.ShouldContain("B6_QUALIFICATION=FAIL");
+                result.StandardError.ShouldNotContain("B6_QUALIFICATION=PASS");
+                File.Exists(Path.Combine(fixture.EvidenceDirectory, "final-verdict.tsv")).ShouldBeTrue();
+                Run(fixture.EvidenceDirectory, "sha256sum", "-c", "SHA256SUMS");
+                var terminalReceipt = File.ReadAllText(Path.Combine(fixture.EvidenceDirectory, "final-verdict.tsv"));
+                terminalReceipt.ShouldContain("final_transaction_result\tFAIL");
+                terminalReceipt.ShouldNotContain("process_exit_code\t0\n");
+                if (scenario == "toolchain-missing")
+                    File.ReadAllText(Path.Combine(fixture.EvidenceDirectory, "toolchain-inventory-result.tsv"))
+                        .ShouldContain("missing\t1");
+                if (scenario == "toolchain-unexpected")
+                    File.ReadAllText(Path.Combine(fixture.EvidenceDirectory, "toolchain-inventory-result.tsv"))
+                        .ShouldContain("unexpected\t1");
+                if (scenario == "runtime-extra")
+                    File.Exists(Path.Combine(fixture.EvidenceDirectory, "toolchain-discovery.tsv")).ShouldBeTrue();
+                if (scenario is "freshness-over" or "receipt-transaction" or "receipt-missing-time" or
+                    "receipt-malformed-time" or "receipt-restart" or "receipt-log-mismatch" or
+                    "receipt-log-missing" or "receipt-log-hash-mismatch" or "clock-reversal" or
+                    "clock-discontinuity" or "monotonic-reversal" or "promoted-tree-tamper")
                 {
-                    ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1",
-                    ["DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE"] = "true",
-                    ["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1",
-                    ["DOTNET_NOLOGO"] = "1",
-                    ["MSBUILDDISABLENODEREUSE"] = "1"
-                }, "restore", Path.Combine(runnerProject, "AqualLifeStyle.B6SnapshotRunner.csproj"),
-                    "--use-lock-file", "--force-evaluate", "--source", lockGenerationSource!,
-                    "--packages", lockCache, "--disable-build-servers");
+                    var freshness = File.ReadAllText(Path.Combine(fixture.EvidenceDirectory, "trust-freshness.tsv"));
+                    freshness.ShouldContain("Result\tFAIL");
+                }
             }
-            finally
-            {
-                if (Directory.Exists(lockCache)) Directory.Delete(lockCache, recursive: true);
-            }
-            foreach (var generatedMarker in new[] { packageSourceMarker, restoreSourcesMarker })
-                if (generatedMarker is not null && File.Exists(generatedMarker)) File.Delete(generatedMarker);
-            if (packageSourceSnapshot is not null && Directory.Exists(packageSourceSnapshot))
-                Directory.Delete(packageSourceSnapshot, recursive: true);
-
-            var coreLock = Path.Combine(coreProject, "packages.lock.json");
-            var efLock = Path.Combine(efProject, "packages.lock.json");
-            var runnerLock = Path.Combine(runnerProject, "packages.lock.json");
-            File.Exists(coreLock).ShouldBeTrue();
-            File.Exists(efLock).ShouldBeTrue();
-            File.Exists(runnerLock).ShouldBeTrue();
-            var canonicalFixtureGraph = string.Concat(packageReferences
-                .Select(package => $"{package.Id.ToLowerInvariant()}\t{package.Version}\n")
-                .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
-            var bootstrapPath = Path.Combine(package, "authoritative-runner.sh");
-            var bootstrap = File.ReadAllText(bootstrapPath)
-                .Replace("expected_selected_package_count='197'",
-                    $"expected_selected_package_count='{packageReferences.Count}'", StringComparison.Ordinal)
-                .Replace("a32d7081f7c687c9ece1511122dd772ac17e7cfc682943e5706ac0caef6fc4a0",
-                    B6Values.Sha256Hex(canonicalFixtureGraph), StringComparison.Ordinal)
-                .Replace("9f467700282dc48f8bdc172eb8f1830a3167cbc4efaa223a328b1ff00c4acddc",
-                    B6Values.Sha256Hex(File.ReadAllBytes(coreLock)), StringComparison.Ordinal)
-                .Replace("2b1925d618a39d10fa57e3e8455f06c3565de75ccdc3ae4a9021e357c9d07356",
-                    B6Values.Sha256Hex(File.ReadAllBytes(efLock)), StringComparison.Ordinal)
-                .Replace("401fafbcfa35347666a4de3fcfa92be9c66399663d8f8410eca420879c3d7b7b",
-                    B6Values.Sha256Hex(File.ReadAllBytes(runnerLock)), StringComparison.Ordinal);
-            File.WriteAllText(bootstrapPath, bootstrap);
+            finally { RemoveCurrentRunnerFixture(fixture.Root); }
         }
-        return Path.Combine(runnerProject, "AqualLifeStyle.B6SnapshotRunner.csproj");
+
+        var fabricated = CreateCurrentRunnerFixture(3599, "success");
+        try
+        {
+            var arguments = fabricated.Arguments.ToList();
+            var operationIndex = arguments.IndexOf("runner");
+            arguments.Insert(operationIndex, "/tmp/fabricated-ledger.tsv");
+            arguments.Insert(operationIndex, "--online-trust-ledger");
+            var result = RunBootstrapCaptured(fabricated.Repository, fabricated.ReviewedCommit,
+                arguments.ToArray());
+            result.ExitCode.ShouldNotBe(0);
+            result.StandardError.ShouldContain("unsupported operation --online-trust-ledger");
+        }
+        finally { RemoveCurrentRunnerFixture(fabricated.Root); }
+
+        var operationFailure = CreateCurrentRunnerFixture(3599, "operation-failure");
+        try
+        {
+            var result = RunBootstrapCaptured(operationFailure.Repository, operationFailure.ReviewedCommit,
+                operationFailure.Arguments);
+            result.ExitCode.ShouldBe(9);
+            result.StandardError.ShouldContain("B6_QUALIFICATION=FAIL");
+            result.StandardError.ShouldNotContain("B6_QUALIFICATION=PASS");
+            var verdict = Path.Combine(operationFailure.EvidenceDirectory, "final-verdict.tsv");
+            File.ReadAllText(verdict).ShouldContain("operation_result\tFAIL");
+            File.ReadAllText(verdict).ShouldContain("process_exit_code\t9");
+            File.ReadAllText(verdict).ShouldContain("final_transaction_result\tFAIL");
+            Run(operationFailure.EvidenceDirectory, "sha256sum", "-c", "SHA256SUMS");
+            File.AppendAllText(verdict, "tampered\n");
+            RunCaptured(operationFailure.EvidenceDirectory, "sha256sum", new Dictionary<string, string>(),
+                "-c", "SHA256SUMS").ExitCode.ShouldNotBe(0);
+        }
+        finally { RemoveCurrentRunnerFixture(operationFailure.Root); }
+
+        foreach (var scenario in new[]
+                 {
+                     "transaction-cleanup-failure", "stale-terminal-receipt",
+                     "signal-int-before-finalization", "signal-term-before-finalization",
+                     "signal-int-cleanup", "signal-term-cleanup",
+                     "signal-int-boundary", "signal-term-boundary"
+                 })
+        {
+            var fixture = CreateCurrentRunnerFixture(3599, scenario);
+            try
+            {
+                var result = RunBootstrapCaptured(fixture.Repository, fixture.ReviewedCommit, fixture.Arguments);
+                var expectedExit = scenario switch
+                {
+                    "signal-int-before-finalization" => 130,
+                    "signal-term-before-finalization" => 143,
+                    "signal-int-cleanup" => 130,
+                    "signal-term-cleanup" => 143,
+                    "signal-int-boundary" => 130,
+                    "signal-term-boundary" => 143,
+                    _ => 3
+                };
+                result.ExitCode.ShouldBe(expectedExit, $"Scenario {scenario}: {result.StandardError}");
+                result.StandardError.ShouldContain("B6_QUALIFICATION=FAIL");
+                result.StandardError.ShouldNotContain("B6_QUALIFICATION=PASS");
+                var receipt = File.ReadAllText(Path.Combine(fixture.EvidenceDirectory, "final-verdict.tsv"));
+                receipt.ShouldContain("final_transaction_result\tFAIL");
+                receipt.ShouldContain($"process_exit_code\t{expectedExit}\n");
+                if (scenario == "transaction-cleanup-failure")
+                    receipt.ShouldContain("cleanup_reconciliation_result\tFAIL");
+                Run(fixture.EvidenceDirectory, "sha256sum", "-c", "SHA256SUMS");
+            }
+            finally { RemoveCurrentRunnerFixture(fixture.Root); }
+        }
+
+        foreach (var scenario in new[]
+                 {
+                     "terminal-manifest-creation-failure", "terminal-manifest-verification-failure",
+                     "terminal-receipt-staging-failure",
+                     "terminal-receipt-publish-failure", "atomic-copy-failure",
+                     "atomic-permission-failure", "atomic-rename-failure",
+                     "stale-pass-and-terminal-manifest-failure"
+                 })
+        {
+            var fixture = CreateCurrentRunnerFixture(3599, scenario);
+            try
+            {
+                var result = RunBootstrapCaptured(fixture.Repository, fixture.ReviewedCommit, fixture.Arguments);
+                result.ExitCode.ShouldBe(3, $"Scenario {scenario}: {result.StandardError}");
+                AssertNoValidPassReceipt(fixture, result);
+            }
+            finally { RemoveCurrentRunnerFixture(fixture.Root); }
+        }
+
+        foreach (var scenario in new[]
+                 {
+                     "signal-int-finalization", "signal-term-finalization",
+                     "signal-int-after-finalization", "signal-term-after-finalization",
+                     "housekeeping-failure"
+                 })
+        {
+            var fixture = CreateCurrentRunnerFixture(3599, scenario);
+            try
+            {
+                var result = RunBootstrapCaptured(fixture.Repository, fixture.ReviewedCommit, fixture.Arguments);
+                result.ExitCode.ShouldBe(0, $"Scenario {scenario}: {result.StandardError}");
+                result.StandardError.ShouldContain("B6_QUALIFICATION=PASS");
+                result.StandardError.ShouldNotContain("B6_QUALIFICATION=FAIL");
+                var receipt = File.ReadAllText(Path.Combine(fixture.EvidenceDirectory, "final-verdict.tsv"));
+                receipt.ShouldContain("final_transaction_result\tPASS");
+                receipt.ShouldContain("process_exit_code\t0\n");
+                Run(fixture.EvidenceDirectory, "sha256sum", "-c", "SHA256SUMS");
+            }
+            finally { RemoveCurrentRunnerFixture(fixture.Root); }
+        }
+    }
+
+    private static void AssertNoValidPassReceipt(CurrentRunnerFixture fixture, CommandResult result)
+    {
+        result.StandardError.ShouldContain("B6_QUALIFICATION=FAIL");
+        result.StandardError.ShouldNotContain("B6_QUALIFICATION=PASS");
+        var receipt = Path.Combine(fixture.EvidenceDirectory, "final-verdict.tsv");
+        var manifest = Path.Combine(fixture.EvidenceDirectory, "SHA256SUMS");
+        if (File.Exists(receipt))
+            File.ReadAllText(receipt).ShouldNotContain("final_transaction_result\tPASS");
+        if (File.Exists(manifest))
+            RunCaptured(fixture.EvidenceDirectory, "sha256sum", new Dictionary<string, string>(),
+                "-c", "SHA256SUMS").ExitCode.ShouldNotBe(0);
+    }
+
+    private static CurrentRunnerFixture CreateCurrentRunnerFixture(int elapsedSeconds, string scenario)
+    {
+        if (OperatingSystem.IsWindows()) throw new PlatformNotSupportedException();
+        var root = Path.Combine(Path.GetTempPath(), "b6-current-runner-" + Guid.NewGuid().ToString("N"));
+        var repository = Path.Combine(root, "repository");
+        var packageDirectory = Path.Combine(repository, "docs", "operations", "aqgreen-v2-b6",
+            "snapshot-package");
+        var authorityDirectory = Path.Combine(packageDirectory, "authority");
+        var acquired = Path.Combine(root, "acquired");
+        var feed = Path.Combine(root, "feed");
+        var frozen = Path.Combine(root, "frozen-dotnet");
+        var evidence = Path.Combine(root, "evidence");
+        var bwrapLog = Path.Combine(root, "bwrap.log");
+        var monotonicValues = Path.Combine(root, "monotonic-values");
+        var monotonicProgram = Path.Combine(root, "monotonic.sh");
+        var fakeBwrap = Path.Combine(root, "bwrap");
+        var mutationMarker = Path.Combine(root, "mutation-applied");
+        Directory.CreateDirectory(repository);
+        Directory.CreateDirectory(packageDirectory);
+        Directory.CreateDirectory(authorityDirectory);
+        Directory.CreateDirectory(acquired);
+        Directory.CreateDirectory(feed);
+        Directory.CreateDirectory(frozen);
+
+        var uPackages = new[]
+        {
+            (Id: "synthetic.b", Version: "2.0.0"),
+            (Id: "synthetic.c", Version: "3.0.0"),
+            (Id: "synthetic.package", Version: "1.0.0")
+        };
+        var gPackages = uPackages.Take(2).ToArray();
+        var tqPackages = uPackages.Skip(1).Take(1).ToArray();
+        foreach (var package in uPackages)
+        {
+            WriteSyntheticNuGetPackage(acquired, package.Id, package.Version);
+            var archive = Path.Combine(acquired, package.Id, package.Version,
+                $"{package.Id}.{package.Version}.nupkg");
+            File.Copy(archive, Path.Combine(feed, Path.GetFileName(archive)));
+        }
+
+        var gManifest = string.Concat(gPackages.Order()
+            .Select(package => $"{package.Id}\t{package.Version}\n"));
+        var tqManifest = string.Concat(tqPackages.Order()
+            .Select(package => $"{package.Id}\t{package.Version}\n"));
+        var uManifest = string.Concat(uPackages.Order()
+            .Select(package => $"{package.Id}\t{package.Version}\n"));
+        var u1Manifest = $"{uPackages[0].Id}\t{uPackages[0].Version}\n";
+        var u2Manifest = string.Concat(uPackages.Take(2).Order()
+            .Select(package => $"{package.Id}\t{package.Version}\n"));
+        File.WriteAllText(Path.Combine(authorityDirectory, "G197.tsv"), gManifest);
+        File.WriteAllText(Path.Combine(authorityDirectory, "TQ186.tsv"), tqManifest);
+        File.WriteAllText(Path.Combine(authorityDirectory, "U215.tsv"), uManifest);
+        File.WriteAllText(Path.Combine(authorityDirectory, "U1.tsv"), u1Manifest);
+        File.WriteAllText(Path.Combine(authorityDirectory, "U2.tsv"), u2Manifest);
+
+        var feedManifest = new StringBuilder(
+            "id\tversion\tarchive\traw_sha256\traw_sha512_base64\tcontent_hash\tarchive_nuspec_sha256\tinstalled_nuspec_sha256\tsource\n");
+        foreach (var package in uPackages.Order())
+        {
+            var directory = Path.Combine(acquired, package.Id, package.Version);
+            var archive = Path.Combine(directory, $"{package.Id}.{package.Version}.nupkg");
+            var archiveBytes = File.ReadAllBytes(archive);
+            var nuspecHash = B6Values.Sha256Hex(File.ReadAllBytes(Path.Combine(directory, $"{package.Id}.nuspec")));
+            feedManifest.Append(package.Id).Append('\t').Append(package.Version).Append('\t')
+                .Append(Path.GetFileName(archive)).Append('\t').Append(B6Values.Sha256Hex(archiveBytes)).Append('\t')
+                .Append(Convert.ToBase64String(SHA512.HashData(archiveBytes))).Append('\t')
+                .Append(File.ReadAllText(archive + ".sha512")).Append('\t').Append(nuspecHash).Append('\t')
+                .Append(nuspecHash).Append('\t').Append("https://api.nuget.org/v3/index.json\n");
+        }
+        var feedManifestPath = Path.Combine(root, "feed-manifest.tsv");
+        File.WriteAllText(feedManifestPath, feedManifest.ToString());
+
+        var policy =
+            "<configuration><config><add key=\"signatureValidationMode\" value=\"require\" /></config>" +
+            "<trustedSigners><repository name=\"nuget.org\" serviceIndex=\"https://api.nuget.org/v3/index.json\">" +
+            "<certificate fingerprint=\"0E5F38F57DC1BCC806D8494F4F90FBCEDD988B46760709CBEEC6F4219AA6157D\" hashAlgorithm=\"SHA256\" allowUntrustedRoot=\"false\" />" +
+            "<certificate fingerprint=\"1F4B311D9ACC115C8DC8018B5A49E00FCE6DA8E2855F9F014CA6F34570BC482D\" hashAlgorithm=\"SHA256\" allowUntrustedRoot=\"false\" />" +
+            "<certificate fingerprint=\"5A2901D6ADA3D18260B9C6DFE2133C95D74B9EEF6AE0E5DC334C8454D1477DF4\" hashAlgorithm=\"SHA256\" allowUntrustedRoot=\"false\" />" +
+            "</repository></trustedSigners></configuration>\n";
+        var policyPath = Path.Combine(packageDirectory, "qualification-nuget.config");
+        File.WriteAllText(policyPath, policy);
+        var simulateInput = Path.Combine(packageDirectory, "fixture", "b2-simulate-input.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(simulateInput)!);
+        File.WriteAllText(simulateInput, "{}\n");
+
+        var lockPaths = new[]
+        {
+            "AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.Core/packages.lock.json",
+            "AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.EntityFrameworkCore/packages.lock.json",
+            "AqualLifeStyle/9.4.2/aspnet-core/tools/AqualLifeStyle.B6SnapshotRunner/packages.lock.json",
+            "AqualLifeStyle/9.4.2/aspnet-core/tools/AqualLifeStyle.B6SnapshotRunner.Tests/packages.lock.json"
+        };
+        foreach (var lockPath in lockPaths)
+        {
+            var path = Path.Combine(repository, lockPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, $"{{\"fixture\":\"{lockPath}\"}}\n");
+            File.WriteAllText(Path.Combine(Path.GetDirectoryName(path)!,
+                Path.GetFileNameWithoutExtension(Path.GetFileName(path)) + ".csproj"), "<Project />\n");
+        }
+        File.WriteAllText(Path.Combine(repository, ".gitignore"), "artifacts/\n");
+
+        var fakeDotnet = Path.Combine(frozen, "dotnet");
+        var fakeDotnetText = """
+            #!/usr/bin/env bash
+            set -euo pipefail
+            root="$(dirname -- "$0")"
+            evidence='@EVIDENCE@'
+            mutation='@MUTATION@'
+            mutation_marker='@MUTATION_MARKER@'
+            if [[ "${1:-}" == --version ]]; then printf '8.0.130\n'; exit 0; fi
+            if [[ "${1:-}" == --list-sdks ]]; then printf '8.0.130 [%s/sdk]\n' "$root"; exit 0; fi
+            if [[ "${1:-}" == --list-runtimes ]]; then
+              printf 'Microsoft.AspNetCore.App 8.0.30 [%s/shared/Microsoft.AspNetCore.App]\n' "$root"
+              printf 'Microsoft.NETCore.App 8.0.30 [%s/shared/Microsoft.NETCore.App]\n' "$root"
+              [[ "$mutation" != runtime-extra ]] || printf 'Microsoft.NETCore.App 8.0.31 [%s/shared/Microsoft.NETCore.App]\n' "$root"
+              exit 0
+            fi
+            if [[ "${1:-}" == nuget && "${2:-}" == --version ]]; then printf 'NuGet Command Line\n6.8.2.32767\n'; exit 0; fi
+            if [[ "${1:-}" == nuget && "${2:-}" == verify ]]; then
+              package="${!#}"; name="$(basename "$package" .nupkg)"
+              [[ "$mutation" != native-verify-failure ]] || exit 41
+              display_name="$name"; [[ "$name" != synthetic.package.1.0.0 ]] || display_name='Synthetic.Package.1.0.0'
+              printf 'Verifying %s\nSignature type: Repository\nService index: https://api.nuget.org/v3/index.json\n  SHA256 hash: 1F4B311D9ACC115C8DC8018B5A49E00FCE6DA8E2855F9F014CA6F34570BC482D\n' "$display_name"
+              [[ "$mutation" == native-verify-missing-success ]] || printf 'Successfully verified package '\''%s'\''.\n' "$display_name"
+              exit 0
+            fi
+            args=("$@")
+            value_after() { local wanted="$1"; for ((i=0;i<${#args[@]}-1;i++)); do [[ "${args[$i]}" != "$wanted" ]] || { printf '%s' "${args[$((i+1))]}"; return; }; done; }
+            artifact=''; for arg in "${args[@]}"; do [[ "$arg" != -p:ArtifactsPath=* && "$arg" != --artifacts-path=* ]] || artifact="${arg#*=}"; done
+            if [[ -z "$artifact" ]]; then artifact="$(value_after --artifacts-path || true)"; fi
+            if [[ "${1:-}" == restore ]]; then
+              packages="$(value_after --packages)"; source="$(value_after --source)"; mkdir -p "$packages" "$artifact"
+              flat_source=no; compgen -G "$source/*.nupkg" >/dev/null && flat_source=yes
+              if [[ "$flat_source" == yes ]]; then
+                cp -R --no-dereference -- '@ACQUIRED@/.' "$packages/"
+              elif [[ "${2:-}" == *B6SnapshotRunner.Tests* ]]; then
+                config="$(value_after --configfile)"; manifest="$(dirname "$config")/authority/TQ186.tsv"
+                while IFS=$'\t' read -r id version; do mkdir -p "$packages/$id"; cp -R --no-dereference -- "$source/$id/$version" "$packages/$id/$version"; done < "$manifest"
+              else
+                cp -R --no-dereference -- "$source/." "$packages/"
+              fi
+              chmod -R u+w "$packages"
+              for metadata in "$packages"/*/*/.nupkg.metadata; do
+                [[ -f "$metadata" ]] || continue
+                sed -i 's|"source":"[^"]*"|"source":"'"$source"'"|' "$metadata"
+              done
+              for name in one two three; do mkdir -p "$artifact/obj/$name"; printf 'assets-%s\n' "$name" > "$artifact/obj/$name/project.assets.json"; done
+              if [[ "$flat_source" == no && "${2:-}" == *B6SnapshotRunner.Tests* && ! -e "$mutation_marker" ]]; then
+                : > "$mutation_marker"
+                case "$mutation" in
+                  receipt-transaction) sed -i 's/^transaction_id\t.*/transaction_id\twrong-transaction/' "$evidence/a-l-transaction-receipt.tsv" ;;
+                  receipt-missing-time) sed -i '/^trust_validation_completed_utc\t/d' "$evidence/a-l-transaction-receipt.tsv" ;;
+                  receipt-malformed-time) sed -i 's/^trust_validation_completed_utc\t.*/trust_validation_completed_utc\tnot-a-time/' "$evidence/a-l-transaction-receipt.tsv" ;;
+                  receipt-restart) sed -i 's/^boot_id\t.*/boot_id\t00000000-0000-0000-0000-000000000000/' "$evidence/a-l-transaction-receipt.tsv" ;;
+                  receipt-log-missing) first=''; for file in "$evidence"/online-trust-logs/*.log; do first="$file"; break; done; rm -f "$first" ;;
+                  receipt-log-mismatch) first=''; for file in "$evidence"/online-trust-logs/*.log; do first="$file"; break; done; printf tamper >> "$first" ;;
+                  receipt-log-hash-mismatch) sed -i '2s/[0-9a-f]\{64\}$/0000000000000000000000000000000000000000000000000000000000000000/' "$evidence/online-trust-logs.tsv" ;;
+                  promoted-tree-tamper) first=''; for file in "$source"/*/*/*.nuspec; do first="$file"; break; done; chmod u+w "$first"; printf tamper >> "$first" ;;
+                esac
+              fi
+              exit 0
+            fi
+            if [[ "${1:-}" == build ]]; then
+              runtime="$artifact/bin/AqualLifeStyle.B6SnapshotRunner/release"; mkdir -p "$runtime"
+              printf runner > "$runtime/AqualLifeStyle.B6SnapshotRunner.dll"; printf core > "$runtime/AqualLifeStyle.Core.dll"; printf ef > "$runtime/AqualLifeStyle.EntityFrameworkCore.dll"
+              commit="$(git -C "$(dirname -- "${2}")" rev-parse HEAD)"
+              for assembly in AqualLifeStyle.B6SnapshotRunner AqualLifeStyle.Core AqualLifeStyle.EntityFrameworkCore; do
+                generated="$artifact/obj/$assembly/release"; mkdir -p "$generated"
+                printf '[assembly: System.Reflection.AssemblyInformationalVersionAttribute("fixture+%s")]\n' "$commit" > "$generated/$assembly.AssemblyInfo.cs"
+              done
+              printf 'a.cs(1,1): warning CS0628: one\nb.cs(1,1): warning CS0628: two\nc.cs(1,1): warning CA2255: three\n'
+              exit 0
+            fi
+            if [[ "${1:-}" == test ]]; then results="$(value_after --results-directory)"; mkdir -p "$results"; printf '<TestRun />\n' > "$results/gate-q.trx"; exit 0; fi
+            if [[ "${1:-}" == *.dll && "${2:-}" == verify-test-run ]]; then printf '{"discovered":61,"executed":61,"passed":61,"failed":0,"skipped":0}\n'; exit 0; fi
+            if [[ "${1:-}" == *.dll && "${2:-}" == simulate ]]; then
+              output="$(value_after --output)"; result=ok
+              [[ "$mutation" != simulation-output-mismatch || "$output" != *simulate-b-output* ]] || result=different
+              printf '{"result":"%s"}\n' "$result" > "$output"; exit 0
+            fi
+            if [[ "${1:-}" == *.dll && "${2:-}" == verify-simulation-output ]]; then
+              printf '{"result":"PASS","projectionSchemaVersion":"B6GateASemanticProjectionV1","semanticProjectionSha256":"747ec92ca0d9f50eccf82079bc8f878a97a3b59a270c6e10b7b1cd3b54ce728a"}\n'; exit 0
+            fi
+            if [[ "${1:-}" == *.dll && "${2:-}" == sensitive-probe ]]; then
+              [[ "$mutation" != operation-failure ]] || exit 9
+              [[ "$mutation" != qualification-evidence-tamper ]] || printf tamper >> "$evidence/qualification-verdict.tsv"
+              [[ "$mutation" != signal-int-before-finalization ]] || kill -INT "$PPID"
+              [[ "$mutation" != signal-term-before-finalization ]] || kill -TERM "$PPID"
+              printf 'B6_VERIFIED_SENSITIVE_CAPABILITY_VISIBLE\n'; exit 0
+            fi
+            printf 'unsupported fake dotnet invocation: %s\n' "$*" >&2; exit 97
+            """
+            .Replace("@EVIDENCE@", evidence, StringComparison.Ordinal)
+            .Replace("@MUTATION@", scenario, StringComparison.Ordinal)
+            .Replace("@ACQUIRED@", acquired, StringComparison.Ordinal)
+            .Replace("@MUTATION_MARKER@", mutationMarker, StringComparison.Ordinal);
+        File.WriteAllText(fakeDotnet, fakeDotnetText);
+        File.SetUnixFileMode(fakeDotnet, UnixFileMode.UserRead | UnixFileMode.UserExecute |
+            UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+
+        var bwrapText = """
+            #!/usr/bin/env bash
+            set -euo pipefail
+            mutation='@MUTATION@'
+            printf '%q ' "$@" >> '@LOG@'; printf '\n' >> '@LOG@'
+            args=("$@"); command=();
+            for ((i=0;i<${#args[@]};i++)); do
+              if [[ "${args[$i]}" == /bin/bash && "${args[$((i+1))]:-}" == /run/aqua/network-witness ]]; then
+                command=("${args[@]:$((i+4))}"); break
+              fi
+            done
+            [[ "${#command[@]}" -gt 0 ]]
+            (
+              IFS= read -r setup <&9; [[ "$setup" == SETUP ]]
+              (
+                child="$BASHPID"; start="$(/usr/bin/mawk '{print $22}' "/proc/$child/stat")"; net="$(readlink "/proc/$child/ns/net")"
+                pid='2'; uid_map='65534 0 1'; gid_map='65534 0 1'; groups='65534'; cap='0000000000000000'; no_new_privileges='1'
+                [[ "$mutation" != witness-uid-dynamic ]] || uid_map='65534 1000 1'
+                [[ "$mutation" != witness-gid-dynamic ]] || gid_map='65534 1000 1'
+                [[ "$mutation" != witness-wrong-inside-uid ]] || uid_map='65533 0 1'
+                [[ "$mutation" != witness-wrong-inside-gid ]] || gid_map='65533 0 1'
+                [[ "$mutation" != witness-wrong-uid-range ]] || uid_map='65534 0 2'
+                [[ "$mutation" != witness-wrong-gid-range ]] || gid_map='65534 0 2'
+                [[ "$mutation" != witness-map-whitespace ]] || uid_map=' 65534 0 1 '
+                [[ "$mutation" != witness-pid ]] || pid='3'
+                [[ "$mutation" != witness-starttime ]] || start='1'
+                [[ "$mutation" != witness-groups ]] || groups='0 65534'
+                [[ "$mutation" != witness-capabilities ]] || cap='0000000000000001'
+                [[ "$mutation" != witness-no-new-privileges ]] || no_new_privileges='0'
+                printf 'pid\t%s\nppid\t1\nstarttime\t%s\nuid\t65534\ngid\t65534\ngroups\t%s\n' "$pid" "$start" "$groups" >&8
+                [[ "$mutation" == witness-uid-map-missing ]] || printf 'uid_map\t%s\n' "$uid_map" >&8
+                [[ "$mutation" != witness-uid-map-extra ]] || printf 'uid_map\t0 0 1\n' >&8
+                [[ "$mutation" == witness-gid-map-missing ]] || printf 'gid_map\t%s\n' "$gid_map" >&8
+                [[ "$mutation" != witness-gid-map-extra ]] || printf 'gid_map\t0 0 1\n' >&8
+                printf 'network_namespace\t%s\nCapInh\t0000000000000000\nCapPrm\t0000000000000000\nCapEff\t%s\nCapBnd\t0000000000000000\nCapAmb\t0000000000000000\nNoNewPrivs\t%s\nEND\n' "$net" "$cap" "$no_new_privileges" >&8
+                IFS= read -r release <&7; [[ "$release" == RELEASE ]]; exec 8>&- 7<&-; exec "${command[@]}"
+              ) &
+              child=$!; wait "$child"
+            ) &
+            init=$!; printf '{"child-pid":%s}\n' "$init" >&3
+            set +e; wait "$init"; status=$?; set -e
+            printf '{"exit-code":%s}\n' "$status" >&3
+            exit "$status"
+            """.Replace("@LOG@", bwrapLog, StringComparison.Ordinal)
+                .Replace("@MUTATION@", scenario, StringComparison.Ordinal);
+        File.WriteAllText(fakeBwrap, bwrapText);
+        File.SetUnixFileMode(fakeBwrap, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+        var finalMonotonic = scenario == "monotonic-reversal" ? 199 : 200 + elapsedSeconds * 100;
+        File.WriteAllText(monotonicValues, "100\n150\n200\n" +
+            string.Concat(Enumerable.Repeat($"{finalMonotonic}\n", 6)));
+        File.WriteAllText(monotonicProgram, """
+            #!/usr/bin/env bash
+            set -euo pipefail
+            file='@VALUES@'; value="$(/usr/bin/mawk 'NR==1 {print; exit}' "$file")"; /usr/bin/mawk 'NR>1' "$file" > "$file.next"; mv "$file.next" "$file"; printf '%s\n' "$value"
+            """.Replace("@VALUES@", monotonicValues, StringComparison.Ordinal));
+        File.SetUnixFileMode(monotonicProgram, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+        var toolchainManifest = Path.Combine(root, "toolchain-manifest.tsv");
+        var dotnetBytes = File.ReadAllBytes(fakeDotnet);
+        File.WriteAllText(toolchainManifest,
+            $"type\tmode\tsize\tsha256\tlink_target\tpath\nF\t555\t{dotnetBytes.Length}\t{B6Values.Sha256Hex(dotnetBytes)}\t-\tdotnet\n");
+        if (scenario == "toolchain-unexpected")
+        {
+            File.WriteAllText(Path.Combine(frozen, "unexpected"), "unexpected");
+            File.SetUnixFileMode(Path.Combine(frozen, "unexpected"), UnixFileMode.UserRead |
+                UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+        }
+        if (scenario == "toolchain-missing") File.Delete(fakeDotnet);
+        File.SetUnixFileMode(frozen, UnixFileMode.UserRead | UnixFileMode.UserExecute |
+            UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+
+        var runnerPath = Path.Combine(packageDirectory, "authoritative-runner.sh");
+        var runner = File.ReadAllText(CanonicalB6EntrypointFromTestSource());
+        runner = ReplaceExactlyOnce(runner, "expected_g_count='197'", "expected_g_count='2'");
+        runner = ReplaceExactlyOnce(runner, "expected_tq_count='186'", "expected_tq_count='1'");
+        runner = ReplaceExactlyOnce(runner, "expected_u_count='215'", "expected_u_count='3'");
+        runner = ReplaceExactlyOnce(runner, CanonicalGraphSha256, B6Values.Sha256Hex(gManifest));
+        runner = ReplaceExactlyOnce(runner, QualificationGraphSha256, B6Values.Sha256Hex(tqManifest));
+        runner = ReplaceExactlyOnce(runner, "372c918aa794e976601ee292caa9c56a884784ebcfe04cd53981f76d3e982dd1", B6Values.Sha256Hex(uManifest));
+        runner = ReplaceExactlyOnce(runner, "9598c6dd7cab8f0dc62a31be8c73a3c030c5d92d26d120689f06bf1b60b0980a", B6Values.Sha256Hex(u1Manifest));
+        runner = ReplaceExactlyOnce(runner, "84ba6476727924aecc6b94207f6de1fdc1135804edbea4d32b7984ede77a6b35", B6Values.Sha256Hex(u2Manifest));
+        runner = ReplaceExactlyOnce(runner, "1a56a8bad2fed7875f3326f620ce40af7c0f805d7f16696efa7f1eceaf816df7", B6Values.Sha256Hex(feedManifest.ToString()));
+        runner = ReplaceExactlyOnce(runner, "1c609222deecbbc9ef65d311528ad1eb19ff26adf70227752ee95cca73a5910c", B6Values.Sha256Hex(File.ReadAllBytes(toolchainManifest)));
+        for (var index = 0; index < lockPaths.Length; index++)
+        {
+            var oldHash = new[]
+            {
+                "9f467700282dc48f8bdc172eb8f1830a3167cbc4efaa223a328b1ff00c4acddc",
+                "2b1925d618a39d10fa57e3e8455f06c3565de75ccdc3ae4a9021e357c9d07356",
+                "401fafbcfa35347666a4de3fcfa92be9c66399663d8f8410eca420879c3d7b7b",
+                "e575bab05aa361751f35ce31340880c0286e6133c7f36b7e3e1fb2ff8bbf0a47"
+            }[index];
+            runner = ReplaceExactlyOnce(runner, oldHash,
+                B6Values.Sha256Hex(File.ReadAllBytes(Path.Combine(repository, lockPaths[index]))));
+        }
+        runner = ReplaceExactlyOnce(runner, "0d131692c7d4035f4ed890d6b32fb127bd6fe423db700b2a0812c2438ff66f79", B6Values.Sha256Hex(policy));
+        runner = ReplaceExactlyOnce(runner, "5ab46a2fe268ad525c42ae06a47fb5a105802b37d0733c48fcdc093a14398a5c", B6Values.Sha256Hex(File.ReadAllBytes(simulateInput)));
+        runner = ReplaceExactlyOnce(runner, "045a8891a4e84d5acec53b3650e2ea4210bc6d3fc4ddc2d6c8de63662afa56aa", B6Values.Sha256Hex(dotnetBytes));
+        runner = ReplaceExactlyOnce(runner, "readonly bwrap='/usr/bin/bwrap'", $"readonly bwrap='{fakeBwrap}'");
+        if (scenario != "bootstrap-nonroot")
+            runner = ReplaceExactlyOnce(runner,
+                "bootstrap_uid=\"$(id -u)\"; bootstrap_gid=\"$(id -g)\"",
+                "bootstrap_uid=0; bootstrap_gid=0");
+        runner = ReplaceFunction(runner, "monotonic_centiseconds()", $"monotonic_centiseconds() {{ \"{monotonicProgram}\"; }}");
+        runner = ReplaceExactlyOnce(runner, "parent_net=\"$(readlink /proc/self/ns/net)\"", "parent_net='net:[fixture-parent]'");
+        if (scenario == "transaction-cleanup-failure")
+            runner = ReplaceFunction(runner, "transaction_critical_cleanup()",
+                "transaction_critical_cleanup() { transaction_cleanup_result='FAIL'; return 1; }");
+        if (scenario is "signal-int-cleanup" or "signal-term-cleanup")
+        {
+            var signal = scenario == "signal-int-cleanup" ? "INT" : "TERM";
+            runner = ReplaceFunction(runner, "transaction_critical_cleanup()",
+                $"transaction_critical_cleanup() {{ transaction_cleanup_result='PASS'; kill -{signal} \"$$\"; return 0; }}");
+        }
+        if (scenario is "terminal-manifest-creation-failure" or "stale-pass-and-terminal-manifest-failure")
+            runner = ReplaceFunction(runner, "stage_terminal_manifest()",
+                "stage_terminal_manifest() { return 1; }");
+        if (scenario == "terminal-manifest-verification-failure")
+            runner = ReplaceFunction(runner, "verify_terminal_manifest()",
+                "verify_terminal_manifest() { return 1; }");
+        if (scenario == "terminal-receipt-staging-failure")
+            runner = ReplaceFunction(runner, "stage_terminal_receipt()",
+                "stage_terminal_receipt() { return 1; }");
+        if (scenario == "terminal-receipt-publish-failure")
+            runner = ReplaceExactlyOnce(runner,
+                "atomic_write() {\n  local destination=\"$1\" source=\"$2\" temporary",
+                "atomic_write() {\n  local destination=\"$1\" source=\"$2\" temporary\n" +
+                "  [[ \"${destination}\" != \"${evidence_dir}/final-verdict.tsv\" ]] || return 1");
+        if (scenario == "atomic-copy-failure")
+            runner = ReplaceExactlyOnce(runner,
+                "if ! cp -- \"${source}\" \"${temporary}\"; then",
+                "if ! false; then");
+        if (scenario == "atomic-permission-failure")
+            runner = ReplaceExactlyOnce(runner,
+                "if ! chmod 600 \"${temporary}\"; then",
+                "if ! false; then");
+        if (scenario == "atomic-rename-failure")
+            runner = ReplaceExactlyOnce(runner,
+                "if ! mv -fT -- \"${temporary}\" \"${destination}\"; then",
+                "if ! false; then");
+        if (scenario is "stale-terminal-receipt" or "stale-pass-and-terminal-manifest-failure")
+            runner = ReplaceFunction(runner, "enter_finalization_critical_section()",
+                "enter_finalization_critical_section() { printf 'final_transaction_result\\tPASS\\nprocess_exit_code\\t0\\n' > \"${evidence_dir}/final-verdict.tsv\"; trap '' INT TERM; terminal_finalization_active='YES'; }");
+        if (scenario is "signal-int-boundary" or "signal-term-boundary")
+        {
+            var signal = scenario == "signal-int-boundary" ? "INT" : "TERM";
+            runner = ReplaceFunction(runner, "enter_finalization_critical_section()",
+                $"enter_finalization_critical_section() {{ kill -{signal} \"$$\"; trap '' INT TERM; terminal_finalization_active='YES'; }}");
+        }
+        if (scenario is "signal-int-finalization" or "signal-term-finalization")
+        {
+            var signal = scenario == "signal-int-finalization" ? "INT" : "TERM";
+            runner = ReplaceFunction(runner, "enter_finalization_critical_section()",
+                $"enter_finalization_critical_section() {{ trap '' INT TERM; terminal_finalization_active='YES'; kill -{signal} \"$$\"; }}");
+        }
+        if (scenario is "signal-int-after-finalization" or "signal-term-after-finalization")
+        {
+            var signal = scenario == "signal-int-after-finalization" ? "INT" : "TERM";
+            runner = ReplaceFunction(runner, "best_effort_housekeeping()",
+                $"best_effort_housekeeping() {{ kill -{signal} \"$$\"; return 1; }}");
+        }
+        if (scenario == "housekeeping-failure")
+            runner = ReplaceFunction(runner, "best_effort_housekeeping()",
+                "best_effort_housekeeping() { return 1; }");
+        if (scenario == "mawk-mismatch")
+            runner = ReplaceExactlyOnce(runner, "3850bf893d3f4f8ec462c8b59d6d66fdbbe8ddc0715b3d404d9cc574526b781c", new string('0', 64));
+        if (scenario == "mawk-version-mismatch")
+            runner = ReplaceExactlyOnce(runner, "expected_mawk_version='mawk 1.3.4 20240123'",
+                "expected_mawk_version='mawk 0.0.0 invalid'");
+        var controlledFinalTime =
+            $"final_package_consumption_at=\"$(date -u -d \"${{trust_validation_completed_at}} + {elapsedSeconds} seconds\" +%Y-%m-%dT%H:%M:%SZ)\"";
+        runner = ReplaceExactlyOnce(runner,
+            "final_package_consumption_at=\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"", controlledFinalTime);
+        if (scenario == "clock-reversal")
+            runner = ReplaceExactlyOnce(runner, controlledFinalTime,
+                "final_package_consumption_at='1970-01-01T00:00:00Z'");
+        if (scenario == "clock-discontinuity")
+            runner = ReplaceExactlyOnce(runner, controlledFinalTime,
+                $"final_package_consumption_at=\"$(date -u -d \"${{trust_validation_completed_at}} + {elapsedSeconds + 10} seconds\" +%Y-%m-%dT%H:%M:%SZ)\"");
+        File.WriteAllText(runnerPath, runner);
+        File.SetUnixFileMode(runnerPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+        if (scenario == "package-substitution") File.AppendAllText(Directory.EnumerateFiles(feed).First(), "substitution");
+        Run(repository, "git", "init");
+        Run(repository, "git", "add", ".");
+        Run(repository, "git", "-c", "user.name=B6 Test", "-c", "user.email=b6@example.test", "commit", "-m", "current runner fixture");
+        var commit = Run(repository, "git", "rev-parse", "HEAD").Trim();
+        return new CurrentRunnerFixture(root, repository, commit, evidence, bwrapLog,
+        [
+            "--frozen-dotnet-root", frozen,
+            "--toolchain-manifest", toolchainManifest,
+            "--acquisition-feed", feed,
+            "--feed-manifest", feedManifestPath,
+            "--evidence-dir", evidence,
+            "runner", "sensitive-probe"
+        ]);
+    }
+
+    private static string ReplaceExactlyOnce(string value, string oldValue, string newValue)
+    {
+        var index = value.IndexOf(oldValue, StringComparison.Ordinal);
+        index.ShouldBeGreaterThanOrEqualTo(0, $"Missing fixture replacement: {oldValue}");
+        value.IndexOf(oldValue, index + oldValue.Length, StringComparison.Ordinal).ShouldBe(-1,
+            $"Non-unique fixture replacement: {oldValue}");
+        return value[..index] + newValue + value[(index + oldValue.Length)..];
+    }
+
+    private static string ReplaceFunction(string value, string signature, string replacement)
+    {
+        var start = value.IndexOf(signature, StringComparison.Ordinal);
+        start.ShouldBeGreaterThanOrEqualTo(0);
+        var open = value.IndexOf('{', start);
+        var close = value.IndexOf("\n}", open, StringComparison.Ordinal);
+        close.ShouldBeGreaterThan(open);
+        return value[..start] + replacement + value[(close + 2)..];
+    }
+
+    private static void RemoveCurrentRunnerFixture(string root)
+    {
+        if (!Directory.Exists(root)) return;
+        Run(root, "chmod", "-R", "u+w", root);
+        Directory.Delete(root, recursive: true);
     }
 
     private static string TestSourceMaterializationDirectory()

@@ -68,25 +68,35 @@ Operational evidence starts from an operator-selected full reviewed Git commit,
 not a mutable live-worktree executable or script. The operator-controlled shell
 streams the exact `authoritative-runner.sh` blob from that commit through trusted
 Git into Bash with replacement objects disabled. That already-reviewed bootstrap
-creates two independent private clones, isolates Git configuration and attributes,
-disables hooks and replacement objects, verifies every materialized file against
-its raw reviewed blob, and gives locked restore/build only a minimal environment
-with no B6 operational variables. It performs two independent B1-R locked
-reproductions and then two B2 no-restore builds, and
-requires exact Runner/Core/EntityFrameworkCore byte equality. It selects build A
-inside the owner-only temporary tree, makes the selected tree read-only, and
-rechecks all three hashes immediately before launch. Only then does the exact
-reviewed operation adapter receive its DSN/snapshot/output/key environment, and the
-adapter rechecks all three hashes before every Runner invocation.
+creates one private Gate-Q checkout plus two independent Gate-A lane checkouts and
+binds the exact frozen toolchain inventory, U215 feed and native-restored bytes,
+parent-produced online trust evidence, repository-signer policy, four locks,
+and separate G197/TQ186/U215 manifests. Gate Q runs the 61 filtered xUnit/VSTest
+cases and existing TRX verifier in Bubblewrap without external networking. Gate A
+performs two B1-R/B2 lanes, compares the complete runtime trees, and executes the
+existing `simulate` command from each exact B2 Runner. The complete A/B output
+bytes must remain identical. The Runner then validates the exact output schema,
+the frozen `B6GateASemanticProjectionV1` semantic digest, independently supplied
+source/B2 provenance, and the recomputed simulator digest. The complete output
+SHA is retained as current-transaction evidence. The historical complete output
+SHA remains historical evidence only: source-specific commit, assembly, and
+evidence-classification values are not frozen as universal semantic truth. Gate A
+publishes and verifies
+qualification evidence before operation release. After the operation it completes
+transaction-critical cleanup/reconciliation, resolves one terminal result, and
+binds that result into the terminal receipt and final verified manifest. Removal of
+the owner-only temporary root is post-result best-effort housekeeping and cannot
+change the bound process result.
 
 This is a trust-before-sensitive-operation boundary. Trusted operating-system
 process isolation, the operator-controlled invocation and `PATH`, Git executable
 and object database, Bash/core utilities and SHA-256 implementation, and the .NET
 SDK/MSBuild/NuGet build base are the minimum trusted computing base. Mutable source
 repository hooks, `info/attributes`, checkout filters, replace objects, ignored files,
-and live worktree contents are explicitly outside that base. The selected G197
-package seed is mandatory; a no-seed operational restore is rejected. Restore uses
-only its derived private filesystem source and receives no
+and live worktree contents are explicitly outside that base. The exact U215 feed,
+installed package root, and feed manifest are mandatory inputs. The bootstrap
+itself generates the transaction ID, native verification logs, ledger, promoted
+U215, and receipt, then derives a separate G197 filesystem source. Restore receives no
 production/representative DSN, snapshot location, output authority, pseudonym key,
 provider secret, or B6 test sentinel. The pre-authority environment variables
 supplied to the Runner bind the selected commit and hashes for evidence; they do not
@@ -104,34 +114,41 @@ dependency-resolution event. Generated locks and resolved graphs are candidates,
 not authority. Separate review must approve their exact hashes and graph before
 B1-R.
 
-Normal operation does not rerun B1-Q. **A-L routine locked acquisition** starts
-from the already-approved exact locks, G197, toolchain and source policy, and uses a
-network-capable child plus native locked restore to obtain exactly those approved
-packages into a fresh cache. A-L makes no new dependency decision. Reconcile raw
-archive, canonical NuGet content, nuspec, installed-tree and source/provenance
-evidence; require missing and extra against G both to be zero; then terminate its
-network authority. It must not rely on an ambient cache, unlocked resolution,
-`--force-evaluate`, ResolverSupport, or unselected acquisition residue.
+Normal operation does not rerun B1-Q. **A-L routine locked acquisition/trust**
+starts from U215, the exact locks, frozen toolchain, and approved signer policy.
+It uses network authority for native acquisition and online signature/revocation
+validation, binds exact bytes in the ledger, promotes only those bytes, then
+terminates network authority. U215 remains acquisition authority only; G197 and
+TQ186 remain separate selection authorities. Replay keeps signature verification
+enabled and uses offline revocation only as an execution control.
+
+The fresh ledger is produced by the parent transaction, never supplied by the
+operator. Every one of its 215 rows carries the same generated transaction ID, one of
+the three approved repository-signing leaf fingerprints, the exact signer-policy
+and frozen-toolchain identities, identities equal to the approved feed row, and the
+hash of its retained complete native NuGet log. The parent receipt binds all logs,
+the ledger, promoted bytes, process starttime, boot ID, civil time, and monotonic
+completion. Do not relabel or supply a historical ledger.
+The signed package/log supplies repository-service-index provenance. Installed
+`.nupkg.metadata` truthfully records the custody or private replay source used by
+that restore; do not rewrite it to resemble an external acquisition.
 
 For first adoption, an explicitly approved B1-Q may regenerate the candidate locks
 and compare them byte-for-byte with the repository copies. Once approved, the locks
 are recurring inputs; B1-Q runs again only after a legitimate dependency-authority
 trigger.
 
-Transfer A-L's content-bound G197 output into a separate selected-only
-global-packages directory, including the complete package directory for every
-selected pair. Do not hand the bootstrap a raw acquisition cache: S19/L1, L2,
-ResolverSupport, and other downloaded-but-unselected A-G versions are residue, not
-B1-R dependency authority. Place
-`--seed-nuget-packages-from '<absolute-canonical-selected-directory>'` immediately
-after `--reviewed-commit "${reviewed_commit}"`. This remains the sole external
-dependency input.
+Supply the exact flat acquisition feed and feed manifest as separate canonical
+inputs. The bootstrap takes private custody, uses native locked restore to create a
+fresh installed U215 cache, performs online native verification, promotes and
+rechecks all 215 byte identities, then derives G197-only material for B1-R.
+Acquired U215 does not become resolution authority merely by being present.
 
 The reviewed bootstrap validates the selected hierarchy and complete package
-material and records an ID/version/`.nupkg` SHA-256 manifest. It derives one
-read-only hierarchical local source, then gives B1-R run 1 and run 2 independently
+material and records ID/version/`.nupkg` SHA-256 manifests. It derives separate
+read-only U215 and G197 sources, runs Gate Q, then gives B1-R A and B independently
 fresh empty global-packages caches and fresh assets. Each uses native
-`dotnet restore --locked-mode`, the three approved lock hashes, and the explicit
+`dotnet restore --locked-mode`, the four approved lock hashes, and the explicit
 private source; warnings, errors, NU1603, lock mutation, missing/extra packages, or
 a non-G inventory fail closed. The external seed and private source must remain
 unchanged. The existing C# graph tooling must independently establish that fresh
@@ -143,8 +160,53 @@ only. It must not change locks, assets, or package inventory. The bootstrap sets
 `DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=true` to suppress workload advertising
 updates as configuration hygiene. Neither that variable, locked mode, no-restore,
 source clearing, nor proxy/environment sanitisation proves network absence. The
-future operational qualification harness must retain the established Bubblewrap
-mechanical network witness and launch the confined child without network capability.
+bootstrap retains the established Bubblewrap mechanism and requires the confined
+child's effective network/capability witness before package consumption. Its
+filesystem view is deliberately narrow: required system runtime files, the public
+certificate store, the frozen toolchain, read-only authority inputs, and only its
+own explicit writable lane/output paths. Parent witness/evidence, sibling lanes,
+future authority inputs, and the transaction root are absent. The parent reconciles
+the Bubblewrap launcher and namespace child by PID/starttime, exact single-row
+UID/GID maps `65534 0 1` and `65534 0 1`, respectively,
+groups, all capability sets, `NoNewPrivs`, network namespace/interface/routes,
+exit status, and cleanup before accepting its own witness record.
+
+The reviewed bootstrap requires effective UID 0 and GID 0 before launching any
+Bubblewrap lane. On this path Bubblewrap 0.9.0 creates an intermediate setup user
+namespace and then a distinct final workload user namespace. In the final namespace,
+each map is `sandbox identity -> identity in Bubblewrap's immediate parent user
+namespace`; thus `--uid 65534 --gid 65534` produces the final literal maps
+`65534 0 1`. The parent deliberately reconciles the final namespace init and final
+workload child, rather than mistaking Bubblewrap's intermediate process or setup
+namespace for the witnessed workload. A bootstrap UID/GID other than 0 fails closed;
+it is not substituted into the contract. The privileged qualification invocation
+remains separately human-gated.
+
+During ordinary execution, one stable SIGINT/SIGTERM handler records the first
+requested terminal code, 130 or 143, without becoming a second transaction engine.
+The EXIT-owned terminal transition performs transaction-critical cleanup first:
+required Bubblewrap termination and reaping, child PID/starttime reconciliation,
+namespace cleanup, network-status reconciliation, and transaction-state closure.
+Any failure in that class prevents PASS. It then suppresses INT/TERM, consumes the
+recorded signal exactly once, and fixes the final result and exit code.
+
+Terminal evidence is built in the private transaction root. The final manifest is
+published and verified against the staged receipt before `final-verdict.tsv` is
+atomically published as the terminal commit point. Receipt staging failure,
+manifest staging or publication failure, manifest verification failure, or receipt
+publication failure therefore leaves no authoritative PASS receipt. Only after the
+receipt commit may the runner print `B6_QUALIFICATION=PASS`; it then exits with the
+exact code bound by that receipt. The receipt binds the transaction ID, final phase,
+qualification/operation/cleanup and final results, process exit code, UTC terminal
+timestamp, qualification-manifest identity, and the final-manifest relationship.
+
+After terminal commitment, only best-effort housekeeping remains: restoring write
+permission on, and removing, the disposable private transaction root. Housekeeping
+cannot rewrite the receipt or manifest, change the bound result or exit code, or
+turn a committed PASS into failure. INT/TERM remain suppressed through this bounded
+post-commit section and process exit. Before commitment the EXIT handler may perform
+the transaction-critical cleanup above, but it never manufactures a successful
+receipt after terminal publication fails.
 
 NuGet owns one lock and one assets decision per restored project. The project-local
 Core, EntityFrameworkCore, and Runner locks govern their corresponding assets and
@@ -162,6 +224,19 @@ and B2 are placed in separate Bubblewrap children, bind their state to the same
 reviewed namespace-local coordinates and verify the assets `projectPath` and
 `packagesPath`. Compare canonical graphs across A/B unconditionally; compare raw
 assets bytes only when their namespace-visible coordinates are identical.
+
+The trust-freshness limit is 60 minutes from completion of the last successful
+online validation to completion of the final package-consuming Gate-Q/B1-R
+operation. This is an approved B6 governance heuristic, not a NuGet, PKI, or
+cryptographic validity period. Enforcement uses parent-observed monotonic elapsed
+time bound to the same process, boot, and transaction; UTC civil time remains audit
+evidence and reversal or material discontinuity fails closed. The exact rule is
+elapsed `<= 3600 seconds`:
+3599 and 3600 pass, 3601 fails. PASS or FAIL evidence is atomically written before
+exit. A NuGet.org repository-signing certificate rotation also fails
+closed. A new leaf fingerprint requires explicit human authority and the relevant
+acquisition/TQ-Q or B1-Q review; it is not accepted merely because the publisher
+or repository name is unchanged.
 
 The extractor starts one PostgreSQL `REPEATABLE READ READ ONLY` transaction,
 records the approved `AnalysisSnapshotCutoff`, captures `transaction_timestamp()`
@@ -189,11 +264,17 @@ export B6_TENANT_ID='<explicitly authorised TenantId>'
 export B6_ANALYSIS_SNAPSHOT_CUTOFF='<approved UTC observation cutoff>'
 repo_root="$(pwd -P)" # run from the repository root
 reviewed_commit='<reviewed full lowercase Git SHA>'
-selected_packages='<approved absolute canonical-G197 directory>'
+frozen_dotnet_root='<approved absolute frozen 8.0.130 dotnet root>'
+toolchain_manifest='<approved absolute frozen-toolchain manifest>'
+acquisition_feed='<exact flat U215 acquisition feed>'
+feed_manifest='<exact U215 feed manifest>'
+evidence_dir='<new external evidence directory>'
 set -o pipefail
 GIT_NO_REPLACE_OBJECTS=1 git -C "${repo_root}" show "${reviewed_commit}:docs/operations/aqgreen-v2-b6/snapshot-package/authoritative-runner.sh" |
   bash -s -- --repository "${repo_root}" --reviewed-commit "${reviewed_commit}" \
-    --seed-nuget-packages-from "${selected_packages}" operator-extract
+    --frozen-dotnet-root "${frozen_dotnet_root}" --toolchain-manifest "${toolchain_manifest}" \
+    --acquisition-feed "${acquisition_feed}" --feed-manifest "${feed_manifest}" \
+    --evidence-dir "${evidence_dir}" operator-extract
 ```
 
 All destination directories must be new paths beneath an already trusted,
@@ -210,11 +291,17 @@ Generate the Zone 2 key, rather than typing a placeholder:
 ```bash
 repo_root="$(pwd -P)"
 reviewed_commit='<reviewed full lowercase Git SHA>'
-selected_packages='<approved absolute canonical-G197 directory>'
+frozen_dotnet_root='<approved absolute frozen 8.0.130 dotnet root>'
+toolchain_manifest='<approved absolute frozen-toolchain manifest>'
+acquisition_feed='<exact flat U215 acquisition feed>'
+feed_manifest='<exact U215 feed manifest>'
+evidence_dir='<new external evidence directory>'
 set -o pipefail
 GIT_NO_REPLACE_OBJECTS=1 git -C "${repo_root}" show "${reviewed_commit}:docs/operations/aqgreen-v2-b6/snapshot-package/authoritative-runner.sh" |
   bash -s -- --repository "${repo_root}" --reviewed-commit "${reviewed_commit}" \
-    --seed-nuget-packages-from "${selected_packages}" runner \
+    --frozen-dotnet-root "${frozen_dotnet_root}" --toolchain-manifest "${toolchain_manifest}" \
+    --acquisition-feed "${acquisition_feed}" --feed-manifest "${feed_manifest}" \
+    --evidence-dir "${evidence_dir}" runner \
     generate-key --output '<new Zone-2 key path>'
 ```
 
@@ -298,11 +385,17 @@ export B6_ROOT_DISPOSITIONS='<reviewed root-disposition path>'
 export B6_ANALYSIS_OUTPUT_DIR='<new owner-only output path>' # optional
 repo_root="$(pwd -P)"
 reviewed_commit='<same reviewed full lowercase Git SHA>'
-selected_packages='<same approved absolute canonical-G197 directory>'
+frozen_dotnet_root='<same approved absolute frozen 8.0.130 dotnet root>'
+toolchain_manifest='<same approved absolute frozen-toolchain manifest>'
+acquisition_feed='<same exact flat U215 acquisition feed>'
+feed_manifest='<same exact U215 feed manifest>'
+evidence_dir='<new external evidence directory>'
 set -o pipefail
 GIT_NO_REPLACE_OBJECTS=1 git -C "${repo_root}" show "${reviewed_commit}:docs/operations/aqgreen-v2-b6/snapshot-package/authoritative-runner.sh" |
   bash -s -- --repository "${repo_root}" --reviewed-commit "${reviewed_commit}" \
-    --seed-nuget-packages-from "${selected_packages}" run-analysis
+    --frozen-dotnet-root "${frozen_dotnet_root}" --toolchain-manifest "${toolchain_manifest}" \
+    --acquisition-feed "${acquisition_feed}" --feed-manifest "${feed_manifest}" \
+    --evidence-dir "${evidence_dir}" run-analysis
 ```
 
 There is no operator-supplied verification status. The receipt is created only when

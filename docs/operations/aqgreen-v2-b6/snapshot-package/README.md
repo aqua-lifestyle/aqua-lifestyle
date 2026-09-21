@@ -31,18 +31,31 @@ admission. None of that production surface is changed by this package.
 - `run-analysis.sh`: package-owned PostgreSQL 16 lifecycle, repeated Zone 3
   inventory, D09 population, D03B component, simulator, structural/impact, final
   manifest, verification, and receipt pipeline.
-- `authoritative-runner.sh`: the reviewed-Git-object bootstrap. Operators stream
-  its exact bytes from the selected commit into Bash; it materialises two private
-  independent clones with isolated Git configuration, disables replacement
-  objects/hooks/system and global attributes, verifies every materialized file against
-  its raw reviewed blob, performs two selected-only locked reproductions and then
-  builds both with `--no-restore` without B6 operational capabilities,
-  verifies exact Runner/Core/EntityFrameworkCore byte equality, selects the
-  private read-only build-A artifact, and only then releases operation-specific
-  authority.
-- The three project-local `packages.lock.json` files are native NuGet candidate
-  approved-decision artifacts. Their exact hashes and canonical G197 union are
-  repository gates, but operational trust remains pending qualification.
+- `authoritative-runner.sh`: the reviewed-Git-object two-gate bootstrap. It binds
+  the exact frozen SDK `8.0.130` inventory, takes parent custody of the exact U215
+  flat feed, uses native locked restore to create the private U215 cache, produces
+  the A-L ledger and retained native-verification logs, applies the
+  approved NuGet repository-signer policy, enforces the 60-minute governance
+  freshness bound, executes Gate Q through xUnit/VSTest plus existing
+  `verify-test-run`, and executes Gate A over two complete B2 runtime trees plus
+  existing `simulate`. Package-consuming children run in Bubblewrap without an
+  external network and publish their effective-property witnesses before an
+  operation receives capability. The privileged parent must have effective UID/GID
+  0 so Bubblewrap's final child has the exact single-row UID and GID maps
+  `65534 0 1`; any dynamic parent mapping is rejected. The sandbox exposes required
+  system runtime and
+  certificate files, the frozen toolchain, read-only authority inputs, and only the
+  current lane's explicit writable outputs. It cannot see the parent transaction,
+  witness, sibling-lane, or evidence roots and does not use a broad host-root,
+  `/etc`, or private-transaction bind.
+- The Core, EntityFrameworkCore, Runner, and test-project native
+  `packages.lock.json` files preserve distinct G197 and TQ186 authority. The
+  coordinate manifests under `authority/` make G197, TQ186, and acquisition-only
+  U215 independently hash-verifiable. U1/U2 remain separate local fixtures.
+- `qualification-nuget.config` is scoped to external packages. It requires
+  signatures and exactly the three approved NuGet.org repository-signing leaf
+  fingerprints. It is not Aqua's permanent certificate-rotation architecture;
+  an unapproved new fingerprint fails closed.
 - `../dependency-qualification-history.md`: durable Attempts 1–16 and native-lock
   architecture evidence. Failed experiments remain evidence rather than active
   resolver authority.
@@ -134,15 +147,31 @@ source, lock, and canonical-graph hashes. Dependency declaration, SDK/NuGet,
 approved source-policy, legitimate refresh, or another explicitly approved
 dependency-resolution change is required to trigger it.
 
-**A-L (routine locked acquisition)** obtains an already-approved dependency
-decision; it does not make a new one. Starting with the approved exact locks,
-canonical G, toolchain and source policy, a network-capable acquisition child uses
-native locked restore to populate a fresh cache with exactly the locked material.
-The existing archive/content/nuspec/tree/provenance checks must reconcile that
-cache to content-bound G197 before network authority terminates. A-L must not use
-ambient caches, unlocked resolution, `--force-evaluate`, ResolverSupport, or
-downloaded-but-unselected residue. Its selected, content-bound G197 output is the
-only acceptable input to `--seed-nuget-packages-from`.
+**A-L (routine locked acquisition/trust)** obtains the approved acquisition union;
+it does not select a new product or qualification graph. Under network authority it
+materialises exact U215 from the hash-bound flat feed by native locked restore,
+applies `signatureValidationMode=require`, the three
+approved NuGet.org repository leaf fingerprints, signed-package verification, and
+online revocation checking. The bootstrap takes the exact feed into parent-owned
+custody, creates a fresh installed U215 cache through the reviewed test/project-
+reference lock closure, executes frozen native `dotnet nuget verify
+--all` for every archive with online revocation mode, retains every complete log,
+produces the ledger and parent transaction ID, promotes only the exact validated
+bytes, revalidates promotion, and then terminates network authority. Every fresh
+ledger row binds the parent transaction ID, exact
+archive/content/nuspec/source identities, one approved repository-signing leaf,
+the signer-policy hash, frozen `dotnet` host and toolchain identities, online
+completion time, and the hash of an actually retained native verification log.
+Repository provenance is taken from the signed package and retained native log;
+each installed cache's `.nupkg.metadata` must instead name the actual custody or
+private replay source used for that restore and is never rewritten to imitate the
+external service index.
+The parent receipt additionally binds process starttime, boot ID, monotonic trust
+completion, ledger/log manifests, signer policy, toolchain, and promoted-byte
+manifest. Replay verifies that receipt and those exact bytes. It keeps signature
+verification enabled and may set offline revocation only as an execution control;
+it makes no fresh-revocation claim. A caller-authored or historical ledger is not
+an accepted input.
 
 For the first adoption of these candidate locks, B1-Q may regenerate them and
 require exact byte equality with the reviewed repository candidates as part of the
@@ -150,27 +179,41 @@ architecture qualification. That first-adoption comparison does not make B1-Q a
 prerequisite for later ordinary runs. After approval, the locks remain inputs until
 a legitimate dependency-authority trigger requires reconsideration.
 
-**B1-R (locked reproduction)** requires
-`--seed-nuget-packages-from <absolute-canonical-G-directory>`. The directory must
-contain exactly the 197 approved selected ID/version pairs. S19/L1, L2,
-ResolverSupport, and every other A-G acquisition residue are prohibited. The
-bootstrap validates the hierarchy, administrative files, and archive hashes; derives
-one read-only local source; and starts each reproduction with an independently empty
-global-packages cache and fresh assets. It verifies the three reviewed lock hashes,
-runs native `dotnet restore --locked-mode`, rejects every restore warning or error,
-requires the lock bytes to remain unchanged, and reconciles each materialized cache
-to the selected manifest. A global-packages folder is not treated as a package
-source. The reviewed `NuGet.Config` remains present as a reviewed input, while the
-explicit private source is the only viable package source.
+**Gate Q** uses the fourth native lock and exact U215 acquisition material to build
+the test/project-reference closure, runs only
+`FullyQualifiedName~B6PrimitiveContractTests`, requires one TRX and exactly
+61 discovered/executed/passed with zero failed/skipped, then calls the existing
+Runner `verify-test-run --expected-count 61`. Its result is source and
+qualification-mechanism evidence, not B2 artifact evidence.
+
+**B1-R (locked reproduction)** derives a read-only G197-only source from U215,
+starts two fresh caches/assets roots, verifies the three production locks, and runs
+native locked restore in network-denied children. **B2** then builds each lane with
+`--no-restore --no-incremental`, applies the exact `/usr/bin/mawk` warning contract
+(SHA-256 `3850bf893d3f4f8ec462c8b59d6d66fdbbe8ddc0715b3d404d9cc574526b781c`,
+version `1.3.4.20240123-1build1`), and
+requires locks, assets, packages, and source to remain unchanged.
 
 The two B1-R runs use separate source checkouts, package caches, tool homes,
 temporary directories, HTTP caches, and assets. Their selected package manifests
 must be equal. Raw `project.assets.json` bytes may contain physical paths, so the
-future qualification harness must use the existing C# graph tooling to require the
+bootstrap uses the reviewed coordinate manifests to require the
 canonical union and SHA rather than manufacture raw byte equality across different
 paths. **B2** then runs `dotnet build --no-restore` against each approved B1-R result,
-requires locks, assets, and package inventories to remain unchanged, and compares
-the three operational assemblies.
+requires locks, assets, and package inventories to remain unchanged. **Gate A**
+compares every regular file in the two B2 runtime trees, retains the individual
+Runner/Core/EntityFrameworkCore hashes, and executes each exact B2 Runner's
+existing `simulate` command over the hash-pinned non-sensitive fixture. Outputs
+must be byte-identical. Each complete output must pass the exact fail-closed schema
+and fixture-cardinality contract, match the frozen
+`B6GateASemanticProjectionV1` semantic projection SHA-256, carry provenance that
+matches independently retained source and B2 assembly evidence, and contain a
+correctly recomputed simulator digest. The current complete-output SHA-256 is
+retained as per-run evidence. The historical complete-output hash remains valid
+historical evidence, but no source-specific provenance value is a universal
+semantic expectation. This is bounded reproducibility and bounded artifact
+behavior under a shared environment; it is not diverse-builder proof,
+database/EF-migration proof, deployment evidence, or complete correctness.
 
 Each current A/B lane preserves the same source checkout, package-cache and
 artifact paths from its B1-R restore into its B2 child, so the path-bound assets are
@@ -182,10 +225,11 @@ present host paths as sandbox authority. A and B may have different host roots;
 canonical graph equality is always required, while raw assets equality is required
 only when their namespace-visible coordinates are identical.
 
-The locks deliberately remain beside all three project files. NuGet creates assets
+The production locks deliberately remain beside all three production project files;
+the separate test lock remains beside the test project. NuGet creates assets
 and consults a lock per restored project, including project references: Core governs
 Core assets, EntityFrameworkCore governs EF assets, and Runner governs Runner
-assets. All three are therefore required and hash-gated before restore. Their
+assets. All four are therefore required and hash-gated in their respective gate. Their
 presence also means ordinary wider-repository restores consult the Core and EF
 locks and may propose lock changes when declarations change unless locked mode is
 used. That maintenance visibility is intentional: such a diff is a B1-Q trigger,
@@ -197,9 +241,9 @@ qualification must launch these stages in the established Bubblewrap model and
 prove network capability absent from the child. Locked mode, no-restore, a local
 source, proxy hygiene, and environment variables do not establish that property.
 
-The bootstrap requires exact byte equality for all three assemblies, makes the
-selected build-A tree read-only inside its owner-only temporary root, and rechecks
-the selected hashes immediately before launch. The exact reviewed
+The bootstrap requires complete runtime-tree equality, makes the selected build-A
+tree read-only inside its owner-only temporary root, and rechecks the three
+first-party hashes immediately before launch. The exact reviewed
 `operator-extract.sh` or `run-analysis.sh` adapter then receives only its required
 operation environment and rechecks all three hashes before every Runner invocation.
 The Runner binds its captured commit and assembly hashes to that pre-authority
@@ -248,10 +292,11 @@ identifier domains are fatal; the tool never repairs a collision with an
 order-dependent counter.
 
 Before provenance, only the trusted operator shell, Git, reviewed bootstrap, and
-system build tools possess execution authority. A-L may use only its approved
-package-source network while obtaining the locked material; that authority ends
-before its content-bound G197 output enters this bootstrap. The bootstrap rejects
-no-seed execution and uses only its derived private selected-package source. The
+system build tools possess execution authority. A-L's native verification may use
+the network for online certificate/revocation validation only after the parent has
+taken custody of exact authorized package bytes; that authority ends before replay.
+The bootstrap rejects missing acquisition inputs and uses only its parent-promoted
+private selected-package source. The
 bootstrap removes every B6 operational variable before materialisation/restore/build
 children start. After provenance it constructs a new minimal environment for the
 exact reviewed adapter and selected artifact. Package restore network access is a
@@ -259,6 +304,30 @@ build capability and receives no database, snapshot, output, key, provider, or B
 test-sentinel authority. The operator must set `GIT_NO_REPLACE_OBJECTS=1` on the
 initial `git show` that supplies the bootstrap; the bootstrap keeps replacement
 objects disabled for its Git-object resolution and private materialisations.
+
+The frozen toolchain gate serializes the complete actual regular-file, directory,
+and symlink inventory and requires byte equality with the approved manifest. Exact
+SDK, runtime, ASP.NET runtime, and NuGet discovery output must also match; an extra
+runtime or SDK fails closed. Freshness enforcement uses same-process Linux
+monotonic uptime bound to the parent receipt. Civil UTC is retained for audit;
+reversal or material discontinuity against monotonic elapsed time fails closed.
+`3599` and exactly `3600` elapsed seconds pass;
+`3601` fails. PASS or FAIL freshness evidence is atomically retained before exit.
+
+Qualification evidence is sealed and verified before operation release in
+`qualification-SHA256SUMS`. After the operation result is known, the EXIT-owned
+terminal transition performs transaction-critical Bubblewrap cleanup and
+reconciliation. A failure there prevents PASS. It then suppresses INT/TERM,
+consumes any recorded termination request, and resolves one final result and exit
+code. The receipt and final `SHA256SUMS` are staged privately; the manifest is
+published and verified against that staged receipt before `final-verdict.tsv` is
+atomically published as the terminal commit point. Publication failure therefore
+leaves no authoritative PASS receipt. The receipt includes the transaction, final
+phase, qualification/operation/cleanup/final results, exit code, terminal timestamp,
+and manifest binding. `B6_QUALIFICATION=PASS` is printed only after this commit.
+Only best-effort private-root removal remains afterward; its failure or a later
+signal cannot change the bound exit. These checksum files establish bundle
+integrity, not independent authenticity.
 
 Analysis accepts no arbitrary destination DSN. The package creates a uniquely
 named, loopback-only PostgreSQL 16 container with generated credentials, verifies
@@ -319,6 +388,6 @@ and reduces the operational runtime surface. Shell remains thin orchestration.
 The package's reviewed-Git-object `authoritative-runner.sh` is the one privileged
 bootstrap/build authority. Its mutable live-worktree path must not be executed for
 operational evidence. `run-analysis.sh` and `operator-extract.sh` are reviewed-tree
-operation adapters executed only after double-build provenance; they reject a
+operation adapters executed only after Gate Q and Gate A provenance; they reject a
 missing pre-authority selection and never build or choose a Runner. This decision
 is specific to B6 and is not a repository-wide prohibition on Python.

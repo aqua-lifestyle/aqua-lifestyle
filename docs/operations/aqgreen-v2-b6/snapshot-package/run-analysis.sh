@@ -7,7 +7,7 @@ umask 0077
 : "${B6_PREAUTHORITY_RUNNER_SHA256:?Verified Runner digest was not supplied}"
 : "${B6_PREAUTHORITY_CORE_SHA256:?Verified Core digest was not supplied}"
 : "${B6_PREAUTHORITY_EF_SHA256:?Verified EF digest was not supplied}"
-[[ "${B6_PREAUTHORITY_PROVENANCE}" == GIT_OBJECT_DOUBLE_BUILD_EXACT_BYTES_V1 ]]
+[[ "${B6_PREAUTHORITY_PROVENANCE}" == GIT_OBJECT_GATE_Q_GATE_A_QUALIFIED_ARTIFACT_V1 ]]
 : "${B6_SNAPSHOT_DIR:?Path to approved Zone 3 snapshot}"
 : "${B6_BASE_MANIFEST:?Path to its BASE_SNAPSHOT manifest}"
 : "${B6_ROOT_DISPOSITIONS:?Path to reviewed root dispositions}"

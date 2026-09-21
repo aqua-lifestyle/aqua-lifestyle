@@ -36,7 +36,9 @@ public static class B6Contract
     public const string EvidenceClassificationEnvironment = "B6_EXECUTION_EVIDENCE_CLASSIFICATION";
     public const string PrecommitEvidence = "PRECOMMIT_SYNTHETIC_VALIDATION";
     public const string OperationalEvidence = "OPERATIONAL_EVIDENCE";
-    public const string PreAuthorityProvenance = "GIT_OBJECT_DOUBLE_BUILD_EXACT_BYTES_V1";
+    public const string PreAuthorityProvenance = "GIT_OBJECT_GATE_Q_GATE_A_QUALIFIED_ARTIFACT_V1";
+    public const string GateASemanticProjectionVersion = "B6GateASemanticProjectionV1";
+    public const string ExpectedGateASemanticProjectionSha256 = "747ec92ca0d9f50eccf82079bc8f878a97a3b59a270c6e10b7b1cd3b54ce728a";
 
     public static readonly Regex ControlledCode = new("^[A-Za-z0-9._:+/@-]{1,128}$", RegexOptions.CultureInvariant);
     public static readonly Regex MigrationCode = new("^[0-9]{14}_[A-Za-z0-9_]{1,180}$", RegexOptions.CultureInvariant);

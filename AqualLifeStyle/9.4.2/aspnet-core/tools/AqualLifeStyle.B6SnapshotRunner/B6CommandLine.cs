@@ -28,6 +28,10 @@ public static class B6CommandLine
         ["handoff-receipt"] = Options("snapshot", "manifest", "root-dispositions", "approved-destination",
             "inventory", "runtime-state", "schema", "sql-file", "output", "generated-at", "forbidden-values"),
         ["verify-test-run"] = Options("trx", "expected-count"),
+        ["verify-simulation-output"] = Options("input", "expected-repository-commit",
+            "expected-runner-sha256", "expected-runner-informational-version",
+            "expected-core-sha256", "expected-core-informational-version",
+            "expected-ef-sha256", "expected-ef-informational-version"),
         ["simulate"] = Options("input", "output")
     };
 
@@ -160,7 +164,43 @@ public static class B6CommandLine
                         new System.Text.Json.JsonSerializerOptions
                         {
                             PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
-                        }));
+                    }));
+                    break;
+                case "verify-simulation-output":
+                    var expectedProvenance = new ToolchainIdentity(
+                        parsed.Required("expected-repository-commit"),
+                        B6Contract.OperationalEvidence,
+                        new FirstPartyAssemblyIdentity(
+                            "AqualLifeStyle.B6SnapshotRunner",
+                            parsed.Required("expected-runner-sha256"),
+                            parsed.Required("expected-runner-informational-version")),
+                        [
+                            new FirstPartyAssemblyIdentity(
+                                "AqualLifeStyle.Core",
+                                parsed.Required("expected-core-sha256"),
+                                parsed.Required("expected-core-informational-version")),
+                            new FirstPartyAssemblyIdentity(
+                                "AqualLifeStyle.EntityFrameworkCore",
+                                parsed.Required("expected-ef-sha256"),
+                                parsed.Required("expected-ef-informational-version"))
+                        ]);
+                    var simulationJsonOptions = new System.Text.Json.JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+                    };
+                    try
+                    {
+                        var simulationVerification = B6SimulationOutputVerifier.Verify(
+                            parsed.RequiredPath("input"), expectedProvenance);
+                        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(
+                            simulationVerification, simulationJsonOptions));
+                    }
+                    catch (B6PackageException exception)
+                    {
+                        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(
+                            new { Result = "FAIL", Reason = exception.Message }, simulationJsonOptions));
+                        return 2;
+                    }
                     break;
                 case "simulate":
                     package.RunSimulator(parsed.RequiredPath("input"), parsed.RequiredPath("output"));
