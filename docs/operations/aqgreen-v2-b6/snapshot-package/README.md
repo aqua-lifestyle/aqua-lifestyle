@@ -16,6 +16,104 @@ admission. None of that production surface is changed by this package.
 
 ## Contents
 
+### Fresh native process-group candidate (new lineage; not qualification)
+
+`native-supervisor.c`, `native-supervisor-amd64`, the deterministic build script
+and manifest, and `non-root-bwrap-proof-harness.sh` form a separate ordinary-user
+candidate. They do not replace or modify the authoritative two-gate Runner below.
+That Runner retains its exact base SHA-256
+`5ed57d64c74014002708dc679d5d26e9d7b53e888d1124dce3a74432e16a6244`.
+Historical lost patches/trees/ELFs and validation results establish no byte
+continuity or current PASS. The current manifest identifies newly built bytes.
+
+The static BusyBox boundary is `/bin/busybox env -i PATH=/usr/bin:/bin LC_ALL=C`.
+BusyBox is only the environment sanitizer; the native process is Bash's direct
+lifecycle parent. The C17 single-threaded parent blocks INT/TERM, resets inherited
+ignored dispositions, synchronously consumes signalfd records, binds its direct
+child by pidfd, and authenticates the exact nine-byte `B6READY1\n` message with
+SCM_CREDENTIALS. Bash checks its exact native parent/ELF/argv/initial environment,
+credentials/capabilities, PID=PGID and monitor OFF before emitting READY.
+
+Contract A: only consumed signals while acceptance is OPEN participate. TERM/143
+dominates INT/130, then infrastructure failure/125, then child status. Generation, pending state and
+successful kill are not acceptance. Pre-READY cleanup is exact-child pidfd-only.
+After READY and before consuming reap, the unreaped child/pidfd anchors group -P.
+WNOWAIT observation does not consume reap. The single consuming pidfd reap closes
+all numeric PGID forwarding permanently; later consumption affects arbitration
+only. `renameat2(RENAME_NOREPLACE)` is COMMIT. Before publication: UNCOMMITTED.
+After publication: immutable COMMITTED/CLOSED source and status, no signalfd reads
+or forwarding; termination uses the committed status. Child proof is not final
+acceptance: native terminal receipt and actual external wait must agree.
+
+Generic failure cleanup is phase-aware. The guarded exact-child force path is
+unreachable after READY. Post-READY/pre-reap failure records infrastructure failure
+and issues cooperative SIGTERM only to the already-authorized child group. This
+cleanup TERM changes no lifecycle latch or accepted/forwarded-signal counts.
+Native observes/reaps exact Bash once, closes group authority, and commits the
+125/130/143 result selected by accepted signals and infrastructure state. Failed
+publication remains UNCOMMITTED and exits with that precedence, without retrying
+publication or signaling a reaped group.
+
+Native cleanup evidence stops at group delivery result and exact Bash reap. It
+does not discover arbitrary members or claim universal delivery/disappearance.
+External fixtures retain known member PID/starttime and verify pre-failure PGID,
+response and disappearance; observation may continue after Bash reap, never PGID
+signaling. Final acceptance still requires external disappearance/residue evidence.
+TERM-resistant members are not guaranteed to terminate; no force escalation or
+new cleanup timeout is provided.
+
+The terminal grammar `B6_NATIVE_TERMINAL_FRESH_V1` requires exactly these 36 keys,
+once each, in any order; no optional/unknown/duplicate keys:
+
+```
+protocol transaction_id output_dir
+supervisor_pid supervisor_starttime supervisor_executable supervisor_device supervisor_inode
+child_pid child_starttime child_pgid ready_ack ready_pid ready_uid ready_gid
+child_code child_raw_status child_status child_reaped_count
+accepted_int_count accepted_term_count group_attempts group_successes group_esrch
+group_authority pre_ready_cleanup latch terminal_source committed_status
+infrastructure_failure cleanup_target cleanup_signal cleanup_delivery
+lifecycle_acceptance commit_state commit_mechanism
+```
+
+Each record is ASCII key, one TAB, nonempty printable-ASCII value, LF (including
+final LF). No blanks/comments, BOM/CR/control bytes, extra columns or value-edge
+whitespace. Keys are `[a-z][a-z0-9_]*`. Numbers are canonical complete unsigned
+decimal tokens, no signs/prefixes/leading zeros, and bounded without overflow.
+Transaction IDs are 64 lowercase hex. PID/PGID range is 2..Int32.MaxValue;
+UID/GID are nonzero UInt32 and equal actual expected credentials; starttime/inode
+are positive UInt64, device nonnegative UInt64, counts UInt32 and statuses0..255.
+Child codes1/2/3 map exit0..255 or signal1..64 to exit or128+signal. READY fields
+bind child PID/PGID and credentials; before READY they explicitly say UNAVAILABLE,
+not zero. Latch NONE/INT/TERM and source CHILD/INT/TERM/INFRASTRUCTURE must reconcile with accepted
+counts and precedence. COMMITTED requires CLOSED, exactly one reap, closed group
+authority and RENAME_NOREPLACE. Forward successes+ESRCH=attempts<=accepted counts.
+No missing-field defaults or permissive parsing is permitted.
+`infrastructure_failure` is YES/NO. Cleanup tuples are exactly
+NONE/NONE/NOT_REQUESTED or CHILD_GROUP/TERM/SENT|ESRCH. A group cleanup tuple
+requires READY and infrastructure_failure=YES. It never establishes accepted TERM.
+Without accepted signals, infrastructure YES selects source INFRASTRUCTURE/status125;
+otherwise accepted TERM143 or INT130 takes precedence. A post-reap infrastructure
+failure can legitimately have no cleanup request. No native field asserts member
+disappearance.
+
+The governed public fact invokes the private native fixture unconditionally.
+Typed first-rejection assertions prevent an unrelated failure from crediting a
+security negative. The live-process negative uses a genuine native COMMITTED hold
+and passes identity/receipt checks before reaching liveness. Test-only phase holds
+are absent from the production ELF. Internal case counts are separate from the
+unchanged 61 public-test count.
+
+Approved corrected Bubblewrap identity remains UNRESOLVED. Installed
+`0.9.0-1ubuntu0.3` is forbidden. This candidate's production harness fails closed;
+private source-copy fixtures prove synthetic boundaries only. Bubblewrap
+`--new-session` intentionally escapes the Bash group and cannot be covered by its
+lifecycle forwarding. Separate session launcher/disappearance/residue checks are
+required; synthetic cleanup is not real Bubblewrap qualification. No operational
+Gate-Q/Gate-A, Attempt 21, application, production or migration is authorized.
+
+### Existing acquisition package
+
 - `allowlist.json`: executable table/column allowlist. Every field records source,
   purpose, classification, transform, type, and necessity. Unlisted data is not
   exported.

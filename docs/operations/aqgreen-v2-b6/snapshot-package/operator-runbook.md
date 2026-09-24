@@ -6,6 +6,58 @@
 
 ## Pre-extraction checkpoint
 
+### New-lineage native candidate boundary
+
+The fresh native process-group candidate is PRECOMMIT_SYNTHETIC_VALIDATION only.
+Its source/build/ELF identities come from its new manifest, not lost historical
+artifacts. Application and real qualification remain unauthorized. Preserve the
+base `authoritative-runner.sh` bytes (SHA-256
+`5ed57d64c74014002708dc679d5d26e9d7b53e888d1124dce3a74432e16a6244`).
+Do not modify Gate-Q/Gate-A policy or mistake ordinary-user native fixture success
+for operational gate execution.
+
+For a separately authorized future installation, the native binary has frozen
+package/output-parent locations recorded in its build manifest. These must be
+ordinary-user-owned private0700 directories, with trusted non-symlink single-link
+regular package files and a new absent output leaf. The only launch boundary is
+static BusyBox `env -i PATH=/usr/bin:/bin LC_ALL=C` followed by the reviewed native
+ELF and exact `--output-dir` argument. Do not launch through caller-controlled
+dynamic helpers or supply a replacement harness, trust identity or environment.
+BusyBox is not a trap/wait supervisor. Native owns the direct Bash child, signalfd
+acceptance, pidfd, authenticated READY and terminal COMMIT.
+
+Numeric process-group forwarding is authorized only by exact unreaped pidfd/direct
+child identity plus authenticated READY, PID=PGID and Bash monitor OFF. Before
+READY, only exact-child pidfd cleanup is allowed. After consuming reap, group
+authority is permanently closed. A successful kill is not acceptance or proof of
+universal delivery/termination. INT/TERM consumed after reap can change arbitration
+before COMMIT, never forwarding. Successful no-replacement rename publishes the
+immutable terminal result; no subsequent signal may change receipt or exit status.
+
+Generic post-READY failure must never force-kill Bash alone. Native requests
+cooperative TERM on the authorized unreaped group, then reaps exact Bash and closes
+group authority. Cleanup TERM is not lifecycle acceptance: accepted TERM143 >
+accepted INT130 > infrastructure125. Publication failure stays UNCOMMITTED.
+Native does not discover members or prove their disappearance. The external
+known-member observer retains PID/starttime, verifies PGID before failure and
+checks response/disappearance/residue, including after Bash reap if necessary.
+No post-reap group signaling, new timeout or force escalation is authorized.
+TERM-resistant programs remain a limitation, not a universal cleanup guarantee.
+
+Do not accept stdout PASS or child proof alone. Require strict child-proof/native
+terminal/external-wait reconciliation and disappearance/residue checks. Missing,
+duplicate, malformed or contradictory fields reject the entire result. The README
+defines the 36-field terminal grammar. Never default missing evidence to success.
+Abrupt parent death before COMMIT remains UNCOMMITTED, even if child proof exists.
+
+Installed Bubblewrap `0.9.0-1ubuntu0.3` remains forbidden and corrected approved
+identity unresolved. The production harness deliberately refuses qualification.
+`--new-session` escapes Bash's group: separate bounded session cleanup and exact
+launcher/disappearance/residue evidence is mandatory. Private synthetic fixtures
+cannot authorize real Bubblewrap, package/policy changes, or Attempt 21.
+
+### Existing extraction authorization
+
 Responsible Aqua personnel must record the processing purpose, minimum allowlist
 and Tenant scope, authorised operator, secure destination, access principals,
 retention/destruction treatment, and whether Information Officer/privacy or other
