@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using AqualLifeStyle.Domain.AQGreen;
+using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -94,6 +95,9 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         foreach(var m in Plan.Members)
         {
             var pay=m.CapturedJoiningPaymentId; var checkout=m.CapturedCheckoutId; var external="fixture-pay-"+m.CustomerId; var providerCheckout="fixture-checkout-"+m.CustomerId;
+            // Exercise the real domain's uppercase representation in every baseline test.
+            var receipt=YocoWebhookReceipt.Record(1,"fixture-event-"+m.CustomerId,external,
+                providerCheckout,new string('a',64),YocoCheckoutProgramme.AQGreen,checkout,m.CapturedReceiptProcessedAtUtc);
             await Sql(dsn,"""
                 INSERT INTO "AbpUsers" ("Id","TenantId","UserName","EmailAddress","Name","Surname","NormalizedUserName","NormalizedEmailAddress","Password","Role","IsEmailConfirmed","IsActive","CreationTime","IsDeleted","AccessFailedCount","IsLockoutEnabled","IsPhoneNumberConfirmed","IsTwoFactorEnabled")
                 VALUES (@user,1,@username,@email,'Fixture','Member',upper(@username),upper(@email),'fixture-only',3,true,true,@start,false,0,true,false,false);
@@ -112,7 +116,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
                 new NpgsqlParameter("customer",m.CustomerId),new NpgsqlParameter("start",m.StartedAtUtc),new NpgsqlParameter("pay",pay),new NpgsqlParameter("amount",m.JoiningAmount),new NpgsqlParameter("external",external),
                 new NpgsqlParameter("confirmed",m.PaymentConfirmedAtUtc),new NpgsqlParameter("participant",m.ParticipantId),new NpgsqlParameter("activated",m.ActivatedAtUtc),
                 new NpgsqlParameter("recruiter",NpgsqlTypes.NpgsqlDbType.Integer){Value=(object?)m.RecruiterCustomerId??DBNull.Value},
-                new NpgsqlParameter("checkout",checkout),new NpgsqlParameter("provider",providerCheckout),new NpgsqlParameter("receipt",m.CapturedReceiptId),new NpgsqlParameter("processed",m.CapturedReceiptProcessedAtUtc),new NpgsqlParameter("event","fixture-event-"+m.CustomerId),new NpgsqlParameter("hash",new string('a',64)));
+                new NpgsqlParameter("checkout",checkout),new NpgsqlParameter("provider",providerCheckout),new NpgsqlParameter("receipt",m.CapturedReceiptId),new NpgsqlParameter("processed",m.CapturedReceiptProcessedAtUtc),new NpgsqlParameter("event",receipt.EventId),new NpgsqlParameter("hash",receipt.PayloadHash));
             if(m.RequiresRetainedPositiveApproval)
                 await Sql(dsn,"INSERT INTO \"EntryParticipationApprovalDecisions\" (\"Id\",\"EntryParticipationId\",\"AdministratorUserId\",\"Approved\",\"DecidedAt\") VALUES (@id,@participant,@actor,true,@activated)",new NpgsqlParameter("id",m.CapturedApprovalDecisionId!.Value),new NpgsqlParameter("participant",m.ParticipantId),new NpgsqlParameter("actor",m.CapturedApprovingActorId!.Value),new NpgsqlParameter("activated",m.ActivatedAtUtc));
         }

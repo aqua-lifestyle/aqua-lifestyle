@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Diagnostics;
 using System.Text.Json;
 using AqualLifeStyle.Domain.AQGreen;
+using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -17,31 +18,147 @@ public sealed class BackfillPostgreSqlTests(PostgreSqlFixture fixture)
     public async Task OperatorCommand_DryRun_Apply_Retry_AndProductionEndpointRefusal()
     {
         await using var db=await fixture.NewDatabase();
-        var target=await GetTarget(db.Dsn);
-        async Task<(int Exit, string Output)> Command(string mode,string dsn)
-        {
-            var start=new ProcessStartInfo("dotnet") { RedirectStandardOutput=true,RedirectStandardError=true };
-            foreach(var arg in new[] { Path.Combine(AppContext.BaseDirectory,"AqualLifeStyle.Customer11Backfill.dll"),
-                "--mode",mode,"--manifest",Environment.GetEnvironmentVariable("AQGREEN_CUSTOMER11_ACCEPTED_INPUT")!,
-                "--output",Environment.GetEnvironmentVariable("AQGREEN_CUSTOMER11_ACCEPTED_OUTPUT")!,
-                "--source-capture",Environment.GetEnvironmentVariable("AQGREEN_CUSTOMER11_ACCEPTED_CAPTURE")!,
-                "--target-kind","local-fixture","--expected-database",target.Database,"--expected-user",target.User,
-                "--expected-server-address",target.ServerAddress,"--expected-server-port",target.ServerPort.ToString(),
-                "--source-snapshot-sha256",target.SourceSnapshotSha256 }) start.ArgumentList.Add(arg);
-            start.Environment["AQGREEN_CUSTOMER11_BACKFILL_DSN"]=dsn;
-            using var process=Process.Start(start)!;
-            var output=process.StandardOutput.ReadToEndAsync(); var error=process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync();
-            return (process.ExitCode,(await output)+(await error));
-        }
-        var dry=await Command("dry-run",db.Dsn); Assert.Equal(0,dry.Exit);
+        var dry=await Command(db.Dsn,"dry-run",db.Dsn); Assert.Equal(0,dry.Exit);
         Assert.Contains("\"ScopeInserts\": 1",dry.Output); Assert.Contains("\"PlacementInserts\": 6",dry.Output);
         await AssertNoTopology(db.Dsn);
-        var apply=await Command("apply",db.Dsn); Assert.Equal(0,apply.Exit); await AssertExactTopology(db.Dsn);
-        var retry=await Command("apply",db.Dsn); Assert.Equal(0,retry.Exit); Assert.Contains("\"AlreadyApplied\": true",retry.Output);
+        var apply=await Command(db.Dsn,"apply",db.Dsn); Assert.Equal(0,apply.Exit); await AssertExactTopology(db.Dsn);
+        var retry=await Command(db.Dsn,"apply",db.Dsn); Assert.Equal(0,retry.Exit); Assert.Contains("\"AlreadyApplied\": true",retry.Output);
         var production=new NpgsqlConnectionStringBuilder(db.Dsn) { Host=fixture.Plan.SourceServiceId+".example.invalid" };
-        var blocked=await Command("apply",production.ConnectionString); Assert.Equal(1,blocked.Exit);
+        var blocked=await Command(db.Dsn,"apply",production.ConnectionString); Assert.Equal(1,blocked.Exit);
         Assert.Contains("loopback endpoint",blocked.Output); Assert.DoesNotContain("local-disposable-only",blocked.Output);
+    }
+
+    [Theory]
+    [InlineData("domain-uppercase")]
+    [InlineData("lowercase")]
+    [InlineData("mixed-case")]
+    public async Task AcceptedAsciiHexRepresentations_ApplyExactlyAndRetryWithoutWrites(string representation)
+    {
+        await using var db=await fixture.NewDatabase();
+        var root=fixture.Plan.Members[0];
+        var hash=representation switch {
+            "domain-uppercase"=>YocoWebhookReceipt.Record(1,"fixture-event","fixture-payment","fixture-checkout",
+                new string('a',64),YocoCheckoutProgramme.AQGreen,root.CapturedCheckoutId,root.CapturedReceiptProcessedAtUtc).PayloadHash,
+            "lowercase"=>string.Concat(Enumerable.Repeat("0123456789abcdef",4)),
+            "mixed-case"=>string.Concat(Enumerable.Repeat("0123456789aBcDeF",4)),
+            _=>throw new InvalidOperationException() };
+        if(representation=="domain-uppercase")
+        {
+            Assert.Equal(new string('A',64),hash);
+            Assert.Equal(hash,await PostgreSqlFixture.Scalar<string>(db.Dsn,
+                "SELECT \"PayloadHash\" FROM \"YocoWebhookReceipts\" WHERE \"CheckoutReferenceId\"='"+root.CapturedCheckoutId+"'"));
+        }
+        else await PostgreSqlFixture.Sql(db.Dsn,"UPDATE \"YocoWebhookReceipts\" SET \"PayloadHash\"=@hash WHERE \"Id\"=@receipt",
+            new NpgsqlParameter("hash",hash),new NpgsqlParameter("receipt",root.CapturedReceiptId));
+        var before=await NonTopologyDigest(db.Dsn);
+        Assert.Equal(new AQGreenBackfillResult(true,false,1,6),await Run(db.Dsn,true));
+        await AssertNoTopology(db.Dsn);
+        Assert.Equal(new AQGreenBackfillResult(false,false,1,6),await Run(db.Dsn,false));
+        await AssertExactTopology(db.Dsn);
+        var placed=await TopologyDigest(db.Dsn);
+        Assert.Equal(new AQGreenBackfillResult(false,true,0,0),await Run(db.Dsn,false));
+        Assert.Equal(placed,await TopologyDigest(db.Dsn));
+        Assert.Equal(before,await NonTopologyDigest(db.Dsn));
+    }
+
+    [Theory]
+    [InlineData("null","PayloadHashNull")]
+    [InlineData("empty","PayloadHashLength")]
+    [InlineData("short","PayloadHashLength")]
+    [InlineData("long","PayloadHashLength")]
+    [InlineData("space","PayloadHashCharacters")]
+    [InlineData("tab","PayloadHashCharacters")]
+    [InlineData("non-hex","PayloadHashCharacters")]
+    [InlineData("fullwidth","PayloadHashCharacters")]
+    [InlineData("unicode-digit","PayloadHashCharacters")]
+    public async Task InvalidHash_ReportsExactCategoryAndLeavesAllTablesUnchanged(string kind,string category)
+    {
+        await using var db=await fixture.NewDatabase();
+        var value=kind switch {
+            "null"=>null,"empty"=>"","short"=>new string('a',63),"long"=>new string('a',65),
+            "space"=>new string('a',63)+" ","tab"=>new string('a',63)+"\t","non-hex"=>new string('g',64),
+            "fullwidth"=>new string('\uFF21',64),"unicode-digit"=>new string('\u0661',64),
+            _=>throw new InvalidOperationException() };
+        var interceptors=Array.Empty<IInterceptor>();
+        if(kind=="null")
+        {
+            // PostgreSQL forbids persisted NULL here. Exercise the defensive null branch
+            // after materialization without weakening that constraint or changing stored rows.
+            interceptors=new IInterceptor[] { new NullReceiptHash() };
+        }
+        else
+        {
+            // Fixture-only text permits malformed lengths without char(64) padding/truncation.
+            // The writer's source validation remains enabled; topology constraints stay intact.
+            await PostgreSqlFixture.Sql(db.Dsn,"ALTER TABLE \"YocoWebhookReceipts\" ALTER COLUMN \"PayloadHash\" TYPE text;");
+            await PostgreSqlFixture.Sql(db.Dsn,"UPDATE \"YocoWebhookReceipts\" SET \"PayloadHash\"=@hash WHERE \"Id\"=@receipt",
+                new NpgsqlParameter("hash",value!),new NpgsqlParameter("receipt",fixture.Plan.Members[0].CapturedReceiptId));
+        }
+        var before=await NonTopologyDigest(db.Dsn);
+        var target=await GetTarget(db.Dsn);
+        await using var context=fixture.Context(db.Dsn,interceptors);
+        var failure=await Assert.ThrowsAsync<InvalidOperationException>(()=>
+            new AQGreenCustomer11BackfillWriter(context).ExecuteAsync(fixture.Plan,target,false));
+        Assert.Equal("Retained joining-receipt binding differs. Predicate: "+category+".",failure.Message);
+        if(!string.IsNullOrEmpty(value)) Assert.DoesNotContain(value,failure.Message);
+        await AssertNoTopology(db.Dsn);
+        Assert.Equal(before,await NonTopologyDigest(db.Dsn));
+    }
+
+    [Theory]
+    [InlineData("missing","ReceiptCount")]
+    [InlineData("duplicate","ReceiptCount")]
+    [InlineData("receipt-id","ReceiptId")]
+    [InlineData("processed-at","ProcessedAt")]
+    [InlineData("tenant","Tenant")]
+    [InlineData("programme","Programme")]
+    [InlineData("provider-checkout","ProviderCheckoutBinding")]
+    [InlineData("payment","PaymentBinding")]
+    [InlineData("checkout-reference","ReceiptCount")]
+    [InlineData("event-empty","EventPresence")]
+    [InlineData("event-whitespace","EventPresence")]
+    public async Task ReceiptBindingConflict_ReportsExactCategoryAndRollsBack(string kind,string category)
+    {
+        await using var db=await fixture.NewDatabase();
+        var sql=kind switch {
+            "missing"=>"DELETE FROM \"YocoWebhookReceipts\" WHERE \"Id\"=@receipt",
+            "duplicate"=>"INSERT INTO \"YocoWebhookReceipts\" (\"Id\",\"TenantId\",\"EventId\",\"PaymentId\",\"ProviderCheckoutId\",\"PayloadHash\",\"Programme\",\"CheckoutReferenceId\",\"ProcessedAt\",\"CreationTime\") SELECT @other,\"TenantId\",'fixture-duplicate-event',\"PaymentId\",\"ProviderCheckoutId\",\"PayloadHash\",\"Programme\",\"CheckoutReferenceId\",\"ProcessedAt\",\"CreationTime\" FROM \"YocoWebhookReceipts\" WHERE \"Id\"=@receipt",
+            "receipt-id"=>"UPDATE \"YocoWebhookReceipts\" SET \"Id\"=@other WHERE \"Id\"=@receipt",
+            "processed-at"=>"UPDATE \"YocoWebhookReceipts\" SET \"ProcessedAt\"=\"ProcessedAt\"+interval '1 microsecond' WHERE \"Id\"=@receipt",
+            "tenant"=>"UPDATE \"YocoWebhookReceipts\" SET \"TenantId\"=2 WHERE \"Id\"=@receipt",
+            "programme"=>"UPDATE \"YocoWebhookReceipts\" SET \"Programme\"=1 WHERE \"Id\"=@receipt",
+            "provider-checkout"=>"UPDATE \"YocoWebhookReceipts\" SET \"ProviderCheckoutId\"='private-fixture-checkout' WHERE \"Id\"=@receipt",
+            "payment"=>"UPDATE \"YocoWebhookReceipts\" SET \"PaymentId\"='private-fixture-payment' WHERE \"Id\"=@receipt",
+            "checkout-reference"=>"UPDATE \"YocoWebhookReceipts\" SET \"CheckoutReferenceId\"=@other WHERE \"Id\"=@receipt",
+            "event-empty"=>"UPDATE \"YocoWebhookReceipts\" SET \"EventId\"='' WHERE \"Id\"=@receipt",
+            "event-whitespace"=>"UPDATE \"YocoWebhookReceipts\" SET \"EventId\"=E' \\t\\r\\n' WHERE \"Id\"=@receipt",
+            _=>throw new InvalidOperationException() };
+        // Mutations construct negative disposable fixture inputs, never writer/clone repairs.
+        await PostgreSqlFixture.Sql(db.Dsn,sql,new NpgsqlParameter("receipt",fixture.Plan.Members[0].CapturedReceiptId),new NpgsqlParameter("other",Guid.NewGuid()));
+        var before=await NonTopologyDigest(db.Dsn);
+        var failure=await Assert.ThrowsAsync<InvalidOperationException>(()=>Run(db.Dsn,false));
+        Assert.Equal("Retained joining-receipt binding differs. Predicate: "+category+".",failure.Message);
+        Assert.DoesNotContain("private-fixture",failure.Message);
+        await AssertNoTopology(db.Dsn); Assert.Equal(before,await NonTopologyDigest(db.Dsn));
+    }
+
+    [Fact]
+    public async Task OperatorReceiptFailure_ExposesOnlyCategoryAndNoSensitiveValues()
+    {
+        await using var db=await fixture.NewDatabase();
+        await PostgreSqlFixture.Sql(db.Dsn,"UPDATE \"YocoWebhookReceipts\" SET \"PaymentId\"='private-fixture-payment' WHERE \"Id\"=@receipt",
+            new NpgsqlParameter("receipt",fixture.Plan.Members[0].CapturedReceiptId));
+        var before=await NonTopologyDigest(db.Dsn);
+        var result=await Command(db.Dsn,"apply",db.Dsn);
+        Assert.Equal(1,result.Exit);
+        using var output=JsonDocument.Parse(result.Output);
+        Assert.Equal("REJECTED",output.RootElement.GetProperty("result").GetString());
+        Assert.Equal("CONTRACT_CONFLICT",output.RootElement.GetProperty("category").GetString());
+        Assert.Equal("Retained joining-receipt binding differs. Predicate: PaymentBinding.",output.RootElement.GetProperty("reason").GetString());
+        Assert.Equal(JsonValueKind.Null,output.RootElement.GetProperty("delta").ValueKind);
+        foreach(var sensitive in new[] {"private-fixture-payment","fixture-checkout-","fixture-event-",new string('A',64),"local-disposable-only"})
+            Assert.DoesNotContain(sensitive,result.Output);
+        await AssertNoTopology(db.Dsn); Assert.Equal(before,await NonTopologyDigest(db.Dsn));
     }
 
     [Fact]
@@ -247,6 +364,34 @@ public sealed class BackfillPostgreSqlTests(PostgreSqlFixture fixture)
     {
         var capture=fixture.Capture.ToArray(); capture[^2]^=1;
         Assert.Throws<InvalidOperationException>(()=>AQGreenCustomer11BackfillPlan.Load(fixture.Input,fixture.Output,capture));
+    }
+
+    private async Task<(int Exit,string Output)> Command(string identityDsn,string mode,string dsn)
+    {
+        var target=await GetTarget(identityDsn);
+        var start=new ProcessStartInfo("dotnet") { RedirectStandardOutput=true,RedirectStandardError=true };
+        foreach(var arg in new[] { Path.Combine(AppContext.BaseDirectory,"AqualLifeStyle.Customer11Backfill.dll"),
+            "--mode",mode,"--manifest",Environment.GetEnvironmentVariable("AQGREEN_CUSTOMER11_ACCEPTED_INPUT")!,
+            "--output",Environment.GetEnvironmentVariable("AQGREEN_CUSTOMER11_ACCEPTED_OUTPUT")!,
+            "--source-capture",Environment.GetEnvironmentVariable("AQGREEN_CUSTOMER11_ACCEPTED_CAPTURE")!,
+            "--target-kind","local-fixture","--expected-database",target.Database,"--expected-user",target.User,
+            "--expected-server-address",target.ServerAddress,"--expected-server-port",target.ServerPort.ToString(),
+            "--source-snapshot-sha256",target.SourceSnapshotSha256 }) start.ArgumentList.Add(arg);
+        start.Environment["AQGREEN_CUSTOMER11_BACKFILL_DSN"]=dsn;
+        using var process=Process.Start(start)!;
+        var output=process.StandardOutput.ReadToEndAsync(); var error=process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        return (process.ExitCode,(await output)+(await error));
+    }
+
+    private sealed class NullReceiptHash : IMaterializationInterceptor
+    {
+        public object InitializedInstance(MaterializationInterceptionData materializationData,object entity)
+        {
+            if(entity is YocoWebhookReceipt)
+                typeof(YocoWebhookReceipt).GetProperty(nameof(YocoWebhookReceipt.PayloadHash))!.SetValue(entity,null);
+            return entity;
+        }
     }
 
     private Task<AQGreenBackfillTargetIdentity> GetTarget(string dsn)=>fixture.Target(dsn);

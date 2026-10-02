@@ -187,12 +187,20 @@ namespace AqualLifeStyle.EntityFrameworkCore
                         checkout.CompletedAt == member.PaymentConfirmedAtUtc, "Retained joining-checkout evidence differs.");
                 var receipts = await _context.YocoWebhookReceipts.IgnoreQueryFilters().AsNoTracking()
                     .Where(r => r.CheckoutReferenceId == checkout.Id).ToListAsync(ct);
-                Require(receipts.Count == 1 && receipts[0].Id == member.CapturedReceiptId && receipts[0].ProcessedAt == member.CapturedReceiptProcessedAtUtc &&
-                        receipts[0].TenantId == plan.TenantId && receipts[0].Programme == YocoCheckoutProgramme.AQGreen &&
-                        receipts[0].ProviderCheckoutId == checkout.ProviderCheckoutId && receipts[0].PaymentId == payment.ExternalReference &&
-                        !string.IsNullOrWhiteSpace(receipts[0].EventId) && receipts[0].PayloadHash != null &&
-                        receipts[0].PayloadHash.Length == 64 && receipts[0].PayloadHash.All(c=>(c>='0' && c<='9') || (c>='a' && c<='f')),
-                    "Retained joining-receipt binding differs.");
+                // Report only the first failing category; never include retained provider values.
+                RequireReceipt(receipts.Count == 1, "ReceiptCount");
+                var receipt = receipts[0];
+                RequireReceipt(receipt.Id == member.CapturedReceiptId, "ReceiptId");
+                RequireReceipt(receipt.ProcessedAt == member.CapturedReceiptProcessedAtUtc, "ProcessedAt");
+                RequireReceipt(receipt.TenantId == plan.TenantId, "Tenant");
+                RequireReceipt(receipt.Programme == YocoCheckoutProgramme.AQGreen, "Programme");
+                RequireReceipt(receipt.ProviderCheckoutId == checkout.ProviderCheckoutId, "ProviderCheckoutBinding");
+                RequireReceipt(receipt.PaymentId == payment.ExternalReference, "PaymentBinding");
+                RequireReceipt(!string.IsNullOrWhiteSpace(receipt.EventId), "EventPresence");
+                RequireReceipt(receipt.PayloadHash != null, "PayloadHashNull");
+                RequireReceipt(receipt.PayloadHash.Length == 64, "PayloadHashLength");
+                RequireReceipt(receipt.PayloadHash.All(c => (c >= '0' && c <= '9') ||
+                    (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')), "PayloadHashCharacters");
                 var decisions = await _context.EntryParticipationApprovalDecisions.AsNoTracking()
                     .Where(d => EF.Property<Guid>(d, "EntryParticipationId") == member.ParticipantId).ToListAsync(ct);
                 if (member.RequiresRetainedPositiveApproval)
@@ -208,6 +216,9 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 else Require(decisions.Count == 0, "Root UNKNOWN approval evidence changed; reconciliation is required.");
             }
         }
+        private static void RequireReceipt(bool condition, string category) =>
+            Require(condition, "Retained joining-receipt binding differs. Predicate: " + category + ".");
+
         private static void Require(bool condition, string message)
         {
             if (!condition) throw new InvalidOperationException(message);

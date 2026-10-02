@@ -63,6 +63,14 @@ The target must retain the accepted six identities, Active state, source timesta
 
 Only domain scope/placement entities are added. Scope identity is accepted; deterministic placement row storage IDs derive from SHA-256 of `AQGreenCustomer11Backfill:<accepted input SHA>:<scope UUID>:<participant UUID>`, first 16 bytes as a big-endian Guid. These storage keys are engineering identity, not new placement authority. Root and children use existing domain factories with accepted parent/slot/path/effective time. Any exception, cancellation, constraint or deferred-commit failure rolls back the whole transaction. No participant, recruiter, attribution, confirmation, approval or financial history is written.
 
+## Receipt predicate correction and diagnostics
+
+The owner-authorised successor corrects the lowercase-only payload-hash restriction in writer commit `952f4835949e791586307845e36aa06672d3cc5e`. A retained hash must still be non-null, exactly 64 characters and entirely ASCII `0-9`, `a-f` or `A-F`. No trimming or stored-value mutation occurs. Receipt identities, Tenant/programme, exact processing time, checkout/payment reference equality and event presence retain their existing comparison semantics.
+
+Receipt rejection reports the first failed category in evaluation order: `ReceiptCount`, `ReceiptId`, `ProcessedAt`, `Tenant`, `Programme`, `ProviderCheckoutBinding`, `PaymentBinding`, `EventPresence`, `PayloadHashNull`, `PayloadHashLength`, or `PayloadHashCharacters`. The operator CLI retains `REJECTED`, `CONTRACT_CONFLICT` and a null delta, with only the category in the reason. No raw provider references, event identifiers, payload hashes, payload contents or credentials are emitted.
+
+The original recovery-clone dry-run rejected with an aggregate receipt-binding message; its first failed term remains UNKNOWN. This correction addresses a separately proven source defect and does not retroactively establish the original runtime cause or a successful clone execution. Accepted manifest/output/capture bytes remain unchanged. A successor artifact and a new source commit are required; the old artifact remains historical rejected evidence. This correction continuation authorises only disposable local validation and a bounded commit, with no push or Render/clone/production execution.
+
 ## Dedicated PostgreSQL validation
 
 This dedicated operator test project is intentionally not part of ordinary API startup and requires protected accepted artifacts. It seeds a disposable fixture with accepted identifiers but synthetic names/contact/provider values; it does not copy production PII or real provider secrets. No input files are committed.
@@ -78,6 +86,8 @@ dotnet test tools/AqualLifeStyle.Customer11Backfill.Tests/AqualLifeStyle.Custome
 ```
 
 Docker is required. The fixture pins PostgreSQL 18.6 at `postgres@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873`. PostgreSQL 18.4 matching the earlier production observation could not be fetched during validation because Docker Hub timed out; no 18.4 execution is claimed. Only uniquely named `aqgreen-customer11-writer-*` fixtures are created; ports bind loopback; fixture teardown removes those owned containers/databases. Tests cover first apply/retry/dry-run, actual PostgreSQL rollback after partial writes, concurrent duplicate applies, conflicting/foreign/partial/extra state, wrong hashes/target/snapshot/source/payment/approval/actor identities, missing/weakened constraints/indexes/triggers/RLS visibility, no changes to all non-topology tables, CLI execution and current EF model agreement. This evidence does not establish production apply, provider recovery lineage or live new-recruit spillover.
+
+The successor fixture obtains baseline hashes through `YocoWebhookReceipt.Record`, exercising its uppercase storage representation throughout the suite. Dedicated cases cover uppercase/lowercase/mixed-case success, malformed ASCII and non-ASCII rejection, each receipt-binding category and CLI redaction. Malformed-length inputs use a disposable fixture text column to avoid PostgreSQL `char(64)` padding; topology constraints remain intact. Because the real receipt column forbids NULL, the defensive null-hash category is tested through an EF materialization interceptor without relaxing that constraint or changing stored rows. These fixture mechanisms are not production schema changes or evidence repairs.
 
 ## Recovery
 
