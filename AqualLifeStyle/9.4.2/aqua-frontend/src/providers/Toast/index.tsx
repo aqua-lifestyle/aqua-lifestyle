@@ -35,10 +35,10 @@ const iconMap: Record<ToastType, typeof Info> = {
 };
 
 const styleMap: Record<ToastType, string> = {
-  error: "bg-error text-white",
-  info: "bg-info text-white",
-  success: "bg-success text-white",
-  warning: "bg-warning text-primary",
+  error: "bg-error text-error-foreground",
+  info: "bg-info text-info-foreground",
+  success: "bg-success text-success-foreground",
+  warning: "bg-warning text-warning-foreground",
 };
 
 export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
@@ -70,7 +70,7 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="fixed right-4 top-4 z-[100] flex flex-col gap-2">
+      <div className="pointer-events-none fixed inset-x-4 bottom-4 z-[100] flex flex-col items-end gap-2 sm:left-auto">
         {toasts.map((toastItem) => {
           const Icon = iconMap[toastItem.type];
 
@@ -78,13 +78,13 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
             <div
               key={toastItem.id}
               className={cn(
-                "flex w-80 items-start gap-3 rounded-xl p-4 shadow-lg animate-slide-in-right",
+                "pointer-events-auto flex w-full max-w-80 items-start gap-3 rounded-xl p-4 shadow-lg animate-slide-in-right",
                 styleMap[toastItem.type],
               )}
               role="alert"
             >
-              <Icon className="mt-0.5 size-5 shrink-0" />
-              <div className="min-w-0 flex-1">
+              <Icon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+              <div className="min-w-0 flex-1 wrap-anywhere">
                 {toastItem.title ? (
                   <p className="font-semibold">{toastItem.title}</p>
                 ) : null}
@@ -92,11 +92,11 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
               </div>
               <button
                 aria-label="Dismiss notification"
-                className="rounded-md p-1 opacity-80 transition hover:bg-white/20 hover:opacity-100"
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg opacity-80 transition hover:bg-white/20 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-current"
                 onClick={() => removeToast(toastItem.id)}
                 type="button"
               >
-                <X className="size-4" />
+                <X aria-hidden="true" className="size-4" />
               </button>
             </div>
           );

@@ -5,6 +5,9 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:3100",
     trace: "retain-on-failure",
+    ...(process.env.PLAYWRIGHT_CHANNEL
+      ? { channel: process.env.PLAYWRIGHT_CHANNEL }
+      : {}),
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },

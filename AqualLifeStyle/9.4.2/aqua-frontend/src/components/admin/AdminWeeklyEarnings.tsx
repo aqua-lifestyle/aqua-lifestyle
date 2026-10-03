@@ -97,6 +97,7 @@ export const AdminWeeklyEarnings = () => {
   const [selectedAreaId, setSelectedAreaId] = useState("");
   const [earnings, setEarnings] = useState<WeeklyEarning[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [error, setError] = useState<string>();
   const [calculationNotice, setCalculationNotice] = useState<string>();
@@ -108,6 +109,7 @@ export const AdminWeeklyEarnings = () => {
     }
 
     setLoading(true);
+    setLoadFailed(false);
     setError(undefined);
     try {
       const result = await httpClient.get<PagedWeeklyEarnings>(
@@ -115,6 +117,7 @@ export const AdminWeeklyEarnings = () => {
       );
       setEarnings(result.items);
     } catch (requestError) {
+      setLoadFailed(true);
       setError(
         getRequestErrorMessage(
           requestError,
@@ -347,6 +350,9 @@ export const AdminWeeklyEarnings = () => {
       data={earnings}
       emptyState={`No ${programme === "entry" ? "AQGreen" : "Onyx"} weekly earnings have been prepared yet.`}
       keyExtractor={(item) => item.id}
+      label={`${programme === "entry" ? "AQGreen" : "Onyx"} weekly earnings`}
+      loadError={loadFailed}
+      onRetry={() => void loadEarnings()}
       searchFn={(item, query) =>
         `${item.customerName} ${item.email} ${item.status}`
           .toLowerCase()
@@ -387,6 +393,7 @@ export const AdminWeeklyEarnings = () => {
               value={selectedAreaId}
             />
             <Button
+              className="w-full lg:w-auto"
               isLoading={calculating}
               onClick={() => void calculateLatestWeek()}
             >
@@ -403,19 +410,19 @@ export const AdminWeeklyEarnings = () => {
         <section className="grid gap-4 sm:grid-cols-3">
           <Card>
             <p className="text-sm text-muted-foreground">Records shown</p>
-            <p className="mt-2 text-2xl font-bold">{earnings.length}</p>
+            <p className="mt-2 wrap-anywhere text-2xl font-bold">{loading ? "Loading…" : loadFailed ? "Unavailable" : earnings.length}</p>
           </Card>
           <Card>
             <p className="text-sm text-muted-foreground">Calculated earnings</p>
-            <p className="mt-2 text-2xl font-bold">
-              {formatCurrency(totalEarned, currency)}
+            <p className="mt-2 wrap-anywhere text-2xl font-bold tabular-nums">
+              {loading ? "Loading…" : loadFailed ? "Unavailable" : formatCurrency(totalEarned, currency)}
             </p>
           </Card>
           <Card>
             <p className="text-sm text-muted-foreground">On hold</p>
-            <p className="mt-2 flex items-center gap-2 text-2xl font-bold">
-              <HandCoins className="size-6 text-warning" />
-              {heldCount}
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-2xl font-bold">
+              <HandCoins aria-hidden="true" className="size-6 shrink-0 text-warning" />
+              <span className="min-w-0 wrap-anywhere">{loading ? "Loading…" : loadFailed ? "Unavailable" : heldCount}</span>
             </p>
           </Card>
         </section>

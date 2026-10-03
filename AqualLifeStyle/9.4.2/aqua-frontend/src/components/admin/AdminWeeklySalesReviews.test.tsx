@@ -138,6 +138,8 @@ describe("AdminWeeklySalesReviews", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reject evidence" }));
 
     expect(screen.getByText(/Add at least one evidence reference/i)).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Weekly sales review queue and history" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Weekly sales review queue and history unavailable" })).not.toBeInTheDocument();
     expect(httpClient.post).not.toHaveBeenCalled();
   });
 

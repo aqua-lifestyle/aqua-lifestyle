@@ -198,10 +198,10 @@ export const AdminLoanAgreements = () => {
         </header>
         {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
         {success ? <StatusMessage tone="success">{success}</StatusMessage> : null}
-        <TruncatedResultsWarning
+        {!loading && !error ? <TruncatedResultsWarning
           loadedCount={loans.length}
           totalCount={totalCount}
-        />
+        /> : null}
         <Card>
           {loading ? (
             <Skeleton className="h-80" />
@@ -211,6 +211,9 @@ export const AdminLoanAgreements = () => {
               data={loans}
               emptyState="No persisted Onyx loan agreements were found."
               keyExtractor={(loan) => loan.id}
+              label="Loan agreements"
+              loadError={Boolean(error)}
+              onRetry={() => void loadLoans()}
               pageSize={10}
               searchFn={(loan, query) =>
                 `${loan.customerName} ${loan.email} ${loan.status}`

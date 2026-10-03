@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
-import { Button, Dialog, StatusMessage, TextAreaField, TextField } from "@/src/shared/ui";
+import { Button, Dialog, DialogActions, StatusMessage, TextAreaField, TextField } from "@/src/shared/ui";
 import { adminAuditJustificationSchema } from "./admin-action-validation";
 import { customerContactNumberSchema, customerEmailSchema, customerFirstNameSchema, customerHomeAddressSchema, customerSurnameSchema } from "@/src/shared/validation/customer-personal-details";
 
@@ -84,10 +84,10 @@ export const EditMemberProfileDialog = ({ member, onUpdated }: EditMemberProfile
         <TextAreaField autoComplete="street-address" className="sm:col-span-2" defaultValue={member.homeAddress ?? ""} errorMessage={fieldErrors.homeAddress} label="Home address" maxLength={512} name="homeAddress" required rows={3} />
         <TextAreaField className="sm:col-span-2" errorMessage={fieldErrors.justification} label="Reason for change" maxLength={500} name="justification" required rows={3} />
         {requestError ? <StatusMessage className="sm:col-span-2" tone="error">{requestError}</StatusMessage> : null}
-        <div className="flex justify-end gap-3 sm:col-span-2">
+        <DialogActions className="sm:col-span-2">
           <Button onClick={close} variant="ghost">Cancel</Button>
           <Button isLoading={submitting} type="submit">Save profile</Button>
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   </>;

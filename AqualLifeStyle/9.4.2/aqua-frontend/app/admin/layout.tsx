@@ -8,7 +8,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     <AdminGuard>
       <div className="min-h-[calc(100dvh-4rem)] bg-muted/30 lg:flex">
         <AdminSidebar />
-        <div className="min-w-0 flex-1">{children}</div>
+        <div className="min-w-0 flex-1" id="main-content" tabIndex={-1}>{children}</div>
       </div>
     </AdminGuard>
   );

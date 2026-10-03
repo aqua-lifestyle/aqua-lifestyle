@@ -44,10 +44,10 @@ export const ActivityFeed = ({ items }: ActivityFeedProps) => {
                 key={item.id}
                 className="flex items-start gap-3 rounded-lg border border-border p-3 transition hover:bg-muted"
               >
-                <div className="mt-0.5 rounded-full bg-accent/10 p-2 text-accent">
+                <div className="mt-0.5 shrink-0 rounded-full bg-accent/10 p-2 text-accent">
                   <Icon className="size-4" />
                 </div>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 wrap-anywhere">
                   <p className="text-sm font-semibold text-foreground">{item.title}</p>
                   <p className="text-sm text-muted-foreground">{item.description}</p>
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

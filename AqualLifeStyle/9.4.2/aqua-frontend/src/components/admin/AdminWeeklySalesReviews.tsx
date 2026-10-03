@@ -102,6 +102,7 @@ export const AdminWeeklySalesReviews = () => {
   const [reviews, setReviews] = useState<WeeklySalesReview[]>([]);
   const [selected, setSelected] = useState<WeeklySalesReview>();
   const [loading, setLoading] = useState(canReview);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [loadingTarget, setLoadingTarget] = useState(false);
   const [action, setAction] = useState<"begin" | "confirm" | "reject">();
   const [error, setError] = useState<string>();
@@ -119,6 +120,7 @@ export const AdminWeeklySalesReviews = () => {
       return;
     }
     setLoading(true);
+    setLoadFailed(false);
     setError(undefined);
     try {
       const result = await httpClient.get<PagedReviews>(
@@ -126,6 +128,7 @@ export const AdminWeeklySalesReviews = () => {
       );
       setReviews(result.items);
     } catch (requestError) {
+      setLoadFailed(true);
       setError(getRequestErrorMessage(
         requestError,
         "Weekly sales reviews could not be loaded.",
@@ -389,9 +392,9 @@ export const AdminWeeklySalesReviews = () => {
         {notice ? <StatusMessage tone="success">{notice}</StatusMessage> : null}
 
         {loadingTarget ? <Skeleton className="h-64" /> : selected ? (
-          <Card className="flex flex-col gap-5 border-accent/30">
+          <Card className="flex min-w-0 flex-col gap-5 wrap-anywhere border-accent/30">
             <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">
                   Selected review
                 </p>
@@ -512,6 +515,9 @@ export const AdminWeeklySalesReviews = () => {
                 data={reviews}
                 emptyState="No weekly sales review decisions have been recorded yet."
                 keyExtractor={(item) => item.decisionId ?? `${item.tenantId}:${item.participantId}:${item.commissionWeekStartUtc}`}
+                label="Weekly sales review queue and history"
+                loadError={loadFailed}
+                onRetry={() => void loadReviews()}
                 searchFn={(item, query) => `${item.customerName} ${item.clubMemberNumber} ${item.areaName} ${statusLabel(item)}`.toLowerCase().includes(query.toLowerCase())}
               />
             )}

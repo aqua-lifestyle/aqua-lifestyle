@@ -8,16 +8,24 @@
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
+  --color-control-border: var(--control-border);
   --color-primary: var(--primary);
   --color-primary-light: var(--primary-light);
   --color-primary-dark: var(--primary-dark);
   --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-foreground: var(--accent-foreground);
   --color-accent-light: var(--accent-light);
   --color-accent-dark: var(--accent-dark);
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-error: var(--error);
+  --color-error-ink: var(--error-ink);
+  --color-error-foreground: var(--error-foreground);
   --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-aqua-display: Georgia, "Times New Roman", serif;
@@ -53,18 +61,26 @@
   --card: #ffffff;
   --card-foreground: #0f172a;
   --muted: #f1f5f9;
-  --muted-foreground: #64748b;
+  --muted-foreground: #475569;
   --border: #e2e8f0;
+  --control-border: #64748b;
   --primary: #0f172a;
   --primary-light: #1e293b;
   --primary-dark: #020617;
-  --accent: #3b82f6;
-  --accent-light: #60a5fa;
-  --accent-dark: #2563eb;
-  --success: #22c55e;
-  --warning: #eab308;
-  --error: #ef4444;
-  --info: #3b82f6;
+  --accent: #2563eb;
+  --accent-ink: #1d4ed8;
+  --accent-foreground: #ffffff;
+  --accent-light: #3b82f6;
+  --accent-dark: #1d4ed8;
+  --success: #166534;
+  --success-foreground: #ffffff;
+  --warning: #854d0e;
+  --warning-foreground: #ffffff;
+  --error: #b91c1c;
+  --error-ink: #991b1b;
+  --error-foreground: #ffffff;
+  --info: #1d4ed8;
+  --info-foreground: #ffffff;
   --radius: 0.625rem;
   --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.04);
   --shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.06), 0 2px 4px -2px rgb(15 23 42 / 0.06);
@@ -98,26 +114,37 @@
     --muted: #1e293b;
     --muted-foreground: #94a3b8;
     --border: #1e293b;
+    --control-border: #64748b;
     --primary: #f8fafc;
     --primary-light: #e2e8f0;
     --primary-dark: #ffffff;
     --accent: #60a5fa;
+    --accent-ink: #60a5fa;
+    --accent-foreground: #0f172a;
     --accent-light: #93c5fd;
     --accent-dark: #3b82f6;
     --success: #4ade80;
+    --success-foreground: #052e16;
     --warning: #facc15;
+    --warning-foreground: #422006;
     --error: #f87171;
+    --error-ink: #fca5a5;
+    --error-foreground: #450a0a;
     --info: #60a5fa;
+    --info-foreground: #0f172a;
   }
 }
 
-* {
-  border-color: var(--border);
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 }
 
 html {
   color-scheme: light dark;
   scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
 }
 
 body {
@@ -218,8 +245,10 @@ body {
   }
 }
 
-/* Focus visible ring */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+/* Default focus indicator; component utilities may select a contrasting colour. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 }

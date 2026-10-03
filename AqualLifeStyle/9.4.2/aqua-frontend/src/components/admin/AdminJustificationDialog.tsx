@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
-import { Button, Dialog, StatusMessage, TextAreaField } from "@/src/shared/ui";
+import { Button, Dialog, DialogActions, StatusMessage, TextAreaField } from "@/src/shared/ui";
 import { adminAuditJustificationSchema } from "./admin-action-validation";
 
 type AdminJustificationDialogProps = {
@@ -43,7 +43,7 @@ export const AdminJustificationDialog = ({
       <p className="text-sm text-muted-foreground">{description}</p>
       <TextAreaField errorMessage={validationError} id={justificationId} label="Reason for action" maxLength={500} name="justification" onChange={(event) => setJustification(event.target.value)} required rows={3} value={justification} />
       {requestError ? <StatusMessage tone="error">{requestError}</StatusMessage> : null}
-      <div className="flex justify-end gap-3"><Button onClick={close} variant="ghost">Cancel</Button><Button isLoading={submitting} onClick={confirm} variant={variant === "danger" ? "danger" : "primary"}>{confirmLabel}</Button></div>
+      <DialogActions><Button onClick={close} variant="ghost">Cancel</Button><Button isLoading={submitting} onClick={confirm} variant={variant === "danger" ? "danger" : "primary"}>{confirmLabel}</Button></DialogActions>
     </Dialog>
   </>;
 };

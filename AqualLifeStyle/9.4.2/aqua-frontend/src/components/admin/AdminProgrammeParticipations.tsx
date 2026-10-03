@@ -19,6 +19,7 @@ import {
   Card,
   DataTable,
   Dialog,
+  DialogActions,
   LinkButton,
   Skeleton,
   StatusMessage,
@@ -124,6 +125,7 @@ export const AdminProgrammeParticipations = () => {
     AdminProgrammeParticipation[]
   >([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [selected, setSelected] = useState<AdminProgrammeParticipation>();
@@ -132,6 +134,7 @@ export const AdminProgrammeParticipations = () => {
   const [savingCorrection, setSavingCorrection] = useState(false);
   const [checkouts, setCheckouts] = useState<AQGreenCheckoutRecovery[]>([]);
   const [loadingCheckouts, setLoadingCheckouts] = useState(canViewCheckouts);
+  const [checkoutsLoadFailed, setCheckoutsLoadFailed] = useState(false);
   const [selectedCheckout, setSelectedCheckout] =
     useState<AQGreenCheckoutRecovery>();
   const [terminationEvidence, setTerminationEvidence] = useState("");
@@ -149,6 +152,7 @@ export const AdminProgrammeParticipations = () => {
       return;
     }
     setLoading(true);
+    setLoadFailed(false);
     setError(undefined);
     try {
       const programmeValue = programme === "entry" ? 0 : 1;
@@ -169,6 +173,7 @@ export const AdminProgrammeParticipations = () => {
       }
       setParticipations(allParticipations);
     } catch (requestError) {
+      setLoadFailed(true);
       setError(
         getRequestErrorMessage(
           requestError,
@@ -186,6 +191,7 @@ export const AdminProgrammeParticipations = () => {
       return;
     }
     setLoadingCheckouts(true);
+    setCheckoutsLoadFailed(false);
     setError(undefined);
     try {
       const result = await httpClient.get<PagedCheckouts>(
@@ -193,6 +199,7 @@ export const AdminProgrammeParticipations = () => {
       );
       setCheckouts(result.items);
     } catch (requestError) {
+      setCheckoutsLoadFailed(true);
       setError(getRequestErrorMessage(
         requestError,
         "Locked AQGreen checkouts could not be loaded.",
@@ -480,7 +487,7 @@ export const AdminProgrammeParticipations = () => {
                 </Button>
               ) : null}
               {canApprove && item.status === AWAITING_APPROVAL_STATUS ? (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     disabled={approvingId === approvalKey(item)}
                     isLoading={approvingId === approvalKey(item)}
@@ -522,6 +529,9 @@ export const AdminProgrammeParticipations = () => {
       data={participations}
       emptyState={`No ${programme === "entry" ? "AQGreen" : "Onyx"} participation records found.`}
       keyExtractor={(item) => `${item.programmeName}:${item.clubMemberNumber}`}
+      label={`${programme === "entry" ? "AQGreen" : "Onyx"} programme participations`}
+      loadError={loadFailed}
+      onRetry={() => void loadParticipations()}
       searchFn={(item, query) =>
         `${item.customerName} ${item.email} ${item.status}`
           .toLowerCase()
@@ -621,11 +631,11 @@ export const AdminProgrammeParticipations = () => {
         <div className="grid gap-3 sm:grid-cols-3">
           <Card className="flex items-center gap-3">
             <Route className="size-6 text-accent" />
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-muted-foreground">
                 {programme === "entry" ? "AQGreen" : "Onyx"} records
               </p>
-              <p className="text-2xl font-bold">{participations.length}</p>
+              <p className="wrap-anywhere text-2xl font-bold">{!canView || loadFailed ? "Unavailable" : loading ? "Loading…" : participations.length}</p>
             </div>
           </Card>
           <Card className="flex items-center gap-3">
@@ -650,7 +660,7 @@ export const AdminProgrammeParticipations = () => {
 
         {canView ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 onClick={() => setQueue("all")}
                 size="sm"
@@ -689,8 +699,8 @@ export const AdminProgrammeParticipations = () => {
         {canViewCheckouts ? (
           <Card className="flex flex-col gap-4">
             <div className="flex items-start gap-3">
-              <ShieldAlert className="mt-1 size-6 text-warning" />
-              <div>
+              <ShieldAlert aria-hidden="true" className="mt-1 size-6 shrink-0 text-warning" />
+              <div className="min-w-0">
                 <h2 className="text-xl font-bold">AQGreen checkout recovery</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Review locally locked checkouts. Browser returns and elapsed
@@ -706,6 +716,9 @@ export const AdminProgrammeParticipations = () => {
                 data={checkouts}
                 emptyState="No locked AQGreen joining checkouts found."
                 keyExtractor={(item) => item.checkoutId}
+                label="AQGreen checkout recovery"
+                loadError={checkoutsLoadFailed}
+                onRetry={() => void loadCheckouts()}
                 searchFn={(item, query) =>
                   `${item.customerName} ${item.clubMemberNumber} ${item.areaName} ${item.providerCheckoutId ?? ""}`
                     .toLowerCase()
@@ -749,7 +762,7 @@ export const AdminProgrammeParticipations = () => {
                 rows={4}
                 value={reason}
               />
-              <div className="flex justify-end gap-3">
+              <DialogActions>
                 <Button
                   disabled={savingCorrection}
                   onClick={() => setSelected(undefined)}
@@ -764,7 +777,7 @@ export const AdminProgrammeParticipations = () => {
                 >
                   Confirm correction
                 </Button>
-              </div>
+              </DialogActions>
             </form>
           ) : null}
         </Dialog>
@@ -807,7 +820,7 @@ export const AdminProgrammeParticipations = () => {
                 rows={5}
                 value={terminationEvidence}
               />
-              <div className="flex justify-end gap-3">
+              <DialogActions>
                 <Button
                   disabled={terminatingCheckout}
                   onClick={() => setSelectedCheckout(undefined)}
@@ -823,7 +836,7 @@ export const AdminProgrammeParticipations = () => {
                 >
                   Terminate checkout
                 </Button>
-              </div>
+              </DialogActions>
             </form>
           ) : null}
         </Dialog>
@@ -862,7 +875,7 @@ export const AdminProgrammeParticipations = () => {
                 rows={4}
                 value={rejectReason}
               />
-              <div className="flex justify-end gap-3">
+              <DialogActions>
                 <Button
                   disabled={savingRejection}
                   onClick={() => setRejecting(undefined)}
@@ -878,7 +891,7 @@ export const AdminProgrammeParticipations = () => {
                 >
                   Decline participation
                 </Button>
-              </div>
+              </DialogActions>
             </form>
           ) : null}
         </Dialog>

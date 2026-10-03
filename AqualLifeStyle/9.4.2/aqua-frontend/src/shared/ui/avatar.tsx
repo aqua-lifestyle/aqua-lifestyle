@@ -52,7 +52,7 @@ export const Avatar = ({
         imageUrl
           ? undefined
           : {
-              background: `linear-gradient(135deg, hsl(${hue} 70% 55%), hsl(${hue} 60% 40%))`,
+              background: `linear-gradient(135deg, hsl(${hue} 65% 28%), hsl(${hue} 60% 20%))`,
             }
       }
       aria-label={alt ?? fallback}

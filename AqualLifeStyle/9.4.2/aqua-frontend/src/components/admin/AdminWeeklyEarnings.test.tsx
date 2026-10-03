@@ -152,6 +152,37 @@ describe("AdminWeeklyEarnings", () => {
     );
   });
 
+  it("shows unavailable earnings on a failed read and recovers through the same read endpoint", async () => {
+    let failRead = true;
+    vi.mocked(httpClient.get).mockImplementation(async url => {
+      if (url.includes("/AdminTenant/")) return { items: [], totalCount: 0 };
+      if (failRead) throw new Error("Synthetic ledger read failure");
+      return weeklyEarnings;
+    });
+    render(<AdminWeeklyEarnings />);
+    await screen.findByRole("region", { name: "AQGreen weekly earnings unavailable" });
+    const totalCard = screen.getByText("Calculated earnings").closest("article")!;
+    expect(totalCard).toHaveTextContent("Unavailable");
+    expect(totalCard).not.toHaveTextContent(/R\s*0/);
+    expect(screen.queryByText(/No AQGreen weekly earnings/)).not.toBeInTheDocument();
+    failRead = false;
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading AQGreen weekly earnings" }));
+    await screen.findByText("Dora Shongwe");
+    expect(totalCard).toHaveTextContent(/R\s*300/);
+    expect(httpClient.get).toHaveBeenLastCalledWith(`${apiEndpoints.weeklyEarnings.getAll}?Programme=0&MaxResultCount=100`);
+  });
+
+  it("retains valid earnings when a preparation validation error occurs", async () => {
+    render(<AdminWeeklyEarnings />);
+    await screen.findByText("Dora Shongwe");
+    fireEvent.click(screen.getByRole("button", { name: "Prepare weekly earnings" }));
+    expect(screen.getByText("Select the Area whose weekly earnings should be prepared.")).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "AQGreen weekly earnings" })).toBeInTheDocument();
+    expect(screen.getByText("Calculated earnings").closest("article")).toHaveTextContent(/R\s*300/);
+    expect(screen.queryByRole("region", { name: "AQGreen weekly earnings unavailable" })).not.toBeInTheDocument();
+    expect(httpClient.post).not.toHaveBeenCalled();
+  });
+
   it("prepares the latest completed week for the selected Area", async () => {
     render(<AdminWeeklyEarnings />);
 

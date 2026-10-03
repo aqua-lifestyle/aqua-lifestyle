@@ -16,11 +16,15 @@ const formatPeriod = (year: number, month: number) =>
 
 export const EntryCommitmentsTable = ({
   obligations,
+  loadError,
+  onRetry,
   onPay,
   payingId,
   showClubMember = false,
 }: {
   obligations: EntryMonthlyObligation[];
+  loadError?: boolean;
+  onRetry?: () => void;
   onPay?: (obligation: EntryMonthlyObligation) => void;
   payingId?: string;
   showClubMember?: boolean;
@@ -120,6 +124,9 @@ export const EntryCommitmentsTable = ({
       data={obligations}
       emptyState="No persisted AQGreen monthly commitments were found."
       keyExtractor={(item) => item.id}
+      label={showClubMember ? "AQGreen commitments" : "My AQGreen commitments"}
+      loadError={loadError}
+      onRetry={onRetry}
       pageSize={10}
       searchFn={(item, query) =>
         `${item.customerName} ${item.email} ${item.status}`

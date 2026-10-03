@@ -23,4 +23,13 @@ describe("TextField", () => {
     expect(screen.getByText("Required")).toBeInTheDocument();
     expect(screen.getByLabelText("Name")).toHaveAttribute("aria-invalid", "true");
   });
+
+  it("generates unique IDs for repeated fields while preserving form names", () => {
+    render(<><TextField label="Email" name="email" /><TextField label="Email" name="email" /></>);
+
+    const fields = screen.getAllByLabelText("Email");
+    expect(fields[0]).toHaveAttribute("name", "email");
+    expect(fields[1]).toHaveAttribute("name", "email");
+    expect(fields[0].id).not.toBe(fields[1].id);
+  });
 });

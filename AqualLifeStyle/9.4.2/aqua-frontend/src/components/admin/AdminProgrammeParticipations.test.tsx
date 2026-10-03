@@ -128,6 +128,23 @@ describe("AdminProgrammeParticipations", () => {
     expect(screen.getByText("101")).toBeInTheDocument();
   });
 
+  it("keeps a successful participation read independent of failed checkout recovery loading", async () => {
+    vi.mocked(useAuthState).mockReturnValue(authState([
+      "Aqua.Admin.ProgrammeParticipations.View",
+      "Aqua.Admin.ProgrammeParticipations.ViewPaymentCheckouts",
+    ]));
+    vi.mocked(httpClient.get).mockImplementation(async url => {
+      if (url.includes("GetAQGreenJoiningCheckouts")) throw new Error("Synthetic checkout read failure");
+      return { items: [participation], totalCount: 1 };
+    });
+    render(<AdminProgrammeParticipations />);
+    await screen.findByRole("region", { name: "AQGreen checkout recovery unavailable" });
+    expect(await screen.findByRole("table", { name: "AQGreen programme participations" })).toBeInTheDocument();
+    expect(screen.getByText("Dora Shongwe")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "AQGreen programme participations unavailable" })).not.toBeInTheDocument();
+    expect(screen.queryByText("No locked AQGreen joining checkouts found.")).not.toBeInTheDocument();
+  });
+
   it("links an authorised host reviewer from an active AQGreen participation", async () => {
     vi.mocked(useAuthState).mockReturnValue(authState([
       "Aqua.Admin.ProgrammeParticipations.View",

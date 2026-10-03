@@ -116,8 +116,14 @@ export const Navbar = () => {
   if (pathname.startsWith("/admin")) {
     return (
       <header className="sticky top-0 z-40 w-full border-b border-border bg-card/95 backdrop-blur">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link className="flex items-center gap-3 text-foreground transition hover:opacity-80" href="/admin/dashboard">
+        <a
+          className="sr-only z-50 rounded-lg bg-card px-4 py-3 font-semibold text-foreground shadow-md focus:not-sr-only focus:absolute focus:left-4 focus:top-2"
+          href="#main-content"
+        >
+          Skip to admin content
+        </a>
+        <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <Link className="flex shrink-0 items-center gap-3 text-foreground transition hover:opacity-80" href="/admin/dashboard">
             <Image
               alt=""
               aria-hidden="true"

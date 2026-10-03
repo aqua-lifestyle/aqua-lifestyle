@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthState } from "@/src/providers";
@@ -67,6 +67,20 @@ describe("AdminSidebar", () => {
     render(<AdminSidebar />);
 
     expect(screen.getByRole("link", { name: "Customer accounts" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("provides an explicit touch-sized navigation disclosure below desktop", () => {
+    render(<AdminSidebar />);
+
+    const trigger = screen.getByRole("button", { name: "Open administration navigation" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveClass("min-h-11", "min-w-11");
+
+    fireEvent.click(trigger);
+    expect(screen.getByRole("button", { name: "Close administration navigation" }))
+      .toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("navigation", { name: "Administration navigation" }))
+      .toHaveClass("grid");
   });
 
   it("shows the global pending approval count beside the navigation link", () => {

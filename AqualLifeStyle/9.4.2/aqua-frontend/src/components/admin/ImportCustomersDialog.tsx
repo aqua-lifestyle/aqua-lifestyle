@@ -8,7 +8,7 @@ import { useAuthState } from "@/src/providers";
 import { httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import { cn } from "@/src/shared/lib/utils";
-import { Button, DataTable, Dialog, StatusMessage } from "@/src/shared/ui";
+import { Button, DataTable, Dialog, DialogActions, StatusMessage } from "@/src/shared/ui";
 
 const IMPORT_PERMISSION = "Aqua.Admin.Customers.Import";
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
@@ -184,10 +184,17 @@ export const ImportCustomersDialog = ({ onImported }: ImportCustomersDialogProps
         <div className="flex flex-col gap-5">
           {!result ? (
             <div
-              {...getRootProps()}
+              {...getRootProps({
+                role: "button",
+                "aria-label": file
+                  ? `Choose a customer import file: ${file.name}`
+                  : isDragActive
+                    ? "Drop the file here"
+                    : "Drop a CSV or XLSX file here or choose a customer import file",
+              })}
               className={cn(
                 "cursor-pointer rounded-xl border-2 border-dashed p-7 text-center transition",
-                isDragActive ? "border-accent bg-accent/10" : "border-border bg-muted/30 hover:border-accent/60",
+                isDragActive ? "border-accent bg-accent/10" : "border-control-border bg-muted/30 hover:border-accent",
               )}
             >
               <input {...getInputProps()} aria-label="Customer import file" />
@@ -222,7 +229,7 @@ export const ImportCustomersDialog = ({ onImported }: ImportCustomersDialogProps
                   </span>
                 )}
               </div>
-              <DataTable columns={columns} data={preview.rows} keyExtractor={(row) => row.rowNumber} pageSize={10} />
+              <DataTable columns={columns} data={preview.rows} keyExtractor={(row) => row.rowNumber} label="Customer import preview" pageSize={10} />
               {preview.errors.length ? (
                 <div className="max-h-44 overflow-auto rounded-lg border border-error/20 bg-error/5 p-3">
                   <h4 className="font-semibold text-error">Validation errors</h4>
@@ -258,7 +265,7 @@ export const ImportCustomersDialog = ({ onImported }: ImportCustomersDialogProps
             </StatusMessage>
           ) : null}
 
-          <div className="flex flex-wrap justify-end gap-3">
+          <DialogActions>
             <Button onClick={() => { setOpen(false); reset(); }} variant="ghost">
               {result ? "Close" : "Cancel"}
             </Button>
@@ -272,7 +279,7 @@ export const ImportCustomersDialog = ({ onImported }: ImportCustomersDialogProps
                 Confirm import of {preview.totalRows} customers
               </Button>
             ) : null}
-          </div>
+          </DialogActions>
         </div>
       </Dialog>
     </>

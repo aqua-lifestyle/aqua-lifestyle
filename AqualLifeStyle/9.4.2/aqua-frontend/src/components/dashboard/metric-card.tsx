@@ -31,19 +31,17 @@ export const MetricCard = ({
         className,
       )}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          {isLoading ? (
-            <Skeleton className="mt-2 h-8 w-20 rounded-md" />
-          ) : (
-            <p className="text-3xl font-bold tracking-tight text-foreground">{value}</p>
-          )}
-        </div>
-        <div className="rounded-lg bg-accent/10 p-2.5 text-accent">
-          <Icon className="size-5" />
+      <div className="flex items-start justify-between gap-3">
+        <p className="min-w-0 flex-1 text-sm font-medium text-muted-foreground">{label}</p>
+        <div className="shrink-0 rounded-lg bg-accent/10 p-2.5 text-accent">
+          <Icon aria-hidden="true" className="size-5" />
         </div>
       </div>
+      {isLoading ? (
+        <Skeleton className="mt-2 h-8 w-20 rounded-md" />
+      ) : (
+        <p className="mt-1 wrap-anywhere text-3xl font-bold tracking-tight text-foreground tabular-nums">{value}</p>
+      )}
 
       {trend !== undefined && !isLoading ? (
         <div className="mt-4 flex items-center gap-1.5 text-sm">

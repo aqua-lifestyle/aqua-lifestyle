@@ -6,6 +6,7 @@ import {
   HandCoins,
   KeyRound,
   LayoutDashboard,
+  Menu,
   Network,
   PiggyBank,
   Route,
@@ -13,9 +14,11 @@ import {
   UserCheck,
   Users,
   UsersRound,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 import { useAuthState } from "@/src/providers";
 import { usePendingProgrammeApprovals } from "@/src/shared/hooks/use-pending-programme-approvals";
@@ -40,6 +43,7 @@ const adminLinks = [
 
 export const AdminSidebar = () => {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
   const { session } = useAuthState();
   const permissions = session?.user?.permissions ?? [];
   const canViewProgrammeParticipations = permissions.includes(
@@ -56,13 +60,33 @@ export const AdminSidebar = () => {
 
   return (
     <aside className="border-b border-border bg-card lg:min-h-[calc(100dvh-4rem)] lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-r">
-      <div className="lg:sticky lg:top-16 lg:p-4">
+      <div className="flex items-center justify-between gap-4 px-4 py-2 lg:hidden">
+        <p className="text-sm font-semibold">Administration</p>
+        <button
+          aria-controls="admin-navigation-panel"
+          aria-expanded={mobileOpen}
+          aria-label={`${mobileOpen ? "Close" : "Open"} administration navigation`}
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          onClick={() => setMobileOpen((current) => !current)}
+          type="button"
+        >
+          {mobileOpen ? <X aria-hidden="true" className="size-5" /> : <Menu aria-hidden="true" className="size-5" />}
+        </button>
+      </div>
+      <div className="lg:sticky lg:top-16 lg:max-h-[calc(100dvh-4rem)] lg:overflow-y-auto lg:overscroll-contain lg:p-4">
         <div className="hidden px-3 pb-3 pt-1 lg:block">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Administration
           </p>
         </div>
-        <nav aria-label="Administration navigation" className="flex gap-1 overflow-x-auto p-2 lg:flex-col lg:overflow-visible lg:p-0">
+        <nav
+          aria-label="Administration navigation"
+          className={cn(
+            "hidden grid-cols-1 gap-1 border-t border-border p-2 sm:grid-cols-2 md:grid-cols-3 lg:flex lg:flex-col lg:border-t-0 lg:p-0",
+            mobileOpen && "grid",
+          )}
+          id="admin-navigation-panel"
+        >
           {visibleLinks.map((link) => {
             const active = isActive(link.href);
 
@@ -70,21 +94,22 @@ export const AdminSidebar = () => {
               <Link
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition",
+                  "flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition",
                   active
-                    ? "bg-accent/10 text-accent"
+                    ? "bg-accent/10 text-accent-ink"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
                 href={link.href}
                 key={link.href}
+                onClick={() => setMobileOpen(false)}
               >
                 <link.icon aria-hidden="true" className="size-4" />
-                <span>{link.label}</span>
+                <span className="min-w-0">{link.label}</span>
                 {link.href === "/admin/programme-participations" &&
                 summary?.totalCount ? (
                   <span
                     aria-label={`${summary.totalCount} approvals awaiting review`}
-                    className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-warning px-1.5 py-0.5 text-xs font-bold text-warning-foreground"
+                    className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-warning/10 px-1.5 py-0.5 text-xs font-bold text-warning ring-1 ring-warning/20"
                   >
                     {summary.totalCount}
                   </span>
