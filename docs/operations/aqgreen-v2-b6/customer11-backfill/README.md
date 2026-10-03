@@ -1,6 +1,53 @@
 # Exact-manifest customer-11 topology backfill
 
-This is an operator tool, not an application endpoint, EF migration or V2 selector. It can insert only the topology approved by the owner's **OWNER ACCEPTANCE — CUSTOMER-11 B6 CANONICALISATION MANIFEST** instruction. That later owner acceptance governs the unchanged artifacts even though their embedded status strings still describe the original candidate stage.
+## Current new-lineage contract (2026-10-03)
+
+The explicit owner **NEW-LINEAGE PLACEMENT IDENTITIES + WRITER REBINDING IMPLEMENTATION** decision governs this successor. Its authority is implementation and local/disposable PostgreSQL validation only: no commit, provider access, recovery-clone execution, production execution or V2 activation. The sections below headed Historical describe earlier artifacts and must not be used as current execution instructions. Interrupted custody of the lost artifacts is not restored by this successor.
+
+Current protected inputs, verified before opening a database connection:
+
+| Artifact | Size | SHA-256 |
+| --- | --- | --- |
+| New candidate manifest | 20,131 bytes | `74a8e8bedd14d151c119173e44671c7ec8fd8c03ebb75cbd0763974c6dd3e416` |
+| New canonical output | 24,489 bytes | `a1bcf510b41fa97e449e0dcb938d2b492ad08f215f6d4e5d75ff117f8b6af11d` |
+| New recovery-clone capture | 27,429 bytes | `b84119e66c886ac0086b9f531186d7345a007359df465ac945afe033787e2494` |
+
+The seven capture records are required in order: DatabaseIdentity, DatabaseUser, ServerVersionNumber and ReadOnlyMode guards; identity; bounded_evidence; bounded_supplement. Guard values/results, recovery origin, repeatable-read/read-only observation, population/evidence counts, absence of corrections/conflicts, and supplemental Tenant state are validated. This is recovery-clone evidence, not an original production capture. Complete protected capture bytes remain digest-bound; no two-document projection replaces them.
+
+Scope `06a452ea-9958-5911-8c5b-5d350e516095`, effective time `2026-10-02T05:37:10Z` and topology remain unchanged. Effective time is separate from the fresh observation `2026-10-03T07:17:10.764589Z`. All six V1 structural levels are null/UNKNOWN with Ambiguous impacts. Customer 11 historical administrator approval, acquisition/invitation/confirmation facts retain their explicit UNKNOWN dispositions. Payment completion denotes retained Aqua finality, not bank settlement.
+
+| Customer | Accepted storage ID | Parent / slot |
+| --- | --- | --- |
+| 11 | `c36485ad-65c2-c44e-54a8-abbba3b91cfa` | root |
+| 14 | `f5110269-2d6d-47a7-4e8a-dc03b9120cc6` | 11 / 1 |
+| 15 | `1f8f57f6-1b42-ee1e-1ddc-d1d92966a0c6` | 11 / 2 |
+| 17 | `08280e99-67e9-4e4d-4359-240f02eba052` | 11 / 3 |
+| 19 | `f003f647-9d57-b259-5656-67bf91231662` | 11 / 4 |
+| 18 | `1d251e09-d29a-d47f-afb6-950aa3ef6634` | 11 / 5 |
+
+Only an absent, conflict-free baseline permits one scope plus six inserts. Existing OLD/arbitrary/mixed IDs fail closed even when topology matches. Exact NEW ID, participant, Tenant, scope, parent, slot, path, rules and timestamp equality is required for zero-change retry. Prospective primary-key collisions anywhere are included in pre-write conflict checks. No automatic replacement, translation of financial evidence references, deletion, recruiter rewrite or attribution/confirmation creation occurs.
+
+### Target guard and future clone verification
+
+CLI and direct writer use the same pre-connection target guard. Production service `dpg-d9f0jne1a83c73d8m780-a` and database `aqualifestyle` are denied independently of evidence origin. Local mode accepts only explicit loopback, `customer11_test_*` databases and user `fixture`, without clone options. Recovery mode requires service `dpg-davoaabncjis73f56rj0-a`, database `aqualifestyle_1t0a`, user `aqualifestyle`, numeric version `180006`, a separately verified exact endpoint, TLS VerifyFull and no multi-host/alias/connection-options substitution. The writer checks actual database/user/internal address/port, version and trigger execution mode inside the transaction.
+
+Before any separately authorised future clone execution, independently verify the provider endpoint and isolated recovery identity. Store a protected UTF-8 JSON verification receipt. The CLI requires both `--verified-target-receipt FILE` and `--verified-target-reference SHA256` plus `--expected-service-id ID`; a hash string alone is refused. The receipt binds these exact fields:
+
+`verification` = `OWNER_AUTHORISED_INDEPENDENT_TARGET_VERIFICATION`; `targetKind` = `verified-recovery-clone`; `serviceId`, `database`, `user`, `endpoint`, `externalPort`, `serverAddress`, `serverPort`, `serverVersionNumber`, `inputSha256`, `outputSha256`, `captureSha256`, `scopeId`, `pitrSourceServiceId` = original production service, `pitrCutoffUtc` = `2026-10-02T05:37:10Z`, `productionServiceId`, `productionDatabase`, `isolatedFromProduction` = true.
+
+The future owner must accept the independently verified receipt bytes/hash and execution context. The tool checks integrity and consistency of that receipt; it cannot prove provider provenance or human authority merely because an operator writes a matching JSON file. No exact endpoint has been invented or authorised by this implementation. No real Render target is contacted in local tests; structurally shaped synthetic hosts are used only in non-connecting guard tests.
+
+### Current build/validation
+
+From the backend directory, restore/build the dedicated writer test project, then run its complete suite with the three protected NEW input paths supplied through `AQGREEN_CUSTOMER11_ACCEPTED_INPUT`, `AQGREEN_CUSTOMER11_ACCEPTED_OUTPUT` and `AQGREEN_CUSTOMER11_ACCEPTED_CAPTURE`. The fixture pins the existing PostgreSQL 18.6 image, binds loopback and owns/removes only its disposable databases/container. It verifies the observed numeric version and seeds synthetic contact/provider details. No schema/domain algorithm changes are required. Historical 59-test evidence does not establish this successor's result; the current evidence receipt records exact executed totals, commands, dependency state, source/build hashes and successor artifact SHA.
+
+Current successor validation: 114 passed, 0 failed, 0 skipped on disposable PostgreSQL 18.6 (180006), including all preceding 59 cases and 55 new cases. Release build passed with three existing Core warnings. Exact first-apply/retry, protected-table equality, conflict/key collision refusal, rollback and concurrency passed. Inherited dependency advisories are recorded separately; no production qualification or 18.4 compatibility is claimed. The source remains uncommitted pending owner source-freeze review.
+
+For a future separately authorised disposable command, use the existing flags with NEW input paths and `--source-snapshot-sha256 b84119e66c886ac0086b9f531186d7345a007359df465ac945afe033787e2494`. Recovery-mode invocation additionally needs the exact service and receipt flags above. Neither command is authority to execute against a preserved recovery clone. A successor archive has a new identity; it is not historical writer-2 and is not continuity of the lost custody chain.
+
+## Historical writer lineage — retained record, superseded bindings
+
+The following records describe the earlier writer and its original acceptance. Their hashes/commands are historical, not the governing bindings of the rebound successor.
 
 ## Authority and input files
 

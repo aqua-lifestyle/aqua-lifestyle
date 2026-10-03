@@ -1,6 +1,9 @@
 using System;
 using System.Data;
 using System.Linq;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AqualLifeStyle.Domain.AQGreen;
@@ -14,7 +17,72 @@ namespace AqualLifeStyle.EntityFrameworkCore
 {
     public sealed record AQGreenBackfillTargetIdentity(
         string Database, string User, string ServerAddress, int ServerPort,
-        string SourceSnapshotSha256);
+        string SourceSnapshotSha256, string TargetKind = "local-fixture",
+        string ServiceId = null, int ServerVersionNumber = 180006,
+        byte[] VerifiedTargetReceipt = null, string VerifiedTargetReceiptSha256 = null);
+
+    // Evidence origin is not an execution permission. The separate, protected receipt must
+    // itself be independently verified and owner-authorised before any future clone use.
+    // This guard verifies its exact bytes and target bindings; it does not authenticate Render.
+    public static class AQGreenCustomer11TargetGuard
+    {
+        public const string ProductionServiceId = "dpg-d9f0jne1a83c73d8m780-a";
+        public const string ProductionDatabase = "aqualifestyle";
+
+        public static void Verify(NpgsqlConnectionStringBuilder connection, AQGreenBackfillTargetIdentity target)
+        {
+            void Check(bool value, string category) { if (!value) throw new InvalidOperationException("TargetIdentity:" + category); }
+            var host = connection.Host;
+            Check(!string.IsNullOrWhiteSpace(host) && !host.Contains(ProductionServiceId, StringComparison.OrdinalIgnoreCase) &&
+                  connection.Database != ProductionDatabase && target.Database != ProductionDatabase &&
+                  target.ServiceId != ProductionServiceId, "ProductionDenied");
+            Check(!host.Contains(',') && host == host.Trim() && !host.Contains('/') &&
+                  connection.Database == target.Database && connection.Username == target.User &&
+                  IPAddress.TryParse(target.ServerAddress, out _) && target.ServerPort > 0 && target.ServerPort <= 65535,
+                "Routing");
+            Check(target.ServerVersionNumber == AQGreenCustomer11BackfillPlan.ServerVersionNumber, "ServerVersionNumber");
+            if (target.TargetKind == "local-fixture")
+            {
+                Check(host == "127.0.0.1" || host == "localhost" || host == "::1", "Local fixture target must be an explicit loopback endpoint.");
+                Check(target.Database.StartsWith("customer11_test_", StringComparison.Ordinal) && target.User == "fixture" &&
+                      target.ServiceId == null && target.VerifiedTargetReceipt == null && target.VerifiedTargetReceiptSha256 == null, "DisposableFixture");
+                return;
+            }
+            Check(target.TargetKind == "verified-recovery-clone", "TargetKind");
+            Check(target.ServiceId == AQGreenCustomer11BackfillPlan.RecoveryServiceId &&
+                  target.Database == AQGreenCustomer11BackfillPlan.RecoveryDatabase &&
+                  target.User == AQGreenCustomer11BackfillPlan.RecoveryUser, "RecoveryContext");
+            Check(target.VerifiedTargetReceipt != null && target.VerifiedTargetReceiptSha256 != null &&
+                  Convert.ToHexString(SHA256.HashData(target.VerifiedTargetReceipt)).ToLowerInvariant() == target.VerifiedTargetReceiptSha256,
+                "VerificationReceiptHash");
+            using var document = JsonDocument.Parse(target.VerifiedTargetReceipt);
+            var r = document.RootElement;
+            Check(r.GetProperty("verification").GetString() == "OWNER_AUTHORISED_INDEPENDENT_TARGET_VERIFICATION" &&
+                  r.GetProperty("targetKind").GetString() == target.TargetKind &&
+                  r.GetProperty("serviceId").GetString() == target.ServiceId &&
+                  r.GetProperty("database").GetString() == target.Database && r.GetProperty("user").GetString() == target.User &&
+                  r.GetProperty("serverAddress").GetString() == target.ServerAddress && r.GetProperty("serverPort").GetInt32() == target.ServerPort &&
+                  r.GetProperty("serverVersionNumber").GetInt32() == target.ServerVersionNumber &&
+                  r.GetProperty("inputSha256").GetString() == AQGreenCustomer11BackfillPlan.InputSha256 &&
+                  r.GetProperty("outputSha256").GetString() == AQGreenCustomer11BackfillPlan.OutputSha256 &&
+                  r.GetProperty("captureSha256").GetString() == AQGreenCustomer11BackfillPlan.CaptureSha256 &&
+                  r.GetProperty("scopeId").GetGuid() == Guid.Parse("06a452ea-9958-5911-8c5b-5d350e516095") &&
+                  r.GetProperty("pitrSourceServiceId").GetString() == ProductionServiceId &&
+                  r.GetProperty("pitrCutoffUtc").GetString() == "2026-10-02T05:37:10Z" &&
+                  r.GetProperty("productionServiceId").GetString() == ProductionServiceId &&
+                  r.GetProperty("productionDatabase").GetString() == ProductionDatabase &&
+                  r.GetProperty("isolatedFromProduction").GetBoolean(), "VerificationReceiptBinding");
+            // No guessed region or endpoint is pinned. The independently verified receipt
+            // supplies the exact provider endpoint; aliases and changed routing are refused.
+            Check(r.GetProperty("endpoint").GetString() == host &&
+                  host.StartsWith(target.ServiceId + ".", StringComparison.Ordinal) &&
+                  host.EndsWith("-postgres.render.com", StringComparison.Ordinal) &&
+                  Uri.CheckHostName(host) == UriHostNameType.Dns &&
+                  connection.Port == r.GetProperty("externalPort").GetInt32() &&
+                  connection.SslMode == SslMode.VerifyFull &&
+                  !Equals(connection["Trust Server Certificate"], true) && string.IsNullOrEmpty(connection.Options), "VerifiedEndpoint");
+        }
+    }
 
     public sealed record AQGreenBackfillResult(
         bool DryRun, bool AlreadyApplied, int ScopeInserts, int PlacementInserts,
@@ -40,10 +108,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 "Writer requires a fresh context and owns the sole transaction.");
             Require(target.SourceSnapshotSha256 == plan.SourceSnapshotSha256,
                 "Operator-verified source snapshot identity differs from accepted input.");
-            var configuredHost = new NpgsqlConnectionStringBuilder(_context.Database.GetConnectionString()).Host;
-            Require(!string.IsNullOrWhiteSpace(configuredHost) &&
-                    !configuredHost.Contains(plan.SourceServiceId, StringComparison.OrdinalIgnoreCase),
-                "The source production Render endpoint is prohibited.");
+            AQGreenCustomer11TargetGuard.Verify(new NpgsqlConnectionStringBuilder(_context.Database.GetConnectionString()), target);
             await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
             try
             {
@@ -53,13 +118,14 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 var connection = (NpgsqlConnection)_context.Database.GetDbConnection();
                 var pgTransaction = (NpgsqlTransaction)transaction.GetDbTransaction();
                 await using (var identity = new NpgsqlCommand(
-                    "SELECT current_database(), current_user, host(inet_server_addr()), inet_server_port(), current_setting('session_replication_role')", connection, pgTransaction))
+                    "SELECT current_database(), current_user, host(inet_server_addr()), inet_server_port(), current_setting('session_replication_role'), current_setting('server_version_num')::integer", connection, pgTransaction))
                 await using (var reader = await identity.ExecuteReaderAsync(cancellationToken))
                 {
                     Require(await reader.ReadAsync(cancellationToken) &&
                             reader.GetString(0) == target.Database && reader.GetString(1) == target.User &&
                             !reader.IsDBNull(2) && reader.GetString(2) == target.ServerAddress && reader.GetInt32(3) == target.ServerPort &&
-                            reader.GetString(4) == "origin", "Target database/user/server identity or trigger execution mode differs.");
+                            reader.GetString(4) == "origin" && reader.GetInt32(5) == target.ServerVersionNumber,
+                        "Target database/user/server/version identity or trigger execution mode differs.");
                 }
                 // Same transaction-scoped key and PostgreSQL hash used by live placement allocation.
                 await _context.Database.ExecuteSqlRawAsync(
@@ -78,10 +144,11 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 await AQGreenBackfillSchemaGuard.VerifyAsync(_context, cancellationToken);
                 await VerifySourceAsync(plan, cancellationToken);
                 var ids = plan.Members.Select(m => m.ParticipantId).ToArray();
+                var storageIds = ids.Select(plan.PlacementId).ToArray();
                 var scope = await _context.AQGreenPlacementTreeScopes.IgnoreQueryFilters().AsNoTracking()
                     .SingleOrDefaultAsync(s => s.Id == plan.ScopeId, cancellationToken);
                 var placements = await _context.AQGreenNetworkPlacements.IgnoreQueryFilters().AsNoTracking()
-                    .Where(p => p.PlacementTreeScopeId == plan.ScopeId || ids.Contains(p.ParticipantId))
+                    .Where(p => p.PlacementTreeScopeId == plan.ScopeId || ids.Contains(p.ParticipantId) || storageIds.Contains(p.Id))
                     .ToListAsync(cancellationToken);
                 var alreadyApplied = scope != null || placements.Count != 0;
                 if (alreadyApplied)
@@ -91,7 +158,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
                     foreach (var member in plan.Members)
                     {
                         var existing = placements.SingleOrDefault(p => p.ParticipantId == member.ParticipantId);
-                        Require(existing != null && existing.TenantId == plan.TenantId && existing.PlacementTreeScopeId == plan.ScopeId &&
+                        Require(existing != null && existing.Id == plan.PlacementId(member.ParticipantId) && existing.TenantId == plan.TenantId && existing.PlacementTreeScopeId == plan.ScopeId &&
                                 existing.PlacementParentParticipantId == member.ParentId && existing.PlacementSlot == member.Slot &&
                                 existing.CanonicalPath == member.CanonicalPath && existing.PlacedAt == plan.EffectiveAtUtc &&
                                 existing.RulesVersion == AQGreenPlacementRules.CurrentVersion,

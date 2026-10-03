@@ -1,6 +1,9 @@
 using System.Data.Common;
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text;
+using System.Text.Json.Nodes;
+using System.Security.Cryptography;
 using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.EntityFrameworkCore;
@@ -14,6 +17,240 @@ namespace AqualLifeStyle.Customer11Backfill.Tests;
 [Collection("Customer11 PostgreSQL")]
 public sealed class BackfillPostgreSqlTests(PostgreSqlFixture fixture)
 {
+    private static readonly string[] NewIds = {
+        "c36485ad-65c2-c44e-54a8-abbba3b91cfa", "f5110269-2d6d-47a7-4e8a-dc03b9120cc6",
+        "1f8f57f6-1b42-ee1e-1ddc-d1d92966a0c6", "08280e99-67e9-4e4d-4359-240f02eba052",
+        "f003f647-9d57-b259-5656-67bf91231662", "1d251e09-d29a-d47f-afb6-950aa3ef6634" };
+    private static readonly string[] OldIds = {
+        "31599db2-bfd8-f661-a328-a66b987e20a7", "97c80850-dfec-5f9c-c309-aa266f426a94",
+        "86988bb0-38b0-cffe-4075-dbce22fcde84", "5161a991-a5f1-50b4-45b8-c40222d14d73",
+        "f7811ac4-256d-02ef-c20d-1c46bbda906c", "7e772bed-3c78-5caa-5521-809caa7e0113" };
+
+    [Fact]
+    public void AcceptedNewLineage_ExactIds_Unknowns_AndCustodyPreserved()
+    {
+        Assert.Equal(180006,fixture.ObservedServerVersionNumber);
+        Assert.Equal("74a8e8bedd14d151c119173e44671c7ec8fd8c03ebb75cbd0763974c6dd3e416",AQGreenCustomer11BackfillPlan.InputSha256);
+        Assert.Equal("a1bcf510b41fa97e449e0dcb938d2b492ad08f215f6d4e5d75ff117f8b6af11d",AQGreenCustomer11BackfillPlan.OutputSha256);
+        Assert.Equal("b84119e66c886ac0086b9f531186d7345a007359df465ac945afe033787e2494",fixture.Plan.SourceSnapshotSha256);
+        Assert.Equal("NEW RECOVERY-CLONE EVIDENCE CAPTURE",fixture.Plan.SourceProvenance.GetProperty("captureLabel").GetString());
+        Assert.Equal("NOT CLAIMED",fixture.Plan.CustodyDisclosure.GetProperty("uninterruptedCustody").GetString());
+        Assert.Equal(new[] {11,14,15,17,19,18},fixture.Plan.Members.Select(m=>m.CustomerId));
+        for(int i=0;i<6;i++)
+        {
+            var m=fixture.Plan.Members[i];
+            Assert.Equal(Guid.Parse(NewIds[i]),fixture.Plan.PlacementId(m.ParticipantId));
+            Assert.DoesNotContain(fixture.Plan.PlacementId(m.ParticipantId),OldIds.Select(Guid.Parse));
+            Assert.Null(m.EffectiveV1StructuralLevel);
+            Assert.Equal(i==0?"UNKNOWN":"RETAINED_POSITIVE_DECISION",m.HistoricalAdministratorApproval);
+            Assert.Equal("LegacyUnknownAcquisition",m.AcquisitionProvenance);
+            Assert.Equal("UNKNOWN",m.HistoricalInvitation); Assert.Equal("UNKNOWN",m.HistoricalParticipantConfirmation);
+        }
+    }
+
+    [Theory]
+    [InlineData("input")][InlineData("output")][InlineData("capture")][InlineData("mixed")]
+    public void HistoricalOrMixedLineage_Rejected(string kind)
+    {
+        var input=fixture.Input.ToArray(); var output=fixture.Output.ToArray(); var capture=fixture.Capture.ToArray();
+        if(kind=="input" || kind=="mixed") input=Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(input).Replace(
+            AQGreenCustomer11BackfillPlan.CaptureSha256,"ac89f43cbe89959b7da690c836c33f6365593476cb687db1f29c059f04b25c8e",StringComparison.Ordinal));
+        if(kind=="output" || kind=="mixed") output=Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(output).Replace(
+            AQGreenCustomer11BackfillPlan.InputSha256,"57529d67d4320595c90e2dedaf492d97c42fede1febd22caea014d0fc16f257c",StringComparison.Ordinal));
+        if(kind=="capture") capture=Encoding.UTF8.GetBytes("{}\n{}\n");
+        Assert.Throws<InvalidOperationException>(()=>AQGreenCustomer11BackfillPlan.Load(input,output,capture));
+    }
+
+    [Theory]
+    [InlineData("missing")][InlineData("duplicate")][InlineData("failed")][InlineData("misordered")]
+    [InlineData("database")][InlineData("user")][InlineData("version")][InlineData("readonly")]
+    [InlineData("origin")][InlineData("label")][InlineData("time")][InlineData("supplement")]
+    [InlineData("identity-database")][InlineData("identity-user")][InlineData("extra")]
+    [InlineData("failed-second")][InlineData("failed-third")][InlineData("failed-fourth")]
+    public void SevenRecordCapture_RejectsInvalidTransportIndependentlyOfHash(string kind)
+    {
+        var r=Encoding.UTF8.GetString(fixture.Capture).Split('\n',StringSplitOptions.RemoveEmptyEntries).Select(s=>JsonNode.Parse(s)!).ToList();
+        switch(kind)
+        {
+            case "missing": r.RemoveAt(0); break;
+            case "extra": r.Add(r[6].DeepClone()); break;
+            case "duplicate": r[1]=r[0].DeepClone(); break;
+            case "misordered": (r[0],r[1])=(r[1],r[0]); break;
+            case "failed": r[0]["result"]="FAIL"; break;
+            case "failed-second": r[1]["result"]="FAIL"; break;
+            case "failed-third": r[2]["result"]="FAIL"; break;
+            case "failed-fourth": r[3]["result"]="FAIL"; break;
+            case "database": r[0]["observed"]="aqualifestyle"; break;
+            case "user": r[1]["observed"]="wrong"; break;
+            case "version": r[2]["observed"]=180004; break;
+            case "readonly": r[3]["observed"]="off"; break;
+            case "origin": r[4]["clone_service_id"]=AQGreenCustomer11TargetGuard.ProductionServiceId; break;
+            case "label": r[4]["capture_label"]="ORIGINAL PRODUCTION CAPTURE"; break;
+            case "time": r[4]["historical_pitr_cutoff"]="2026-10-03T00:00:00Z"; break;
+            case "identity-database": r[4]["database"]="wrong"; break;
+            case "identity-user": r[4]["user"]="wrong"; break;
+            case "supplement": r[6]["placement_count"]=1; break;
+        }
+        var bytes=Encoding.UTF8.GetBytes(string.Join('\n',r.Select(n=>n.ToJsonString()))+"\n");
+        Assert.Throws<InvalidOperationException>(()=>AQGreenCustomer11BackfillPlan.VerifyCaptureStructure(bytes));
+        Assert.Throws<InvalidOperationException>(()=>AQGreenCustomer11BackfillPlan.Load(fixture.Input,fixture.Output,bytes));
+    }
+
+    [Fact]
+    public void ExactSevenRecordCapture_PresentationVersionIsObservationOnly()
+    {
+        AQGreenCustomer11BackfillPlan.VerifyCaptureStructure(fixture.Capture);
+        var r=Encoding.UTF8.GetString(fixture.Capture).Split('\n',StringSplitOptions.RemoveEmptyEntries).Select(s=>JsonNode.Parse(s)!).ToArray();
+        r[2]["server_version"]="18.6 distribution observation";
+        r[4]["version"]="PostgreSQL 18.6 distribution observation";
+        AQGreenCustomer11BackfillPlan.VerifyCaptureStructure(Encoding.UTF8.GetBytes(string.Join('\n',r.Select(n=>n.ToJsonString()))+"\n"));
+    }
+
+    // No real provider endpoint is used. This structurally shaped host is synthetic and
+    // is only passed to the pure guard; never resolved or connected.
+    private static (NpgsqlConnectionStringBuilder Connection,AQGreenBackfillTargetIdentity Target,JsonObject Receipt) CloneContext()
+    {
+        var service=AQGreenCustomer11BackfillPlan.RecoveryServiceId;
+        var endpoint=service+".fixture-postgres.render.com";
+        var c=new NpgsqlConnectionStringBuilder { Host=endpoint,Database=AQGreenCustomer11BackfillPlan.RecoveryDatabase,
+            Username=AQGreenCustomer11BackfillPlan.RecoveryUser,Port=5432,SslMode=SslMode.VerifyFull };
+        var r=new JsonObject {
+            ["verification"]="OWNER_AUTHORISED_INDEPENDENT_TARGET_VERIFICATION",["targetKind"]="verified-recovery-clone",
+            ["serviceId"]=service,["database"]=c.Database,["user"]=c.Username,["endpoint"]=endpoint,["externalPort"]=5432,
+            ["serverAddress"]="192.0.2.1",["serverPort"]=5432,["serverVersionNumber"]=180006,
+            ["inputSha256"]=AQGreenCustomer11BackfillPlan.InputSha256,["outputSha256"]=AQGreenCustomer11BackfillPlan.OutputSha256,
+            ["captureSha256"]=AQGreenCustomer11BackfillPlan.CaptureSha256,
+            ["scopeId"]="06a452ea-9958-5911-8c5b-5d350e516095",
+            ["pitrSourceServiceId"]=AQGreenCustomer11TargetGuard.ProductionServiceId,["pitrCutoffUtc"]="2026-10-02T05:37:10Z",
+            ["productionServiceId"]=AQGreenCustomer11TargetGuard.ProductionServiceId,
+            ["productionDatabase"]=AQGreenCustomer11TargetGuard.ProductionDatabase,["isolatedFromProduction"]=true };
+        var t=new AQGreenBackfillTargetIdentity(c.Database!,c.Username!,"192.0.2.1",5432,AQGreenCustomer11BackfillPlan.CaptureSha256,
+            "verified-recovery-clone",service,180006);
+        return(c,BindReceipt(t,r),r);
+    }
+    private static AQGreenBackfillTargetIdentity BindReceipt(AQGreenBackfillTargetIdentity t,JsonObject r)
+    {
+        var bytes=Encoding.UTF8.GetBytes(r.ToJsonString());
+        return t with { VerifiedTargetReceipt=bytes,VerifiedTargetReceiptSha256=Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant() };
+    }
+
+    [Fact]
+    public void RecoveryGuard_DoesNotDenyRecoveryEvidenceOrigin_NoNetworkExecution()
+    {
+        var (c,t,_)=CloneContext(); AQGreenCustomer11TargetGuard.Verify(c,t);
+    }
+
+    [Theory]
+    [InlineData("production-host")][InlineData("production-database")][InlineData("production-service")]
+    [InlineData("database")][InlineData("user")][InlineData("service")][InlineData("version")]
+    [InlineData("alias")][InlineData("multi-host")][InlineData("port")][InlineData("ssl")]
+    [InlineData("missing-receipt")][InlineData("forged-reference")][InlineData("forged-endpoint")]
+    [InlineData("forged-service")][InlineData("forged-isolation")][InlineData("old-input")][InlineData("old-output")]
+    [InlineData("old-capture")][InlineData("options")][InlineData("trust-certificate")]
+    [InlineData("wrong-pitr-source")][InlineData("wrong-pitr-cutoff")][InlineData("wrong-scope")]
+    public async Task CloneContextOrEndpointMismatch_DirectWriterRejectsBeforeConnection(string kind)
+    {
+        var(c,t,r)=CloneContext();
+        switch(kind)
+        {
+            case "production-host": c.Host=AQGreenCustomer11TargetGuard.ProductionServiceId+".fixture-postgres.render.com"; break;
+            case "production-database": c.Database=AQGreenCustomer11TargetGuard.ProductionDatabase; t=t with {Database=c.Database}; break;
+            case "production-service": t=t with {ServiceId=AQGreenCustomer11TargetGuard.ProductionServiceId}; break;
+            case "database": c.Database="wrong"; t=t with {Database="wrong"}; break;
+            case "user": c.Username="wrong"; t=t with {User="wrong"}; break;
+            case "service": t=t with {ServiceId="wrong"}; break;
+            case "version": t=t with {ServerVersionNumber=180004}; break;
+            case "alias": c.Host="alias.example.invalid"; break;
+            case "multi-host": c.Host+=",127.0.0.1"; break;
+            case "port": c.Port=1; break;
+            case "ssl": c.SslMode=SslMode.Require; break;
+            case "missing-receipt": t=t with {VerifiedTargetReceipt=null}; break;
+            case "forged-reference": t=t with {VerifiedTargetReceiptSha256=new string('0',64)}; break;
+            case "forged-endpoint": r["endpoint"]="alias.example.invalid"; t=BindReceipt(t,r); break;
+            case "forged-service": r["serviceId"]=AQGreenCustomer11TargetGuard.ProductionServiceId; t=BindReceipt(t,r); break;
+            case "forged-isolation": r["isolatedFromProduction"]=false; t=BindReceipt(t,r); break;
+            case "old-input": r["inputSha256"]="57529d67d4320595c90e2dedaf492d97c42fede1febd22caea014d0fc16f257c"; t=BindReceipt(t,r); break;
+            case "old-output": r["outputSha256"]="46a7ae8a01b28b4c8896f1f778f704e6673256164b3825c1a052f1d113430978"; t=BindReceipt(t,r); break;
+            case "old-capture": r["captureSha256"]="ac89f43cbe89959b7da690c836c33f6365593476cb687db1f29c059f04b25c8e"; t=BindReceipt(t,r); break;
+            case "options": c.Options="-c search_path=pg_catalog"; break;
+            case "trust-certificate": c["Trust Server Certificate"]=true; break;
+            case "wrong-pitr-source": r["pitrSourceServiceId"]="wrong"; t=BindReceipt(t,r); break;
+            case "wrong-pitr-cutoff": r["pitrCutoffUtc"]="2026-10-03T00:00:00Z"; t=BindReceipt(t,r); break;
+            case "wrong-scope": r["scopeId"]=Guid.NewGuid().ToString(); t=BindReceipt(t,r); break;
+        }
+        var interceptor=new NoConnection();
+        await using var guarded=new AqualLifeStyleDbContext(new DbContextOptionsBuilder<AqualLifeStyleDbContext>().UseNpgsql(c.ConnectionString).AddInterceptors(interceptor).Options);
+        var error=await Assert.ThrowsAsync<InvalidOperationException>(()=>new AQGreenCustomer11BackfillWriter(guarded).ExecuteAsync(fixture.Plan,t,true));
+        Assert.StartsWith("TargetIdentity:",error.Message); Assert.Equal(0,interceptor.Attempts);
+    }
+
+    private sealed class NoConnection : DbConnectionInterceptor
+    {
+        public int Attempts { get; private set; }
+        public override ValueTask<InterceptionResult> ConnectionOpeningAsync(DbConnection connection,ConnectionEventData eventData,InterceptionResult result,CancellationToken cancellationToken=default)
+        { Attempts++; throw new InvalidOperationException("Unexpected network connection"); }
+    }
+
+    [Fact]
+    public async Task CloneModeCli_ProductionEndpointRejectedBeforeAnyNetworkConnection()
+    {
+        var(c,t,_)=CloneContext();
+        c.Host=AQGreenCustomer11TargetGuard.ProductionServiceId+".fixture-postgres.render.com";
+        var result=await Command("unused","dry-run",c.ConnectionString,t);
+        Assert.Equal(1,result.Exit); Assert.Contains("TargetIdentity:ProductionDenied",result.Output);
+        Assert.DoesNotContain("POSTGRESQL_FAILURE",result.Output);
+    }
+
+    [Theory]
+    [InlineData("old")][InlineData("arbitrary")][InlineData("mixed")]
+    public async Task SameTopologyDifferentStorageIdentity_FailsClosed(string kind)
+    {
+        await using var db=await fixture.NewDatabase();
+        await using(var context=fixture.Context(db.Dsn))
+        {
+            await using var tx=await context.Database.BeginTransactionAsync();
+            var scope=AQGreenPlacementTreeScope.Create(1); scope.Id=fixture.Plan.ScopeId;
+            context.AQGreenPlacementTreeScopes.Add(scope); await context.SaveChangesAsync();
+            AQGreenNetworkPlacement? root=null;
+            for(int i=0;i<6;i++)
+            {
+                var m=fixture.Plan.Members[i];
+                var p=i==0?AQGreenNetworkPlacement.CreateRoot(scope,m.ParticipantId,fixture.Plan.EffectiveAtUtc,AQGreenPlacementRules.CurrentVersion):
+                    AQGreenNetworkPlacement.CreateChild(root!,m.ParticipantId,m.Slot!.Value,fixture.Plan.EffectiveAtUtc,AQGreenPlacementRules.CurrentVersion);
+                p.Id=kind=="arbitrary"?Guid.NewGuid():Guid.Parse(kind=="mixed" && i%2==0?NewIds[i]:OldIds[i]);
+                context.AQGreenNetworkPlacements.Add(p); await context.SaveChangesAsync(); if(i==0) root=p;
+            }
+            await tx.CommitAsync();
+        }
+        var before=await TopologyDigest(db.Dsn); var other=await NonTopologyDigest(db.Dsn);
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>Run(db.Dsn,true));
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>Run(db.Dsn,false));
+        Assert.Equal(before,await TopologyDigest(db.Dsn)); Assert.Equal(other,await NonTopologyDigest(db.Dsn));
+    }
+
+    [Fact]
+    public async Task ProspectivePrimaryKeyCollisionElsewhere_RejectedByDryRunBeforeInsert()
+    {
+        await using var db=await fixture.NewDatabase(); var id=Guid.NewGuid();
+        await PostgreSqlFixture.Sql(db.Dsn,"""
+            INSERT INTO "Customers" ("Id","TenantId","Name","Email","AreaId","IsActive","CreationTime","ClubMemberNumber","UserId","IsDeleted")
+            VALUES (999,1,'Fixture','collision@example.test','cccccccc-0000-0000-0000-000000000001',true,NOW(),'COLLISION',9000,false);
+            INSERT INTO "EntryParticipations" ("Id","TenantId","CustomerId","Status","StartedAt","TermsVersion","TermsEffectiveFrom","JoiningPaymentAmount","JoiningInstallmentAmount","RegistrationPaymentAmount","ActivationPaymentAmount","MonthlyCommitmentAmount","GracePeriodDays","Currency","CreationTime","IsDeleted")
+            VALUES (@id,1,999,0,TIMESTAMPTZ '2026-01-01','fixture',TIMESTAMPTZ '2026-01-01',1200,0,0,0,600,7,'ZAR',NOW(),false);
+            """,new NpgsqlParameter("id",id));
+        await using(var context=fixture.Context(db.Dsn))
+        {
+            await using var tx=await context.Database.BeginTransactionAsync();
+            var scope=AQGreenPlacementTreeScope.Create(1); context.AQGreenPlacementTreeScopes.Add(scope); await context.SaveChangesAsync();
+            var p=AQGreenNetworkPlacement.CreateRoot(scope,id,fixture.Plan.EffectiveAtUtc,AQGreenPlacementRules.CurrentVersion);
+            p.Id=Guid.Parse(NewIds[0]); context.AQGreenNetworkPlacements.Add(p); await context.SaveChangesAsync(); await tx.CommitAsync();
+        }
+        var before=await TopologyDigest(db.Dsn);
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>Run(db.Dsn,true));
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>Run(db.Dsn,false));
+        Assert.Equal(before,await TopologyDigest(db.Dsn));
+    }
+
     [Fact]
     public async Task OperatorCommand_DryRun_Apply_Retry_AndProductionEndpointRefusal()
     {
@@ -239,6 +476,7 @@ public sealed class BackfillPostgreSqlTests(PostgreSqlFixture fixture)
 
     [Theory]
     [InlineData("scope")]
+    [InlineData("participant-elsewhere")]
     [InlineData("placement")]
     [InlineData("partial")]
     [InlineData("extra")]
@@ -248,11 +486,11 @@ public sealed class BackfillPostgreSqlTests(PostgreSqlFixture fixture)
         await using(var context=fixture.Context(db.Dsn))
         {
             await using var tx=await context.Database.BeginTransactionAsync();
-            var scope=AQGreenPlacementTreeScope.Create(1); scope.Id=kind=="scope"?Guid.NewGuid():fixture.Plan.ScopeId;
+            var scope=AQGreenPlacementTreeScope.Create(1); scope.Id=kind=="scope" || kind=="participant-elsewhere"?Guid.NewGuid():fixture.Plan.ScopeId;
             context.AQGreenPlacementTreeScopes.Add(scope); await context.SaveChangesAsync();
             var root=AQGreenNetworkPlacement.CreateRoot(scope,fixture.Plan.RootParticipantId,fixture.Plan.EffectiveAtUtc,AQGreenPlacementRules.CurrentVersion);
             context.AQGreenNetworkPlacements.Add(root); await context.SaveChangesAsync();
-            if(kind=="placement" || kind=="extra")
+            if(kind=="placement" || kind=="extra" || kind=="participant-elsewhere")
             {
                 foreach(var member in fixture.Plan.Members.Skip(1))
                 {
@@ -270,6 +508,7 @@ public sealed class BackfillPostgreSqlTests(PostgreSqlFixture fixture)
             await AddExtra(db.Dsn,fixture.Plan.ScopeId);
         }
         var before=await TopologyDigest(db.Dsn);
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>Run(db.Dsn,true));
         await Assert.ThrowsAsync<InvalidOperationException>(()=>Run(db.Dsn,false));
         Assert.Equal(before,await TopologyDigest(db.Dsn));
     }
@@ -366,22 +605,32 @@ public sealed class BackfillPostgreSqlTests(PostgreSqlFixture fixture)
         Assert.Throws<InvalidOperationException>(()=>AQGreenCustomer11BackfillPlan.Load(fixture.Input,fixture.Output,capture));
     }
 
-    private async Task<(int Exit,string Output)> Command(string identityDsn,string mode,string dsn)
+    private async Task<(int Exit,string Output)> Command(string identityDsn,string mode,string dsn,AQGreenBackfillTargetIdentity? suppliedTarget=null)
     {
-        var target=await GetTarget(identityDsn);
+        var target=suppliedTarget??await GetTarget(identityDsn);
         var start=new ProcessStartInfo("dotnet") { RedirectStandardOutput=true,RedirectStandardError=true };
         foreach(var arg in new[] { Path.Combine(AppContext.BaseDirectory,"AqualLifeStyle.Customer11Backfill.dll"),
             "--mode",mode,"--manifest",Environment.GetEnvironmentVariable("AQGREEN_CUSTOMER11_ACCEPTED_INPUT")!,
             "--output",Environment.GetEnvironmentVariable("AQGREEN_CUSTOMER11_ACCEPTED_OUTPUT")!,
             "--source-capture",Environment.GetEnvironmentVariable("AQGREEN_CUSTOMER11_ACCEPTED_CAPTURE")!,
-            "--target-kind","local-fixture","--expected-database",target.Database,"--expected-user",target.User,
+            "--target-kind",target.TargetKind,"--expected-database",target.Database,"--expected-user",target.User,
             "--expected-server-address",target.ServerAddress,"--expected-server-port",target.ServerPort.ToString(),
             "--source-snapshot-sha256",target.SourceSnapshotSha256 }) start.ArgumentList.Add(arg);
-        start.Environment["AQGREEN_CUSTOMER11_BACKFILL_DSN"]=dsn;
-        using var process=Process.Start(start)!;
-        var output=process.StandardOutput.ReadToEndAsync(); var error=process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        return (process.ExitCode,(await output)+(await error));
+        string? receiptFile=null;
+        try
+        {
+            if(target.TargetKind=="verified-recovery-clone")
+            {
+                receiptFile=Path.GetTempFileName(); await File.WriteAllBytesAsync(receiptFile,target.VerifiedTargetReceipt!);
+                foreach(var arg in new[] {"--expected-service-id",target.ServiceId!,"--verified-target-receipt",receiptFile,"--verified-target-reference",target.VerifiedTargetReceiptSha256!}) start.ArgumentList.Add(arg);
+            }
+            start.Environment["AQGREEN_CUSTOMER11_BACKFILL_DSN"]=dsn;
+            using var process=Process.Start(start)!;
+            var output=process.StandardOutput.ReadToEndAsync(); var error=process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            return (process.ExitCode,(await output)+(await error));
+        }
+        finally { if(receiptFile!=null) File.Delete(receiptFile); }
     }
 
     private sealed class NullReceiptHash : IMaterializationInterceptor

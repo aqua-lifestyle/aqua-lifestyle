@@ -10,12 +10,12 @@ try
 {
     if (args.Length == 1 && args[0] == "--help")
     {
-        Console.WriteLine("Customer11Backfill --mode dry-run|apply --manifest FILE --output FILE --source-capture FILE --target-kind local-fixture|verified-recovery-clone --expected-database NAME --expected-user NAME --expected-server-address IP --expected-server-port PORT --source-snapshot-sha256 SHA [--verified-target-reference RECEIPT_SHA256]");
+        Console.WriteLine("Customer11Backfill --mode dry-run|apply --manifest FILE --output FILE --source-capture FILE --target-kind local-fixture|verified-recovery-clone --expected-database NAME --expected-user NAME --expected-server-address IP --expected-server-port PORT --source-snapshot-sha256 SHA [--expected-service-id ID --verified-target-receipt FILE --verified-target-reference RECEIPT_SHA256]");
         Console.WriteLine("Connection secret: AQGREEN_CUSTOMER11_BACKFILL_DSN environment variable. Production execution is prohibited. Clone verification and execution require separate owner authority.");
         return 0;
     }
     if (args.Length % 2 != 0) throw new InvalidOperationException("Every option requires one explicit value.");
-    var allowed = new HashSet<string> { "--mode", "--manifest", "--output", "--source-capture", "--target-kind", "--expected-database", "--expected-user", "--expected-server-address", "--expected-server-port", "--source-snapshot-sha256", "--verified-target-reference" };
+    var allowed = new HashSet<string> { "--mode", "--manifest", "--output", "--source-capture", "--target-kind", "--expected-database", "--expected-user", "--expected-server-address", "--expected-server-port", "--source-snapshot-sha256", "--verified-target-reference", "--verified-target-receipt", "--expected-service-id" };
     var parsed = new Dictionary<string, string>(StringComparer.Ordinal);
     for (var i = 0; i < args.Length; i += 2)
         if (!allowed.Contains(args[i]) || !parsed.TryAdd(args[i], args[i + 1]))
@@ -29,21 +29,6 @@ try
     if (string.IsNullOrWhiteSpace(dsn)) throw new InvalidOperationException("Connection environment variable is required; credentials must not be command arguments.");
     var connection = new NpgsqlConnectionStringBuilder(dsn) { ApplicationName = "AQGreenCustomer11BoundedBackfill", IncludeErrorDetail = false };
     var targetKind = Required("--target-kind");
-    var host = connection.Host ?? throw new InvalidOperationException("Explicit connection host is required.");
-    if (targetKind == "local-fixture")
-    {
-        if (host != "127.0.0.1" && host != "localhost" && host != "::1")
-            throw new InvalidOperationException("Local fixture target must be an explicit loopback endpoint.");
-    }
-    else if (targetKind == "verified-recovery-clone")
-    {
-        var reference = Required("--verified-target-reference");
-        if (reference.Length != 64 || !reference.All(c => char.IsAsciiHexDigit(c)))
-            throw new InvalidOperationException("A separately verified clone/authority receipt SHA-256 reference is required.");
-    }
-    else throw new InvalidOperationException("Production/unknown target kind is prohibited.");
-    if (host.Contains(plan.SourceServiceId, StringComparison.OrdinalIgnoreCase))
-        throw new InvalidOperationException("The source production Render endpoint is prohibited.");
     var database = Required("--expected-database");
     var user = Required("--expected-user");
     if (database != connection.Database || user != connection.Username)
@@ -51,7 +36,15 @@ try
     var address = Required("--expected-server-address");
     if (!IPAddress.TryParse(address, out _) || !int.TryParse(Required("--expected-server-port"), out var port) || port < 1 || port > 65535)
         throw new InvalidOperationException("Explicit server IP/internal port identity is required.");
-    var target = new AQGreenBackfillTargetIdentity(database, user, address, port, Required("--source-snapshot-sha256"));
+    var clone = targetKind == "verified-recovery-clone";
+    if (!clone && parsed.Keys.Any(k => k == "--expected-service-id" || k == "--verified-target-receipt" || k == "--verified-target-reference"))
+        throw new InvalidOperationException("Clone verification options cannot be used in fixture mode.");
+    var target = new AQGreenBackfillTargetIdentity(database, user, address, port, Required("--source-snapshot-sha256"),
+        targetKind, clone ? Required("--expected-service-id") : null,
+        AQGreenCustomer11BackfillPlan.ServerVersionNumber,
+        clone ? File.ReadAllBytes(Required("--verified-target-receipt")) : null,
+        clone ? Required("--verified-target-reference") : null);
+    AQGreenCustomer11TargetGuard.Verify(connection, target); // same check also enforced inside the writer
     await using var context = new AqualLifeStyleDbContext(new DbContextOptionsBuilder<AqualLifeStyleDbContext>().UseNpgsql(connection.ConnectionString).Options);
     var result = await new AQGreenCustomer11BackfillWriter(context).ExecuteAsync(plan, target, mode == "dry-run");
     Console.WriteLine(JsonSerializer.Serialize(new

@@ -21,6 +21,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
     public byte[] Output { get; private set; } = null!;
     public byte[] Capture { get; private set; } = null!;
     public AQGreenCustomer11BackfillPlan Plan { get; private set; } = null!;
+    public int ObservedServerVersionNumber { get; private set; }
     private string Admin => ConnectionString("postgres");
     private string ConnectionString(string database) => new NpgsqlConnectionStringBuilder
     {
@@ -45,6 +46,8 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         await Sql(Admin, $"CREATE DATABASE \"{_template}\";");
         await using(var context=Context(ConnectionString(_template))) await context.Database.MigrateAsync();
         await Seed(ConnectionString(_template));
+        ObservedServerVersionNumber = await Scalar<int>(Admin,"SELECT current_setting('server_version_num')::integer");
+        if (ObservedServerVersionNumber != 180006) throw new InvalidOperationException("Disposable PostgreSQL version differs.");
     }
     public async Task DisposeAsync() => await Docker("rm", "-fv", _container);
 
@@ -60,7 +63,8 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         await using var c=new NpgsqlConnection(dsn); await c.OpenAsync();
         await using var cmd=new NpgsqlCommand("SELECT current_database(), current_user, host(inet_server_addr()), inet_server_port()",c);
         await using var r=await cmd.ExecuteReaderAsync(); await r.ReadAsync();
-        return new(r.GetString(0),r.GetString(1),r.GetString(2),r.GetInt32(3),Plan.SourceSnapshotSha256);
+        return new(r.GetString(0),r.GetString(1),r.GetString(2),r.GetInt32(3),Plan.SourceSnapshotSha256,
+            ServerVersionNumber: ObservedServerVersionNumber);
     }
     public static async Task Sql(string dsn,string sql,params NpgsqlParameter[] parameters)
     {
