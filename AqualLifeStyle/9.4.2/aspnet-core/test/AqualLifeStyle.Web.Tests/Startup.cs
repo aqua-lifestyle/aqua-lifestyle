@@ -113,7 +113,8 @@ namespace AqualLifeStyle.Web.Tests
             connection.Open();
 
             var builderSqlite = new DbContextOptionsBuilder<AqualLifeStyleDbContext>();
-            builderSqlite.UseSqlite(connection).UseInternalServiceProvider(serviceProvider);
+            // Reuse EF's metadata/query services while each test server owns its database.
+            builderSqlite.UseSqlite(connection);
             var optionsSqlite = builderSqlite.Options;
 
             // The database starts empty; create the schema before ABP runs its data seeders.

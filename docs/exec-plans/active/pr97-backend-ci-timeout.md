@@ -82,9 +82,48 @@ Local timing cannot establish that the unchanged hosted job budget is sufficient
 
 ## Current state
 
-Local correction IMPLEMENTED and TESTED through the entire unfiltered solution
-and dedicated real-PostgreSQL selection. Hosted acceptance is pending publication;
-no hosted success, merge readiness, deployment, or production claim is made here.
+The lifecycle correction was published as `fcb120c8f074194cb84b9a50a3100a09f2838dba`.
+Hosted runs `37472953833` (push) and `37472959962` (PR) still exceeded the backend
+budget; Web passed 93/93 (PR duration 9m3s) and PostgreSQL passed. Thus the genuine
+lifecycle fixes are insufficient to claim the backend gate repaired.
+
+The same new runs report an independent production audit finding in unchanged
+`source-map-js` (`GHSA-68fv-2mgg-jv7q`, one high severity finding). Frontend audit
+failed and downstream frontend checks/container jobs were skipped. This task
+does not authorize reopening an unrelated frontend security finding; package
+files and the four prior security fixes remain untouched.
+
+## Remaining time sink: per-host EF service providers
+
+Diagnostic stacks showed repeated model/query compilation. Both SQLite harnesses
+bind EF to a freshly created Windsor provider through UseInternalServiceProvider,
+which makes each test host's EF model/query caches independent. A new regression
+proved that two fresh databases had separate runtime models; it failed before
+correction. Letting EF manage/cache its metadata services makes that regression
+pass while preserving independently owned SQLite connections and database state.
+Focused tenant/Area rejection tests and both lifecycle regressions also pass.
+
+Controlled same-project/class timing (`AdminCommissionAppServiceTests`, 12 tests)
+passed both before and after: 2m20.32s before versus 1m58.79s after. This is a
+measured improvement, not yet proof of hosted-budget sufficiency. Backend console
+normal logging is added alongside unchanged TRX logging so any further deadline
+breach identifies last completed tests. No filter or timeout change is made.
+
+### Complete EF-cache follow-up validation
+
+The final Release build passed, followed by the complete unfiltered solution:
+1249 application tests and 93 Web tests passed with zero failures/skips. TRX wall
+times were 39m4.57s and 12m35.41s; whole-command wall time was 39m8.82s (versus
+49m44.47s for the lifecycle-only correction in the same local environment).
+The one additional application test proves immutable EF metadata reuse alongside
+fresh physical database state; no contexts/connections/data are pooled or shared.
+
+The unchanged dedicated PostgreSQL command passed 38/38 again in 3m11.99s,
+including every existing test-body/outcome/provenance gate. All temporary
+containers were removed. YAML parsing and exact unfiltered backend command,
+unchanged 25-minute budget, container prerequisites, and failure propagation
+were validated with PyYAML and command-token assertions. `git diff --check` passed.
+These results do not yet establish hosted-budget sufficiency.
 
 ## Proven lifecycle defects and focused correction
 
@@ -161,11 +200,13 @@ and one regression per test project IMPLEMENTED; focused regressions TESTED.
 
 ## Next action
 
-Publish the separately reviewed test-lifecycle follow-up and observe both push
+Publish the separately reviewed EF-cache follow-up and observe both push
 and PR workflows. Require backend completion, all PostgreSQL body/provenance
 checks, frontend checks, Vercel, and actual hosted API/web container builds.
 This is the pre-publication local evidence record; hosted acceptance must come
 from the new PR checks. Do not merge or treat local validation as hosted success.
+The independently failing frontend production audit requires separate authorized
+security remediation before dependent container jobs can execute.
 
 ## Git/branch context
 
