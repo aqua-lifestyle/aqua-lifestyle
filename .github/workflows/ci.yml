@@ -19,42 +19,8 @@ env:
   NEXT_TELEMETRY_DISABLED: 1
 
 jobs:
-  backend-application:
+  backend-application-tests:
     name: Backend application tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    defaults:
-      run:
-        working-directory: AqualLifeStyle/9.4.2/aspnet-core
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 8.0.x
-      - name: Restore
-        run: dotnet restore AqualLifeStyle.sln
-      - name: Build
-        run: dotnet build AqualLifeStyle.sln --configuration Release --no-restore
-      - name: Test application suite
-        run: |
-          mkdir -p TestResults/application
-          dotnet test test/AqualLifeStyle.Tests/AqualLifeStyle.Tests.csproj \
-            --configuration Release --no-build \
-            --logger "trx;LogFileName=application-tests.trx" \
-            --results-directory TestResults/application \
-            --diag TestResults/application/vstest.log \
-            --blame-hang --blame-hang-timeout 10m --blame-hang-dump-type none
-      - name: Upload application test results and diagnostics
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: backend-application-test-results
-          path: AqualLifeStyle/9.4.2/aspnet-core/TestResults/application
-          if-no-files-found: warn
-          retention-days: 7
-
-  backend-web:
-    name: Backend web tests
     runs-on: ubuntu-latest
     timeout-minutes: 25
     defaults:
@@ -66,9 +32,41 @@ jobs:
         with:
           dotnet-version: 8.0.x
       - name: Restore
-        run: dotnet restore AqualLifeStyle.sln
+        run: dotnet restore test/AqualLifeStyle.Tests/AqualLifeStyle.Tests.csproj -p:Configuration=Release
       - name: Build
-        run: dotnet build AqualLifeStyle.sln --configuration Release --no-restore
+        run: dotnet build test/AqualLifeStyle.Tests/AqualLifeStyle.Tests.csproj --configuration Release --no-restore
+      - name: Test application suite
+        run: |
+          mkdir -p TestResults/application
+          dotnet test test/AqualLifeStyle.Tests/AqualLifeStyle.Tests.csproj \
+            --configuration Release --no-build \
+            --logger "trx;LogFileName=application-tests.trx" \
+            --results-directory TestResults/application
+      - name: Upload application test results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: backend-application-test-results
+          path: AqualLifeStyle/9.4.2/aspnet-core/TestResults/application
+          if-no-files-found: warn
+          retention-days: 7
+
+  backend-web-tests:
+    name: Backend web tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: AqualLifeStyle/9.4.2/aspnet-core
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj -p:Configuration=Release
+      - name: Build
+        run: dotnet build test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --no-restore
       - name: Test web suite
         run: |
           mkdir -p TestResults/web
@@ -120,7 +118,7 @@ jobs:
     name: Validate container images
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: [backend-application, backend-web, frontend]
+    needs: [backend-application-tests, backend-web-tests, frontend]
     steps:
       - uses: actions/checkout@v6
       - uses: docker/setup-buildx-action@v3
