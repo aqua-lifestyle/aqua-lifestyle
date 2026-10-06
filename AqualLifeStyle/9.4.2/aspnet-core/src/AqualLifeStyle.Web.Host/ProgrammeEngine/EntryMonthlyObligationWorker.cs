@@ -24,6 +24,8 @@ namespace AqualLifeStyle.Web.Host.ProgrammeEngine
         : AsyncPeriodicBackgroundWorkerBase, ISingletonDependency
     {
         private const int DefaultIntervalMinutes = 60;
+        public AqualLifeStyle.Domain.AQGreen.IAQGreenPilotMode PilotMode { get; set; }
+            = AqualLifeStyle.Domain.AQGreen.DisabledAQGreenPilotMode.Instance;
 
         private readonly IConfiguration _configuration;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
@@ -55,6 +57,7 @@ namespace AqualLifeStyle.Web.Host.ProgrammeEngine
 
         protected override async Task DoWorkAsync()
         {
+            PilotMode.DenyOutsidePilot("Monthly obligation worker");
             if (!_configuration.GetValue<bool>("App:EntryMonthlyObligations:Enabled"))
             {
                 return;

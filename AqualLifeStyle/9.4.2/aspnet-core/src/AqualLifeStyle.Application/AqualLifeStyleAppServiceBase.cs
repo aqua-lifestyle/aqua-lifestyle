@@ -20,6 +20,9 @@ namespace AqualLifeStyle
 
         public UserManager UserManager { get; set; }
 
+        public AqualLifeStyle.Domain.AQGreen.IAQGreenPilotMode PilotMode { get; set; }
+            = AqualLifeStyle.Domain.AQGreen.DisabledAQGreenPilotMode.Instance;
+
         protected AqualLifeStyleAppServiceBase()
         {
             LocalizationSourceName = AqualLifeStyleConsts.LocalizationSourceName;

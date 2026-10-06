@@ -4,6 +4,7 @@ import { HandCoins } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAuthState } from "@/src/providers";
+import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import {
@@ -87,12 +88,13 @@ const formatPeriodDate = (value: string) =>
   }).format(new Date(value));
 
 export const AdminWeeklyEarnings = () => {
+  const { isPilot, modeKnown } = usePilotStatus();
   const { session } = useAuthState();
   const permissions = session?.user?.permissions ?? [];
   const canView = permissions.includes(VIEW_PERMISSION);
   const canCalculate = permissions.includes(CALCULATE_PERMISSION);
-  const canRelease = permissions.includes(RELEASE_PERMISSION);
-  const canRecordPayment = permissions.includes(RECORD_PAYMENT_PERMISSION);
+  const canRelease = modeKnown && !isPilot && permissions.includes(RELEASE_PERMISSION);
+  const canRecordPayment = modeKnown && !isPilot && permissions.includes(RECORD_PAYMENT_PERMISSION);
   const [programme, setProgramme] = useState<Programme>("entry");
   const [selectedAreaId, setSelectedAreaId] = useState("");
   const [earnings, setEarnings] = useState<WeeklyEarning[]>([]);
@@ -427,7 +429,7 @@ export const AdminWeeklyEarnings = () => {
           }}
           tabs={[
             { content: table, id: "entry", label: "AQGreen" },
-            { content: table, id: "onyx", label: "Onyx" },
+            ...(!isPilot ? [{ content: table, id: "onyx", label: "Onyx" }] : []),
           ]}
           value={programme}
         />

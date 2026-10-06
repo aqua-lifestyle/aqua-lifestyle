@@ -33,11 +33,14 @@ namespace AqualLifeStyle.Web.Tests
 
         protected override IWebHostBuilder CreateWebHostBuilder()
         {
-            return base
+            var builder = base
                 .CreateWebHostBuilder()
                 .UseContentRoot(ContentRootFolder.Value)
                 .UseSetting("App:ClientRootAddress", "https://client.example.test")
                 .UseSetting(WebHostDefaults.ApplicationKey, typeof(AqualLifeStyleWebMvcModule).Assembly.FullName);
+            if (Environment.GetEnvironmentVariable("REPRO_PILOT") == "true")
+                builder.UseEnvironment(AqualLifeStyle.Web.Host.AQGreenV2Pilot.AQGreenV2PilotConfiguration.EnvironmentName);
+            return builder;
         }
 
         #region Get response

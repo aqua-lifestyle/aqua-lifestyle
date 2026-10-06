@@ -40,6 +40,8 @@ namespace AqualLifeStyle.Payments.Yoco
 
     public class YocoPaymentNotificationProcessor : ITransientDependency
     {
+        public AqualLifeStyle.Domain.AQGreen.IAQGreenPilotMode PilotMode { get; set; }
+            = AqualLifeStyle.Domain.AQGreen.DisabledAQGreenPilotMode.Instance;
         private readonly ProgrammePaymentConfirmationProcessor _confirmationProcessor;
         private readonly IConfiguration _configuration;
         private readonly IRepository<DirectOnyxCheckoutIntent, Guid> _onyxCheckoutRepository;
@@ -88,6 +90,7 @@ namespace AqualLifeStyle.Payments.Yoco
         [UnitOfWork]
         public virtual async Task ProcessAsync(VerifiedYocoPaymentNotification notification)
         {
+            PilotMode.DenyOutsidePilot("External provider notification");
             if (notification == null) throw new ArgumentNullException(nameof(notification));
             var isSucceeded = string.Equals(
                 notification.EventType,

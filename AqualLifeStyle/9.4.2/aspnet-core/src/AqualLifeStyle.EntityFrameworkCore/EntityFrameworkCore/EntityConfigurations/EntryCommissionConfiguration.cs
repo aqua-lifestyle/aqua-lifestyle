@@ -37,6 +37,8 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
         {
             builder.ToTable("EntryWeeklyCommissions", table =>
             {
+                table.HasCheckConstraint("CK_EntryWeeklyCommissions_TestMoney_NoPayout",
+                    "NOT \"IsTestMoney\" OR (\"PayoutStatus\" IN (0, 1, 2) AND \"ReleasedAt\" IS NULL AND \"PaidAt\" IS NULL)");
                 table.HasCheckConstraint(
                     "CK_EntryWeeklyCommissions_StructuralModel_Range",
                     "\"StructuralModel\" IN (1, 2)");

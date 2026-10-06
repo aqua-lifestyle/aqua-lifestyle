@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Navbar } from "@/src/components/app/navbar";
+import { PilotBoundary } from "@/src/components/app/pilot-boundary";
 import { WebVitals } from "@/src/shared/observability/web-vitals";
 
 import { AppProviders } from "./providers";
@@ -48,7 +49,7 @@ export default function RootLayout({
         <WebVitals />
         <AppProviders>
           <Navbar />
-          {children}
+          <PilotBoundary>{children}</PilotBoundary>
         </AppProviders>
       </body>
     </html>

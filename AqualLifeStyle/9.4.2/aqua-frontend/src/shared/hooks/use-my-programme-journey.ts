@@ -9,7 +9,7 @@ import {
   type MyProgrammeJourney,
 } from "@/src/shared/domain/programme-journey";
 
-export const useMyProgrammeJourney = (enabled: boolean) => {
+export const useMyProgrammeJourney = (enabled: boolean, pilot = false) => {
   const requestId = useRef(0);
   const [data, setData] = useState<MyProgrammeJourney>();
   const [errorMessage, setErrorMessage] = useState<string>();
@@ -34,7 +34,7 @@ export const useMyProgrammeJourney = (enabled: boolean) => {
         )
         .then((result) => {
           if (requestId.current === currentRequest) {
-            setData(parseMyProgrammeJourney(result));
+            setData(parseMyProgrammeJourney(result, pilot));
           }
         })
         .catch((error) => {
@@ -52,7 +52,7 @@ export const useMyProgrammeJourney = (enabled: boolean) => {
         });
     }, 0);
     return () => window.clearTimeout(task);
-  }, [enabled]);
+  }, [enabled, pilot]);
 
   return { data, errorMessage, isLoading };
 };

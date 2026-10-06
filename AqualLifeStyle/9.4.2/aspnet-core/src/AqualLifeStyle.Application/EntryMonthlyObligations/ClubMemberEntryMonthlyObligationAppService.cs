@@ -94,6 +94,7 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
         public async Task<EntryMonthlyObligationCheckoutDto> CreateCheckoutAsync(
             CreateEntryMonthlyObligationCheckoutInput input)
         {
+            PilotMode.DenyOutsidePilot("Monthly obligation checkout");
             if (input == null || input.ObligationId == Guid.Empty)
                 throw NotPayable();
 

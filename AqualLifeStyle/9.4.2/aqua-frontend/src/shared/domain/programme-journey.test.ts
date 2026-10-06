@@ -37,4 +37,27 @@ describe("parseMyProgrammeJourney", () => {
       onyx,
     ))).toThrow(/ONYX progression contract is incompatible/);
   });
+
+  it("accepts only the commissioned AQGreen journey in explicit pilot mode", () => {
+    const value = { ...createJourneyResponse(), programmes: [
+      createProgrammeJourney("AQGREEN", { benefits: [], monthlySubscription: null }),
+    ] };
+    expect(parseMyProgrammeJourney(value, true).programmes).toHaveLength(1);
+    expect(() => parseMyProgrammeJourney(value)).toThrow();
+    expect(() => parseMyProgrammeJourney(createJourneyResponse(), true)).toThrow();
+  });
+
+  it("rejects production obligations, benefits and incomplete structure in pilot mode", () => {
+    const value = { ...createJourneyResponse(), programmes: [
+      createProgrammeJourney("AQGREEN", { benefits: [], monthlySubscription: null }),
+    ] };
+    expect(() => parseMyProgrammeJourney({ ...value, programmes: [
+      createProgrammeJourney("AQGREEN", { benefits: [] }),
+    ] }, true)).toThrow();
+    expect(() => parseMyProgrammeJourney({ ...value, programmes: [
+      createProgrammeJourney("AQGREEN", { monthlySubscription: null }),
+    ] }, true)).toThrow();
+    value.programmes[0].levels.pop();
+    expect(() => parseMyProgrammeJourney(value, true)).toThrow(/progression contract/);
+  });
 });

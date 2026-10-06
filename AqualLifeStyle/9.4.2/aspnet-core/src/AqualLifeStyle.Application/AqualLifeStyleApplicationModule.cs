@@ -16,6 +16,13 @@ namespace AqualLifeStyle
     {
         public override void PreInitialize()
         {
+            IocManager.IocContainer.Kernel.ComponentRegistered += (key, handler) =>
+            {
+                if (typeof(Abp.Application.Services.IApplicationService).IsAssignableFrom(
+                        handler.ComponentModel.Implementation))
+                    handler.ComponentModel.Interceptors.Add(new Castle.Core.InterceptorReference(
+                        typeof(AqualLifeStyle.Application.ProgrammeParticipations.PilotApplicationBoundaryInterceptor)));
+            };
             IocManager.IocContainer.Kernel.Resolver.AddSubResolver(
                 new CollectionResolver(IocManager.IocContainer.Kernel, true));
             IocManager.IocContainer.Kernel.Resolver.AddSubResolver(

@@ -55,6 +55,19 @@ namespace AqualLifeStyle.Tests.Domain
         }
 
         [Fact]
+        public void TestLedgerCannotReleaseOrRecordRealPayment()
+        {
+            var commission = Calculate(BuildNetwork(maxDepth: 1));
+            commission.MarkAsTestMoney();
+            Assert.True(commission.IsTestMoney);
+            Assert.Throws<InvalidOperationException>(() => commission.ReleaseEligiblePayout(EffectiveFrom.AddMonths(1)));
+            Assert.Throws<InvalidOperationException>(() => commission.ReleaseHeldPayoutAfterComplianceRestored(EffectiveFrom.AddMonths(1), "Test"));
+            Assert.Throws<InvalidOperationException>(() => commission.MarkPaid(EffectiveFrom.AddMonths(1), "TEST-ONLY"));
+            Assert.Null(commission.ReleasedAt);
+            Assert.Null(commission.PaidAt);
+        }
+
+        [Fact]
         public void CompleteLevels_RecordSeparateCumulativeComponents()
         {
             var network = BuildNetwork(maxDepth: 3);

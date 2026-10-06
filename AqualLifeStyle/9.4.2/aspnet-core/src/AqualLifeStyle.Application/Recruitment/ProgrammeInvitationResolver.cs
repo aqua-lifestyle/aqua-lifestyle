@@ -31,16 +31,25 @@ namespace AqualLifeStyle.Application.Recruitment
         public int RecruiterCustomerId { get; }
         public int TenantId { get; }
         public Area RecruiterArea { get; }
+        public Guid? InvitationId { get; }
+        public Guid? RecruiterParticipationId { get; }
+        public string ProgrammeKey { get; }
 
         public ProgrammeInvitationPlacement(
             int tenantId,
             int recruiterCustomerId,
-            Area recruiterArea)
+            Area recruiterArea,
+            Guid? invitationId = null,
+            Guid? recruiterParticipationId = null,
+            string programmeKey = null)
         {
             if (tenantId <= 0) throw new ArgumentOutOfRangeException(nameof(tenantId));
             TenantId = tenantId;
             RecruiterCustomerId = recruiterCustomerId;
             RecruiterArea = recruiterArea ?? throw new ArgumentNullException(nameof(recruiterArea));
+            InvitationId = invitationId;
+            RecruiterParticipationId = recruiterParticipationId;
+            ProgrammeKey = programmeKey;
         }
     }
 
@@ -179,7 +188,10 @@ namespace AqualLifeStyle.Application.Recruitment
             return new ProgrammeInvitationPlacement(
                 authoritativeTenantId,
                 source.CustomerId,
-                area);
+                area,
+                invitation.Id,
+                invitation.ProgrammeParticipationId,
+                invitation.ProgrammeKey);
         }
 
         internal static string NormalizeCode(string inviteCode)

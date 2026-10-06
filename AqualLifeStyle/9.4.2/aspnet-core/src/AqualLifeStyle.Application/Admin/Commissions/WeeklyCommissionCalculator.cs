@@ -62,6 +62,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         private readonly IAQGreenWeeklySalesEligibilityDecisionReader
             _weeklySalesDecisionReader;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        public AqualLifeStyle.Domain.AQGreen.IAQGreenPilotMode PilotMode { get; set; }
+            = AqualLifeStyle.Domain.AQGreen.DisabledAQGreenPilotMode.Instance;
 
         public WeeklyCommissionCalculator(
             IRepository<EntryParticipation, Guid> entryParticipationRepository,
@@ -112,6 +114,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     .Where(commission =>
                         commission.CommissionPeriodId == existingPeriod.Id)
                     .ToListAsync();
+                if (PilotMode.IsEnabled && existingCommissions.Any(commission => !commission.IsTestMoney))
+                    throw new InvalidOperationException("A real-money ledger cannot be reused in the isolated pilot.");
                 return BuildResult(
                     existingPeriod.Id,
                     "AQGreen",
@@ -137,6 +141,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             var structuralModel = await _entryStructuralModelSelector.SelectAsync(
                 tenantId,
                 closedWeek.PeriodEndUtc);
+            if (PilotMode.IsEnabled && structuralModel != AQGreenCommissionStructuralModel.PlacementV2)
+                throw new InvalidOperationException("The pilot requires the explicitly selected Placement V2 path.");
             if (structuralModel != AQGreenCommissionStructuralModel.LegacyV1 &&
                 structuralModel != AQGreenCommissionStructuralModel.PlacementV2)
                 throw new InvalidOperationException(
@@ -253,6 +259,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                         commissionedLevel,
                         obligations,
                         loanAgreements);
+                    if (PilotMode.IsEnabled) commission.MarkAsTestMoney();
                     var evidence = AQGreenV2WeeklyCommissionEvidence.Capture(
                         commission,
                         period,
@@ -286,6 +293,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             ClosedCommissionWeek closedWeek,
             DateTime calculatedAt)
         {
+            PilotMode.DenyOutsidePilot("Onyx commission calculation");
             var existingPeriod = await _onyxPeriodRepository.FirstOrDefaultAsync(period =>
                 period.TenantId == tenantId &&
                 period.PeriodStart == closedWeek.PeriodStartUtc &&

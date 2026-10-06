@@ -127,6 +127,7 @@ namespace AqualLifeStyle.Application.Admin.Tenants
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Tenants.Activate)]
+        [Abp.Domain.Uow.UnitOfWork]
         public async Task<AdminTenantDto> ObserveActivationStateAsync(
             ObserveTenantActivationStateInput input)
         {
