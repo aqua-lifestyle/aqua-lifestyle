@@ -82,7 +82,12 @@ Local timing cannot establish that the unchanged hosted job budget is sufficient
 
 ## Current state
 
-The lifecycle correction was published as `fcb120c8f074194cb84b9a50a3100a09f2838dba`.
+Backend CI is resolved at `e2fffe958a9016c01a2e090fcdf31306b9f8139d` on both
+push and PR runs. Whole-PR/container acceptance remains blocked independently
+by the frontend production audit. This worklog remains active for that blocked
+integration handoff; no additional backend implementation is currently required.
+
+The initial lifecycle correction was published as `fcb120c8f074194cb84b9a50a3100a09f2838dba`.
 Hosted runs `37472953833` (push) and `37472959962` (PR) still exceeded the backend
 budget; Web passed 93/93 (PR duration 9m3s) and PostgreSQL passed. Thus the genuine
 lifecycle fixes are insufficient to claim the backend gate repaired.
@@ -124,6 +129,26 @@ containers were removed. YAML parsing and exact unfiltered backend command,
 unchanged 25-minute budget, container prerequisites, and failure propagation
 were validated with PyYAML and command-token assertions. `git diff --check` passed.
 These results do not yet establish hosted-budget sufficiency.
+
+### Hosted acceptance of backend correction
+
+- [Push run 37486996523](https://github.com/aqua-lifestyle/aqua-lifestyle/actions/runs/37486996523):
+  backend restore/build/tests passed; backend job 24m26s, application project
+  1249 passed in 22.2933 minutes, Web project 93 passed in 6.4292 minutes.
+- [PR run 37487008037](https://github.com/aqua-lifestyle/aqua-lifestyle/actions/runs/37487008037):
+  backend restore/build/tests passed; backend job 24m14s, application project
+  1249 passed in 22.2576 minutes, Web project 93 passed in 6.4109 minutes.
+- Both backend TRX sets report zero failures/skips; all original tests plus the
+  three lifecycle/isolation regressions execute. The 25-minute budget is unchanged.
+- Both dedicated PostgreSQL jobs passed. The PR log confirms 38 passed / 0 failed /
+  0 skipped, with the existing test-body/outcome/provenance verification passing.
+- Vercel passed. Both overall workflows failed because of the independently
+  reported source-map-js audit advisory; frontend lint/typecheck/tests/build were
+  skipped. Hosted container jobs were SKIPPED, not executed or validated.
+- Frontend files remain byte-identical to the frontend security commit. Its
+  earlier successful audit/UI validation evidence is carried forward only at
+  that prior SHA/date; it does not prove a clean current advisory database.
+- PR #97 remains OPEN, MERGEABLE, UNSTABLE. Recommendation: DO NOT MERGE.
 
 ## Proven lifecycle defects and focused correction
 
@@ -200,13 +225,10 @@ and one regression per test project IMPLEMENTED; focused regressions TESTED.
 
 ## Next action
 
-Publish the separately reviewed EF-cache follow-up and observe both push
-and PR workflows. Require backend completion, all PostgreSQL body/provenance
-checks, frontend checks, Vercel, and actual hosted API/web container builds.
-This is the pre-publication local evidence record; hosted acceptance must come
-from the new PR checks. Do not merge or treat local validation as hosted success.
-The independently failing frontend production audit requires separate authorized
-security remediation before dependent container jobs can execute.
+Complete the evidence-only publication and observe its current checks. Then
+handoff the independently failing source-map-js production audit for a separately
+authorized frontend security task. Restore the frontend gate before requiring
+actual hosted API/web container builds. Do not bypass any prerequisite or merge.
 
 ## Git/branch context
 
