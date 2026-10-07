@@ -198,7 +198,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
 
             await using (var connection = new NpgsqlConnection(ConnectionString))
             {
-                await connection.OpenAsync();
+                await PostgreSqlHostedDiagnostics.OpenAsync(connection);
                 await using var command = new NpgsqlCommand(
                     """
                     UPDATE public."OnyxParticipations"
@@ -209,7 +209,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 command.Parameters.AddWithValue(
                     "onyxParticipationId",
                     result.OnyxParticipationId);
-                (await command.ExecuteNonQueryAsync()).ShouldBe(1);
+                (await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command)).ShouldBe(1);
             }
 
             var exception = await Should.ThrowAsync<Abp.UI.UserFriendlyException>(() =>
@@ -257,7 +257,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await SeedMigratedHistoricalLegacyGraphAsync();
             await using (var connection = new NpgsqlConnection(ConnectionString))
             {
-                await connection.OpenAsync();
+                await PostgreSqlHostedDiagnostics.OpenAsync(connection);
                 await using var command = new NpgsqlCommand(
                     """
                     UPDATE public."OnyxParticipations"
@@ -268,7 +268,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 command.Parameters.AddWithValue(
                     "onyxParticipationId",
                     HistoricalOnyxParticipationId);
-                (await command.ExecuteNonQueryAsync()).ShouldBe(1);
+                (await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command)).ShouldBe(1);
             }
 
             var exception = await Should.ThrowAsync<Abp.UI.UserFriendlyException>(() =>
@@ -289,7 +289,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
 
             await using (var connection = new NpgsqlConnection(ConnectionString))
             {
-                await connection.OpenAsync();
+                await PostgreSqlHostedDiagnostics.OpenAsync(connection);
                 await using var command = new NpgsqlCommand(
                     """
                     UPDATE public."OnyxGraduationDecisions"
@@ -298,7 +298,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     """,
                     connection);
                 command.Parameters.AddWithValue("decisionId", result.DecisionId);
-                (await command.ExecuteNonQueryAsync()).ShouldBe(1);
+                (await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command)).ShouldBe(1);
             }
 
             var exception = await Should.ThrowAsync<Abp.UI.UserFriendlyException>(() =>
@@ -322,7 +322,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             await SeedFixtureAsync();
             await using var connection = new NpgsqlConnection(ConnectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             var secondLoanId = Guid.Parse("b5200000-0000-0000-0000-000000000099");
             var exception = await Should.ThrowAsync<PostgresException>(async () =>
             {
@@ -330,7 +330,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     LoanInsertSql,
                     connection);
                 AddLoanParameters(command, secondLoanId);
-                await command.ExecuteNonQueryAsync();
+                await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
             });
 
             exception.SqlState.ShouldBe(PostgresErrorCodes.UniqueViolation);
@@ -392,7 +392,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             var placements = new List<Guid>();
             await using var connection = new NpgsqlConnection(ConnectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var transaction = await connection.BeginTransactionAsync();
 
             await ExecuteAsync(
@@ -480,7 +480,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await using (var loan = new NpgsqlCommand(LoanInsertSql, connection, transaction))
             {
                 AddLoanParameters(loan, LoanId);
-                await loan.ExecuteNonQueryAsync();
+                await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(loan);
             }
             await transaction.CommitAsync();
 
@@ -507,13 +507,13 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             await using var command = new NpgsqlCommand(sql, connection, transaction);
             command.Parameters.AddRange(parameters);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
         }
 
         private async Task ConfigureLegacyRecruiterNetworkAsync()
         {
             await using var connection = new NpgsqlConnection(ConnectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new NpgsqlCommand(
                 """
                 UPDATE public."EntryParticipations"
@@ -528,7 +528,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 """,
                 connection);
             command.Parameters.AddWithValue("activatedAt", PlacedAt.AddDays(-1));
-            (await command.ExecuteNonQueryAsync()).ShouldBe(64);
+            (await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command)).ShouldBe(64);
         }
 
         private async Task SeedMigratedHistoricalLegacyGraphAsync()
@@ -537,7 +537,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await SeedFixtureAsync();
             await using (var connection = new NpgsqlConnection(ConnectionString))
             {
-                await connection.OpenAsync();
+                await PostgreSqlHostedDiagnostics.OpenAsync(connection);
                 await using var transaction = await connection.BeginTransactionAsync();
                 await ExecuteAsync(
                     connection,
@@ -590,7 +590,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         private async Task MigrateAsync(string targetMigration = null)
         {
             await using var connection = new NpgsqlConnection(ConnectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var context = new AqualLifeStyleDbContext(
                 new DbContextOptionsBuilder<AqualLifeStyleDbContext>()
                     .UseNpgsql(connection)
@@ -634,7 +634,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         private async Task AssertCoherentGraphAsync(Guid decisionId, Guid loanId)
         {
             await using var connection = new NpgsqlConnection(ConnectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var context = new AqualLifeStyleDbContext(
                 new DbContextOptionsBuilder<AqualLifeStyleDbContext>()
                     .UseNpgsql(connection)

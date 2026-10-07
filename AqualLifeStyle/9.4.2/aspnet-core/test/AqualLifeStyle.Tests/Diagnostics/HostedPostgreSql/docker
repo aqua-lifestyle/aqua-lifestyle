@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# TEMPORARY DIAGNOSTIC BRANCH ONLY. Preserve Docker/test exits; never repair a test.
+set -uo pipefail
+umask 077
+real=${AQGREEN_DIAG_DOCKER_REAL:?}
+root=${AQGREEN_PG_DIAGNOSTICS:?}
+mkdir -p "$root/docker"
+utc() { date -u +%FT%T.%NZ; }
+monotonic() { cut -d ' ' -f 1 /proc/uptime; }
+event() {
+  local phase=$1 name=${2:-} status=${3:-}
+  jq -nc --arg utc "$(utc)" --arg monotonic "$(monotonic)" --arg phase "$phase" --arg name "$name" --arg status "$status" '{utc:$utc,hostUptimeSeconds:$monotonic,phase:$phase,containerName:$name,status:$status}' >> "$root/docker/events-${BASHPID}.jsonl"
+}
+capture() {
+  local name=$1 reason=$2 safe stamp out secret
+  [[ "$name" =~ ^[a-zA-Z0-9_.-]+$ ]] || return 0
+  test -e "$root/docker/registered-$name" || return 0
+  stamp=$(date -u +%s%N)
+  out="$root/docker/$name/$stamp-$reason"
+  mkdir -p "$out"
+  event capture.begin "$name" "$reason"
+  "$real" inspect "$name" 2> "$out/inspect.stderr" | jq 'map(.Config.Env |= map(if test("(?i)(password|secret|token|credential)=") then sub("=.*$";"=<REDACTED>") else . end))' > "$out/inspect-redacted.json" || event capture.inspect.error "$name"
+  secret=$("$real" inspect "$name" | jq -r '.[0].Config.Env[] | select(startswith("POSTGRES_PASSWORD=")) | sub("^[^=]*=";"")')
+  "$real" logs --timestamps "$name" 2>&1 | jq -rRs --arg secret "$secret" '(if $secret == "" then . else split($secret) | join("<REDACTED>") end) | gsub("test-password";"<REDACTED-TEST-PASSWORD>")' > "$out/postgres.log" || event capture.logs.error "$name"
+  "$real" stats --no-stream --format '{{json .}}' "$name" > "$out/stats.jsonl" 2> "$out/stats.stderr" || event capture.stats.error "$name"
+  cat /proc/meminfo > "$out/host-meminfo.txt"
+  df -h / /var/lib/docker > "$out/host-disk.txt" 2>&1
+  # Independent Unix-socket observer. Never uses or repairs the Npgsql connector.
+  "$real" exec "$name" psql -U aqualifestyle -d postgres -Atc "SELECT json_build_object('observed_utc',clock_timestamp(),'postmaster_start',pg_postmaster_start_time(),'server_version',current_setting('server_version'),'activity',(SELECT json_agg(json_build_object('pid',pid,'backend_start',backend_start,'client_addr',client_addr,'client_port',client_port,'database',datname,'application_name',application_name,'state',state)) FROM pg_stat_activity WHERE backend_type='client backend' AND usename='aqualifestyle'));" > "$out/server-identity.json" 2> "$out/server-identity.stderr"
+  printf '%s\n' "$?" > "$out/server-identity.exit"
+  "$real" logs --timestamps "$name" 2>&1 | jq -rRs --arg secret "$secret" '(if $secret == "" then . else split($secret) | join("<REDACTED>") end) | gsub("test-password";"<REDACTED-TEST-PASSWORD>")' > "$out/postgres-after-observation.log" || true
+  event capture.complete "$name" "$reason"
+}
+if test "${1:-}" = aqgreen-diagnostic-capture; then
+  port=${2:-}
+  for registry in "$root"/docker/registered-*; do
+    test -f "$registry" || continue
+    if test "$(cat "$registry")" = "$port"; then capture "${registry##*/registered-}" failure; fi
+  done
+  exit 0
+fi
+name= port= command=${1:-}
+if test "$command" = run; then
+  args=("$@")
+  for ((i=0;i<${#args[@]};i++)); do
+    if test "${args[$i]}" = --name; then name=${args[$((i+1))]}; fi
+    if test "${args[$i]}" = -p; then port=${args[$((i+1))]}; port=${port%:*}; port=${port##*:}; fi
+  done
+  if test -n "$name"; then printf '%s' "$port" > "$root/docker/registered-$name"; fi
+  event container.creation.begin "$name"
+fi
+if test "$command" = rm; then
+  for arg in "${@:2}"; do
+    if [[ "$arg" != -* ]]; then event fixture.disposal.begin "$arg"; capture "$arg" before-cleanup; event container.cleanup.begin "$arg"; fi
+  done
+fi
+"$real" "$@"
+status=$?
+if test "$command" = run; then
+  event container.run.return "$name" "$status"
+  if test "$status" = 0 && test -n "$name"; then
+    mkdir -p "$root/docker/$name"
+    "$real" inspect "$name" | jq 'map(.Config.Env |= map(if test("(?i)(password|secret|token|credential)=") then sub("=.*$";"=<REDACTED>") else . end))' > "$root/docker/$name/created-inspect-redacted.json" 2> "$root/docker/$name/created-inspect.stderr" || true
+  fi
+fi
+if test "$command" = rm; then event container.cleanup.return '' "$status"; fi
+exit "$status"

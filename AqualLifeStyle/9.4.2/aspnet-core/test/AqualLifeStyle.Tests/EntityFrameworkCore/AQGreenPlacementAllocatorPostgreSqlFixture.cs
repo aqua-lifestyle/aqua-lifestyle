@@ -36,6 +36,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             listener.Start();
             _hostPort = ((IPEndPoint)listener.LocalEndpoint).Port;
             listener.Stop();
+            PostgreSqlHostedDiagnostics.FixtureCreated(this, _containerName, _hostPort);
         }
 
         public async Task InitializeAsync()
@@ -51,7 +52,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 try
                 {
                     await using var connection = new NpgsqlConnection(AdminConnectionString);
-                    await connection.OpenAsync();
+                    await PostgreSqlHostedDiagnostics.OpenAsync(connection);
                     break;
                 }
                 catch when (attempt < 29)
@@ -101,7 +102,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             for (var attempt = 0; attempt < 100; attempt++)
             {
                 await using var connection = new NpgsqlConnection(lease.ConnectionString());
-                await connection.OpenAsync();
+                await PostgreSqlHostedDiagnostics.OpenAsync(connection);
                 await using var command = new NpgsqlCommand(
                     """
                     SELECT COUNT(*)
@@ -136,15 +137,15 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         private async Task ExecuteAdminAsync(string sql)
         {
             await using var connection = new NpgsqlConnection(AdminConnectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new NpgsqlCommand(sql, connection);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
         }
 
         private static async Task SeedParticipantsAsync(string connectionString)
         {
             await using var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new NpgsqlCommand(
                 """
                 INSERT INTO "AbpTenants" (
@@ -246,7 +247,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 FROM "EntryParticipations";
                 """,
                 connection);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
         }
 
         private async Task RunDockerAsync(

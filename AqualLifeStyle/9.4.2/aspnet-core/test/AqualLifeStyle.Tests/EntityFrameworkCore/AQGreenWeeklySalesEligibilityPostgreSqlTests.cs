@@ -43,7 +43,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 AQGreenWeeklySalesThresholdResult.Met,
                 null);
             await using var connection = new NpgsqlConnection(database.ConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var context = _fixture.CreateDbContext(connection);
             var provider = Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>();
             provider.GetDbContext().Returns(context);
@@ -253,7 +253,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 database,
                 EvidenceInsertSql(Guid.NewGuid(), decisionId, "ticket:rejection-shape"));
             await using var connection = new NpgsqlConnection(database.ConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new NpgsqlCommand(
                 """
                 UPDATE public."AQGreenWeeklySalesEligibilityDecisions"
@@ -270,7 +270,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             command.Parameters.AddWithValue("decisionId", decisionId);
 
             var exception = await Should.ThrowAsync<PostgresException>(() =>
-                command.ExecuteNonQueryAsync());
+                PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command));
 
             exception.SqlState.ShouldBe(PostgresErrorCodes.CheckViolation);
             exception.ConstraintName.ShouldBe(
@@ -283,7 +283,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await using var database = await _fixture.CreateDatabaseAsync();
             var decisionId = Guid.NewGuid();
             await using var connection = new NpgsqlConnection(database.ConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var transaction = await connection.BeginTransactionAsync();
             try
             {
@@ -347,7 +347,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 null,
                 participantNumber: 9);
             await using var connection = new NpgsqlConnection(database.ConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var transaction = await connection.BeginTransactionAsync();
             try
             {
@@ -536,7 +536,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             var decisionId = Guid.NewGuid();
             await using (var connection = new NpgsqlConnection(database.ConnectionString()))
             {
-                await connection.OpenAsync();
+                await PostgreSqlHostedDiagnostics.OpenAsync(connection);
                 await using var transaction = await connection.BeginTransactionAsync();
                 await ExecuteAsync(
                     connection,
@@ -663,7 +663,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             var decisionId = Guid.NewGuid();
             await using var connection = new NpgsqlConnection(database.ConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var transaction = await connection.BeginTransactionAsync();
             await ExecuteAsync(
                 connection,
@@ -759,9 +759,9 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             string sql)
         {
             await using var connection = new NpgsqlConnection(database.ConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new NpgsqlCommand(sql, connection);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
         }
 
         private static async Task ExpectReplicaRoleRejectedAsync(
@@ -769,7 +769,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             Func<NpgsqlConnection, NpgsqlTransaction, Task> action)
         {
             await using var connection = new NpgsqlConnection(database.ConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var transaction = await connection.BeginTransactionAsync();
             PostgresException exception = null;
             try
@@ -800,7 +800,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             string sql)
         {
             await using var command = new NpgsqlCommand(sql, connection, transaction);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
         }
 
         private static async Task<T> ScalarAsync<T>(
@@ -808,7 +808,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             string sql)
         {
             await using var connection = new NpgsqlConnection(database.ConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new NpgsqlCommand(sql, connection);
             var value = await command.ExecuteScalarAsync();
             return value is T typed
@@ -821,7 +821,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             string targetMigration)
         {
             await using var connection = new NpgsqlConnection(database.ConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var context = _fixture.CreateDbContext(connection);
             await context.GetService<IMigrator>().MigrateAsync(targetMigration);
         }
@@ -831,7 +831,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             Guid participantId)
         {
             await using var connection = new NpgsqlConnection(database.ConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var context = _fixture.CreateDbContext(connection);
             var provider = Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>();
             provider.GetDbContext().Returns(context);

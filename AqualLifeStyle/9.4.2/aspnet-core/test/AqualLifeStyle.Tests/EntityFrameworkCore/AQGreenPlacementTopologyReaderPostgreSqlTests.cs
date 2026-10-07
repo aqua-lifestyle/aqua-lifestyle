@@ -882,7 +882,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             await using var command = new NpgsqlCommand(sql, connection, transaction);
             command.Parameters.AddRange(parameters);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
         }
 
         private static async Task CorruptAsync(
@@ -992,7 +992,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             {
                 await using var command = new NpgsqlCommand(sql, _connection, _transaction);
                 command.Parameters.AddRange(parameters);
-                await command.ExecuteNonQueryAsync();
+                await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
             }
         }
     }
@@ -1050,6 +1050,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             listener.Start();
             _hostPort = ((IPEndPoint)listener.LocalEndpoint).Port;
             listener.Stop();
+            PostgreSqlHostedDiagnostics.FixtureCreated(this, _containerName, _hostPort);
         }
 
         public async Task InitializeAsync()
@@ -1064,7 +1065,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 try
                 {
                     await using var connection = new NpgsqlConnection(AdminConnectionString);
-                    await connection.OpenAsync();
+                    await PostgreSqlHostedDiagnostics.OpenAsync(connection);
                     break;
                 }
                 catch when (attempt < 29)
@@ -1086,7 +1087,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         public async Task<NpgsqlConnection> OpenConnectionAsync()
         {
             var connection = new NpgsqlConnection(TestConnectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             return connection;
         }
 
@@ -1252,9 +1253,9 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         private static async Task ExecuteAsync(string connectionString, string sql)
         {
             await using var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new NpgsqlCommand(sql, connection);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
         }
 
         private async Task RunDockerAsync(

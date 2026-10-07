@@ -44,6 +44,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             listener.Start();
             _hostPort = ((IPEndPoint)listener.LocalEndpoint).Port;
             listener.Stop();
+            PostgreSqlHostedDiagnostics.FixtureCreated(this, _containerName, _hostPort);
         }
 
         public async Task InitializeAsync()
@@ -92,7 +93,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 try
                 {
                     using var connection = new Npgsql.NpgsqlConnection(BuildAdminConnectionString());
-                    await connection.OpenAsync();
+                    await PostgreSqlHostedDiagnostics.OpenAsync(connection);
                     TraceLine("PostgreSQL is ready.");
                     return;
                 }
@@ -108,7 +109,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         private async Task ResetDatabaseAsync()
         {
             await using var adminConnection = new Npgsql.NpgsqlConnection(BuildAdminConnectionString());
-            await adminConnection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(adminConnection);
 
             await using var terminateCommand = adminConnection.CreateCommand();
             terminateCommand.CommandText = $"""
@@ -117,19 +118,19 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 WHERE datname = '{_databaseName}'
                   AND pid <> pg_backend_pid();
                 """;
-            await terminateCommand.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(terminateCommand);
 
             await using var dropCommand = adminConnection.CreateCommand();
             dropCommand.CommandText = $"""
                 DROP DATABASE IF EXISTS "{_databaseName}";
                 """;
-            await dropCommand.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(dropCommand);
 
             await using var createCommand = adminConnection.CreateCommand();
             createCommand.CommandText = $"""
                 CREATE DATABASE "{_databaseName}" WITH OWNER = aqualifestyle;
                 """;
-            await createCommand.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(createCommand);
 
             Npgsql.NpgsqlConnection.ClearAllPools();
 
@@ -139,10 +140,10 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         private async Task CreateTestDatabaseAsync()
         {
             await using var connection = new Npgsql.NpgsqlConnection(BuildAdminConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = connection.CreateCommand();
             command.CommandText = $"CREATE DATABASE \"{_databaseName}\" WITH OWNER = aqualifestyle;";
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
             TraceLine($"Created test database: {_databaseName}");
         }
 
@@ -150,7 +151,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             var connectionString = BuildTestConnectionString();
             await using var connection = new Npgsql.NpgsqlConnection(connectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
 
             await using var userCommand = connection.CreateCommand();
             userCommand.CommandText = """
@@ -174,7 +175,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 )
                 ON CONFLICT ("Id") DO NOTHING;
                 """;
-            await userCommand.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(userCommand);
 
             await using var customerCommand = connection.CreateCommand();
             customerCommand.CommandText = $"""
@@ -190,7 +191,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 )
                 ON CONFLICT ("Id") DO NOTHING;
                 """;
-            await customerCommand.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(customerCommand);
 
             TraceLine("Seeded minimal user and customer.");
         }
@@ -279,7 +280,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         private static async Task<long> CountAsync(string connectionString, string sql)
         {
             await using var connection = new Npgsql.NpgsqlConnection(connectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new Npgsql.NpgsqlCommand(sql, connection);
             var result = await command.ExecuteScalarAsync();
             return Convert.ToInt64(result);
@@ -288,18 +289,18 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         private static async Task ExecuteAsync(string connectionString, string sql)
         {
             await using var connection = new Npgsql.NpgsqlConnection(connectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new Npgsql.NpgsqlCommand(sql, connection);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
         }
 
         private async Task ExecuteAsync(string sql)
         {
             await using var connection = new Npgsql.NpgsqlConnection(
                 BuildTestConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new Npgsql.NpgsqlCommand(sql, connection);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
         }
 
         private async Task<(Guid ParticipationId, DateTime ConfirmedAt)>

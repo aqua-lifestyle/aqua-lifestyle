@@ -25,6 +25,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             listener.Start();
             _hostPort = ((IPEndPoint)listener.LocalEndpoint).Port;
             listener.Stop();
+            PostgreSqlHostedDiagnostics.FixtureCreated(this, _containerName, _hostPort);
         }
 
         public async Task InitializeAsync()
@@ -37,7 +38,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 try
                 {
                     await using var connection = new NpgsqlConnection(ConnectionString);
-                    await connection.OpenAsync();
+                    await PostgreSqlHostedDiagnostics.OpenAsync(connection);
                     return;
                 }
                 catch when (attempt < 29)
@@ -56,7 +57,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         public async Task TransactionLock_SerializesTheSameWeeklyEngineKey()
         {
             await using var secondConnection = new NpgsqlConnection(ConnectionString);
-            await secondConnection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(secondConnection);
             await using var secondTransaction = await secondConnection.BeginTransactionAsync();
             await using var context = new AqualLifeStyleDbContext(
                 new DbContextOptionsBuilder<AqualLifeStyleDbContext>()
@@ -83,7 +84,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             const int tenantId = 42;
             await using var secondConnection = new NpgsqlConnection(ConnectionString);
-            await secondConnection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(secondConnection);
             await using var secondTransaction = await secondConnection.BeginTransactionAsync();
             await using var context = new AqualLifeStyleDbContext(
                 new DbContextOptionsBuilder<AqualLifeStyleDbContext>()
@@ -122,7 +123,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         public async Task MonthlyObligationLock_SerializesPaymentApplication()
         {
             await using var secondConnection = new NpgsqlConnection(ConnectionString);
-            await secondConnection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(secondConnection);
             await using var secondTransaction = await secondConnection.BeginTransactionAsync();
             await using var context = new AqualLifeStyleDbContext(
                 new DbContextOptionsBuilder<AqualLifeStyleDbContext>()

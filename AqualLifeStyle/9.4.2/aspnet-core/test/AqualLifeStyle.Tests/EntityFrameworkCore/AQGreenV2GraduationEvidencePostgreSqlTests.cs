@@ -45,7 +45,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await using var database = await _fixture.CreateDatabaseAsync();
             await using (var connection = new NpgsqlConnection(database.ConnectionString()))
             {
-                await connection.OpenAsync();
+                await PostgreSqlHostedDiagnostics.OpenAsync(connection);
                 await using var transaction = await connection.BeginTransactionAsync();
                 await SeedTopologyAsync(connection, transaction, includeLaterPlacement: false);
                 await SeedGraduationDependenciesAsync(connection, transaction);
@@ -58,7 +58,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
 
             await using (var connection = new NpgsqlConnection(database.ConnectionString()))
             {
-                await connection.OpenAsync();
+                await PostgreSqlHostedDiagnostics.OpenAsync(connection);
                 await using var context = _fixture.CreateDbContext(connection);
                 var provider = Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>();
                 provider.GetDbContext().Returns(context);
@@ -104,7 +104,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             await using var database = await _fixture.CreateDatabaseAsync();
             await using var connection = new NpgsqlConnection(database.ConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var transaction = await connection.BeginTransactionAsync();
             await SeedTopologyAsync(
                 connection,
@@ -131,7 +131,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             await using var database = await _fixture.CreateDatabaseAsync();
             await using var connection = new NpgsqlConnection(database.ConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var context = _fixture.CreateDbContext(connection);
             await context.GetService<IMigrator>().MigrateAsync(PreviousMigration);
 
@@ -168,7 +168,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             await using var database = await _fixture.CreateDatabaseAsync();
             await using var connection = new NpgsqlConnection(database.ConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             if (write == UnversionedLegacyWrite.NewInsert)
             {
                 await using var transaction = await connection.BeginTransactionAsync();
@@ -209,7 +209,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     """,
                     connection);
                 command.Parameters.AddWithValue("decisionId", DecisionId);
-                await command.ExecuteNonQueryAsync();
+                await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
             });
             updateException.SqlState.ShouldBe(PostgresErrorCodes.CheckViolation);
             updateException.ConstraintName.ShouldBe(
@@ -224,7 +224,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             await using var database = await _fixture.CreateDatabaseAsync();
             await using var connection = new NpgsqlConnection(database.ConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var context = _fixture.CreateDbContext(connection);
             await context.GetService<IMigrator>().MigrateAsync(PreviousMigration);
 
@@ -267,7 +267,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             await using var database = await _fixture.CreateDatabaseAsync();
             await using var connection = new NpgsqlConnection(database.ConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using (var transaction = await connection.BeginTransactionAsync())
             {
                 await SeedTopologyAsync(connection, transaction, includeLaterPlacement: false);
@@ -300,7 +300,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await using var database = await _fixture.CreateDatabaseAsync();
             await using (var seedConnection = new NpgsqlConnection(database.ConnectionString()))
             {
-                await seedConnection.OpenAsync();
+                await PostgreSqlHostedDiagnostics.OpenAsync(seedConnection);
                 await using var seedTransaction = await seedConnection.BeginTransactionAsync();
                 await SeedGraduationDependenciesAsync(seedConnection, seedTransaction);
                 await seedTransaction.CommitAsync();
@@ -310,8 +310,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 new NpgsqlConnection(database.ConnectionString("b52-first-graduation"));
             await using var secondConnection =
                 new NpgsqlConnection(database.ConnectionString("b52-second-graduation"));
-            await firstConnection.OpenAsync();
-            await secondConnection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(firstConnection);
+            await PostgreSqlHostedDiagnostics.OpenAsync(secondConnection);
             await using var firstTransaction = await firstConnection.BeginTransactionAsync();
             await using var secondTransaction = await secondConnection.BeginTransactionAsync();
             await InsertCurrentDecisionAsync(
@@ -337,7 +337,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await secondTransaction.RollbackAsync();
 
             await using var verifyConnection = new NpgsqlConnection(database.ConnectionString());
-            await verifyConnection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(verifyConnection);
             await using var verify = new NpgsqlCommand(
                 "SELECT COUNT(*) FROM public.\"OnyxGraduationDecisions\";",
                 verifyConnection);
@@ -676,11 +676,11 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             string sql)
         {
             await using var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await Should.ThrowAsync<PostgresException>(async () =>
             {
                 await using var command = new NpgsqlCommand(sql, connection);
-                await command.ExecuteNonQueryAsync();
+                await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
             });
         }
 
@@ -693,7 +693,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await using var command = new NpgsqlCommand(sql, connection, transaction);
             if (parameters.Length > 0)
                 command.Parameters.AddRange(parameters);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
         }
 
         private static Guid Participant(int number) =>

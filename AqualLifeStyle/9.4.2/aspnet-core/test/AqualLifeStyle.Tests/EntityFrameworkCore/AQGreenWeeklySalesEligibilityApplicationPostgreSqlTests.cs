@@ -142,7 +142,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 .CurrentDatabase.ShouldNotBeNull();
             await using var blockerConnection = new NpgsqlConnection(
                 database.ConnectionString("b53-weekly-sales-winner"));
-            await blockerConnection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(blockerConnection);
             await using var blockerTransaction =
                 await blockerConnection.BeginTransactionAsync();
             await using var blockerContext = _fixture.CreateDbContext(
@@ -188,7 +188,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
 
                 await using var verificationConnection = new NpgsqlConnection(
                     database.ConnectionString("b53-weekly-sales-verification"));
-                await verificationConnection.OpenAsync();
+                await PostgreSqlHostedDiagnostics.OpenAsync(verificationConnection);
                 await using var verificationContext = _fixture.CreateDbContext(
                     verificationConnection);
                 var decisions = await verificationContext
@@ -291,7 +291,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             await using var connection = new NpgsqlConnection(
                 AQGreenGraduationPostgreSqlFailureState.Shared.ConnectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new NpgsqlCommand(
                 """
                 SELECT COUNT(*)
@@ -307,7 +307,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             await using var connection = new NpgsqlConnection(
                 AQGreenGraduationPostgreSqlFailureState.Shared.ConnectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new NpgsqlCommand(
                 """
                 SELECT COUNT(*)
@@ -368,7 +368,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             command.Parameters.AddWithValue(
                 "reviewedAt",
                 WeekStartUtc.AddDays(7));
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
         }
 
         private static Guid P(int number) =>

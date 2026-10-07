@@ -790,7 +790,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 : DBNull.Value);
             command.Parameters.AddWithValue("reason", reason ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("rulesVersion", rulesVersion);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
             return id;
         }
 
@@ -834,7 +834,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 "evidenceReferenceId",
                 evidenceReferenceId ?? Guid.NewGuid());
             command.Parameters.AddWithValue("rulesVersion", rulesVersion);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
             return id;
         }
 
@@ -844,7 +844,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             string sql)
         {
             await using var command = new NpgsqlCommand(sql, connection, transaction);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
         }
 
         private static async Task<long> ScalarAsync(

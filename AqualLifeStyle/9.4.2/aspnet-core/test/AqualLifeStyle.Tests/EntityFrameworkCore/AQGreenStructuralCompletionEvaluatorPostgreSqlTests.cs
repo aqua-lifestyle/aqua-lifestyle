@@ -510,7 +510,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             await using var command = new NpgsqlCommand(sql, connection, transaction);
             command.Parameters.AddRange(parameters);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
         }
 
         private static Guid P(int number, int tenantId = 1) =>

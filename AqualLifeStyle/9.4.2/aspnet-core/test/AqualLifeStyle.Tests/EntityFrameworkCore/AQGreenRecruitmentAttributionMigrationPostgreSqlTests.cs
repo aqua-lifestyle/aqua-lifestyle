@@ -36,6 +36,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             listener.Start();
             _hostPort = ((IPEndPoint)listener.LocalEndpoint).Port;
             listener.Stop();
+            PostgreSqlHostedDiagnostics.FixtureCreated(this, _containerName, _hostPort);
         }
 
         public async Task InitializeAsync()
@@ -50,7 +51,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 try
                 {
                     await using var connection = new NpgsqlConnection(AdminConnectionString);
-                    await connection.OpenAsync();
+                    await PostgreSqlHostedDiagnostics.OpenAsync(connection);
                     break;
                 }
                 catch when (attempt < 29)
@@ -70,6 +71,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         [Fact]
         public async Task Migration_UpIsAdditiveAndEmptyDownPreservesV1Facts()
         {
+            PostgreSqlHostedDiagnostics.TestBody(this);
             await MigrateAsync(PreviousMigration);
             await SeedLegacyParticipantsAsync();
             await MigrateAsync(AttributionMigration);
@@ -108,6 +110,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         [Fact]
         public async Task Migration_DownRefusesRecordedAttributionEvidence()
         {
+            PostgreSqlHostedDiagnostics.TestBody(this);
             await MigrateAsync(AttributionMigration);
             await SeedLegacyParticipantsAsync();
             await InsertRootAttributionAsync(TestConnectionString, Guid.NewGuid());
@@ -128,11 +131,12 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         [Fact]
         public async Task Migration_DownWaitsForWriterThenRefusesCommittedEvidence()
         {
+            PostgreSqlHostedDiagnostics.TestBody(this);
             await MigrateAsync(AttributionMigration);
             await SeedLegacyParticipantsAsync();
 
             await using var writerConnection = new NpgsqlConnection(TestConnectionString);
-            await writerConnection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(writerConnection);
             await using var writerTransaction = await writerConnection.BeginTransactionAsync();
             await InsertRootAttributionAsync(
                 writerConnection,
@@ -248,7 +252,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         private async Task<long> ScalarAsync(string sql)
         {
             await using var connection = new NpgsqlConnection(TestConnectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new NpgsqlCommand(sql, connection);
             return Convert.ToInt64(await command.ExecuteScalarAsync());
         }
@@ -256,9 +260,9 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         private static async Task ExecuteAsync(string connectionString, string sql)
         {
             await using var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new NpgsqlCommand(sql, connection);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
         }
 
         private static async Task ExecuteAsync(
@@ -267,7 +271,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             string sql)
         {
             await using var command = new NpgsqlCommand(sql, connection, transaction);
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
         }
 
         private async Task RunDockerAsync(

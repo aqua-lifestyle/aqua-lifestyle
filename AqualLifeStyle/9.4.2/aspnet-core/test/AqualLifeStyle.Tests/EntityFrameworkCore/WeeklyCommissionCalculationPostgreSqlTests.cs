@@ -53,6 +53,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             listener.Start();
             _hostPort = ((IPEndPoint)listener.LocalEndpoint).Port;
             listener.Stop();
+            PostgreSqlHostedDiagnostics.FixtureCreated(this, _containerName, _hostPort);
         }
 
         public async Task InitializeAsync()
@@ -842,7 +843,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             }
 
             await using var connection = new NpgsqlConnection(BuildTestConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new NpgsqlCommand(
                 """
                 SELECT COUNT(*)
@@ -889,7 +890,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 try
                 {
                     await using var connection = new NpgsqlConnection(BuildAdminConnectionString());
-                    await connection.OpenAsync();
+                    await PostgreSqlHostedDiagnostics.OpenAsync(connection);
                     TraceLine("PostgreSQL is ready.");
                     return;
                 }
@@ -941,10 +942,10 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         private async Task CreateTestDatabaseAsync()
         {
             await using var connection = new NpgsqlConnection(BuildAdminConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = connection.CreateCommand();
             command.CommandText = $"""CREATE DATABASE "{_databaseName}" WITH OWNER = aqualifestyle;""";
-            await command.ExecuteNonQueryAsync();
+            await PostgreSqlHostedDiagnostics.ExecuteNonQueryAsync(command);
             TraceLine($"Created test database: {_databaseName}");
         }
 
@@ -967,7 +968,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         private async Task<long> CountAsync(string table)
         {
             await using var connection = new NpgsqlConnection(BuildTestConnectionString());
-            await connection.OpenAsync();
+            await PostgreSqlHostedDiagnostics.OpenAsync(connection);
             await using var command = new NpgsqlCommand($"""SELECT COUNT(*) FROM "{table}" """, connection);
             var result = await command.ExecuteScalarAsync();
             return Convert.ToInt64(result);

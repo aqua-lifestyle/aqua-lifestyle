@@ -125,6 +125,24 @@ jobs:
           test -s "$RESULTS_DIR/expected-names.txt"
           diff -u "TestResults/partition/${SHARD}-names.txt" "$RESULTS_DIR/expected-names.txt" \
             | tee "$RESULTS_DIR/discovery-diff.txt"
+      - name: Prepare temporary PostgreSQL observational capture
+        if: matrix.shard == 'entity-framework'
+        run: |
+          set -euo pipefail
+          root="$PWD/$RESULTS_DIR/postgres-diagnostics"
+          mkdir -p "$root"
+          real_docker="$(command -v docker)"
+          echo "AQGREEN_DIAG_DOCKER_REAL=$real_docker" >> "$GITHUB_ENV"
+          echo "AQGREEN_PG_DIAGNOSTICS=$root" >> "$GITHUB_ENV"
+          echo "$PWD/test/AqualLifeStyle.Tests/Diagnostics/HostedPostgreSql" >> "$GITHUB_PATH"
+          dotnet --info > "$root/dotnet-info.txt"
+          docker version > "$root/docker-version.txt"
+          cp test/AqualLifeStyle.Tests/obj/project.assets.json "$root/project.assets.json"
+          cp test/AqualLifeStyle.Tests/bin/Release/net8.0/AqualLifeStyle.Tests.deps.json "$root/test.deps.json"
+          sha256sum test/AqualLifeStyle.Tests/bin/Release/net8.0/Npgsql.dll > "$root/npgsql-binary.sha256"
+          docker events --filter type=container --format '{{json .}}' > "$root/docker-events.jsonl" 2> "$root/docker-events.stderr" &
+          echo "$!" > "$root/docker-observer.pid"
+
       - name: Test complete application shard
         run: |
           set -euo pipefail
@@ -138,6 +156,20 @@ jobs:
             --blame-hang-timeout 5m \
             --blame-hang-dump-type none \
             2>&1 | tee "$RESULTS_DIR/application-console.log"
+      - name: Preserve temporary PostgreSQL observer state
+        if: always() && matrix.shard == 'entity-framework'
+        run: |
+          root="$PWD/$RESULTS_DIR/postgres-diagnostics"
+          if test -f "$root/docker-observer.pid"; then
+            kill "$(cat "$root/docker-observer.pid")" 2>/dev/null || true
+          fi
+          if test -f "$RESULTS_DIR/application-console.log"; then
+            if rg -q '\[PG-DIAG-ERROR\]' "$RESULTS_DIR/application-console.log"; then
+              echo "Diagnostic capture reported an error; inspect artifacts."
+              exit 1
+            fi
+          fi
+
       - name: Verify complete shard results
         if: always()
         shell: pwsh
@@ -181,7 +213,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: backend-application-${{ matrix.shard }}-results
+          name: backend-application-${{ matrix.shard }}-results-attempt-${{ github.run_attempt }}
           path: AqualLifeStyle/9.4.2/aspnet-core/TestResults/${{ matrix.shard }}
           if-no-files-found: error
           retention-days: 7
