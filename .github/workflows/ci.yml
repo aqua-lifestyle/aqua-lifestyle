@@ -181,7 +181,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: backend-application-${{ matrix.shard }}-results
+          name: backend-application-${{ matrix.shard }}-results-attempt-${{ github.run_attempt }}
           path: AqualLifeStyle/9.4.2/aspnet-core/TestResults/${{ matrix.shard }}
           if-no-files-found: error
           retention-days: 7
