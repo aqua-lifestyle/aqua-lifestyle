@@ -34,6 +34,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         private readonly string _databaseName =
             $"aqgreen_attribution_migration_{Guid.NewGuid():N}";
         private readonly int _hostPort;
+        private string _containerId;
 
         public AQGreenRecruitmentAttributionMigrationPostgreSqlTests()
         {
@@ -45,11 +46,12 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
 
         public async Task InitializeAsync()
         {
-            await RunDockerAsync(
+            _containerId = await RunDockerAsync(
                 $"run -d --name {_containerName} -e POSTGRES_DB=postgres " +
                 "-e POSTGRES_USER=aqualifestyle -e POSTGRES_PASSWORD=aqualifestyle " +
                 $"-p {_hostPort}:5432 postgres:16-alpine");
 
+            await WaitForTcpReadinessAsync();
             await using var connection = await OpenReadyAdminConnectionAsync();
             try
             {
@@ -71,34 +73,102 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
 
         private async Task<NpgsqlConnection> OpenReadyAdminConnectionAsync()
         {
-            for (var attempt = 0; attempt < 30; attempt++)
+            var connection = new NpgsqlConnection(AdminConnectionString);
+            var boundary = "OPEN";
+            try
             {
-                var connection = new NpgsqlConnection(AdminConnectionString);
-                var boundary = "OPEN";
-                try
+                WriteAdminEvent("OPEN_BEGIN", connection);
+                await connection.OpenAsync();
+                WriteAdminEvent("OPEN_SUCCESS", connection);
+                boundary = "SELECT_1";
+                await using var command = new NpgsqlCommand("SELECT 1;", connection);
+                if (await command.ExecuteScalarAsync() is not int result || result != 1)
+                    throw new InvalidOperationException("Admin SELECT 1 returned an unexpected result.");
+                WriteAdminEvent("SELECT_1_SUCCESS", connection);
+                // Transfer the still-open connection to InitializeAsync for DDL.
+                return connection;
+            }
+            catch (Exception exception)
+            {
+                // Once TCP readiness passed, do not relabel or retry a connection failure.
+                await CaptureFailureAsync(boundary, exception, connection);
+                await connection.DisposeAsync();
+                throw;
+            }
+        }
+
+        private async Task WaitForTcpReadinessAsync()
+        {
+            // Preserve the existing 30-second startup budget, independently of CI limits.
+            using var budget = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var attempt = 0;
+            try
+            {
+                while (true)
                 {
-                    WriteAdminEvent("OPEN_BEGIN", connection);
-                    await connection.OpenAsync();
-                    WriteAdminEvent("OPEN_SUCCESS", connection);
-                    boundary = "SELECT_1";
-                    await using var command = new NpgsqlCommand("SELECT 1;", connection);
-                    if (await command.ExecuteScalarAsync() is not int result || result != 1)
-                        throw new InvalidOperationException("Admin SELECT 1 returned an unexpected result.");
-                    WriteAdminEvent("SELECT_1_SUCCESS", connection);
-                    // Transfer the still-open connection to InitializeAsync for DDL.
-                    return connection;
-                }
-                catch (Exception exception)
-                {
-                    await CaptureFailureAsync(boundary, exception, connection);
-                    await connection.DisposeAsync();
-                    if (attempt == 29)
+                    budget.Token.ThrowIfCancellationRequested();
+                    var info = new ProcessStartInfo("docker")
+                    {
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false
+                    };
+                    // The official image's initialization server is socket-only.
+                    // Explicit TCP can accept only after the final server starts.
+                    foreach (var argument in new[] { "exec", _containerName, "pg_isready",
+                        "-h", "127.0.0.1", "-p", "5432", "-U", "aqualifestyle",
+                        "-d", "postgres", "-t", "1" })
+                        info.ArgumentList.Add(argument);
+                    using var process = Process.Start(info);
+                    var output = process.StandardOutput.ReadToEndAsync();
+                    var error = process.StandardError.ReadToEndAsync();
+                    try { await process.WaitForExitAsync(budget.Token); }
+                    catch (OperationCanceledException)
+                    {
+                        if (!process.HasExited)
+                            process.Kill(entireProcessTree: true);
+                        await process.WaitForExitAsync();
                         throw;
-                    // Only pre-DDL readiness retries, always on a fresh connection.
-                    await Task.Delay(1000);
+                    }
+                    Console.WriteLine(JsonSerializer.Serialize(new
+                    {
+                        utc = DateTimeOffset.UtcNow,
+                        monotonicTicks = Stopwatch.GetTimestamp(),
+                        monotonicFrequency = Stopwatch.Frequency,
+                        testClass = nameof(AQGreenRecruitmentAttributionMigrationPostgreSqlTests),
+                        container = _containerName,
+                        containerId = _containerId,
+                        hostPort = _hostPort,
+                        boundary = "TCP_READINESS",
+                        attempt = ++attempt,
+                        exitCode = process.ExitCode,
+                        stdout = await output,
+                        stderr = await error
+                    }));
+                    if (process.ExitCode == 0)
+                    {
+                        await ObserveDockerAsync("inspect", "--format",
+                            "Id={{.Id}} Name={{.Name}} State={{json .State}} " +
+                            "RestartCount={{.RestartCount}} Ports={{json .NetworkSettings.Ports}}",
+                            _containerName);
+                        return;
+                    }
+                    if (process.ExitCode != 1 && process.ExitCode != 2)
+                        throw new InvalidOperationException(
+                            $"TCP pg_isready failed with exit code {process.ExitCode}.");
+                    await Task.Delay(1000, budget.Token);
                 }
             }
-            throw new InvalidOperationException("Admin readiness was not established.");
+            catch (Exception exception)
+            {
+                var failure = exception is OperationCanceledException
+                    ? new TimeoutException("PostgreSQL TCP readiness exceeded 30 seconds.", exception)
+                    : exception;
+                await CaptureFailureAsync("TCP_READINESS", failure, null);
+                if (failure != exception)
+                    throw failure;
+                throw;
+            }
         }
 
         private void WriteAdminEvent(
@@ -111,7 +181,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             settings.Remove("Password");
             var identity = settings.ConnectionString;
             int? backendPid = null;
-            try { backendPid = connection.ProcessID; }
+            try { backendPid = connection?.ProcessID; }
             catch (InvalidOperationException) { }
             Console.WriteLine(JsonSerializer.Serialize(new
             {
@@ -120,10 +190,19 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 monotonicFrequency = Stopwatch.Frequency,
                 testClass = nameof(AQGreenRecruitmentAttributionMigrationPostgreSqlTests),
                 container = _containerName,
+                containerId = _containerId,
                 hostPort = _hostPort,
                 boundary,
                 pooling = settings.Pooling,
-                connectionIdentity = RuntimeHelpers.GetHashCode(connection),
+                connectionIdentity = connection == null ? (int?)null : RuntimeHelpers.GetHashCode(connection),
+                failureClass = exception == null ? null : boundary switch
+                {
+                    "TCP_READINESS_FAILURE" => "PRE_READINESS",
+                    "OPEN_FAILURE" => "POST_READINESS_OPEN",
+                    "SELECT_1_FAILURE" => "POST_OPEN_SELECT",
+                    "CREATE_DATABASE_FAILURE" => "POST_VERIFICATION_DDL",
+                    _ => "UNCLASSIFIED"
+                },
                 connectionStringIdentity = Convert.ToHexString(
                     SHA256.HashData(Encoding.UTF8.GetBytes(identity))),
                 redactedConnectionString = identity,
@@ -175,8 +254,11 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 Console.WriteLine(JsonSerializer.Serialize(new
                 {
                     utc = DateTimeOffset.UtcNow,
+                    monotonicTicks = Stopwatch.GetTimestamp(),
+                    monotonicFrequency = Stopwatch.Frequency,
                     testClass = nameof(AQGreenRecruitmentAttributionMigrationPostgreSqlTests),
                     container = _containerName,
+                    containerId = _containerId,
                     hostPort = _hostPort,
                     observation = arguments[0],
                     exitCode = process.ExitCode,
@@ -397,7 +479,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await command.ExecuteNonQueryAsync();
         }
 
-        private async Task RunDockerAsync(
+        private async Task<string> RunDockerAsync(
             string arguments,
             bool throwOnFailure = true)
         {
@@ -410,11 +492,12 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 UseShellExecute = false
             });
             process.ShouldNotBeNull();
-            await process.StandardOutput.ReadToEndAsync();
+            var output = await process.StandardOutput.ReadToEndAsync();
             var error = await process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync();
             if (throwOnFailure && process.ExitCode != 0)
                 throw new InvalidOperationException($"Docker command failed: {error}");
+            return output.Trim();
         }
 
         private string BuildConnectionString(string database) =>
