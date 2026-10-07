@@ -48,6 +48,7 @@ export type AQGreenFuneralCover = {
 };
 
 export type ProgrammeCheckout = {
+  checkoutId?: string;
   amount: number;
   checkoutUrl: string;
   currency: string;

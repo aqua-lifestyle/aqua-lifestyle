@@ -50,6 +50,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
         protected virtual DateTime UtcNow => DateTime.UtcNow;
 
+        public IAQGreenProspectiveJoiningRecorder ProspectiveJoiningRecorder { get; set; }
+
         public ClubMemberProgrammeParticipationAppService(
             ICustomerRepository customerRepository,
             IRepository<CustomerAreaAssignment, Guid> customerAreaAssignmentRepository,
@@ -85,6 +87,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         }
 
         [AbpAuthorize(AquaPermissions.ProgrammeParticipations.ViewSelf)]
+        [UnitOfWork]
         public async Task<MyProgrammeParticipationsDto> GetMyParticipationsAsync()
         {
             var customer = await GetCurrentActiveCustomerAsync();
@@ -160,6 +163,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 ? null
                 : new PendingProgrammeCheckoutDto
                 {
+                    CheckoutId = checkout.Id,
                     Amount = checkout.Amount,
                     Currency = checkout.Currency,
                     CheckoutUrl = checkout.CheckoutUrl,
@@ -194,6 +198,18 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             input ??= new StartEntryParticipationInput();
             var customerId = await GetCurrentActiveCustomerIdAsync();
             var tenantId = GetRequiredTenantId("Programme participation is unavailable.");
+            if (PilotMode.IsEnabled)
+            {
+                if (input.RecruiterCustomerId.HasValue || string.IsNullOrWhiteSpace(input.InviteCode))
+                    throw new UserFriendlyException("The pilot requires a sponsor invitation. Root admission is a separate privileged action.");
+                var prior = await _entryParticipationRepository.FirstOrDefaultAsync(item => item.CustomerId == customerId);
+                if (prior != null)
+                {
+                    if (ProspectiveJoiningRecorder == null) throw new InvalidOperationException("The V2 joining recorder is unavailable.");
+                    await ProspectiveJoiningRecorder.ValidateReplayAsync(prior, input.InviteCode);
+                    return Map(prior, await GetClubMemberNumberAsync(prior.RecruiterCustomerId));
+                }
+            }
             var requestedPlacement = await ResolveRequestedRecruiterAsync(
                 input.RecruiterCustomerId,
                 input.InviteCode,
@@ -211,6 +227,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             if (existing != null)
             {
                 EnsureSameRecruiter(existing.RecruiterCustomerId, recruiterCustomerId, "AQGreen");
+                if (PilotMode.IsEnabled)
+                    await ProspectiveJoiningRecorder.ValidateReplayAsync(existing, input.InviteCode);
                 return Map(existing, await GetClubMemberNumberAsync(existing.RecruiterCustomerId));
             }
 
@@ -253,6 +271,13 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
             await _entryParticipationRepository.InsertAsync(participation);
             await CurrentUnitOfWork.SaveChangesAsync();
+            if (PilotMode.IsEnabled)
+            {
+                if (ProspectiveJoiningRecorder == null) throw new InvalidOperationException("The V2 joining recorder is unavailable.");
+                await ProspectiveJoiningRecorder.RecordAsync(participation,
+                    requestedPlacement.InvitationPlacement, AbpSession.GetUserId(), UtcNow);
+                await CurrentUnitOfWork.SaveChangesAsync();
+            }
             Logger.Info(
                 $"AQGreen participation started tenant={customer.TenantId} customer={customer.Id} independent={participation.JoinedIndependently}");
             return Map(participation, await GetClubMemberNumberAsync(participation.RecruiterCustomerId));
@@ -375,6 +400,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         public async Task<ProgrammeCheckoutDto> CreateDirectOnyxCheckoutAsync(
             CreateDirectOnyxCheckoutInput input)
         {
+            PilotMode.DenyOutsidePilot("Direct Onyx checkout");
             input ??= new CreateDirectOnyxCheckoutInput();
             var tenantId = GetRequiredTenantId("Onyx checkout is unavailable.");
             DirectOnyxCheckoutIntent intent;
@@ -482,7 +508,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
             if (!Uri.TryCreate(configured, UriKind.Absolute, out var root) ||
                 root.Scheme != Uri.UriSchemeHttps &&
-                (!isDevelopment || root.Scheme != Uri.UriSchemeHttp))
+                (!(isDevelopment || PilotMode.IsEnabled && root.IsLoopback) || root.Scheme != Uri.UriSchemeHttp))
                 throw new UserFriendlyException(
                     "Online payment is temporarily unavailable.",
                     "The customer website address has not been configured correctly.");
@@ -533,6 +559,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         private static ProgrammeCheckoutDto MapCheckout(HostedPaymentCheckout checkout) =>
             new ProgrammeCheckoutDto
             {
+                CheckoutId = checkout.Id,
                 Amount = checkout.Amount,
                 Currency = checkout.Currency,
                 CheckoutUrl = checkout.CheckoutUrl

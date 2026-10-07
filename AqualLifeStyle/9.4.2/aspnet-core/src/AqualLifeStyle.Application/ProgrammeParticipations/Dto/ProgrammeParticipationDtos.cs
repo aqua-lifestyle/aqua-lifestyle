@@ -29,6 +29,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
 
     public class ProgrammeCheckoutDto
     {
+        public Guid CheckoutId { get; set; }
         public decimal Amount { get; set; }
         public string Currency { get; set; }
         public string CheckoutUrl { get; set; }
@@ -36,6 +37,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
 
     public class PendingProgrammeCheckoutDto
     {
+        public Guid CheckoutId { get; set; }
         public decimal Amount { get; set; }
         public string Currency { get; set; }
         public string CheckoutUrl { get; set; }

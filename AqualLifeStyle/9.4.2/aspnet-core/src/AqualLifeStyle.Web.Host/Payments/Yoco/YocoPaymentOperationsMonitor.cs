@@ -13,6 +13,8 @@ namespace AqualLifeStyle.Web.Host.Payments.Yoco
         : AsyncPeriodicBackgroundWorkerBase, ISingletonDependency
     {
         private const int DefaultScanIntervalMinutes = 15;
+        public AqualLifeStyle.Domain.AQGreen.IAQGreenPilotMode PilotMode { get; set; }
+            = AqualLifeStyle.Domain.AQGreen.DisabledAQGreenPilotMode.Instance;
         private const int DefaultStaleCheckoutThresholdMinutes = 60;
 
         private readonly StaleYocoCheckoutDetector _detector;
@@ -38,6 +40,7 @@ namespace AqualLifeStyle.Web.Host.Payments.Yoco
 
         protected override async Task DoWorkAsync()
         {
+            PilotMode.DenyOutsidePilot("External payment monitor");
             var checkedAtUtc = DateTime.UtcNow;
             var cutoffUtc = checkedAtUtc.AddMinutes(-_staleCheckoutThresholdMinutes);
             StaleYocoCheckoutSnapshot snapshot;

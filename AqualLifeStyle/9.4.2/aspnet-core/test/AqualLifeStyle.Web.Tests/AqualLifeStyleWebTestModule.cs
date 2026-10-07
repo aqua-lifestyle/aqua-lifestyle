@@ -50,6 +50,19 @@ namespace AqualLifeStyle.Web.Tests
             Configuration.ReplaceService<
                 IAQGreenWeeklySalesEligibilityClock,
                 AQGreenV2ContinuousSalesClock>(DependencyLifeStyle.Singleton);
+            if (Environment.GetEnvironmentVariable("REPRO_PILOT") == "true")
+            {
+                Configuration.ReplaceService<IAQGreenPilotMode,
+                    AqualLifeStyle.Web.Host.AQGreenV2Pilot.AQGreenV2PilotMode>(DependencyLifeStyle.Singleton);
+                Configuration.ReplaceService<IAQGreenPlacementV2ApprovalGate,
+                    AqualLifeStyle.Web.Host.AQGreenV2Pilot.AQGreenV2PilotApprovalGate>(DependencyLifeStyle.Singleton);
+                Configuration.ReplaceService<IAQGreenPlacementV2ProgressGate,
+                    AqualLifeStyle.Web.Host.AQGreenV2Pilot.AQGreenV2PilotProgressGate>(DependencyLifeStyle.Singleton);
+                Configuration.ReplaceService<IAQGreenCommissionStructuralModelSelector,
+                    AqualLifeStyle.Web.Host.AQGreenV2Pilot.AQGreenV2PilotCommissionSelector>(DependencyLifeStyle.Singleton);
+                Configuration.ReplaceService<IAQGreenWeeklySalesReviewGate,
+                    AqualLifeStyle.Web.Host.AQGreenV2Pilot.AQGreenV2PilotSalesReviewGate>(DependencyLifeStyle.Singleton);
+            }
             // Allow enabling transactional UnitOfWork for reproduction via environment variable to avoid impacting other tests.
             var enableTransactional = string.Equals(Environment.GetEnvironmentVariable("REPRO_TRANSACTIONAL"), "true", StringComparison.OrdinalIgnoreCase);
             Configuration.UnitOfWork.IsTransactional = enableTransactional;

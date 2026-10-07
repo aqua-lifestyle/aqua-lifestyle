@@ -150,7 +150,7 @@ describe("MemberProgrammes", () => {
 
     expect(await screen.findByText(/does not advertise the required member journey capability/i))
       .toBeInTheDocument();
-    expect(useMyProgrammeJourney).toHaveBeenCalledWith(false);
+    expect(useMyProgrammeJourney).toHaveBeenCalledWith(false, false);
   });
 
   it("refreshes account access after programme activation changes the role", async () => {
@@ -697,3 +697,9 @@ describe("MemberProgrammes", () => {
       .toBeInTheDocument();
   });
 });
+
+// These existing cases exercise ordinary deployments. Pilot-specific cases use
+// the actual mode boundary separately rather than consuming their domain mock responses.
+vi.mock("@/src/shared/hooks/use-pilot-status", () => ({
+  usePilotStatus: () => ({ isPilot: false, modeKnown: true }),
+}));

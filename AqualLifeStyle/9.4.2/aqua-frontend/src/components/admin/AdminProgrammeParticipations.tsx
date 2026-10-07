@@ -5,6 +5,8 @@ import type { FormEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 
 import { useAuthState } from "@/src/providers";
+import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
+import { PilotRootAdmission } from "./pilot-root-admission";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import {
@@ -105,15 +107,16 @@ const formatCurrency = (amount: number, currency: string) =>
   new Intl.NumberFormat("en-ZA", { currency, style: "currency" }).format(amount);
 
 export const AdminProgrammeParticipations = () => {
+  const { isPilot, modeKnown } = usePilotStatus();
   const { session } = useAuthState();
   const canView =
     session?.user?.permissions?.includes(VIEW_PERMISSION) ?? false;
   const canCorrect =
-    session?.user?.permissions?.includes(CORRECT_PERMISSION) ?? false;
+    modeKnown && !isPilot && (session?.user?.permissions?.includes(CORRECT_PERMISSION) ?? false);
   const canApprove =
     session?.user?.permissions?.includes(APPROVE_PERMISSION) ?? false;
   const canViewCheckouts =
-    session?.user?.permissions?.includes(VIEW_CHECKOUTS_PERMISSION) ?? false;
+    modeKnown && !isPilot && (session?.user?.permissions?.includes(VIEW_CHECKOUTS_PERMISSION) ?? false);
   const canTerminateCheckouts =
     session?.user?.permissions?.includes(TERMINATE_CHECKOUTS_PERMISSION) ?? false;
   const canReviewWeeklySales =
@@ -618,6 +621,8 @@ export const AdminProgrammeParticipations = () => {
           </p>
         </header>
 
+        {isPilot && <PilotRootAdmission />}
+
         <div className="grid gap-3 sm:grid-cols-3">
           <Card className="flex items-center gap-3">
             <Route className="size-6 text-accent" />
@@ -680,7 +685,7 @@ export const AdminProgrammeParticipations = () => {
             onChange={(value) => setProgramme(value as ProgrammeType)}
             tabs={[
               { content: table, id: "entry", label: "AQGreen" },
-              { content: table, id: "onyx", label: "Onyx" },
+              ...(!isPilot ? [{ content: table, id: "onyx", label: "Onyx" }] : []),
             ]}
             value={programme}
           />

@@ -4,6 +4,7 @@ import { CheckCircle2, DollarSign, HeartPulse, TrendingUp } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useAuthState } from "@/src/providers";
+import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
 import { useMyProgrammeProgress } from "@/src/shared/hooks/use-my-programme-progress";
 import {
   Badge,
@@ -96,9 +97,10 @@ const EmptyProgress = ({ currency }: { currency: string }) => (
 
 export const MemberProgrammeProgress = () => {
   const { session } = useAuthState();
+  const { isPilot, modeKnown } = usePilotStatus();
   const canView =
     session?.user?.permissions?.includes(VIEW_PERMISSION) ?? false;
-  const { data, errorMessage, isLoading } = useMyProgrammeProgress(canView);
+  const { data, errorMessage, isLoading } = useMyProgrammeProgress(canView && modeKnown);
   const structuralProgress = data?.structuralProgress;
 
   if (!canView) {
@@ -123,8 +125,7 @@ export const MemberProgrammeProgress = () => {
           />
           <h1 className="mt-2 text-3xl font-bold">AQGreen progress</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Your current AQGreen network level, weekly earnings, monthly
-            subscription, and included funeral-cover benefit.
+            {isPilot ? "Your cutoff-effective AQGreen structural progress and test-money ledger. No payout, recurring obligation or benefit entitlement." : "Your current AQGreen network level, weekly earnings, monthly subscription, and included funeral-cover benefit."}
           </p>
         </header>
 
@@ -156,7 +157,7 @@ export const MemberProgrammeProgress = () => {
                         : "You have reached the highest AQGreen level."}
                     </p>
                   </div>
-                  {data.funeralCoverIncluded ? (
+                  {!isPilot && modeKnown && data.funeralCoverIncluded ? (
                     <Badge tone="success">
                       {formatCurrency(
                         data.funeralCoverBenefitAmount,
@@ -213,13 +214,13 @@ export const MemberProgrammeProgress = () => {
             <Card className="flex flex-col gap-4">
               <SectionHeading
                 icon={<DollarSign className="size-5" />}
-                title="Weekly earnings"
+                title={isPilot ? "Weekly test-money ledger" : "Weekly earnings"}
               />
               <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <Stat label="Total earned" value={formatCurrency(data.totalEarned, data.currency)} />
                 <Stat label="Awaiting release" value={formatCurrency(data.earnedAwaitingRelease, data.currency)} />
                 <Stat label="On hold" value={formatCurrency(data.onHold, data.currency)} />
-                <Stat label="Paid to you" value={formatCurrency(data.paid, data.currency)} />
+                {!isPilot && modeKnown ? <Stat label="Paid to you" value={formatCurrency(data.paid, data.currency)} /> : null}
               </dl>
 
               {data.recentEarnings.length > 0 ? (
@@ -279,7 +280,7 @@ export const MemberProgrammeProgress = () => {
               ) : null}
             </Card>
 
-            <Card className="flex flex-col gap-4">
+            {!isPilot && modeKnown ? <Card className="flex flex-col gap-4">
               <SectionHeading
                 icon={<TrendingUp className="size-5" />}
                 title="Monthly subscription"
@@ -332,9 +333,9 @@ export const MemberProgrammeProgress = () => {
                   <p className="mt-1 text-muted-foreground">{data.nextAction}</p>
                 </div>
               ) : null}
-            </Card>
+            </Card> : null}
 
-            {data.funeralCoverIncluded ? (
+            {!isPilot && modeKnown && data.funeralCoverIncluded ? (
               <Card className="flex flex-col gap-3">
                 <SectionHeading
                   icon={<HeartPulse className="size-5" />}

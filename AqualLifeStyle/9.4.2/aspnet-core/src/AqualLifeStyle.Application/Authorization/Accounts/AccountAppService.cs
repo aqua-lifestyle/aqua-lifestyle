@@ -102,6 +102,8 @@ namespace AqualLifeStyle.Authorization.Accounts
                 invitationPlacement = await _invitationResolver.ResolveForRegistrationAsync(
                     input.InviteCode,
                     targetTenantId);
+                if (PilotMode.IsEnabled && invitationPlacement.ProgrammeKey != "AQGREEN")
+                    PilotMode.DenyOutsidePilot("Uncommissioned programme registration");
                 targetTenantId = invitationPlacement.TenantId;
             }
             else if (!targetTenantId.HasValue)

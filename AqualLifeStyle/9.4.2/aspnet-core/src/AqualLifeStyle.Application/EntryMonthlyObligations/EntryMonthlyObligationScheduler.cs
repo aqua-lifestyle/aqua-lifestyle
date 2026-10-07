@@ -20,6 +20,8 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
     public class EntryMonthlyObligationScheduler
         : IEntryMonthlyObligationScheduler, ITransientDependency
     {
+        public AqualLifeStyle.Domain.AQGreen.IAQGreenPilotMode PilotMode { get; set; }
+            = AqualLifeStyle.Domain.AQGreen.DisabledAQGreenPilotMode.Instance;
         private readonly IRepository<EntryMonthlyObligation, Guid> _obligationRepository;
         private readonly IRepository<EntryParticipation, Guid> _participationRepository;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
@@ -42,6 +44,7 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
             string duePolicyVersion)
         {
             ValidatePeriod(periodYear, periodMonth);
+            PilotMode.DenyOutsidePilot("Monthly obligation scheduling");
             ValidateUtc(dueAt, nameof(dueAt));
             ValidateDuePolicyVersion(duePolicyVersion);
 
@@ -99,6 +102,7 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
         [UnitOfWork]
         public virtual async Task<int> AssessObligationsAsync(DateTime asOf)
         {
+            PilotMode.DenyOutsidePilot("Monthly obligation assessment");
             ValidateUtc(asOf, nameof(asOf));
 
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))

@@ -88,7 +88,10 @@ namespace AqualLifeStyle.Web.Host.Controllers
                 ImageId = DeploymentMetadata.ResolveImageId(_configuration),
                 PaymentContractVersion = DeploymentMetadata.PaymentContractVersion,
                 ContractCapabilities = System.Linq.Enumerable.ToArray(
-                    DeploymentMetadata.ContractCapabilities),
+                    System.Linq.Enumerable.Where(DeploymentMetadata.ContractCapabilities,
+                        capability => _environment.EnvironmentName != AQGreenV2Pilot.AQGreenV2PilotConfiguration.EnvironmentName ||
+                            capability == "aqgreen-flexible-joining-v1" || capability == "programme-approval-queue-v1" ||
+                            capability == "member-programme-journey-v1")),
                 ReleaseDate = AppVersionHelper.ReleaseDate,
                 CheckedAtUtc = DateTime.UtcNow,
                 Environment = _environment.EnvironmentName,

@@ -43,12 +43,14 @@ namespace AqualLifeStyle.Application.Recruitment
         }
 
         [AbpAuthorize(AquaPermissions.ProgrammeParticipations.Invite)]
+        [UnitOfWork]
         public async Task<MyProgrammeInvitationsDto> GetMyInvitationsAsync()
         {
             var customer = await GetCurrentActiveCustomerAsync();
             var invitations = new List<ProgrammeInvitationDto>();
             foreach (var policy in _policyResolver.GetAll())
             {
+                if (PilotMode.IsEnabled && policy.ProgrammeKey != RecruitmentProgrammeKeys.AQGreen) continue;
                 var participation = await policy.FindByCustomerAsync(customer.Id);
                 if (participation == null || !participation.IsEligible) continue;
 
@@ -69,6 +71,7 @@ namespace AqualLifeStyle.Application.Recruitment
         }
 
         [AbpAllowAnonymous]
+        [UnitOfWork]
         public async Task<ProgrammeInvitationPreviewDto> GetPreviewAsync(
             ProgrammeInvitationCodeInput input)
         {
@@ -84,6 +87,8 @@ namespace AqualLifeStyle.Application.Recruitment
             }
             if (invitation == null)
                 throw new UserFriendlyException("Invitation unavailable.", "This invitation link is not valid.");
+            if (invitation.ProgrammeKey != RecruitmentProgrammeKeys.AQGreen)
+                PilotMode.DenyOutsidePilot("Uncommissioned programme invitation");
 
             var policy = _policyResolver.Resolve(invitation.ProgrammeKey);
             var participation = await policy.FindByParticipationAsync(

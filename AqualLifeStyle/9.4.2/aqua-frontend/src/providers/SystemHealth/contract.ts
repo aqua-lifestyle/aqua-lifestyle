@@ -36,6 +36,15 @@ export const isPaymentApiCompatible = (health: SystemHealth | null) =>
     health.contractCapabilities.includes(capability),
   );
 
+// The isolated pilot commissions AQGreen joining and approval only. It must
+// neither advertise nor require the deliberately closed Onyx checkout path.
+export const isPilotAQGreenJoiningApiCompatible = (health: SystemHealth | null) =>
+  health?.environment === "AQGreenV2Pilot" &&
+  health.paymentContractVersion === REQUIRED_PAYMENT_CONTRACT_VERSION &&
+  ["aqgreen-flexible-joining-v1", "programme-approval-queue-v1"].every(
+    (capability) => health.contractCapabilities.includes(capability),
+  );
+
 export const isProgrammeJourneyApiCompatible = (health: SystemHealth | null) =>
   health?.contractCapabilities.includes("member-programme-journey-v1") ?? false;
 

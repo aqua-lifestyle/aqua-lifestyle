@@ -254,3 +254,9 @@ describe("AdminWeeklyEarnings", () => {
     expect(httpClient.get).not.toHaveBeenCalled();
   });
 });
+
+// These existing cases exercise ordinary deployments. Pilot-specific cases use
+// the actual mode boundary separately rather than consuming their domain mock responses.
+vi.mock("@/src/shared/hooks/use-pilot-status", () => ({
+  usePilotStatus: () => ({ isPilot: false, modeKnown: true }),
+}));

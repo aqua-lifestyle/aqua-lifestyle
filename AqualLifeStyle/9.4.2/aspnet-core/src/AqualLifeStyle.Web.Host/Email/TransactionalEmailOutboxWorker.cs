@@ -11,6 +11,8 @@ namespace AqualLifeStyle.Web.Host.Email
         : AsyncPeriodicBackgroundWorkerBase, ISingletonDependency
     {
         private readonly IConfiguration _configuration;
+        public AqualLifeStyle.Domain.AQGreen.IAQGreenPilotMode PilotMode { get; set; }
+            = AqualLifeStyle.Domain.AQGreen.DisabledAQGreenPilotMode.Instance;
         private readonly TransactionalEmailOutboxProcessor _processor;
 
         public TransactionalEmailOutboxWorker(
@@ -26,6 +28,7 @@ namespace AqualLifeStyle.Web.Host.Email
 
         protected override async Task DoWorkAsync()
         {
+            PilotMode.DenyOutsidePilot("External email delivery worker");
             if (!_configuration.GetValue<bool>("Bird:Enabled")) return;
             await _processor.ProcessPendingAsync();
         }
