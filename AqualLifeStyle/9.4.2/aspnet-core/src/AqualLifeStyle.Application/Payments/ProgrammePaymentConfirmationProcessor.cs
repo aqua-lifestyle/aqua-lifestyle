@@ -78,6 +78,8 @@ namespace AqualLifeStyle.Payments
         private readonly IUnitOfWorkManager _unitOfWorkManager;
         private readonly IHostedPaymentCheckoutLock _hostedPaymentCheckoutLock;
         private readonly ProgrammeApprovalNotificationScheduler _approvalNotificationScheduler;
+        public AqualLifeStyle.Domain.AQGreen.IAQGreenPilotMode PilotMode { get; set; }
+            = AqualLifeStyle.Domain.AQGreen.DisabledAQGreenPilotMode.Instance;
 
         public ProgrammePaymentConfirmationProcessor(
             IRepository<MemberPayment, Guid> paymentRepository,
@@ -130,6 +132,7 @@ namespace AqualLifeStyle.Payments
                 string currency,
                 DateTime confirmedAt)
         {
+            PilotMode.DenyOutsidePilot("Direct Onyx payment confirmation");
             if (checkoutIntentId == Guid.Empty)
                 throw new ArgumentException("A checkout intent is required.", nameof(checkoutIntentId));
 
@@ -424,6 +427,10 @@ namespace AqualLifeStyle.Payments
                 string currency,
                 DateTime confirmedAt)
         {
+            if (PilotMode.IsEnabled && (provider != "AQGREEN-PILOT-TEST" ||
+                providerCheckoutId != "PILOT-TEST-" + checkoutId.ToString("N") ||
+                externalPaymentReference != "PILOT-TEST-PAYMENT-" + checkoutId.ToString("N")))
+                throw new InvalidOperationException("Only explicitly represented test money can enter the pilot.");
             if (checkoutId == Guid.Empty)
                 throw new ArgumentException("An AQGreen checkout is required.", nameof(checkoutId));
 
@@ -569,6 +576,7 @@ namespace AqualLifeStyle.Payments
                 string currency,
                 DateTime confirmedAt)
         {
+            PilotMode.DenyOutsidePilot("Monthly obligation payment");
             if (checkoutId == Guid.Empty)
                 throw new ArgumentException(
                     "An AQGreen monthly checkout is required.",
@@ -721,6 +729,7 @@ namespace AqualLifeStyle.Payments
         public virtual async Task<ProgrammePaymentConfirmationResult> ProcessAsync(
             ConfirmedProgrammePayment confirmation)
         {
+            PilotMode.DenyOutsidePilot("External programme payment confirmation");
             if (confirmation == null)
             {
                 throw new ArgumentNullException(nameof(confirmation));
@@ -877,6 +886,7 @@ namespace AqualLifeStyle.Payments
             EntryParticipation participation,
             DateTime joiningCompletedAt)
         {
+            if (PilotMode.IsEnabled) return; // No actual policy/benefit entitlement from test money.
             if (!participation.IsJoiningObligationSatisfied)
             {
                 return;

@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthState } from "@/src/providers";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
+import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
 import { MemberProgrammeProgress } from "./member-programme-progress";
 import { heldProgress, levelOneProgress } from "./programme-progress-test-data";
 
+vi.mock("@/src/shared/hooks/use-pilot-status", () => ({ usePilotStatus: vi.fn() }));
 vi.mock("@/src/providers", () => ({ useAuthState: vi.fn() }));
 vi.mock("@/src/shared/api", async () => {
   const actual = await vi.importActual<typeof import("@/src/shared/api")>(
@@ -33,10 +35,21 @@ const authState = (permissions: string[]) => ({
 describe("MemberProgrammeProgress", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: false, modeKnown: true });
     vi.mocked(useAuthState).mockReturnValue(
       authState(["Aqua.ProgrammeParticipations.ViewSelf"]),
     );
     vi.mocked(httpClient.get).mockResolvedValue(levelOneProgress);
+  });
+
+  it("keeps production obligations and benefit claims out of pilot progress", async () => {
+    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: true, modeKnown: true });
+    render(<MemberProgrammeProgress />);
+    expect(await screen.findByRole("heading", { name: "Level 1" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Weekly test-money ledger" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Monthly subscription" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/funeral cover included/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Paid to you")).not.toBeInTheDocument();
   });
 
   it("loads and shows AQGreen level, earnings, and funeral cover", async () => {

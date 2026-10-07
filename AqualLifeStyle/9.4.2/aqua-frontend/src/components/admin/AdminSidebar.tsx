@@ -18,6 +18,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useAuthState } from "@/src/providers";
+import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
 import { usePendingProgrammeApprovals } from "@/src/shared/hooks/use-pending-programme-approvals";
 import { cn } from "@/src/shared/lib/utils";
 
@@ -39,6 +40,7 @@ const adminLinks = [
 ] as const;
 
 export const AdminSidebar = () => {
+  const { isPilot } = usePilotStatus();
   const pathname = usePathname();
   const { session } = useAuthState();
   const permissions = session?.user?.permissions ?? [];
@@ -49,7 +51,8 @@ export const AdminSidebar = () => {
     canViewProgrammeParticipations,
   );
   const visibleLinks = adminLinks.filter(
-    ({ permission }) => permission === null || permissions.includes(permission),
+    ({ permission, href }) => (permission === null || permissions.includes(permission)) &&
+      (!isPilot || ["/admin/dashboard", "/admin/programme-participations", "/admin/weekly-sales-reviews", "/admin/weekly-earnings"].includes(href)),
   );
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);

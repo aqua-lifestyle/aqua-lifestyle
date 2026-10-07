@@ -203,8 +203,17 @@ const programmeJourneySchema = z.object({
   startedAt: z.string().nullable(),
 });
 
-const programmeJourneyResponseSchema = z.object({
-  programmes: z.array(programmeJourneySchema).length(2),
+const pilotProgrammeJourneySchema = programmeJourneySchema.extend({
+  programmeCode: z.literal("AQGREEN"),
+  programmeName: z.literal("AQGreen"),
+  benefits: z.array(z.never()).length(0),
+  monthlySubscription: z.null(),
+});
+
+const journeyResponseSchema = (pilot: boolean) => z.object({
+  programmes: pilot
+    ? z.array(pilotProgrammeJourneySchema).length(1)
+    : z.array(programmeJourneySchema).length(2),
   projectedAt: z.string().min(1),
 }).superRefine((response, context) => {
   const expected = {
@@ -238,6 +247,8 @@ const programmeJourneyResponseSchema = z.object({
   });
 });
 
-export const parseMyProgrammeJourney = (value: unknown): MyProgrammeJourney =>
-  programmeJourneyResponseSchema.parse(value);
+export const parseMyProgrammeJourney = (
+  value: unknown,
+  pilot = false,
+): MyProgrammeJourney => journeyResponseSchema(pilot).parse(value);
 import { z } from "zod";

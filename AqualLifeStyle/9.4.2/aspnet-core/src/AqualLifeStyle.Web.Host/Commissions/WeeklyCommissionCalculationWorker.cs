@@ -53,6 +53,8 @@ namespace AqualLifeStyle.Web.Host.Commissions
         }
 
         private const int DefaultIntervalMinutes = 1440;
+        public AqualLifeStyle.Domain.AQGreen.IAQGreenPilotMode PilotMode { get; set; }
+            = AqualLifeStyle.Domain.AQGreen.DisabledAQGreenPilotMode.Instance;
 
         private readonly IConfiguration _configuration;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
@@ -94,6 +96,7 @@ namespace AqualLifeStyle.Web.Host.Commissions
 
         protected override async Task DoWorkAsync()
         {
+            PilotMode.DenyOutsidePilot("Automatic programme commission worker");
             if (!_configuration.GetValue<bool>("App:WeeklyCommissions:Enabled"))
             {
                 return;

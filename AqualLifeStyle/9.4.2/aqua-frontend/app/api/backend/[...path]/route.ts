@@ -9,6 +9,7 @@ const publicBackendRoutes: Readonly<Record<string, ReadonlySet<string>>> = {
     "api/health",
     "api/services/app/Account/GetTenantSelfRegistrationAvailability",
     "api/services/app/ProgrammeInvitation/GetPreview",
+    "api/services/app/AQGreenPilot/GetStatus",
   ]),
   POST: new Set(["api/services/app/Account/Register"]),
 };

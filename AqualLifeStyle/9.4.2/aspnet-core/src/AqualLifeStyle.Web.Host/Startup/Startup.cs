@@ -27,6 +27,7 @@ using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Email;
 using AqualLifeStyle.Web.Host.Email;
 using AqualLifeStyle.Web.Host.AQGreenV2Demo;
+using AqualLifeStyle.Web.Host.AQGreenV2Pilot;
 using System.Threading.RateLimiting;
 
 namespace AqualLifeStyle.Web.Host.Startup
@@ -46,6 +47,7 @@ namespace AqualLifeStyle.Web.Host.Startup
             // Run this before any other Production-only setup so an accidental
             // demo request fails with the explicit non-production boundary.
             AQGreenV2DemoConfiguration.Validate(_environment, _appConfiguration);
+            AQGreenV2PilotConfiguration.Validate(_environment, _appConfiguration);
         }
 
         public void ConfigureServices(IServiceCollection services)
@@ -130,7 +132,10 @@ namespace AqualLifeStyle.Web.Host.Startup
 
             // Register IHttpContextAccessor so ABP exception converters can access the current request correlation id.
             services.AddHttpContextAccessor();
-            services.AddHttpClient<IYocoCheckoutGateway, YocoCheckoutGateway>();
+            if (AQGreenV2PilotConfiguration.Validate(_environment, _appConfiguration))
+                services.AddTransient<IYocoCheckoutGateway, PilotCheckoutGateway>();
+            else
+                services.AddHttpClient<IYocoCheckoutGateway, YocoCheckoutGateway>();
             services.Configure<BirdOptions>(_appConfiguration.GetSection("Bird"));
             services.AddHttpClient<ITransactionalEmailDeliveryGateway, BirdTransactionalEmailDeliveryGateway>(client =>
             {

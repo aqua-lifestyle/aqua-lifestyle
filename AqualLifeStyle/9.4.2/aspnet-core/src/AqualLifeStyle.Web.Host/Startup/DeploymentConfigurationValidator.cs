@@ -18,6 +18,8 @@ namespace AqualLifeStyle.Web.Host.Startup
             var configuration = services.GetRequiredService<IConfiguration>();
 
             AQGreenV2DemoConfiguration.Validate(environment, configuration);
+            if (AQGreenV2Pilot.AQGreenV2PilotConfiguration.Validate(environment, configuration))
+                return; // The isolated checkout has no provider credentials or outbound provider call.
 
             var yocoMode = configuration["Yoco:Mode"]?.Trim().ToLowerInvariant();
             var yocoSecretKey = configuration["Yoco:SecretKey"]?.Trim();
