@@ -1,0 +1,306 @@
+{
+  "allowlistVersion": "AQGreenB6SnapshotAllowlistV2",
+  "packageSchemaVersion": "AQGreenB6SnapshotPackageV3",
+  "fieldContract": "Each purpose is the necessity statement; classification defines handling; transform is resolved by transformSemantics.",
+  "transformSemantics": {
+    "pseudonym-*": {"pseudonymised": true, "transformed": true, "retainedVerbatim": false},
+    "legacy-participation-order-ordinal": {"pseudonymised": false, "transformed": true, "retainedVerbatim": false},
+    "presence-bool": {"pseudonymised": false, "transformed": true, "retainedVerbatim": false},
+    "utc-microseconds": {"pseudonymised": false, "transformed": true, "retainedVerbatim": false},
+    "canonical-*": {"pseudonymised": false, "transformed": false, "retainedVerbatim": true},
+    "controlled-code": {"pseudonymised": false, "transformed": false, "retainedVerbatim": true},
+    "programme-code": {"pseudonymised": false, "transformed": false, "retainedVerbatim": true},
+    "timezone-code": {"pseudonymised": false, "transformed": false, "retainedVerbatim": true},
+    "canonical-path": {"pseudonymised": false, "transformed": false, "retainedVerbatim": true},
+    "migration-code": {"pseudonymised": false, "transformed": false, "retainedVerbatim": true},
+    "product-version": {"pseudonymised": false, "transformed": false, "retainedVerbatim": true}
+  },
+  "tables": [
+    {
+      "sourceTable": "AbpTenants",
+      "scopeRelationship": "Exactly the explicitly authorised TenantId.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "Tenant boundary and count", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Tenant", "type": "int"},
+        {"output": "IsActive", "sourceColumns": ["IsActive"], "purpose": "Current Tenant integrity signal", "classification": "lifecycle decision", "transform": "canonical-bool", "type": "bool"},
+        {"output": "IsDeleted", "sourceColumns": ["IsDeleted"], "purpose": "Current Tenant deletion signal", "classification": "lifecycle decision", "transform": "canonical-bool", "type": "bool"},
+        {"output": "DeletionTime", "sourceColumns": ["DeletionTime"], "purpose": "Tenant deletion timing evidence", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"}
+      ]
+    },
+    {
+      "sourceTable": "Areas",
+      "scopeRelationship": "Areas referenced by Customers in the authorised AQGreen participation/recruiter/historical-impact closure.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "Area relationship key; never topology authority", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:Area", "type": "uuid"},
+        {"output": "TenantId", "sourceColumns": ["TenantId"], "purpose": "Area-to-Tenant integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Tenant", "type": "int"},
+        {"output": "IsActive", "sourceColumns": ["IsActive"], "purpose": "Current Area lifecycle signal", "classification": "lifecycle decision", "transform": "canonical-bool", "type": "bool"},
+        {"output": "IsDeleted", "sourceColumns": ["IsDeleted"], "purpose": "Current Area deletion signal", "classification": "lifecycle decision", "transform": "canonical-bool", "type": "bool"},
+        {"output": "DeletionTime", "sourceColumns": ["DeletionTime"], "purpose": "Area deletion timing evidence", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"}
+      ]
+    },
+    {
+      "sourceTable": "Customers",
+      "scopeRelationship": "Customers that own, recruit, appear in corrections, or are referenced by retained historical-impact rows for authorised Tenant AQGreen participations.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "Customer relationship key for legacy recruiter evidence", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Customer", "type": "int"},
+        {"output": "TenantId", "sourceColumns": ["TenantId"], "purpose": "Customer-to-Tenant integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Tenant", "type": "int?"},
+        {"output": "AreaId", "sourceColumns": ["AreaId"], "purpose": "Current Area integrity only", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:Area", "type": "uuid?"},
+        {"output": "IsActive", "sourceColumns": ["IsActive"], "purpose": "Current-only D08 review signal", "classification": "lifecycle decision", "transform": "canonical-bool", "type": "bool"},
+        {"output": "IsDeleted", "sourceColumns": ["IsDeleted"], "purpose": "Current-only deletion review signal", "classification": "lifecycle decision", "transform": "canonical-bool", "type": "bool"},
+        {"output": "DeletionTime", "sourceColumns": ["DeletionTime"], "purpose": "Customer deletion timing evidence", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"}
+      ]
+    },
+    {
+      "sourceTable": "EntryParticipations",
+      "scopeRelationship": "All AQGreen participations in the explicitly authorised Tenant analysis population.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "ParticipantSnapshotKey used for all AQGreen relationships", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:Participation", "type": "uuid"},
+        {"output": "TenantId", "sourceColumns": ["TenantId"], "purpose": "Hard Tenant boundary", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Tenant", "type": "int"},
+        {"output": "CustomerId", "sourceColumns": ["CustomerId"], "purpose": "Participation-to-Customer and recruiter resolution", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Customer", "type": "int"},
+        {"output": "RecruiterCustomerId", "sourceColumns": ["RecruiterCustomerId"], "purpose": "Current legacy sponsor/root evidence", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Customer", "type": "int?"},
+        {"output": "Status", "sourceColumns": ["Status"], "purpose": "D09 population and qualification state", "classification": "business state", "transform": "canonical-int", "type": "int"},
+        {"output": "StartedAt", "sourceColumns": ["StartedAt"], "purpose": "Original recruiter ordering boundary", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp"},
+        {"output": "ActivatedAt", "sourceColumns": ["ActivatedAt"], "purpose": "Authoritative activation/effective evidence", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"},
+        {"output": "IsDeleted", "sourceColumns": ["IsDeleted"], "purpose": "D08 exception classification", "classification": "lifecycle decision", "transform": "canonical-bool", "type": "bool"},
+        {"output": "DeletionTime", "sourceColumns": ["DeletionTime"], "purpose": "Deletion timing evidence", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"},
+        {"output": "LegacyOrderingTieBreakOrdinal", "sourceColumns": ["Id"], "purpose": "Preserve actual .NET Guid.CompareTo order over immutable ParticipationId without exporting it", "classification": "derived ordering evidence", "transform": "legacy-participation-order-ordinal", "type": "long"}
+      ]
+    },
+    {
+      "sourceTable": "EntryRecruiterCorrections",
+      "scopeRelationship": "Corrections whose EntryParticipationId belongs to the authorised AQGreen population.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "Correction evidence identity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:EntryRecruiterCorrection", "type": "uuid"},
+        {"output": "EntryParticipationId", "sourceColumns": ["EntryParticipationId"], "purpose": "Correction-to-participant relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:Participation", "type": "uuid"},
+        {"output": "PreviousRecruiterCustomerId", "sourceColumns": ["PreviousRecruiterCustomerId"], "purpose": "Correction-chain continuity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Customer", "type": "int?"},
+        {"output": "NewRecruiterCustomerId", "sourceColumns": ["NewRecruiterCustomerId"], "purpose": "Cutoff-effective sponsor evidence", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Customer", "type": "int?"},
+        {"output": "CorrectedAt", "sourceColumns": ["CorrectedAt"], "purpose": "Correction order and effective time", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp"},
+        {"output": "ActorPresent", "sourceColumns": ["AdministratorUserId"], "purpose": "Evidence that a correction actor was recorded without exporting identity", "classification": "derived boolean", "transform": "presence-bool", "type": "bool"}
+      ]
+    },
+    {
+      "sourceTable": "EntryParticipationApprovalDecisions",
+      "scopeRelationship": "Approval evidence whose EntryParticipationId belongs to the authorised AQGreen population.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "Approval evidence identity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:EntryApprovalDecision", "type": "uuid"},
+        {"output": "EntryParticipationId", "sourceColumns": ["EntryParticipationId"], "purpose": "Approval-to-participant relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:Participation", "type": "uuid"},
+        {"output": "Approved", "sourceColumns": ["Approved"], "purpose": "Approval/activation gate evidence", "classification": "business decision", "transform": "canonical-bool", "type": "bool"},
+        {"output": "DecidedAt", "sourceColumns": ["DecidedAt"], "purpose": "Approval decision cutoff evidence", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp"},
+        {"output": "ActorPresent", "sourceColumns": ["AdministratorUserId"], "purpose": "Evidence that an approval actor was recorded without exporting identity", "classification": "derived boolean", "transform": "presence-bool", "type": "bool"}
+      ]
+    },
+    {
+      "sourceTable": "AQGreenRecruitmentAttributions",
+      "scopeRelationship": "Attributions whose ParticipantId belongs to the authorised AQGreen population.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "Attribution evidence identity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:AQGreenAttribution", "type": "uuid"},
+        {"output": "TenantId", "sourceColumns": ["TenantId"], "purpose": "Attribution Tenant integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Tenant", "type": "int"},
+        {"output": "ParticipantId", "sourceColumns": ["ParticipantId"], "purpose": "Attribution-to-participant relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:Participation", "type": "uuid"},
+        {"output": "CreditedSponsorParticipantId", "sourceColumns": ["CreditedSponsorParticipantId"], "purpose": "Persisted credited-sponsor evidence where present", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:Participation", "type": "uuid?"},
+        {"output": "AttributionKind", "sourceColumns": ["AttributionKind"], "purpose": "Distinguish sponsored participant from explicit root", "classification": "business classification", "transform": "canonical-int", "type": "int"},
+        {"output": "AcquisitionSource", "sourceColumns": ["AcquisitionSource"], "purpose": "Known acquisition provenance only", "classification": "business classification", "transform": "canonical-int", "type": "int"},
+        {"output": "SourceReferenceId", "sourceColumns": ["SourceReferenceId"], "purpose": "Relationship to retained source evidence; an invitation only for MemberInvitation", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:AcquisitionEvidence", "type": "uuid"},
+        {"output": "AttributedAt", "sourceColumns": ["AttributedAt"], "purpose": "Attribution evidence time", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp"},
+        {"output": "RulesVersion", "sourceColumns": ["RulesVersion"], "purpose": "Attribution rules identity", "classification": "controlled version code", "transform": "controlled-code", "type": "string"},
+        {"output": "ActorPresent", "sourceColumns": ["AttributedByUserId"], "purpose": "Evidence that an attribution actor was recorded without exporting identity", "classification": "derived boolean", "transform": "presence-bool", "type": "bool"},
+        {"output": "AssignmentReasonPresent", "sourceColumns": ["AssignmentReason"], "purpose": "Validate the production attribution source shape without exporting administrative free text", "classification": "derived boolean", "transform": "presence-bool", "type": "bool"}
+      ]
+    },
+    {
+      "sourceTable": "AQGreenRecruitmentAttributionConfirmations",
+      "scopeRelationship": "Confirmations for retained authorised-population attributions.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "Confirmation evidence identity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:AQGreenAttributionConfirmation", "type": "uuid"},
+        {"output": "TenantId", "sourceColumns": ["TenantId"], "purpose": "Confirmation Tenant integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Tenant", "type": "int"},
+        {"output": "AttributionId", "sourceColumns": ["AttributionId"], "purpose": "Confirmation-to-attribution relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:AQGreenAttribution", "type": "uuid"},
+        {"output": "ConfirmedAt", "sourceColumns": ["ConfirmedAt"], "purpose": "Confirmation time", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp"},
+        {"output": "ConfirmationMethod", "sourceColumns": ["ConfirmationMethod"], "purpose": "Confirmation classification", "classification": "business classification", "transform": "canonical-int", "type": "int"},
+        {"output": "EvidenceReferenceId", "sourceColumns": ["EvidenceReferenceId"], "purpose": "Non-secret confirmation evidence relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:AttributionEvidence", "type": "uuid"},
+        {"output": "RulesVersion", "sourceColumns": ["RulesVersion"], "purpose": "Confirmation rules identity", "classification": "controlled version code", "transform": "controlled-code", "type": "string"},
+        {"output": "ActorPresent", "sourceColumns": ["ConfirmedByUserId"], "purpose": "Evidence that a confirmation actor was recorded without exporting identity", "classification": "derived boolean", "transform": "presence-bool", "type": "bool"}
+      ]
+    },
+    {
+      "sourceTable": "AQGreenPlacementTreeScopes",
+      "scopeRelationship": "Existing V2 scopes referenced by placements of authorised-population participants.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "Existing V2 scope conflict evidence", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:PlacementScope", "type": "uuid"},
+        {"output": "TenantId", "sourceColumns": ["TenantId"], "purpose": "Existing V2 scope Tenant integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Tenant", "type": "int"}
+      ]
+    },
+    {
+      "sourceTable": "AQGreenNetworkPlacements",
+      "scopeRelationship": "Existing V2 placements whose ParticipantId belongs to the authorised AQGreen population.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "Existing V2 placement conflict evidence", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:Placement", "type": "uuid"},
+        {"output": "TenantId", "sourceColumns": ["TenantId"], "purpose": "Existing placement Tenant integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Tenant", "type": "int"},
+        {"output": "PlacementTreeScopeId", "sourceColumns": ["PlacementTreeScopeId"], "purpose": "Existing placement-to-scope relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:PlacementScope", "type": "uuid"},
+        {"output": "ParticipantId", "sourceColumns": ["ParticipantId"], "purpose": "Existing placement-to-participant relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:Participation", "type": "uuid"},
+        {"output": "PlacementParentParticipantId", "sourceColumns": ["PlacementParentParticipantId"], "purpose": "Existing V2 parent relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:Participation", "type": "uuid?"},
+        {"output": "PlacementSlot", "sourceColumns": ["PlacementSlot"], "purpose": "Existing V2 slot conflict", "classification": "topology value", "transform": "canonical-int", "type": "int?"},
+        {"output": "CanonicalPath", "sourceColumns": ["CanonicalPath"], "purpose": "Existing V2 path conflict", "classification": "controlled topology code", "transform": "canonical-path", "type": "string"},
+        {"output": "PlacedAt", "sourceColumns": ["PlacedAt"], "purpose": "Existing placement time", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp"},
+        {"output": "RulesVersion", "sourceColumns": ["RulesVersion"], "purpose": "Existing placement rules identity", "classification": "controlled version code", "transform": "controlled-code", "type": "string"}
+      ]
+    },
+    {
+      "sourceTable": "ProgrammeInvitations",
+      "scopeRelationship": "Only non-deleted AQGREEN invitations referenced by retained MemberInvitation attributions.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "Non-secret MemberInvitation source-evidence relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:AcquisitionEvidence", "type": "uuid"},
+        {"output": "TenantId", "sourceColumns": ["TenantId"], "purpose": "Invitation Tenant integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Tenant", "type": "int"},
+        {"output": "ProgrammeKey", "sourceColumns": ["ProgrammeKey"], "purpose": "Programme boundary", "classification": "controlled programme code", "transform": "programme-code", "type": "string"},
+        {"output": "ProgrammeParticipationId", "sourceColumns": ["ProgrammeParticipationId"], "purpose": "Invitation sponsor-participation relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:Participation", "type": "uuid"},
+        {"output": "IsDeleted", "sourceColumns": ["IsDeleted"], "purpose": "Required current validity signal for invitation acquisition evidence", "classification": "lifecycle decision", "transform": "canonical-bool", "type": "bool"}
+      ]
+    },
+    {
+      "sourceTable": "EntryCommissionPeriods",
+      "scopeRelationship": "Commission periods referenced by retained historical AQGreen commission rows.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "Commission-period relationship key", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:EntryCommissionPeriod", "type": "uuid"},
+        {"output": "TenantId", "sourceColumns": ["TenantId"], "purpose": "Commission Tenant integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Tenant", "type": "int"},
+        {"output": "PeriodStart", "sourceColumns": ["PeriodStart"], "purpose": "Historical financial cutoff", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp"},
+        {"output": "PeriodEnd", "sourceColumns": ["PeriodEnd"], "purpose": "Historical financial cutoff", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp"},
+        {"output": "TimeZoneId", "sourceColumns": ["TimeZoneId"], "purpose": "Period-boundary interpretation", "classification": "controlled time-zone code", "transform": "timezone-code", "type": "string"},
+        {"output": "CalculatedAt", "sourceColumns": ["CalculatedAt"], "purpose": "Ledger calculation time", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp"},
+        {"output": "RulesVersion", "sourceColumns": ["RulesVersion"], "purpose": "Commission terms identity", "classification": "controlled version code", "transform": "controlled-code", "type": "string"}
+      ]
+    },
+    {
+      "sourceTable": "EntryWeeklyCommissions",
+      "scopeRelationship": "Historical commissions whose EntryParticipationId belongs to the authorised AQGreen population.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "Historical commission identity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:EntryWeeklyCommission", "type": "uuid"},
+        {"output": "TenantId", "sourceColumns": ["TenantId"], "purpose": "Commission Tenant integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Tenant", "type": "int"},
+        {"output": "EntryParticipationId", "sourceColumns": ["EntryParticipationId"], "purpose": "Commission-to-AQGreen relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:Participation", "type": "uuid"},
+        {"output": "CustomerId", "sourceColumns": ["CustomerId"], "purpose": "Commission Customer relationship integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Customer", "type": "int"},
+        {"output": "CommissionPeriodId", "sourceColumns": ["CommissionPeriodId"], "purpose": "Commission-to-period relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:EntryCommissionPeriod", "type": "uuid"},
+        {"output": "StructuralModel", "sourceColumns": ["StructuralModel"], "purpose": "Historical V1/V2 model distinction", "classification": "business classification", "transform": "canonical-int", "type": "int"},
+        {"output": "CommissionDecisionRulesVersion", "sourceColumns": ["CommissionDecisionRulesVersion"], "purpose": "Historical structural-decision version", "classification": "controlled version code", "transform": "controlled-code", "type": "string?"},
+        {"output": "HighestCompletedLevel", "sourceColumns": ["HighestCompletedLevel"], "purpose": "Historical structural decision", "classification": "business decision", "transform": "canonical-int", "type": "int"},
+        {"output": "PayoutStatus", "sourceColumns": ["PayoutStatus"], "purpose": "Not-earned/earned/held/released/paid impact state", "classification": "financial state", "transform": "canonical-int", "type": "int"},
+        {"output": "CalculatedAt", "sourceColumns": ["CalculatedAt"], "purpose": "Historical calculation time", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp"},
+        {"output": "ReleasedAt", "sourceColumns": ["ReleasedAt"], "purpose": "Release-state timing", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"},
+        {"output": "PaidAt", "sourceColumns": ["PaidAt"], "purpose": "Settled payout timing", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"},
+        {"output": "RulesVersion", "sourceColumns": ["RulesVersion"], "purpose": "Commission terms identity", "classification": "controlled version code", "transform": "controlled-code", "type": "string"},
+        {"output": "IsDeleted", "sourceColumns": ["IsDeleted"], "purpose": "Deleted-ledger impact evidence", "classification": "lifecycle decision", "transform": "canonical-bool", "type": "bool"},
+        {"output": "DeletionTime", "sourceColumns": ["DeletionTime"], "purpose": "Deleted-ledger timing evidence", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"}
+      ]
+    },
+    {
+      "sourceTable": "OnyxLoanAgreements",
+      "scopeRelationship": "Loans whose EntryParticipationId intersects the authorised AQGreen historical-impact population.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "Loan relationship key", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:OnyxLoanAgreement", "type": "uuid"},
+        {"output": "TenantId", "sourceColumns": ["TenantId"], "purpose": "Loan Tenant integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Tenant", "type": "int"},
+        {"output": "EntryParticipationId", "sourceColumns": ["EntryParticipationId"], "purpose": "Loan-to-AQGreen relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:Participation", "type": "uuid"},
+        {"output": "CustomerId", "sourceColumns": ["CustomerId"], "purpose": "Loan Customer relationship integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Customer", "type": "int"},
+        {"output": "Status", "sourceColumns": ["Status"], "purpose": "Offer/agreement lifecycle impact", "classification": "financial state", "transform": "canonical-int", "type": "int"},
+        {"output": "OfferedAt", "sourceColumns": ["OfferedAt"], "purpose": "Offer timing", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp"},
+        {"output": "MemberAcceptedAt", "sourceColumns": ["MemberAcceptedAt"], "purpose": "Acceptance-state timing", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"},
+        {"output": "ApprovedAt", "sourceColumns": ["ApprovedAt"], "purpose": "Approval-state timing", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"},
+        {"output": "EffectiveAt", "sourceColumns": ["EffectiveAt"], "purpose": "Agreement effective timing", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"},
+        {"output": "RepaymentDeadlineAt", "sourceColumns": ["RepaymentDeadlineAt"], "purpose": "Agreement lifecycle impact", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"},
+        {"output": "LastAssessedAt", "sourceColumns": ["LastAssessedAt"], "purpose": "Current assessment timing", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"},
+        {"output": "SettledAt", "sourceColumns": ["SettledAt"], "purpose": "Settlement timing", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"},
+        {"output": "TermsVersion", "sourceColumns": ["TermsVersion"], "purpose": "Loan terms identity", "classification": "controlled version code", "transform": "controlled-code", "type": "string"},
+        {"output": "MemberAcceptedActorPresent", "sourceColumns": ["MemberAcceptedByUserId"], "purpose": "Acceptance actor evidence without identity", "classification": "derived boolean", "transform": "presence-bool", "type": "bool"},
+        {"output": "ApprovedActorPresent", "sourceColumns": ["ApprovedByAdministratorUserId"], "purpose": "Approval actor evidence without identity", "classification": "derived boolean", "transform": "presence-bool", "type": "bool"},
+        {"output": "IsDeleted", "sourceColumns": ["IsDeleted"], "purpose": "Deleted-loan impact evidence", "classification": "lifecycle decision", "transform": "canonical-bool", "type": "bool"},
+        {"output": "DeletionTime", "sourceColumns": ["DeletionTime"], "purpose": "Deleted-loan timing evidence", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"}
+      ]
+    },
+    {
+      "sourceTable": "OnyxGraduationDecisions",
+      "scopeRelationship": "Graduation decisions whose EntryParticipationId intersects the authorised AQGreen historical-impact population.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "Graduation decision identity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:OnyxGraduationDecision", "type": "uuid"},
+        {"output": "TenantId", "sourceColumns": ["TenantId"], "purpose": "Graduation Tenant integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Tenant", "type": "int"},
+        {"output": "CustomerId", "sourceColumns": ["CustomerId"], "purpose": "Graduation Customer relationship integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Customer", "type": "int"},
+        {"output": "EntryParticipationId", "sourceColumns": ["EntryParticipationId"], "purpose": "Graduation-to-AQGreen relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:Participation", "type": "uuid"},
+        {"output": "LoanAgreementId", "sourceColumns": ["LoanAgreementId"], "purpose": "Graduation-to-loan relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:OnyxLoanAgreement", "type": "uuid"},
+        {"output": "OnyxParticipationId", "sourceColumns": ["OnyxParticipationId"], "purpose": "Graduation-to-Onyx relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:OnyxParticipation", "type": "uuid"},
+        {"output": "DecidedAt", "sourceColumns": ["DecidedAt"], "purpose": "Graduation decision time", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp"},
+        {"output": "StructuralModel", "sourceColumns": ["StructuralModel"], "purpose": "Historical V1/V2 model distinction", "classification": "business classification", "transform": "canonical-int", "type": "int"},
+        {"output": "GraduationRulesVersion", "sourceColumns": ["GraduationRulesVersion"], "purpose": "Graduation rules identity", "classification": "controlled version code", "transform": "controlled-code", "type": "string"},
+        {"output": "EvaluatedNetworkLevel", "sourceColumns": ["EvaluatedNetworkLevel"], "purpose": "Historical graduation structural input", "classification": "business decision", "transform": "canonical-int", "type": "int?"},
+        {"output": "AQGreenWasActive", "sourceColumns": ["AQGreenWasActive"], "purpose": "Historical graduation evidence", "classification": "business decision", "transform": "canonical-bool", "type": "bool"},
+        {"output": "LoanWasActive", "sourceColumns": ["LoanWasActive"], "purpose": "Historical graduation evidence", "classification": "business decision", "transform": "canonical-bool", "type": "bool"},
+        {"output": "LoanWasAccepted", "sourceColumns": ["LoanWasAccepted"], "purpose": "Historical graduation evidence", "classification": "business decision", "transform": "canonical-bool", "type": "bool"},
+        {"output": "LoanWasAdministratorApproved", "sourceColumns": ["LoanWasAdministratorApproved"], "purpose": "Historical graduation evidence", "classification": "business decision", "transform": "canonical-bool", "type": "bool"},
+        {"output": "EvaluatedLoanTermsVersion", "sourceColumns": ["EvaluatedLoanTermsVersion"], "purpose": "Historical loan terms identity", "classification": "controlled version code", "transform": "controlled-code", "type": "string"},
+        {"output": "ActorPresent", "sourceColumns": ["AdministratorUserId"], "purpose": "Graduation actor evidence without identity", "classification": "derived boolean", "transform": "presence-bool", "type": "bool"}
+      ]
+    },
+    {
+      "sourceTable": "OnyxParticipations",
+      "scopeRelationship": "Onyx participations explicitly linked by EntryParticipationId to the authorised AQGreen historical-impact population.",
+      "primaryKey": ["Id"],
+      "fields": [
+        {"output": "Id", "sourceColumns": ["Id"], "purpose": "Onyx participation relationship key", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:OnyxParticipation", "type": "uuid"},
+        {"output": "TenantId", "sourceColumns": ["TenantId"], "purpose": "Onyx participation Tenant integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Tenant", "type": "int"},
+        {"output": "CustomerId", "sourceColumns": ["CustomerId"], "purpose": "Onyx Customer relationship integrity", "classification": "pseudonymous technical identifier", "transform": "pseudonym-int:Customer", "type": "int"},
+        {"output": "EntryParticipationId", "sourceColumns": ["EntryParticipationId"], "purpose": "Graduated Onyx-to-AQGreen relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:Participation", "type": "uuid?"},
+        {"output": "LoanAgreementId", "sourceColumns": ["LoanAgreementId"], "purpose": "Graduated Onyx-to-loan relationship", "classification": "pseudonymous technical identifier", "transform": "pseudonym-uuid:OnyxLoanAgreement", "type": "uuid?"},
+        {"output": "AdmissionRoute", "sourceColumns": ["AdmissionRoute"], "purpose": "Identify AQGreen graduation route", "classification": "business classification", "transform": "canonical-int", "type": "int"},
+        {"output": "Status", "sourceColumns": ["Status"], "purpose": "Onyx lifecycle impact", "classification": "business state", "transform": "canonical-int", "type": "int"},
+        {"output": "StartedAt", "sourceColumns": ["StartedAt"], "purpose": "Onyx start time", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp"},
+        {"output": "ActivatedAt", "sourceColumns": ["ActivatedAt"], "purpose": "Onyx activation time", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"},
+        {"output": "IsDeleted", "sourceColumns": ["IsDeleted"], "purpose": "Deleted-Onyx impact evidence", "classification": "lifecycle decision", "transform": "canonical-bool", "type": "bool"},
+        {"output": "DeletionTime", "sourceColumns": ["DeletionTime"], "purpose": "Deleted-Onyx timing evidence", "classification": "timestamp", "transform": "utc-microseconds", "type": "timestamp?"}
+      ]
+    },
+    {
+      "sourceTable": "__EFMigrationsHistory",
+      "scopeRelationship": "Global non-business schema-version metadata required to bind the source EF migration head.",
+      "primaryKey": ["MigrationId"],
+      "fields": [
+        {"output": "MigrationId", "sourceColumns": ["MigrationId"], "purpose": "Exact source schema migration identity", "classification": "controlled schema code", "transform": "migration-code", "type": "string"},
+        {"output": "ProductVersion", "sourceColumns": ["ProductVersion"], "purpose": "EF schema tooling version", "classification": "controlled version code", "transform": "product-version", "type": "string"}
+      ]
+    }
+  ],
+  "prohibitedOutputColumnPatterns": [
+    "(^|_)(Name|Surname|Email|Phone|PhoneNumber|ContactNumber|Address|IdentityNumber|PassportNumber)$",
+    "Password", "PasswordHash", "SecurityStamp", "AuthenticationSource", "Token",
+    "InvitationCode", "^Code$", "Secret", "Payload", "Response", "Metadata",
+    "Comment", "Notes", "Description", "Reason", "Justification", "^Confirmation$",
+    "PaymentReference", "BankReference", "Yoco", "ProviderReference", "CheckoutUrl"
+  ],
+  "prohibitedSourceColumns": {
+    "AbpTenants": ["AreaLeaderId", "ConnectionString", "CreationTime", "CreatorUserId", "DeleterUserId", "EditionId", "LastModificationTime", "LastModifierUserId", "Name", "TenancyName"],
+    "Areas": ["Code", "CreationTime", "CreatorUserId", "DeleterUserId", "LastModificationTime", "LastModifierUserId", "Name"],
+    "Customers": ["ClubMemberNumber", "CreationTime", "CreatorUserId", "DeleterUserId", "LastModificationTime", "LastModifierUserId", "MembershipId", "Name", "UserId", "Email", "PhoneNumber", "ContactNumber", "Address", "IdentityNumber", "PassportNumber"],
+    "EntryParticipations": ["ActivationPaymentAmount", "ActivationPaymentId", "CreationTime", "CreatorUserId", "Currency", "DeleterUserId", "GracePeriodDays", "JoiningInstallmentAmount", "JoiningPaymentAmount", "JoiningPaymentId", "JoiningPaymentSchedule", "LastModificationTime", "LastModifierUserId", "MonthlyCommitmentAmount", "RegistrationPaymentAmount", "RegistrationPaymentId", "TermsEffectiveFrom", "TermsVersion"],
+    "EntryRecruiterCorrections": ["AdministratorUserId", "Reason"],
+    "EntryParticipationApprovalDecisions": ["AdministratorUserId", "Reason"],
+    "AQGreenRecruitmentAttributions": ["AttributedByUserId", "AssignmentReason"],
+    "AQGreenRecruitmentAttributionConfirmations": ["ConfirmedByUserId"],
+    "ProgrammeInvitations": ["Code", "CreationTime", "CreatorUserId", "DeleterUserId", "DeletionTime", "LastModificationTime", "LastModifierUserId"],
+    "EntryCommissionPeriods": ["CreationTime", "CreatorUserId", "DeleterUserId", "DeletionTime", "IsDeleted", "LastModificationTime", "LastModifierUserId"],
+    "EntryWeeklyCommissions": ["CreationTime", "CreatorUserId", "Currency", "DeleterUserId", "HoldReason", "LastModificationTime", "LastModifierUserId", "PaymentReference", "ReleaseReason", "TotalAmount"],
+    "OnyxLoanAgreements": ["CreationTime", "CreatorUserId", "Currency", "DeleterUserId", "InitialWeeklyMinimumAmount", "InitialWeeklyRequirementCount", "InterestRatePercent", "LastModificationTime", "LastModifierUserId", "MemberConfirmation", "OutstandingAmount", "PrincipalAmount", "RepaymentPeriodMonths", "TotalPayableAmount"],
+    "OnyxGraduationDecisions": ["CreationTime", "CreatorUserId", "EvaluatedFundingAmount", "EvaluatedFundingCurrency", "Justification", "AdministratorUserId"],
+    "OnyxParticipations": ["CreationTime", "CreatorUserId", "Currency", "DeleterUserId", "DirectEntryAmount", "DirectEntryPaymentId", "LastModificationTime", "LastModifierUserId", "OnyxMembershipId", "RecruiterCustomerId", "TermsEffectiveFrom", "TermsVersion"]
+  },
+  "prohibitedTablePatterns": [
+    "User", "Role", "Claim", "Token", "Session", "DataProtection", "Payment", "Yoco",
+    "Webhook", "Callback", "Outbox", "Email", "Order", "Product", "Combo", "Catalogue",
+    "Enquiry", "Profile", "Setting", "BackgroundJob", "Worker"
+  ]
+}

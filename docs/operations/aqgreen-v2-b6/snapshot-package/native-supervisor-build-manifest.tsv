@@ -1,0 +1,28 @@
+protocol	B6_NATIVE_BUILD_FRESH_V1
+source_sha256	b713eba5c55eac43d6cf67a62418b835c0e5ecb7fbaec21b621a2e24448e9180
+build_script_sha256	114a9b0163529992cdd5196d8d91dab5fde509427974baf9b42bf9118b4c9e45
+elf_sha256	02f2709f1a7f2e64a7fd4320a28763d47f71e75b2f47fe103ef0b8d42597667f
+compiler_version	13.3.0
+target	x86_64-linux-gnu
+flags	-std=c17 -D_GNU_SOURCE -O2 -Wall -Wextra -Werror -pedantic -fstack-protector-strong -D_FORTIFY_SOURCE=3 -fPIE -pie -Wl,-z,relro,-z,now -Wl,--build-id=sha1
+environment	PATH=/usr/bin:/bin LC_ALL=C SOURCE_DATE_EPOCH=0 TZ=UTC
+package_root	/tmp/aqgreen-b6-native-package
+output_parent	/tmp/aqgreen-b6-proof-output
+compiler_path	/usr/bin/x86_64-linux-gnu-gcc-13
+compiler_sha256	1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26
+cc1_path	/usr/libexec/gcc/x86_64-linux-gnu/13/cc1
+cc1_sha256	5d1679131184e2de4435b426eb264bf13472fe026db8e5c6bc97445814e8e2f4
+collect2_path	/usr/libexec/gcc/x86_64-linux-gnu/13/collect2
+collect2_sha256	4d1f341ae5b763b513258ee2812422a45e063c30a2f1924a0cf63d3699f3a158
+assembler_path	/usr/bin/x86_64-linux-gnu-as
+assembler_sha256	21aff249b692b5c31a44007491f922dcb49f41323e362c57d2ada3f52eddb7f0
+linker_path	/usr/bin/x86_64-linux-gnu-ld.bfd
+linker_sha256	e9ceb054c12207970f2726dfc07e9a66b411602748628baf27399f02a9bbb31b
+loader_path	/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+loader_sha256	c20a2dc8917c755f02b94049356320fe1f62ac7d9f8994731f807d9df39302da
+libc_path	/usr/lib/x86_64-linux-gnu/libc.so.6
+libc_sha256	3a15d66867d83762c7f2f1e37359cb8f6c5743edb369c65285cb0b1c4f7498bf
+bash_path	/usr/bin/bash
+bash_sha256	bc5945feb8bd26203ebfafea5ce1878bb2e32cb8fb50ab7ae395cfb1e1aaaef1
+busybox_path	/usr/bin/busybox
+busybox_sha256	dbac288c29ba568459550a2da9e7ae0ded6b1fc728ee9fad3044c44e62d6ac14

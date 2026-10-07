@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aqua:aqgreen:b6:root-disposition:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "snapshotId", "sourceSnapshotDigest", "baseManifestDigest", "dispositions"],
+  "properties": {
+    "schemaVersion": {"const": "AQGreenB6RootReviewDispositionV1"},
+    "snapshotId": {"type": "string"},
+    "sourceSnapshotDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "baseManifestDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "dispositions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["participantSnapshotKey", "disposition", "evidenceType", "evidenceDigest", "decisionReference", "reviewedAt", "reviewedByRole"],
+        "properties": {
+          "participantSnapshotKey": {"type": "string", "format": "uuid"},
+          "disposition": {"enum": ["AcceptedRoot", "RejectedRoot", "AmbiguousRoot"]},
+          "evidenceType": {"const": "ReviewedLegacyRootEvidenceV1"},
+          "evidenceDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "decisionReference": {"type": "string", "pattern": "^[A-Za-z0-9._:+/@-]{1,128}$"},
+          "reviewedAt": {"type": "string", "format": "date-time"},
+          "reviewedByRole": {"const": "AuthorisedB6RootReviewer"}
+        }
+      }
+    }
+  }
+}

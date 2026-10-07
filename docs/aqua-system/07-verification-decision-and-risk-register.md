@@ -357,3 +357,92 @@ older one `SUPERSEDED` and link both decision IDs; never silently rewrite histor
 These decision statuses are separate from `IMPLEMENTED`, `TESTED`, `INTEGRATED`,
 `MERGE READY`, `MERGED`, `DEPLOYED`, `ENABLED`, and `PRODUCTION VERIFIED`. A confirmed
 policy may be unimplemented, and merged code may lack business authority.
+
+## Q. Owner-confirmed AQGreen V2 B6 decisions — 2026-09-03
+
+### AQG-V2-D03B — legacy root/scope mapping
+
+- **Decision ID:** `AQG-V2-D03B`.
+- **Status:** `CONFIRMED`.
+- **Scope:** AQGreen V1 legacy root-specific component classification and mapping to
+  proposed V2 `PlacementTreeScope` records during B6 analysis/canonicalisation.
+- **Decision:** Each accepted cutoff-effective legacy root-specific component maps
+  to exactly one V2 `PlacementTreeScope`. It must belong to one Tenant, have exactly
+  one deterministic accepted root and deterministic recruiter/correction evidence,
+  and be acyclic with no dangling or cross-Tenant sponsor edge. Independent roots
+  are not merged merely because they share a Tenant, Area, Aqua relationship, or
+  non-authoritative historical correction evidence. A topology-affecting unresolved
+  condition quarantines the complete component in `EXCEPTION_REVIEW`; the process
+  must not guess, merge, compress, skip an ancestor, reflow descendants, invent a
+  root, or search globally for a replacement sponsor.
+- **Historical boundary:** `LegacyCanonicalisation` creates proposed future V2
+  topology. It does not claim that topology existed historically.
+- **Authorizing owner:** Business owner, by direct written instruction for the B6
+  decision-recording work item.
+- **Confirmation date:** 2026-09-03.
+- **Authority evidence locator:** Direct owner instruction titled “AQGREEN V2 B6 —
+  RECORD OWNER-CONFIRMED D03B / D09 DECISIONS AND DEFINE THE REPRESENTATIVE SNAPSHOT
+  REQUIREMENT”, durably transcribed in this record and the
+  [Placement V2 specification](aqgreen-network-placement-specification.md#113-legacy-root-and-scope-mapping-d03b).
+- **Effective boundary:** Governs B6 legacy analysis/canonicalisation policy from
+  confirmation. It does not authorise production access, migration apply, a final
+  manifest, D10, or `V2EffectiveAt`.
+- **Supersedes:** The `OPEN / MIGRATION-BOUND` D03B entry in the Placement V2
+  specification before this confirmation.
+
+### AQG-V2-D09 — three populations and legacy acquisition provenance
+
+- **Decision ID:** `AQG-V2-D09`.
+- **Status:** `CONFIRMED`.
+- **Scope:** B6 canonicalisation population, cutoff qualification eligibility,
+  historical impact inventory, and unknown legacy acquisition-channel treatment.
+- **Decision:** Keep three populations distinct. Canonicalisation includes only
+  cutoff-effective AQGreen participations that crossed the authoritative
+  approval/activation gate and have deterministic Tenant, sponsor/root, ordering,
+  correction, and accepted D03B component evidence. Current pre-activation and
+  rejected states are excluded. Qualification eligibility remains Active-only at
+  the authoritative cutoff. Historical financial/graduation/Onyx evidence belongs
+  only to the impact inventory and never makes a participant canonicalisation-
+  eligible. Post-Active/deleted/unsupported topology-affecting states are
+  `EXCEPTION_REVIEW` while D08 remains unresolved, and a required affected ancestor
+  quarantines the component without deletion, slot reuse, compression, movement,
+  or re-parenting.
+- **Provenance:** `LegacyUnknownAcquisition` means only that authoritative retained
+  evidence cannot reliably recover the historical acquisition channel. It may be
+  used when credited sponsor and root evidence remain deterministic. It does not
+  mean unknown/inferred sponsor or root, invitation, marketing, direct admission,
+  consent, placement, administrative assignment, or evidence waiver. Unknown or
+  ambiguous sponsor/root and corrupt/ambiguous correction evidence remain blocking.
+- **Historical boundary:** Historical V1 financial, payout, loan, graduation, and
+  Onyx facts remain historical and are not recalculated, overwritten, revoked, or
+  rewritten by B6.
+- **Authorizing owner:** Business owner, by direct written instruction for the B6
+  decision-recording work item.
+- **Confirmation date:** 2026-09-03.
+- **Authority evidence locator:** Same direct owner instruction as D03B, durably
+  transcribed here and in the
+  [Placement V2 specification](aqgreen-network-placement-specification.md#114-three-distinct-b6-populations-d09).
+- **Effective boundary:** Governs B6 population/provenance analysis from
+  confirmation. Representative-data analysis and final manifest approval remain
+  separate gates; production access, persistence changes, migration, D10, and
+  remediation are not authorised.
+- **Supersedes:** The open D09 population/provenance entry and any B6 proposal that
+  treated historical financial/graduation evidence as migration inclusion.
+
+### AQG-COMBO-01 — AQGreen has no combo requirement
+
+- **Decision ID:** `AQG-COMBO-01`.
+- **Status:** `CONFIRMED`; the previous AQGreen combo-mapping assumption is
+  `SUPERSEDED`.
+- **Scope:** AQGreen combo requirement only.
+- **Decision:** AQGreen has no combo requirement. Onyx combo policy is separate and
+  outside B6. AQGreen commission-eligibility authority remains a separate TODO;
+  this decision does not change B5.3 or B5.4.
+- **Authorizing owner:** Business owner, by the same direct written B6 instruction.
+- **Confirmation date:** 2026-09-03.
+- **Authority evidence locator:** Direct owner instruction titled above and the B6
+  worklog update linked from this change.
+- **Effective boundary:** Current AQGreen business interpretation; no production
+  code, commission, Onyx combo, or migration change is authorised here.
+- **Supersedes:** The unnumbered “global combo policy” AQGreen mapping assumption
+  recorded in the earlier B6 worklog.

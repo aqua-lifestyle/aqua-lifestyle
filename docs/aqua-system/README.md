@@ -30,7 +30,7 @@ The documents have different jobs:
 4. Document 07 is the evidence and contradiction register. It records what is implemented, tested, merged, deployed, enabled, or production verified; those terms are not interchangeable.
 5. Document 01 explains the system to a non-technical reader. It does not override document 02.
 6. Older repository documents and archived WIP remain useful evidence, but do not override a later confirmed decision or current code. Material conflicts are listed in document 07 rather than silently resolved.
-7. Current repository behavior and historical decisions remain governed by AQGreen V1 unless separately evidenced. The [AQGreen Network Placement V2 specification](aqgreen-network-placement-specification.md) is authoritative only for resolved V2 design semantics; the document does not implement or enable V2. `AQG-V2-D03B`, `D09`, and `D10` migration and cutover work remains unresolved.
+7. Current repository behavior and historical decisions remain governed by AQGreen V1 unless separately evidenced. The [AQGreen Network Placement V2 specification](aqgreen-network-placement-specification.md) is authoritative only for resolved/confirmed V2 design semantics; the document does not implement or enable V2. `AQG-V2-D03B` and `D09` are confirmed migration-policy rules, but representative-data analysis, final-manifest approval, and migration/apply remain unauthorised. `AQG-V2-D10` remains unresolved and V2 remains disabled.
 
 Status labels used throughout the pack are `BUSINESS DECISION`, `VERIFIED IMPLEMENTATION`, `ENGINEERING INFERENCE`, `HISTORICAL`, `SUPERSEDED`, `UNRESOLVED`, and `PLANNED / NOT ENABLED`.
 

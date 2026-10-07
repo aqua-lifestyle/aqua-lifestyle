@@ -92,7 +92,11 @@ namespace AqualLifeStyle.EntityFrameworkCore
                     wasAlreadyPlaced: true);
             }
 
-            var vacancy = FindFirstVacancy(subtree);
+            var vacancy = AQGreenSponsorLocalVacancySelector.FindFirstVacancy(
+                subtree.Select(node => new AQGreenPlacementVacancyNode(
+                    node.ParticipantId,
+                    node.PlacementParentParticipantId,
+                    node.PlacementSlot)).ToList());
             var parent = await context.AQGreenNetworkPlacements
                 .AsNoTracking()
                 .SingleOrDefaultAsync(
@@ -327,34 +331,6 @@ namespace AqualLifeStyle.EntityFrameworkCore
             return sponsorPlacement;
         }
 
-        private static Vacancy FindFirstVacancy(
-            IReadOnlyList<AQGreenPlacementTopologyNode> subtree)
-        {
-            if (subtree == null || subtree.Count == 0)
-            {
-                throw new AQGreenPlacementTopologyIntegrityException(
-                    "AQGreen placement topology contains no sponsor anchor.");
-            }
-
-            var occupiedSlots = subtree
-                .Where(node => node.PlacementParentParticipantId.HasValue)
-                .ToLookup(
-                    node => node.PlacementParentParticipantId.Value,
-                    node => node.PlacementSlot.Value);
-            foreach (var parent in subtree)
-            {
-                var occupied = occupiedSlots[parent.ParticipantId].ToHashSet();
-                for (var slot = 1; slot <= AQGreenPlacementRules.MaximumPlacementSlot; slot++)
-                {
-                    if (!occupied.Contains(slot))
-                        return new Vacancy(parent.ParticipantId, slot);
-                }
-            }
-
-            throw new AQGreenPlacementTopologyIntegrityException(
-                "AQGreen placement topology contains no canonical vacancy.");
-        }
-
         private static void EnsureExistingPlacementMatches(
             AQGreenNetworkPlacement existingPlacement,
             Guid placementTreeScopeId,
@@ -377,7 +353,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             Guid participantId,
             Guid placementTreeScopeId,
             Guid sponsorParticipantId,
-            Vacancy attemptedVacancy,
+            AQGreenPlacementVacancy attemptedVacancy,
             string constraintName,
             CancellationToken cancellationToken)
         {
@@ -499,16 +475,5 @@ namespace AqualLifeStyle.EntityFrameworkCore
             public AQGreenNetworkPlacement ExistingPlacement { get; }
         }
 
-        private readonly struct Vacancy
-        {
-            public Vacancy(Guid parentParticipantId, int placementSlot)
-            {
-                ParentParticipantId = parentParticipantId;
-                PlacementSlot = placementSlot;
-            }
-
-            public Guid ParentParticipantId { get; }
-            public int PlacementSlot { get; }
-        }
     }
 }

@@ -284,65 +284,23 @@ namespace AqualLifeStyle.Domain.Onyx
             DateTime cutoff,
             string programme)
         {
-            if (startedAt == default || activatedAt == default || activatedAt < startedAt)
-            {
-                throw new InvalidOperationException(
-                    $"Customer {customerId} has invalid {programme} activation evidence.");
-            }
-
-            var ordered = corrections.OrderBy(item => item.CorrectedAt).ToList();
-            var duplicateTime = ordered
-                .GroupBy(item => item.CorrectedAt)
-                .FirstOrDefault(group => group.Count() > 1);
-            if (duplicateTime != null)
-            {
-                throw new InvalidOperationException(
-                    $"Customer {customerId} has ambiguous {programme} recruiter corrections at {duplicateTime.Key:O}.");
-            }
-
-            int? effectiveRecruiter = currentRecruiterCustomerId;
-            var placementEffectiveAt = startedAt;
-            if (ordered.Count > 0)
-            {
-                effectiveRecruiter = ordered[0].PreviousRecruiterCustomerId;
-                int? expectedPrevious = effectiveRecruiter;
-                foreach (var correction in ordered)
-                {
-                    if (correction.CorrectedAt < startedAt ||
-                        correction.PreviousRecruiterCustomerId != expectedPrevious ||
-                        correction.PreviousRecruiterCustomerId == correction.NewRecruiterCustomerId)
-                    {
-                        throw new InvalidOperationException(
-                            $"Customer {customerId} has discontinuous {programme} recruiter history.");
-                    }
-
-                    if (correction.CorrectedAt <= cutoff)
-                    {
-                        effectiveRecruiter = correction.NewRecruiterCustomerId;
-                        placementEffectiveAt = correction.CorrectedAt;
-                    }
-
-                    expectedPrevious = correction.NewRecruiterCustomerId;
-                }
-
-                if (expectedPrevious != currentRecruiterCustomerId)
-                {
-                    throw new InvalidOperationException(
-                        $"Customer {customerId} has {programme} recruiter history that does not match current state.");
-                }
-            }
-
-            if (effectiveRecruiter == customerId)
-            {
-                throw new InvalidOperationException(
-                    $"Customer {customerId} cannot recruit themselves in the {programme} network.");
-            }
+            var evidence = EffectiveRecruiterOrdering.Derive(
+                customerId,
+                currentRecruiterCustomerId,
+                startedAt,
+                activatedAt,
+                corrections.Select(correction => new EffectiveRecruiterCorrectionEvidence(
+                    correction.PreviousRecruiterCustomerId,
+                    correction.NewRecruiterCustomerId,
+                    correction.CorrectedAt)),
+                cutoff,
+                programme);
 
             return new EffectiveNetworkParticipation(
                 participationId,
                 customerId,
-                effectiveRecruiter,
-                activatedAt > placementEffectiveAt ? activatedAt : placementEffectiveAt);
+                evidence.EffectiveRecruiterCustomerId,
+                evidence.QualifiedUnderRecruiterAt);
         }
 
         private static void EnsureAcyclic(
@@ -393,6 +351,93 @@ namespace AqualLifeStyle.Domain.Onyx
             public int? PreviousRecruiterCustomerId { get; }
             public int? NewRecruiterCustomerId { get; }
             public DateTime CorrectedAt { get; }
+        }
+    }
+
+    public sealed class EffectiveRecruiterCorrectionEvidence
+    {
+        public EffectiveRecruiterCorrectionEvidence(
+            int? previousRecruiterCustomerId,
+            int? newRecruiterCustomerId,
+            DateTime correctedAt)
+        {
+            PreviousRecruiterCustomerId = previousRecruiterCustomerId;
+            NewRecruiterCustomerId = newRecruiterCustomerId;
+            CorrectedAt = correctedAt;
+        }
+
+        public int? PreviousRecruiterCustomerId { get; }
+        public int? NewRecruiterCustomerId { get; }
+        public DateTime CorrectedAt { get; }
+    }
+
+    public sealed class EffectiveRecruiterOrderingEvidence
+    {
+        public EffectiveRecruiterOrderingEvidence(
+            int? effectiveRecruiterCustomerId,
+            DateTime qualifiedUnderRecruiterAt)
+        {
+            EffectiveRecruiterCustomerId = effectiveRecruiterCustomerId;
+            QualifiedUnderRecruiterAt = qualifiedUnderRecruiterAt;
+        }
+
+        public int? EffectiveRecruiterCustomerId { get; }
+        public DateTime QualifiedUnderRecruiterAt { get; }
+    }
+
+    /// <summary>
+    /// Authoritative V1 cutoff-effective recruiter and ordering derivation shared
+    /// by the live V1 network and the offline B6 canonicalisation package.
+    /// </summary>
+    public static class EffectiveRecruiterOrdering
+    {
+        public static EffectiveRecruiterOrderingEvidence Derive(
+            int customerId,
+            int? currentRecruiterCustomerId,
+            DateTime startedAt,
+            DateTime activatedAt,
+            IEnumerable<EffectiveRecruiterCorrectionEvidence> corrections,
+            DateTime cutoff,
+            string programme)
+        {
+            if (startedAt == default || activatedAt == default || activatedAt < startedAt)
+                throw new InvalidOperationException(
+                    $"Customer {customerId} has invalid {programme} activation evidence.");
+            var ordered = corrections.OrderBy(item => item.CorrectedAt).ToList();
+            var duplicateTime = ordered.GroupBy(item => item.CorrectedAt).FirstOrDefault(group => group.Count() > 1);
+            if (duplicateTime != null)
+                throw new InvalidOperationException(
+                    $"Customer {customerId} has ambiguous {programme} recruiter corrections at {duplicateTime.Key:O}.");
+
+            int? effectiveRecruiter = currentRecruiterCustomerId;
+            var placementEffectiveAt = startedAt;
+            if (ordered.Count > 0)
+            {
+                effectiveRecruiter = ordered[0].PreviousRecruiterCustomerId;
+                int? expectedPrevious = effectiveRecruiter;
+                foreach (var correction in ordered)
+                {
+                    if (correction.CorrectedAt < startedAt || correction.PreviousRecruiterCustomerId != expectedPrevious ||
+                        correction.PreviousRecruiterCustomerId == correction.NewRecruiterCustomerId)
+                        throw new InvalidOperationException(
+                            $"Customer {customerId} has discontinuous {programme} recruiter history.");
+                    if (correction.CorrectedAt <= cutoff)
+                    {
+                        effectiveRecruiter = correction.NewRecruiterCustomerId;
+                        placementEffectiveAt = correction.CorrectedAt;
+                    }
+                    expectedPrevious = correction.NewRecruiterCustomerId;
+                }
+                if (expectedPrevious != currentRecruiterCustomerId)
+                    throw new InvalidOperationException(
+                        $"Customer {customerId} has {programme} recruiter history that does not match current state.");
+            }
+            if (effectiveRecruiter == customerId)
+                throw new InvalidOperationException(
+                    $"Customer {customerId} cannot recruit themselves in the {programme} network.");
+            return new EffectiveRecruiterOrderingEvidence(
+                effectiveRecruiter,
+                activatedAt > placementEffectiveAt ? activatedAt : placementEffectiveAt);
         }
     }
 }
