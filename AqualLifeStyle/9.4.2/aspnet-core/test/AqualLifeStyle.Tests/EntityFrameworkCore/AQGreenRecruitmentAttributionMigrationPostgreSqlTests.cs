@@ -2,6 +2,11 @@ using System;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using AqualLifeStyle.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -45,23 +50,145 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 "-e POSTGRES_USER=aqualifestyle -e POSTGRES_PASSWORD=aqualifestyle " +
                 $"-p {_hostPort}:5432 postgres:16-alpine");
 
+            await using var connection = await OpenReadyAdminConnectionAsync();
+            try
+            {
+                WriteAdminEvent("CREATE_DATABASE_BEGIN", connection);
+                await using var command = new NpgsqlCommand(
+                    $"CREATE DATABASE \"{_databaseName}\" WITH OWNER = aqualifestyle;",
+                    connection);
+                // Execute once on the connection whose SELECT 1 succeeded.
+                // A lost DDL response is ambiguous and must not be retried.
+                await command.ExecuteNonQueryAsync();
+                WriteAdminEvent("CREATE_DATABASE_SUCCESS", connection);
+            }
+            catch (Exception exception)
+            {
+                await CaptureFailureAsync("CREATE_DATABASE", exception, connection);
+                throw;
+            }
+        }
+
+        private async Task<NpgsqlConnection> OpenReadyAdminConnectionAsync()
+        {
             for (var attempt = 0; attempt < 30; attempt++)
             {
+                var connection = new NpgsqlConnection(AdminConnectionString);
+                var boundary = "OPEN";
                 try
                 {
-                    await using var connection = new NpgsqlConnection(AdminConnectionString);
+                    WriteAdminEvent("OPEN_BEGIN", connection);
                     await connection.OpenAsync();
-                    break;
+                    WriteAdminEvent("OPEN_SUCCESS", connection);
+                    boundary = "SELECT_1";
+                    await using var command = new NpgsqlCommand("SELECT 1;", connection);
+                    if (await command.ExecuteScalarAsync() is not int result || result != 1)
+                        throw new InvalidOperationException("Admin SELECT 1 returned an unexpected result.");
+                    WriteAdminEvent("SELECT_1_SUCCESS", connection);
+                    // Transfer the still-open connection to InitializeAsync for DDL.
+                    return connection;
                 }
-                catch when (attempt < 29)
+                catch (Exception exception)
                 {
+                    await CaptureFailureAsync(boundary, exception, connection);
+                    await connection.DisposeAsync();
+                    if (attempt == 29)
+                        throw;
+                    // Only pre-DDL readiness retries, always on a fresh connection.
                     await Task.Delay(1000);
                 }
             }
+            throw new InvalidOperationException("Admin readiness was not established.");
+        }
 
-            await ExecuteAsync(
-                AdminConnectionString,
-                $"CREATE DATABASE \"{_databaseName}\" WITH OWNER = aqualifestyle;");
+        private void WriteAdminEvent(
+            string boundary,
+            NpgsqlConnection connection,
+            Exception exception = null)
+        {
+            var settings = new NpgsqlConnectionStringBuilder(AdminConnectionString);
+            var password = settings.Password;
+            settings.Remove("Password");
+            var identity = settings.ConnectionString;
+            int? backendPid = null;
+            try { backendPid = connection.ProcessID; }
+            catch (InvalidOperationException) { }
+            Console.WriteLine(JsonSerializer.Serialize(new
+            {
+                utc = DateTimeOffset.UtcNow,
+                monotonicTicks = Stopwatch.GetTimestamp(),
+                monotonicFrequency = Stopwatch.Frequency,
+                testClass = nameof(AQGreenRecruitmentAttributionMigrationPostgreSqlTests),
+                container = _containerName,
+                hostPort = _hostPort,
+                boundary,
+                pooling = settings.Pooling,
+                connectionIdentity = RuntimeHelpers.GetHashCode(connection),
+                connectionStringIdentity = Convert.ToHexString(
+                    SHA256.HashData(Encoding.UTF8.GetBytes(identity))),
+                redactedConnectionString = identity,
+                backendPid,
+                exception = exception?.ToString().Replace(password, "[REDACTED]")
+            }));
+        }
+
+        private async Task CaptureFailureAsync(
+            string boundary,
+            Exception exception,
+            NpgsqlConnection connection)
+        {
+            WriteAdminEvent(boundary + "_FAILURE", connection, exception);
+            // Observe before cleanup; never use this independent session for readiness.
+            await ObserveDockerAsync("inspect", "--format",
+                "Id={{.Id}} Name={{.Name}} Image={{.Image}} State={{json .State}} " +
+                "RestartCount={{.RestartCount}} Ports={{json .NetworkSettings.Ports}}",
+                _containerName);
+            await ObserveDockerAsync("logs", "--timestamps", _containerName);
+            await ObserveDockerAsync("exec", "-e", "PGCONNECT_TIMEOUT=3", _containerName,
+                "psql", "-U", "aqualifestyle", "-d", "postgres", "-X", "-A", "-t", "-c",
+                "SELECT pg_postmaster_start_time(), pg_backend_pid(), version();");
+        }
+
+        private async Task ObserveDockerAsync(params string[] arguments)
+        {
+            try
+            {
+                var info = new ProcessStartInfo("docker")
+                {
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false
+                };
+                foreach (var argument in arguments)
+                    info.ArgumentList.Add(argument);
+                using var process = Process.Start(info);
+                var output = process.StandardOutput.ReadToEndAsync();
+                var error = process.StandardError.ReadToEndAsync();
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                try { await process.WaitForExitAsync(timeout.Token); }
+                catch (OperationCanceledException)
+                {
+                    process.Kill(entireProcessTree: true);
+                    await process.WaitForExitAsync();
+                }
+                var password = new NpgsqlConnectionStringBuilder(AdminConnectionString).Password;
+                Console.WriteLine(JsonSerializer.Serialize(new
+                {
+                    utc = DateTimeOffset.UtcNow,
+                    testClass = nameof(AQGreenRecruitmentAttributionMigrationPostgreSqlTests),
+                    container = _containerName,
+                    hostPort = _hostPort,
+                    observation = arguments[0],
+                    exitCode = process.ExitCode,
+                    stdout = (await output).Replace(password, "[REDACTED]"),
+                    stderr = (await error).Replace(password, "[REDACTED]")
+                }));
+            }
+            catch (Exception observationFailure)
+            {
+                // Diagnostics must not replace the original fixture failure.
+                Console.WriteLine($"PostgreSQL observation unavailable: {observationFailure.GetType().Name}");
+            }
         }
 
         public Task DisposeAsync() =>
@@ -294,7 +421,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             $"Host=localhost;Port={_hostPort};Database={database};" +
             "Username=aqualifestyle;Password=aqualifestyle";
 
-        private string AdminConnectionString => BuildConnectionString("postgres");
+        private string AdminConnectionString => BuildConnectionString("postgres") + ";Pooling=false";
         private string TestConnectionString => BuildConnectionString(_databaseName);
     }
 }
