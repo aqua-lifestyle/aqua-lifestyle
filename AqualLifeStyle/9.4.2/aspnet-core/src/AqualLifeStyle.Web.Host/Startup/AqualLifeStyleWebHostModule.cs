@@ -45,6 +45,12 @@ namespace AqualLifeStyle.Web.Host.Startup
             if (AQGreenV2DemoConfiguration.Validate(_env, _appConfiguration))
             {
                 Configuration.ReplaceService<
+                    IAQGreenPlacementV2JoiningGate,
+                    AQGreenV2DemoJoiningGate>(DependencyLifeStyle.Singleton);
+                Configuration.ReplaceService<
+                    IAQGreenPlacementV2ApprovalGate,
+                    AQGreenV2DemoApprovalGate>(DependencyLifeStyle.Singleton);
+                Configuration.ReplaceService<
                     IAQGreenPlacementV2ProgressGate,
                     AQGreenV2DemoProgressGate>(DependencyLifeStyle.Singleton);
                 Configuration.ReplaceService<

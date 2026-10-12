@@ -39,6 +39,10 @@ export const isPaymentApiCompatible = (health: SystemHealth | null) =>
 export const isProgrammeJourneyApiCompatible = (health: SystemHealth | null) =>
   health?.contractCapabilities.includes("member-programme-journey-v1") ?? false;
 
+export const isAQGreenV2DemoCheckout = (health: SystemHealth | null) =>
+  health?.environment === "AQGreenV2Demo" &&
+  health.contractCapabilities.includes("aqgreen-v2-demo-checkout-v1");
+
 export const isSystemHealthContractError = (error: unknown) => {
   return error instanceof z.ZodError;
 };

@@ -130,7 +130,8 @@ namespace AqualLifeStyle.Web.Host.Startup
 
             // Register IHttpContextAccessor so ABP exception converters can access the current request correlation id.
             services.AddHttpContextAccessor();
-            services.AddHttpClient<IYocoCheckoutGateway, YocoCheckoutGateway>();
+            AQGreenV2DemoConfiguration.RegisterCheckoutGateway(
+                services, _environment, _appConfiguration);
             services.Configure<BirdOptions>(_appConfiguration.GetSection("Bird"));
             services.AddHttpClient<ITransactionalEmailDeliveryGateway, BirdTransactionalEmailDeliveryGateway>(client =>
             {
@@ -148,6 +149,11 @@ namespace AqualLifeStyle.Web.Host.Startup
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerFactory)
         {
+            if (AQGreenV2DemoConfiguration.Validate(env, _appConfiguration) &&
+                !(app.ApplicationServices.GetRequiredService<IYocoCheckoutGateway>()
+                    is AQGreenV2DemoCheckoutGateway))
+                throw new InvalidOperationException(
+                    "AQGreen V2 demo checkout must use the no-network gateway.");
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();

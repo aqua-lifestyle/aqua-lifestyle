@@ -23,6 +23,10 @@ export const apiEndpoints = {
   health: {
     get: "/api/health",
   },
+  aqgreenV2DemoCheckout: {
+    get: "/api/demo/aqgreen-checkout",
+    confirm: "/api/demo/aqgreen-checkout/confirm",
+  },
   account: {
     confirmEmail: "/api/services/app/Account/ConfirmEmail",
     getTenantSelfRegistrationAvailability:

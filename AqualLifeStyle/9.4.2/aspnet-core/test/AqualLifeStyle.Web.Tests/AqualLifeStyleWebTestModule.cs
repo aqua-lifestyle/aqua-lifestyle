@@ -30,6 +30,9 @@ namespace AqualLifeStyle.Web.Tests
         {
             AdministratorBootstrapTestEnvironment.Configure();
             Configuration.ReplaceService<
+                IAQGreenPlacementV2JoiningGate,
+                AQGreenV2TestJoiningGate>(DependencyLifeStyle.Singleton);
+            Configuration.ReplaceService<
                 IAQGreenPlacementV2ApprovalGate,
                 AQGreenPlacementV2TestApprovalGate>(DependencyLifeStyle.Singleton);
             Configuration.ReplaceService<

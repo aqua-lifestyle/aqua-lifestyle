@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 
 import { confirmEmail } from "@/src/shared/api/account-email-service";
 import { Button, Card, LinkButton, StatusMessage } from "@/src/shared/ui";
@@ -9,11 +9,14 @@ type Props = { areaName?: string; redirectPath?: string; tenantId: number; token
 
 export const VerifyEmailResult = ({ areaName, redirectPath, tenantId, token, userId }: Props) => {
   const [linkToken, setLinkToken] = useState(token ?? "");
+  const capturedToken = useRef(token ?? "");
   const hasValidRequest = tenantId > 0 && userId > 0 && Boolean(linkToken);
   const [state, setState] = useState<"error" | "idle" | "loading" | "success">("loading");
 
   useEffect(() => {
-    const fragmentToken = token ?? new URLSearchParams(window.location.hash.slice(1)).get("token") ?? "";
+    const fragmentToken = token ?? (capturedToken.current ||
+      new URLSearchParams(window.location.hash.slice(1)).get("token") || "");
+    capturedToken.current = fragmentToken;
     startTransition(() => {
       setLinkToken(fragmentToken);
       setState(tenantId > 0 && userId > 0 && Boolean(fragmentToken) ? "idle" : "error");

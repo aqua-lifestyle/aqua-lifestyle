@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { StrictMode } from "react";
 
 import { useAuthState } from "@/src/providers";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
@@ -176,7 +177,22 @@ describe("AdminWeeklySalesReviews", () => {
     expect(screen.queryByLabelText("Rejection reason")).not.toBeInTheDocument();
   });
 
-  it("does not load review data without the host review permission", () => {
+  it("loads a direct member/week target after Strict Mode effect cleanup", async () => {
+    window.history.replaceState({}, "", "/admin/weekly-sales-reviews?tenantId=1&participantId=participant-1");
+    vi.mocked(httpClient.get).mockImplementation(async (url) =>
+      url.includes("GetLatestClosedWeek") ? heldReview : { items: [], totalCount: 0 },
+    );
+
+    render(<StrictMode><AdminWeeklySalesReviews /></StrictMode>);
+
+    expect(await screen.findByText("Selected review")).toBeInTheDocument();
+    expect(screen.getByLabelText("Spray verified quantity")).toBeInTheDocument();
+    expect(httpClient.get).toHaveBeenCalledWith(
+      `${apiEndpoints.weeklySalesReviews.getLatestClosedWeek}?TenantId=1&ParticipantId=participant-1`,
+    );
+  });
+
+  it("does not load review data without the review permission", () => {
     vi.mocked(useAuthState).mockReturnValue(authState([]));
 
     render(<AdminWeeklySalesReviews />);

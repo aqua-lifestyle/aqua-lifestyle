@@ -8,6 +8,7 @@ import {
   useSystemHealthState,
 } from "@/src/providers";
 import {
+  isAQGreenV2DemoCheckout,
   isPaymentApiCompatible,
   isProgrammeJourneyApiCompatible,
 } from "@/src/providers/SystemHealth/contract";
@@ -72,6 +73,7 @@ export const MemberProgrammes = () => {
       "Aqua.ProgrammeParticipations.Invite",
     ) ?? false;
   const paymentApiCompatible = isPaymentApiCompatible(healthState.health);
+  const demoCheckout = isAQGreenV2DemoCheckout(healthState.health);
   const paymentActionsUnavailable =
     !isJourneyContractResolved || healthState.isPending || !paymentApiCompatible;
   const entryCanAcceptJoiningPayment = [
@@ -181,13 +183,13 @@ export const MemberProgrammes = () => {
     entryCanAcceptJoiningPayment ? (
       participations.pendingAQGreenCheckout ? (
         paymentActionsUnavailable ? (
-          <Button className="w-full" disabled>Continue secure payment</Button>
+          <Button className="w-full" disabled>{demoCheckout ? "Continue test checkout" : "Continue secure payment"}</Button>
         ) : (
           <a
             className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
             href={participations.pendingAQGreenCheckout.checkoutUrl}
           >
-            Continue secure payment
+            {demoCheckout ? "Continue test checkout" : "Continue secure payment"}
           </a>
         )
       ) : participations.entry.joiningSchedule == null &&
@@ -230,7 +232,11 @@ export const MemberProgrammes = () => {
       )
     ) : undefined;
 
-  const aqGreenJoinAction = !participations?.entry ? (
+  const aqGreenJoinAction = !participations?.entry && demoCheckout ? (
+    <StatusMessage tone="info">
+      In this test environment, open a valid AQGreen sponsor invitation to begin.
+    </StatusMessage>
+  ) : !participations?.entry ? (
     <JoinProgrammeDialog
       disabled={paymentActionsUnavailable}
       programme="AQGreen"
@@ -341,6 +347,7 @@ export const MemberProgrammes = () => {
             {journey.programmes.map((programme) => (
               <ProgrammeJourneyOverview
                 canInvite={hasInvitationPermission}
+                demoTestMoney={Boolean(demoCheckout) && programme.programmeCode === "AQGREEN"}
                 joinAction={programme.programmeCode === "AQGREEN" ? aqGreenJoinAction : onyxJoinAction}
                 journey={programme}
                 key={programme.programmeCode}

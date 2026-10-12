@@ -34,6 +34,7 @@ namespace AqualLifeStyle.Web.Host.AQGreenV2Demo
     {
         public const string RootUserName = "aqgreen.demo.member";
         public const string RootEmail = "aqgreen.demo.member@example.test";
+        public const string GuestUserName = "aqgreen.demo.guest";
         private const int TenantId = 1;
 
         private readonly IDbContextProvider<AqualLifeStyleDbContext>
@@ -103,6 +104,7 @@ namespace AqualLifeStyle.Web.Host.AQGreenV2Demo
             if (existingRootUser != null)
             {
                 ValidateExistingFixture(context, existingRootUser.Id, week);
+                EnsureFirstTimeGuest(context, memberPassword);
                 Logger.Info(
                     "NON-PRODUCTION AQGreen V2 demo fixture already exists for " +
                     $"week {week.PeriodStartUtc:O}.");
@@ -228,12 +230,57 @@ namespace AqualLifeStyle.Web.Host.AQGreenV2Demo
             }
 
             context.SaveChanges();
+            EnsureFirstTimeGuest(context, memberPassword);
             Logger.Info(
                 "NON-PRODUCTION AQGreen V2 demo fixture created: " +
                 $"tenant={tenant.Id}, member={RootUserName}, " +
                 $"participation={participations[0].Id}, " +
                 $"heldWeek={week.PeriodStartUtc:O}. " +
                 "The root review and root commission remain uncompleted.");
+        }
+
+        private static void EnsureFirstTimeGuest(
+            AqualLifeStyleDbContext context,
+            string memberPassword)
+        {
+            var existing = context.Users.IgnoreQueryFilters().SingleOrDefault(candidate =>
+                candidate.TenantId == TenantId && candidate.UserName == GuestUserName);
+            if (existing != null)
+            {
+                if (!context.Customers.IgnoreQueryFilters().Any(candidate =>
+                        candidate.TenantId == TenantId && candidate.UserId == existing.Id))
+                    throw new InvalidOperationException("The AQGreen demo guest is missing its customer record.");
+                return;
+            }
+
+            var area = context.Areas.IgnoreQueryFilters().Single(item =>
+                item.TenantId == TenantId && item.Code == "JHB");
+            var role = context.Roles.IgnoreQueryFilters().Single(item =>
+                item.TenantId == TenantId && item.Name == AquaUserRole.Guest.ToString());
+            var user = new User
+            {
+                TenantId = TenantId,
+                UserName = GuestUserName,
+                EmailAddress = "aqgreen.demo.guest@example.test",
+                Name = "AQGreen",
+                Surname = "First-time Guest",
+                IsEmailConfirmed = true,
+                IsActive = true
+            };
+            user.SetNormalizedNames();
+            user.SetRole(AquaUserRole.Guest);
+            user.Password = new PasswordHasher<User>(
+                new OptionsWrapper<PasswordHasherOptions>(new PasswordHasherOptions()))
+                .HashPassword(user, memberPassword);
+            context.Users.Add(user);
+            context.SaveChanges();
+            context.UserRoles.Add(new UserRole(TenantId, user.Id, role.Id));
+            var customer = Customer.Create(TenantId, user.Id,
+                "AQGreen V2 Demo First-time Guest", new EmailAddress(user.EmailAddress));
+            customer.AssignInitialArea(area, DateTime.UtcNow,
+                "NON-PRODUCTION AQGreen V2 first-time guest");
+            context.Customers.Add(customer);
+            context.SaveChanges();
         }
 
         private static List<User> CreateUsers(

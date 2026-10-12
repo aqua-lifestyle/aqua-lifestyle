@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthActions, useTenantActions, useTenantState, useToast } from "@/src/providers";
@@ -76,6 +77,13 @@ describe("LoginForm", () => {
     await waitFor(() =>
       expect(getTenantSelfRegistrationAvailability).toHaveBeenCalled(),
     );
+  });
+
+  it("prevents pre-hydration submission and excludes credentials from URL submission", () => {
+    const markup = renderToStaticMarkup(<LoginForm />);
+    const document = new DOMParser().parseFromString(markup, "text/html");
+    expect(document.querySelector("form")?.getAttribute("method")).toBe("post");
+    expect(document.querySelector('button[type="submit"]')?.hasAttribute("disabled")).toBe(true);
   });
 
   it("does not describe a temporary refresh problem as an ended session", async () => {

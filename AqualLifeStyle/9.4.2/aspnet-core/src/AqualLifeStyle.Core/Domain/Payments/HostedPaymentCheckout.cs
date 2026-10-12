@@ -74,7 +74,8 @@ namespace AqualLifeStyle.Domain.Payments
             var normalizedId = RequireText(providerCheckoutId, nameof(providerCheckoutId), MaxProviderCheckoutIdLength);
             var normalizedUrl = RequireText(checkoutUrl, nameof(checkoutUrl), MaxCheckoutUrlLength);
             if (!Uri.TryCreate(normalizedUrl, UriKind.Absolute, out var parsedUrl) ||
-                parsedUrl.Scheme != Uri.UriSchemeHttps)
+                parsedUrl.Scheme != Uri.UriSchemeHttps &&
+                !IsIsolatedDemoCheckout(normalizedId, parsedUrl))
                 throw new ArgumentException("The checkout URL must be a secure absolute URL.", nameof(checkoutUrl));
             if (createdAt == default || createdAt < CreatedAt)
                 throw new ArgumentException("Checkout creation cannot precede the payment request.", nameof(createdAt));
@@ -88,6 +89,18 @@ namespace AqualLifeStyle.Domain.Payments
             CheckoutCreatedAt = createdAt;
             Status = HostedPaymentCheckoutStatus.AwaitingPayment;
         }
+
+        private bool IsIsolatedDemoCheckout(string providerCheckoutId, Uri url) =>
+            this is AQGreenJoiningCheckout &&
+            string.Equals(providerCheckoutId, $"aqgreen_v2_demo_{Id:N}", StringComparison.Ordinal) &&
+            url.Scheme == Uri.UriSchemeHttp &&
+            (string.Equals(url.Host, "localhost", StringComparison.OrdinalIgnoreCase) ||
+             System.Net.IPAddress.TryParse(url.Host, out var address) &&
+             System.Net.IPAddress.IsLoopback(address)) &&
+            url.AbsolutePath == "/test/aqgreen-checkout" &&
+            string.IsNullOrEmpty(url.UserInfo) &&
+            string.IsNullOrEmpty(url.Query) &&
+            string.IsNullOrEmpty(url.Fragment);
 
         protected bool CompletePayment(Guid paymentId, DateTime completedAt)
         {

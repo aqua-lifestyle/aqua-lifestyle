@@ -16,6 +16,7 @@ using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace AqualLifeStyle.Application.Admin.Commissions
 {
@@ -34,6 +35,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         private readonly IWeeklyCommissionPayoutMutationLock _payoutMutationLock;
         private readonly IRepository<Tenant, int> _tenantRepository;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        private readonly IConfiguration _configuration;
 
         public AdminCommissionAppService(
             ICustomerRepository customerRepository,
@@ -46,7 +48,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             IWeeklyCommissionCalculationLock calculationLock,
             IWeeklyCommissionPayoutMutationLock payoutMutationLock,
             IRepository<Tenant, int> tenantRepository,
-            IUnitOfWorkManager unitOfWorkManager)
+            IUnitOfWorkManager unitOfWorkManager,
+            IConfiguration configuration)
         {
             _customerRepository = customerRepository;
             _entryPeriodRepository = entryPeriodRepository;
@@ -59,6 +62,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             _payoutMutationLock = payoutMutationLock;
             _tenantRepository = tenantRepository;
             _unitOfWorkManager = unitOfWorkManager;
+            _configuration = configuration;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Commissions.View)]
@@ -188,6 +192,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             RequireAllPermissions = true)]
         public async Task ReleaseAsync(ReleaseWeeklyEarningInput input)
         {
+            EnsureNoDemoPayoutMutation();
             ValidateMutationInput(
                 input?.Id ?? Guid.Empty,
                 input?.Justification,
@@ -259,6 +264,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         public async Task RecordPaymentAsync(
             RecordWeeklyEarningPaymentInput input)
         {
+            EnsureNoDemoPayoutMutation();
             ValidateMutationInput(
                 input?.Id ?? Guid.Empty,
                 input?.Justification,
@@ -330,6 +336,13 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             return programme == AdminCommissionProgramme.Onyx
                 ? _payoutMutationLock.AcquireOnyxAsync(commissionId)
                 : _payoutMutationLock.AcquireEntryAsync(commissionId);
+        }
+
+        private void EnsureNoDemoPayoutMutation()
+        {
+            if (_configuration.GetValue<bool>("AQGreenV2Demo:Enabled"))
+                throw Failed("Weekly earnings payout",
+                    "Simulated demo commissions cannot be released or marked paid.");
         }
 
         private async Task<PagedResultDto<AdminWeeklyCommissionDto>>

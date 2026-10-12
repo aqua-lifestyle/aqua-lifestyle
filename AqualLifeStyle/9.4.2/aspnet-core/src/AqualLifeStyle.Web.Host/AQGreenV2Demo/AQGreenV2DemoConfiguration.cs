@@ -1,7 +1,10 @@
 using System;
 using System.Net;
+using AqualLifeStyle.Payments.Yoco;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
 
@@ -57,7 +60,40 @@ namespace AqualLifeStyle.Web.Host.AQGreenV2Demo
             }
 
             ValidateDisposableDatabase(configuration["ConnectionStrings:Default"]);
+            ValidateLoopbackClient(configuration["App:ClientRootAddress"]);
             return true;
+        }
+
+        public static Uri ValidateLoopbackClient(string address)
+        {
+            if (!Uri.TryCreate(address, UriKind.Absolute, out var uri) ||
+                uri.Scheme != Uri.UriSchemeHttp ||
+                !IsLoopbackHost(uri.Host) ||
+                !string.IsNullOrEmpty(uri.UserInfo) ||
+                !string.IsNullOrEmpty(uri.Query) ||
+                !string.IsNullOrEmpty(uri.Fragment))
+                throw new InvalidOperationException(
+                    "AQGreen V2 demo mode requires a plain HTTP loopback client address.");
+            return uri;
+        }
+
+        public static void RegisterCheckoutGateway(
+            IServiceCollection services,
+            IWebHostEnvironment environment,
+            IConfiguration configuration)
+        {
+            if (services == null) throw new ArgumentNullException(nameof(services));
+            if (Validate(environment, configuration))
+            {
+                // Remove an accidentally registered typed HTTP gateway, including
+                // an earlier registration, before installing the no-network adapter.
+                services.RemoveAll<IYocoCheckoutGateway>();
+                services.AddSingleton<IYocoCheckoutGateway, AQGreenV2DemoCheckoutGateway>();
+            }
+            else
+            {
+                services.AddHttpClient<IYocoCheckoutGateway, YocoCheckoutGateway>();
+            }
         }
 
         private static void ValidateDisposableDatabase(string connectionString)

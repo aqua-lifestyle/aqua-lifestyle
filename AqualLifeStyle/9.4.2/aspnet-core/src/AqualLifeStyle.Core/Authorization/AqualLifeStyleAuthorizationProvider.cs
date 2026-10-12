@@ -174,14 +174,14 @@ namespace AqualLifeStyle.Authorization
             CreateChildren(
                 commissions,
                 sides,
-                AquaPermissions.Admin.Commissions.View);
+                AquaPermissions.Admin.Commissions.View,
+                AquaPermissions.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility);
             CreateChildren(
                 commissions,
                 host,
                 AquaPermissions.Admin.Commissions.Calculate,
                 AquaPermissions.Admin.Commissions.Release,
-                AquaPermissions.Admin.Commissions.RecordPayment,
-                AquaPermissions.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility);
+                AquaPermissions.Admin.Commissions.RecordPayment);
 
             var savings = admin.CreateChildPermission(
                 AquaPermissions.Admin.Savings.Default,

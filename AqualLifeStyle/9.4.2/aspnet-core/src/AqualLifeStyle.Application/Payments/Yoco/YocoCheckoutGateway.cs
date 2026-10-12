@@ -48,6 +48,11 @@ namespace AqualLifeStyle.Payments.Yoco
 
         public async Task<YocoCheckout> CreateAsync(CreateYocoCheckout checkout)
         {
+            if (_configuration.GetValue<bool>("AQGreenV2Demo:Enabled") ||
+                string.Equals(_configuration["ASPNETCORE_ENVIRONMENT"],
+                    "AQGreenV2Demo", StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "The real payment gateway is disabled in the AQGreen V2 demo.");
             if (checkout == null) throw new ArgumentNullException(nameof(checkout));
             if (checkout.ReferenceId == Guid.Empty)
                 throw new ArgumentException("A checkout reference is required.", nameof(checkout));

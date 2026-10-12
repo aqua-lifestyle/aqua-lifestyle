@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.Web.Host.Health;
 using AqualLifeStyle.Web.Host.Models;
+using AqualLifeStyle.Web.Host.AQGreenV2Demo;
 using Abp.Dependency;
 using Abp.EntityFrameworkCore;
 using Microsoft.AspNetCore.Hosting;
@@ -87,8 +88,14 @@ namespace AqualLifeStyle.Web.Host.Controllers
                 BuildId = DeploymentMetadata.ResolveBuildId(_configuration),
                 ImageId = DeploymentMetadata.ResolveImageId(_configuration),
                 PaymentContractVersion = DeploymentMetadata.PaymentContractVersion,
-                ContractCapabilities = System.Linq.Enumerable.ToArray(
-                    DeploymentMetadata.ContractCapabilities),
+                ContractCapabilities = AQGreenV2DemoConfiguration.Validate(
+                        _environment, _configuration)
+                    ? System.Linq.Enumerable.ToArray(
+                        System.Linq.Enumerable.Append(
+                            DeploymentMetadata.ContractCapabilities,
+                            "aqgreen-v2-demo-checkout-v1"))
+                    : System.Linq.Enumerable.ToArray(
+                        DeploymentMetadata.ContractCapabilities),
                 ReleaseDate = AppVersionHelper.ReleaseDate,
                 CheckedAtUtc = DateTime.UtcNow,
                 Environment = _environment.EnvironmentName,

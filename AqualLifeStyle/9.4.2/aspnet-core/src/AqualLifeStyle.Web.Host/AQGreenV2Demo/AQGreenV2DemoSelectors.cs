@@ -5,6 +5,17 @@ using AqualLifeStyle.Domain.Onyx;
 
 namespace AqualLifeStyle.Web.Host.AQGreenV2Demo
 {
+    public sealed class AQGreenV2DemoJoiningGate : IAQGreenPlacementV2JoiningGate
+    {
+        public Task<bool> IsEnabledAsync(int tenantId) => Task.FromResult(tenantId > 0);
+    }
+
+    public sealed class AQGreenV2DemoApprovalGate : IAQGreenPlacementV2ApprovalGate
+    {
+        public Task<bool> IsEnabledAsync(int? tenantId, Guid participantId) =>
+            Task.FromResult(tenantId > 0 && participantId != Guid.Empty);
+    }
+
     /// <summary>
     /// Environment-scoped implementations used only after the dedicated demo
     /// environment and explicit opt-in have both been validated.

@@ -110,7 +110,9 @@ describe("AdminWeeklyEarnings", () => {
       ]),
     );
     vi.mocked(httpClient.get).mockImplementation(async (url) =>
-      url.includes("/AdminTenant/")
+      url === apiEndpoints.health.get
+        ? { environment: "Development", contractCapabilities: [] }
+        : url.includes("/AdminTenant/")
         ? {
             items: [{ id: 3, name: "Soweto", tenancyName: "soweto" }],
             totalCount: 1,
@@ -176,21 +178,28 @@ describe("AdminWeeklyEarnings", () => {
     render(<AdminWeeklyEarnings />);
     await screen.findByText("Dora Shongwe");
     fireEvent.click(screen.getByRole("button", { name: "Prepare weekly earnings" }));
-    expect(screen.getByText("Select the Area whose weekly earnings should be prepared.")).toBeInTheDocument();
+    expect(screen.getByText("Select the Tenant whose weekly earnings should be prepared.")).toBeInTheDocument();
     expect(screen.getByRole("table", { name: "AQGreen weekly earnings" })).toBeInTheDocument();
     expect(screen.getByText("Calculated earnings").closest("article")).toHaveTextContent(/R\s*300/);
     expect(screen.queryByRole("region", { name: "AQGreen weekly earnings unavailable" })).not.toBeInTheDocument();
     expect(httpClient.post).not.toHaveBeenCalled();
   });
 
-  it("prepares the latest completed week for the selected Area", async () => {
+  it("labels and submits the selected Tenant for the latest completed week", async () => {
     render(<AdminWeeklyEarnings />);
 
     expect(
       screen.getByText(/Friday-to-Thursday cycle in Johannesburg time/i),
     ).toBeInTheDocument();
 
-    fireEvent.change(await screen.findByLabelText("Area"), {
+    expect(await screen.findByRole("columnheader", { name: "Tenant" })).toBeInTheDocument();
+    expect(screen.getAllByText("Tenant 3")).toHaveLength(2);
+    expect(screen.queryByLabelText("Area")).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Select a tenant" })).toBeInTheDocument();
+    expect(httpClient.get).toHaveBeenCalledWith(
+      "/api/services/app/AdminTenant/GetAll?IsActive=true&MaxResultCount=100",
+    );
+    fireEvent.change(await screen.findByLabelText("Tenant"), {
       target: { value: "3" },
     });
     fireEvent.click(
@@ -272,6 +281,21 @@ describe("AdminWeeklyEarnings", () => {
         },
       ),
     );
+  });
+
+  it("shows test calculation and no payout actions in the demo", async () => {
+    vi.mocked(httpClient.get).mockImplementation(async (url) =>
+      url === apiEndpoints.health.get
+        ? { environment: "AQGreenV2Demo", contractCapabilities: ["aqgreen-v2-demo-checkout-v1"] }
+        : url.includes("/AdminTenant/")
+          ? { items: [{ id: 3, name: "Soweto", tenancyName: "soweto" }], totalCount: 1 }
+          : weeklyEarnings,
+    );
+
+    render(<AdminWeeklyEarnings />);
+    await screen.findByText("Test calculation — no payout");
+    expect(screen.queryByRole("button", { name: "Release for payment" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Record external payment" })).not.toBeInTheDocument();
   });
 
   it("does not load records without the review permission", () => {

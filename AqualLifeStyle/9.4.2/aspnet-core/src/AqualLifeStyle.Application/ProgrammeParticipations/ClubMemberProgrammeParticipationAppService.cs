@@ -11,6 +11,7 @@ using Abp.UI;
 using AqualLifeStyle.Application.ProgrammeParticipations.Dto;
 using AqualLifeStyle.Application.Recruitment;
 using AqualLifeStyle.Authorization;
+using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Domain.Memberships;
@@ -43,6 +44,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             _funeralCoverRepository;
         private readonly ICurrentProgrammeTermsProvider _termsProvider;
         private readonly IProgrammeInvitationResolver _invitationResolver;
+        private readonly IAQGreenPlacementV2JoiningGate _v2JoiningGate;
+        private readonly AQGreenInvitationAttributionRecorder _attributionRecorder;
         private readonly IYocoCheckoutGateway _yocoCheckoutGateway;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
         private readonly IHostedPaymentCheckoutLock _hostedPaymentCheckoutLock;
@@ -65,7 +68,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             IYocoCheckoutGateway yocoCheckoutGateway,
             IHostedPaymentCheckoutLock hostedPaymentCheckoutLock,
             IUnitOfWorkManager unitOfWorkManager,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IAQGreenPlacementV2JoiningGate v2JoiningGate,
+            AQGreenInvitationAttributionRecorder attributionRecorder)
         {
             _customerRepository = customerRepository;
             _customerAreaAssignmentRepository = customerAreaAssignmentRepository;
@@ -78,6 +83,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             _funeralCoverRepository = funeralCoverRepository;
             _termsProvider = termsProvider;
             _invitationResolver = invitationResolver;
+            _v2JoiningGate = v2JoiningGate;
+            _attributionRecorder = attributionRecorder;
             _yocoCheckoutGateway = yocoCheckoutGateway;
             _hostedPaymentCheckoutLock = hostedPaymentCheckoutLock;
             _unitOfWorkManager = unitOfWorkManager;
@@ -187,13 +194,22 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             };
 
         [AbpAuthorize(AquaPermissions.ProgrammeParticipations.Join)]
-        [UnitOfWork]
+        [UnitOfWork(true)]
         public async Task<ProgrammeParticipationDto> StartEntryAsync(
             StartEntryParticipationInput input)
         {
             input ??= new StartEntryParticipationInput();
             var customerId = await GetCurrentActiveCustomerIdAsync();
             var tenantId = GetRequiredTenantId("Programme participation is unavailable.");
+            var useV2Joining = await _v2JoiningGate.IsEnabledAsync(tenantId);
+            if (useV2Joining && CurrentUnitOfWork?.Options.IsTransactional != true)
+                throw new InvalidOperationException(
+                    "AQGreen V2 invitation acceptance requires a transactional unit of work.");
+            if (useV2Joining && (string.IsNullOrWhiteSpace(input.InviteCode) ||
+                                 input.RecruiterCustomerId.HasValue))
+                throw new UserFriendlyException(
+                    "AQGreen V2 joining requires a sponsor invitation.",
+                    "Independent admission and recruiter-only joining are unavailable on this path.");
             var requestedPlacement = await ResolveRequestedRecruiterAsync(
                 input.RecruiterCustomerId,
                 input.InviteCode,
@@ -211,6 +227,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             if (existing != null)
             {
                 EnsureSameRecruiter(existing.RecruiterCustomerId, recruiterCustomerId, "AQGreen");
+                if (useV2Joining)
+                    await _attributionRecorder.RecordAsync(existing,
+                        requestedPlacement.InvitationPlacement, AbpSession.GetUserId(), UtcNow, isNew: false);
                 return Map(existing, await GetClubMemberNumberAsync(existing.RecruiterCustomerId));
             }
 
@@ -252,6 +271,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             }
 
             await _entryParticipationRepository.InsertAsync(participation);
+            if (useV2Joining)
+                await _attributionRecorder.RecordAsync(participation,
+                    requestedPlacement.InvitationPlacement, AbpSession.GetUserId(), UtcNow, isNew: true);
             await CurrentUnitOfWork.SaveChangesAsync();
             Logger.Info(
                 $"AQGreen participation started tenant={customer.TenantId} customer={customer.Id} independent={participation.JoinedIndependently}");
@@ -471,7 +493,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             return MapCheckout(intent);
         }
 
-        private Uri GetClientRootAddress()
+        private Uri GetClientRootAddress(bool allowIsolatedLoopback)
         {
             var configured = _configuration["App:ClientRootAddress"];
             var environment = _configuration["ASPNETCORE_ENVIRONMENT"];
@@ -479,10 +501,16 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 environment,
                 "Development",
                 StringComparison.OrdinalIgnoreCase);
+            var isIsolatedLoopback = allowIsolatedLoopback &&
+                Uri.TryCreate(configured, UriKind.Absolute, out var localRoot) &&
+                localRoot.Scheme == Uri.UriSchemeHttp &&
+                (string.Equals(localRoot.Host, "localhost", StringComparison.OrdinalIgnoreCase) ||
+                 System.Net.IPAddress.TryParse(localRoot.Host, out var address) &&
+                 System.Net.IPAddress.IsLoopback(address));
 
             if (!Uri.TryCreate(configured, UriKind.Absolute, out var root) ||
                 root.Scheme != Uri.UriSchemeHttps &&
-                (!isDevelopment || root.Scheme != Uri.UriSchemeHttp))
+                (!isDevelopment && !isIsolatedLoopback || root.Scheme != Uri.UriSchemeHttp))
                 throw new UserFriendlyException(
                     "Online payment is temporarily unavailable.",
                     "The customer website address has not been configured correctly.");
@@ -514,7 +542,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             string description,
             string programme)
         {
-            var clientRootAddress = GetClientRootAddress();
+            var clientRootAddress = GetClientRootAddress(
+                paymentCheckout is AQGreenJoiningCheckout &&
+                await _v2JoiningGate.IsEnabledAsync(paymentCheckout.TenantId));
             var query = $"payment={{0}}&programme={Uri.EscapeDataString(programme)}";
             return await _yocoCheckoutGateway.CreateAsync(new CreateYocoCheckout
             {

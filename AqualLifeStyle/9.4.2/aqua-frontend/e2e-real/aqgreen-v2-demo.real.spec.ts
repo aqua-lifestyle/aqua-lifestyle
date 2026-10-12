@@ -34,6 +34,7 @@ const signIn = async (
 };
 
 test("real host review creates a durable R400 ledger visible to the real member", async ({ browser }) => {
+  test.setTimeout(120_000);
   const adminContext = await browser.newContext();
   const adminPage = await adminContext.newPage();
   await signIn(
@@ -60,15 +61,40 @@ test("real host review creates a durable R400 ledger visible to the real member"
   await expect(adminPage.getByLabel("Spray verified quantity")).toHaveCount(0);
 
   await adminPage.goto("/admin/weekly-earnings");
-  await adminPage.getByLabel("Area").selectOption("1");
+  await adminPage.getByLabel("Tenant").selectOption("1");
   await adminPage.getByRole("button", { name: "Prepare weekly earnings" }).click();
-  await expect(adminPage.getByText(/1 earned R\s*400[,.]00 in total/)).toBeVisible();
-  await adminPage.getByRole("searchbox", { name: "Search..." })
+  await expect(adminPage.getByText(/1 had test commissions calculated R\s*400[,.]00 in total/)).toBeVisible();
+  await adminPage.getByRole("searchbox", { name: "Search AQGreen weekly earnings" })
     .fill("aqgreen.demo.member@example.test");
   const earningRow = adminPage.getByRole("row", { name: /AQGreen V2 Demo Member/ });
+  const earnedPeriod = (await earningRow.getByRole("cell").nth(2).innerText()).trim();
   await expect(earningRow.getByText("Commissioned level: 2")).toBeVisible();
   await expect(earningRow.getByText(/R\s*400[,.]00/).first()).toBeVisible();
-  await expect(earningRow.getByText("Earned — awaiting release")).toBeVisible();
+  await expect(earningRow.getByText("Test calculation — no payout")).toBeVisible();
+  await expect(earningRow.getByRole("button", { name: "Release for payment" })).toHaveCount(0);
+  const ledgerResponse = await adminPage.request.get(
+    "/api/backend/api/services/app/AdminCommission/GetAll?Programme=0&MaxResultCount=100");
+  expect(ledgerResponse.ok()).toBeTruthy();
+  const ledger = (await ledgerResponse.json()).result.items.find(
+    (item: { email: string }) => item.email === "aqgreen.demo.member@example.test");
+  expect(ledger).toBeTruthy();
+  for (const endpoint of ["Release", "RecordPayment"]) {
+    const denied = await adminPage.request.post(
+      `/api/backend/api/services/app/AdminCommission/${endpoint}`, {
+        data: {
+          id: ledger.id, programme: 0, justification: "Synthetic hold check",
+          paymentReference: "synthetic-no-transfer",
+        },
+        headers: { origin: "http://127.0.0.1:3000" },
+      });
+    expect(denied.ok()).toBe(false);
+  }
+  const ledgerAfterResponse = await adminPage.request.get(
+    "/api/backend/api/services/app/AdminCommission/GetAll?Programme=0&MaxResultCount=100");
+  const ledgerAfter = (await ledgerAfterResponse.json()).result.items.find(
+    (item: { id: string }) => item.id === ledger.id);
+  expect(ledgerAfter.releasedAt).toBeNull();
+  expect(ledgerAfter.paidAt).toBeNull();
   await adminContext.close();
 
   const memberContext = await browser.newContext();
@@ -83,14 +109,14 @@ test("real host review creates a durable R400 ledger visible to the real member"
   await memberPage.goto("/member/programmes");
   const aqGreen = memberPage.getByRole("article", { name: "AQGreen" });
   await expect(aqGreen.getByText("Structurally qualified through Level 2.")).toBeVisible();
-  await expect(aqGreen.getByText("Earned — awaiting release")).toBeVisible();
+  await expect(aqGreen.getByText("Test calculation — no payout")).toBeVisible();
   await expect(aqGreen.getByText("Qualified depth: Level 2 · Commissioned depth: Level 2")).toBeVisible();
   await expect(aqGreen.getByText("Level 1 component")).toBeVisible();
   await expect(aqGreen.getByText(/R\s*150[,.]00/).first()).toBeVisible();
   await expect(aqGreen.getByText("Level 2 component")).toBeVisible();
   await expect(aqGreen.getByText(/R\s*250[,.]00/).first()).toBeVisible();
   await expect(aqGreen.getByText(/R\s*400[,.]00/).first()).toBeVisible();
-  await expect(aqGreen.getByText(/21 Aug 2026.*27 Aug 2026/)).toBeVisible();
+  await expect(aqGreen.getByText(earnedPeriod)).toBeVisible();
   await expect(aqGreen.getByText("Paid", { exact: true })).toHaveCount(0);
   await memberContext.close();
 });

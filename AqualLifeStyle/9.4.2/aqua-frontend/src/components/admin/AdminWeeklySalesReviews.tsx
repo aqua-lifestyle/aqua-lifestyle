@@ -1,7 +1,7 @@
 "use client";
 
 import { ClipboardCheck, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useAuthState } from "@/src/providers";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
@@ -112,7 +112,6 @@ export const AdminWeeklySalesReviews = () => {
   const [fiveLitre, setFiveLitre] = useState("0");
   const [evidence, setEvidence] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
-  const initialTargetLoaded = useRef(false);
 
   const loadReviews = useCallback(async () => {
     if (!canReview) {
@@ -163,8 +162,7 @@ export const AdminWeeklySalesReviews = () => {
   }, [loadReviews]);
 
   useEffect(() => {
-    if (!canReview || initialTargetLoaded.current) return;
-    initialTargetLoaded.current = true;
+    if (!canReview) return;
     const parameters = new URLSearchParams(window.location.search);
     const tenantId = Number(parameters.get("tenantId"));
     const participantId = parameters.get("participantId");

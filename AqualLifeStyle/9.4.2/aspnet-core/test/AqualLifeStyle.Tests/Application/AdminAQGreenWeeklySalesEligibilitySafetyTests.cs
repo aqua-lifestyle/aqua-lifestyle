@@ -87,9 +87,15 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task TenantAdministrator_CannotReachReviewWritePath()
+        public async Task TenantAdministratorWithoutAreaAssignment_CannotReachReviewWritePath()
         {
             LoginAsDefaultTenantAdmin();
+            UsingDbContext(1, context =>
+            {
+                foreach (var assignment in context.AreaAdminAssignments
+                    .Where(item => item.UserId == AbpSession.UserId && !item.RevokedAt.HasValue))
+                    assignment.Revoke(DateTime.UtcNow);
+            });
             var service = Resolve<IAdminAQGreenWeeklySalesEligibilityAppService>();
 
             await Should.ThrowAsync<AbpAuthorizationException>(() =>
@@ -177,7 +183,11 @@ namespace AqualLifeStyle.Tests.Application
                 "ThresholdResult",
                 "ReviewedAt",
                 "ReviewedByUserId",
-                "CreatorUserId"
+                "CreatorUserId",
+                "CommissionAmount",
+                "TotalAmount",
+                "ThresholdOverride",
+                "PayoutStatus"
             };
 
             foreach (var inputType in new[]

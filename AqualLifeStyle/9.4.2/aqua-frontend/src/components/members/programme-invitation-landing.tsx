@@ -8,7 +8,7 @@ import {
   useSystemHealthActions,
   useSystemHealthState,
 } from "@/src/providers";
-import { isPaymentApiCompatible } from "@/src/providers/SystemHealth/contract";
+import { isAQGreenV2DemoCheckout, isPaymentApiCompatible } from "@/src/providers/SystemHealth/contract";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import type { ProgrammeInvitationPreview } from "@/src/shared/domain/programme-invitations";
@@ -30,10 +30,12 @@ const getProgrammeJoinEndpoint = (programmeKey: string) => {
   }
 };
 
-const getProgrammePaymentExplanation = (programmeKey: string) => {
+const getProgrammePaymentExplanation = (programmeKey: string, demo: boolean) => {
   switch (programmeKey) {
     case "AQGREEN":
-      return "Confirming records your AQGreen place under this inviting Club Member. AQGreen joining is R1,200, paid once or as two R600 instalments. Area Administrator approval is required after the full amount is confirmed.";
+      return demo
+        ? "Accepting records your sponsor attribution. AQGreen joining is R1,200 once or two R600 instalments; a separate R600 monthly obligation applies only after activation, but its due policy remains unresolved. The exact joining amount is shown at a simulated checkout. No real payment, insurance cover or earnings occur. Area approval and placement follow full test confirmation."
+        : "Confirming records your AQGreen place under this inviting Club Member. AQGreen joining is R1,200, paid once or as two R600 instalments. Area Administrator approval is required after the full amount is confirmed.";
     case "ONYX":
       return "Confirming continues to Yoco for the full R6,120 payment. Your Onyx participation and network place are created after confirmation, then remain inactive until Area Administrator approval.";
     default:
@@ -52,6 +54,7 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
   const [error, setError] = useState<string>();
   const [aqGreenSchedule, setAQGreenSchedule] = useState<0 | 1>(0);
   const paymentApiCompatible = isPaymentApiCompatible(healthState.health);
+  const demoCheckout = isAQGreenV2DemoCheckout(healthState.health);
   const paymentActionsUnavailable =
     healthState.isPending || !paymentApiCompatible;
 
@@ -132,7 +135,7 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
     ? getProgrammeJoinEndpoint(preview.programmeKey)
     : undefined;
   const programmePaymentExplanation = preview
-    ? getProgrammePaymentExplanation(preview.programmeKey)
+    ? getProgrammePaymentExplanation(preview.programmeKey, Boolean(demoCheckout))
     : undefined;
 
   return (
@@ -222,7 +225,9 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
                 isLoading={joining}
                 onClick={() => void confirm()}
               >
-                Confirm and continue to payment
+                {preview.programmeKey === "AQGREEN" && demoCheckout
+                  ? "Accept and open simulated checkout"
+                  : "Confirm and continue to payment"}
               </Button>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">

@@ -32,7 +32,9 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         private readonly IRepository<EntryParticipation, Guid> _participationRepository;
         private readonly ICustomerRepository _customerRepository;
         private readonly IRepository<Area, Guid> _areaRepository;
+        private readonly IRepository<AreaAdminAssignment, Guid> _areaAdminAssignmentRepository;
         private readonly IAQGreenWeeklySalesEligibilityMutationLock _mutationLock;
+        private readonly IAQGreenApprovalAuthorityStabilizer _areaAuthorityStabilizer;
         private readonly IAQGreenWeeklySalesEligibilityClock _clock;
         private readonly IAQGreenWeeklySalesReviewGate _reviewGate;
         private readonly IAQGreenWeeklySalesReviewScopePolicy _scopePolicy;
@@ -44,7 +46,9 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             IRepository<EntryParticipation, Guid> participationRepository,
             ICustomerRepository customerRepository,
             IRepository<Area, Guid> areaRepository,
+            IRepository<AreaAdminAssignment, Guid> areaAdminAssignmentRepository,
             IAQGreenWeeklySalesEligibilityMutationLock mutationLock,
+            IAQGreenApprovalAuthorityStabilizer areaAuthorityStabilizer,
             IAQGreenWeeklySalesEligibilityClock clock,
             IAQGreenWeeklySalesReviewGate reviewGate,
             IAQGreenWeeklySalesReviewScopePolicy scopePolicy,
@@ -55,7 +59,9 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             _participationRepository = participationRepository;
             _customerRepository = customerRepository;
             _areaRepository = areaRepository;
+            _areaAdminAssignmentRepository = areaAdminAssignmentRepository;
             _mutationLock = mutationLock;
+            _areaAuthorityStabilizer = areaAuthorityStabilizer;
             _clock = clock;
             _reviewGate = reviewGate;
             _scopePolicy = scopePolicy;
@@ -67,7 +73,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             GetAllAsync(AQGreenWeeklySalesReviewListInput input)
         {
             input ??= new AQGreenWeeklySalesReviewListInput();
-            await EnsureHostReviewAccessAsync();
+            await EnsureReviewAccessAsync();
+            ValidateRequestedTenant(input.TenantId, "AQGreen weekly-sales review");
             if (input.TenantId.HasValue &&
                 !await _scopePolicy.CanReviewAsync(input.TenantId.Value))
             {
@@ -79,6 +86,22 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             {
                 var query = _decisionRepository
                     .GetAllIncluding(item => item.EvidenceReferences);
+                var areaScope = await GetAuthorizedAreaScopeAsync();
+                if (AbpSession.TenantId.HasValue)
+                {
+                    var tenantId = AbpSession.TenantId.Value;
+                    var participants =
+                        from participation in _participationRepository.GetAll()
+                        join customer in _customerRepository.GetAll()
+                            on participation.CustomerId equals customer.Id
+                        where participation.TenantId == tenantId &&
+                              customer.TenantId == tenantId &&
+                              customer.AreaId.HasValue &&
+                              areaScope.Contains(customer.AreaId.Value)
+                        select participation.Id;
+                    query = query.Where(item => item.TenantId == tenantId &&
+                        participants.Contains(item.ParticipantId));
+                }
                 if (input.TenantId.HasValue)
                 {
                     query = query.Where(item => item.TenantId == input.TenantId.Value);
@@ -116,7 +139,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 throw Failed(
                     "AQGreen weekly-sales review lookup",
                     "A review decision is required.");
-            await EnsureHostReviewAccessAsync();
+            await EnsureReviewAccessAsync();
 
             using (DisableAllTenantDataFiltersForHost())
             {
@@ -130,6 +153,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 if (!await _scopePolicy.CanReviewAsync(decision.TenantId))
                     throw new AbpAuthorizationException(
                         "The AQGreen weekly-sales review is outside the authorized scope.");
+                await EnsureParticipantScopeAsync(decision.TenantId, decision.ParticipantId);
 
                 var subjects = await LoadSubjectsAsync(new[]
                 {
@@ -151,13 +175,14 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     "AQGreen weekly-sales review lookup",
                     "An explicit Tenant and AQGreen participation are required.");
             }
-            await EnsureHostReviewAccessAsync();
+            await EnsureReviewAccessAsync();
             if (!await _scopePolicy.CanReviewAsync(input.TenantId))
                 throw new AbpAuthorizationException(
                     "The AQGreen weekly-sales review is outside the authorized scope.");
 
             using (DisableAllTenantDataFiltersForHost())
             {
+                await EnsureParticipantScopeAsync(input.TenantId, input.ParticipantId);
                 var subjects = await LoadSubjectsAsync(new[]
                 {
                     new ReviewSubjectKey(input.TenantId, input.ParticipantId)
@@ -236,15 +261,10 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 throw Failed("AQGreen weekly-sales review", exception.Message);
             }
 
-            await EnsureHostReviewAccessAsync();
+            await EnsureReviewAccessAsync();
             if (!await _scopePolicy.CanReviewAsync(input.TenantId))
                 throw new AbpAuthorizationException(
                     "The AQGreen weekly-sales review is outside the authorized scope.");
-            if (!await _reviewGate.IsEnabledAsync(input.TenantId))
-                throw new UserFriendlyException(
-                    "AQGreen weekly-sales review is disabled.",
-                    "The detailed manual-review, Area ownership and evidence-retention policies are not yet approved.");
-
             var normalizedEvidence = operation == ReviewOperation.Begin
                 ? Array.Empty<string>()
                 : NormalizeEvidence(evidenceReferences);
@@ -259,15 +279,33 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 // statement snapshot after acquiring the lock and see the winner.
                 IsolationLevel = IsolationLevel.ReadCommitted
             }))
-            using (CurrentUnitOfWork.DisableFilter(
-                       AbpDataFilters.MayHaveTenant,
-                       AbpDataFilters.MustHaveTenant))
+            using (DisableAllTenantDataFiltersForHost())
             {
+                await EnsureParticipantScopeAsync(input.TenantId, input.ParticipantId);
+                if (!await _reviewGate.IsEnabledAsync(input.TenantId))
+                    throw new UserFriendlyException(
+                        "AQGreen weekly-sales review is disabled.",
+                        "This environment has not enabled AQGreen weekly-sales review.");
                 await _mutationLock.AcquireAsync(
                     input.TenantId,
                     input.ParticipantId,
                     week.StartUtc,
                     AQGreenWeeklySalesEligibilityRules.CurrentVersion);
+
+                if (AbpSession.TenantId.HasValue)
+                {
+                    var participant = await _participationRepository.GetAll()
+                        .AsNoTracking().SingleAsync(item => item.TenantId == input.TenantId &&
+                            item.Id == input.ParticipantId);
+                    // Reuse the established customer/Area/assignment row locks.
+                    // Keep current Area authority stable until this review commits.
+                    await _areaAuthorityStabilizer.StabilizeAsync(
+                        input.TenantId, participant.CustomerId, AbpSession.GetUserId());
+                }
+
+                // Check current record authority after acquiring the transaction
+                // lock, including on retries of a finalized review.
+                await EnsureParticipantScopeAsync(input.TenantId, input.ParticipantId);
 
                 var existing = await FindAsync(
                     input.TenantId,
@@ -345,14 +383,58 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     item.SalesEligibilityRulesVersion ==
                     AQGreenWeeklySalesEligibilityRules.CurrentVersion);
 
-        private async Task EnsureHostReviewAccessAsync()
+        private async Task EnsureReviewAccessAsync()
         {
-            if (AbpSession.TenantId.HasValue)
+            if (!AbpSession.UserId.HasValue ||
+                !await PermissionChecker.IsGrantedAsync(
+                    AquaPermissions.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility))
                 throw new AbpAuthorizationException(
-                    "AQGreen weekly-sales review is unavailable to Area-scoped administrators until the Area ownership policy is confirmed.");
-            if (!await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
+                    "AQGreen weekly-sales review requires an authenticated administrator with review permission.");
+            if (!AbpSession.TenantId.HasValue &&
+                !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants))
                 throw new AbpAuthorizationException(
                     "Host AQGreen weekly-sales review requires permission to manage all Areas.");
+        }
+
+        private async Task<Guid[]> GetAuthorizedAreaScopeAsync()
+        {
+            if (!AbpSession.TenantId.HasValue) return null;
+            var tenantId = AbpSession.TenantId.Value;
+            var userId = AbpSession.GetUserId();
+            var now = Clock.Now.ToUniversalTime();
+            var areas = await (
+                from assignment in _areaAdminAssignmentRepository.GetAll()
+                join area in _areaRepository.GetAll()
+                    on new { assignment.TenantId, assignment.AreaId }
+                    equals new { area.TenantId, AreaId = area.Id }
+                where assignment.TenantId == tenantId && assignment.UserId == userId &&
+                      !assignment.IsDeleted && !assignment.RevokedAt.HasValue &&
+                      assignment.EffectiveFrom <= now && !area.IsDeleted && area.IsActive
+                select assignment.AreaId).Distinct().ToArrayAsync();
+            if (areas.Length == 0)
+                throw new AbpAuthorizationException(
+                    "You are not assigned to administer an active Area.");
+            return areas;
+        }
+
+        private async Task EnsureParticipantScopeAsync(int tenantId, Guid participantId)
+        {
+            if (!await _scopePolicy.CanReviewAsync(tenantId))
+                throw new AbpAuthorizationException(
+                    "The AQGreen weekly-sales review is outside the authorized scope.");
+            if (!AbpSession.TenantId.HasValue) return;
+            var areas = await GetAuthorizedAreaScopeAsync();
+            var permitted = await (
+                from participation in _participationRepository.GetAll()
+                join customer in _customerRepository.GetAll()
+                    on participation.CustomerId equals customer.Id
+                where participation.Id == participantId && participation.TenantId == tenantId &&
+                      customer.TenantId == tenantId && customer.AreaId.HasValue &&
+                      areas.Contains(customer.AreaId.Value)
+                select participation.Id).AnyAsync();
+            if (!permitted)
+                throw new AbpAuthorizationException(
+                    "The AQGreen weekly-sales review is outside your authorized Area.");
         }
 
         private async Task<IReadOnlyDictionary<ReviewSubjectKey, ReviewSubject>>
