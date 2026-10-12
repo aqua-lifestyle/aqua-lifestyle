@@ -15,6 +15,10 @@ The pack explains Aqua at several levels without making one document carry every
 | Checking evidence, decisions, risks, or readiness | [07 — Verification, decision, and risk register](07-verification-decision-and-risk-register.md) |
 | Understanding Tenant versus business Area | [08 — Tenant and Area boundaries](08-area-and-tenant-boundaries.md) |
 | Reviewing resolved AQGreen Placement V2 design semantics | [AQGreen Network Placement V2 specification](aqgreen-network-placement-specification.md) |
+| Reviewing the isolated AQGreen V2 working slice and learning boundary | [Lean MVP working-slice report](aqgreen-v2-lean-mvp-report.md) and [discovery/task scripts](aqgreen-v2-lean-mvp-discovery.md) |
+| Reviewing the local interactive test-money browser qualification | [Interactive MVP qualification](aqgreen-v2-interactive-test-money-qualification.md) |
+| Reviewing the isolated operational joining, spillover, sales and commission acceptance | [Operational MVP acceptance](aqgreen-v2-operational-mvp-acceptance.md) |
+| Reviewing scoped Area and central administrator sales authorization | [Administrator sales authorization](aqgreen-v2-admin-sales-authorization.md) |
 | Resolving decision authority or status | [07 — Business-decision authority convention](07-verification-decision-and-risk-register.md#p-business-decision-authority-convention) |
 | Choosing repository validation | [Repository validation commands](../development/validation.md) |
 | Performing an engineering review | [Review benchmark](../review-benchmark.md) and the repository [`review-change` skill](../../.agents/skills/review-change/SKILL.md) |

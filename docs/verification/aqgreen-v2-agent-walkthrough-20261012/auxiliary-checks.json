@@ -1,0 +1,21 @@
+{
+  "vitest": {
+    "command": "npx vitest run src/components/admin/AdminWeeklySalesReviews.test.tsx src/components/auth/login-form.test.tsx",
+    "result": "21 passed; zero failed",
+    "log": "focused-regressions.log"
+  },
+  "typecheck": {
+    "command": "npx tsc --noEmit",
+    "exitCode": 0,
+    "output": ""
+  },
+  "lint": {
+    "command": "npx eslint src/components/auth/login-form.tsx src/components/auth/login-form.test.tsx src/components/admin/AdminWeeklySalesReviews.tsx src/components/admin/AdminWeeklySalesReviews.test.tsx",
+    "exitCode": 0,
+    "output": ""
+  },
+  "noJavaScriptBrowser": {
+    "result": "3/3 passed",
+    "evidence": "Executed tool stdout; no separate journal event at execution time; checks disabled Sign in and method=post with no credentials entered."
+  }
+}

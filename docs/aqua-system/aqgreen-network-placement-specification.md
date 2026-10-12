@@ -1072,6 +1072,18 @@ Each record requires its own action type, actor, server time, applicable period/
 
 Sales-eligibility review and commission release/payment require separately granted permissions; authority for one action does not grant authority for the other. The same person may hold both permissions if current authorization policy allows it, but each action remains separately authorized and audited. Different human actors or dual approval are not required for MVP unless separately authorised.
 
+**CONFIRMED owner decision, 12 October 2026 — isolated MVP delegation:** all
+authenticated Aqua administrators are eligible to review, confirm, reject or
+hold weekly evidence within their authorized records. The dedicated review
+permission is available on both Host and Tenant sides. Tenant reviewers must
+have an effective, unrevoked assignment to the member's active Area in the
+same Tenant; the administrator role alone conveys no Tenant-wide or global
+scope. Central reviewers require the separately granted broader authority
+(`AllTenants` in the existing model). Enforce the same scope on list, detail,
+latest-week and mutation APIs, including retries. Preserve reviewer identity,
+server time and final history. The production write gate remains disabled by
+default; this delegation enables no worker, amount override, release or payout.
+
 ### 24.6 Financial recording and corrections
 
 `ENGINEERING DECISION`:

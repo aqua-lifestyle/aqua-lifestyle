@@ -1,0 +1,296 @@
+[
+  {
+    "caseId": "J1",
+    "actor": "Sponsor + fresh member",
+    "result": "PASS",
+    "evidenceSequences": [
+      4,
+      8,
+      9,
+      10,
+      17,
+      20,
+      21,
+      22,
+      35,
+      55,
+      65,
+      77,
+      86,
+      99,
+      114,
+      115
+    ],
+    "originalFailuresPreserved": [],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "J2",
+    "actor": "Fresh member",
+    "result": "PASS",
+    "evidenceSequences": [
+      26,
+      117
+    ],
+    "originalFailuresPreserved": [],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "J3",
+    "actor": "Two-instalment member",
+    "result": "PASS",
+    "evidenceSequences": [
+      52
+    ],
+    "originalFailuresPreserved": [],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "J4",
+    "actor": "Member + other member",
+    "result": "PASS",
+    "evidenceSequences": [
+      13,
+      24,
+      27,
+      124
+    ],
+    "originalFailuresPreserved": [],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "J5",
+    "actor": "Area administrator + negative actors",
+    "result": "PASS",
+    "evidenceSequences": [
+      30,
+      36,
+      109,
+      110
+    ],
+    "originalFailuresPreserved": [],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "J6",
+    "actor": "Area approver + activated member",
+    "result": "PASS",
+    "evidenceSequences": [
+      32,
+      119
+    ],
+    "originalFailuresPreserved": [],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "P1",
+    "actor": "Fresh sponsor + six members + Area approver",
+    "result": "PASS",
+    "evidenceSequences": [
+      33,
+      54,
+      56,
+      62,
+      70,
+      74,
+      79,
+      82,
+      87,
+      89,
+      100,
+      101
+    ],
+    "originalFailuresPreserved": [],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "P2",
+    "actor": "Fresh sponsor + pre-cutoff member",
+    "result": "PASS",
+    "evidenceSequences": [
+      90,
+      102,
+      116
+    ],
+    "originalFailuresPreserved": [],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "S1",
+    "actor": "Area/central/Host administrators + negative actors",
+    "result": "PASS",
+    "evidenceSequences": [
+      5,
+      6,
+      7,
+      11,
+      12,
+      14,
+      18,
+      19,
+      23,
+      25,
+      28,
+      29,
+      31,
+      34,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      53,
+      57,
+      104,
+      105,
+      118,
+      126
+    ],
+    "originalFailuresPreserved": [
+      34,
+      57
+    ],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "S2",
+    "actor": "Area reviewer + manual register writer",
+    "result": "PASS",
+    "evidenceSequences": [
+      39,
+      63,
+      64,
+      111,
+      112,
+      127,
+      128
+    ],
+    "originalFailuresPreserved": [
+      39
+    ],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "S3",
+    "actor": "Area reviewer",
+    "result": "PASS",
+    "evidenceSequences": [
+      40,
+      67,
+      69
+    ],
+    "originalFailuresPreserved": [
+      40
+    ],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "S4",
+    "actor": "Authorized other-Area reviewer",
+    "result": "PASS",
+    "evidenceSequences": [
+      41,
+      71,
+      72
+    ],
+    "originalFailuresPreserved": [
+      41
+    ],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "S5",
+    "actor": "Area reviewer + financial operator",
+    "result": "PASS",
+    "evidenceSequences": [
+      38,
+      58,
+      59,
+      60,
+      61,
+      129
+    ],
+    "originalFailuresPreserved": [
+      38
+    ],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "S6",
+    "actor": "Area/central reviewers + one register writer",
+    "result": "PASS",
+    "evidenceSequences": [
+      42,
+      66,
+      68,
+      76,
+      106,
+      107,
+      122,
+      123,
+      125
+    ],
+    "originalFailuresPreserved": [
+      42,
+      76
+    ],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "C1",
+    "actor": "Host financial operator + member",
+    "result": "PASS",
+    "evidenceSequences": [
+      43,
+      80,
+      81,
+      83,
+      84,
+      85,
+      88,
+      91
+    ],
+    "originalFailuresPreserved": [
+      43
+    ],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "C2",
+    "actor": "Financial operator + held member",
+    "result": "PASS",
+    "evidenceSequences": [
+      44,
+      78,
+      92,
+      108,
+      120,
+      121
+    ],
+    "originalFailuresPreserved": [
+      44,
+      92,
+      108
+    ],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  },
+  {
+    "caseId": "C3",
+    "actor": "Explicitly permissioned Host financial operator",
+    "result": "PASS",
+    "evidenceSequences": [
+      45,
+      93,
+      94,
+      95,
+      96,
+      97,
+      98
+    ],
+    "originalFailuresPreserved": [
+      45
+    ],
+    "evidenceCategory": "New agent-operated browser/API/PostgreSQL execution; no human observation"
+  }
+]

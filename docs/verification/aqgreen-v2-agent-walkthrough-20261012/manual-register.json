@@ -1,0 +1,86 @@
+{
+  "writer": "Area administrator #4; one active register writer",
+  "secondRequester": "central administrator #43",
+  "saleKey": "SIM-ISSUER/SIM-SALE-001",
+  "lineKeys": [
+    "THZ125",
+    "1L",
+    "5L"
+  ],
+  "aliases": [
+    "invoice-A",
+    "receipt-renamed-B"
+  ],
+  "supported": [
+    5,
+    5,
+    4
+  ],
+  "allocated": [
+    5,
+    5,
+    4
+  ],
+  "secondAllocated": [
+    0,
+    0,
+    0
+  ],
+  "firstDecision": "60e91a64-c34c-48c9-a7a4-6817cc0f122b",
+  "secondDecision": "7f4ddde2-b847-4d39-9b63-a24ebb65d451",
+  "week": "2026-10-01T22:00:00Z",
+  "reason": "Same underlying units already allocated to confirmed NotMet decision. Renamed receipt copy is held; no carry-forward.",
+  "source": "synthetic manual operator register",
+  "otherWeekClaim": {
+    "participantId": "1964b366-5677-4f55-9524-7bd315e2e8d1",
+    "week": "2026-09-24T22:00:00.000Z",
+    "appDecision": "76a3662c-a76f-4a95-bf5f-15ad25cebc2f",
+    "requested": [
+      5,
+      5,
+      4
+    ],
+    "allocated": [
+      0,
+      0,
+      0
+    ],
+    "reason": "Same source units remain allocated in later original case; existing global register reservations also checked across retained weeks; retain original older period held."
+  },
+  "metCase": {
+    "case": "fresh S2 after independent review",
+    "participantId": "573c5a26-263a-481a-9712-333eda614951",
+    "tenantId": 1,
+    "week": "2026-10-01T22:00:00Z",
+    "writer": "Area administrator #4; one active writer",
+    "saleKey": "SIM-ISSUER/SIM-SALE-002",
+    "lineKeys": [
+      "THZ125",
+      "1L",
+      "5L"
+    ],
+    "supported": [
+      5,
+      5,
+      5
+    ],
+    "reserved": [
+      0,
+      0,
+      0
+    ],
+    "aliases": [
+      "invoice-met-C",
+      "receipt-met-D"
+    ],
+    "source": "explicit synthetic completed-sale fixture within displayed week; not external commerce",
+    "reservationAt": "2026-10-12T13:48:06.312Z",
+    "appDecision": "bcbd63b0-0548-4203-9406-d534954c484c",
+    "finalizedAt": "2026-10-12T13:48:09.841Z",
+    "allocated": [
+      5,
+      5,
+      5
+    ]
+  }
+}

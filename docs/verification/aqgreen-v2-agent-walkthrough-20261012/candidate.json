@@ -1,0 +1,27 @@
+{
+  "head": "e9bd8e96d55d03466492ffd40dd657802ae36d4b",
+  "branch": "feature/admin-ui-remediation",
+  "sourceManifestSha256": "72219b17d8cd5a55f9c0b542190caa969bb5193131fa2924fdefcdff54d1e26c",
+  "sourceFileCount": 1739,
+  "artifacts": [
+    {
+      "name": "AqualLifeStyle.Web.Host.dll",
+      "sha256": "ba8c798495236bd289e3929b25012bf82daacf3020d336a1f30224780cb9616d"
+    },
+    {
+      "name": "AqualLifeStyle.Application.dll",
+      "sha256": "a87a83ec41a29e3d62852138df570afd0169d1149827262b28a63690cd06e686"
+    },
+    {
+      "name": "AqualLifeStyle.Core.dll",
+      "sha256": "b8240a8c38cd8edb56f24d5d014ffbdb2515e3483b908f02a817c4016823dca4"
+    },
+    {
+      "name": "AqualLifeStyle.EntityFrameworkCore.dll",
+      "sha256": "8aeddaea06f6e4eed5574122261f2deae7728fce3c86b88237991a93f1988660"
+    }
+  ],
+  "frontend": "Next 16.3.6 dev; Node 26.6.0 glibc host binary mounted into cached Debian runtime; no new toolchain or dependency",
+  "database": "PostgreSQL 16-alpine, dedicated aqua_aqgreen_v2_demo",
+  "runtimeOverride": "Only task-copy allowedDevOrigins=[127.0.0.1]"
+}
