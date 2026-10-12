@@ -1,4 +1,5 @@
 using System;
+using Abp.Domain.Uow;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -99,6 +100,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         }
 
         [AbpAuthorize(AquaPermissions.ProgrammeParticipations.ViewSelf)]
+        [UnitOfWork]
         public async Task<MyProgrammeJourneyDto> GetMyJourneyAsync()
         {
             var tenantId = GetRequiredTenantId(
@@ -151,7 +153,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             // has a real lifecycle state, not a missing/corrupt V2 placement.
             var v2Enabled = entryParticipation?.Status == EntryParticipationStatus.Active
                 && await _v2ProgressGate.IsEnabledAsync(tenantId, entryParticipation.Id);
-            var v2StructuralResult = v2Enabled
+            var v2StructuralResult = v2Enabled &&
+                (!PilotMode.IsEnabled || entryParticipation.Status == EntryParticipationStatus.Active)
                 ? await EvaluateV2StructuralProgressAsync(
                     tenantId,
                     entryParticipation.Id,
@@ -193,11 +196,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             var travelBenefit = await _travelBenefitRepository.FirstOrDefaultAsync(
                 item => item.CustomerId == customer.Id);
 
-            return new MyProgrammeJourneyDto
+            var journeys = new List<MemberProgrammeJourneyDto>
             {
-                ProjectedAt = projectedAt,
-                Programmes = new[]
-                {
                     BuildAQGreenJourney(
                         entryParticipation,
                         entryNetwork,
@@ -206,15 +206,27 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         entryPeriods,
                         obligations,
                         funeralCover,
-                        v2StructuralResult),
-                    BuildOnyxJourney(
+                        v2StructuralResult)
+            };
+            if (PilotMode.IsEnabled)
+            {
+                // These capabilities are not commissioned; they are not unknown
+                // financial values and no entitlement is represented by this pilot.
+                journeys[0].MonthlySubscription = null;
+                journeys[0].Benefits = Array.Empty<MemberProgrammeBenefitDto>();
+            }
+            else
+                journeys.Add(BuildOnyxJourney(
                         onyxParticipation,
                         onyxNetwork,
                         onyxLevel,
                         onyxCommissions,
                         onyxPeriods,
-                        travelBenefit)
-                }
+                        travelBenefit));
+            return new MyProgrammeJourneyDto
+            {
+                ProjectedAt = projectedAt,
+                Programmes = journeys
             };
         }
 
@@ -815,6 +827,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         }
 
         [AbpAuthorize(AquaPermissions.ProgrammeParticipations.ViewSelf)]
+        [UnitOfWork]
         public async Task<MyProgrammeProgressDto> GetMyProgressAsync()
         {
             var tenantId = GetRequiredTenantId(

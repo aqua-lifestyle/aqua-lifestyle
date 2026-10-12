@@ -33,13 +33,16 @@ namespace AqualLifeStyle.Application.Recruitment
         public int RecruiterCustomerId { get; }
         public int TenantId { get; }
         public Area RecruiterArea { get; }
+        public Guid? RecruiterParticipationId => SponsorParticipantId;
+        public string ProgrammeKey { get; }
 
         public ProgrammeInvitationPlacement(
             Guid invitationId,
             Guid sponsorParticipantId,
             int tenantId,
             int recruiterCustomerId,
-            Area recruiterArea)
+            Area recruiterArea,
+            string programmeKey = null)
         {
             if (invitationId == Guid.Empty) throw new ArgumentException("Invitation evidence is required.", nameof(invitationId));
             if (sponsorParticipantId == Guid.Empty) throw new ArgumentException("Sponsor participation is required.", nameof(sponsorParticipantId));
@@ -49,6 +52,7 @@ namespace AqualLifeStyle.Application.Recruitment
             TenantId = tenantId;
             RecruiterCustomerId = recruiterCustomerId;
             RecruiterArea = recruiterArea ?? throw new ArgumentNullException(nameof(recruiterArea));
+            ProgrammeKey = programmeKey;
         }
     }
 
@@ -189,7 +193,8 @@ namespace AqualLifeStyle.Application.Recruitment
                 invitation.ProgrammeParticipationId,
                 authoritativeTenantId,
                 source.CustomerId,
-                area);
+                area,
+                invitation.ProgrammeKey);
         }
 
         internal static string NormalizeCode(string inviteCode)

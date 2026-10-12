@@ -1,0 +1,31 @@
+{
+  "baselineExplicitSkipRecords14Counter0": "PASS",
+  "compatibleExplicitSkipCounter14": "PASS",
+  "invalidMutations": [
+    {
+      "name": "missing record",
+      "result": "REJECTED"
+    },
+    {
+      "name": "duplicate record",
+      "result": "REJECTED"
+    },
+    {
+      "name": "unexpected identity",
+      "result": "REJECTED"
+    },
+    {
+      "name": "unknown outcome",
+      "result": "REJECTED"
+    },
+    {
+      "name": "inconsistent execution counter",
+      "result": "REJECTED"
+    },
+    {
+      "name": "inconsistent redundant skip counter",
+      "result": "REJECTED"
+    }
+  ],
+  "powershellExecution": "NOT RUN: pwsh unavailable locally; Node equivalence and static YAML checks executed"
+}

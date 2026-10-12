@@ -189,7 +189,8 @@ namespace AqualLifeStyle.Tests.WebHost
                 ["AQGreenV2Demo:Enabled"] = "true",
                 ["ConnectionStrings:Default"] =
                     $"Host={host};Port={port};Database=aqua_aqgreen_v2_demo;" +
-                    "Username=demo;Password=demo"
+                    "Username=demo;Password=demo",
+                ["App:ClientRootAddress"] = "http://127.0.0.1:3100/"
             });
 
             Should.NotThrow(() => DeploymentConfigurationValidator.Validate(services));

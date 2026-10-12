@@ -19,8 +19,8 @@ env:
   NEXT_TELEMETRY_DISABLED: 1
 
 jobs:
-  backend:
-    name: Backend build and tests
+  backend-application-discovery:
+    name: Backend application coverage partition
     runs-on: ubuntu-latest
     timeout-minutes: 25
     defaults:
@@ -32,18 +32,345 @@ jobs:
         with:
           dotnet-version: 8.0.x
       - name: Restore
-        run: dotnet restore AqualLifeStyle.sln
+        run: dotnet restore test/AqualLifeStyle.Tests/AqualLifeStyle.Tests.csproj -p:Configuration=Release
       - name: Build
-        run: dotnet build AqualLifeStyle.sln --configuration Release --no-restore
-      - name: Test
-        run: dotnet test AqualLifeStyle.sln --configuration Release --no-build --logger trx --logger "console;verbosity=normal" --results-directory TestResults
-      - name: Upload backend test results
+        run: dotnet build test/AqualLifeStyle.Tests/AqualLifeStyle.Tests.csproj --configuration Release --no-restore
+      - name: Prove complete application coverage partition
+        run: |
+          set -euo pipefail
+          export LC_ALL=C
+          mkdir -p TestResults/partition
+          discover() {
+            local shard="$1"
+            shift
+            dotnet test test/AqualLifeStyle.Tests/AqualLifeStyle.Tests.csproj \
+              --configuration Release --no-build --list-tests "$@" \
+              2>&1 | tee "TestResults/partition/${shard}-discovery.txt"
+            awk '
+              /^The following Tests are available:\r?$/ { found=1; next }
+              found && /^    / { sub(/^    /, ""); sub(/\r$/, ""); print }
+            ' "TestResults/partition/${shard}-discovery.txt" \
+              | sort > "TestResults/partition/${shard}-names.txt"
+            test -s "TestResults/partition/${shard}-names.txt"
+          }
+          discover all
+          discover application-administration --filter 'FullyQualifiedName~AqualLifeStyle.Tests.Application.Admin&FullyQualifiedName!~AqualLifeStyle.Tests.Application.AdminProgramme'
+          discover application-membership --filter 'FullyQualifiedName~AqualLifeStyle.Tests.Application.&(FullyQualifiedName~AqualLifeStyle.Tests.Application.AdminProgramme|FullyQualifiedName~AqualLifeStyle.Tests.Application.ClubMember)'
+          discover application-authentication --filter 'FullyQualifiedName~AqualLifeStyle.Tests.Application.&FullyQualifiedName!~AqualLifeStyle.Tests.Application.Admin&FullyQualifiedName!~AqualLifeStyle.Tests.Application.ClubMember&(FullyQualifiedName~Account|FullyQualifiedName~Authorization|FullyQualifiedName~User|FullyQualifiedName~Role)'
+          discover application-remainder --filter 'FullyQualifiedName~AqualLifeStyle.Tests.Application.&FullyQualifiedName!~AqualLifeStyle.Tests.Application.Admin&FullyQualifiedName!~AqualLifeStyle.Tests.Application.ClubMember&FullyQualifiedName!~Account&FullyQualifiedName!~Authorization&FullyQualifiedName!~User&FullyQualifiedName!~Role'
+          discover entity-framework-migrations --filter 'FullyQualifiedName~AqualLifeStyle.Tests.EntityFrameworkCore.&FullyQualifiedName~Migration'
+          discover entity-framework-placement --filter 'FullyQualifiedName~AqualLifeStyle.Tests.EntityFrameworkCore.&FullyQualifiedName!~Migration&(FullyQualifiedName~AQGreenPlacement|FullyQualifiedName~AQGreenStructural)'
+          discover entity-framework-remainder --filter 'FullyQualifiedName~AqualLifeStyle.Tests.EntityFrameworkCore.&FullyQualifiedName!~Migration&FullyQualifiedName!~AQGreenPlacement&FullyQualifiedName!~AQGreenStructural'
+          discover remainder --filter 'FullyQualifiedName!~AqualLifeStyle.Tests.Application.&FullyQualifiedName!~AqualLifeStyle.Tests.EntityFrameworkCore.'
+          cat TestResults/partition/{application-administration,application-membership,application-authentication,application-remainder,entity-framework-migrations,entity-framework-placement,entity-framework-remainder,remainder}-names.txt \
+            | sort > TestResults/partition/union-names.txt
+          diff -u TestResults/partition/{all,union}-names.txt \
+            | tee TestResults/partition/multiset-diff.txt
+          for shard in all application-administration application-membership application-authentication application-remainder entity-framework-migrations entity-framework-placement entity-framework-remainder remainder; do
+            printf '%s: %s\n' "$shard" "$(wc -l < "TestResults/partition/${shard}-names.txt")"
+          done | tee TestResults/partition/counts.txt
+          printf 'PASS: full inventory equals shard union as multisets.\n' \
+            | tee TestResults/partition/coverage-result.txt
+      - name: Upload application coverage partition
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: backend-test-results
-          path: AqualLifeStyle/9.4.2/aspnet-core/TestResults
-          if-no-files-found: ignore
+          name: backend-application-coverage-partition
+          path: AqualLifeStyle/9.4.2/aspnet-core/TestResults/partition
+          if-no-files-found: error
+          retention-days: 7
+
+  backend-application-tests:
+    name: Backend application tests (${{ matrix.shard }})
+    needs: backend-application-discovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: application-administration
+            filter: FullyQualifiedName~AqualLifeStyle.Tests.Application.Admin&FullyQualifiedName!~AqualLifeStyle.Tests.Application.AdminProgramme
+          - shard: application-membership
+            filter: FullyQualifiedName~AqualLifeStyle.Tests.Application.&(FullyQualifiedName~AqualLifeStyle.Tests.Application.AdminProgramme|FullyQualifiedName~AqualLifeStyle.Tests.Application.ClubMember)
+          - shard: application-authentication
+            filter: FullyQualifiedName~AqualLifeStyle.Tests.Application.&FullyQualifiedName!~AqualLifeStyle.Tests.Application.Admin&FullyQualifiedName!~AqualLifeStyle.Tests.Application.ClubMember&(FullyQualifiedName~Account|FullyQualifiedName~Authorization|FullyQualifiedName~User|FullyQualifiedName~Role)
+          - shard: application-remainder
+            filter: FullyQualifiedName~AqualLifeStyle.Tests.Application.&FullyQualifiedName!~AqualLifeStyle.Tests.Application.Admin&FullyQualifiedName!~AqualLifeStyle.Tests.Application.ClubMember&FullyQualifiedName!~Account&FullyQualifiedName!~Authorization&FullyQualifiedName!~User&FullyQualifiedName!~Role
+          - shard: entity-framework-migrations
+            filter: FullyQualifiedName~AqualLifeStyle.Tests.EntityFrameworkCore.&FullyQualifiedName~Migration
+          - shard: entity-framework-placement
+            filter: FullyQualifiedName~AqualLifeStyle.Tests.EntityFrameworkCore.&FullyQualifiedName!~Migration&(FullyQualifiedName~AQGreenPlacement|FullyQualifiedName~AQGreenStructural)
+          - shard: entity-framework-remainder
+            filter: FullyQualifiedName~AqualLifeStyle.Tests.EntityFrameworkCore.&FullyQualifiedName!~Migration&FullyQualifiedName!~AQGreenPlacement&FullyQualifiedName!~AQGreenStructural
+          - shard: remainder
+            filter: FullyQualifiedName!~AqualLifeStyle.Tests.Application.&FullyQualifiedName!~AqualLifeStyle.Tests.EntityFrameworkCore.
+    defaults:
+      run:
+        working-directory: AqualLifeStyle/9.4.2/aspnet-core
+    env:
+      SHARD: ${{ matrix.shard }}
+      TEST_FILTER: ${{ matrix.filter }}
+      RESULTS_DIR: TestResults/${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/download-artifact@v7
+        with:
+          name: backend-application-coverage-partition
+          path: AqualLifeStyle/9.4.2/aspnet-core/TestResults/partition
+      - name: Restore
+        run: dotnet restore test/AqualLifeStyle.Tests/AqualLifeStyle.Tests.csproj -p:Configuration=Release
+      - name: Build
+        run: dotnet build test/AqualLifeStyle.Tests/AqualLifeStyle.Tests.csproj --configuration Release --no-restore
+      - name: Verify local shard discovery
+        run: |
+          set -euo pipefail
+          export LC_ALL=C
+          mkdir -p "$RESULTS_DIR"
+          dotnet test test/AqualLifeStyle.Tests/AqualLifeStyle.Tests.csproj \
+            --configuration Release --no-build --list-tests --filter "$TEST_FILTER" \
+            2>&1 | tee "$RESULTS_DIR/discovered-tests.txt"
+          awk '
+            /^The following Tests are available:\r?$/ { found=1; next }
+            found && /^    / { sub(/^    /, ""); sub(/\r$/, ""); print }
+          ' "$RESULTS_DIR/discovered-tests.txt" | sort > "$RESULTS_DIR/expected-names.txt"
+          test -s "$RESULTS_DIR/expected-names.txt"
+          diff -u "TestResults/partition/${SHARD}-names.txt" "$RESULTS_DIR/expected-names.txt" \
+            | tee "$RESULTS_DIR/discovery-diff.txt"
+      - name: Test complete application shard
+        run: |
+          set -euo pipefail
+          dotnet test test/AqualLifeStyle.Tests/AqualLifeStyle.Tests.csproj \
+            --configuration Release --no-build --filter "$TEST_FILTER" \
+            --logger "trx;LogFileName=${SHARD}-tests.trx" \
+            --logger "console;verbosity=detailed" \
+            --results-directory "$RESULTS_DIR" \
+            --diag "$RESULTS_DIR/vstest-diag.log" \
+            --blame-hang \
+            --blame-hang-timeout 5m \
+            --blame-hang-dump-type none \
+            2>&1 | tee "$RESULTS_DIR/application-console.log"
+      - name: Verify complete shard results
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $expected = [string[]][System.IO.File]::ReadAllLines((Join-Path $env:RESULTS_DIR 'expected-names.txt'))
+          if ($expected.Count -eq 0) { throw 'Empty shard inventory' }
+          $settings = [System.Xml.XmlReaderSettings]::new()
+          $settings.DtdProcessing = [System.Xml.DtdProcessing]::Prohibit
+          $reader = [System.Xml.XmlReader]::Create((Join-Path $env:RESULTS_DIR "$($env:SHARD)-tests.trx"), $settings)
+          $trx = [System.Xml.XmlDocument]::new()
+          try { $trx.Load($reader) } finally { $reader.Dispose() }
+          $results = @($trx.SelectNodes("/*[local-name()='TestRun']/*[local-name()='Results']/*[local-name()='UnitTestResult']"))
+          $actual = [string[]]@($results | ForEach-Object { $_.GetAttribute('testName') })
+          [Array]::Sort($expected, [StringComparer]::Ordinal)
+          [Array]::Sort($actual, [StringComparer]::Ordinal)
+          if ($expected.Count -ne $actual.Count) { throw 'Shard result count does not match discovery' }
+          for ($i = 0; $i -lt $expected.Count; $i++) {
+            if (-not [StringComparer]::Ordinal.Equals($expected[$i], $actual[$i])) {
+              throw "Shard result identity mismatch at index $i"
+            }
+          }
+          $passed = @($results | Where-Object { $_.GetAttribute('outcome') -eq 'Passed' }).Count
+          $failed = @($results | Where-Object { $_.GetAttribute('outcome') -eq 'Failed' }).Count
+          $skipped = @($results | Where-Object { $_.GetAttribute('outcome') -eq 'NotExecuted' }).Count
+          $summary = $trx.SelectSingleNode("/*[local-name()='TestRun']/*[local-name()='ResultSummary']")
+          $counters = $summary.SelectSingleNode("*[local-name()='Counters']")
+          if ($summary.GetAttribute('outcome') -ne 'Completed' -or $failed -ne 0 -or
+              ($passed + $failed + $skipped) -ne $actual.Count -or
+              [int]$counters.GetAttribute('total') -ne $actual.Count -or
+              [int]$counters.GetAttribute('executed') -ne ($passed + $failed) -or
+              [int]$counters.GetAttribute('passed') -ne $passed -or
+              [int]$counters.GetAttribute('failed') -ne $failed -or
+              [int]$counters.GetAttribute('notExecuted') -ne $skipped) {
+            throw 'Failed, incomplete or inconsistent shard results'
+          }
+          $report = [ordered]@{ shard=$env:SHARD; expected=$expected.Count; results=$actual.Count; executed=($passed + $failed); passed=$passed; failed=$failed; skipped=$skipped; multisetEqual=$true }
+          $report | ConvertTo-Json | Tee-Object -FilePath (Join-Path $env:RESULTS_DIR 'result-completeness.json')
+          $results | Where-Object { $_.GetAttribute('outcome') -eq 'NotExecuted' } | ForEach-Object { "SKIPPED: $($_.GetAttribute('testName'))" }
+      - name: Upload application shard results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: backend-application-${{ matrix.shard }}-results
+          path: AqualLifeStyle/9.4.2/aspnet-core/TestResults/${{ matrix.shard }}
+          if-no-files-found: error
+          retention-days: 7
+
+  backend-web-discovery:
+    name: Backend web coverage partition
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: AqualLifeStyle/9.4.2/aspnet-core
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj -p:Configuration=Release
+      - name: Build
+        run: dotnet build test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --no-restore
+      - name: Prove complete web coverage partition
+        run: |
+          set -euo pipefail
+          export LC_ALL=C
+          mkdir -p TestResults/partition
+          discover() {
+            local shard="$1"
+            shift
+            dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj \
+              --configuration Release --no-build --list-tests "$@" \
+              2>&1 | tee "TestResults/partition/${shard}-discovery.txt"
+            awk '
+              /^The following Tests are available:\r?$/ { found=1; next }
+              found && /^    / { sub(/^    /, ""); sub(/\r$/, ""); print }
+            ' "TestResults/partition/${shard}-discovery.txt" \
+              | sort > "TestResults/partition/${shard}-names.txt"
+            test -s "TestResults/partition/${shard}-names.txt"
+          }
+          discover all
+          discover placement --filter 'FullyQualifiedName~AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests'
+          discover controllers --filter 'FullyQualifiedName~AqualLifeStyle.Web.Tests.Controllers.'
+          discover remainder --filter 'FullyQualifiedName!~AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests&FullyQualifiedName!~AqualLifeStyle.Web.Tests.Controllers.'
+          cat TestResults/partition/{placement,controllers,remainder}-names.txt \
+            | sort > TestResults/partition/union-names.txt
+          diff -u TestResults/partition/{all,union}-names.txt \
+            | tee TestResults/partition/multiset-diff.txt
+          for shard in all placement controllers remainder; do
+            printf '%s: %s\n' "$shard" "$(wc -l < "TestResults/partition/${shard}-names.txt")"
+          done | tee TestResults/partition/counts.txt
+          printf 'PASS: full inventory equals shard union as multisets.\n' \
+            | tee TestResults/partition/coverage-result.txt
+      - name: Upload web coverage partition
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: backend-web-coverage-partition
+          path: AqualLifeStyle/9.4.2/aspnet-core/TestResults/partition
+          if-no-files-found: error
+          retention-days: 7
+
+  backend-web-tests:
+    name: Backend web tests (${{ matrix.shard }})
+    needs: backend-web-discovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: placement
+            filter: FullyQualifiedName~AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests
+          - shard: controllers
+            filter: FullyQualifiedName~AqualLifeStyle.Web.Tests.Controllers.
+          - shard: remainder
+            filter: FullyQualifiedName!~AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests&FullyQualifiedName!~AqualLifeStyle.Web.Tests.Controllers.
+    defaults:
+      run:
+        working-directory: AqualLifeStyle/9.4.2/aspnet-core
+    env:
+      SHARD: ${{ matrix.shard }}
+      TEST_FILTER: ${{ matrix.filter }}
+      RESULTS_DIR: TestResults/${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/download-artifact@v7
+        with:
+          name: backend-web-coverage-partition
+          path: AqualLifeStyle/9.4.2/aspnet-core/TestResults/partition
+      - name: Restore
+        run: dotnet restore test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj -p:Configuration=Release
+      - name: Build
+        run: dotnet build test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --no-restore
+      - name: Verify local shard discovery
+        run: |
+          set -euo pipefail
+          export LC_ALL=C
+          mkdir -p "$RESULTS_DIR"
+          dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj \
+            --configuration Release --no-build --list-tests --filter "$TEST_FILTER" \
+            2>&1 | tee "$RESULTS_DIR/discovered-tests.txt"
+          awk '
+            /^The following Tests are available:\r?$/ { found=1; next }
+            found && /^    / { sub(/^    /, ""); sub(/\r$/, ""); print }
+          ' "$RESULTS_DIR/discovered-tests.txt" | sort > "$RESULTS_DIR/expected-names.txt"
+          test -s "$RESULTS_DIR/expected-names.txt"
+          diff -u "TestResults/partition/${SHARD}-names.txt" "$RESULTS_DIR/expected-names.txt" \
+            | tee "$RESULTS_DIR/discovery-diff.txt"
+      - name: Test complete web shard
+        run: |
+          set -euo pipefail
+          dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj \
+            --configuration Release --no-build --filter "$TEST_FILTER" \
+            --logger "trx;LogFileName=${SHARD}-tests.trx" \
+            --logger "console;verbosity=detailed" \
+            --results-directory "$RESULTS_DIR" \
+            --diag "$RESULTS_DIR/vstest-diag.log" \
+            --blame-hang \
+            --blame-hang-timeout 5m \
+            --blame-hang-dump-type none \
+            2>&1 | tee "$RESULTS_DIR/web-console.log"
+      - name: Verify complete shard results
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $expected = [string[]][System.IO.File]::ReadAllLines((Join-Path $env:RESULTS_DIR 'expected-names.txt'))
+          if ($expected.Count -eq 0) { throw 'Empty shard inventory' }
+          $settings = [System.Xml.XmlReaderSettings]::new()
+          $settings.DtdProcessing = [System.Xml.DtdProcessing]::Prohibit
+          $reader = [System.Xml.XmlReader]::Create((Join-Path $env:RESULTS_DIR "$($env:SHARD)-tests.trx"), $settings)
+          $trx = [System.Xml.XmlDocument]::new()
+          try { $trx.Load($reader) } finally { $reader.Dispose() }
+          $results = @($trx.SelectNodes("/*[local-name()='TestRun']/*[local-name()='Results']/*[local-name()='UnitTestResult']"))
+          $actual = [string[]]@($results | ForEach-Object { $_.GetAttribute('testName') })
+          [Array]::Sort($expected, [StringComparer]::Ordinal)
+          [Array]::Sort($actual, [StringComparer]::Ordinal)
+          if ($expected.Count -ne $actual.Count) { throw 'Shard result count does not match discovery' }
+          for ($i = 0; $i -lt $expected.Count; $i++) {
+            if (-not [StringComparer]::Ordinal.Equals($expected[$i], $actual[$i])) {
+              throw "Shard result identity mismatch at index $i"
+            }
+          }
+          $passed = @($results | Where-Object { $_.GetAttribute('outcome') -eq 'Passed' }).Count
+          $failed = @($results | Where-Object { $_.GetAttribute('outcome') -eq 'Failed' }).Count
+          $skipped = @($results | Where-Object { $_.GetAttribute('outcome') -eq 'NotExecuted' }).Count
+          $summary = $trx.SelectSingleNode("/*[local-name()='TestRun']/*[local-name()='ResultSummary']")
+          $counters = $summary.SelectSingleNode("*[local-name()='Counters']")
+          # VSTest/xUnit TRX can leave notExecuted=0 for explicit skipped records.
+          # Require the complete per-case multiset and total/executed gap instead;
+          # accept only zero or the exact skip count in that redundant counter.
+          if ($summary.GetAttribute('outcome') -ne 'Completed' -or $failed -ne 0 -or
+              ($passed + $failed + $skipped) -ne $actual.Count -or
+              [int]$counters.GetAttribute('total') -ne $actual.Count -or
+              [int]$counters.GetAttribute('executed') -ne ($passed + $failed) -or
+              [int]$counters.GetAttribute('passed') -ne $passed -or
+              [int]$counters.GetAttribute('failed') -ne $failed -or
+              ([int]$counters.GetAttribute('total') - [int]$counters.GetAttribute('executed')) -ne $skipped -or
+              ([int]$counters.GetAttribute('notExecuted') -ne 0 -and
+               [int]$counters.GetAttribute('notExecuted') -ne $skipped)) {
+            throw 'Failed, incomplete or inconsistent shard results'
+          }
+          $report = [ordered]@{ shard=$env:SHARD; expected=$expected.Count; results=$actual.Count; executed=($passed + $failed); passed=$passed; failed=$failed; skipped=$skipped; multisetEqual=$true }
+          $report | ConvertTo-Json | Tee-Object -FilePath (Join-Path $env:RESULTS_DIR 'result-completeness.json')
+          $results | Where-Object { $_.GetAttribute('outcome') -eq 'NotExecuted' } | ForEach-Object { "SKIPPED: $($_.GetAttribute('testName'))" }
+      - name: Upload web shard results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: backend-web-${{ matrix.shard }}-results
+          path: AqualLifeStyle/9.4.2/aspnet-core/TestResults/${{ matrix.shard }}
+          if-no-files-found: error
           retention-days: 7
 
   frontend:
@@ -81,7 +408,7 @@ jobs:
     name: Validate container images
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: [backend, frontend]
+    needs: [backend-application-discovery, backend-application-tests, backend-web-discovery, backend-web-tests, frontend]
     steps:
       - uses: actions/checkout@v6
       - uses: docker/setup-buildx-action@v3

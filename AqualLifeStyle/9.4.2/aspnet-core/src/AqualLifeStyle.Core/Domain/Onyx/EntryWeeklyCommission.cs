@@ -16,6 +16,7 @@ namespace AqualLifeStyle.Domain.Onyx
         public Guid CommissionPeriodId { get; private set; }
         public AQGreenCommissionStructuralModel StructuralModel { get; private set; }
         public string CommissionDecisionRulesVersion { get; private set; }
+        public bool IsTestMoney { get; private set; }
         // Retained column/property name for compatibility. This stores the
         // structural network level proven at the commission-period cutoff.
         public int HighestCompletedLevel { get; private set; }
@@ -38,6 +39,19 @@ namespace AqualLifeStyle.Domain.Onyx
 
         protected EntryWeeklyCommission()
         {
+        }
+
+        public void MarkAsTestMoney()
+        {
+            if (ReleasedAt.HasValue || PaidAt.HasValue)
+                throw new InvalidOperationException("A released or paid ledger cannot become test money.");
+            IsTestMoney = true;
+        }
+
+        private void EnsureRealMoney()
+        {
+            if (IsTestMoney)
+                throw new InvalidOperationException("TEST-MONEY pilot ledgers cannot be released or paid.");
         }
 
         private EntryWeeklyCommission(
@@ -210,6 +224,7 @@ namespace AqualLifeStyle.Domain.Onyx
 
         public void ReleaseEligiblePayout(DateTime releasedAt)
         {
+            EnsureRealMoney();
             if (PayoutStatus == WeeklyCommissionPayoutStatus.Released ||
                 PayoutStatus == WeeklyCommissionPayoutStatus.Paid)
             {
@@ -230,6 +245,7 @@ namespace AqualLifeStyle.Domain.Onyx
             DateTime releasedAt,
             string reason)
         {
+            EnsureRealMoney();
             if (string.IsNullOrWhiteSpace(reason))
             {
                 throw new ArgumentException("A release reason is required.", nameof(reason));
@@ -254,6 +270,7 @@ namespace AqualLifeStyle.Domain.Onyx
 
         public void MarkPaid(DateTime paidAt, string paymentReference)
         {
+            EnsureRealMoney();
             if (paidAt == default)
             {
                 throw new ArgumentException(

@@ -193,6 +193,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         public async Task ReleaseAsync(ReleaseWeeklyEarningInput input)
         {
             EnsureNoDemoPayoutMutation();
+            PilotMode.DenyOutsidePilot("Commission release");
             ValidateMutationInput(
                 input?.Id ?? Guid.Empty,
                 input?.Justification,
@@ -265,6 +266,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             RecordWeeklyEarningPaymentInput input)
         {
             EnsureNoDemoPayoutMutation();
+            PilotMode.DenyOutsidePilot("Commission payment");
             ValidateMutationInput(
                 input?.Id ?? Guid.Empty,
                 input?.Justification,
@@ -453,6 +455,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 CustomerName = customer.Name,
                 Email = customer.User.EmailAddress,
                 ProgrammeName = "AQGreen",
+                IsTestMoney = commission.IsTestMoney,
                 PeriodStart = period.PeriodStart,
                 PeriodEnd = period.PeriodEnd,
                 TimeZoneId = period.TimeZoneId,
@@ -463,8 +466,9 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     commission.CommissionDecisionRulesVersion,
                 TotalAmount = commission.TotalAmount,
                 Currency = commission.Currency,
-                Status = CommissionPayoutStatusPresenter.ToBusinessLabel(
-                    commission.PayoutStatus),
+                Status = commission.IsTestMoney
+                    ? "Test money — " + commission.PayoutStatus + " — no payout"
+                    : CommissionPayoutStatusPresenter.ToBusinessLabel(commission.PayoutStatus),
                 HoldReason = commission.HoldReason,
                 ReleasedAt = commission.ReleasedAt,
                 ReleaseReason = commission.ReleaseReason,

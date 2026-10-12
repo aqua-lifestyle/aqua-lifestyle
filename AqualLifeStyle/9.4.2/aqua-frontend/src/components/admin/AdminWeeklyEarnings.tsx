@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAuthState } from "@/src/providers";
 import { isAQGreenV2DemoCheckout, type SystemHealth } from "@/src/providers/SystemHealth/contract";
+import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import {
@@ -88,13 +89,15 @@ const formatPeriodDate = (value: string) =>
   }).format(new Date(value));
 
 export const AdminWeeklyEarnings = () => {
+  const { isPilot, modeKnown } = usePilotStatus();
   const { session } = useAuthState();
   const permissions = session?.user?.permissions ?? [];
   const canView = permissions.includes(VIEW_PERMISSION);
   const canCalculate = permissions.includes(CALCULATE_PERMISSION);
   const [demoMode, setDemoMode] = useState<boolean | null>(null);
-  const canRelease = demoMode === false && permissions.includes(RELEASE_PERMISSION);
-  const canRecordPayment = demoMode === false && permissions.includes(RECORD_PAYMENT_PERMISSION);
+  const testMoneyMode = demoMode === true || isPilot;
+  const canRelease = modeKnown && !isPilot && demoMode === false && permissions.includes(RELEASE_PERMISSION);
+  const canRecordPayment = modeKnown && !isPilot && demoMode === false && permissions.includes(RECORD_PAYMENT_PERMISSION);
   const [programme, setProgramme] = useState<Programme>("entry");
   const [selectedTenantId, setSelectedTenantId] = useState("");
   const [earnings, setEarnings] = useState<WeeklyEarning[]>([]);
@@ -165,7 +168,7 @@ export const AdminWeeklyEarnings = () => {
       setCalculationNotice(
         result.wasAlreadyCalculated
           ? `${result.programmeName} earnings for ${period} were already prepared. No records were duplicated.`
-          : `${result.programmeName} earnings for ${period} were prepared for ${result.recordsCreated} Club Members. ${result.earnedCount} ${demoMode ? "had test commissions calculated" : "earned"} ${formatCurrency(result.totalEarnedAmount, result.currency)} in total${result.heldCount > 0 ? `; ${result.heldCount} are on hold` : ""}.`,
+          : `${result.programmeName} earnings for ${period} were prepared for ${result.recordsCreated} Club Members. ${result.earnedCount} ${demoMode || isPilot ? "had test commissions calculated" : "earned"} ${formatCurrency(result.totalEarnedAmount, result.currency)} in total${result.heldCount > 0 ? `; ${result.heldCount} are on hold` : ""}.`,
       );
       await loadEarnings();
     } catch (requestError) {
@@ -295,7 +298,7 @@ export const AdminWeeklyEarnings = () => {
                   : "neutral"
             }
           >
-            {demoMode && item.status === "Earned — awaiting release"
+            {testMoneyMode && item.status === "Earned — awaiting release"
               ? "Test calculation — no payout"
               : item.status}
           </Badge>
@@ -425,7 +428,7 @@ export const AdminWeeklyEarnings = () => {
             <p className="mt-2 wrap-anywhere text-2xl font-bold">{loading ? "Loading…" : loadFailed ? "Unavailable" : earnings.length}</p>
           </Card>
           <Card>
-            <p className="text-sm text-muted-foreground">{demoMode ? "Calculated test commission" : "Calculated earnings"}</p>
+            <p className="text-sm text-muted-foreground">{testMoneyMode ? "Calculated test commission" : "Calculated earnings"}</p>
             <p className="mt-2 wrap-anywhere text-2xl font-bold tabular-nums">
               {loading ? "Loading…" : loadFailed ? "Unavailable" : formatCurrency(totalEarned, currency)}
             </p>
@@ -446,7 +449,7 @@ export const AdminWeeklyEarnings = () => {
           }}
           tabs={[
             { content: table, id: "entry", label: "AQGreen" },
-            { content: table, id: "onyx", label: "Onyx" },
+            ...(!isPilot ? [{ content: table, id: "onyx", label: "Onyx" }] : []),
           ]}
           value={programme}
         />

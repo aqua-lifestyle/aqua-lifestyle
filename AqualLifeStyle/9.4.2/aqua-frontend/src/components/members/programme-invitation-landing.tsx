@@ -8,12 +8,13 @@ import {
   useSystemHealthActions,
   useSystemHealthState,
 } from "@/src/providers";
-import { isAQGreenV2DemoCheckout, isPaymentApiCompatible } from "@/src/providers/SystemHealth/contract";
+import { isAQGreenV2DemoCheckout, isPaymentApiCompatible, isPilotAQGreenJoiningApiCompatible } from "@/src/providers/SystemHealth/contract";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import type { ProgrammeInvitationPreview } from "@/src/shared/domain/programme-invitations";
 import type { ProgrammeCheckout } from "@/src/shared/domain/programme-participations";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
+import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
 import { Button, Card, LinkButton, Skeleton, StatusMessage } from "@/src/shared/ui";
 
 const unsupportedProgrammeMessage =
@@ -44,6 +45,7 @@ const getProgrammePaymentExplanation = (programmeKey: string, demo: boolean) => 
 };
 
 export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string }) => {
+  const { isPilot, modeKnown } = usePilotStatus();
   const { session } = useAuthState();
   const healthActions = useSystemHealthActions();
   const healthState = useSystemHealthState();
@@ -53,10 +55,12 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string>();
   const [aqGreenSchedule, setAQGreenSchedule] = useState<0 | 1>(0);
-  const paymentApiCompatible = isPaymentApiCompatible(healthState.health);
   const demoCheckout = isAQGreenV2DemoCheckout(healthState.health);
+  const paymentApiCompatible = isPilot
+    ? isPilotAQGreenJoiningApiCompatible(healthState.health)
+    : isPaymentApiCompatible(healthState.health);
   const paymentActionsUnavailable =
-    healthState.isPending || !paymentApiCompatible;
+    !modeKnown || healthState.isPending || !paymentApiCompatible || (isPilot && preview?.programmeKey !== "AQGREEN");
 
   useEffect(() => {
     if (
@@ -110,7 +114,8 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
           apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
           { schedule: aqGreenSchedule },
         );
-        navigateToExternalUrl(checkout.checkoutUrl);
+        if (isPilot) window.location.assign("/member/programmes");
+        else navigateToExternalUrl(checkout.checkoutUrl);
       }
     } catch (requestError) {
       setError(

@@ -1666,6 +1666,42 @@ namespace AqualLifeStyle.Migrations
                         });
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenProspectiveRootAdmission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AdministratorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("AuthorizedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ParticipantId")
+                        .IsUnique();
+
+                    b.ToTable("AQGreenProspectiveRootAdmissions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AQGRootAdmission_Actor", "\"AdministratorUserId\" > 0");
+
+                            t.HasCheckConstraint("CK_AQGRootAdmission_Reason", "length(trim(\"Reason\")) > 0");
+                        });
+                });
+
             modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenRecruitmentAttribution", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3048,12 +3084,12 @@ namespace AqualLifeStyle.Migrations
                     b.Property<int>("QualifyingDepth3Count")
                         .HasColumnType("integer");
 
+                    b.Property<int>("SalesApplicability")
+                        .HasColumnType("integer");
+
                     b.Property<string>("SalesEligibilityRulesVersion")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
-
-                    b.Property<int>("SalesApplicability")
-                        .HasColumnType("integer");
 
                     b.Property<int?>("SalesReviewStatus")
                         .HasColumnType("integer");
@@ -3674,6 +3710,9 @@ namespace AqualLifeStyle.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsTestMoney")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime?>("LastModificationTime")
                         .HasColumnType("timestamp with time zone");
 
@@ -3705,7 +3744,6 @@ namespace AqualLifeStyle.Migrations
                     b.Property<int>("StructuralModel")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasSentinel(1)
                         .HasDefaultValue(1);
 
                     b.Property<int>("TenantId")
@@ -3731,6 +3769,8 @@ namespace AqualLifeStyle.Migrations
                             t.HasCheckConstraint("CK_EntryWeeklyCommissions_DecisionVersion_Shape", "(\"StructuralModel\" = 1 AND \"CommissionDecisionRulesVersion\" IS NULL) OR (\"StructuralModel\" = 2 AND \"CommissionDecisionRulesVersion\" IS NOT NULL AND \"CommissionDecisionRulesVersion\" = 'AQGreenWeeklyCommissionDecisionV1')");
 
                             t.HasCheckConstraint("CK_EntryWeeklyCommissions_StructuralModel_Range", "\"StructuralModel\" IN (1, 2)");
+
+                            t.HasCheckConstraint("CK_EntryWeeklyCommissions_TestMoney_NoPayout", "NOT \"IsTestMoney\" OR (\"PayoutStatus\" IN (0, 1, 2) AND \"ReleasedAt\" IS NULL AND \"PaidAt\" IS NULL)");
                         });
                 });
 
@@ -5654,6 +5694,16 @@ namespace AqualLifeStyle.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenProspectiveRootAdmission", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.EntryParticipation", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ParticipantId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenRecruitmentAttribution", b =>
                 {
                     b.HasOne("AqualLifeStyle.Domain.Onyx.EntryParticipation", null)
@@ -5935,8 +5985,7 @@ namespace AqualLifeStyle.Migrations
                         .WithMany()
                         .HasForeignKey("TenantId", "WeeklySalesEligibilityDecisionId")
                         .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("AqualLifeStyle.Domain.Onyx.AQGreenV2WeeklyCommissionEvidenceNode", b =>

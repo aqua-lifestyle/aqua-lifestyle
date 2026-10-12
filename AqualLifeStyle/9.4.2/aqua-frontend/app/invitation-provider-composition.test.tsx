@@ -65,7 +65,8 @@ describe("invitation provider composition", () => {
     vi.clearAllMocks();
     localStorage.clear();
     vi.mocked(httpClient.get).mockImplementation(async (url) =>
-      url === apiEndpoints.health.get ? health : preview,
+      url === "/api/services/app/AQGreenPilot/GetStatus" ? { isPilot: false, testMoneyOnly: false } :
+        url === apiEndpoints.health.get ? health : preview,
     );
   });
 

@@ -32,6 +32,8 @@ namespace AqualLifeStyle.Web.Tests
 
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
+            if (Environment.GetEnvironmentVariable("REPRO_PILOT") == "true")
+                services.AddSingleton<IConfiguration>(_appConfiguration);
             services.AddEntityFrameworkSqlite();
 
             services.AddMvc();
@@ -41,7 +43,14 @@ namespace AqualLifeStyle.Web.Tests
             AuthConfigurer.Configure(services, _appConfiguration);
             
             services.AddScoped<IWebResourceManager, WebResourceManager>();
-            services.AddHttpClient<IYocoCheckoutGateway, YocoCheckoutGateway>();
+            if (Environment.GetEnvironmentVariable("REPRO_PILOT") == "true")
+            {
+                services.AddTransient<IYocoCheckoutGateway, AqualLifeStyle.Web.Host.AQGreenV2Pilot.PilotCheckoutGateway>();
+                services.Configure<AqualLifeStyle.Web.Host.Email.BirdOptions>(_appConfiguration.GetSection("Bird"));
+                services.AddHttpClient<AqualLifeStyle.Email.ITransactionalEmailDeliveryGateway,
+                    AqualLifeStyle.Web.Host.Email.BirdTransactionalEmailDeliveryGateway>();
+            }
+            else services.AddHttpClient<IYocoCheckoutGateway, YocoCheckoutGateway>();
 
             //Configure Abp and Dependency Injection
             return services.AddAbp<AqualLifeStyleWebTestModule>(options =>

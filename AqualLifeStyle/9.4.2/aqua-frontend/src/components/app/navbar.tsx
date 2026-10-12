@@ -26,6 +26,8 @@ import { useState } from "react";
 import { cn } from "@/src/shared/lib/utils";
 
 import { useAuthState } from "@/src/providers";
+import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
+import { isPilotRoute } from "@/src/shared/lib/pilot-routes";
 import { isAreaLeader, isFacilitator, isSystemAdmin } from "@/src/shared/auth/roles";
 import { TenantSwitcher } from "./tenant-switcher";
 import { UserMenu } from "./user-menu";
@@ -63,6 +65,7 @@ const publicLinks = [
 ];
 
 export const Navbar = () => {
+  const { isPilot } = usePilotStatus();
   const pathname = usePathname();
   const isLanding = pathname === "/";
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -198,7 +201,7 @@ export const Navbar = () => {
             )}
           >
             {isAuthenticated
-              ? primaryLinks.filter((link) => hasPermission(link.permission)).map((link) => (
+              ? primaryLinks.filter((link) => hasPermission(link.permission) && (!isPilot || isPilotRoute(link.href))).map((link) => (
                   <Link
                     key={link.href}
                     className={cn(
@@ -260,7 +263,7 @@ export const Navbar = () => {
                 {isMoreOpen ? (
                   <div className="absolute left-0 top-full z-50 mt-2 w-44 rounded-xl border border-border bg-card p-1 shadow-lg animate-fade-in">
                     {contextualMoreLinks
-                      .filter((link) => hasPermission(link.permission))
+                      .filter((link) => hasPermission(link.permission) && (!isPilot || isPilotRoute(link.href)))
                       .map((link) => (
                         <Link
                           key={link.href}
@@ -339,7 +342,7 @@ export const Navbar = () => {
           <nav aria-label="Mobile navigation" className="flex flex-col gap-1">
             {isAuthenticated
               ? [...primaryLinks, ...contextualMoreLinks]
-                  .filter((link) => hasPermission(link.permission))
+                  .filter((link) => hasPermission(link.permission) && (!isPilot || isPilotRoute(link.href)))
                   .map((link) => (
                     <Link
                       key={link.href}

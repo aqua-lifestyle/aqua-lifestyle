@@ -10,6 +10,7 @@ import {
 import {
   isAQGreenV2DemoCheckout,
   isPaymentApiCompatible,
+  isPilotAQGreenJoiningApiCompatible,
   isProgrammeJourneyApiCompatible,
 } from "@/src/providers/SystemHealth/contract";
 import {
@@ -21,6 +22,7 @@ import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 import { useMyProgrammeJourney } from "@/src/shared/hooks/use-my-programme-journey";
 import { useMyProgrammeParticipations } from "@/src/shared/hooks/use-my-programme-participations";
+import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
 import {
   Breadcrumb,
   Button,
@@ -39,6 +41,7 @@ const formatCurrency = (amount: number, currency: string) =>
   }).format(amount);
 
 export const MemberProgrammes = () => {
+  const { isPilot, modeKnown } = usePilotStatus();
   const { session } = useAuthState();
   const healthActions = useSystemHealthActions();
   const healthState = useSystemHealthState();
@@ -48,6 +51,7 @@ export const MemberProgrammes = () => {
     data: participations,
     errorMessage: loadError,
     isLoading: loading,
+    reload: reloadParticipations,
   } = useMyProgrammeParticipations(canView);
   const journeyApiCompatible = isProgrammeJourneyApiCompatible(healthState.health);
   const isJourneyContractResolved = healthState.isSuccess || healthState.isError;
@@ -56,7 +60,8 @@ export const MemberProgrammes = () => {
     errorMessage: journeyError,
     isLoading: journeyLoading,
   } = useMyProgrammeJourney(
-    canView && isJourneyContractResolved && journeyApiCompatible,
+    canView && modeKnown && isJourneyContractResolved && journeyApiCompatible,
+    isPilot,
   );
   const [actionError, setActionError] = useState<string>();
   const [success, setSuccess] = useState<string>();
@@ -72,10 +77,12 @@ export const MemberProgrammes = () => {
     session?.user?.permissions?.includes(
       "Aqua.ProgrammeParticipations.Invite",
     ) ?? false;
-  const paymentApiCompatible = isPaymentApiCompatible(healthState.health);
   const demoCheckout = isAQGreenV2DemoCheckout(healthState.health);
+  const paymentApiCompatible = isPilot
+    ? isPilotAQGreenJoiningApiCompatible(healthState.health)
+    : isPaymentApiCompatible(healthState.health);
   const paymentActionsUnavailable =
-    !isJourneyContractResolved || healthState.isPending || !paymentApiCompatible;
+    !modeKnown || !isJourneyContractResolved || healthState.isPending || !paymentApiCompatible;
   const entryCanAcceptJoiningPayment = [
     "AwaitingJoiningPayment",
     "AwaitingActivationPayment",
@@ -159,13 +166,14 @@ export const MemberProgrammes = () => {
     setActionError(undefined);
     try {
       const checkout = await httpClient.post<
-        { checkoutUrl: string },
+        { checkoutUrl: string; checkoutId: string },
         { schedule: 0 | 1 }
       >(
         apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
         { schedule },
       );
-      navigateToExternalUrl(checkout.checkoutUrl);
+      if (isPilot) await reloadParticipations();
+      else navigateToExternalUrl(checkout.checkoutUrl);
     } catch (requestError) {
       setActionError(
         getRequestErrorMessage(
@@ -178,11 +186,31 @@ export const MemberProgrammes = () => {
     }
   };
 
+  const confirmTestPayment = async (checkoutId?: string) => {
+    if (!isPilot || !checkoutId || paymentActionsUnavailable) return;
+    setStartingAQGreenPayment(true);
+    setActionError(undefined);
+    try {
+      await httpClient.post("/api/services/app/AQGreenPilot/ConfirmTestPayment", { checkoutId });
+      setSuccess("Test joining payment verified. Area approval is still required for activation.");
+      await reloadParticipations();
+      window.location.reload();
+    } catch (error) {
+      setActionError(getRequestErrorMessage(error, "Test payment could not be verified."));
+    } finally { setStartingAQGreenPayment(false); }
+  };
+
   const aqGreenPaymentAction = journeyAcceptsAQGreenPayment &&
     participations?.entry &&
     entryCanAcceptJoiningPayment ? (
       participations.pendingAQGreenCheckout ? (
-        paymentActionsUnavailable ? (
+        isPilot ? (
+          <Button disabled={paymentActionsUnavailable || !participations.pendingAQGreenCheckout.checkoutId}
+            isLoading={startingAQGreenPayment}
+            onClick={() => void confirmTestPayment(participations.pendingAQGreenCheckout?.checkoutId)}>
+            Confirm test joining payment
+          </Button>
+        ) : paymentActionsUnavailable ? (
           <Button className="w-full" disabled>{demoCheckout ? "Continue test checkout" : "Continue secure payment"}</Button>
         ) : (
           <a
@@ -232,9 +260,11 @@ export const MemberProgrammes = () => {
       )
     ) : undefined;
 
-  const aqGreenJoinAction = !participations?.entry && demoCheckout ? (
+  const aqGreenJoinAction = !participations?.entry && (isPilot || demoCheckout) ? (
     <StatusMessage tone="info">
-      In this test environment, open a valid AQGreen sponsor invitation to begin.
+      {isPilot
+        ? "Open your sponsor’s invitation to join this pilot. Independent admission requires authorized prospective-root administration."
+        : "In this test environment, open a valid AQGreen sponsor invitation to begin."}
     </StatusMessage>
   ) : !participations?.entry ? (
     <JoinProgrammeDialog
@@ -243,7 +273,7 @@ export const MemberProgrammes = () => {
     />
   ) : undefined;
 
-  const onyxJoinAction = participations?.pendingDirectOnyxCheckout ? (
+  const onyxJoinAction = isPilot ? undefined : participations?.pendingDirectOnyxCheckout ? (
     paymentActionsUnavailable ? (
       <Button className="w-full" disabled>Continue secure payment</Button>
     ) : (

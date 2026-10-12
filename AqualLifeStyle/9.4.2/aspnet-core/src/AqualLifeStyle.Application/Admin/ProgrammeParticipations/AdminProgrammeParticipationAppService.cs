@@ -286,6 +286,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         public async Task<OnyxGraduationDecisionDto> GraduateAQGreenToOnyxAsync(
             GraduateAQGreenToOnyxInput input)
         {
+            PilotMode.DenyOutsidePilot("Onyx graduation");
             if (input == null || input.LoanAgreementId == Guid.Empty)
                 throw new Abp.UI.UserFriendlyException(
                     "Onyx graduation failed.",
@@ -709,6 +710,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         public async Task ApproveProgrammeParticipationAsync(
             ApproveProgrammeParticipationInput input)
         {
+            if (input?.Programme != AdminProgrammeType.Entry)
+                PilotMode.DenyOutsidePilot("Non-AQGreen participation approval");
             if (input == null || input.ParticipationId == Guid.Empty)
                 throw Failed("Participation approval", "Select a valid participation awaiting approval.");
             if (!AbpSession.TenantId.HasValue &&
@@ -790,6 +793,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         public async Task RejectProgrammeParticipationAsync(
             RejectProgrammeParticipationInput input)
         {
+            if (PilotMode.IsEnabled && input?.Programme != AdminProgrammeType.Entry)
+                PilotMode.DenyOutsidePilot("Non-AQGreen rejection");
             if (input == null || input.ParticipationId == Guid.Empty)
                 throw Failed("Participation rejection", "Select a valid participation awaiting approval.");
             if (!AbpSession.TenantId.HasValue &&
@@ -1327,6 +1332,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         [UnitOfWork(IsDisabled = true)]
         public async Task CorrectRecruiterAsync(CorrectProgrammeRecruiterInput input)
         {
+            PilotMode.DenyOutsidePilot("Historical sponsor correction");
             if (input == null)
                 throw new Abp.UI.UserFriendlyException(
                     "Network placement correction failed.",

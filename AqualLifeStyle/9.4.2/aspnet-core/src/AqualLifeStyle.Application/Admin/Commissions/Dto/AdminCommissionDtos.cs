@@ -81,6 +81,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions.Dto
 
     public class AdminWeeklyCommissionDto
     {
+        public bool IsTestMoney { get; set; }
         public Guid Id { get; set; }
         public int TenantId { get; set; }
         public int CustomerId { get; set; }

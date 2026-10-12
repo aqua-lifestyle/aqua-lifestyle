@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthState } from "@/src/providers";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { AdminWeeklyEarnings } from "./AdminWeeklyEarnings";
+import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
 
 vi.mock("@/src/providers", () => ({ useAuthState: vi.fn() }));
 vi.mock("@/src/shared/api", async () => {
@@ -308,4 +309,21 @@ describe("AdminWeeklyEarnings", () => {
     ).toBeInTheDocument();
     expect(httpClient.get).not.toHaveBeenCalled();
   });
+
+  it("retains test-money labels and denies payout controls in the pilot", async () => {
+    vi.mocked(usePilotStatus).mockReturnValueOnce({ isPilot: true, modeKnown: true });
+    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: true, modeKnown: true });
+    render(<AdminWeeklyEarnings />);
+    await screen.findByText("Test calculation — no payout");
+    expect(screen.getByText("Calculated test commission")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Release for payment" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Record external payment" })).not.toBeInTheDocument();
+    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: false, modeKnown: true });
+  });
 });
+
+// These existing cases exercise ordinary deployments. Pilot-specific cases use
+// the actual mode boundary separately rather than consuming their domain mock responses.
+vi.mock("@/src/shared/hooks/use-pilot-status", () => ({
+  usePilotStatus: vi.fn(() => ({ isPilot: false, modeKnown: true })),
+}));

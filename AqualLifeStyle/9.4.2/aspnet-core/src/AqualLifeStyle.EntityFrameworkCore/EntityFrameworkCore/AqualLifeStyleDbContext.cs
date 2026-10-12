@@ -58,6 +58,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<AQGreenPlacementTreeScope> AQGreenPlacementTreeScopes { get; set; }
         public virtual DbSet<AQGreenNetworkPlacement> AQGreenNetworkPlacements { get; set; }
         public virtual DbSet<AQGreenRecruitmentAttribution> AQGreenRecruitmentAttributions { get; set; }
+        public virtual DbSet<AQGreenProspectiveRootAdmission> AQGreenProspectiveRootAdmissions { get; set; }
         public virtual DbSet<AQGreenRecruitmentAttributionConfirmation> AQGreenRecruitmentAttributionConfirmations { get; set; }
         public virtual DbSet<AQGreenWeeklySalesEligibilityDecision> AQGreenWeeklySalesEligibilityDecisions { get; set; }
         public virtual DbSet<AQGreenWeeklySalesEvidenceReference> AQGreenWeeklySalesEvidenceReferences { get; set; }
@@ -345,6 +346,9 @@ namespace AqualLifeStyle.EntityFrameworkCore
                     entry.State == EntityState.Modified ||
                     entry.State == EntityState.Deleted) ||
                 ChangeTracker.Entries<AQGreenRecruitmentAttributionConfirmation>().Any(entry =>
+                    entry.State == EntityState.Modified ||
+                    entry.State == EntityState.Deleted) ||
+                ChangeTracker.Entries<AQGreenProspectiveRootAdmission>().Any(entry =>
                     entry.State == EntityState.Modified ||
                     entry.State == EntityState.Deleted))
             {

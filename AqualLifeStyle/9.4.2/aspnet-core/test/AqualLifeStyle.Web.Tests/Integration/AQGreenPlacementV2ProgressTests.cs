@@ -183,7 +183,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
         }
 
         [Fact]
-        public async Task EnabledV2Progress_NonActiveParticipationIsNotMaskedAsLevelZero()
+        public async Task EnabledV2Progress_NonActiveParticipationPreservesPendingJourneyWithoutPlacement()
         {
             var fixture = await SeedMemberAsync(activeParticipation: false);
             var gate = ResolveGate();
@@ -195,11 +195,23 @@ namespace AqualLifeStyle.Web.Tests.Integration
                            cutoff)))
             {
                 LoginAs(fixture.UserId);
-                await Should.ThrowAsync<UserFriendlyException>(() =>
-                    InUnitOfWorkAsync(() =>
+                var progress = await InUnitOfWorkAsync(() =>
                         Resolve<IClubMemberProgrammeProgressAppService>()
-                            .GetMyProgressAsync()));
-                evaluator.GetCallCount(fixture.ParticipantId).ShouldBe(1);
+                            .GetMyProgressAsync());
+                progress.HasEntryParticipation.ShouldBeTrue();
+                progress.QualifiedLevel.ShouldBe(0);
+                progress.StructuralProgress.ShouldBeNull();
+                var journey = await InUnitOfWorkAsync(() =>
+                    Resolve<IClubMemberProgrammeProgressAppService>().GetMyJourneyAsync());
+                var aqgreen = journey.Programmes.Single(item => item.ProgrammeCode == "AQGREEN");
+                aqgreen.IsActive.ShouldBeFalse();
+                aqgreen.ParticipationStatus.ShouldBe("Awaiting joining payment");
+                aqgreen.QualifiedLevel.ShouldBe(0);
+                aqgreen.ActivatedAt.ShouldBeNull();
+                aqgreen.ActivationSteps.Single(item => item.Code == "Active").State.ShouldBe("Upcoming");
+                aqgreen.Levels.ShouldAllBe(item => !item.IsStructurallyComplete);
+                gate.GetCheckCount(fixture.ParticipantId).ShouldBe(0);
+                evaluator.GetCallCount(fixture.ParticipantId).ShouldBe(0);
             }
         }
 

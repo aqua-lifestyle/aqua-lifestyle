@@ -38,6 +38,13 @@ namespace AqualLifeStyle.Web.Tests.Controllers
         }
     }
 
+    // These journeys share authentication state and, in PostgreSQL mode, one
+    // persistent fixture database. Startup repair seeders must not run while
+    // another journey is midway through creating its identity/customer fixture.
+    // Explicit Task.WhenAll operations inside regression bodies stay concurrent.
+    [CollectionDefinition("Authentication web journeys", DisableParallelization = true)]
+    public sealed class AuthenticationWebJourneyCollection { }
+
     [Collection("Authentication web journeys")]
     public sealed class AQGreenSalesReviewAuthorizationPostgreSqlTests : AqualLifeStyleWebTestBase
     {

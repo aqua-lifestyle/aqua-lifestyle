@@ -1,0 +1,792 @@
+{
+  "scope": "Local integration; not owner accepted; no publication or production qualification",
+  "branch": "feature/aqgreen-v2-main-integration",
+  "parents": {
+    "accepted": "2ddaa4977888be7bd91064a500806c0d29c7b5fa",
+    "main": "21a41694163ef09628fd84a9f4e12cb0efe1bb85"
+  },
+  "applicationSourceManifest": {
+    "path": "docs/verification/aqgreen-v2-main-integration-20261012/candidate-application-source.sha256",
+    "sha256": "3bd719f304f1d3d3b423f8c97bbd28b8aa4f1b0a4b1eedb3056b7becb25c2144",
+    "files": 2007
+  },
+  "preservation": {
+    "originalManifest": "a21093f4319ac454a3308ea68a3544b0eddc8d5b51852e84ff1262d3738dd384",
+    "acceptedDerivativeManifest": "5e133be584398b2db14a5c542e27860bd6f02adae0c66c1488ef30e7ee2573e0",
+    "originalArchive": "784836d801cb459f1026e24805fb4c0b52b79e86ad6b4ed0838b0349d4964aa5",
+    "acceptedDerivativeArchive": "0af6babebb839c3e65cf4df4797d59822ba84700829b2f0e96e0cdbd87faf11d",
+    "sourceChecks": 4206,
+    "unchangedGitIdentityRecords": 8,
+    "priorDependencyPatch": "a9c46eb893d01686eb3469b4b6921ee449a65cb4fb4b51c8d8927158a1b7c6ae"
+  },
+  "dependencies": {
+    "node": "24.21.0",
+    "npm": "11.19.0",
+    "next": "16.3.8",
+    "sharp": "0.35.5",
+    "sourceMapJs": "1.2.2",
+    "npmProductionVulnerabilities": 0,
+    "mainPackageAndLockPreserved": true
+  },
+  "backend": {
+    "sdk": "8.0.131",
+    "ef": "8.0.8",
+    "providerRegressionPostgreSql": "15.19",
+    "releaseBuildErrors": 0,
+    "modelDifferences": 0,
+    "discoveredMigrations": 54,
+    "shards": [
+      {
+        "name": "application-administration",
+        "exitCode": 0,
+        "elapsedSeconds": 928.611,
+        "within25MinuteLimit": true,
+        "expected": 63,
+        "actual": 63,
+        "passed": 63,
+        "failed": 0,
+        "skipped": 0,
+        "multisetEqual": true,
+        "trxSha256": "0828a20dd24170cbf93622b6d23e7506066c08022c204873fda7c57295dfc36e",
+        "skippedCases": []
+      },
+      {
+        "name": "application-membership",
+        "exitCode": 0,
+        "elapsedSeconds": 955.592,
+        "within25MinuteLimit": true,
+        "expected": 102,
+        "actual": 102,
+        "passed": 102,
+        "failed": 0,
+        "skipped": 0,
+        "multisetEqual": true,
+        "trxSha256": "28364a0984bf101dff326c6c2ce8c7a9aefe8ca1d4461c8b9255b24affeb0939",
+        "skippedCases": []
+      },
+      {
+        "name": "application-authentication",
+        "exitCode": 0,
+        "elapsedSeconds": 311.894,
+        "within25MinuteLimit": true,
+        "expected": 68,
+        "actual": 68,
+        "passed": 68,
+        "failed": 0,
+        "skipped": 0,
+        "multisetEqual": true,
+        "trxSha256": "2dd004294ce5ab00eb130c9a8828e0fb38f613b7b7465d3de6a7dee37574dea3",
+        "skippedCases": []
+      },
+      {
+        "name": "application-remainder",
+        "exitCode": 0,
+        "elapsedSeconds": 476.701,
+        "within25MinuteLimit": true,
+        "expected": 132,
+        "actual": 132,
+        "passed": 132,
+        "failed": 0,
+        "skipped": 0,
+        "multisetEqual": true,
+        "trxSha256": "a4b73508726853e210a396e502a22308ce890b90a78378af0f278c1a794dc065",
+        "skippedCases": []
+      },
+      {
+        "name": "entity-framework-migrations",
+        "exitCode": 0,
+        "elapsedSeconds": 1180.506,
+        "within25MinuteLimit": true,
+        "expected": 51,
+        "actual": 51,
+        "passed": 51,
+        "failed": 0,
+        "skipped": 0,
+        "multisetEqual": true,
+        "trxSha256": "482a25faae9875ab14999145f42195fa064668f1760c1cdfa98eb163b07a1e6e",
+        "skippedCases": []
+      },
+      {
+        "name": "entity-framework-placement",
+        "exitCode": 0,
+        "elapsedSeconds": 256.054,
+        "within25MinuteLimit": true,
+        "expected": 88,
+        "actual": 88,
+        "passed": 88,
+        "failed": 0,
+        "skipped": 0,
+        "multisetEqual": true,
+        "trxSha256": "1e795375015363eaf8582ca752d6b82d508dfccdf3baf57186a1f6f7801bc8b7",
+        "skippedCases": []
+      },
+      {
+        "name": "entity-framework-remainder",
+        "exitCode": 0,
+        "elapsedSeconds": 356.48,
+        "within25MinuteLimit": true,
+        "expected": 144,
+        "actual": 144,
+        "passed": 144,
+        "failed": 0,
+        "skipped": 0,
+        "multisetEqual": true,
+        "trxSha256": "b537257c14d8b44407a53ec17869655c6169ece9504c917e26b4fbe6dbd83d33",
+        "skippedCases": []
+      },
+      {
+        "name": "remainder",
+        "exitCode": 0,
+        "elapsedSeconds": 900.861,
+        "within25MinuteLimit": true,
+        "expected": 641,
+        "actual": 641,
+        "passed": 641,
+        "failed": 0,
+        "skipped": 0,
+        "multisetEqual": true,
+        "trxSha256": "6d5be385e40adbbbff26a749c84702c5264dcd3cb3d00906ffa11be992f6a62b",
+        "skippedCases": []
+      }
+    ],
+    "passed": 1289,
+    "failed": 0,
+    "skipped": 0,
+    "completeMultiset": true
+  },
+  "web": {
+    "shards": [
+      {
+        "name": "placement",
+        "exitCode": 0,
+        "elapsedSeconds": 502.885,
+        "within15MinuteLimit": true,
+        "expected": 31,
+        "actual": 31,
+        "passed": 31,
+        "failed": 0,
+        "skipped": 0,
+        "multisetEqual": true,
+        "trxSha256": "7500633d1fe0a434a21e4116bf55f565551ecac39661f68006ff604569b55f7f",
+        "skippedCases": []
+      },
+      {
+        "name": "controllers",
+        "exitCode": 0,
+        "elapsedSeconds": 425.293,
+        "within15MinuteLimit": true,
+        "expected": 38,
+        "actual": 38,
+        "passed": 24,
+        "failed": 0,
+        "skipped": 14,
+        "multisetEqual": true,
+        "trxSha256": "c0d47d5b796fdba2c3572efe9753afe31b7a0d5c3796bbdcff7ac7b5e35463e4",
+        "skippedCases": [
+          "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.AreaAuthority_IsLockedUntilTheReviewCommits",
+          "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.CentralReviewer_WithoutBroaderGrant_IsDenied",
+          "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.CentralReviewer_WithoutReviewPermission_IsDenied",
+          "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.CentralReviewer_WithExplicitAllTenants_CanReviewOtherTenant",
+          "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.AreaAdmin_CrossAreaDirectReadsAndWrites_AreDeniedWithoutMutation",
+          "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.RevokedAreaAssignment_DeniesExactRetryWithoutChangingFinalHistory",
+          "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.MissingReviewPermission_WithAreaAssignment_CannotReadOrWrite",
+          "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.ClientSuppliedOverrides_CannotSetThresholdAuditOrCommission",
+          "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.UnauthenticatedDirectApi_IsDenied",
+          "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.AreaAdmin_CrossTenantDirectReadsAndWrites_AreDeniedWithoutMutation",
+          "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.AreaAdmin_HoldAndReject_AreScopedAndIdempotent",
+          "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.ExistingSeededTenantAndHostAdmins_RetainScopedCompatibility",
+          "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.AreaAdmin_ConfirmExactRetryAndScopedReads_PreserveDurableAudit",
+          "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.InactiveArea_DeniesReviewEvenWithUnrevokedAssignment"
+        ]
+      },
+      {
+        "name": "noncontrollers",
+        "exitCode": 0,
+        "elapsedSeconds": 560.342,
+        "within15MinuteLimit": true,
+        "expected": 47,
+        "actual": 47,
+        "passed": 38,
+        "failed": 0,
+        "skipped": 9,
+        "multisetEqual": true,
+        "trxSha256": "e7b4d6a597bd7d3b80f84dee46e14ff2df1f8c467ea44bc53a2fd17962eba45c",
+        "skippedCases": [
+          "AqualLifeStyle.Web.Tests.Integration.AQGreenIsolatedPilotPostgreSqlTests.ConcurrentApprovalsAllocateCanonicalSlotsAndNeverDuplicate",
+          "AqualLifeStyle.Web.Tests.Integration.AQGreenIsolatedPilotPostgreSqlTests.WorkersAndExternalFinancialServicesDenyDirectInvocation",
+          "AqualLifeStyle.Web.Tests.Integration.AQGreenIsolatedPilotPostgreSqlTests.ProspectiveBrowserIdentitiesHaveNoBusinessState",
+          "AqualLifeStyle.Web.Tests.Integration.AQGreenIsolatedPilotPostgreSqlTests.RealProspectiveFlow_PreservesAttribution_PlacesFiveWide_AndProducesTestLedger",
+          "AqualLifeStyle.Web.Tests.Integration.AQGreenIsolatedPilotPostgreSqlTests.UnauthorizedRoot_InviteMissing_AndExcludedServiceCallsFailClosed",
+          "AqualLifeStyle.Web.Tests.Integration.AQGreenIsolatedPilotPostgreSqlTests.FailedRootAdmissionRollsBackAndRetryStartsCleanly",
+          "AqualLifeStyle.Web.Tests.Integration.AQGreenV2ContinuousFreshNetworkE2ETests.LeanMvp_MissingHistoryAndMissingSponsorScope_FailClosedWithoutPartialJoining",
+          "AqualLifeStyle.Web.Tests.Integration.AQGreenIsolatedPilotPostgreSqlTests.ConcurrentProspectiveRootAdmissionIsOneImmutableFact",
+          "AqualLifeStyle.Web.Tests.Integration.AQGreenV2ContinuousFreshNetworkE2ETests.LeanMvp_FirstTimeInvitationJoin_ToUnreleasedLedger_WithoutLoansOrOnyx"
+        ]
+      }
+    ],
+    "passed": 93,
+    "failed": 0,
+    "skipped": 23,
+    "completeMultiset": true,
+    "inactiveProgressCase": {
+      "name": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ProgressTests.EnabledV2Progress_NonActiveParticipationPreservesPendingJourneyWithoutPlacement",
+      "outcome": "Passed",
+      "duration": "00:00:12.8519405"
+    }
+  },
+  "focusedCases": [
+    {
+      "evidence": "six-failures-startup",
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "testName": "AqualLifeStyle.Tests.WebHost.DeploymentConfigurationValidatorTests.Validate_ExactDemoEnvironmentFlagLoopbackHostAndDatabase_AllowsStartup(host: \"LOCALHOST\", port: 5432)",
+          "outcome": "Passed",
+          "duration": "00:00:00.0006726"
+        },
+        {
+          "testName": "AqualLifeStyle.Tests.WebHost.DeploymentConfigurationValidatorTests.Validate_ExactDemoEnvironmentFlagLoopbackHostAndDatabase_AllowsStartup(host: \"localhost\", port: 5432)",
+          "outcome": "Passed",
+          "duration": "00:00:00.0005862"
+        },
+        {
+          "testName": "AqualLifeStyle.Tests.WebHost.DeploymentConfigurationValidatorTests.Validate_ExactDemoEnvironmentFlagLoopbackHostAndDatabase_AllowsStartup(host: \"::1\", port: 5432)",
+          "outcome": "Passed",
+          "duration": "00:00:00.0073148"
+        },
+        {
+          "testName": "AqualLifeStyle.Tests.WebHost.DeploymentConfigurationValidatorTests.Validate_ExactDemoEnvironmentFlagLoopbackHostAndDatabase_AllowsStartup(host: \"127.0.0.1\", port: 55434)",
+          "outcome": "Passed",
+          "duration": "00:00:00.4797611"
+        },
+        {
+          "testName": "AqualLifeStyle.Tests.WebHost.DeploymentConfigurationValidatorTests.Validate_ExactDemoEnvironmentFlagLoopbackHostAndDatabase_AllowsStartup(host: \"0:0:0:0:0:0:0:1\", port: 5432)",
+          "outcome": "Passed",
+          "duration": "00:00:00.0006962"
+        }
+      ]
+    },
+    {
+      "evidence": "boundaries-pg-qualified",
+      "passed": 52,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.AreaAdmin_HoldAndReject_AreScopedAndIdempotent",
+          "outcome": "Passed",
+          "duration": "00:00:11.2339438"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_CommitsPlacementActivationDecisionRoleAndOutbox_AndRetryIsExact",
+          "outcome": "Passed",
+          "duration": "00:00:09.1204078"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_TenantAdministratorCannotBootstrapAuthorisedRoot",
+          "outcome": "Passed",
+          "duration": "00:00:05.8525881"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_DatabaseCancellationReleasesUserSessionLock",
+          "outcome": "Passed",
+          "duration": "00:00:06.4571468"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_AuthorisedProspectiveRootCommitsExactRootAndRetryIsExact",
+          "outcome": "Passed",
+          "duration": "00:00:10.5738282"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.ClientSuppliedOverrides_CannotSetThresholdAuditOrCommission",
+          "outcome": "Passed",
+          "duration": "00:00:08.9617491"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_StabilizesAuthorityRowsUntilCommit(authorityFact: \"customer\")",
+          "outcome": "Passed",
+          "duration": "00:00:07.9451348"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_StabilizesAuthorityRowsUntilCommit(authorityFact: \"area\")",
+          "outcome": "Passed",
+          "duration": "00:00:08.7587339"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_ActiveWithPlacementOutsideSponsorSubtreeFailsIntegrity",
+          "outcome": "Passed",
+          "duration": "00:00:13.4321835"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_ApproveRejectRaceCommitsExactlyOneOutcome",
+          "outcome": "Passed",
+          "duration": "00:00:09.7859088"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.UnauthenticatedDirectApi_IsDenied",
+          "outcome": "Passed",
+          "duration": "00:00:08.3337230"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.WeeklyCommissionPostgreSqlApplicationPathTests.PostgreSqlApplicationPath_RollsBackThenRetriesIdempotently",
+          "outcome": "Passed",
+          "duration": "00:00:11.7505127"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_FailureAfterAllocationRollsBackEveryEffect(table: \"TransactionalEmailOutboxMessages\", operation: \"INSERT\")",
+          "outcome": "Passed",
+          "duration": "00:00:07.4088172"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.ApprovalUserSessionLock_ReleasesAfterPreTransactionFailure",
+          "outcome": "Passed",
+          "duration": "00:00:08.3962920"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_HostWithoutDedicatedBootstrapPermissionCannotBootstrapAuthorisedRoot",
+          "outcome": "Passed",
+          "duration": "00:00:07.8975153"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.CentralReviewer_WithExplicitAllTenants_CanReviewOtherTenant",
+          "outcome": "Passed",
+          "duration": "00:00:09.5905561"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.InactiveArea_DeniesReviewEvenWithUnrevokedAssignment",
+          "outcome": "Passed",
+          "duration": "00:00:09.8668303"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_AwaitingWithPlacementRequiresReconciliation",
+          "outcome": "Passed",
+          "duration": "00:00:07.4082504"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.WeeklyCommissionProductionLikeE2ETests.QualifiedLevelOneNetwork_WorkerCalculatesLatestClosedWeek_ExactlyOnce",
+          "outcome": "Passed",
+          "duration": "00:00:17.3594595"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.AreaAdmin_CrossAreaDirectReadsAndWrites_AreDeniedWithoutMutation",
+          "outcome": "Passed",
+          "duration": "00:00:09.9246079"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_ConcurrentSameProspectiveRootCreatesOneExactMutation",
+          "outcome": "Passed",
+          "duration": "00:00:09.1017035"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.InternalAccountInvitationEndToEndTests.CreateAndInvite_TransactionalRollback_LeavesNoPartialAdministrator",
+          "outcome": "Passed",
+          "duration": "00:00:09.7236574"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.CentralReviewer_WithoutBroaderGrant_IsDenied",
+          "outcome": "Passed",
+          "duration": "00:00:09.7759276"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.RevokedAreaAssignment_DeniesExactRetryWithoutChangingFinalHistory",
+          "outcome": "Passed",
+          "duration": "00:00:08.9383759"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.AreaAdmin_ConfirmExactRetryAndScopedReads_PreserveDurableAudit",
+          "outcome": "Passed",
+          "duration": "00:00:09.3317703"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_ConcurrentApproveApproveIsOneExactMutation",
+          "outcome": "Passed",
+          "duration": "00:00:11.4303506"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_ActiveWithoutPlacementIsVisibleIntegrityFailure",
+          "outcome": "Passed",
+          "duration": "00:00:10.3363074"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.ApprovalUserSessionLock_UsesSameOuterBackendAcrossRequiresNewTransaction",
+          "outcome": "Passed",
+          "duration": "00:00:07.4943584"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.ExistingSeededTenantAndHostAdmins_RetainScopedCompatibility",
+          "outcome": "Passed",
+          "duration": "00:00:09.5969849"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_FailureAfterAllocationRollsBackEveryEffect(table: \"AbpUsers\", operation: \"UPDATE\")",
+          "outcome": "Passed",
+          "duration": "00:00:06.4071002"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_FailureAfterAllocationRollsBackEveryEffect(table: \"EntryParticipationApprovalDecisions\", operation: \"INSERT\")",
+          "outcome": "Passed",
+          "duration": "00:00:06.3870417"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.PaymentConfirmationAndEnabledV2ApprovalCoordinateOnDecisionLock",
+          "outcome": "Passed",
+          "duration": "00:00:07.8664000"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_CrossTenantSessionCannotBootstrapAuthorisedRoot",
+          "outcome": "Passed",
+          "duration": "00:00:05.7316110"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_StabilizesAuthorityRowsUntilCommit(authorityFact: \"assignment\")",
+          "outcome": "Passed",
+          "duration": "00:00:10.8851513"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.ConcurrentAQGreenAndOnyxApprovalsForSameUserSerializeRolePromotion",
+          "outcome": "Passed",
+          "duration": "00:00:12.0669086"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_SponsorAreaAdministratorCannotApproveParticipantArea",
+          "outcome": "Passed",
+          "duration": "00:00:09.1428461"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_MissingAttributionFailsClosedWithoutV1Fallback",
+          "outcome": "Passed",
+          "duration": "00:00:14.9610028"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_SponsoredParticipantMissingSponsorPlacementStillFailsClosed",
+          "outcome": "Passed",
+          "duration": "00:00:06.1125541"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_ConcurrentSameScopeParticipantsReceiveConsecutiveSlots",
+          "outcome": "Passed",
+          "duration": "00:00:07.2589671"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.AreaAuthority_IsLockedUntilTheReviewCommits",
+          "outcome": "Passed",
+          "duration": "00:00:08.4029589"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.DefaultDisabledGate_PreservesV1ApprovalWithoutAttributionOrPlacement",
+          "outcome": "Passed",
+          "duration": "00:00:07.8814401"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_UsesParticipantAreaAuthorityAcrossSponsorAreaTopology",
+          "outcome": "Passed",
+          "duration": "00:00:09.2266814"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AdminCommissionPayoutMutationPostgreSqlTests.ConcurrentDifferentPaymentReferences_OnlyOneApplicationCallWins(programme: Onyx)",
+          "outcome": "Passed",
+          "duration": "00:00:08.2075048"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.AreaAdmin_CrossTenantDirectReadsAndWrites_AreDeniedWithoutMutation",
+          "outcome": "Passed",
+          "duration": "00:00:09.5230510"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.InternalAccountInvitationEndToEndTests.InvitationAcceptance_AllowsTokenAuthentication",
+          "outcome": "Passed",
+          "duration": "00:02:05.1341775"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.ApprovalUserSessionLock_ReleasesAfterCancellationInsideTransaction",
+          "outcome": "Passed",
+          "duration": "00:00:07.9505386"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_FreshRootThenSponsoredChildUsesNormalAllocator",
+          "outcome": "Passed",
+          "duration": "00:00:16.6872358"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.CentralReviewer_WithoutReviewPermission_IsDenied",
+          "outcome": "Passed",
+          "duration": "00:00:08.4203922"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ProgressTests.EnabledV2Progress_RealPostgreSqlB4MapsSpilloverOccupancySeparatelyFromRecruitment",
+          "outcome": "Passed",
+          "duration": "00:00:09.0427303"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.MissingReviewPermission_WithAreaAssignment_CannotReadOrWrite",
+          "outcome": "Passed",
+          "duration": "00:00:08.1340197"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AdminCommissionPayoutMutationPostgreSqlTests.ConcurrentDifferentPaymentReferences_OnlyOneApplicationCallWins(programme: Entry)",
+          "outcome": "Passed",
+          "duration": "00:00:11.6205000"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenPlacementV2ApprovalPostgreSqlTests.EnabledV2Approval_AuthorisedRootLateFailureRollsBackScopeAndEveryEffectThenRetries",
+          "outcome": "Passed",
+          "duration": "00:00:09.5528112"
+        }
+      ]
+    },
+    {
+      "evidence": "pilot-pg",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenIsolatedPilotPostgreSqlTests.RealProspectiveFlow_PreservesAttribution_PlacesFiveWide_AndProducesTestLedger",
+          "outcome": "Passed",
+          "duration": "00:00:34.1632062"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenIsolatedPilotPostgreSqlTests.FailedRootAdmissionRollsBackAndRetryStartsCleanly",
+          "outcome": "Passed",
+          "duration": "00:00:06.8029488"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenIsolatedPilotPostgreSqlTests.ProspectiveBrowserIdentitiesHaveNoBusinessState",
+          "outcome": "Passed",
+          "duration": "00:00:05.3725493"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenIsolatedPilotPostgreSqlTests.UnauthorizedRoot_InviteMissing_AndExcludedServiceCallsFailClosed",
+          "outcome": "Passed",
+          "duration": "00:00:09.6069690"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenIsolatedPilotPostgreSqlTests.WorkersAndExternalFinancialServicesDenyDirectInvocation",
+          "outcome": "Passed",
+          "duration": "00:00:06.2703753"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenIsolatedPilotPostgreSqlTests.ConcurrentApprovalsAllocateCanonicalSlotsAndNeverDuplicate",
+          "outcome": "Passed",
+          "duration": "00:02:27.0513152"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenIsolatedPilotPostgreSqlTests.ConcurrentProspectiveRootAdmissionIsOneImmutableFact",
+          "outcome": "Passed",
+          "duration": "00:00:10.3774096"
+        }
+      ]
+    },
+    {
+      "evidence": "lean-pg",
+      "passed": 1,
+      "failed": 1,
+      "skipped": 0,
+      "cases": [
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenV2ContinuousFreshNetworkE2ETests.LeanMvp_MissingHistoryAndMissingSponsorScope_FailClosedWithoutPartialJoining",
+          "outcome": "Passed",
+          "duration": "00:02:43.4897539"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenV2ContinuousFreshNetworkE2ETests.LeanMvp_FirstTimeInvitationJoin_ToUnreleasedLedger_WithoutLoansOrOnyx",
+          "outcome": "Failed",
+          "duration": "00:00:07.8835725"
+        }
+      ]
+    },
+    {
+      "evidence": "lean-positive-pg",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.AQGreenV2ContinuousFreshNetworkE2ETests.LeanMvp_FirstTimeInvitationJoin_ToUnreleasedLedger_WithoutLoansOrOnyx",
+          "outcome": "Passed",
+          "duration": "00:02:17.1315478"
+        }
+      ]
+    },
+    {
+      "evidence": "auth-repeat-pg",
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.InternalAccountInvitationEndToEndTests.CreateAndInvite_TransactionalRollback_LeavesNoPartialAdministrator",
+          "outcome": "Passed",
+          "duration": "00:00:06.9718799"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.AreaAdmin_HoldAndReject_AreScopedAndIdempotent",
+          "outcome": "Passed",
+          "duration": "00:00:11.4215798"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.CentralReviewer_WithoutBroaderGrant_IsDenied",
+          "outcome": "Passed",
+          "duration": "00:00:09.6600643"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.AreaAuthority_IsLockedUntilTheReviewCommits",
+          "outcome": "Passed",
+          "duration": "00:00:11.3810506"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.RevokedAreaAssignment_DeniesExactRetryWithoutChangingFinalHistory",
+          "outcome": "Passed",
+          "duration": "00:00:14.2147244"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.InactiveArea_DeniesReviewEvenWithUnrevokedAssignment",
+          "outcome": "Passed",
+          "duration": "00:00:12.8935996"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.UnauthenticatedDirectApi_IsDenied",
+          "outcome": "Passed",
+          "duration": "00:00:09.1533171"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.CentralReviewer_WithExplicitAllTenants_CanReviewOtherTenant",
+          "outcome": "Passed",
+          "duration": "00:00:11.4620574"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Integration.InternalAccountInvitationEndToEndTests.InvitationAcceptance_AllowsTokenAuthentication",
+          "outcome": "Passed",
+          "duration": "00:02:00.9041862"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.AreaAdmin_CrossAreaDirectReadsAndWrites_AreDeniedWithoutMutation",
+          "outcome": "Passed",
+          "duration": "00:00:11.8487744"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.ExistingSeededTenantAndHostAdmins_RetainScopedCompatibility",
+          "outcome": "Passed",
+          "duration": "00:00:15.8664580"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.MissingReviewPermission_WithAreaAssignment_CannotReadOrWrite",
+          "outcome": "Passed",
+          "duration": "00:00:18.5663062"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.ClientSuppliedOverrides_CannotSetThresholdAuditOrCommission",
+          "outcome": "Passed",
+          "duration": "00:00:12.8903873"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.CentralReviewer_WithoutReviewPermission_IsDenied",
+          "outcome": "Passed",
+          "duration": "00:00:11.1198571"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.AreaAdmin_CrossTenantDirectReadsAndWrites_AreDeniedWithoutMutation",
+          "outcome": "Passed",
+          "duration": "00:00:08.4330791"
+        },
+        {
+          "testName": "AqualLifeStyle.Web.Tests.Controllers.AQGreenSalesReviewAuthorizationPostgreSqlTests.AreaAdmin_ConfirmExactRetryAndScopedReads_PreserveDurableAudit",
+          "outcome": "Passed",
+          "duration": "00:00:12.6650459"
+        }
+      ]
+    }
+  ],
+  "frontend": {
+    "focusedPassed": 104,
+    "files": 17,
+    "lint": "PASS",
+    "typeCheck": "PASS",
+    "productionBuild": "PASS",
+    "network": "Docker --network none",
+    "productionRuntime": {
+      "network": "Docker --network none",
+      "browserExecuted": false,
+      "backend": "Synthetic local stub; no real backend or business acceptance rerun",
+      "results": [
+        {
+          "name": "Indexed source-map offset regression",
+          "result": "PASS",
+          "before": "1.2.1 timed out and was killed after 1500ms",
+          "after": "1.2.2 rejected the excessive offset within 1500ms; ordinary maps still preserve source text"
+        },
+        {
+          "name": "Sharp native SVG decode/resize/PNG round trip",
+          "result": "PASS",
+          "sharp": "0.35.5",
+          "libvips": "8.18.7",
+          "librsvg": "2.63.2"
+        },
+        {
+          "name": "Production startup and public routes",
+          "result": "PASS",
+          "node": "v24.21.0",
+          "next": "16.3.8",
+          "routes": [
+            "/login",
+            "/signup"
+          ]
+        },
+        {
+          "name": "Anonymous API and cross-origin login denial",
+          "result": "PASS",
+          "anonymousStatus": 401,
+          "crossOriginStatus": 403,
+          "backendRequests": 0
+        },
+        {
+          "name": "Production encrypted session and API forwarding with synthetic backend",
+          "result": "PASS",
+          "loginStatus": 200,
+          "sessionStatus": 200,
+          "forwardedStatus": 200,
+          "secureHttpOnlyCookies": true,
+          "tenantPreserved": true
+        },
+        {
+          "name": "Corrupt-session denial and logout",
+          "result": "PASS",
+          "corruptStatus": 401,
+          "logoutStatus": 204
+        },
+        {
+          "name": "Production Next Image optimization and remote URL denial",
+          "result": "PASS",
+          "localImageStatus": 200,
+          "disallowedRemoteStatus": 400
+        },
+        {
+          "name": "Public invitation API forwarding with synthetic backend",
+          "result": "PASS",
+          "status": 200
+        }
+      ]
+    }
+  },
+  "knownOriginalFailures": {
+    "applicationUnsplitSeconds": 1599.426,
+    "administrationAndMembershipCombinedSeconds": 1605.406,
+    "entityFrameworkCombinedSeconds": 1652.964,
+    "applicationRemainingCombinedSeconds": 1590.198,
+    "initialWebFull": "93 passed, 23 skipped, 16-minute local runtime",
+    "intermediatePostgreSqlFailures": [
+      "internal-network host-port unreachable",
+      "external build output could not resolve content root",
+      "DDL initialization collision",
+      "seed initialization collision",
+      "startup-only locking insufficient for overlapping seed/fixture body"
+    ],
+    "leanFreshnessFailure": "Combined negative+positive execution left three participations before the positive fresh-database proof. Negative passed; positive rerun alone on new disposable database passed. No assertion weakened."
+  },
+  "remoteCi": "NOT RUN: candidate not published",
+  "browser": "NOT RUN: no repeated 17-case walkthrough",
+  "production": "NOT RUN / NOT AUTHORIZED",
+  "businessAcceptanceInherited": false
+}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Navbar } from "@/src/components/app/navbar";
 import { AQGreenV2DemoBanner } from "@/src/components/members/aqgreen-v2-demo-banner";
+import { PilotBoundary } from "@/src/components/app/pilot-boundary";
 import { WebVitals } from "@/src/shared/observability/web-vitals";
 
 import { AppProviders } from "./providers";
@@ -56,7 +57,7 @@ export default function RootLayout({
         <AppProviders>
           <Navbar />
           <AQGreenV2DemoBanner />
-          {children}
+          <PilotBoundary>{children}</PilotBoundary>
         </AppProviders>
       </body>
     </html>

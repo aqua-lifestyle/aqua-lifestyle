@@ -24,13 +24,23 @@ Working directory:
 cd AqualLifeStyle/9.4.2/aspnet-core
 ```
 
-CI-equivalent restore, Release build, and full test suite:
+Local restore, Release build, and full test suite:
 
 ```bash
 dotnet restore AqualLifeStyle.sln
 dotnet build AqualLifeStyle.sln --configuration Release --no-restore
 dotnet test AqualLifeStyle.sln --configuration Release --no-build --logger "trx;LogFileName=backend-tests.trx" --results-directory TestResults
 ```
+
+CI executes the same application inventory in eight disjoint partitions:
+administration, membership, authentication/account, and remaining application cases; migration, placement/
+structural, and remaining EntityFrameworkCore cases; and remaining namespaces. Web
+tests use placement, controller, and remaining-case partitions. Discovery must equal each full inventory as a
+multiset; every shard must also match discovered identities to completed TRX
+results. Splitting does not remove cases or increase the existing test-job limits.
+The explicit PostgreSQL job remains separate: default web skips and provider-gated
+bodies do not establish PostgreSQL execution. See the workflow's required passing
+cases and execution markers.
 
 The full application test project includes PostgreSQL migration tests that start `postgres:16-alpine`; Docker must be running. A focused xUnit test can be selected with its fully qualified name:
 

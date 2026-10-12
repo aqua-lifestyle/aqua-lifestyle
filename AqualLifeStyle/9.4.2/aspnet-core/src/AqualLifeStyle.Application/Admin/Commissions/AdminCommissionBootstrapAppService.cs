@@ -120,6 +120,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
 
         /// <inheritdoc />
         [AbpAuthorize(AquaPermissions.Admin.Commissions.Release)]
+        [UnitOfWork]
         public virtual async Task<CommissionTermsBootstrapResult>
             BootstrapInitialCommissionTermsAsync(
                 BootstrapInitialCommissionTermsInput input)
@@ -134,7 +135,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             };
 
             await ValidateAndStageEntryAsync(effectiveAt, result);
-            await ValidateAndStageOnyxAsync(effectiveAt, result);
+            if (!PilotMode.IsEnabled)
+                await ValidateAndStageOnyxAsync(effectiveAt, result);
 
             if (result.AnyConflict)
             {

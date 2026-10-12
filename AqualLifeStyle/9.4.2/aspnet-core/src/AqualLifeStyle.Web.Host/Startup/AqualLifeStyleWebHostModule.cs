@@ -18,6 +18,7 @@ using AqualLifeStyle.Application.Admin.ProgrammeParticipations;
 using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Web.Host.AQGreenV2Demo;
+using AqualLifeStyle.Web.Host.AQGreenV2Pilot;
 
 namespace AqualLifeStyle.Web.Host.Startup
 {
@@ -42,6 +43,16 @@ namespace AqualLifeStyle.Web.Host.Startup
 
         public override void PreInitialize()
         {
+            var pilot = AQGreenV2PilotConfiguration.Validate(_env, _appConfiguration);
+            if (pilot)
+            {
+                Configuration.ReplaceService<IAQGreenPilotMode, AQGreenV2PilotMode>(DependencyLifeStyle.Singleton);
+                Configuration.ReplaceService<IAQGreenPlacementV2ApprovalGate, AQGreenV2PilotApprovalGate>(DependencyLifeStyle.Singleton);
+                Configuration.ReplaceService<IAQGreenPlacementV2ProgressGate, AQGreenV2PilotProgressGate>(DependencyLifeStyle.Singleton);
+                Configuration.ReplaceService<IAQGreenCommissionStructuralModelSelector, AQGreenV2PilotCommissionSelector>(DependencyLifeStyle.Singleton);
+                Configuration.ReplaceService<IAQGreenWeeklySalesReviewGate, AQGreenV2PilotSalesReviewGate>(DependencyLifeStyle.Singleton);
+                Configuration.BackgroundJobs.IsJobExecutionEnabled = false;
+            }
             if (AQGreenV2DemoConfiguration.Validate(_env, _appConfiguration))
             {
                 Configuration.ReplaceService<
@@ -61,7 +72,10 @@ namespace AqualLifeStyle.Web.Host.Startup
                     AQGreenV2DemoSalesReviewGate>(DependencyLifeStyle.Singleton);
             }
 
-            Configuration.ReplaceService<IEmailSender, BirdAbpEmailSender>(DependencyLifeStyle.Transient);
+            if (pilot)
+                Configuration.ReplaceService<IEmailSender, NullEmailSender>(DependencyLifeStyle.Transient);
+            else
+                Configuration.ReplaceService<IEmailSender, BirdAbpEmailSender>(DependencyLifeStyle.Transient);
             var redisConfiguration = _appConfiguration["Redis:Configuration"];
             if (string.IsNullOrWhiteSpace(redisConfiguration))
             {
@@ -93,6 +107,9 @@ namespace AqualLifeStyle.Web.Host.Startup
                 // Swallow any errors here to avoid startup crash; ABP will fall back
                 // to default behavior if the ErrorInfoBuilder is not available.
             }
+
+            if (AQGreenV2PilotConfiguration.Validate(_env, _appConfiguration))
+                return; // No outbound delivery, monthly, Onyx or automatic financial worker in the pilot.
 
             IocManager.Resolve<IBackgroundWorkerManager>().Add(
                 IocManager.Resolve<YocoPaymentOperationsMonitor>());
