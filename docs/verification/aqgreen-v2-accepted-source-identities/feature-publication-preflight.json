@@ -1,0 +1,103 @@
+{
+  "inspectedAtUtc": "2026-10-12T16:57:19.451Z",
+  "repository": "aqua-lifestyle/aqua-lifestyle",
+  "branch": "feature/aqgreen-v2-accepted-mvp",
+  "acceptedCommits": [
+    "fd0d188ffa5fb7388a0333938a293bba23998f24",
+    "2aac8e4e5f648f3a1a4aac1b7347d83fbc9dcd8a"
+  ],
+  "vercelTeams": {
+    "pagination": {
+      "count": 1,
+      "next": null,
+      "prev": 1784287951804
+    },
+    "teams": [
+      {
+        "id": "team_Hc3BWfhTLfwLzwbgbtaasBUY",
+        "slug": "aqua-lifestyle-club"
+      }
+    ]
+  },
+  "vercelProjects": {
+    "pagination": {
+      "count": 1,
+      "next": null,
+      "prev": 1791408258541
+    },
+    "projects": [
+      {
+        "id": "prj_6qL1e43KhsWrRshY5GxdmGl3HGMz",
+        "name": "aqua-lifestyle",
+        "accountId": "team_Hc3BWfhTLfwLzwbgbtaasBUY",
+        "rootDirectory": "AqualLifeStyle/9.4.2/aqua-frontend",
+        "configFilePath": null,
+        "gitProviderOptions": {
+          "createDeployments": "enabled"
+        },
+        "commandForIgnoringBuildStep": null,
+        "link": {
+          "type": "github",
+          "org": "aqua-lifestyle",
+          "repo": "aqua-lifestyle",
+          "repoId": 1276688422,
+          "productionBranch": "main"
+        },
+        "deployHookCount": 0,
+        "customEnvironmentCount": 0
+      }
+    ]
+  },
+  "renderServices": [
+    {
+      "id": "srv-d9f0k8e1a83c73d8n1b0",
+      "name": "aqualifestyle-api",
+      "type": "web_service",
+      "repo": "https://github.com/aqua-lifestyle/aqua-lifestyle",
+      "branch": "main",
+      "autoDeploy": "no",
+      "autoDeployTrigger": "off",
+      "rootDir": "",
+      "previews": {
+        "generation": "off"
+      }
+    }
+  ],
+  "githubWorkflows": [
+    {
+      "id": 314866230,
+      "name": "Continuous integration",
+      "path": ".github/workflows/ci.yml",
+      "state": "active"
+    },
+    {
+      "id": 314880866,
+      "name": "Publish versioned container images",
+      "path": ".github/workflows/publish-images.yml",
+      "state": "active"
+    }
+  ],
+  "githubRepositoryHooks": [],
+  "integrity": {
+    "reference": "worktree",
+    "acceptedApplicationFiles": 1987,
+    "unchangedAcceptedApplicationFiles": 1986,
+    "authorizedConfigurationExceptions": [
+      "AqualLifeStyle/9.4.2/aqua-frontend/vercel.json"
+    ],
+    "exception": "Only the exact feature branch maps to false; existing configuration fields unchanged.",
+    "acceptedManifestsUnchanged": true,
+    "presentPropertiesSchemaValidation": "PASS",
+    "fullRemoteSchemaValidation": "UNAVAILABLE: published schema mixes draft-04 metadata with numeric exclusiveMinimum in unrelated function/service definitions",
+    "currentProjectRootMatchesGuard": true,
+    "renderAutomaticDeployments": "off",
+    "firstPushSuppression": "NOT VERIFIED",
+    "pushed": false
+  },
+  "firstPushSuppression": "NOT VERIFIED",
+  "publication": "BLOCKED",
+  "remoteBranchExists": false,
+  "branchCiRuns": 0,
+  "branchVercelDeployments": 0,
+  "deploymentTriggeredByTask": false
+}
