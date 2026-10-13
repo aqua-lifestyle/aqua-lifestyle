@@ -235,7 +235,11 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             var customer = await GetCurrentActiveCustomerAsync();
             var recruiterCustomerId = requestedPlacement.RecruiterCustomerId;
             if (useV2Joining)
+            {
+                await _v2JoiningGate.ValidateDestinationAsync(tenantId,
+                    requestedPlacement.InvitationPlacement.RecruiterArea.Id);
                 await EnsureNoLegacyAQGreenMembershipAsync(customer);
+            }
             await ClearLegacyProgrammeMembershipAssignmentAsync(
                 customer,
                 MembershipType.AQGreen,
@@ -326,6 +330,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             }))
             using (_unitOfWorkManager.Current.SetTenantId(tenantId))
             {
+                var customerId = await GetCurrentActiveCustomerIdAsync();
+                await _hostedPaymentCheckoutLock.AcquireCustomerAreaTransitionsAsync(customerId);
                 var customer = await GetCurrentActiveCustomerAsync();
                 if (await _v2JoiningGate.IsEnabledAsync(tenantId))
                     await EnsureNoLegacyAQGreenMembershipAsync(customer);

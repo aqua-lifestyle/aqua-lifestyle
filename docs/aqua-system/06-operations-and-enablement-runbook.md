@@ -102,10 +102,26 @@ replace the upstream verifier or independently authenticate human approvals.
 Production selection checks the actual database/schema and Core/Application/EF
 assembly identities using the existing read-only PostgreSQL boundary reader. It
 preserves V1 financial cutoffs before the approved instant and selects V2 afterward.
+The complete live AQGreen population, including prospective admissions, must have
+a verifiable current same-Tenant Area and one matching current Area assignment
+inside the commissioned envelope. Financial selection stabilizes customer Area
+transitions with the existing ordered transaction locks. A legitimate Onyx Area
+move outside that envelope stops Tenant-wide V2 selection; it never drops that
+member or their obligations from the calculation.
+Financial selection and final invitation approval require PostgreSQL current-read
+transaction semantics; repeatable snapshots are denied because they can predate
+an Area-lock wait.
 Prospective admissions and graduation require explicit capability selection. Starts,
 approvals and graduation are fenced before the cutover instant; legacy sponsor
 corrections are closed for the commissioned Tenant. Existing Area permissions,
 approval locks, allocator, roles/outbox transaction and financial holds remain.
+Invitation joining validates the resolved sponsor destination after the resolver
+acquires sponsor/invitee Area-transition locks and before any participation writes,
+including on replay. Checkout takes the invitee's existing Area-transition lock
+before checking current D10 scope and preparing a payment obligation. Onyx's
+existing Area movement workflow is preserved.
+Checkout retains its serializable transaction; its D10 invitee check reads the
+committed current assignment in a fresh transaction after the Area-lock wait.
 
 Automatic financial workers require separate verified worker commissioning evidence
 and exact approved configuration; monthly automation is outside this launch scope.

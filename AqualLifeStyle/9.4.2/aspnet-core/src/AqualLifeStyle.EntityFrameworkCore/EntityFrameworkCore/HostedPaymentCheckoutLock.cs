@@ -5,6 +5,7 @@ using Abp.Dependency;
 using Abp.EntityFrameworkCore;
 using AqualLifeStyle.Domain.Payments;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace AqualLifeStyle.EntityFrameworkCore
 {
@@ -41,6 +42,17 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 throw new ArgumentOutOfRangeException(nameof(customerIds));
             foreach (var customerId in customerIds.Distinct().OrderBy(customerId => customerId))
                 await AcquireAsync($"customer-area-transition:{customerId}");
+        }
+
+        public async Task<bool> HasCurrentReadTransactionAsync()
+        {
+            var context = _dbContextProvider.GetDbContext();
+            if (!context.Database.IsNpgsql() || context.Database.CurrentTransaction == null) return false;
+            using var command = context.Database.GetDbConnection().CreateCommand();
+            command.Transaction = context.Database.CurrentTransaction.GetDbTransaction();
+            command.CommandText = "SHOW transaction_isolation";
+            var isolation = (string)await command.ExecuteScalarAsync();
+            return isolation == "read committed" || isolation == "read uncommitted";
         }
 
         public async Task AcquireProgrammeApprovalUserSessionAsync(long userId)

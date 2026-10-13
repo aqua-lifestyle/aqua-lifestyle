@@ -12,6 +12,7 @@ namespace AqualLifeStyle.Web.Tests
         private readonly AsyncLocal<int?> _tenant = new();
         public Task<bool> IsEnabledAsync(int tenantId) =>
             Task.FromResult(_tenant.Value == tenantId);
+        public Task ValidateDestinationAsync(int tenantId, Guid destinationAreaId) => Task.CompletedTask;
         public IDisposable Enable(int tenantId)
         {
             var previous = _tenant.Value;

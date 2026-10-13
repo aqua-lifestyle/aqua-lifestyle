@@ -15,6 +15,8 @@ using AqualLifeStyle.Domain.Memberships;
 using AqualLifeStyle.Domain.Enums;
 using System.Transactions;
 using System.IO;
+using AqualLifeStyle.Domain.Areas;
+using AqualLifeStyle.Domain.Payments;
 
 namespace AqualLifeStyle.Application.ProgrammeParticipations
 {
@@ -32,14 +34,19 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         private readonly IAQGreenReconciliationEvidenceSnapshot _snapshot;
         private readonly IRepository<EntryCommissionPeriod, Guid> _periods;
         private readonly IRepository<EntryWeeklyCommission, Guid> _commissions;
+        private readonly IRepository<Area, Guid> _areas;
+        private readonly IRepository<CustomerAreaAssignment, Guid> _areaAssignments;
+        private readonly IHostedPaymentCheckoutLock _areaLocks;
         public AQGreenD10Runtime(IAQGreenD10CommissioningSource source, IConfiguration configuration,
             IUnitOfWorkManager uows, IRepository<EntryParticipation, Guid> participations,
             ICustomerRepository customers, IRepository<AQGreenNetworkPlacement, Guid> placements, IAbpSession session,
             IRepository<Membership, int> memberships, IAQGreenReconciliationEvidenceSnapshot snapshot,
-            IRepository<EntryCommissionPeriod, Guid> periods, IRepository<EntryWeeklyCommission, Guid> commissions)
+            IRepository<EntryCommissionPeriod, Guid> periods, IRepository<EntryWeeklyCommission, Guid> commissions,
+            IRepository<Area, Guid> areas, IRepository<CustomerAreaAssignment, Guid> areaAssignments,
+            IHostedPaymentCheckoutLock areaLocks)
         { _source = source; _configuration = configuration; _uows = uows; _participations = participations;
             _customers = customers; _placements = placements; _session = session; _memberships = memberships; _snapshot = snapshot;
-            _periods = periods; _commissions = commissions; }
+            _periods = periods; _commissions = commissions; _areas = areas; _areaAssignments = areaAssignments; _areaLocks = areaLocks; }
 
         public async Task VerifyStartupAsync()
         {
@@ -107,7 +114,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             }
             if (financialCutoff.HasValue && financialCutoff >= d.V2EffectiveAtUtc)
                 AQGreenD10Commissioning.Require(DateTime.UtcNow >= d.V2EffectiveAtUtc, "D10_CUTOVER_NOT_EFFECTIVE");
-            await VerifyPopulationAsync(d); return true;
+            await VerifyPopulationAsync(d, stabilizeAreas: financialCutoff.HasValue); return true;
         }
 
         public async Task<bool> ForParticipantAsync(int? tenantId, Guid participantId, bool write, bool graduation = false)
@@ -139,13 +146,43 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             var d = _source.Read().Decision;
             AQGreenD10Commissioning.Require(d.AllowProspectiveAdmissions == true && _session.TenantId == tenantId && _session.UserId.HasValue,
                 "D10_PROSPECTIVE_JOINING_NOT_COMMISSIONED");
-            using var uow = _uows.Begin();
+            // Checkout's serializable snapshot may precede an Area-lock wait.
+            // Read the committed invitee assignment in a fresh transaction while
+            // the caller retains that lock; no joining writes exist at this point.
+            using var uow = _uows.Begin(new UnitOfWorkOptions { Scope = TransactionScopeOption.RequiresNew,
+                IsTransactional = true, IsolationLevel = IsolationLevel.ReadCommitted });
             var c = await _customers.GetAll().AsNoTracking().SingleOrDefaultAsync(c => c.TenantId == tenantId && c.UserId == _session.UserId);
             AQGreenD10Commissioning.Require(c?.AreaId != null && d.AuthorizedAreaIds.Contains(c.AreaId.Value), "D10_AREA_OUTSIDE_AUTHORIZED_SCOPE");
+            var assignments = await _areaAssignments.GetAll().IgnoreQueryFilters().AsNoTracking()
+                .Where(a => a.CustomerId == c.Id && !a.IsDeleted && !a.EffectiveTo.HasValue)
+                .Select(a => new { a.TenantId, a.AreaId, a.EffectiveFrom }).ToListAsync();
+            AQGreenD10Commissioning.Require(assignments.Count == 1 && assignments[0].TenantId == tenantId &&
+                assignments[0].AreaId == c.AreaId && assignments[0].EffectiveFrom <= DateTime.UtcNow &&
+                await _areas.GetAll().AsNoTracking().AnyAsync(a => a.Id == c.AreaId && a.TenantId == tenantId && a.IsActive),
+                "D10_CURRENT_JOINING_AREA_UNVERIFIABLE");
             await uow.CompleteAsync(); return true;
         }
 
-        private async Task VerifyPopulationAsync(AQGreenD10Decision d)
+        public async Task ValidateJoiningDestinationAsync(int tenantId, Guid destinationAreaId)
+        {
+            ApplicationRecoveryMode.DenyBusinessOperation(_configuration);
+            await RequireCurrentReadTransactionAsync("D10_JOINING_REQUIRES_CURRENT_READ_TRANSACTION");
+            var authority = _source.Read();
+            AQGreenD10Commissioning.Require(authority != null && authority.Decision.TenantId == tenantId,
+                "D10_JOINING_AUTHORITY_CHANGED");
+            Check(authority);
+            AQGreenD10Commissioning.Require(destinationAreaId != Guid.Empty &&
+                authority.Decision.AuthorizedAreaIds.Contains(destinationAreaId), "D10_JOINING_DESTINATION_OUTSIDE_AUTHORIZED_SCOPE");
+            // The invitation resolver owns ordered sponsor/invitee Area-transition locks.
+            // Recheck commissioning inside that transaction, before any joining writes.
+            AQGreenD10Commissioning.Require(await JoiningAsync(tenantId), "D10_JOINING_AUTHORITY_CHANGED");
+            using var uow = _uows.Begin();
+            AQGreenD10Commissioning.Require(await _areas.GetAll().AsNoTracking().AnyAsync(a =>
+                a.Id == destinationAreaId && a.TenantId == tenantId && a.IsActive), "D10_JOINING_DESTINATION_UNVERIFIABLE");
+            await uow.CompleteAsync();
+        }
+
+        private async Task VerifyPopulationAsync(AQGreenD10Decision d, bool stabilizeAreas = false)
         {
             // Reuse the existing PostgreSQL source-boundary reader in its own read-only snapshot;
             // never mark an approval/calculation transaction read-only or observe its uncommitted writes.
@@ -163,6 +200,31 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             using (_uows.Current.DisableFilter(AbpDataFilters.MustHaveTenant, AbpDataFilters.MayHaveTenant))
             {
                 var ids = d.HistoricalMembers.Select(m => m.ParticipantId).ToArray();
+                var live = _participations.GetAll().IgnoreQueryFilters().AsNoTracking().Where(p =>
+                    p.TenantId == d.TenantId && (!p.IsDeleted || p.Status == EntryParticipationStatus.Active));
+                if (stabilizeAreas)
+                {
+                    await RequireCurrentReadTransactionAsync("D10_FINANCIAL_REQUIRES_CURRENT_READ_TRANSACTION");
+                    var customerIdsToLock = await live.Select(p => p.CustomerId).Distinct().ToArrayAsync();
+                    if (customerIdsToLock.Length > 0) await _areaLocks.AcquireCustomerAreaTransitionsAsync(customerIdsToLock);
+                }
+                var currentAreaAssignments = _areaAssignments.GetAll().IgnoreQueryFilters().AsNoTracking();
+                var now = DateTime.UtcNow;
+                var invalidLiveArea = await (from p in live
+                    join c in _customers.GetAll().IgnoreQueryFilters().AsNoTracking()
+                        on new { p.CustomerId, TenantId = (int?)p.TenantId } equals new { CustomerId = c.Id, c.TenantId } into customers
+                    from c in customers.DefaultIfEmpty()
+                    join area in _areas.GetAll().IgnoreQueryFilters().AsNoTracking()
+                        on new { AreaId = c.AreaId, TenantId = (int?)p.TenantId } equals new { AreaId = (Guid?)area.Id, TenantId = (int?)area.TenantId } into areas
+                    from area in areas.DefaultIfEmpty()
+                    where p.IsDeleted || c == null || c.IsDeleted || !c.AreaId.HasValue ||
+                        !d.AuthorizedAreaIds.Contains(c.AreaId.Value) || area == null || area.IsDeleted || !area.IsActive ||
+                        currentAreaAssignments.Count(a => a.CustomerId == p.CustomerId && !a.IsDeleted && !a.EffectiveTo.HasValue) != 1 ||
+                        !currentAreaAssignments.Any(a => a.CustomerId == p.CustomerId && a.TenantId == d.TenantId &&
+                            !a.IsDeleted && !a.EffectiveTo.HasValue && a.AreaId == c.AreaId && a.EffectiveFrom <= now) ||
+                        (!ids.Contains(p.Id) && (d.AllowProspectiveAdmissions != true || p.StartedAt < d.V2EffectiveAtUtc))
+                    select p.Id).AnyAsync();
+                AQGreenD10Commissioning.Require(!invalidLiveArea, "D10_LIVE_POPULATION_AREA_OR_IDENTITY_UNVERIFIABLE");
                 var members = await (from p in _participations.GetAll().IgnoreQueryFilters().AsNoTracking()
                     join c in _customers.GetAll().IgnoreQueryFilters().AsNoTracking() on new { p.CustomerId, TenantId = (int?)p.TenantId }
                         equals new { CustomerId = c.Id, c.TenantId }
@@ -205,6 +267,16 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             }
         }
 
+        private async Task RequireCurrentReadTransactionAsync(string code)
+        {
+            // PostgreSQL READ UNCOMMITTED has READ COMMITTED statement visibility.
+            // A repeatable snapshot established before an advisory-lock wait cannot
+            // establish the current Area after the other transaction commits.
+            // ABP may omit the requested option when the provider chose its default.
+            // Establish actual PostgreSQL visibility rather than assume that default.
+            AQGreenD10Commissioning.Require(await _areaLocks.HasCurrentReadTransactionAsync(), code);
+        }
+
         public static string RuntimeAssemblyDigest(string efAssemblyDigest) => AQGreenB6CanonicalEvidence.Tuples(new[]
         {
             new[] { "AqualLifeStyle.Application", AQGreenB6CanonicalEvidence.Hash(File.ReadAllBytes(typeof(AQGreenD10Runtime).Assembly.Location)) },
@@ -215,7 +287,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
     public sealed class AQGreenD10JoiningGate : IAQGreenPlacementV2JoiningGate
     { private readonly AQGreenD10Runtime _runtime; public AQGreenD10JoiningGate(AQGreenD10Runtime runtime) => _runtime = runtime;
-        public Task<bool> IsEnabledAsync(int tenantId) => _runtime.JoiningAsync(tenantId); }
+        public Task<bool> IsEnabledAsync(int tenantId) => _runtime.JoiningAsync(tenantId);
+        public Task ValidateDestinationAsync(int tenantId, Guid destinationAreaId) => _runtime.ValidateJoiningDestinationAsync(tenantId, destinationAreaId); }
     public sealed class AQGreenD10ApprovalGate : IAQGreenPlacementV2ApprovalGate
     { private readonly AQGreenD10Runtime _runtime; public AQGreenD10ApprovalGate(AQGreenD10Runtime runtime) => _runtime = runtime;
         public Task<bool> IsEnabledAsync(int? tenantId, Guid participantId) => _runtime.ForParticipantAsync(tenantId, participantId, true); }

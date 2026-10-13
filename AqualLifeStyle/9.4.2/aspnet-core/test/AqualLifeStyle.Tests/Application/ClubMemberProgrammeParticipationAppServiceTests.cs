@@ -1423,6 +1423,7 @@ namespace AqualLifeStyle.Tests.Application
         {
             var gate = Substitute.For<IAQGreenPlacementV2JoiningGate>();
             gate.IsEnabledAsync(1).Returns(Task.FromResult(true));
+            gate.ValidateDestinationAsync(1, Arg.Any<Guid>()).Returns(Task.CompletedTask);
             LocalIocManager.IocContainer.Register(
                 Component.For<IAQGreenPlacementV2JoiningGate>()
                     .Instance(gate).Named($"legacy-member-guard-{Guid.NewGuid():N}").IsDefault());

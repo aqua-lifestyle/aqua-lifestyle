@@ -8,6 +8,7 @@ namespace AqualLifeStyle.Web.Host.AQGreenV2Demo
     public sealed class AQGreenV2DemoJoiningGate : IAQGreenPlacementV2JoiningGate
     {
         public Task<bool> IsEnabledAsync(int tenantId) => Task.FromResult(tenantId > 0);
+        public Task ValidateDestinationAsync(int tenantId, Guid destinationAreaId) => Task.CompletedTask;
     }
 
     public sealed class AQGreenV2DemoApprovalGate : IAQGreenPlacementV2ApprovalGate
