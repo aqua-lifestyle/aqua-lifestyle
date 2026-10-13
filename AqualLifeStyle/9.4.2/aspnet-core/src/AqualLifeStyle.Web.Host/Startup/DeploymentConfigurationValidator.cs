@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Web.Host.Email;
 using AqualLifeStyle.Web.Host.AQGreenV2Demo;
+using AqualLifeStyle.Configuration;
 
 namespace AqualLifeStyle.Web.Host.Startup
 {
@@ -16,6 +17,22 @@ namespace AqualLifeStyle.Web.Host.Startup
         {
             var environment = services.GetRequiredService<IWebHostEnvironment>();
             var configuration = services.GetRequiredService<IConfiguration>();
+            Validate(environment, configuration);
+        }
+
+        public static void Validate(IWebHostEnvironment environment, IConfiguration configuration)
+        {
+            var recovery = ApplicationRecoveryMode.IsEnabled(configuration);
+            if (recovery)
+            {
+                foreach (var key in new[] { "Bird:Enabled", "App:WeeklyCommissions:Enabled",
+                    "App:EntryMonthlyObligations:Enabled", "AQGreenV2Demo:Enabled", "AQGreenV2Pilot:Enabled", "SEED_DEMO_DATA" })
+                    if (configuration.GetValue<bool>(key))
+                        throw new InvalidOperationException("API recovery requires " + key.Replace(":", "__") + "=false.");
+                foreach (var key in new[] { "Yoco:Mode", "Yoco:SecretKey", "Yoco:WebhookSecret", "Bird:ApiKey" })
+                    if (IsConfigured(configuration[key]))
+                        throw new InvalidOperationException("API recovery requires provider setting " + key.Replace(":", "__") + " to be absent.");
+            }
 
             AQGreenV2DemoConfiguration.Validate(environment, configuration);
             if (AQGreenV2Pilot.AQGreenV2PilotConfiguration.Validate(environment, configuration))
@@ -69,10 +86,13 @@ namespace AqualLifeStyle.Web.Host.Startup
                 ["Authentication:JwtBearer:SecurityKey"] = "Authentication__JwtBearer__SecurityKey",
                 ["DataProtection:CertificateBase64"] = "DataProtection__CertificateBase64",
                 ["DataProtection:CertificatePassword"] = "DataProtection__CertificatePassword",
-                ["Redis:Configuration"] = "Redis__Configuration",
-                ["Yoco:SecretKey"] = "Yoco__SecretKey",
-                ["Yoco:Mode"] = "Yoco__Mode"
+                ["Redis:Configuration"] = "Redis__Configuration"
             };
+            if (!recovery)
+            {
+                requiredSettings["Yoco:SecretKey"] = "Yoco__SecretKey";
+                requiredSettings["Yoco:Mode"] = "Yoco__Mode";
+            }
             var missing = new List<string>();
             if (!IsConfigured(configuration["ConnectionStrings:Default"]) &&
                 !IsConfigured(configuration["DATABASE_URL"]))
@@ -88,7 +108,7 @@ namespace AqualLifeStyle.Web.Host.Startup
                 }
             }
 
-            if (!configuration.GetValue<bool>("Bird:Enabled"))
+            if (!recovery && !configuration.GetValue<bool>("Bird:Enabled"))
             {
                 missing.Add("Bird__Enabled=true");
             }
@@ -100,13 +120,17 @@ namespace AqualLifeStyle.Web.Host.Startup
                 ["Bird:FromName"] = "Bird__FromName",
                 ["Bird:ReplyToEmail"] = "Bird__ReplyToEmail"
             };
-            foreach (var setting in birdSettings)
+            foreach (var setting in recovery ? new Dictionary<string, string>() : birdSettings)
             {
                 if (!IsConfigured(configuration[setting.Key])) missing.Add(setting.Value);
             }
             if (missing.Count > 0)
                 throw new InvalidOperationException(
                     "Production configuration is incomplete. Set: " + string.Join(", ", missing));
+
+            ValidateSecurePublicAddress(configuration, "App:ServerRootAddress", "App__ServerRootAddress");
+            ValidateSecurePublicAddress(configuration, "App:ClientRootAddress", "App__ClientRootAddress");
+            if (recovery) return; // Common security configuration remains mandatory; providers stay unavailable.
 
             if (!BirdOptions.TryResolveRegion(configuration["Bird:ApiKey"], out _))
             {
@@ -126,8 +150,6 @@ namespace AqualLifeStyle.Web.Host.Startup
                     "Production Yoco configuration is invalid. Yoco__Mode must be test or live and must match the Yoco__SecretKey prefix.");
             }
 
-            ValidateSecurePublicAddress(configuration, "App:ServerRootAddress", "App__ServerRootAddress");
-            ValidateSecurePublicAddress(configuration, "App:ClientRootAddress", "App__ClientRootAddress");
         }
 
         private static void ValidateSecurePublicAddress(

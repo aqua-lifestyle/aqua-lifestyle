@@ -59,7 +59,7 @@ namespace AqualLifeStyle.Migrator
 
             try
             {
-                _migrator.CreateOrMigrateForHost(SeedHelper.SeedHostDb);
+                MigrateHost();
             }
             catch (Exception ex)
             {
@@ -87,13 +87,14 @@ namespace AqualLifeStyle.Migrator
                 {
                     try
                     {
-                        _migrator.CreateOrMigrateForTenant(tenant);
+                        MigrateTenant(tenant);
                     }
                     catch (Exception ex)
                     {
                         _log.Write("An error occured during migration of tenant database:");
                         _log.Write(ex.ToString());
-                        _log.Write("Skipped this tenant and will continue for others...");
+                        _log.Write("Canceled remaining migrations. Release must not proceed.");
+                        return false;
                     }
 
                     migratedDatabases.Add(tenant.ConnectionString);
@@ -127,5 +128,8 @@ namespace AqualLifeStyle.Migrator
 
             return builder.ToString();
         }
+
+        protected virtual void MigrateHost() => _migrator.CreateOrMigrateForHost(SeedHelper.SeedHostDb);
+        protected virtual void MigrateTenant(Tenant tenant) => _migrator.CreateOrMigrateForTenant(tenant);
     }
 }

@@ -96,6 +96,7 @@ namespace AqualLifeStyle.Web.Host.Commissions
 
         protected override async Task DoWorkAsync()
         {
+            if (AqualLifeStyle.Configuration.ApplicationRecoveryMode.IsEnabled(_configuration)) return;
             PilotMode.DenyOutsidePilot("Automatic programme commission worker");
             if (!_configuration.GetValue<bool>("App:WeeklyCommissions:Enabled"))
             {

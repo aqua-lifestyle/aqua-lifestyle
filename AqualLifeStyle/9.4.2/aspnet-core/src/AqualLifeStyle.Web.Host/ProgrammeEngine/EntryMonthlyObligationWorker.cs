@@ -57,6 +57,7 @@ namespace AqualLifeStyle.Web.Host.ProgrammeEngine
 
         protected override async Task DoWorkAsync()
         {
+            if (AqualLifeStyle.Configuration.ApplicationRecoveryMode.IsEnabled(_configuration)) return;
             PilotMode.DenyOutsidePilot("Monthly obligation worker");
             if (!_configuration.GetValue<bool>("App:EntryMonthlyObligations:Enabled"))
             {

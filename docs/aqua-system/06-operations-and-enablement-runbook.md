@@ -23,6 +23,48 @@ Each step needs its own evidence. A passing test does not prove deployment. A de
 
 Current capability status is in [document 07](07-verification-decision-and-risk-register.md).
 
+### Controlled API recovery before reconciliation/commissioning
+
+`App__Recovery__Enabled=true` selects operational suspension, not V2 activation.
+The production API remains suspended until recovery is separately authorized.
+Production/recovery API startup skips the existing host seeder and requires the
+database migration history to exactly match the release; startup never migrates,
+repairs, or downgrades a database. History matching does not prove absence of
+manual schema drift or replace a verified production backup/recovery exercise.
+
+In recovery, Bird and the weekly/monthly worker flags must be false; configured
+Yoco mode/secrets and Bird API key must be absent. Common Production HTTPS,
+authentication, Data Protection and Redis requirements remain. Conflicting flags
+fail before ABP initialization. Background jobs and application workers are not
+started. Real checkout and payment notification processing independently deny
+recovery, and worker bodies also return before processing.
+
+Recovery HTTP routes permit only health, authentication/antiforgery and existing
+reconciliation discovery/Area reads/frozen export. All other routes return 503;
+the existing application commissioning interceptor also denies direct application
+business calls. Existing Tenant/Area/permission checks still apply to every
+permitted reconciliation operation, including explicit bulk export/AllTenants
+permissions. Responses carry `X-Aqua-Recovery-Suspended: true`. Data Protection
+key persistence and security/audit records remain infrastructure writes; this is
+business-operation suspension, not an entirely SELECT-only API database role.
+
+After an authorized release: verify backup/restore and source/schema compatibility,
+start only the matching API in recovery, reconcile frozen production evidence
+through the existing B6 contracts, and retain independently verified review and
+exception dispositions. Preparation, deployment, reconciliation, provider/worker
+commissioning and B7/D10 activation are separate steps. Disabling recovery alone
+does not enable V2: production joining/approval/progress gates and financial
+selectors remain disabled/LegacyV1 until separately implemented authorized cutover
+wiring exists. Do not select the demo or pilot for real members.
+
+On failure, keep writers stopped and retain failed evidence. Emergency suspension
+uses an authorized stop or restart in recovery; it does not cancel already-running
+transactions or providers. Restore an approved backup to a separate compatible
+database, or perform separately reviewed forward remediation. Do not erase
+financial/history evidence with EF Down. Migrator host or tenant failure returns
+failure and stops remaining databases; successful earlier database migrations are
+not automatically undone. Recovery mode rejects the migrator before bootstrap.
+
 ## 2. Safe payment/approval deployment order
 
 ```mermaid

@@ -48,6 +48,7 @@ namespace AqualLifeStyle.Web.Host.Startup
             // demo request fails with the explicit non-production boundary.
             AQGreenV2DemoConfiguration.Validate(_environment, _appConfiguration);
             AQGreenV2PilotConfiguration.Validate(_environment, _appConfiguration);
+            DeploymentConfigurationValidator.Validate(_environment, _appConfiguration);
         }
 
         public void ConfigureServices(IServiceCollection services)
@@ -138,6 +139,8 @@ namespace AqualLifeStyle.Web.Host.Startup
                 AQGreenV2DemoConfiguration.RegisterCheckoutGateway(
                     services, _environment, _appConfiguration);
             services.Configure<BirdOptions>(_appConfiguration.GetSection("Bird"));
+            if (ApplicationRecoveryMode.IsEnabled(_appConfiguration))
+                services.Configure<BirdOptions>(options => options.Enabled = false);
             services.AddHttpClient<ITransactionalEmailDeliveryGateway, BirdTransactionalEmailDeliveryGateway>(client =>
             {
                 client.Timeout = TimeSpan.FromSeconds(15);
@@ -167,6 +170,7 @@ namespace AqualLifeStyle.Web.Host.Startup
             app.UseAbp(options => { options.UseAbpRequestLocalization = false; }); // Initializes ABP framework.
 
             app.UseCors(_defaultCorsPolicyName); // Enable CORS!
+            app.UseMiddleware<ApplicationRecoveryMiddleware>();
 
             app.UseStaticFiles();
 

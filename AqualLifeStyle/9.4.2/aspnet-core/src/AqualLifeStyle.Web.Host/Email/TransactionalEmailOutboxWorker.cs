@@ -28,6 +28,7 @@ namespace AqualLifeStyle.Web.Host.Email
 
         protected override async Task DoWorkAsync()
         {
+            if (AqualLifeStyle.Configuration.ApplicationRecoveryMode.IsEnabled(_configuration)) return;
             PilotMode.DenyOutsidePilot("External email delivery worker");
             if (!_configuration.GetValue<bool>("Bird:Enabled")) return;
             await _processor.ProcessPendingAsync();

@@ -19,6 +19,10 @@ using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Web.Host.AQGreenV2Demo;
 using AqualLifeStyle.Web.Host.AQGreenV2Pilot;
+using Microsoft.Extensions.Hosting;
+using Abp.Domain.Uow;
+using Abp.EntityFrameworkCore.Uow;
+using AqualLifeStyle.EntityFrameworkCore;
 
 namespace AqualLifeStyle.Web.Host.Startup
 {
@@ -43,6 +47,8 @@ namespace AqualLifeStyle.Web.Host.Startup
 
         public override void PreInitialize()
         {
+            if (ApplicationRecoveryMode.IsEnabled(_appConfiguration))
+                Configuration.BackgroundJobs.IsJobExecutionEnabled = false;
             var pilot = AQGreenV2PilotConfiguration.Validate(_env, _appConfiguration);
             if (pilot)
             {
@@ -91,6 +97,15 @@ namespace AqualLifeStyle.Web.Host.Startup
 
         public override void PostInitialize()
         {
+            if (_env.IsProduction() || ApplicationRecoveryMode.IsEnabled(_appConfiguration))
+            {
+                var manager = IocManager.Resolve<IUnitOfWorkManager>();
+                using (var uow = manager.Begin())
+                {
+                    DatabaseReleasePreflight.Verify(manager.Current.GetDbContext<AqualLifeStyleDbContext>());
+                    uow.Complete();
+                }
+            }
             // PostInitialize is called after ABP modules are started. Resolve the
             // ErrorInfoBuilder here and add our converter so ABP will build
             // descriptive ErrorInfo instances for known exceptions.
@@ -108,8 +123,9 @@ namespace AqualLifeStyle.Web.Host.Startup
                 // to default behavior if the ErrorInfoBuilder is not available.
             }
 
-            if (AQGreenV2PilotConfiguration.Validate(_env, _appConfiguration))
-                return; // No outbound delivery, monthly, Onyx or automatic financial worker in the pilot.
+            if (ApplicationRecoveryMode.IsEnabled(_appConfiguration) ||
+                AQGreenV2PilotConfiguration.Validate(_env, _appConfiguration))
+                return; // Recovery and pilot never register provider or financial workers.
 
             IocManager.Resolve<IBackgroundWorkerManager>().Add(
                 IocManager.Resolve<YocoPaymentOperationsMonitor>());

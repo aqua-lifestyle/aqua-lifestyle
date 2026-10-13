@@ -48,6 +48,7 @@ namespace AqualLifeStyle.Payments.Yoco
 
         public async Task<YocoCheckout> CreateAsync(CreateYocoCheckout checkout)
         {
+            AqualLifeStyle.Configuration.ApplicationRecoveryMode.DenyBusinessOperation(_configuration);
             if (_configuration.GetValue<bool>("AQGreenV2Demo:Enabled") ||
                 string.Equals(_configuration["ASPNETCORE_ENVIRONMENT"],
                     "AQGreenV2Demo", StringComparison.Ordinal))
