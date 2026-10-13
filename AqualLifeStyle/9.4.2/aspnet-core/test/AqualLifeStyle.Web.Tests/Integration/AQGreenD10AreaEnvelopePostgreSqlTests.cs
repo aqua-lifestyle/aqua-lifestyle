@@ -27,12 +27,13 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Shouldly;
 using Xunit;
+using AqualLifeStyle.Web.Tests.Controllers;
 
 namespace AqualLifeStyle.Web.Tests.Integration
 {
     public sealed partial class AQGreenPlacementV2ApprovalPostgreSqlTests
     {
-        [Fact]
+        [DiscoveryPostgreSqlFact]
         public async Task D10Area_ProspectiveJoinAndRetryAllowA_OnyxMoveToBDeniesFinancialSelectionWithoutDiscardingEvidence()
         {
             IsPostgreSqlRegressionMode().ShouldBeTrue(); LoginAsDefaultTenantAdmin();
@@ -109,7 +110,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 .ShouldBe(AQGreenCommissionStructuralModel.LegacyV1);
         }
 
-        [Fact]
+        [DiscoveryPostgreSqlFact]
         public async Task D10Area_ConcurrentSponsorMoveIsResolvedUnderLock_AndFinalDestinationDeniesJoinAndCheckoutWithoutWrites()
         {
             IsPostgreSqlRegressionMode().ShouldBeTrue(); LoginAsDefaultTenantAdmin();
@@ -148,7 +149,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             await UsingDbContextAsync(async context => (await context.Customers.SingleAsync(c => c.Id == member.CustomerId)).AreaId.ShouldBe(fixture.AreaId));
         }
 
-        [Fact]
+        [DiscoveryPostgreSqlFact]
         public async Task D10Area_CheckoutWaitsForAreaMove_AndReadsCommittedScopeBeforeAnyObligationOrProviderCall()
         {
             IsPostgreSqlRegressionMode().ShouldBeTrue(); LoginAsDefaultTenantAdmin();
@@ -184,7 +185,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             (await D10AreaBusinessStateAsync(member.CustomerId)).ShouldBe(before); gateway.Calls.ShouldBe(0);
         }
 
-        [Theory]
+        [DiscoveryPostgreSqlTheory]
         [InlineData(IsolationLevel.RepeatableRead)]
         [InlineData(IsolationLevel.Serializable)]
         public async Task D10Area_RepeatableSnapshotCannotAuthorizeResolvedDestinationOrFinancialSelection(IsolationLevel isolation)
@@ -208,7 +209,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             gateway.Calls.ShouldBe(0); (await D10AreaBusinessStateAsync(member.CustomerId)).ShouldBe(before);
         }
 
-        [Theory]
+        [DiscoveryPostgreSqlTheory]
         [InlineData("missing")]
         [InlineData("missing-assignment")]
         [InlineData("conflicting")]

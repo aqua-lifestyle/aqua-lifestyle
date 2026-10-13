@@ -205,6 +205,8 @@ jobs:
     name: Backend web coverage partition
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
     defaults:
       run:
         working-directory: AqualLifeStyle/9.4.2/aspnet-core
@@ -276,6 +278,7 @@ jobs:
       run:
         working-directory: AqualLifeStyle/9.4.2/aspnet-core
     env:
+      ASPNETCORE_ENVIRONMENT: Development
       SHARD: ${{ matrix.shard }}
       TEST_FILTER: ${{ matrix.filter }}
       RESULTS_DIR: TestResults/${{ matrix.shard }}
@@ -458,6 +461,7 @@ jobs:
           --health-timeout 5s
           --health-retries 6
     env:
+      ASPNETCORE_ENVIRONMENT: Development
       REPRO_PG: "true"
       REPRO_TRANSACTIONAL: "true"
       REPRO_PG_CONNECTION: "Host=localhost;Port=5432;Database=aqual_ci;Username=aqual_ci;Password=aqual_ci_tests_only"
@@ -479,7 +483,7 @@ jobs:
       - name: Build web tests
         run: dotnet build test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --no-restore
       - name: Run transactional regressions on PostgreSQL
-        run: dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~InternalAccountInvitation|FullyQualifiedName~WeeklyCommissionPostgreSqlApplicationPathTests|FullyQualifiedName~WeeklyCommissionProductionLikeE2ETests|FullyQualifiedName~AdminCommissionPayoutMutationPostgreSqlTests|FullyQualifiedName~AQGreenPlacementV2ApprovalPostgreSqlTests|FullyQualifiedName~AQGreenPlacementV2ProgressTests.EnabledV2Progress_RealPostgreSqlB4" --logger "trx;LogFileName=pg-regressions.trx" --results-directory TestResults
+        run: dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~InternalAccountInvitation|FullyQualifiedName~WeeklyCommissionPostgreSqlApplicationPathTests|FullyQualifiedName~WeeklyCommissionProductionLikeE2ETests|FullyQualifiedName~AdminCommissionPayoutMutationPostgreSqlTests|(FullyQualifiedName~AQGreenPlacementV2ApprovalPostgreSqlTests&FullyQualifiedName!~D10)|FullyQualifiedName~AQGreenPlacementV2ProgressTests.EnabledV2Progress_RealPostgreSqlB4" --logger "trx;LogFileName=pg-regressions.trx" --results-directory TestResults
       - name: Verify the regressions really ran under PostgreSQL and were not skipped
         shell: bash
         run: |
@@ -521,6 +525,34 @@ jobs:
             exit 1
           fi
           echo "PostgreSQL transactional regressions ran and passed (neither skipped); visibility + rollback guarded."
+      # Frozen D10 fixtures require a complete, isolated population. Reuse this
+      # job's existing PostgreSQL service, with a fresh model-created database.
+      - name: Prepare isolated synthetic D10 population
+        run: docker exec '${{ job.services.postgres.id }}' createdb -U aqual_ci aqual_d10
+      - name: Run isolated D10 cutover and Area regressions
+        env:
+          REPRO_PG_SCHEMA_FROM_MODEL: "true"
+          REPRO_PG_CONNECTION: "Host=localhost;Port=5432;Database=aqual_d10;Username=aqual_ci;Password=aqual_ci_tests_only"
+          ConnectionStrings__Default: "Host=localhost;Port=5432;Database=aqual_d10;Username=aqual_ci;Password=aqual_ci_tests_only"
+        run: dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~D10Cutover_|FullyQualifiedName~D10Area_" --logger "trx;LogFileName=d10-pg-regressions.trx" --results-directory TestResults
+      - name: Verify complete D10 PostgreSQL execution
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $settings = [System.Xml.XmlReaderSettings]::new()
+          $settings.DtdProcessing = [System.Xml.DtdProcessing]::Prohibit
+          $reader = [System.Xml.XmlReader]::Create('TestResults/d10-pg-regressions.trx', $settings)
+          $trx = [System.Xml.XmlDocument]::new()
+          try { $trx.Load($reader) } finally { $reader.Dispose() }
+          $results = @($trx.SelectNodes("/*[local-name()='TestRun']/*[local-name()='Results']/*[local-name()='UnitTestResult']"))
+          $actual = @($results | ForEach-Object { $_.GetAttribute('testName') })
+          if ($results.Count -ne 14 -or (@($actual | Sort-Object -Unique)).Count -ne 14 -or
+              @($results | Where-Object { $_.GetAttribute('outcome') -ne 'Passed' }).Count -ne 0 -or
+              @($actual | Where-Object { $_ -like '*D10Cutover_*' }).Count -ne 5 -or
+              @($actual | Where-Object { $_ -like '*D10Area_*' }).Count -ne 9) {
+            throw 'D10 PostgreSQL population tests were missing, duplicated, skipped or failed'
+          }
+          Write-Output 'PASS: all 14 isolated D10 PostgreSQL cases executed and passed.'
       - name: Upload PostgreSQL regression results
         if: always()
         uses: actions/upload-artifact@v6

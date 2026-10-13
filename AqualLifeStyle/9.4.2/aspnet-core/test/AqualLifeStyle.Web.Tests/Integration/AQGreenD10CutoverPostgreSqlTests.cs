@@ -15,12 +15,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Shouldly;
 using Xunit;
+using AqualLifeStyle.Web.Tests.Controllers;
 
 namespace AqualLifeStyle.Web.Tests.Integration
 {
     public sealed partial class AQGreenPlacementV2ApprovalPostgreSqlTests
     {
-        [Fact]
+        [DiscoveryPostgreSqlFact]
         public async Task D10Cutover_AuthorisedPopulationUsesAtomicV2Approval_AndPreservesHistoricalFinancialSelection()
         {
             IsPostgreSqlRegressionMode().ShouldBeTrue(); LoginAsDefaultTenantAdmin();
@@ -54,7 +55,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             await AssertApprovalUserLockAvailableAsync(fixture.UserId);
         }
 
-        [Fact]
+        [DiscoveryPostgreSqlFact]
         public async Task D10Cutover_LateApprovalFailureRollsBackEveryEffect_ThenRetriesUnderSameFrozenAuthority()
         {
             IsPostgreSqlRegressionMode().ShouldBeTrue(); LoginAsDefaultTenantAdmin();
@@ -69,7 +70,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 (await context.AQGreenNetworkPlacements.CountAsync(p => p.ParticipantId == fixture.ParticipantId)).ShouldBe(1));
         }
 
-        [Fact]
+        [DiscoveryPostgreSqlFact]
         public async Task D10Cutover_MissingAuthorityWrongScopeDriftAndRecoveryCannotFallBackToV1()
         {
             IsPostgreSqlRegressionMode().ShouldBeTrue(); LoginAsDefaultTenantAdmin();
@@ -94,7 +95,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             await AssertNoApprovalSideEffectsAsync(fixture.ParticipantId, fixture.UserId);
         }
 
-        [Fact]
+        [DiscoveryPostgreSqlFact]
         public async Task D10Cutover_PreEffectiveFenceAndUnreconciledLegacyOnlyMemberDenyWithoutMutation()
         {
             IsPostgreSqlRegressionMode().ShouldBeTrue(); LoginAsDefaultTenantAdmin();
@@ -158,7 +159,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             return (source, IocManager.Resolve<AQGreenD10Runtime>(), configuration, evidence);
         }
 
-        [Fact]
+        [DiscoveryPostgreSqlFact]
         public async Task D10Cutover_PostBoundaryV1LedgerBlocksCommissioningAndRemainsUnchanged()
         {
             IsPostgreSqlRegressionMode().ShouldBeTrue(); LoginAsDefaultTenantAdmin();
