@@ -41,6 +41,26 @@ flowchart TD
 | Monthly compliance | Due/grace/payment timestamps and policy coverage | Current obligation status alone |
 | Loan compliance | Effective date, due/satisfaction/repayment/deadline facts | Current outstanding/status projection alone |
 
+### Retained sources and the limits of their authority
+
+The following are source contracts identified in code; production availability,
+custody, completeness and historical authorization have not been verified here.
+A database row is not automatically proof that its historical assertion is true.
+
+| Essential fact | Actual retained source | Can establish, subject to provenance verification | Cannot establish alone |
+| --- | --- | --- | --- |
+| Member identity / Tenant / Area | `Customers` identity and ownership keys; `CustomerAreaAssignments` effective dates, baseline and audit metadata | Current internal identity; recorded same-Tenant assignment intervals; controlled system-introduction baseline when its migration/authorization provenance is verified | Original Aqua registration, earlier business membership, pre-baseline Area, historical permission from today's security state |
+| Sponsor / acquisition | `EntryParticipations` plus complete `EntryRecruiterCorrections`; immutable `AQGreenRecruitmentAttributions` / confirmations and referenced `ProgrammeInvitations` | Recorded recruitment credit and confirmation; conditional reconstruction from validated complete corrections and activation | Original sponsor from current recruiter alone, invitation existence as acceptance, root acceptance from a null recruiter, facilitator/Area-leader referral as AQGreen member sponsorship |
+| Joining money / finality | Owned linked `MemberPayments`; matching joining checkout; authenticated processing evidence in `YocoWebhookReceipts` and provider/accounting evidence retained by the operator | Recorded purpose/amount/currency/confirmation and accepted-event provenance when ownership, reference, finality and chronology reconcile | Cash/legacy payments never recorded here; provider settlement/refund/reversal state from `Confirmed` alone; `ProcessedAt` as provider capture time; browser return as payment |
+| Approval / activation | `EntryParticipationApprovalDecisions`, `ActivatedAt`, contemporaneous Area/actor authority evidence | Matching recorded positive approval/activation transition with verified historical authority | Activation from payment, `Customer.IsActive`, current role or migration date; Area authorization merely because an actor ID is present |
+| Placement / populations | `AQGreenNetworkPlacements` and tree scopes; V1 `EffectiveProgrammeNetwork` and B6 derived analysis; D03B root dispositions / D09 populations | Observed V2 placements; conditional V1 reconstruction and separately reviewed B6 proposals | An immutable stored V1 placement history (none identified); topology as sponsor credit or financial eligibility; current status as exact old-cutoff lifecycle; a proposed scope as historical root |
+| Ordering / corrections | `StartedAt`, verified activation, complete `EntryRecruiterCorrections`; existing V1/B6 ordering logic; `AQGreenMigrationBackup` | Conditional as-of recruiter/order reconstruction; backup of old terms version/effective date from the joining transformation | Invented tie times, missing corrections, old terms as proof of payment or original activation; technical GUID tie-break order as recruitment time |
+
+No authoritative original member-register, cash/bank/payment ledger, legacy sponsor
+register or legacy approval-document format has been supplied. No adapter is built
+for those unknown formats. Real legacy-only facts remain unresolved until those
+sources and their identity/provenance mappings are available.
+
 ## 3. Legacy AQGreen members
 
 Legitimate Aqua members may predate modern application onboarding and have no `EntryParticipation`, checkout, or `MemberPayment` history. Their absence from modern tables is not proof that they did not pay or are not covered.
@@ -89,7 +109,7 @@ The endpoint disables auditing of export inputs/results. Keep packages outside G
 and logs, in restricted operator storage; technical IDs and joining amounts remain
 sensitive. This is not the sanitised external B6 handoff.
 
-`AQGreenB6ReconciliationDiscoveryEvidenceV1` uses the existing B6 canonical UTF-8
+`AQGreenB6ReconciliationDiscoveryEvidenceV2` uses the existing B6 canonical UTF-8
 JSON, SHA-256 and `B6TUPLE1` population-digest conventions. The result supplies
 `Manifest`, `Records` and `Sha256Sums`; `ManifestBytes()` and `RecordsBytes()` give
 the exact bytes for `manifest.json` / `records.json`, with UTF-8 `SHA256SUMS`.
@@ -101,6 +121,26 @@ content, scope, cutoff and implementation. The full manifest hash additionally
 seals source observation boundaries, which may differ on another extraction.
 The cutoff is for offline analysis; it does not reconstruct mutable state at that
 historical time or filter the observed inventory into an eligibility population.
+
+V2 adds the established `CustomerAreaAssignments` source to the same snapshot and
+hash/count conventions. Each allowlisted row includes source assignment ID,
+authorized Area identity, effective interval, migration-baseline/tombstone flags,
+recording/modification/deletion times and actor-presence booleans. Free text and
+actor identities are omitted. History is constrained to the exact returned
+customer/Tenant identities; unauthorized former Area IDs are withheld explicitly.
+Retained deleted rows remain visible as tombstones. Missing history, earlier
+unknown intervals, baseline limits, gaps, overlaps and current-projection conflicts
+are recorded. Existing review processing preserves these supplemental issues and
+blocks effective acceptance while audit/authorization provenance remains unknown.
+
+This table is effective-dated but mutable/audited, not an immutable authority.
+`AreaHistoryEvidenceIssues` always requires audit/authorization corroboration;
+the supplement never approves a member or clears other historical uncertainties.
+It is hashed into each discovery record and the exact manifest, so older review
+acceptance cannot be reused silently. Archived V1 packages retain their original
+canonical bytes/hashes; absent V1 supplement fields mean history was not exported,
+not that no Area history existed. The old synthetic artifacts are retained intact.
+Current exports always emit V2; no uncertainty-triggered downgrade to V1 exists.
 
 The package can be deserialised without database access and supplied to
 `SimulateWholeScope` with explicit source-bound review classifications for every

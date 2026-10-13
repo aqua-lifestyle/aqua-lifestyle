@@ -33,6 +33,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         private const int MaximumGraduationTransactionAttempts = 3;
         private readonly IAQGreenReconciliationEvidenceSnapshot _reconciliationEvidenceSnapshot;
         private readonly ICustomerRepository _customerRepository;
+        private readonly IRepository<CustomerAreaAssignment, Guid> _customerAreaAssignmentRepository;
         private readonly IRepository<EntryParticipation, Guid> _entryParticipationRepository;
         private readonly IRepository<OnyxParticipation, Guid> _onyxParticipationRepository;
         private readonly IRepository<OnyxLoanAgreement, Guid> _onyxLoanAgreementRepository;
@@ -113,8 +114,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             IAQGreenGraduationStructuralEvidenceEvaluator graduationStructuralEvidenceEvaluator,
             IAQGreenV2GraduationEvidenceReplayValidator graduationEvidenceReplayValidator,
             IOnyxGraduationTransactionFailureClassifier graduationFailureClassifier,
-            IAQGreenReconciliationEvidenceSnapshot reconciliationEvidenceSnapshot)
+            IAQGreenReconciliationEvidenceSnapshot reconciliationEvidenceSnapshot,
+            IRepository<CustomerAreaAssignment, Guid> customerAreaAssignmentRepository)
         {
+            _customerAreaAssignmentRepository = customerAreaAssignmentRepository;
             _reconciliationEvidenceSnapshot = reconciliationEvidenceSnapshot;
             _customerRepository = customerRepository;
             _entryParticipationRepository = entryParticipationRepository;
@@ -1620,8 +1623,19 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     .ToListAsync();
 
                 if (exportRecords != null)
+                {
+                    // Include retained tombstones without disabling ownership checks.
+                    // Current authorized discovery rows define the customer population.
+                    var areaHistory = await _customerAreaAssignmentRepository.GetAll().IgnoreQueryFilters().AsNoTracking()
+                        .Where(a => customerIds.Contains(a.CustomerId) && tenantIds.Contains(a.TenantId))
+                        .OrderBy(a => a.EffectiveFrom).ThenBy(a => a.Id).ToListAsync();
                     foreach (var row in rows)
-                        exportRecords.Add(MapReconciliationExport(row, payments, checkouts, attributions, confirmations, placements));
+                    {
+                        var record = MapReconciliationExport(row, payments, checkouts, attributions, confirmations, placements);
+                        AddRecordedAreaHistory(record, areaHistory, exportAreaScope);
+                        exportRecords.Add(record);
+                    }
+                }
 
                 return new PagedResultDto<LegacyAQGreenReconciliationDto>(
                     total,
@@ -1744,6 +1758,53 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     ParentParticipantId = placement.PlacementParentParticipantId, Slot = placement.PlacementSlot, PlacedAt = placement.PlacedAt,
                     RulesVersion = placement.RulesVersion }
             };
+        }
+
+        private static void AddRecordedAreaHistory(AQGreenReconciliationEvidenceRecord record,
+            IReadOnlyCollection<CustomerAreaAssignment> history, Guid[] authorizedAreas)
+        {
+            var rows = history.Where(a => a.TenantId == record.TenantId && a.CustomerId == record.CustomerId)
+                .OrderBy(a => a.EffectiveFrom).ThenBy(a => a.Id).ToList();
+            var issues = new List<string> { "AREA_HISTORY_REQUIRES_AUDIT_AND_AUTHORIZATION_CORROBORATION" };
+            if (rows.Count == 0) issues.Add("AREA_HISTORY_RECORDS_MISSING");
+            else issues.Add("AREA_BEFORE_FIRST_RETAINED_ASSIGNMENT_UNVERIFIABLE");
+            if (rows.Any(a => a.IsMigrationBaseline)) issues.Add("PRE_BASELINE_AREA_UNVERIFIABLE");
+            if (rows.Any(a => a.IsDeleted)) issues.Add("DELETED_AREA_HISTORY_REQUIRES_REVIEW");
+            var live = rows.Where(a => !a.IsDeleted).ToList();
+            if (live.Any(a => a.EffectiveTo < a.EffectiveFrom || a.EffectiveFrom.Kind != DateTimeKind.Utc ||
+                (a.EffectiveTo.HasValue && a.EffectiveTo.Value.Kind != DateTimeKind.Utc)))
+                issues.Add("AREA_HISTORY_TIME_CONFLICT");
+            if (live.GroupBy(a => a.EffectiveFrom).Any(g => g.Count() > 1)) issues.Add("AREA_HISTORY_EQUAL_TIME_CONFLICT");
+            for (var index = 1; index < live.Count; index++)
+            {
+                var previous = live[index - 1]; var next = live[index];
+                if (!previous.EffectiveTo.HasValue || previous.EffectiveTo > next.EffectiveFrom)
+                    issues.Add("AREA_HISTORY_INTERVALS_CONFLICT");
+                else if (previous.EffectiveTo < next.EffectiveFrom) issues.Add("AREA_HISTORY_GAP_UNVERIFIABLE");
+            }
+            var current = live.Where(a => !a.EffectiveTo.HasValue).ToList();
+            if (current.Count != 1) issues.Add("AREA_HISTORY_CURRENT_UNVERIFIABLE");
+            else if (current[0].AreaId != record.CurrentAreaId) issues.Add("AREA_HISTORY_CURRENT_PROJECTION_CONFLICT");
+            record.AreaAssignmentHistory = rows.Select(a =>
+            {
+                var visible = authorizedAreas == null || authorizedAreas.Contains(a.AreaId);
+                if (!visible) issues.Add("AREA_HISTORY_AREA_OUTSIDE_AUTHORIZED_SCOPE");
+                return new AQGreenCustomerAreaAssignmentEvidence
+                {
+                    SourceAssignmentId = a.Id, AreaId = visible ? a.AreaId : null,
+                    AreaIdentityEvidence = visible ? "RECORDED_SAME_TENANT_AREA" : "WITHHELD_UNAUTHORIZED_AREA",
+                    EffectiveFrom = a.EffectiveFrom, EffectiveTo = a.EffectiveTo,
+                    IsMigrationBaseline = a.IsMigrationBaseline, IsDeleted = a.IsDeleted, RecordedAt = a.CreationTime,
+                    LastModifiedAt = a.LastModificationTime, DeletedAt = a.DeletionTime,
+                    RecordingActorPresent = a.CreatorUserId.HasValue, ModificationActorPresent = a.LastModifierUserId.HasValue
+                };
+            }).ToList();
+            record.AreaHistoryEvidenceIssues = issues.Distinct().OrderBy(x => x, StringComparer.Ordinal).ToArray();
+            // Do not resolve historical uncertainty or mutate any business value.
+            // Actual contradictions/gaps must also block existing review acceptance.
+            record.HistoricalEvidenceIssues = record.HistoricalEvidenceIssues.Concat(issues.Where(x =>
+                x.EndsWith("_CONFLICT", StringComparison.Ordinal) || x == "AREA_HISTORY_GAP_UNVERIFIABLE"))
+                .Distinct().OrderBy(x => x, StringComparer.Ordinal).ToArray();
         }
 
         private static void RestrictExportRelationships(List<AQGreenReconciliationEvidenceRecord> records)

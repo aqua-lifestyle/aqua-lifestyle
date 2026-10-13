@@ -101,9 +101,13 @@ namespace AqualLifeStyle.Domain.AQGreen
             {
                 changed = false;
                 foreach (var c in inventory.Components)
-                    if (byComponent[c.ComponentDigest].EffectiveDisposition == "ACCEPTED" &&
+                    if ((byComponent[c.ComponentDigest].EffectiveDisposition == "ACCEPTED" ||
+                         source.Manifest.PackageVersion == AQGreenReconciliationEvidenceManifest.Version) &&
                         c.DependentComponentDigests.Any(id => byComponent[id].EffectiveDisposition != "ACCEPTED"))
-                    { Block(byComponent[c.ComponentDigest], "DEPENDENT_COMPONENT_NOT_ACCEPTED"); changed = true; }
+                    {
+                        changed |= byComponent[c.ComponentDigest].EffectiveDisposition == "ACCEPTED";
+                        Block(byComponent[c.ComponentDigest], "DEPENDENT_COMPONENT_NOT_ACCEPTED");
+                    }
             } while (changed);
             foreach (var c in inventory.Components)
                 byComponent[c.ComponentDigest].DependentComponentDigests = c.DependentComponentDigests;
@@ -142,7 +146,8 @@ namespace AqualLifeStyle.Domain.AQGreen
         private static AQGreenFrozenReviewSubjectResult SubjectResult(string type, string id, string[] members,
             AQGreenFrozenReviewDecision d, IReadOnlyDictionary<string, AQGreenReconciliationEvidenceRecord> records)
         {
-            var unresolved = members.SelectMany(key => records[key].HistoricalEvidenceIssues.Select(issue => key + ":" + issue))
+            var unresolved = members.SelectMany(key => records[key].HistoricalEvidenceIssues
+                .Concat(records[key].AreaHistoryEvidenceIssues ?? Array.Empty<string>()).Select(issue => key + ":" + issue))
                 .OrderBy(x => x, StringComparer.Ordinal).ToArray();
             var result = new AQGreenFrozenReviewSubjectResult { SubjectType = type, SubjectId = id, MemberDiscoveryIds = members,
                 DecisionReference = d?.DecisionReference, RequestedDisposition = d?.Disposition ?? "UNREVIEWED",

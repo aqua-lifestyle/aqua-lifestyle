@@ -20,7 +20,7 @@ namespace AqualLifeStyle.Domain.AQGreen
             foreach (var record in records) record.RecordDigest = AQGreenB6CanonicalEvidence.Digest(record, "recordDigest");
             manifest.RecordCount = records.Count;
             manifest.ClassificationCounts = Counts(records);
-            manifest.SourceRecordCounts = SourceCounts(records);
+            manifest.SourceRecordCounts = SourceCounts(records, manifest.PackageVersion);
             manifest.CandidatePopulationDigest = PopulationDigest(records);
             manifest.RecordsDigest = AQGreenB6CanonicalEvidence.Digest(records);
             manifest.OverallSnapshotDigest = ContentDigest(manifest);
@@ -34,7 +34,8 @@ namespace AqualLifeStyle.Domain.AQGreen
         {
             void Require(bool condition) { if (!condition) throw new InvalidOperationException("Reconciliation evidence integrity check failed."); }
             Require(Manifest != null && Records != null);
-            Require(Manifest.PackageVersion == AQGreenReconciliationEvidenceManifest.Version &&
+            Require((Manifest.PackageVersion == AQGreenReconciliationEvidenceManifest.Version ||
+                Manifest.PackageVersion == AQGreenReconciliationEvidenceManifest.LegacyVersion) &&
                 Manifest.TenantId > 0 && Manifest.AnalysisSnapshotCutoffUtc.Kind == DateTimeKind.Utc &&
                 Manifest.AnalysisSnapshotCutoffUtc <= Manifest.SourceBoundary.SourceObservedAtUtc &&
                 Manifest.SourceBoundary.TransactionMode == "REPEATABLE READ READ ONLY");
@@ -46,6 +47,10 @@ namespace AqualLifeStyle.Domain.AQGreen
                 Records.Count(r => r.ParticipationId.HasValue));
             foreach (var record in Records)
             {
+                Require(Manifest.PackageVersion == AQGreenReconciliationEvidenceManifest.LegacyVersion
+                    ? record.AreaAssignmentHistory == null && record.AreaHistoryEvidenceIssues == null
+                    : record.AreaAssignmentHistory != null && record.AreaHistoryEvidenceIssues != null &&
+                        Manifest.SourceTables.Contains("CustomerAreaAssignments"));
                 Require(record.TenantId == Manifest.TenantId && record.CustomerId > 0 &&
                     record.DiscoveryId == FormattableString.Invariant($"aqgreen:{record.TenantId}:{record.CustomerId}") &&
                     (Manifest.WholeTenant || (record.CurrentAreaId.HasValue && Manifest.AuthorizedAreaIds.Contains(record.CurrentAreaId.Value))) &&
@@ -54,7 +59,7 @@ namespace AqualLifeStyle.Domain.AQGreen
             Require(Manifest.RecordsDigest == AQGreenB6CanonicalEvidence.Digest(Records) &&
                 Manifest.CandidatePopulationDigest == PopulationDigest(Records) &&
                 AQGreenB6CanonicalEvidence.Digest(Manifest.ClassificationCounts) == AQGreenB6CanonicalEvidence.Digest(Counts(Records)) &&
-                AQGreenB6CanonicalEvidence.Digest(Manifest.SourceRecordCounts) == AQGreenB6CanonicalEvidence.Digest(SourceCounts(Records)) &&
+                AQGreenB6CanonicalEvidence.Digest(Manifest.SourceRecordCounts) == AQGreenB6CanonicalEvidence.Digest(SourceCounts(Records, Manifest.PackageVersion)) &&
                 Manifest.OverallSnapshotDigest == ContentDigest(Manifest) &&
                 Manifest.ManifestHash == AQGreenB6CanonicalEvidence.Digest(Manifest, "manifestHash") && Sha256Sums == Checksums());
         }
@@ -66,8 +71,10 @@ namespace AqualLifeStyle.Domain.AQGreen
         private string Checksums() => $"{AQGreenB6CanonicalEvidence.Hash(RecordsBytes())}  records.json\n{AQGreenB6CanonicalEvidence.Hash(ManifestBytes())}  manifest.json\n";
         private static SortedDictionary<string, int> Counts(IEnumerable<AQGreenReconciliationEvidenceRecord> records) =>
             new(records.GroupBy(r => r.DiscoveryKind).ToDictionary(g => g.Key, g => g.Count()), StringComparer.Ordinal);
-        private static SortedDictionary<string, int> SourceCounts(IReadOnlyCollection<AQGreenReconciliationEvidenceRecord> records) => new(StringComparer.Ordinal)
+        private static SortedDictionary<string, int> SourceCounts(IReadOnlyCollection<AQGreenReconciliationEvidenceRecord> records, string packageVersion)
         {
+            var counts = new SortedDictionary<string, int>(StringComparer.Ordinal)
+            {
             ["Customers"] = records.Count,
             ["LegacyAQGreenAssignments"] = records.Count(r => r.LegacyMembershipId.HasValue),
             ["EntryParticipations"] = records.Count(r => r.ParticipationId.HasValue),
@@ -77,8 +84,12 @@ namespace AqualLifeStyle.Domain.AQGreen
             ["EntryRecruiterCorrections"] = records.Sum(r => r.RecruiterCorrections.Count),
             ["AQGreenRecruitmentAttributions"] = records.Count(r => r.Attribution != null),
             ["AQGreenRecruitmentAttributionConfirmations"] = records.Count(r => r.AttributionConfirmation != null),
-            ["AQGreenNetworkPlacements"] = records.Count(r => r.Placement != null)
-        };
+                ["AQGreenNetworkPlacements"] = records.Count(r => r.Placement != null)
+            };
+            if (packageVersion == AQGreenReconciliationEvidenceManifest.Version)
+                counts["CustomerAreaAssignments"] = records.Sum(r => r.AreaAssignmentHistory?.Count ?? 0);
+            return counts;
+        }
         private static string PopulationDigest(IEnumerable<AQGreenReconciliationEvidenceRecord> records) =>
             AQGreenB6CanonicalEvidence.Tuples(records.Select(r => new[] { r.TenantId.ToString(CultureInfo.InvariantCulture),
                 r.CustomerId.ToString(CultureInfo.InvariantCulture), r.ParticipationId?.ToString("D") ?? @"\N", r.RecordDigest }));
@@ -124,7 +135,8 @@ namespace AqualLifeStyle.Domain.AQGreen
 
     public sealed class AQGreenReconciliationEvidenceManifest
     {
-        public const string Version = "AQGreenB6ReconciliationDiscoveryEvidenceV1";
+        public const string LegacyVersion = "AQGreenB6ReconciliationDiscoveryEvidenceV1";
+        public const string Version = "AQGreenB6ReconciliationDiscoveryEvidenceV2";
         public string PackageVersion { get; set; } = Version;
         public int TenantId { get; set; }
         public bool WholeTenant { get; set; }
@@ -133,7 +145,7 @@ namespace AqualLifeStyle.Domain.AQGreen
         public AQGreenReconciliationSourceBoundary SourceBoundary { get; set; }
         public string ExportImplementationDigest { get; set; }
         public string PopulationDefinition { get; set; } = "Current nondeleted customers with AQGreen membership assignment, unverifiable assignment, or AQGreen participation; observed inventory, not historical eligibility.";
-        public string[] SourceTables { get; set; } = new[] { "Customers", "Memberships", "EntryParticipations", "EntryParticipationApprovalDecisions", "EntryRecruiterCorrections", "MemberPayments", "AQGreenJoiningCheckouts", "AQGreenRecruitmentAttributions", "AQGreenRecruitmentAttributionConfirmations", "AQGreenNetworkPlacements", "Areas", "AreaAdminAssignments", "AbpTenants" };
+        public string[] SourceTables { get; set; } = new[] { "Customers", "Memberships", "EntryParticipations", "EntryParticipationApprovalDecisions", "EntryRecruiterCorrections", "MemberPayments", "AQGreenJoiningCheckouts", "AQGreenRecruitmentAttributions", "AQGreenRecruitmentAttributionConfirmations", "AQGreenNetworkPlacements", "Areas", "AreaAdminAssignments", "AbpTenants", "CustomerAreaAssignments" };
         public int RecordCount { get; set; }
         public SortedDictionary<string, int> ClassificationCounts { get; set; }
         public SortedDictionary<string, int> SourceRecordCounts { get; set; }
@@ -173,7 +185,28 @@ namespace AqualLifeStyle.Domain.AQGreen
         public AQGreenAttributionEvidence Attribution { get; set; }
         public AQGreenConfirmationEvidence AttributionConfirmation { get; set; }
         public AQGreenPlacementEvidence Placement { get; set; }
+        // Omit absent supplement fields from V1 canonical bytes: archived source
+        // hashes and review bindings must remain verifiable without reinterpretation.
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public List<AQGreenCustomerAreaAssignmentEvidence> AreaAssignmentHistory { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public string[] AreaHistoryEvidenceIssues { get; set; }
         public string RecordDigest { get; set; }
+    }
+    public sealed class AQGreenCustomerAreaAssignmentEvidence
+    {
+        public Guid SourceAssignmentId { get; set; }
+        public Guid? AreaId { get; set; }
+        public string AreaIdentityEvidence { get; set; }
+        public DateTime EffectiveFrom { get; set; }
+        public DateTime? EffectiveTo { get; set; }
+        public bool IsMigrationBaseline { get; set; }
+        public bool IsDeleted { get; set; }
+        public DateTime RecordedAt { get; set; }
+        public DateTime? LastModifiedAt { get; set; }
+        public DateTime? DeletedAt { get; set; }
+        public bool RecordingActorPresent { get; set; }
+        public bool ModificationActorPresent { get; set; }
     }
     public sealed class AQGreenJoiningPaymentEvidence
     {

@@ -19,7 +19,9 @@ namespace AqualLifeStyle.Web.Tests.Controllers
         [DiscoveryPostgreSqlFact]
         public async Task ReviewBinding_ValidAcceptance_ExactReplay_DeterministicReceipt_WithoutBusinessWrites()
         {
-            var source = await ReviewSourceAsync();
+            // Explicit V1 projection exercises the previously established binding
+            // contract. Current exports use V2 and retain corroboration blockers.
+            var source = await ReviewSourceAsync(legacyEnvelope: true);
             var inventory = ReviewInventory(source);
             var (decisions, authorities) = ReviewDecisions(source, inventory);
             var before = await BusinessSnapshotAsync();
@@ -154,7 +156,7 @@ namespace AqualLifeStyle.Web.Tests.Controllers
             AQGreenB6CanonicalEvidence.Bytes(source).ShouldBe(bytes); (await BusinessSnapshotAsync()).ShouldBe(before);
         }
 
-        private async Task<AQGreenReconciliationEvidencePackage> ReviewSourceAsync(int legacyMembers = 0)
+        private async Task<AQGreenReconciliationEvidencePackage> ReviewSourceAsync(int legacyMembers = 0, bool legacyEnvelope = false)
         {
             var fixture = await SeedAsync(central: true, allTenants: true, exportPermission: true);
             await UsingDbContextAsync(async context =>
@@ -184,6 +186,13 @@ namespace AqualLifeStyle.Web.Tests.Controllers
             var source = await ExportAsync(new ExportLegacyAQGreenReconciliationEvidenceInput
             { TenantId = fixture.ForeignTenantId, WholeTenant = true, AnalysisSnapshotCutoffUtc = RecordedAt.AddDays(1) });
             source.Records[0].HistoricalEvidenceIssues.ShouldBeEmpty();
+            if (legacyEnvelope)
+            {
+                source.Manifest.PackageVersion = AQGreenReconciliationEvidenceManifest.LegacyVersion;
+                source.Manifest.SourceTables = source.Manifest.SourceTables.Where(t => t != "CustomerAreaAssignments").ToArray();
+                foreach (var row in source.Records) { row.AreaAssignmentHistory = null; row.AreaHistoryEvidenceIssues = null; }
+                source = AQGreenReconciliationEvidencePackage.Freeze(source.Manifest, source.Records);
+            }
             return source;
         }
         private static AQGreenFrozenReviewInventory ReviewInventory(AQGreenReconciliationEvidencePackage source) =>
