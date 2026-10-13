@@ -41,7 +41,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
     }
 
     [Collection("AQGreen B3.2 PostgreSQL application path")]
-    public sealed class AQGreenPlacementV2ApprovalPostgreSqlTests
+    public sealed partial class AQGreenPlacementV2ApprovalPostgreSqlTests
         : AqualLifeStyleWebTestBase
     {
         [Fact]
@@ -917,13 +917,14 @@ namespace AqualLifeStyle.Web.Tests.Integration
             bool includeAttribution = true,
             bool sponsorInDifferentArea = false,
             bool targetPaymentConfirmed = true,
-            bool includeSponsorPlacement = true)
+            bool includeSponsorPlacement = true,
+            DateTime? recordedAt = null)
         {
             var fixture = new ApprovalFixture();
             await UsingDbContextAsync(async context =>
             {
                 context.Database.IsNpgsql().ShouldBeTrue();
-                var now = DateTime.UtcNow.AddMinutes(-10);
+                var now = recordedAt ?? DateTime.UtcNow.AddMinutes(-10);
                 var area = await (
                         from assignment in context.AreaAdminAssignments
                         join candidate in context.Areas on assignment.AreaId equals candidate.Id

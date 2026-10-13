@@ -23,6 +23,7 @@ using Microsoft.Extensions.Hosting;
 using Abp.Domain.Uow;
 using Abp.EntityFrameworkCore.Uow;
 using AqualLifeStyle.EntityFrameworkCore;
+using AqualLifeStyle.Application.ProgrammeParticipations;
 
 namespace AqualLifeStyle.Web.Host.Startup
 {
@@ -50,6 +51,17 @@ namespace AqualLifeStyle.Web.Host.Startup
             if (ApplicationRecoveryMode.IsEnabled(_appConfiguration))
                 Configuration.BackgroundJobs.IsJobExecutionEnabled = false;
             var pilot = AQGreenV2PilotConfiguration.Validate(_env, _appConfiguration);
+            var demo = AQGreenV2DemoConfiguration.Validate(_env, _appConfiguration);
+            if (!pilot && !demo)
+            {
+                Configuration.ReplaceService<IAQGreenD10CommissioningSource, AQGreenD10OperatorEvidenceSource>(DependencyLifeStyle.Singleton);
+                Configuration.ReplaceService<IAQGreenPlacementV2JoiningGate, AQGreenD10JoiningGate>(DependencyLifeStyle.Transient);
+                Configuration.ReplaceService<IAQGreenPlacementV2ApprovalGate, AQGreenD10ApprovalGate>(DependencyLifeStyle.Transient);
+                Configuration.ReplaceService<IAQGreenPlacementV2ProgressGate, AQGreenD10ProgressGate>(DependencyLifeStyle.Transient);
+                Configuration.ReplaceService<IAQGreenWeeklySalesReviewGate, AQGreenD10SalesReviewGate>(DependencyLifeStyle.Transient);
+                Configuration.ReplaceService<IAQGreenCommissionStructuralModelSelector, AQGreenD10CommissionSelector>(DependencyLifeStyle.Transient);
+                Configuration.ReplaceService<IAQGreenGraduationStructuralModelSelector, AQGreenD10GraduationSelector>(DependencyLifeStyle.Transient);
+            }
             if (pilot)
             {
                 Configuration.ReplaceService<IAQGreenPilotMode, AQGreenV2PilotMode>(DependencyLifeStyle.Singleton);
@@ -105,6 +117,8 @@ namespace AqualLifeStyle.Web.Host.Startup
                     DatabaseReleasePreflight.Verify(manager.Current.GetDbContext<AqualLifeStyleDbContext>());
                     uow.Complete();
                 }
+                if (!ApplicationRecoveryMode.IsEnabled(_appConfiguration))
+                    IocManager.Resolve<AQGreenD10Runtime>().VerifyStartupAsync().GetAwaiter().GetResult();
             }
             // PostInitialize is called after ABP modules are started. Resolve the
             // ErrorInfoBuilder here and add our converter so ABP will build

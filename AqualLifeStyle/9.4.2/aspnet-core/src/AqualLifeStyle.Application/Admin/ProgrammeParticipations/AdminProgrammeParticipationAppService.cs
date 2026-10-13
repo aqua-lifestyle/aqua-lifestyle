@@ -30,6 +30,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
     public class AdminProgrammeParticipationAppService
         : AdminAppServiceBase, IAdminProgrammeParticipationAppService
     {
+        public IAQGreenD10CommissioningSource D10Source { get; set; } = UncommissionedAQGreenD10Source.Instance;
         private const int MaximumGraduationTransactionAttempts = 3;
         private readonly IAQGreenReconciliationEvidenceSnapshot _reconciliationEvidenceSnapshot;
         private readonly ICustomerRepository _customerRepository;
@@ -757,6 +758,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     {
                         await _hostedPaymentCheckoutLock
                             .AcquireProgrammeParticipationDecisionAsync(input.ParticipationId);
+                        if (usePlacementV2 &&
+                            !await _placementV2ApprovalGate.IsEnabledAsync(AbpSession.TenantId, input.ParticipationId))
+                            throw new InvalidOperationException("D10_APPROVAL_AUTHORITY_CHANGED_BEFORE_COMMIT");
                         (customer, participationId, decisionApplied) = usePlacementV2
                             ? await ApplyAQGreenV2ApprovalAsync(input.ParticipationId)
                             : await ApplyDecisionAsync(
@@ -1403,6 +1407,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     }
                 }
 
+                var cutover = D10Source.Read();
+                if (input.Programme == AdminProgrammeType.Entry && cutover?.Decision.TenantId == target.TenantId)
+                    throw new InvalidOperationException("D10_HISTORICAL_SPONSOR_CORRECTION_NOT_COMMISSIONED");
                 await policy.CorrectAsync(
                     target.TenantId.Value,
                     target.Id,

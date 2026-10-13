@@ -40,10 +40,15 @@ namespace AqualLifeStyle.Web.Host.Startup
 
         private readonly IConfigurationRoot _appConfiguration;
         private readonly IWebHostEnvironment _environment;
-        public Startup(IWebHostEnvironment env)
+        public Startup(IWebHostEnvironment env, IConfiguration configuration)
         {
             _environment = env;
             _appConfiguration = env.GetAppConfiguration();
+            if (ApplicationRecoveryMode.IsEnabled(_appConfiguration) || ApplicationRecoveryMode.IsEnabled(configuration))
+            {
+                ApplicationRecoveryMode.Latch(_appConfiguration);
+                ApplicationRecoveryMode.Latch(configuration);
+            }
             // Run this before any other Production-only setup so an accidental
             // demo request fails with the explicit non-production boundary.
             AQGreenV2DemoConfiguration.Validate(_environment, _appConfiguration);

@@ -27,6 +27,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
     public class AdminAQGreenWeeklySalesEligibilityAppService
         : AdminAppServiceBase, IAdminAQGreenWeeklySalesEligibilityAppService
     {
+        public IAQGreenD10CommissioningSource D10Source { get; set; } = UncommissionedAQGreenD10Source.Instance;
+        public AqualLifeStyle.Application.ProgrammeParticipations.AQGreenD10Runtime D10Runtime { get; set; }
         private readonly IRepository<AQGreenWeeklySalesEligibilityDecision, Guid>
             _decisionRepository;
         private readonly IRepository<EntryParticipation, Guid> _participationRepository;
@@ -183,6 +185,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             using (DisableAllTenantDataFiltersForHost())
             {
                 await EnsureParticipantScopeAsync(input.TenantId, input.ParticipantId);
+
                 var subjects = await LoadSubjectsAsync(new[]
                 {
                     new ReviewSubjectKey(input.TenantId, input.ParticipantId)
@@ -286,6 +289,14 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     throw new UserFriendlyException(
                         "AQGreen weekly-sales review is disabled.",
                         "This environment has not enabled AQGreen weekly-sales review.");
+                var cutover = D10Source.Read();
+                if (cutover?.Decision.TenantId == input.TenantId)
+                {
+                    AQGreenD10Commissioning.Require(week.StartUtc >= cutover.Decision.V2EffectiveAtUtc && D10Runtime != null,
+                        "D10_SALES_REVIEW_OUTSIDE_FINANCIAL_BOUNDARY");
+                    AQGreenD10Commissioning.Require(await D10Runtime.ForParticipantAsync(input.TenantId, input.ParticipantId, true),
+                        "D10_SALES_REVIEW_OUTSIDE_COMMISSIONED_POPULATION");
+                }
                 await _mutationLock.AcquireAsync(
                     input.TenantId,
                     input.ParticipantId,

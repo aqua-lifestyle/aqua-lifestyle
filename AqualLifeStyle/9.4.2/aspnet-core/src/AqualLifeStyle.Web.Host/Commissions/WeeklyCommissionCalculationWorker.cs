@@ -55,6 +55,7 @@ namespace AqualLifeStyle.Web.Host.Commissions
         private const int DefaultIntervalMinutes = 1440;
         public AqualLifeStyle.Domain.AQGreen.IAQGreenPilotMode PilotMode { get; set; }
             = AqualLifeStyle.Domain.AQGreen.DisabledAQGreenPilotMode.Instance;
+        public AqualLifeStyle.Application.ProgrammeParticipations.AQGreenD10Runtime D10Runtime { get; set; }
 
         private readonly IConfiguration _configuration;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
@@ -102,6 +103,7 @@ namespace AqualLifeStyle.Web.Host.Commissions
             {
                 return;
             }
+            if (D10Runtime != null) await D10Runtime.EnsureFinancialWorkersAsync();
 
             var nowUtc = DateTime.UtcNow;
             var stopwatch = Stopwatch.StartNew();

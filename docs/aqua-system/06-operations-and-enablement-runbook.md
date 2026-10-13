@@ -53,9 +53,12 @@ start only the matching API in recovery, reconcile frozen production evidence
 through the existing B6 contracts, and retain independently verified review and
 exception dispositions. Preparation, deployment, reconciliation, provider/worker
 commissioning and B7/D10 activation are separate steps. Disabling recovery alone
-does not enable V2: production joining/approval/progress gates and financial
-selectors remain disabled/LegacyV1 until separately implemented authorized cutover
-wiring exists. Do not select the demo or pilot for real members.
+does not enable V2: production joining/approval/progress and financial selectors
+require the separately verified, explicitly selected D10 inputs below. Without
+commissioning they retain V1 behavior where no V2 durable state exists. Do not
+select the demo or pilot for real members. Recovery is latched for the running
+application; changing its flag back to false cannot lift suspension. An authorized
+restart is a separate operational step.
 
 On failure, keep writers stopped and retain failed evidence. Emergency suspension
 uses an authorized stop or restart in recovery; it does not cancel already-running
@@ -64,6 +67,56 @@ database, or perform separately reviewed forward remediation. Do not erase
 financial/history evidence with EF Down. Migrator host or tenant failure returns
 failure and stops remaining databases; successful earlier database migrations are
 not automatically undone. Recovery mode rejects the migrator before bootstrap.
+
+### D10 production selection inputs (disabled by default)
+
+The technical cutover supports one explicit whole-Tenant population at a canonical
+AQGreen weekly boundary. It rejects partial populations, quarantined B6 components,
+unresolved mappings and unsupported consumer scope. D10 remains an actual owner
+decision to be supplied later; this implementation does not confirm that decision.
+
+`App__AQGreenV2__Commissioning__Enabled=true` requires three separate restricted,
+non-Git files and operator-approved SHA-256 pins, using the same prefix with
+`DecisionPath/DecisionSha256`, `VerifiedAuthorityPath/VerifiedAuthoritySha256`, and
+`B6FinalManifestPath/B6FinalManifestSha256`. No commissioning API or database write
+is provided. Files and their containing directory must be owner-only and not
+symlinks. Changed bytes, duplicate fields, missing pins and stale authority fail
+closed; source inputs are checked on use rather than silently reusing old acceptance.
+
+The D10 decision declares the exact Tenant, authorized Areas, effective instant,
+native customer/participation to B6 snapshot-key mappings, the three D09 population
+sets/digests, accepted component digest, and exact applied canonical placements.
+Existing B6 canonical JSON, B6TUPLE1 and SHA-256 conventions are reused. Native IDs
+remain sensitive; original mapping custody stays restricted. The canonical placement
+set must match the complete B6 canonicalisation population, not merely a subset.
+
+Before supplying the independently verified authority file, the custodian must use
+the existing B6 `VerifyFinalAsync`/operational manifest machinery and retain the
+actual verification, approved reconciliation execution, applied-output comparison,
+owner D10 authorization, backup/restore, release, financial-boundary and write-fence
+evidence. The authority binds the exact decision digest and validity window.
+Hash-shaped strings, role labels and self-hashed JSON do not verify an approver or
+B6 execution. This reader checks binding to trusted operator inputs; it does not
+replace the upstream verifier or independently authenticate human approvals.
+
+Production selection checks the actual database/schema and Core/Application/EF
+assembly identities using the existing read-only PostgreSQL boundary reader. It
+preserves V1 financial cutoffs before the approved instant and selects V2 afterward.
+Prospective admissions and graduation require explicit capability selection. Starts,
+approvals and graduation are fenced before the cutover instant; legacy sponsor
+corrections are closed for the commissioned Tenant. Existing Area permissions,
+approval locks, allocator, roles/outbox transaction and financial holds remain.
+
+Automatic financial workers require separate verified worker commissioning evidence
+and exact approved configuration; monthly automation is outside this launch scope.
+Worker preflight happens before either AQGreen or Onyx processing. Removing D10
+inputs while V2 placements exist refuses normal startup/processing rather than
+returning to V1. Recovery remains the safe inspection path; no topology or financial
+history is deleted for rollback. Successful startup alone creates no participation,
+placement, approval, payment or commission.
+Existing post-boundary V1 or incompatible financial decisions also block
+commissioning. They remain unchanged for authoritative exception review; the
+cutover does not silently recalculate or relabel settled history.
 
 ## 2. Safe payment/approval deployment order
 
