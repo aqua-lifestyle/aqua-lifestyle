@@ -140,6 +140,12 @@ jobs:
           test -s "$RESULTS_DIR/expected-names.txt"
           diff -u "TestResults/partition/${SHARD}-names.txt" "$RESULTS_DIR/expected-names.txt" \
             | tee "$RESULTS_DIR/discovery-diff.txt"
+      - name: Prepare Redis image for recovery-host test
+        if: matrix.shard == 'entity-framework-migrations'
+        run: |
+          set -euo pipefail
+          docker pull redis:7-alpine
+          docker image inspect redis:7-alpine --format '{{.Id}}'
       - name: Test complete application shard
         run: |
           set -euo pipefail
