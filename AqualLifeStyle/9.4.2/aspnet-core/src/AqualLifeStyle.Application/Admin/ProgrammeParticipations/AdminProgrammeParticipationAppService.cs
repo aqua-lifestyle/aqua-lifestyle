@@ -31,6 +31,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         : AdminAppServiceBase, IAdminProgrammeParticipationAppService
     {
         private const int MaximumGraduationTransactionAttempts = 3;
+        private readonly IAQGreenReconciliationEvidenceSnapshot _reconciliationEvidenceSnapshot;
         private readonly ICustomerRepository _customerRepository;
         private readonly IRepository<EntryParticipation, Guid> _entryParticipationRepository;
         private readonly IRepository<OnyxParticipation, Guid> _onyxParticipationRepository;
@@ -111,8 +112,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             IAQGreenGraduationStructuralModelSelector graduationStructuralModelSelector,
             IAQGreenGraduationStructuralEvidenceEvaluator graduationStructuralEvidenceEvaluator,
             IAQGreenV2GraduationEvidenceReplayValidator graduationEvidenceReplayValidator,
-            IOnyxGraduationTransactionFailureClassifier graduationFailureClassifier)
+            IOnyxGraduationTransactionFailureClassifier graduationFailureClassifier,
+            IAQGreenReconciliationEvidenceSnapshot reconciliationEvidenceSnapshot)
         {
+            _reconciliationEvidenceSnapshot = reconciliationEvidenceSnapshot;
             _customerRepository = customerRepository;
             _entryParticipationRepository = entryParticipationRepository;
             _onyxParticipationRepository = onyxParticipationRepository;
@@ -1518,6 +1521,13 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             GetLegacyAQGreenReconciliationAsync(
                 LegacyAQGreenReconciliationListInput input)
         {
+            return await ReadLegacyAQGreenDiscoveryPageAsync(input);
+        }
+
+        private async Task<PagedResultDto<LegacyAQGreenReconciliationDto>> ReadLegacyAQGreenDiscoveryPageAsync(
+            LegacyAQGreenReconciliationListInput input, Guid? requestedAreaId = null,
+            List<AQGreenReconciliationEvidenceRecord> exportRecords = null, Guid[] exportAreaScope = null)
+        {
             input ??= new LegacyAQGreenReconciliationListInput();
             ValidateRequestedTenant(input.TenantId, "Legacy AQGreen reconciliation");
             if (!AbpSession.TenantId.HasValue &&
@@ -1526,27 +1536,45 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     "Host-wide legacy reconciliation access requires permission to view all Areas.");
 
             using (DisableAllTenantDataFiltersForHost())
+            using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
             {
-                var areaScope = await GetAuthorizedAreaScopeAsync(requestedAreaId: null);
+                var areaScope = await GetAuthorizedAreaScopeAsync(requestedAreaId);
+                if (exportAreaScope != null) areaScope = exportAreaScope;
+                // Customer is the inventory identity. Composite ownership joins and
+                // existing uniqueness constraints preserve one row when sources overlap.
                 var query =
-                    from participation in _entryParticipationRepository.GetAll()
-                    join customer in _customerRepository.GetAll()
-                        on participation.CustomerId equals customer.Id
-                    where participation.JoiningInstallmentAmount == 0m
-                    select new EntryParticipationQueryRow
+                    from customer in _customerRepository.GetAll().AsNoTracking()
+                    where customer.TenantId.HasValue
+                    join participation in _entryParticipationRepository
+                        .GetAllIncluding(item => item.ApprovalDecisions, item => item.RecruiterCorrections).AsNoTracking()
+                        on new { customer.TenantId, CustomerId = customer.Id }
+                        equals new { TenantId = (int?)participation.TenantId, participation.CustomerId }
+                        into participations
+                    from participation in participations.DefaultIfEmpty()
+                    join membership in _membershipRepository.GetAll().AsNoTracking()
+                        on customer.MembershipId equals (int?)membership.Id into memberships
+                    from membership in memberships.DefaultIfEmpty()
+                    let validAssignment = membership != null &&
+                        (!membership.TenantId.HasValue || membership.TenantId == customer.TenantId)
+                    let legacyAssignment = validAssignment && membership.MembershipType == MembershipType.AQGreen
+                    let unverifiableAssignment = customer.MembershipId.HasValue && !validAssignment
+                    where legacyAssignment || unverifiableAssignment || participation != null
+                    select new LegacyAQGreenDiscoveryRow
                     {
                         Participation = participation,
-                        Customer = customer
+                        Customer = customer,
+                        LegacyMembershipId = legacyAssignment ? (int?)membership.Id : null,
+                        MembershipAssignmentUnverifiable = unverifiableAssignment
                     };
                 if (AbpSession.TenantId.HasValue)
                 {
                     var tenantId = AbpSession.TenantId.Value;
-                    query = query.Where(row => row.Participation.TenantId == tenantId);
+                    query = query.Where(row => row.Customer.TenantId == tenantId);
                 }
                 else if (input.TenantId.HasValue)
                 {
                     var tenantId = input.TenantId.Value;
-                    query = query.Where(row => row.Participation.TenantId == tenantId);
+                    query = query.Where(row => row.Customer.TenantId == tenantId);
                 }
                 if (areaScope != null)
                 {
@@ -1557,69 +1585,333 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 
                 var total = await query.CountAsync();
                 var rows = await query
-                    .OrderBy(row => row.Participation.StartedAt)
+                    .OrderBy(row => row.Customer.TenantId)
+                    .ThenBy(row => row.Customer.Id)
                     .Skip(input.SkipCount)
                     .Take(input.MaxResultCount)
                     .ToListAsync();
-                var participationIds = rows.Select(row => row.Participation.Id).ToArray();
-                var customerIds = rows.Select(row => row.Participation.CustomerId)
-                    .Distinct()
-                    .ToArray();
-                var payments = await _paymentRepository.GetAll()
+                var participationIds = rows.Where(row => row.Participation != null)
+                    .Select(row => row.Participation.Id).ToArray();
+                var customerIds = rows.Select(row => row.Customer.Id).ToArray();
+                var tenantIds = rows.Select(row => row.Customer.TenantId.Value).Distinct().ToArray();
+                var payments = await _paymentRepository.GetAll().AsNoTracking()
                     .Where(payment => customerIds.Contains(payment.CustomerId) &&
-                                      payment.Status == MemberPaymentStatus.Confirmed &&
+                                      tenantIds.Contains(payment.TenantId) &&
                                       (payment.Purpose == MemberPaymentPurpose.AQGreenJoining ||
                                        payment.Purpose == MemberPaymentPurpose.EntryRegistration ||
                                        payment.Purpose == MemberPaymentPurpose.EntryActivation ||
                                        payment.Purpose == MemberPaymentPurpose.EntryMonthlyCommitment))
                     .ToListAsync();
-                var checkouts = await _aqGreenJoiningCheckoutRepository.GetAll()
-                    .Where(checkout => participationIds.Contains(checkout.ParticipationId))
+                var checkouts = await _aqGreenJoiningCheckoutRepository.GetAll().AsNoTracking()
+                    .Where(checkout => participationIds.Contains(checkout.ParticipationId) &&
+                                      tenantIds.Contains(checkout.TenantId))
                     .OrderBy(checkout => checkout.CreatedAt)
+                    .ThenBy(checkout => checkout.Id)
                     .ToListAsync();
+                var attributions = await _attributionRepository.GetAll().AsNoTracking()
+                    .Where(item => participationIds.Contains(item.ParticipantId) && tenantIds.Contains(item.TenantId))
+                    .ToListAsync();
+                var attributionIds = attributions.Select(item => item.Id).ToArray();
+                var confirmations = await _attributionConfirmationRepository.GetAll().AsNoTracking()
+                    .Where(item => attributionIds.Contains(item.AttributionId) && tenantIds.Contains(item.TenantId))
+                    .ToListAsync();
+                var placements = await _networkPlacementRepository.GetAll().AsNoTracking()
+                    .Where(item => participationIds.Contains(item.ParticipantId) && tenantIds.Contains(item.TenantId))
+                    .ToListAsync();
+
+                if (exportRecords != null)
+                    foreach (var row in rows)
+                        exportRecords.Add(MapReconciliationExport(row, payments, checkouts, attributions, confirmations, placements));
 
                 return new PagedResultDto<LegacyAQGreenReconciliationDto>(
                     total,
-                    rows.Select(row => new LegacyAQGreenReconciliationDto
-                    {
-                        TenantId = row.Participation.TenantId,
-                        ParticipationId = row.Participation.Id,
-                        ClubMemberNumber = row.Customer.ClubMemberNumber,
-                        TermsVersion = row.Participation.TermsVersion,
-                        JoiningAmount = row.Participation.JoiningPaymentAmount,
-                        RegistrationAmount = row.Participation.RegistrationPaymentAmount,
-                        ActivationAmount = row.Participation.ActivationPaymentAmount,
-                        MonthlySubscriptionAmount = row.Participation.MonthlyCommitmentAmount,
-                        JoiningPaymentId = row.Participation.JoiningPaymentId,
-                        RegistrationPaymentId = row.Participation.RegistrationPaymentId,
-                        ActivationPaymentId = row.Participation.ActivationPaymentId,
-                        VerifiedPayments = payments
-                            .Where(payment => payment.CustomerId == row.Participation.CustomerId)
-                            .Select(payment => new LegacyAQGreenPaymentFactDto
-                            {
-                                PaymentId = payment.Id,
-                                Purpose = payment.Purpose,
-                                Amount = payment.Amount,
-                                Currency = payment.Currency,
-                                Provider = payment.Provider,
-                                ProviderReference = payment.ExternalReference,
-                                ConfirmedAt = payment.ConfirmedAt.Value
-                            })
-                            .ToList(),
-                        CheckoutAttempts = checkouts
-                            .Where(checkout => checkout.ParticipationId == row.Participation.Id)
-                            .Select(checkout => new LegacyAQGreenCheckoutFactDto
-                            {
-                                CheckoutId = checkout.Id,
-                                Amount = checkout.Amount,
-                                Currency = checkout.Currency,
-                                Status = checkout.Status,
-                                ProviderCheckoutId = checkout.ProviderCheckoutId,
-                                PaymentId = checkout.PaymentId
-                            })
-                            .ToList()
-                    }).ToList());
+                    rows.Select(row => MapLegacyAQGreenDiscovery(
+                        row, payments, checkouts, attributions, confirmations, placements)).ToList());
             }
+        }
+
+        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation,
+            AquaPermissions.Admin.ProgrammeParticipations.ExportLegacyReconciliationEvidence, RequireAllPermissions = true)]
+        [DisableAuditing]
+        [UnitOfWork(IsDisabled = true)]
+        public async Task<AQGreenReconciliationEvidencePackage> ExportLegacyAQGreenReconciliationEvidenceAsync(
+            ExportLegacyAQGreenReconciliationEvidenceInput input)
+        {
+            if (input == null || input.TenantId <= 0 || input.AnalysisSnapshotCutoffUtc == default ||
+                input.AnalysisSnapshotCutoffUtc.Kind != DateTimeKind.Utc || (input.WholeTenant && input.AreaId.HasValue))
+                throw new ArgumentException("An explicit Tenant, UTC analysis cutoff and consistent scope are required.");
+            ValidateRequestedTenant(input.TenantId, "Frozen AQGreen evidence export");
+            if ((!AbpSession.TenantId.HasValue || input.WholeTenant) &&
+                (AbpSession.TenantId.HasValue || !await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants)))
+                throw new AbpAuthorizationException("Whole-Tenant evidence requires explicit host AllTenants authority.");
+
+            using var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+            {
+                Scope = TransactionScopeOption.RequiresNew, IsTransactional = true,
+                IsolationLevel = IsolationLevel.RepeatableRead
+            });
+            var boundary = await _reconciliationEvidenceSnapshot.CaptureAsync();
+            if (input.AnalysisSnapshotCutoffUtc > boundary.SourceObservedAtUtc)
+                throw new ArgumentException("The analysis cutoff cannot be later than source observation.");
+            using (DisableAllTenantDataFiltersForHost())
+            {
+                if (!await _tenantRepository.GetAll().AnyAsync(t => t.Id == input.TenantId && t.IsActive))
+                    throw new AbpAuthorizationException("The requested export Tenant is unavailable.");
+                var areaIds = await GetAuthorizedAreaScopeAsync(input.AreaId);
+                if (areaIds == null)
+                    areaIds = await _areaRepository.GetAll().AsNoTracking()
+                        .Where(a => a.TenantId == input.TenantId && a.IsActive).Select(a => a.Id).ToArrayAsync();
+                if (!input.WholeTenant && areaIds.Length == 0)
+                    throw new AbpAuthorizationException("No authorised active Area is available for export.");
+                if (input.AreaId.HasValue && (!areaIds.Contains(input.AreaId.Value) ||
+                    !await _areaRepository.GetAll().AnyAsync(a => a.Id == input.AreaId && a.TenantId == input.TenantId && a.IsActive)))
+                    throw new AbpAuthorizationException("The requested Area is not authorised for this Tenant.");
+                var records = new List<AQGreenReconciliationEvidenceRecord>();
+                int? count = null;
+                do
+                {
+                    var page = await ReadLegacyAQGreenDiscoveryPageAsync(new LegacyAQGreenReconciliationListInput
+                    { TenantId = input.TenantId, SkipCount = records.Count, MaxResultCount = 100 }, input.AreaId, records,
+                        input.WholeTenant ? null : areaIds);
+                    if (count.HasValue && count != page.TotalCount)
+                        throw new InvalidOperationException("The frozen discovery population changed.");
+                    count = page.TotalCount;
+                    if (page.Items.Count == 0 && records.Count < count)
+                        throw new InvalidOperationException("Frozen discovery pagination omitted records.");
+                } while (records.Count < count);
+                if (records.Count != count) throw new InvalidOperationException("Frozen discovery count mismatch.");
+                RestrictExportRelationships(records);
+                var manifest = new AQGreenReconciliationEvidenceManifest
+                {
+                    TenantId = input.TenantId, WholeTenant = input.WholeTenant,
+                    AuthorizedAreaIds = areaIds.Distinct().OrderBy(id => id).ToArray(),
+                    AnalysisSnapshotCutoffUtc = input.AnalysisSnapshotCutoffUtc, SourceBoundary = boundary,
+                    ExportImplementationDigest = AQGreenB6CanonicalEvidence.Digest(new[]
+                    {
+                        boundary.SourceAssemblyDigest,
+                        AQGreenB6CanonicalEvidence.Hash(System.IO.File.ReadAllBytes(typeof(AdminProgrammeParticipationAppService).Assembly.Location)),
+                        AQGreenB6CanonicalEvidence.Hash(System.IO.File.ReadAllBytes(typeof(AQGreenReconciliationEvidencePackage).Assembly.Location))
+                    })
+                };
+                var package = AQGreenReconciliationEvidencePackage.Freeze(manifest, records);
+                await uow.CompleteAsync();
+                return package;
+            }
+        }
+
+        private static AQGreenReconciliationEvidenceRecord MapReconciliationExport(
+            LegacyAQGreenDiscoveryRow row, IReadOnlyList<MemberPayment> payments,
+            IReadOnlyList<AQGreenJoiningCheckout> checkouts, IReadOnlyList<AQGreenRecruitmentAttribution> attributions,
+            IReadOnlyList<AQGreenRecruitmentAttributionConfirmation> confirmations, IReadOnlyList<AQGreenNetworkPlacement> placements)
+        {
+            var discovery = MapLegacyAQGreenDiscovery(row, payments, checkouts, attributions, confirmations, placements);
+            var p = row.Participation;
+            var attribution = attributions.SingleOrDefault(a => a.TenantId == discovery.TenantId && a.ParticipantId == p?.Id);
+            var confirmation = confirmations.SingleOrDefault(c => c.TenantId == discovery.TenantId && c.AttributionId == attribution?.Id);
+            var placement = placements.SingleOrDefault(n => n.TenantId == discovery.TenantId && n.ParticipantId == p?.Id);
+            return new AQGreenReconciliationEvidenceRecord
+            {
+                DiscoveryId = discovery.DiscoveryId, TenantId = discovery.TenantId, CustomerId = discovery.CustomerId,
+                CurrentAreaId = discovery.CurrentAreaId, LegacyMembershipId = discovery.LegacyMembershipId,
+                ParticipationId = discovery.ParticipationId, DiscoveryKind = discovery.DiscoveryKind.ToString(),
+                ParticipationVersionEvidence = discovery.ParticipationVersionEvidence.ToString(),
+                HistoricalEvidenceIssues = discovery.HistoricalEvidenceIssues.ToArray(), CurrentParticipationStatus = p?.Status.ToString(),
+                RecordedStartedAt = p?.StartedAt, RecordedActivatedAt = p?.ActivatedAt,
+                CurrentRecruiterCustomerId = p?.RecruiterCustomerId, TermsVersion = p?.TermsVersion, Currency = p?.Currency,
+                JoiningAmount = discovery.JoiningAmount, RegistrationAmount = discovery.RegistrationAmount, ActivationAmount = discovery.ActivationAmount,
+                JoiningPaymentId = discovery.JoiningPaymentId, RegistrationPaymentId = discovery.RegistrationPaymentId,
+                ActivationPaymentId = discovery.ActivationPaymentId,
+                JoiningPayments = payments.Where(payment => payment.TenantId == discovery.TenantId && payment.CustomerId == discovery.CustomerId &&
+                    payment.Purpose != MemberPaymentPurpose.EntryMonthlyCommitment).OrderBy(payment => payment.Id)
+                    .Select(payment => new AQGreenJoiningPaymentEvidence { PaymentId = payment.Id, Purpose = payment.Purpose.ToString(),
+                        Status = payment.Status.ToString(), Amount = payment.Amount, Currency = payment.Currency, ConfirmedAt = payment.ConfirmedAt }).ToList(),
+                CheckoutAttempts = discovery.CheckoutAttempts.OrderBy(c => c.CheckoutId).Select(c => new AQGreenCheckoutEvidence
+                { CheckoutId = c.CheckoutId, Status = c.Status.ToString(), PaymentId = c.PaymentId, Amount = c.Amount, Currency = c.Currency }).ToList(),
+                ApprovalDecisions = p?.ApprovalDecisions.OrderBy(d => d.DecidedAt).ThenBy(d => d.Id).Select(d => new AQGreenApprovalEvidence
+                { DecisionId = d.Id, DecidedAt = d.DecidedAt, Approved = d.Approved }).ToList() ?? new(),
+                RecruiterCorrections = p?.RecruiterCorrections.OrderBy(c => c.CorrectedAt).ThenBy(c => c.Id).Select(c => new AQGreenRecruiterCorrectionEvidence
+                { CorrectionId = c.Id, PreviousRecruiterCustomerId = c.PreviousRecruiterCustomerId,
+                    NewRecruiterCustomerId = c.NewRecruiterCustomerId, CorrectedAt = c.CorrectedAt }).ToList() ?? new(),
+                Attribution = attribution == null ? null : new AQGreenAttributionEvidence
+                { AttributionId = attribution.Id, CreditedSponsorParticipantId = attribution.CreditedSponsorParticipantId,
+                    Kind = attribution.AttributionKind.ToString(), AcquisitionSource = attribution.AcquisitionSource.ToString(),
+                    SourceReferenceId = attribution.SourceReferenceId, AttributedAt = attribution.AttributedAt, RulesVersion = attribution.RulesVersion },
+                AttributionConfirmation = confirmation == null ? null : new AQGreenConfirmationEvidence
+                { ConfirmationId = confirmation.Id, EvidenceReferenceId = confirmation.EvidenceReferenceId, Method = confirmation.ConfirmationMethod.ToString(),
+                    ConfirmedAt = confirmation.ConfirmedAt, RulesVersion = confirmation.RulesVersion },
+                Placement = placement == null ? null : new AQGreenPlacementEvidence
+                { PlacementId = placement.Id, PlacementTreeScopeId = placement.PlacementTreeScopeId,
+                    ParentParticipantId = placement.PlacementParentParticipantId, Slot = placement.PlacementSlot, PlacedAt = placement.PlacedAt,
+                    RulesVersion = placement.RulesVersion }
+            };
+        }
+
+        private static void RestrictExportRelationships(List<AQGreenReconciliationEvidenceRecord> records)
+        {
+            var customers = records.Select(r => r.CustomerId).ToHashSet();
+            var participations = records.Where(r => r.ParticipationId.HasValue).Select(r => r.ParticipationId.Value).ToHashSet();
+            foreach (var record in records)
+            {
+                var issues = record.HistoricalEvidenceIssues.ToList();
+                int? CustomerReference(int? id)
+                {
+                    if (!id.HasValue || customers.Contains(id.Value)) return id;
+                    issues.Add("RECRUITER_OUTSIDE_EXPORT_POPULATION"); return null;
+                }
+                record.CurrentRecruiterCustomerId = CustomerReference(record.CurrentRecruiterCustomerId);
+                foreach (var correction in record.RecruiterCorrections)
+                {
+                    correction.PreviousRecruiterCustomerId = CustomerReference(correction.PreviousRecruiterCustomerId);
+                    correction.NewRecruiterCustomerId = CustomerReference(correction.NewRecruiterCustomerId);
+                }
+                if (record.Attribution?.CreditedSponsorParticipantId is Guid sponsor && !participations.Contains(sponsor))
+                { record.Attribution.CreditedSponsorParticipantId = null; issues.Add("SPONSOR_OUTSIDE_EXPORT_POPULATION"); }
+                if (record.Placement?.ParentParticipantId is Guid parent && !participations.Contains(parent))
+                { record.Placement.ParentParticipantId = null; issues.Add("PLACEMENT_PARENT_OUTSIDE_EXPORT_POPULATION"); }
+                if (record.CurrentRecruiterCustomerId.HasValue)
+                    issues.Add("CURRENT_RECRUITER_IS_NOT_ORIGINAL_SPONSOR_EVIDENCE");
+                record.HistoricalEvidenceIssues = issues.Distinct().OrderBy(issue => issue, StringComparer.Ordinal).ToArray();
+            }
+        }
+
+        private static LegacyAQGreenReconciliationDto MapLegacyAQGreenDiscovery(
+            LegacyAQGreenDiscoveryRow row,
+            IReadOnlyList<MemberPayment> payments,
+            IReadOnlyList<AQGreenJoiningCheckout> checkouts,
+            IReadOnlyList<AQGreenRecruitmentAttribution> attributions,
+            IReadOnlyList<AQGreenRecruitmentAttributionConfirmation> confirmations,
+            IReadOnlyList<AQGreenNetworkPlacement> placements)
+        {
+            var tenantId = row.Customer.TenantId.Value;
+            var participation = row.Participation;
+            var ownPayments = payments.Where(item => item.TenantId == tenantId &&
+                item.CustomerId == row.Customer.Id).OrderBy(item => item.Id).ToList();
+            var attribution = attributions.SingleOrDefault(item => item.TenantId == tenantId &&
+                item.ParticipantId == participation?.Id);
+            var placement = placements.SingleOrDefault(item => item.TenantId == tenantId &&
+                item.ParticipantId == participation?.Id);
+            var confirmation = confirmations.SingleOrDefault(item => item.TenantId == tenantId &&
+                item.AttributionId == attribution?.Id);
+            var v2Recorded = (attribution != null || placement != null) &&
+                (attribution == null || attribution.RulesVersion == AQGreenRecruitmentAttributionRules.CurrentVersion) &&
+                (placement == null || placement.RulesVersion == AQGreenPlacementRules.CurrentVersion);
+            var issues = new List<string>();
+            if (row.MembershipAssignmentUnverifiable)
+                issues.Add("MEMBERSHIP_ASSIGNMENT_UNVERIFIABLE");
+            if (row.LegacyMembershipId.HasValue)
+                issues.Add("HISTORICAL_MEMBERSHIP_PROVENANCE_UNVERIFIABLE");
+            if (!row.Customer.AreaId.HasValue)
+                issues.Add("CURRENT_AREA_UNASSIGNED");
+            if (participation == null)
+                issues.Add("NO_LIVE_AQGREEN_PARTICIPATION");
+            if (!v2Recorded)
+                issues.Add("PARTICIPATION_VERSION_UNVERIFIABLE");
+            if (attribution == null)
+                issues.Add("SPONSOR_HISTORY_UNVERIFIABLE");
+            else
+            {
+                if (attribution.RulesVersion != AQGreenRecruitmentAttributionRules.CurrentVersion)
+                    issues.Add("ATTRIBUTION_RULES_UNSUPPORTED");
+                if (confirmation == null)
+                    issues.Add("ATTRIBUTION_CONFIRMATION_MISSING");
+                else if (confirmation.EvidenceReferenceId != attribution.SourceReferenceId ||
+                         confirmation.RulesVersion != AQGreenRecruitmentAttributionRules.CurrentVersion)
+                    issues.Add("ATTRIBUTION_CONFIRMATION_CONFLICT");
+            }
+            if (placement != null && placement.RulesVersion != AQGreenPlacementRules.CurrentVersion)
+                issues.Add("PLACEMENT_RULES_UNSUPPORTED");
+            if (v2Recorded && participation?.Status == EntryParticipationStatus.Active && placement == null)
+                issues.Add("ACTIVE_V2_PLACEMENT_MISSING");
+            if (participation?.ActivatedAt == null ||
+                !participation.ApprovalDecisions.Any(item => item.Approved &&
+                    item.DecidedAt == participation.ActivatedAt))
+                issues.Add("ACTIVATION_HISTORY_UNVERIFIABLE");
+            var linkedIds = new[] { participation?.JoiningPaymentId,
+                participation?.RegistrationPaymentId, participation?.ActivationPaymentId }
+                .Where(id => id.HasValue).Select(id => id.Value).ToArray();
+            if (linkedIds.Length == 0)
+                issues.Add("HISTORICAL_JOINING_PAYMENT_UNVERIFIABLE");
+            if (linkedIds.Distinct().Count() != linkedIds.Length ||
+                (participation?.JoiningPaymentId.HasValue == true && linkedIds.Length > 1))
+                issues.Add("JOINING_PAYMENT_LINKS_CONFLICT");
+            foreach (var id in linkedIds.Distinct())
+            {
+                var payment = ownPayments.SingleOrDefault(item => item.Id == id);
+                var modernJoining = participation.JoiningPaymentAmount > 0m;
+                var expectedPurpose = modernJoining ? MemberPaymentPurpose.AQGreenJoining
+                    : (id == participation.RegistrationPaymentId ? MemberPaymentPurpose.EntryRegistration
+                        : MemberPaymentPurpose.EntryActivation);
+                var expectedAmount = id == participation.JoiningPaymentId ? participation.JoiningPaymentAmount
+                    : (modernJoining ? participation.JoiningInstallmentAmount
+                        : (id == participation.RegistrationPaymentId ? participation.RegistrationPaymentAmount
+                            : participation.ActivationPaymentAmount));
+                if (payment == null)
+                    issues.Add("LINKED_JOINING_PAYMENT_UNVERIFIABLE");
+                else if (payment.Status != MemberPaymentStatus.Confirmed || !payment.ConfirmedAt.HasValue)
+                    issues.Add("LINKED_JOINING_PAYMENT_CONFIRMATION_UNVERIFIABLE");
+                else if (payment.Currency != participation.Currency ||
+                    payment.Purpose != expectedPurpose || payment.Amount != expectedAmount)
+                    issues.Add("LINKED_JOINING_PAYMENT_FACTS_CONFLICT");
+            }
+            if (ownPayments.Any(item => item.Status == MemberPaymentStatus.Confirmed && !item.ConfirmedAt.HasValue))
+                issues.Add("CONFIRMED_PAYMENT_TIME_MISSING");
+            if (checkouts.Any(item => item.ParticipationId == participation?.Id &&
+                (item.TenantId != tenantId || item.CustomerId != row.Customer.Id)))
+                issues.Add("CHECKOUT_OWNERSHIP_UNVERIFIABLE");
+            if (checkouts.Any(item => item.ParticipationId == participation?.Id &&
+                item.TenantId == tenantId && item.CustomerId == row.Customer.Id &&
+                item.PaymentId.HasValue && !ownPayments.Any(payment => payment.Id == item.PaymentId)))
+                issues.Add("CHECKOUT_PAYMENT_LINK_UNVERIFIABLE");
+
+            return new LegacyAQGreenReconciliationDto
+            {
+                DiscoveryId = FormattableString.Invariant($"aqgreen:{tenantId}:{row.Customer.Id}"),
+                CustomerId = row.Customer.Id,
+                TenantId = tenantId,
+                CurrentAreaId = row.Customer.AreaId,
+                LegacyMembershipId = row.LegacyMembershipId,
+                DiscoveryKind = row.LegacyMembershipId.HasValue && v2Recorded
+                    ? LegacyAQGreenDiscoveryKind.LegacyAssignmentWithV2Participation
+                    : (row.LegacyMembershipId.HasValue && participation == null
+                        ? LegacyAQGreenDiscoveryKind.LegacyAssignmentWithoutV2Participation
+                    : (v2Recorded ? (issues.Count > 0
+                        ? LegacyAQGreenDiscoveryKind.V2ParticipationRequiringReconciliation
+                        : LegacyAQGreenDiscoveryKind.V2RecordedFacts)
+                        : LegacyAQGreenDiscoveryKind.HistoricalInformationUnverifiable)),
+                ParticipationVersionEvidence = participation == null
+                    ? AQGreenParticipationVersionEvidence.NoLiveParticipation
+                    : (v2Recorded ? AQGreenParticipationVersionEvidence.PlacementV2Recorded
+                        : AQGreenParticipationVersionEvidence.VersionUnverifiable),
+                HistoricalEvidenceIssues = issues.Distinct().ToArray(),
+                ParticipationId = participation?.Id,
+                ClubMemberNumber = row.Customer.ClubMemberNumber,
+                TermsVersion = participation?.TermsVersion,
+                JoiningAmount = participation?.JoiningPaymentAmount,
+                RegistrationAmount = participation?.RegistrationPaymentAmount,
+                ActivationAmount = participation?.ActivationPaymentAmount,
+                MonthlySubscriptionAmount = participation?.MonthlyCommitmentAmount,
+                JoiningPaymentId = ownPayments.Any(item => item.Id == participation?.JoiningPaymentId)
+                    ? participation.JoiningPaymentId : null,
+                RegistrationPaymentId = ownPayments.Any(item => item.Id == participation?.RegistrationPaymentId)
+                    ? participation.RegistrationPaymentId : null,
+                ActivationPaymentId = ownPayments.Any(item => item.Id == participation?.ActivationPaymentId)
+                    ? participation.ActivationPaymentId : null,
+                VerifiedPayments = ownPayments.Where(item => item.Status == MemberPaymentStatus.Confirmed)
+                    .Select(item => new LegacyAQGreenPaymentFactDto
+                    {
+                        PaymentId = item.Id, Purpose = item.Purpose, Amount = item.Amount,
+                        Currency = item.Currency, Provider = item.Provider,
+                        ProviderReference = item.ExternalReference, ConfirmedAt = item.ConfirmedAt
+                    }).ToList(),
+                CheckoutAttempts = checkouts.Where(item => item.TenantId == tenantId &&
+                    item.CustomerId == row.Customer.Id && item.ParticipationId == participation?.Id)
+                    .Select(item => new LegacyAQGreenCheckoutFactDto
+                    {
+                        CheckoutId = item.Id, Amount = item.Amount, Currency = item.Currency,
+                        Status = item.Status, ProviderCheckoutId = item.ProviderCheckoutId,
+                        PaymentId = ownPayments.Any(payment => payment.Id == item.PaymentId) ? item.PaymentId : null
+                    }).ToList()
+            };
         }
 
         [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation)]
@@ -2171,6 +2463,14 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             public EntryParticipation Participation { get; init; }
             public Customer Customer { get; init; }
+        }
+
+        private sealed class LegacyAQGreenDiscoveryRow
+        {
+            public Customer Customer { get; init; }
+            public EntryParticipation Participation { get; init; }
+            public int? LegacyMembershipId { get; init; }
+            public bool MembershipAssignmentUnverifiable { get; init; }
         }
 
         private sealed class OnyxParticipationQueryRow

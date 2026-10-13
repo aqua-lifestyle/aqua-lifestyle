@@ -55,6 +55,110 @@ They are also not candidates for a migration based on modern payment evidence. T
 
 `PLANNED`: a future audited legacy-member import should capture identity, real AQGreen participation, known Aqua inclusion/cover facts, source evidence, authorising operator, business-effective date when known, and import recording time. Unknown dates must stay unknown. This workflow is not implemented by the funeral-cover migration.
 
+When V2 joining is explicitly selected, a current AQGreen membership assignment
+blocks prospective joining and joining-checkout preparation with
+`Existing AQGreen membership requires reconciliation.` The assignment is preserved;
+the member must not pay to join again through this path. This guard also applies to
+direct checkout of an existing pending participation. It does not prove historical
+payment, activation, sponsor or cover, and absence of an assignment does not prove
+the member is new. B6 reconciliation must classify the full accepted population
+before production V2 selection; D03B/D09 govern legacy mapping and D10/B7 governs
+cutover. Existing V1 behavior remains authoritative while V2 is disabled.
+
+### Frozen discovery evidence for offline B6 review
+
+`ExportLegacyAQGreenReconciliationEvidence` extends the existing discovery query;
+it does not perform B6 reconciliation. The API accepts an explicit Tenant, optional
+Area, `WholeTenant` flag and UTC analysis cutoff. It reads all pages inside one
+PostgreSQL `REPEATABLE READ READ ONLY` transaction. Scoped exports require active
+assigned Areas. Whole-Tenant exports require host identity and the explicit
+`Admin.AllTenants` permission. Both discovery-view and the separate
+`Admin.ProgrammeParticipations.ExportLegacyReconciliationEvidence` permissions are
+required; role seeders do not automatically grant the bulk permission.
+
+The restricted operator package contains customer/Tenant/current-Area identity,
+legacy membership and participation references, classifications and issue codes;
+allowlisted joining payments/checkouts, approval decisions, recruiter corrections,
+immutable attribution/confirmation and placement references/times when present.
+Current Area, recruiter and participation status are current observations, not
+exact historical values. Recorded activation without a matching approval remains
+unverifiable. Outside-population recruiter/sponsor/placement-parent identifiers
+are withheld with explicit issues. Names, contact details, member numbers, provider
+references, monthly financial history, actor identifiers and free text are omitted.
+The endpoint disables auditing of export inputs/results. Keep packages outside Git
+and logs, in restricted operator storage; technical IDs and joining amounts remain
+sensitive. This is not the sanitised external B6 handoff.
+
+`AQGreenB6ReconciliationDiscoveryEvidenceV1` uses the existing B6 canonical UTF-8
+JSON, SHA-256 and `B6TUPLE1` population-digest conventions. The result supplies
+`Manifest`, `Records` and `Sha256Sums`; `ManifestBytes()` and `RecordsBytes()` give
+the exact bytes for `manifest.json` / `records.json`, with UTF-8 `SHA256SUMS`.
+`Verify()` rejects altered hashes, scope, duplicates, ordering or counts. The
+manifest records source tables, exported source/category counts, schema and
+implementation digests, PostgreSQL version, observation time and hashed MVCC/
+database identity. Stable content/population hashes repeat for unchanged source
+content, scope, cutoff and implementation. The full manifest hash additionally
+seals source observation boundaries, which may differ on another extraction.
+The cutoff is for offline analysis; it does not reconstruct mutable state at that
+historical time or filter the observed inventory into an eligibility population.
+
+The package can be deserialised without database access and supplied to
+`SimulateWholeScope` with explicit source-bound review classifications for every
+record, including legacy-only records. Existing B6 simulation emits proposals,
+anomalies and structural impact; missing facts produce anomalies with no placement
+proposals. Partial Area packages and omitted/duplicate/unbound review records are
+rejected. Review snapshot keys are offline identities, not new participation IDs.
+Review hypotheses are counterfactual inputs, not source facts or authorisation.
+Multiple legacy components need authoritative component/population dispositions
+before any accepted scope analysis; this preliminary envelope is not an approved
+`BASE_SNAPSHOT`, `FINAL_ANALYSIS` manifest or production application input. It
+contains neither inferred historical roots nor fabricated financial eligibility.
+Authoritative B6 data review, approved evidence/custody and B7/D10 cutover remain
+separate gates. Runtime production gates are unchanged.
+
+### Source-bound offline component and population reviews
+
+`AQGreenFrozenReconciliationReview.SealInventory` seals declared B6 component
+identities, exact discovery-record membership/digests and dependency edges. It
+keeps `canonicalisation`, `qualificationEligibility` and
+`historicalImpactInventory` distinct; each population must explicitly classify
+every frozen record as Included, Excluded or Unverifiable. Components are supplied
+by reviewed analysis, never inferred from Area, placement parents or absent history.
+Retained sponsor/recruiter/correction links must be accounted for as dependencies.
+
+`Process` binds each decision to the exact source content and full manifest hash,
+Tenant/Area population scope, inventory digest, subject identity/membership and
+evidence/review-contract versions. It reuses B6 controlled decision references,
+reviewer-role labels, source/base-manifest fields, `B6TUPLE1`, accepted/quarantined
+component digests and the self-excluding `receiptDigest` convention. This is the
+`AQGreenB6DiscoveryReviewBindingV1` adapter for preliminary discovery evidence,
+not a second governance authority or an approved B6 root/execution/handoff receipt.
+
+Reviewer authority must be supplied separately from decisions as independently
+verified owner/operator evidence covering the exact source, inventory, subject,
+decision identity, role and effective authorization window. Role claims and
+hash-shaped strings cannot establish that authority. The pure library validates
+these supplied bindings; it does not authenticate arbitrary uploaded authority,
+issue grants, accept roots or establish the truth of external historical evidence.
+No new production HTTP endpoint or authority bootstrap is provided.
+
+Explicit ACCEPTED/QUARANTINED decisions require controlled reason codes. Source
+historical issues remain unchanged and force effective quarantine even when a
+review requests acceptance. Omitted decisions/membership, cyclic or unaccepted
+dependencies and unverifiable populations are reported explicitly and cannot
+produce complete whole-Tenant acceptance. Duplicate/conflicting decisions,
+incorrect identities/membership, unsupported versions and mismatched authority
+are rejected. Receipt replay is deterministic for identical frozen inputs;
+`VerifyReceipt` reprocesses decisions against trusted authority and rejects altered
+or conflicting receipts. A new source observation/manifest needs new review
+bindings even if its content digest is unchanged. Preserve review inputs and
+receipts in restricted operator storage outside Git/logs.
+
+All outcomes are `OFFLINE_REVIEW_BINDING_ONLY`. Review acceptance is neither
+authoritative D03B/D09 data reconciliation nor B6 execution permission, financial
+eligibility or B7/D10 activation. Existing B6 FINAL_ANALYSIS verification,
+sanitisation/custody, execution authority and production gates remain required.
+
 ## 4. AQGreen joining migration provenance
 
 Migration `20260726162000_AddAQGreenSingleJoiningPayment` created `AQGreenMigrationBackup` before changing the joining model. The backup preserves each migrated participation's prior terms version and effective date so a later investigation can distinguish records transformed from an older lifecycle.
@@ -138,6 +242,47 @@ The monthly due-policy table starts empty and is append-only. A policy records a
 Monthly checkouts link to a specific obligation. Contradictory or unlinked allocation becomes `ReconciliationRequired`; no oldest-open fallback is authoritative.
 
 Discovery endpoints expose legacy joining and monthly checkout reconciliation rows to authorised Area/host operators. They are read-only. Issue #66 tracks the missing authorised resolution workflow.
+
+`GetLegacyAQGreenReconciliation` now inventories live Tenant customers with a
+current AQGreen membership assignment or an AQGreen participation, including
+legacy-only assignments with no participation. Referenced membership assignments
+whose ownership cannot be verified are explicit uncertainty candidates. Shared
+membership definitions and definitions belonging to the customer's Tenant are
+valid lookup sources; another Tenant's definition supplies no membership authority.
+Customer/participation joins match both Tenant and customer identity. Tenant
+administrators receive only their active assigned Areas; central discovery requires
+the existing `AllTenants` permission. Unassigned-Area customers are visible only to
+the authorized central scope. Soft-deleted customers/participations retain the
+existing exclusion; an absent live record does not prove no historical record exists.
+
+The response has one row per Tenant/customer, ordered by Tenant then customer ID,
+with stable `DiscoveryId`, `CustomerId` and any existing `ParticipationId`. Offset
+pagination is deterministic for an unchanged population; it is not a frozen B6
+snapshot. The old zero-instalment restriction is removed, so modern schedules are
+also discoverable. `ParticipationId` and participation amounts are now nullable;
+consumers must inspect `ParticipationVersionEvidence` and `HistoricalEvidenceIssues`
+instead of treating missing values as zero. No frontend currently consumes this DTO.
+
+`DiscoveryKind` distinguishes legacy assignment with recorded V2 provenance,
+legacy assignment without a live participation, V2 candidates with evidence
+issues, and unverifiable information. Coherent recorded V2 facts have a separate
+`V2RecordedFacts` category. An `EntryParticipation` alone cannot establish V2;
+recognized V2 attribution/placement rules are recorded evidence, not activation or
+historical membership authority. Existing participation with unknown/unsupported
+version remains unverifiable even when a legacy assignment exists. Issue codes identify missing participation,
+membership/sponsor/activation uncertainty, absent confirmation, unsupported rules,
+and conflicting/unverifiable joining-payment links. Confirmed ledger facts may have
+an explicitly missing confirmation timestamp; they are not silently discarded.
+Payment and checkout details are restricted to the returned customer's Tenant and
+ownership. Unverifiable linked payment identifiers are withheld with an issue code.
+`CHECKOUT_OWNERSHIP_UNVERIFIABLE` and `CHECKOUT_PAYMENT_LINK_UNVERIFIABLE` explain
+withheld checkout facts or payment references; absence of returned details must
+not be interpreted as evidence that no checkout or payment exists.
+
+Discovery does not infer an original sponsor, payment, approval time, root mapping,
+or membership validity, and does not repair or create records. Ordinary ABP access
+auditing remains in place. Authoritative B6 reconciliation and D03B/D09 mapping,
+and B7/D10 production selection/activation, remain separate owner-gated operations.
 
 ## 9. Area activation baselines
 

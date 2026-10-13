@@ -100,7 +100,11 @@ namespace AqualLifeStyle.Web.Tests
 
                 using (var context = new AqualLifeStyleDbContext(options))
                 {
-                    context.Database.Migrate();
+                    // Discovery regressions need real queries, not migration execution.
+                    if (Environment.GetEnvironmentVariable("REPRO_PG_SCHEMA_FROM_MODEL") == "true")
+                        context.Database.EnsureCreated();
+                    else
+                        context.Database.Migrate();
                 }
 
                 var iocManager = serviceProvider.GetRequiredService<IIocManager>();

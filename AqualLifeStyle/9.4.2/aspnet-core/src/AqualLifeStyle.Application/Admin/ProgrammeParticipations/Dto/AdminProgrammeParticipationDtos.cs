@@ -170,6 +170,15 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
         public string LockReason { get; set; }
     }
 
+    public class ExportLegacyAQGreenReconciliationEvidenceInput
+    {
+        [Range(1, int.MaxValue)]
+        public int TenantId { get; set; }
+        public Guid? AreaId { get; set; }
+        public bool WholeTenant { get; set; }
+        public DateTime AnalysisSnapshotCutoffUtc { get; set; }
+    }
+
     public class LegacyAQGreenReconciliationListInput : PagedResultRequestDto
     {
         [Range(1, int.MaxValue)]
@@ -194,19 +203,42 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
         public string Currency { get; set; }
         public string Provider { get; set; }
         public string ProviderReference { get; set; }
-        public DateTime ConfirmedAt { get; set; }
+        public DateTime? ConfirmedAt { get; set; }
+    }
+
+    public enum LegacyAQGreenDiscoveryKind
+    {
+        LegacyAssignmentWithV2Participation = 1,
+        LegacyAssignmentWithoutV2Participation = 2,
+        V2ParticipationRequiringReconciliation = 3,
+        HistoricalInformationUnverifiable = 4,
+        V2RecordedFacts = 5
+    }
+
+    public enum AQGreenParticipationVersionEvidence
+    {
+        NoLiveParticipation = 1,
+        VersionUnverifiable = 2,
+        PlacementV2Recorded = 3
     }
 
     public class LegacyAQGreenReconciliationDto
     {
+        public string DiscoveryId { get; set; }
+        public int CustomerId { get; set; }
         public int TenantId { get; set; }
-        public Guid ParticipationId { get; set; }
+        public Guid? CurrentAreaId { get; set; }
+        public int? LegacyMembershipId { get; set; }
+        public LegacyAQGreenDiscoveryKind DiscoveryKind { get; set; }
+        public AQGreenParticipationVersionEvidence ParticipationVersionEvidence { get; set; }
+        public IReadOnlyList<string> HistoricalEvidenceIssues { get; set; }
+        public Guid? ParticipationId { get; set; }
         public string ClubMemberNumber { get; set; }
         public string TermsVersion { get; set; }
-        public decimal JoiningAmount { get; set; }
-        public decimal RegistrationAmount { get; set; }
-        public decimal ActivationAmount { get; set; }
-        public decimal MonthlySubscriptionAmount { get; set; }
+        public decimal? JoiningAmount { get; set; }
+        public decimal? RegistrationAmount { get; set; }
+        public decimal? ActivationAmount { get; set; }
+        public decimal? MonthlySubscriptionAmount { get; set; }
         public Guid? JoiningPaymentId { get; set; }
         public Guid? RegistrationPaymentId { get; set; }
         public Guid? ActivationPaymentId { get; set; }

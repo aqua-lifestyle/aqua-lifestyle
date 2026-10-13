@@ -56,6 +56,7 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
 
             var permissions = PermissionFinder
                 .GetAllPermissions(new AqualLifeStyleAuthorizationProvider())
+                .Where(p => p.Name != AquaPermissions.Admin.ProgrammeParticipations.ExportLegacyReconciliationEvidence)
                 .Where(p => p.MultiTenancySides.HasFlag(MultiTenancySides.Tenant) &&
                             !grantedPermissions.Contains(p.Name))
                 .ToList();

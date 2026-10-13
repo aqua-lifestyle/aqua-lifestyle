@@ -5,12 +5,14 @@ using Abp.Configuration;
 using Abp.Domain.Uow;
 using Abp.Runtime.Session;
 using Abp.UI;
+using Castle.MicroKernel.Registration;
 using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Application.ProgrammeParticipations.Dto;
 using AqualLifeStyle.Application.Recruitment;
 using AqualLifeStyle.Application.Recruitment.Dto;
 using AqualLifeStyle.Authorization.Accounts;
 using AqualLifeStyle.Authorization.Accounts.Dto;
+using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Domain.Areas;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
@@ -23,6 +25,7 @@ using AqualLifeStyle.MultiTenancy;
 using AqualLifeStyle.Payments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using NSubstitute;
 using Shouldly;
 using Xunit;
 
@@ -1328,6 +1331,132 @@ namespace AqualLifeStyle.Tests.Application
                 persistedCustomer.MembershipId.ShouldBeNull();
             });
         }
+
+        [Fact]
+        public async Task V2Joining_LegacyAQGreenMembershipRequiresReconciliationWithoutNewParticipation()
+        {
+            var inviteCode = await CreateV2SponsorInvitationAsync();
+            var areaId = await GetAreaIdAsync("JHB");
+            var customerId = await RegisterAndSignInCustomerAsync(areaId: areaId);
+            var membershipId = await AssignLegacyAQGreenMembershipAsync(customerId);
+            var service = ResolveV2JoiningService();
+
+            var exception = await Should.ThrowAsync<UserFriendlyException>(() =>
+                service.StartEntryAsync(new StartEntryParticipationInput { InviteCode = inviteCode }));
+
+            exception.Message.ShouldBe("Existing AQGreen membership requires reconciliation.");
+            await UsingDbContextAsync(1, async context =>
+            {
+                var customer = await context.Customers.SingleAsync(item => item.Id == customerId);
+                customer.MembershipId.ShouldBe(membershipId);
+                (await context.EntryParticipations.AnyAsync(item => item.CustomerId == customerId)).ShouldBeFalse();
+                (await context.AQGreenJoiningCheckouts.AnyAsync(item => item.CustomerId == customerId)).ShouldBeFalse();
+                (await context.MemberPayments.AnyAsync(item => item.CustomerId == customerId)).ShouldBeFalse();
+                (await context.AQGreenRecruitmentAttributions.CountAsync()).ShouldBe(0);
+                (await context.AQGreenRecruitmentAttributionConfirmations.CountAsync()).ShouldBe(0);
+                customer.AreaId.ShouldBe(areaId);
+                (await context.CustomerAreaAssignments.CountAsync(item => item.CustomerId == customerId)).ShouldBe(1);
+            });
+        }
+
+        [Theory]
+        [InlineData(AQGreenJoiningPaymentSchedule.Full)]
+        [InlineData(AQGreenJoiningPaymentSchedule.TwoInstallments)]
+        public async Task V2Checkout_LegacyMembershipCannotBeChargedThroughExistingPendingParticipation(
+            AQGreenJoiningPaymentSchedule schedule)
+        {
+            var customerId = await RegisterAndSignInCustomerAsync();
+            await _participationService.StartEntryAsync(new StartEntryParticipationInput());
+            var membershipId = await AssignLegacyAQGreenMembershipAsync(customerId);
+            var gateway = Substitute.For<AqualLifeStyle.Payments.Yoco.IYocoCheckoutGateway>();
+            gateway.CreateAsync(Arg.Any<AqualLifeStyle.Payments.Yoco.CreateYocoCheckout>())
+                .Returns(Task.FromResult(new AqualLifeStyle.Payments.Yoco.YocoCheckout
+                {
+                    Id = "synthetic-legacy-checkout",
+                    RedirectUrl = "https://payments.example.test/legacy-checkout"
+                }));
+            LocalIocManager.IocContainer.Register(
+                Component.For<AqualLifeStyle.Payments.Yoco.IYocoCheckoutGateway>()
+                    .Instance(gateway).Named($"legacy-checkout-{Guid.NewGuid():N}").IsDefault());
+            var service = ResolveV2JoiningService();
+
+            var exception = await Should.ThrowAsync<UserFriendlyException>(() =>
+                service.CreateAQGreenJoiningCheckoutAsync(new CreateAQGreenJoiningCheckoutInput { Schedule = schedule }));
+
+            exception.Message.ShouldBe("Existing AQGreen membership requires reconciliation.");
+            gateway.ReceivedCalls().ShouldBeEmpty();
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.Customers.SingleAsync(item => item.Id == customerId)).MembershipId.ShouldBe(membershipId);
+                var participation = await context.EntryParticipations.SingleAsync(item => item.CustomerId == customerId);
+                participation.Status.ShouldBe(EntryParticipationStatus.AwaitingJoiningPayment);
+                participation.JoiningPaymentSchedule.ShouldBeNull();
+                (await context.AQGreenJoiningCheckouts.AnyAsync(item => item.CustomerId == customerId)).ShouldBeFalse();
+                (await context.MemberPayments.AnyAsync(item => item.CustomerId == customerId)).ShouldBeFalse();
+            });
+        }
+
+        [Fact]
+        public async Task V2Joining_FreshMemberCanJoinReplayAndPrepareCheckout()
+        {
+            var inviteCode = await CreateV2SponsorInvitationAsync();
+            var customerId = await RegisterAndSignInCustomerAsync(areaId: await GetAreaIdAsync("JHB"));
+            var service = ResolveV2JoiningService();
+            var input = new StartEntryParticipationInput { InviteCode = inviteCode };
+
+            await service.StartEntryAsync(input);
+            await service.StartEntryAsync(input);
+            var checkout = await service.CreateAQGreenJoiningCheckoutAsync(
+                new CreateAQGreenJoiningCheckoutInput { Schedule = AQGreenJoiningPaymentSchedule.Full });
+
+            checkout.Amount.ShouldBe(1200m);
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations.SingleAsync(item => item.CustomerId == customerId);
+                (await context.AQGreenRecruitmentAttributions.CountAsync(item => item.ParticipantId == participation.Id)).ShouldBe(1);
+                (await context.AQGreenRecruitmentAttributionConfirmations.CountAsync()).ShouldBe(1);
+                (await context.AQGreenJoiningCheckouts.CountAsync(item => item.CustomerId == customerId)).ShouldBe(1);
+            });
+        }
+
+        private IClubMemberProgrammeParticipationAppService ResolveV2JoiningService()
+        {
+            var gate = Substitute.For<IAQGreenPlacementV2JoiningGate>();
+            gate.IsEnabledAsync(1).Returns(Task.FromResult(true));
+            LocalIocManager.IocContainer.Register(
+                Component.For<IAQGreenPlacementV2JoiningGate>()
+                    .Instance(gate).Named($"legacy-member-guard-{Guid.NewGuid():N}").IsDefault());
+            return Resolve<IClubMemberProgrammeParticipationAppService>();
+        }
+
+        private async Task<string> CreateV2SponsorInvitationAsync()
+        {
+            var customerId = await RegisterAndSignInCustomerAsync(
+                areaId: await CreateAreaAsync("PTA", "Pretoria"));
+            await ActivateCurrentAQGreenParticipationAsync(customerId);
+            await UsingDbContextAsync(1, async context =>
+            {
+                var participation = await context.EntryParticipations.SingleAsync(item => item.CustomerId == customerId);
+                var scope = AQGreenPlacementTreeScope.Create(1);
+                context.AQGreenPlacementTreeScopes.Add(scope);
+                context.AQGreenNetworkPlacements.Add(AQGreenNetworkPlacement.CreateRoot(
+                    scope, participation.Id, participation.ActivatedAt.Value, AQGreenPlacementRules.CurrentVersion));
+                await context.SaveChangesAsync();
+            });
+            return (await _invitationService.GetMyInvitationsAsync()).Invitations.Single().Code;
+        }
+
+        private Task<int> AssignLegacyAQGreenMembershipAsync(int customerId) =>
+            UsingDbContextAsync(1, async context =>
+            {
+                var membershipId = await context.Memberships
+                    .Where(item => item.MembershipType == MembershipType.AQGreen)
+                    .Select(item => item.Id).FirstAsync();
+                var customer = await context.Customers.SingleAsync(item => item.Id == customerId);
+                customer.ChangeMembership(membershipId);
+                await context.SaveChangesAsync();
+                return membershipId;
+            });
 
         [Fact]
         public async Task JoiningUnderRecruiter_RequiresActiveParticipationInSameProgramme()

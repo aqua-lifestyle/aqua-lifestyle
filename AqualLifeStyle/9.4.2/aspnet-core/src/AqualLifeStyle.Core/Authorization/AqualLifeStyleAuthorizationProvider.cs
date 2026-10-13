@@ -151,6 +151,7 @@ namespace AqualLifeStyle.Authorization
                 AquaPermissions.Admin.ProgrammeParticipations.ViewPaymentCheckouts,
                 AquaPermissions.Admin.ProgrammeParticipations.TerminatePaymentCheckouts,
                 AquaPermissions.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation,
+                AquaPermissions.Admin.ProgrammeParticipations.ExportLegacyReconciliationEvidence,
                 AquaPermissions.Admin.ProgrammeParticipations.Approve);
             CreateChildren(
                 programmeParticipations,

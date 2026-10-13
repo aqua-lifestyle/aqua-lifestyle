@@ -234,6 +234,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 tenantId);
             var customer = await GetCurrentActiveCustomerAsync();
             var recruiterCustomerId = requestedPlacement.RecruiterCustomerId;
+            if (useV2Joining)
+                await EnsureNoLegacyAQGreenMembershipAsync(customer);
             await ClearLegacyProgrammeMembershipAssignmentAsync(
                 customer,
                 MembershipType.AQGreen,
@@ -325,6 +327,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             using (_unitOfWorkManager.Current.SetTenantId(tenantId))
             {
                 var customer = await GetCurrentActiveCustomerAsync();
+                if (await _v2JoiningGate.IsEnabledAsync(tenantId))
+                    await EnsureNoLegacyAQGreenMembershipAsync(customer);
                 var participation = await _entryParticipationRepository.FirstOrDefaultAsync(
                     candidate => candidate.CustomerId == customer.Id);
                 if (participation == null)
@@ -594,6 +598,26 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 Currency = checkout.Currency,
                 CheckoutUrl = checkout.CheckoutUrl
             };
+
+        private async Task EnsureNoLegacyAQGreenMembershipAsync(Customer customer)
+        {
+            if (!customer.MembershipId.HasValue)
+                return;
+
+            Membership assignedMembership;
+            using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
+            {
+                assignedMembership = await _membershipRepository.FirstOrDefaultAsync(
+                    customer.MembershipId.Value);
+            }
+            if (assignedMembership == null)
+                throw new InvalidOperationException(
+                    "AQGreen V2 admission cannot verify the existing membership assignment.");
+            if (assignedMembership.MembershipType == MembershipType.AQGreen)
+                throw new UserFriendlyException(
+                    "Existing AQGreen membership requires reconciliation.",
+                    "Contact the club team to reconcile your existing membership and joining evidence before V2 admission. Do not pay to join again.");
+        }
 
         private async Task ClearLegacyProgrammeMembershipAssignmentAsync(
             Customer customer,
