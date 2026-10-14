@@ -60,6 +60,9 @@ const forward = async (
     status: backendResponse.status,
   });
   response.headers.set("Cache-Control", "no-store");
+  // Preserve the backend signal; a generic 503 is not proof of recovery mode.
+  if (backendResponse.headers.get("X-Aqua-Recovery-Suspended") === "true")
+    response.headers.set("X-Aqua-Recovery-Suspended", "true");
   if (session && backendResponse.status === 401) deleteSessionCookies(response.cookies);
   return response;
 };

@@ -3,19 +3,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PilotBoundary } from "./pilot-boundary";
 
 let path = "/login";
-let status = { isPilot: false, modeKnown: false };
+let status = { isPilot: false, modeKnown: false, isRecovery: false };
 vi.mock("next/navigation", () => ({ usePathname: () => path }));
 vi.mock("@/src/shared/hooks/use-pilot-status", () => ({
   usePilotStatus: () => status,
-}));
-vi.mock("@/src/features/recovery/recovery-admin-workspace", () => ({
-  RecoveryAdminWorkspace: ({ discovery }: { discovery: boolean }) => <div>{discovery ? "Recovery discovery" : "Recovery workspace"}</div>,
 }));
 
 describe("authentication while capability status is unavailable", () => {
   beforeEach(() => {
     path = "/login";
-    status = { isPilot: false, modeKnown: false };
+    status = { isPilot: false, modeKnown: false, isRecovery: false };
   });
 
   it("mounts sign-in without presenting unknown mode as normal operation", () => {
@@ -32,25 +29,36 @@ describe("authentication while capability status is unavailable", () => {
     path = value;
     render(<PilotBoundary><div>Business capability</div></PilotBoundary>);
     expect(screen.queryByText("Business capability")).not.toBeInTheDocument();
-    expect(screen.getByText(value === "/admin/dashboard" ? "Recovery workspace" : /Establishing the application/)).toBeInTheDocument();
-  });
-
-  it("replaces the discovery route with the recovery workspace without mounting business content", () => {
-    path = "/admin/b6-discovery";
-    render(<PilotBoundary><div>Business capability</div></PilotBoundary>);
-    expect(screen.getByText("Recovery discovery")).toBeInTheDocument();
-    expect(screen.queryByText("Business capability")).not.toBeInTheDocument();
-  });
-
-  it("does not extend the recovery exception to nested routes", () => {
-    path = "/admin/b6-discovery/other";
-    render(<PilotBoundary><div>Business capability</div></PilotBoundary>);
-    expect(screen.queryByText("Business capability")).not.toBeInTheDocument();
     expect(screen.getByText(/Establishing the application/)).toBeInTheDocument();
   });
 
+  it("mounts the original dashboard only on verified recovery", () => {
+    status.isRecovery = true;
+    path = "/admin/dashboard";
+    render(<PilotBoundary><div>Original dashboard shell</div></PilotBoundary>);
+    expect(screen.getByText("Original dashboard shell")).toBeInTheDocument();
+    expect(screen.queryByText(/Establishing the application/)).not.toBeInTheDocument();
+  });
+
+  it.each(["/admin/dashboard/other", "/admin/b6-discovery", "/admin/customers", "/admin/weekly-earnings", "/member/programmes", "/signup"])(
+    "does not mount business content for %s in verified recovery", (value) => {
+      status.isRecovery = true;
+      path = value;
+      render(<PilotBoundary><div>Business capability</div></PilotBoundary>);
+      expect(screen.queryByText("Business capability")).not.toBeInTheDocument();
+      expect(screen.getByText(/Restricted recovery mode is active/)).toBeInTheDocument();
+    },
+  );
+
+  it("preserves the ordinary non-pilot route", () => {
+    status.modeKnown = true;
+    path = "/admin/dashboard";
+    render(<PilotBoundary><div>Normal dashboard</div></PilotBoundary>);
+    expect(screen.getByText("Normal dashboard")).toBeInTheDocument();
+  });
+
   it("retains the explicit pilot label on a known pilot login", () => {
-    status = { isPilot: true, modeKnown: true };
+    status = { isPilot: true, modeKnown: true, isRecovery: false };
     render(<PilotBoundary><form aria-label="Administrator sign-in" /></PilotBoundary>);
     expect(screen.getByRole("form", { name: "Administrator sign-in" })).toBeInTheDocument();
     expect(screen.getByRole("note")).toHaveTextContent("TEST MONEY ONLY");

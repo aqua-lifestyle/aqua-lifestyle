@@ -141,6 +141,30 @@ describe("app/api/backend/[...path]", () => {
     expect(new Headers(forwardedFetch()[1].headers).get("__tenant")).toBe("area-2");
   });
 
+  it("preserves the authoritative recovery signal and status without forwarding other headers", async () => {
+    vi.mocked(readSession).mockResolvedValue(null);
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ error: "APPLICATION_RECOVERY_SUSPENDED" }), {
+      status: 503,
+      headers: { "X-Aqua-Recovery-Suspended": "true", "X-Unrelated": "private", "Set-Cookie": "private" },
+    }));
+    const { request, handlerArgs } = routeRequest(["api", "services", "app", "AQGreenPilot", "GetStatus"]);
+    const response = await GET(request, handlerArgs);
+    expect(response.status).toBe(503);
+    expect(response.headers.get("X-Aqua-Recovery-Suspended")).toBe("true");
+    expect(response.headers.has("X-Unrelated")).toBe(false);
+    expect(response.headers.has("Set-Cookie")).toBe(false);
+    expect(deleteSessionCookies).not.toHaveBeenCalled();
+  });
+
+  it("does not add a recovery signal to a generic server failure", async () => {
+    vi.mocked(readSession).mockResolvedValue(null);
+    vi.mocked(fetch).mockResolvedValue(new Response("{}", { status: 503 }));
+    const { request, handlerArgs } = routeRequest(["api", "services", "app", "AQGreenPilot", "GetStatus"]);
+    const response = await GET(request, handlerArgs);
+    expect(response.status).toBe(503);
+    expect(response.headers.has("X-Aqua-Recovery-Suspended")).toBe(false);
+  });
+
   it("deletes session cookies when the backend rejects the session with 401", async () => {
     vi.mocked(readSession).mockResolvedValue(session);
     vi.mocked(fetch).mockResolvedValue(

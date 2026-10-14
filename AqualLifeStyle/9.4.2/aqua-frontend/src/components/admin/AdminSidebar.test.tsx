@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthState } from "@/src/providers";
 import { usePendingProgrammeApprovals } from "@/src/shared/hooks/use-pending-programme-approvals";
+import { RecoveryContext } from "@/src/shared/hooks/recovery-context";
 import { AdminSidebar } from "./AdminSidebar";
 
 vi.mock("next/navigation", () => ({
@@ -61,6 +62,15 @@ describe("AdminSidebar", () => {
     expect(screen.getByRole("link", { name: "AQGreen commitments" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Areas" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Club members" })).not.toBeInTheDocument();
+  });
+
+  it("retains permissioned navigation labels but disables restricted destinations during recovery", () => {
+    render(<RecoveryContext.Provider value={true}><AdminSidebar /></RecoveryContext.Provider>);
+    expect(screen.getByRole("link", { name: "Dashboard" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Customer accounts" })).not.toBeInTheDocument();
+    expect(screen.getByText("Customer accounts").parentElement).toHaveAttribute("aria-disabled", "true");
+    expect(screen.queryByText("Areas")).not.toBeInTheDocument();
+    expect(usePendingProgrammeApprovals).toHaveBeenCalledWith(false);
   });
 
   it("marks the current section as active", () => {

@@ -35,7 +35,7 @@ const authState = (permissions: string[]) => ({
 describe("MemberProgrammeProgress", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: false, modeKnown: true });
+    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: false, modeKnown: true, isRecovery: false });
     vi.mocked(useAuthState).mockReturnValue(
       authState(["Aqua.ProgrammeParticipations.ViewSelf"]),
     );
@@ -43,7 +43,7 @@ describe("MemberProgrammeProgress", () => {
   });
 
   it("keeps production obligations and benefit claims out of pilot progress", async () => {
-    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: true, modeKnown: true });
+    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: true, modeKnown: true, isRecovery: false });
     render(<MemberProgrammeProgress />);
     expect(await screen.findByRole("heading", { name: "Level 1" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Weekly test-money ledger" })).toBeInTheDocument();

@@ -1,6 +1,5 @@
 import { createServer } from "node:http";
 import { longName, uiPermissions } from "./admin-ui-fixtures.mjs";
-import { handleRecoveryB6 } from "./recovery-b6-fixture.mjs";
 
 const port = Number(process.env.MOCK_BACKEND_PORT ?? 3200);
 
@@ -366,7 +365,12 @@ const sendJson = (response, status, body) => {
 
 createServer((request, response) => {
   const url = new URL(request.url ?? "/", `http://127.0.0.1:${port}`);
-  if (handleRecoveryB6(request, response, url, createAccessToken)) return;
+  if (process.env.MOCK_APPLICATION_RECOVERY === "1") {
+    response.setHeader("X-Aqua-Recovery-Suspended", "true");
+    if (!((request.method === "GET" && url.pathname === "/api/health") ||
+          (request.method === "POST" && url.pathname === "/api/TokenAuth/Authenticate")))
+      return sendJson(response, 503, { error: "APPLICATION_RECOVERY_SUSPENDED" });
+  }
   if (request.method === "OPTIONS") return sendJson(response, 204, null);
   if (url.pathname === "/api/health") {
     return sendJson(response, 200, responses.get(url.pathname));
