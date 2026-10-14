@@ -22,6 +22,7 @@ import { useState } from "react";
 
 import { useAuthState } from "@/src/providers";
 import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
+import { useRecoveryMode } from "@/src/shared/hooks/recovery-context";
 import { usePendingProgrammeApprovals } from "@/src/shared/hooks/use-pending-programme-approvals";
 import { cn } from "@/src/shared/lib/utils";
 
@@ -44,6 +45,7 @@ const adminLinks = [
 
 export const AdminSidebar = () => {
   const { isPilot } = usePilotStatus();
+  const isRecovery = useRecoveryMode();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { session } = useAuthState();
@@ -52,7 +54,7 @@ export const AdminSidebar = () => {
     "Aqua.Admin.ProgrammeParticipations.View",
   );
   const { summary } = usePendingProgrammeApprovals(
-    canViewProgrammeParticipations,
+    !isRecovery && canViewProgrammeParticipations,
   );
   const visibleLinks = adminLinks.filter(
     ({ permission, href }) => (permission === null || permissions.includes(permission)) &&
@@ -92,6 +94,12 @@ export const AdminSidebar = () => {
         >
           {visibleLinks.map((link) => {
             const active = isActive(link.href);
+            if (isRecovery && link.href !== "/admin/dashboard") return (
+              <span aria-disabled="true" className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-muted-foreground opacity-60" key={link.href} title="Unavailable during restricted recovery">
+                <link.icon aria-hidden="true" className="size-4" />
+                <span className="min-w-0">{link.label}<span className="block text-xs font-normal">Unavailable during recovery</span></span>
+              </span>
+            );
 
             return (
               <Link

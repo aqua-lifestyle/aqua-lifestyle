@@ -28,7 +28,7 @@ vi.mock("@/src/shared/api", async () => {
   const actual = await vi.importActual<typeof import("@/src/shared/api")>(
     "@/src/shared/api",
   );
-  return { ...actual, httpClient: { get: vi.fn(), post: vi.fn() } };
+  return { ...actual, apiClient: { get: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { isPilot: false, testMoneyOnly: false } }) }, httpClient: { get: vi.fn(), post: vi.fn() } };
 });
 
 const health = {

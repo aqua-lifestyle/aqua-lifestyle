@@ -13,19 +13,19 @@ vi.mock("@/src/components/members/member-programme-progress", () => ({
 describe("progress route commissioning", () => {
   beforeEach(() => vi.clearAllMocks());
   it("opens the existing structural view for the explicit pilot", () => {
-    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: true, modeKnown: true });
+    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: true, modeKnown: true, isRecovery: false });
     render(<Page />);
     expect(screen.getByText("Structural progress view")).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
   });
   it("preserves the normal-mode journey redirect", async () => {
-    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: false, modeKnown: true });
+    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: false, modeKnown: true, isRecovery: false });
     render(<Page />);
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/member/programmes"));
     expect(screen.queryByText("Structural progress view")).not.toBeInTheDocument();
   });
   it("does not expose a view or choose a route when deployment mode is unknown", () => {
-    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: false, modeKnown: false });
+    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: false, modeKnown: false, isRecovery: false });
     render(<Page />);
     expect(screen.queryByText("Structural progress view")).not.toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();

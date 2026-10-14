@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
 import { StatusMessage } from "@/src/shared/ui";
+import { RecoveryContext } from "@/src/shared/hooks/recovery-context";
 
 const pilotRoutes = new Set([
   "/", "/login", "/signup", "/verify-email", "/verify-email-sent", "/profile", "/member", "/member/programmes", "/member/programme-progress",
@@ -12,8 +13,19 @@ const pilotRoutes = new Set([
 ]);
 
 export function PilotBoundary({ children }: { children: React.ReactNode }) {
-  const { isPilot, modeKnown } = usePilotStatus();
+  const { isPilot, modeKnown, isRecovery } = usePilotStatus();
   const path = usePathname();
+  // Authentication remains available when recovery closes capability discovery.
+  // Business routes require an authoritative capability result or explicit recovery handling.
+  if (!modeKnown && path === "/login") return children;
+  if (isRecovery) {
+    if (path === "/admin/dashboard")
+      return <RecoveryContext.Provider value={true}>{children}</RecoveryContext.Provider>;
+    return <main className="p-6"><StatusMessage tone="warning">
+      Restricted recovery mode is active. This operation is unavailable.
+      <Link className="ml-2 underline" href="/admin/dashboard">Return to the administration overview</Link>
+    </StatusMessage></main>;
+  }
   if (!modeKnown) return <main className="p-6"><StatusMessage tone="info">Establishing the application capability boundary…</StatusMessage></main>;
   if (!isPilot) return children;
   return <>

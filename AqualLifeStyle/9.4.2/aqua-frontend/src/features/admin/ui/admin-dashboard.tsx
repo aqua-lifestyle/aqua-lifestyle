@@ -26,6 +26,7 @@ import {
 import { Badge, Button, Card, Skeleton, StatusMessage } from "@/src/shared/ui";
 import { buildAdminDashboard, formatCurrency } from "../model/dashboard";
 import { isSystemAdmin } from "@/src/shared/auth/roles";
+import { useRecoveryMode } from "@/src/shared/hooks/recovery-context";
 import { KpiCards } from "./kpi-cards";
 import { MemberAnalytics } from "./member-analytics";
 import { OrderAnalytics } from "./order-analytics";
@@ -33,6 +34,7 @@ import { RecentActivity } from "./recent-activity";
 
 export const AdminDashboard = () => {
   const auth = useAuthState();
+  const isRecovery = useRecoveryMode();
   const customerActions = useCustomersActions();
   const enquiryActions = useEnquiriesActions();
   const membershipActions = useMembershipsActions();
@@ -55,7 +57,7 @@ export const AdminDashboard = () => {
   const loadDashboard = () => {
     if (!auth.isAuthenticated || !isSystemAdmin(auth.session?.user?.role)) return;
 
-    if (isPlatformAdministrator) {
+    if (isRecovery || isPlatformAdministrator) {
       void healthActions.checkHealth();
       return;
     }
@@ -75,21 +77,21 @@ export const AdminDashboard = () => {
     if (auth.isReady) loadDashboard();
     // Provider actions are memoized. Loading is intentionally keyed to the authenticated session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth.isAuthenticated, auth.isReady, auth.session?.user?.id]);
+  }, [auth.isAuthenticated, auth.isReady, auth.session?.user?.id, isRecovery]);
 
-  const requiredFailed = !isPlatformAdministrator && (
+  const requiredFailed = !isRecovery && !isPlatformAdministrator && (
     customerState.isLoadError || enquiryState.isLoadError ||
     membershipState.isError || orderState.isLoadError
   );
-  const requiredSettled = isPlatformAdministrator ||
+  const requiredSettled = isRecovery || isPlatformAdministrator ||
     (customerState.isLoadSuccess || customerState.isLoadError) &&
     (enquiryState.isLoadSuccess || enquiryState.isLoadError) &&
     (membershipState.isSuccess || membershipState.isError) &&
     (orderState.isLoadSuccess || orderState.isLoadError);
-  const isLoading = !requiredSettled || customerState.isLoadPending ||
+  const isLoading = isRecovery ? healthState.isPending : !requiredSettled || customerState.isLoadPending ||
     enquiryState.isLoadPending || membershipState.isPending || orderState.isLoadPending;
 
-  const dashboard = useMemo(() => buildAdminDashboard({
+  const dashboard = useMemo(() => isRecovery ? null : buildAdminDashboard({
     areaLeaderCount: leaderState.areaLeaders.length,
     customers: customerState.customers,
     enquiries: enquiryState.enquiries,
@@ -98,7 +100,7 @@ export const AdminDashboard = () => {
     orders: orderState.orderIntents,
     referrals: referralState.referrals,
   }), [
-    customerState.customers, enquiryState.enquiries, facilitatorState.facilitators.length,
+    isRecovery, customerState.customers, enquiryState.enquiries, facilitatorState.facilitators.length,
     leaderState.areaLeaders.length, membershipState.memberships, orderState.orderIntents,
     referralState.referrals,
   ]);
@@ -130,9 +132,20 @@ export const AdminDashboard = () => {
           </div>
           <Button className="shrink-0" disabled={isLoading} onClick={loadDashboard} variant="secondary">
             <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
-            Refresh data
+            {isRecovery ? "Refresh system status" : "Refresh data"}
           </Button>
         </header>
+
+        {isRecovery ? <StatusMessage tone="warning">
+          Restricted recovery mode is active. Operational data, membership changes, payments,
+          messaging and financial processing are unavailable. Management actions are disabled.
+        </StatusMessage> : null}
+
+        {isRecovery ? <Card>
+          <h2 className="font-semibold">System status</h2>
+          <p className="mt-2">{healthState.isPending ? "Checking…" : healthState.isError ? "Unavailable" : healthState.health?.status ?? "Unavailable"}</p>
+          {healthState.isError ? <p className="mt-2 text-sm text-muted-foreground">{healthState.errorMessage}</p> : null}
+        </Card> : null}
 
         {requiredFailed ? (
           <StatusMessage tone="warning">
@@ -142,20 +155,24 @@ export const AdminDashboard = () => {
 
         <section aria-labelledby="management-heading">
           <h2 className="text-xl font-bold" id="management-heading">Management</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Choose an area to continue.</p>
-          <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">{managementLinks.map((item) => <Link className="group" href={item.href} key={item.href}><Card className="h-full transition group-hover:border-accent group-hover:shadow-md"><div className="flex items-start gap-3"><div className="rounded-lg bg-accent/10 p-2 text-accent"><item.icon className="size-5" /></div><div><h3 className="font-semibold">{item.label}</h3><p className="mt-1 text-sm text-muted-foreground">{item.summary}</p><p className="mt-3 text-sm font-semibold text-accent">Open {item.label.toLowerCase()} →</p></div></div></Card></Link>)}</div>
+          <p className="mt-1 text-sm text-muted-foreground">{isRecovery ? "These tools are unavailable during restricted recovery." : "Choose an area to continue."}</p>
+          <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">{managementLinks.map((item) => {
+            const card = <Card className="h-full transition group-hover:border-accent group-hover:shadow-md"><div className="flex items-start gap-3"><div className="rounded-lg bg-accent/10 p-2 text-accent"><item.icon className="size-5" /></div><div><h3 className="font-semibold">{item.label}</h3><p className="mt-1 text-sm text-muted-foreground">{item.summary}</p><p className="mt-3 text-sm font-semibold text-accent">{isRecovery ? "Unavailable during recovery" : `Open ${item.label.toLowerCase()} →`}</p></div></div></Card>;
+            return isRecovery ? <div aria-disabled="true" key={item.href}>{card}</div> :
+              <Link className="group" href={item.href} key={item.href}>{card}</Link>;
+          })}</div>
         </section>
 
-        {!isPlatformAdministrator && !requiredFailed ? <KpiCards isLoading={isLoading} stats={dashboard.stats} /> : null}
+        {dashboard && !isPlatformAdministrator && !requiredFailed ? <KpiCards isLoading={isLoading} stats={dashboard.stats} /> : null}
 
-        {!isPlatformAdministrator && !requiredFailed ? <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,26rem),1fr))] gap-6">
+        {dashboard && !isPlatformAdministrator && !requiredFailed ? <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,26rem),1fr))] gap-6">
           {isLoading ? <><Skeleton className="h-96" /><Skeleton className="h-96" /></> : <>
             <MemberAnalytics members={dashboard.members} />
             <OrderAnalytics orders={dashboard.orders} />
           </>}
         </section> : null}
 
-        {!isPlatformAdministrator && !requiredFailed ? <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-4">
+        {dashboard && !isPlatformAdministrator && !requiredFailed ? <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-4">
           <Card>
             <div className="flex items-start justify-between"><p className="text-sm text-muted-foreground">Area leaders</p><UsersRound className="size-5 text-accent" /></div>
             <p className="mt-2 break-words text-2xl font-bold tabular-nums">{leaderState.isLoadError ? "Unavailable" : leaderState.isLoadPending || !leaderState.isLoadSuccess ? "Loading…" : dashboard.leaders.total}</p>
@@ -188,7 +205,7 @@ export const AdminDashboard = () => {
           </Card>
         </section> : null}
 
-        {!isPlatformAdministrator && !requiredFailed ? isLoading ? <Skeleton className="h-64" /> : <RecentActivity activity={dashboard.activity} /> : null}
+        {dashboard && !isPlatformAdministrator && !requiredFailed ? isLoading ? <Skeleton className="h-64" /> : <RecentActivity activity={dashboard.activity} /> : null}
       </div>
     </main>
   );

@@ -311,19 +311,19 @@ describe("AdminWeeklyEarnings", () => {
   });
 
   it("retains test-money labels and denies payout controls in the pilot", async () => {
-    vi.mocked(usePilotStatus).mockReturnValueOnce({ isPilot: true, modeKnown: true });
-    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: true, modeKnown: true });
+    vi.mocked(usePilotStatus).mockReturnValueOnce({ isPilot: true, modeKnown: true, isRecovery: false });
+    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: true, modeKnown: true, isRecovery: false });
     render(<AdminWeeklyEarnings />);
     await screen.findByText("Test calculation — no payout");
     expect(screen.getByText("Calculated test commission")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Release for payment" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Record external payment" })).not.toBeInTheDocument();
-    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: false, modeKnown: true });
+    vi.mocked(usePilotStatus).mockReturnValue({ isPilot: false, modeKnown: true, isRecovery: false });
   });
 });
 
 // These existing cases exercise ordinary deployments. Pilot-specific cases use
 // the actual mode boundary separately rather than consuming their domain mock responses.
 vi.mock("@/src/shared/hooks/use-pilot-status", () => ({
-  usePilotStatus: vi.fn(() => ({ isPilot: false, modeKnown: true })),
+  usePilotStatus: vi.fn(() => ({ isPilot: false, modeKnown: true, isRecovery: false })),
 }));
