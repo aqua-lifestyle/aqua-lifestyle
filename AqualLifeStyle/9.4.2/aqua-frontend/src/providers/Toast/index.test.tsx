@@ -33,8 +33,12 @@ describe("ToastProvider", () => {
       screen.getByRole("button", { name: "Show" }).click();
     });
 
-    expect(screen.getByRole("alert")).toHaveTextContent("Hello");
-    expect(screen.getByRole("alert")).toHaveTextContent("Success");
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Hello");
+    expect(alert).toHaveTextContent("Success");
+    expect(alert).toHaveClass("w-full", "max-w-80");
+    expect(screen.getByRole("button", { name: "Dismiss notification" }))
+      .toHaveClass("min-h-11", "min-w-11");
 
     act(() => {
       vi.advanceTimersByTime(5000);

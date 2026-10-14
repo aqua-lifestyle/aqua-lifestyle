@@ -8,6 +8,7 @@ import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import {
   Button,
   Dialog,
+  DialogActions,
   StatusMessage,
   TextAreaField,
   TextField,
@@ -125,12 +126,12 @@ export const RecordWeeklyEarningPaymentDialog = ({
           {requestError ? (
             <StatusMessage tone="error">{requestError}</StatusMessage>
           ) : null}
-          <div className="flex justify-end gap-3">
+          <DialogActions>
             <Button onClick={close} variant="ghost">Cancel</Button>
             <Button isLoading={submitting} type="submit">
               Confirm payment record
             </Button>
-          </div>
+          </DialogActions>
         </form>
       </Dialog>
     </>

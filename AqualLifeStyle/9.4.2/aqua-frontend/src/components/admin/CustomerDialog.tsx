@@ -13,6 +13,7 @@ import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import {
   Button,
   Dialog,
+  DialogActions,
   SelectField,
   StatusMessage,
   TextAreaField,
@@ -202,13 +203,13 @@ export const CustomerDialog = ({ onCreated }: CustomerDialogProps) => {
                 </div>
               </div>
               <div className="mt-4 flex gap-2">
-                <input aria-label="Password setup link" className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2 text-sm" readOnly value={passwordSetupUrl} />
+                <input aria-label="Password setup link" className="min-h-11 min-w-0 flex-1 rounded-lg border border-control-border bg-card px-3 py-2 text-sm" readOnly value={passwordSetupUrl} />
                 <Button onClick={() => void navigator.clipboard.writeText(passwordSetupUrl)} variant="outline">
                   <Copy className="size-4" /> Copy link
                 </Button>
               </div>
             </div>
-            <div className="flex justify-end"><Button onClick={close}>Done</Button></div>
+            <DialogActions><Button onClick={close}>Done</Button></DialogActions>
           </div>
         ) : pendingRestore ? (
           <div className="flex flex-col gap-4">
@@ -226,10 +227,10 @@ export const CustomerDialog = ({ onCreated }: CustomerDialogProps) => {
               </ul>
             </div>
             {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
-            <div className="flex justify-end gap-3">
+            <DialogActions>
               <Button onClick={() => { setPendingRestore(null); setError(null); }} variant="ghost">Back</Button>
               <Button isLoading={isSubmitting} onClick={() => void restoreCustomer()}>Restore customer</Button>
-            </div>
+            </DialogActions>
           </div>
         ) : <form className="grid gap-4 sm:grid-cols-2" noValidate onSubmit={submit}>
           <AdminAreaSelectionField
@@ -252,14 +253,14 @@ export const CustomerDialog = ({ onCreated }: CustomerDialogProps) => {
           <TextField autoComplete="new-password" className="sm:col-span-2" errorMessage={fieldErrors.password} label="Temporary password for a new customer" minLength={8} name="password" type="password" />
           <p className="-mt-2 text-xs text-muted-foreground sm:col-span-2">This is used only for a brand-new account. Restored customers receive a one-time password setup link instead.</p>
           <TextAreaField className="sm:col-span-2" errorMessage={fieldErrors.justification} label="Reason for creating this account" maxLength={500} name="justification" required rows={3} />
-          <label className="flex items-center gap-2 text-sm font-medium">
+          <label className="flex min-h-11 items-center gap-2 text-sm font-medium">
             <input defaultChecked name="isActive" type="checkbox" /> Active account
           </label>
           {error ? <StatusMessage className="sm:col-span-2" tone="error">{error}</StatusMessage> : null}
-          <div className="flex justify-end gap-3 sm:col-span-2">
+          <DialogActions className="sm:col-span-2">
             <Button onClick={close} variant="ghost">Cancel</Button>
             <Button isLoading={isSubmitting} type="submit">Create customer</Button>
-          </div>
+          </DialogActions>
         </form>}
       </Dialog>
     </>

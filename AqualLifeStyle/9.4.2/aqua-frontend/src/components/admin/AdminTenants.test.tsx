@@ -61,6 +61,7 @@ describe("AdminTenants", () => {
     render(<AdminTenants />);
 
     expect(await screen.findByText("Cutoff history not recorded")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Manage area for Johannesburg Central" }));
     fireEvent.click(screen.getByRole("button", { name: "Record cutoff baseline" }));
     const dialog = screen.getByRole("dialog", { name: "Record cutoff baseline" });
     fireEvent.change(within(dialog).getByLabelText("Reason for action"), {
@@ -97,6 +98,7 @@ describe("AdminTenants", () => {
     render(<AdminTenants />);
 
     expect(await screen.findByText("Cutoff history not recorded")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Manage area for Johannesburg Central" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Record cutoff baseline" })).not.toBeInTheDocument();
     expect(httpClient.post).not.toHaveBeenCalled();
   });

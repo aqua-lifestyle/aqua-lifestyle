@@ -87,15 +87,17 @@ export const AdminEntryCommitments = () => {
           </p>
         </header>
         {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
-        <TruncatedResultsWarning
+        {!loading && !error ? <TruncatedResultsWarning
           loadedCount={items.length}
           totalCount={totalCount}
-        />
+        /> : null}
         <Card>
           {loading ? (
             <Skeleton className="h-80" />
           ) : (
             <EntryCommitmentsTable
+              loadError={Boolean(error)}
+              onRetry={() => void load()}
               obligations={items}
               showClubMember
             />

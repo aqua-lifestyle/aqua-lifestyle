@@ -28,27 +28,30 @@ namespace AqualLifeStyle.Application.Recruitment
 
     public sealed class ProgrammeInvitationPlacement
     {
+        public Guid InvitationId { get; }
+        public Guid SponsorParticipantId { get; }
         public int RecruiterCustomerId { get; }
         public int TenantId { get; }
         public Area RecruiterArea { get; }
-        public Guid? InvitationId { get; }
-        public Guid? RecruiterParticipationId { get; }
+        public Guid? RecruiterParticipationId => SponsorParticipantId;
         public string ProgrammeKey { get; }
 
         public ProgrammeInvitationPlacement(
+            Guid invitationId,
+            Guid sponsorParticipantId,
             int tenantId,
             int recruiterCustomerId,
             Area recruiterArea,
-            Guid? invitationId = null,
-            Guid? recruiterParticipationId = null,
             string programmeKey = null)
         {
+            if (invitationId == Guid.Empty) throw new ArgumentException("Invitation evidence is required.", nameof(invitationId));
+            if (sponsorParticipantId == Guid.Empty) throw new ArgumentException("Sponsor participation is required.", nameof(sponsorParticipantId));
+            InvitationId = invitationId;
+            SponsorParticipantId = sponsorParticipantId;
             if (tenantId <= 0) throw new ArgumentOutOfRangeException(nameof(tenantId));
             TenantId = tenantId;
             RecruiterCustomerId = recruiterCustomerId;
             RecruiterArea = recruiterArea ?? throw new ArgumentNullException(nameof(recruiterArea));
-            InvitationId = invitationId;
-            RecruiterParticipationId = recruiterParticipationId;
             ProgrammeKey = programmeKey;
         }
     }
@@ -186,11 +189,11 @@ namespace AqualLifeStyle.Application.Recruitment
                     "The inviting Club Member's business Area is unavailable.");
 
             return new ProgrammeInvitationPlacement(
+                invitation.Id,
+                invitation.ProgrammeParticipationId,
                 authoritativeTenantId,
                 source.CustomerId,
                 area,
-                invitation.Id,
-                invitation.ProgrammeParticipationId,
                 invitation.ProgrammeKey);
         }
 

@@ -95,6 +95,9 @@ namespace AqualLifeStyle.EntityFrameworkCore.Seed.Tenants
 
         private static bool RoleShouldReceive(string roleName, string permissionName)
         {
+            // Bulk source evidence export requires an explicit grant; no seed role opts in.
+            if (permissionName == AquaPermissions.Admin.ProgrammeParticipations.ExportLegacyReconciliationEvidence)
+                return false;
             if (roleName == "SystemAdmin" || roleName == StaticRoleNames.Tenants.Admin)
             {
                 return true;

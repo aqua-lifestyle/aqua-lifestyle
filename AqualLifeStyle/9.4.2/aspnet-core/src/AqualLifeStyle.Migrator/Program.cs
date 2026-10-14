@@ -35,6 +35,8 @@ namespace AqualLifeStyle.Migrator
             {
                 using (var bootstrapper = AbpBootstrapper.Create<AqualLifeStyleMigratorModule>())
                 {
+                    AqualLifeStyle.Configuration.ApplicationRecoveryMode.DenyBusinessOperation(
+                        AqualLifeStyle.Configuration.AppConfigurations.Get(AppContext.BaseDirectory));
                     bootstrapper.IocManager.IocContainer
                         .AddFacility<LoggingFacility>(f => f.LogUsing<SerilogFactory>());
 

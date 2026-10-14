@@ -1,0 +1,40 @@
+{
+  "parentHead": "e9bd8e96d55d03466492ffd40dd657802ae36d4b",
+  "parentAcceptedSourceManifestSha256": "72219b17d8cd5a55f9c0b542190caa969bb5193131fa2924fdefcdff54d1e26c",
+  "parentSnapshotManifestSha256": "a21093f4319ac454a3308ea68a3544b0eddc8d5b51852e84ff1262d3738dd384",
+  "derivativeSnapshotManifestSha256": "5e133be584398b2db14a5c542e27860bd6f02adae0c66c1488ef30e7ee2573e0",
+  "files": 2105,
+  "correction": "Local Latin variable Geist fonts replace build-time external Google Fonts download; no dependency or business rule change; original owner-accepted source preserved separately.",
+  "changes": [
+    {
+      "file": "AqualLifeStyle/9.4.2/aqua-frontend/app/fonts/OFL.txt",
+      "bytes": 4383,
+      "sha256": "c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90",
+      "previousSha256": null
+    },
+    {
+      "file": "AqualLifeStyle/9.4.2/aqua-frontend/app/fonts/README.md",
+      "bytes": 836,
+      "sha256": "9f4b991910f274c32e658fad2669dba4820c8f0571841df51f0b4ca127dfe419",
+      "previousSha256": null
+    },
+    {
+      "file": "AqualLifeStyle/9.4.2/aqua-frontend/app/fonts/geist-latin-variable.woff2",
+      "bytes": 29288,
+      "sha256": "9b6f5ff45b278c744b5f379a2c4ecbaf858a842b8eaf82ac8d21b699ca16c608",
+      "previousSha256": null
+    },
+    {
+      "file": "AqualLifeStyle/9.4.2/aqua-frontend/app/fonts/geist-mono-latin-variable.woff2",
+      "bytes": 23108,
+      "sha256": "5f3d6ad60f29d6cb708414ec6887163d63bf197377ef5417d2483ff31ace6c3b",
+      "previousSha256": null
+    },
+    {
+      "file": "AqualLifeStyle/9.4.2/aqua-frontend/app/layout.tsx",
+      "bytes": 1741,
+      "sha256": "58e5b69d74e13547391b7f4e385d32af220689f76142124ae241a4b71f89bfea",
+      "previousSha256": "9b8fcad4cbdcad42dd407f14c9ddb47283e51ea116389ee2eb17295de3e061a2"
+    }
+  ]
+}

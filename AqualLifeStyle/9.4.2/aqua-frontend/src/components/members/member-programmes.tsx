@@ -8,6 +8,7 @@ import {
   useSystemHealthState,
 } from "@/src/providers";
 import {
+  isAQGreenV2DemoCheckout,
   isPaymentApiCompatible,
   isPilotAQGreenJoiningApiCompatible,
   isProgrammeJourneyApiCompatible,
@@ -76,6 +77,7 @@ export const MemberProgrammes = () => {
     session?.user?.permissions?.includes(
       "Aqua.ProgrammeParticipations.Invite",
     ) ?? false;
+  const demoCheckout = isAQGreenV2DemoCheckout(healthState.health);
   const paymentApiCompatible = isPilot
     ? isPilotAQGreenJoiningApiCompatible(healthState.health)
     : isPaymentApiCompatible(healthState.health);
@@ -209,13 +211,13 @@ export const MemberProgrammes = () => {
             Confirm test joining payment
           </Button>
         ) : paymentActionsUnavailable ? (
-          <Button className="w-full" disabled>Continue secure payment</Button>
+          <Button className="w-full" disabled>{demoCheckout ? "Continue test checkout" : "Continue secure payment"}</Button>
         ) : (
           <a
             className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
             href={participations.pendingAQGreenCheckout.checkoutUrl}
           >
-            Continue secure payment
+            {demoCheckout ? "Continue test checkout" : "Continue secure payment"}
           </a>
         )
       ) : participations.entry.joiningSchedule == null &&
@@ -258,8 +260,12 @@ export const MemberProgrammes = () => {
       )
     ) : undefined;
 
-  const aqGreenJoinAction = isPilot && !participations?.entry ? (
-    <StatusMessage tone="info">Open your sponsor’s invitation to join this pilot. Independent admission requires authorized prospective-root administration.</StatusMessage>
+  const aqGreenJoinAction = !participations?.entry && (isPilot || demoCheckout) ? (
+    <StatusMessage tone="info">
+      {isPilot
+        ? "Open your sponsor’s invitation to join this pilot. Independent admission requires authorized prospective-root administration."
+        : "In this test environment, open a valid AQGreen sponsor invitation to begin."}
+    </StatusMessage>
   ) : !participations?.entry ? (
     <JoinProgrammeDialog
       disabled={paymentActionsUnavailable}
@@ -371,6 +377,7 @@ export const MemberProgrammes = () => {
             {journey.programmes.map((programme) => (
               <ProgrammeJourneyOverview
                 canInvite={hasInvitationPermission}
+                demoTestMoney={Boolean(demoCheckout) && programme.programmeCode === "AQGREEN"}
                 joinAction={programme.programmeCode === "AQGREEN" ? aqGreenJoinAction : onyxJoinAction}
                 journey={programme}
                 key={programme.programmeCode}

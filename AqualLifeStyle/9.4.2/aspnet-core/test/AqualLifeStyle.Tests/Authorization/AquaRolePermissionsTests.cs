@@ -1,5 +1,6 @@
 using System.Linq;
 using Abp.Authorization;
+using Abp.MultiTenancy;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Enums;
 using Shouldly;
@@ -113,6 +114,17 @@ namespace AqualLifeStyle.Tests.Authorization
         [InlineData(AquaUserRole.Member, AquaPermissions.Referrals.Confirm)]
         [InlineData(AquaUserRole.Guest, AquaPermissions.Enquiries.Create)]
         public void Role_DoesNotLeakPermission(AquaUserRole role, string permission) => AquaRolePermissions.GetFor(role).ShouldNotContain(permission);
+
+        [Fact]
+        public void ReviewDelegation_IsAvailableOnBothSides_WhileFinancialMutationsRemainHostOnly()
+        {
+            var permissions = PermissionFinder.GetAllPermissions(new AqualLifeStyleAuthorizationProvider());
+            permissions.Single(item => item.Name == AquaPermissions.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility)
+                .MultiTenancySides.ShouldBe(MultiTenancySides.Host | MultiTenancySides.Tenant);
+            foreach (var name in new[] { AquaPermissions.Admin.Commissions.Calculate,
+                AquaPermissions.Admin.Commissions.Release, AquaPermissions.Admin.Commissions.RecordPayment })
+                permissions.Single(item => item.Name == name).MultiTenancySides.ShouldBe(MultiTenancySides.Host);
+        }
 
         [Fact]
         public void Provider_RegistersEveryAquaPermission()

@@ -68,6 +68,7 @@ describe("administrator account management", () => {
     vi.mocked(httpClient.get).mockResolvedValue({ items: [{ creationTime: "2026-01-01", email: "user@example.com", firstName: "Club", id: 4, invitationExpiresAt: "2026-02-01", invitationStatus: "Accepted", isActive: true, lastName: "User", requiresPasswordSetup: false, role: 1, tenantId: 1 }], totalCount: 1 });
     render(<AdminUsers />);
     await waitFor(() => expect(screen.getByText("Club User")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Manage account for Club User" }));
     expect(screen.getByRole("button", { name: "Edit details" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Change access" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send password reset email" })).toBeInTheDocument();
@@ -80,6 +81,7 @@ describe("administrator account management", () => {
     render(<AdminUsers />);
 
     expect(await screen.findByText("Invitation pending")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Manage account for Pending User" }));
     expect(screen.getByRole("button", { name: "Resend invitation" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Revoke invitation" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit details" })).not.toBeInTheDocument();
@@ -92,6 +94,7 @@ describe("administrator account management", () => {
     vi.mocked(httpClient.get).mockResolvedValue({ items: [{ creationTime: "2026-01-01", email: "pending@example.com", firstName: "Pending", id: 5, invitationExpiresAt: "2026-08-10T10:00:00Z", invitationStatus: "Pending", isActive: false, lastName: "User", requiresPasswordSetup: true, role: 4, tenantId: 1 }], totalCount: 1 });
     render(<AdminUsers />);
     await screen.findByText("Pending User");
+    expect(screen.queryByRole("button", { name: "Manage account for Pending User" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Resend invitation" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Revoke invitation" })).not.toBeInTheDocument();
   });
@@ -102,6 +105,7 @@ describe("administrator account management", () => {
     vi.mocked(httpClient.post).mockResolvedValue(undefined);
     render(<AdminUsers />);
 
+    fireEvent.click(await screen.findByRole("button", { name: "Manage account for Active User" }));
     fireEvent.click(await screen.findByRole("button", { name: "Send password reset email" }));
     fireEvent.change(screen.getByLabelText("Reason for reset"), { target: { value: "User requested account recovery" } });
     fireEvent.click(screen.getByRole("button", { name: "Send reset email" }));
@@ -129,6 +133,7 @@ describe("administrator account management", () => {
     render(<AdminUsers />);
 
     expect(await screen.findByText("Setup required")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Manage account for Legacy User" }));
     expect(screen.getByRole("button", { name: "Resend invitation" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Send password reset email" })).not.toBeInTheDocument();
   });

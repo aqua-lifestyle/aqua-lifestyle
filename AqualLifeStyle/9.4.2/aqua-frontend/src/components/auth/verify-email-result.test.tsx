@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { StrictMode } from "react";
 
 import { confirmEmail } from "@/src/shared/api/account-email-service";
 
@@ -56,6 +57,17 @@ describe("VerifyEmailResult", () => {
     render(<VerifyEmailResult tenantId={1} userId={42} />);
 
     await waitFor(() => expect(window.location.hash).toBe(""));
+    fireEvent.click(await screen.findByRole("button", { name: "Verify email" }));
+    expect(await screen.findByText("Your email is verified. You can now sign in.")).toBeInTheDocument();
+    expect(confirmEmail).toHaveBeenCalledWith(1, 42, "fragment-token");
+  });
+
+  it("retains the fragment token across StrictMode's repeated effect", async () => {
+    window.history.replaceState(null, "", "/verify-email?tenantId=1&userId=42#token=fragment-token");
+    vi.mocked(confirmEmail).mockResolvedValue({ ok: true });
+
+    render(<StrictMode><VerifyEmailResult tenantId={1} userId={42} /></StrictMode>);
+
     fireEvent.click(await screen.findByRole("button", { name: "Verify email" }));
     expect(await screen.findByText("Your email is verified. You can now sign in.")).toBeInTheDocument();
     expect(confirmEmail).toHaveBeenCalledWith(1, 42, "fragment-token");

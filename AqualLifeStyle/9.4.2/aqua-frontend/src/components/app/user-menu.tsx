@@ -61,12 +61,12 @@ export const UserMenu = ({ inverted = false }: { inverted?: boolean }) => {
   }
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="hidden text-right sm:block">
-        <p className={`text-sm font-semibold ${inverted ? "text-white" : ""}`}>{userLabel}</p>
-        <p className={`text-xs ${inverted ? "text-white/60" : "text-muted-foreground"}`}>{session?.user?.email}</p>
+    <div className="flex min-w-0 items-center gap-3">
+      <div className="hidden min-w-0 max-w-xs text-right sm:block">
+        <p className={`truncate text-sm font-semibold ${inverted ? "text-white" : ""}`} title={userLabel}>{userLabel}</p>
+        <p className={`truncate text-xs ${inverted ? "text-white/60" : "text-muted-foreground"}`} title={session?.user?.email ?? undefined}>{session?.user?.email}</p>
       </div>
-      <div className="relative" ref={menuRef}>
+      <div className="relative shrink-0" ref={menuRef}>
         <button
           aria-controls="user-menu-panel"
           aria-expanded={isOpen}

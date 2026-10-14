@@ -1,0 +1,180 @@
+{
+  "health": {
+    "result": {
+      "status": "Healthy",
+      "isDatabaseReachable": true,
+      "databaseStatus": "Healthy",
+      "isDataProtectionKeyStoreReachable": true,
+      "dataProtectionKeyStoreStatus": "Healthy",
+      "isRedisReachable": true,
+      "redisStatus": "NotConfigured",
+      "version": "9.3.0",
+      "buildId": "unavailable",
+      "imageId": "unavailable",
+      "paymentContractVersion": "aqua-payments-2026-08-09-flexible-payment-approval",
+      "contractCapabilities": [
+        "aqgreen-flexible-joining-v1",
+        "programme-approval-queue-v1",
+        "member-programme-journey-v1",
+        "direct-onyx-checkout-v1",
+        "admin-onyx-graduation-v1",
+        "admin-checkout-recovery-v1",
+        "aqgreen-v2-demo-checkout-v1"
+      ],
+      "releaseDate": "2026-10-12T11:08:00.3353206Z",
+      "checkedAtUtc": "2026-10-12T12:24:22.0165512Z",
+      "environment": "AQGreenV2Demo",
+      "traceId": "0HNP8BEME0H67:00000001"
+    },
+    "targetUrl": null,
+    "success": true,
+    "error": null,
+    "unAuthorizedRequest": false,
+    "__abp": true
+  },
+  "routes": "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT                                                       \neth0\t000012AC\t00000000\t0001\t0\t0\t0\t0000FFFF\t0\t0\t0                                                                               \n",
+  "browserNamespaceRouteTable": "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT                                                       ",
+  "heldFixture": {
+    "week": {
+      "PeriodStartUtc": "2026-10-01T22:00:00Z",
+      "PeriodEndUtc": "2026-10-08T21:59:59.9999999Z",
+      "TimeZoneId": "Africa/Johannesburg"
+    },
+    "actors": {
+      "outAdmin": 40,
+      "noPermission": 41,
+      "revoked": 42,
+      "central": 43,
+      "centralLimited": 44,
+      "owner": 45
+    },
+    "otherArea": "2b8b0db6-ef08-481f-a879-2ecddba0f240",
+    "otherTenant": 2,
+    "targetOtherArea": "af3d746e-42eb-4fd0-a8f6-2616a44fbec0",
+    "targetOtherTenant": "77e41bf8-a6d6-44bc-bedf-7e9f49f3da8b",
+    "financialParticipants": [
+      "ebedfe41-6121-4ca0-b220-d87064233b1e",
+      "8fa67aa8-c607-490c-b4c5-ad7a89cab9b2",
+      "3f9e1886-7a99-4d55-9d62-af5136e10535",
+      "80fa1aae-c18c-424c-b669-a3ececc7ff75",
+      "3493a06b-a1e9-426d-9f82-d8eede0d4c47",
+      "4303ad4e-47f3-4911-acaf-c49c7ac0b751"
+    ],
+    "financialScope": "1068814a-ac98-4512-8951-6f775a83d9de",
+    "obligation": {
+      "Id": "75d6467a-d2e4-4942-b3bf-18987762fce0",
+      "AmountDue": 600,
+      "DueAt": "2026-08-31T22:00:00Z",
+      "GracePeriodEndsAt": "2026-09-07T22:00:00Z",
+      "PaidAt": null
+    },
+    "evaluator1500": 2
+  },
+  "joining": {
+    "sponsor": {
+      "id": "0b73ae7d-875b-487a-9b56-f4e6d65121ec",
+      "email": "aqgreen.operational.walk.sponsor2@example.test"
+    },
+    "members": [
+      {
+        "id": "31d35d64-24bb-4dd2-8fdf-c3eb79bc89c1",
+        "email": "aqgreen.operational.walk.bchild1@example.test"
+      },
+      {
+        "id": "4d55c3b5-011a-49e7-81c6-907facca55ba",
+        "email": "aqgreen.operational.walk.bchild2@example.test"
+      },
+      {
+        "id": "f2c038fe-b64e-451e-94d3-6aee16900ccb",
+        "email": "aqgreen.operational.walk.bchild3@example.test"
+      },
+      {
+        "id": "89b100ae-3afd-4605-8541-7a3d34582ced",
+        "email": "aqgreen.operational.walk.bchild4@example.test"
+      },
+      {
+        "id": "b8d505e2-3265-4be1-85e5-0f734e1c63f8",
+        "email": "aqgreen.operational.walk.bchild5@example.test"
+      },
+      {
+        "id": "30178af6-4a0a-4e18-afb2-f1198a03559b",
+        "email": "aqgreen.operational.walk.bchild6@example.test"
+      }
+    ]
+  },
+  "ledgers": {
+    "normal": {
+      "id": "c8d4c949-98df-4916-90b2-03f0c1024cfd",
+      "tenantId": 1,
+      "customerId": 7,
+      "customerName": "AQGreen V2 Demo Member",
+      "email": "aqgreen.demo.member@example.test",
+      "programmeName": "AQGreen",
+      "periodStart": "2026-10-01T22:00:00Z",
+      "periodEnd": "2026-10-08T21:59:59.999999Z",
+      "timeZoneId": "Africa/Johannesburg",
+      "highestQualifiedLevel": 2,
+      "highestCommissionedLevel": 2,
+      "structuralModel": "PlacementV2",
+      "commissionDecisionRulesVersion": "AQGreenWeeklyCommissionDecisionV1",
+      "totalAmount": 400,
+      "currency": "ZAR",
+      "status": "Earned — awaiting release",
+      "holdReason": null,
+      "releasedAt": null,
+      "releaseReason": null,
+      "paidAt": null,
+      "paymentReference": null,
+      "calculatedAt": "2026-10-12T13:33:14.607789Z",
+      "rulesVersion": "aqgreen-v2-demo-commission",
+      "components": [
+        {
+          "level": 1,
+          "amount": 150
+        },
+        {
+          "level": 2,
+          "amount": 250
+        }
+      ]
+    },
+    "hold": {
+      "id": "ef577fb1-a09b-4202-a9fe-5e027ece0f9c",
+      "tenantId": 1,
+      "customerId": 43,
+      "customerName": "Synthetic walk.financial.0",
+      "email": "walk.financial.0@example.test",
+      "programmeName": "AQGreen",
+      "periodStart": "2026-10-01T22:00:00Z",
+      "periodEnd": "2026-10-08T21:59:59.999999Z",
+      "timeZoneId": "Africa/Johannesburg",
+      "highestQualifiedLevel": 1,
+      "highestCommissionedLevel": 1,
+      "structuralModel": "PlacementV2",
+      "commissionDecisionRulesVersion": "AQGreenWeeklyCommissionDecisionV1",
+      "totalAmount": 150,
+      "currency": "ZAR",
+      "status": "On hold",
+      "holdReason": "AQGreen monthly commitment is overdue.",
+      "releasedAt": null,
+      "releaseReason": null,
+      "paidAt": null,
+      "paymentReference": null,
+      "calculatedAt": "2026-10-12T13:33:14.607789Z",
+      "rulesVersion": "aqgreen-v2-demo-commission",
+      "components": [
+        {
+          "level": 1,
+          "amount": 150
+        }
+      ]
+    }
+  },
+  "counts": {
+    "onyxParticipations": 0,
+    "onyxLoans": 0,
+    "releasedOrPaidLedgers": 0
+  },
+  "newlyExecuted": true,
+  "recordings": false
+}

@@ -53,13 +53,13 @@ export const AdminAccessLevels = () => {
 
   const columns = [
     { header: "Access level", key: "displayName", sortable: true, render: (accessLevel: AccessLevel) => <div><p className="font-semibold">{businessNames[accessLevel.name] ?? accessLevel.displayName}</p><p className="text-xs text-muted-foreground">{describeAccessLevel(accessLevel)}</p></div> },
-    { header: "Responsibilities", key: "grantedPermissions", sortable: true, render: (accessLevel: AccessLevel) => <Badge tone="neutral">{accessLevel.grantedPermissions.length} assigned</Badge> },
+    { header: "Responsibilities", key: "grantedPermissions", sortable: true, sortValue: (accessLevel: AccessLevel) => accessLevel.grantedPermissions.length, render: (accessLevel: AccessLevel) => <Badge tone="neutral">{accessLevel.grantedPermissions.length} assigned</Badge> },
   ];
 
   return <main className="min-h-dvh px-4 py-6 sm:px-6 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-6">
     <header><Breadcrumb items={[{ href: "/admin/dashboard", label: "Administration" }, { label: "Access levels" }]} /><h1 className="mt-2 text-3xl font-bold">Access levels</h1><p className="mt-2 text-muted-foreground">Review the account types available in this area. Assign access from User accounts &amp; access.</p></header>
-    <Card><div className="flex items-center gap-3"><KeyRound className="size-5 text-accent" /><div><p className="text-sm text-muted-foreground">Available access levels</p><p className="text-2xl font-bold">{accessLevels.length}</p></div></div></Card>
+    <Card><div className="flex items-center gap-3"><KeyRound className="size-5 text-accent" /><div><p className="text-sm text-muted-foreground">Available access levels</p><p className="text-2xl font-bold">{loading ? "Loading…" : error ? "Unavailable" : accessLevels.length}</p></div></div></Card>
     {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
-    {loading ? <Skeleton className="h-72" /> : <DataTable columns={columns} data={accessLevels} emptyState="No access levels found." keyExtractor={(accessLevel) => accessLevel.id} searchFn={(accessLevel, query) => `${businessNames[accessLevel.name] ?? accessLevel.displayName} ${accessLevel.description ?? ""}`.toLowerCase().includes(query)} />}
+    {loading ? <Skeleton className="h-72" /> : <DataTable columns={columns} data={accessLevels} emptyState="No access levels found." keyExtractor={(accessLevel) => accessLevel.id} label="Access levels" loadError={Boolean(error)} onRetry={() => void loadAccessLevels()} searchFn={(accessLevel, query) => `${businessNames[accessLevel.name] ?? accessLevel.displayName} ${accessLevel.description ?? ""}`.toLowerCase().includes(query)} />}
   </div></main>;
 };

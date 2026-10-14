@@ -13,6 +13,7 @@ type AdminAreaSelectionFieldProps = {
   className?: string;
   errorMessage?: string;
   fixedAreaId?: number;
+  scopeLabel?: "Area" | "Tenant";
   onChange?: (areaId: string) => void;
   value?: string;
 };
@@ -21,6 +22,7 @@ export const AdminAreaSelectionField = ({
   className,
   errorMessage,
   fixedAreaId,
+  scopeLabel = "Area",
   onChange,
   value,
 }: AdminAreaSelectionFieldProps) => {
@@ -37,14 +39,14 @@ export const AdminAreaSelectionField = ({
         setLoadError(undefined);
       })
       .catch((requestError) => {
-        setLoadError(getRequestErrorMessage(requestError, "Available areas could not be loaded."));
+        setLoadError(getRequestErrorMessage(requestError, `Available ${scopeLabel.toLowerCase()}s could not be loaded.`));
       });
-  }, [fixedAreaId]);
+  }, [fixedAreaId, scopeLabel]);
 
   if (fixedAreaId) {
     return (
       <>
-        <TextField className={className} disabled label="Area" name="selectedArea" value={`Your area (${fixedAreaId})`} />
+        <TextField className={className} disabled label={scopeLabel} name={`selected${scopeLabel}`} value={`Your ${scopeLabel.toLowerCase()} (${fixedAreaId})`} />
         <input name="tenantId" type="hidden" value={fixedAreaId} />
       </>
     );
@@ -54,13 +56,13 @@ export const AdminAreaSelectionField = ({
     <div className={className}>
       <SelectField
         errorMessage={errorMessage}
-        label="Area"
+        label={scopeLabel}
         name="tenantId"
         onChange={(event) => onChange?.(event.target.value)}
         required
         value={value}
       >
-        <option value="">Select an area</option>
+        <option value="">{scopeLabel === "Tenant" ? "Select a tenant" : "Select an area"}</option>
         {areas.map((area) => (
           <option key={area.id} value={area.id}>{area.name} ({area.tenancyName})</option>
         ))}

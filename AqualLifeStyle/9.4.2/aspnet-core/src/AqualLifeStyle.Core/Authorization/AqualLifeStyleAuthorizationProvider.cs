@@ -151,6 +151,7 @@ namespace AqualLifeStyle.Authorization
                 AquaPermissions.Admin.ProgrammeParticipations.ViewPaymentCheckouts,
                 AquaPermissions.Admin.ProgrammeParticipations.TerminatePaymentCheckouts,
                 AquaPermissions.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation,
+                AquaPermissions.Admin.ProgrammeParticipations.ExportLegacyReconciliationEvidence,
                 AquaPermissions.Admin.ProgrammeParticipations.Approve);
             CreateChildren(
                 programmeParticipations,
@@ -174,14 +175,14 @@ namespace AqualLifeStyle.Authorization
             CreateChildren(
                 commissions,
                 sides,
-                AquaPermissions.Admin.Commissions.View);
+                AquaPermissions.Admin.Commissions.View,
+                AquaPermissions.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility);
             CreateChildren(
                 commissions,
                 host,
                 AquaPermissions.Admin.Commissions.Calculate,
                 AquaPermissions.Admin.Commissions.Release,
-                AquaPermissions.Admin.Commissions.RecordPayment,
-                AquaPermissions.Admin.Commissions.ReviewAQGreenWeeklySalesEligibility);
+                AquaPermissions.Admin.Commissions.RecordPayment);
 
             var savings = admin.CreateChildPermission(
                 AquaPermissions.Admin.Savings.Default,

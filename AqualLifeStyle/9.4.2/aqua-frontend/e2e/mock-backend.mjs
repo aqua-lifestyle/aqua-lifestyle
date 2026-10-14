@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { longName, uiPermissions } from "./admin-ui-fixtures.mjs";
 
 const port = Number(process.env.MOCK_BACKEND_PORT ?? 3200);
 
@@ -376,7 +377,9 @@ createServer((request, response) => {
       const credentials = JSON.parse(body);
       const isAdmin = credentials.userNameOrEmailAddress.startsWith("admin");
       const accessToken = isAdmin
-        ? createAdminAccessToken(credentials.userNameOrEmailAddress)
+        ? /^admin-ui(?:-read|-denied|-long)?@example\.test$/.test(credentials.userNameOrEmailAddress)
+          ? createAccessToken({ email: credentials.userNameOrEmailAddress.includes("-long") ? `${"synthetic".repeat(20)}@example.test` : credentials.userNameOrEmailAddress, name: credentials.userNameOrEmailAddress.includes("-long") ? longName : "UI Audit Administrator", permissions: credentials.userNameOrEmailAddress.includes("-denied") ? [] : credentials.userNameOrEmailAddress.includes("-read") ? uiPermissions.filter(permission => permission.endsWith(".View") || permission === "Pages.Roles") : uiPermissions, role: "SystemAdmin", sub: "1", tenantId: "7" })
+          : createAdminAccessToken(credentials.userNameOrEmailAddress)
         : memberAccessToken;
       if (isAdmin) {
         weeklySalesReviews.set(

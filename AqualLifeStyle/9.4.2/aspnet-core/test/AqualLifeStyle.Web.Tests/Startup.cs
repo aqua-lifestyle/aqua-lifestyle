@@ -100,7 +100,11 @@ namespace AqualLifeStyle.Web.Tests
 
                 using (var context = new AqualLifeStyleDbContext(options))
                 {
-                    context.Database.Migrate();
+                    // Discovery regressions need real queries, not migration execution.
+                    if (Environment.GetEnvironmentVariable("REPRO_PG_SCHEMA_FROM_MODEL") == "true")
+                        context.Database.EnsureCreated();
+                    else
+                        context.Database.Migrate();
                 }
 
                 var iocManager = serviceProvider.GetRequiredService<IIocManager>();
@@ -122,7 +126,8 @@ namespace AqualLifeStyle.Web.Tests
             connection.Open();
 
             var builderSqlite = new DbContextOptionsBuilder<AqualLifeStyleDbContext>();
-            builderSqlite.UseSqlite(connection).UseInternalServiceProvider(serviceProvider);
+            // Reuse EF's metadata/query services while each test server owns its database.
+            builderSqlite.UseSqlite(connection);
             var optionsSqlite = builderSqlite.Options;
 
             // The database starts empty; create the schema before ABP runs its data seeders.

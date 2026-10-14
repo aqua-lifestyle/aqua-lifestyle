@@ -16,22 +16,23 @@ namespace AqualLifeStyle.Application.Admin.Commissions
     }
 
     /// <summary>
-    /// The Area ownership rule is unresolved. The current policy therefore
-    /// admits host-side callers only; authorization separately requires the
-    /// dedicated review permission and AllTenants.
+    /// Tenant callers cannot cross Tenant boundaries. The service separately
+    /// enforces the review permission and active Area assignments; host callers
+    /// additionally require the existing AllTenants grant.
     /// </summary>
-    public sealed class HostOnlyAQGreenWeeklySalesReviewScopePolicy
+    public sealed class TenantBoundAQGreenWeeklySalesReviewScopePolicy
         : IAQGreenWeeklySalesReviewScopePolicy, ITransientDependency
     {
         private readonly Abp.Runtime.Session.IAbpSession _session;
 
-        public HostOnlyAQGreenWeeklySalesReviewScopePolicy(
+        public TenantBoundAQGreenWeeklySalesReviewScopePolicy(
             Abp.Runtime.Session.IAbpSession session)
         {
             _session = session;
         }
 
         public Task<bool> CanReviewAsync(int tenantId) =>
-            Task.FromResult(!_session.TenantId.HasValue && tenantId > 0);
+            Task.FromResult(tenantId > 0 &&
+                (!_session.TenantId.HasValue || _session.TenantId == tenantId));
     }
 }

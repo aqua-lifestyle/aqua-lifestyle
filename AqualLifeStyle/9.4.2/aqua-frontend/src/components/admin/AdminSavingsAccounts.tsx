@@ -198,6 +198,9 @@ export const AdminSavingsAccounts = () => {
               data={accounts}
               emptyState="No persisted savings accounts were found."
               keyExtractor={(account) => account.id}
+              label="Savings accounts"
+              loadError={Boolean(error)}
+              onRetry={() => void loadAccounts()}
               pageSize={10}
               searchFn={(account, query) =>
                 `${account.customerName} ${account.email} ${account.status}`

@@ -10,6 +10,7 @@ import { Avatar, Badge, Breadcrumb, Card, DataTable, Skeleton, StatusMessage } f
 import { UserDialog } from "./UserDialog";
 import { AdminJustificationDialog } from "./AdminJustificationDialog";
 import { ChangeUserAccessLevelDialog, EditUserAccountDialog, ResetUserPasswordDialog } from "./UserAccountManagementDialogs";
+import { AdminActionDisclosure } from "./AdminActionDisclosure";
 
 type InvitationStatus = "Accepted" | "Expired" | "Pending" | "Revoked";
 type AdminUser = { id: number; tenantId: number; firstName: string; lastName: string; email: string; isActive: boolean; role: number; creationTime: string; invitationExpiresAt: string | null; invitationStatus: InvitationStatus | null; requiresPasswordSetup: boolean };
@@ -55,20 +56,27 @@ export const AdminUsers = () => {
     { header: "Actions", key: "actions", render: (user: AdminUser) => {
       const setupPending = user.invitationStatus === "Pending";
       const setupIncomplete = user.requiresPasswordSetup || Boolean(user.invitationStatus && user.invitationStatus !== "Accepted");
-      return <div className="flex flex-wrap gap-2">
+      const hasActions =
+        (can("Edit") && !setupPending) ||
+        (can("AssignRole") && !setupPending) ||
+        (can("ResetPassword") && user.isActive && !setupIncomplete) ||
+        (can("Invite") && setupIncomplete) ||
+        can("Delete");
+      if (!hasActions) return null;
+      return <AdminActionDisclosure accessibleLabel={`Manage account for ${user.firstName} ${user.lastName}`} label="Manage account">
         {can("Edit") && !setupPending ? <EditUserAccountDialog onUpdated={() => updated("Account details saved.")} user={user} /> : null}
         {can("AssignRole") && !setupPending ? <ChangeUserAccessLevelDialog onUpdated={() => updated("Access level updated.")} user={user} /> : null}
         {can("ResetPassword") && user.isActive && !setupIncomplete ? <ResetUserPasswordDialog onUpdated={() => updated("Password reset email queued.")} user={user} /> : null}
         {can("Invite") && setupIncomplete ? <AdminJustificationDialog confirmLabel="Resend invitation" description={`Invalidate the previous link and email a new invitation to ${user.email}.`} onConfirm={(justification) => invitationAction(user, "ResendInvitation", justification)} title="Resend account invitation" triggerLabel="Resend invitation" /> : null}
         {can("Invite") && setupPending ? <AdminJustificationDialog confirmLabel="Revoke invitation" description={`Revoke ${user.firstName} ${user.lastName}'s pending invitation. Its setup link will stop working.`} onConfirm={(justification) => invitationAction(user, "RevokeInvitation", justification)} title="Revoke account invitation" triggerLabel="Revoke invitation" variant="danger" /> : null}
         {can("Delete") ? <AdminJustificationDialog confirmLabel="Remove account" description={`Remove ${user.firstName} ${user.lastName}'s access. This action is recorded for accountability.`} onConfirm={(justification) => remove(user, justification)} title="Remove user account" triggerLabel="Remove" variant="danger" /> : null}
-      </div>;
+      </AdminActionDisclosure>;
     } },
   ];
   return <main className="min-h-dvh px-4 py-6 sm:px-6 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-6">
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><Breadcrumb items={[{ href: "/admin/dashboard", label: "Administration" }, { label: "User accounts" }]} /><h1 className="mt-2 text-3xl font-bold">User accounts</h1><p className="mt-2 text-muted-foreground">New users receive a secure invitation to choose their own password. Track setup, resend or revoke invitations, and help active users regain access.</p></div><UserDialog onCreated={load} /></header>
-    <Card><div className="flex items-center gap-3"><Users className="size-5 text-accent" /><div><p className="text-sm text-muted-foreground">Total users</p><p className="text-2xl font-bold">{users.length}</p></div></div></Card>
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div className="min-w-0 flex-1"><Breadcrumb items={[{ href: "/admin/dashboard", label: "Administration" }, { label: "User accounts" }]} /><h1 className="mt-2 text-3xl font-bold">User accounts</h1><p className="mt-2 text-muted-foreground">New users receive a secure invitation to choose their own password. Track setup, resend or revoke invitations, and help active users regain access.</p></div><UserDialog onCreated={load} /></header>
+    <Card><div className="flex items-center gap-3"><Users className="size-5 text-accent" /><div><p className="text-sm text-muted-foreground">Total users</p><p className="text-2xl font-bold">{loading ? "Loading…" : error ? "Unavailable" : users.length}</p></div></div></Card>
     {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
-    {loading ? <Skeleton className="h-72" /> : <DataTable columns={columns} data={users} keyExtractor={(user) => user.id} searchFn={(user, query) => `${user.firstName} ${user.lastName} ${user.email}`.toLowerCase().includes(query)} />}
+    {loading ? <Skeleton className="h-72" /> : <DataTable columns={columns} data={users} keyExtractor={(user) => user.id} label="User accounts" loadError={Boolean(error)} onRetry={() => void load()} searchFn={(user, query) => `${user.firstName} ${user.lastName} ${user.email}`.toLowerCase().includes(query)} />}
   </div></main>;
 };

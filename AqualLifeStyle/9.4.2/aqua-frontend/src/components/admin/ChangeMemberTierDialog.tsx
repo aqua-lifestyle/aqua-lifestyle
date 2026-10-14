@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
-import { Button, Dialog, SelectField, StatusMessage, TextAreaField } from "@/src/shared/ui";
+import { Button, Dialog, DialogActions, SelectField, StatusMessage, TextAreaField } from "@/src/shared/ui";
 import { adminAuditJustificationSchema } from "./admin-action-validation";
 
 const changeMemberTierSchema = z.object({
@@ -83,10 +83,10 @@ export const ChangeMemberTierDialog = ({ currentMembershipId, memberId, memberNa
         </SelectField>
         <TextAreaField errorMessage={fieldErrors.justification} label="Reason for change" maxLength={500} name="justification" required rows={3} />
         {requestError ? <StatusMessage tone="error">{requestError}</StatusMessage> : null}
-        <div className="flex justify-end gap-3">
+        <DialogActions>
           <Button onClick={close} variant="ghost">Cancel</Button>
           <Button disabled={loadingOptions || Boolean(requestError)} isLoading={submitting} type="submit">Change plan</Button>
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   </>;

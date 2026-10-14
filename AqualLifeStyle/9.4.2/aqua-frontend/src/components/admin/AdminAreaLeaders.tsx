@@ -8,6 +8,7 @@ import { httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import { Avatar, Badge, Breadcrumb, Card, DataTable, Skeleton, StatusMessage } from "@/src/shared/ui";
 import { AdminJustificationDialog } from "./AdminJustificationDialog";
+import { AdminActionDisclosure } from "./AdminActionDisclosure";
 
 type AdminAreaLeader = {
   id: number; tenantId: number; customerName: string; email: string; licenseType: number;
@@ -56,18 +57,20 @@ export const AdminAreaLeaders = () => {
     { header: "Rank", key: "rank", sortable: true, render: (leader: AdminAreaLeader) => rankNames[leader.rank] ?? "Unknown" },
     { header: "Referrals", key: "directReferrals", render: (leader: AdminAreaLeader) => `${leader.directReferrals} direct / ${leader.indirectReferrals} indirect` },
     { header: "Status", key: "isApproved", sortable: true, render: (leader: AdminAreaLeader) => <Badge tone={leader.isApproved ? "success" : "warning"}>{leader.isApproved ? "Approved" : "Pending"}</Badge> },
-    { header: "Actions", key: "actions", render: (leader: AdminAreaLeader) => <div className="flex flex-wrap gap-2">
+    { header: "Actions", key: "actions", render: (leader: AdminAreaLeader) => <div className="flex flex-wrap items-start gap-2">
       {!leader.isApproved && can("Approve") ? <AdminJustificationDialog confirmLabel="Approve" description={`Approve ${leader.customerName}'s application and grant area leader access.`} onConfirm={(reason) => mutateAreaLeader("Approve", leader, reason)} title="Approve area leader" triggerLabel="Approve" /> : null}
+      {((leader.isApproved && (can("Promote") || can("Demote"))) || can("Remove")) ? <AdminActionDisclosure accessibleLabel={`More actions for ${leader.customerName}`}>
       {leader.isApproved && can("Promote") ? <AdminJustificationDialog confirmLabel="Promote" description={`Promote ${leader.customerName} to the rank earned by their order target.`} onConfirm={(reason) => mutateAreaLeader("Promote", leader, reason)} title="Promote area leader" triggerLabel="Promote" /> : null}
       {leader.isApproved && can("Demote") ? <AdminJustificationDialog confirmLabel="Demote" description={`Demote ${leader.customerName} by one rank.`} onConfirm={(reason) => mutateAreaLeader("Demote", leader, reason)} title="Demote area leader" triggerLabel="Demote" /> : null}
       {can("Remove") ? <AdminJustificationDialog confirmLabel="Remove" description={`Remove ${leader.customerName} from area-leader administration.`} onConfirm={(reason) => mutateAreaLeader("Remove", leader, reason)} title="Remove area leader" triggerLabel="Remove" variant="danger" /> : null}
+      </AdminActionDisclosure> : null}
     </div> },
   ];
 
   return <main className="min-h-dvh px-4 py-6 sm:px-6 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-6">
     <header><Breadcrumb items={[{ href: "/admin/dashboard", label: "Administration" }, { label: "Area leaders" }]} /><h1 className="mt-2 text-3xl font-bold">Area leaders</h1><p className="mt-2 text-muted-foreground">Review applications, manage progression, and monitor referral activity.</p></header>
-    <Card><div className="flex items-center gap-3"><Network className="size-5 text-accent" /><div><p className="text-sm text-muted-foreground">Area leaders</p><p className="text-2xl font-bold">{areaLeaders.length}</p></div></div></Card>
+    <Card><div className="flex items-center gap-3"><Network className="size-5 text-accent" /><div><p className="text-sm text-muted-foreground">Area leaders</p><p className="text-2xl font-bold">{loading ? "Loading…" : error ? "Unavailable" : areaLeaders.length}</p></div></div></Card>
     {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
-    {loading ? <Skeleton className="h-72" /> : <DataTable columns={columns} data={areaLeaders} keyExtractor={(leader) => leader.id} searchFn={(leader, query) => `${leader.customerName} ${leader.email}`.toLowerCase().includes(query)} />}
+    {loading ? <Skeleton className="h-72" /> : <DataTable columns={columns} data={areaLeaders} keyExtractor={(leader) => leader.id} label="Area leaders" loadError={Boolean(error)} onRetry={() => void loadAreaLeaders()} searchFn={(leader, query) => `${leader.customerName} ${leader.email}`.toLowerCase().includes(query)} />}
   </div></main>;
 };

@@ -40,14 +40,20 @@ namespace AqualLifeStyle.Web.Host.Startup
 
         private readonly IConfigurationRoot _appConfiguration;
         private readonly IWebHostEnvironment _environment;
-        public Startup(IWebHostEnvironment env)
+        public Startup(IWebHostEnvironment env, IConfiguration configuration)
         {
             _environment = env;
             _appConfiguration = env.GetAppConfiguration();
+            if (ApplicationRecoveryMode.IsEnabled(_appConfiguration) || ApplicationRecoveryMode.IsEnabled(configuration))
+            {
+                ApplicationRecoveryMode.Latch(_appConfiguration);
+                ApplicationRecoveryMode.Latch(configuration);
+            }
             // Run this before any other Production-only setup so an accidental
             // demo request fails with the explicit non-production boundary.
             AQGreenV2DemoConfiguration.Validate(_environment, _appConfiguration);
             AQGreenV2PilotConfiguration.Validate(_environment, _appConfiguration);
+            DeploymentConfigurationValidator.Validate(_environment, _appConfiguration);
         }
 
         public void ConfigureServices(IServiceCollection services)
@@ -135,8 +141,11 @@ namespace AqualLifeStyle.Web.Host.Startup
             if (AQGreenV2PilotConfiguration.Validate(_environment, _appConfiguration))
                 services.AddTransient<IYocoCheckoutGateway, PilotCheckoutGateway>();
             else
-                services.AddHttpClient<IYocoCheckoutGateway, YocoCheckoutGateway>();
+                AQGreenV2DemoConfiguration.RegisterCheckoutGateway(
+                    services, _environment, _appConfiguration);
             services.Configure<BirdOptions>(_appConfiguration.GetSection("Bird"));
+            if (ApplicationRecoveryMode.IsEnabled(_appConfiguration))
+                services.Configure<BirdOptions>(options => options.Enabled = false);
             services.AddHttpClient<ITransactionalEmailDeliveryGateway, BirdTransactionalEmailDeliveryGateway>(client =>
             {
                 client.Timeout = TimeSpan.FromSeconds(15);
@@ -153,6 +162,11 @@ namespace AqualLifeStyle.Web.Host.Startup
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerFactory)
         {
+            if (AQGreenV2DemoConfiguration.Validate(env, _appConfiguration) &&
+                !(app.ApplicationServices.GetRequiredService<IYocoCheckoutGateway>()
+                    is AQGreenV2DemoCheckoutGateway))
+                throw new InvalidOperationException(
+                    "AQGreen V2 demo checkout must use the no-network gateway.");
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
@@ -161,6 +175,7 @@ namespace AqualLifeStyle.Web.Host.Startup
             app.UseAbp(options => { options.UseAbpRequestLocalization = false; }); // Initializes ABP framework.
 
             app.UseCors(_defaultCorsPolicyName); // Enable CORS!
+            app.UseMiddleware<ApplicationRecoveryMiddleware>();
 
             app.UseStaticFiles();
 

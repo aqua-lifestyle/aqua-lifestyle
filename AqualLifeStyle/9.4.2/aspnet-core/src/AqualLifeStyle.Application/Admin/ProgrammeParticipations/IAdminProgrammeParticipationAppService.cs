@@ -8,6 +8,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 {
     public interface IAdminProgrammeParticipationAppService : IApplicationService
     {
+        Task<AqualLifeStyle.Domain.AQGreen.AQGreenReconciliationEvidencePackage> ExportLegacyAQGreenReconciliationEvidenceAsync(
+            ExportLegacyAQGreenReconciliationEvidenceInput input);
         Task<PagedResultDto<AdminProgrammeParticipationDto>> GetAllAsync(
             AdminProgrammeParticipationListInput input);
         Task<PendingProgrammeApprovalSummaryDto> GetPendingApprovalSummaryAsync(

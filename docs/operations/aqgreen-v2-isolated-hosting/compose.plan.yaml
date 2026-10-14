@@ -1,0 +1,77 @@
+# PREPARED PLAN ONLY. Do not run until separate isolated-deployment authorization.
+# Application outputs must be built from accepted manifest 5e133be58439, not HEAD.
+name: aqgreen-v2-5e133be58439
+services:
+  postgres:
+    image: ${AQGREEN_POSTGRES_IMAGE:?Load the qualified PostgreSQL image first}
+    pull_policy: never
+    env_file: ${AQGREEN_SECRET_DIR:?Set the isolated private directory}/postgres.private.env
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - demo-postgres:/var/lib/postgresql/data
+    networks: [isolated]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: "no"
+
+  migrate:
+    image: ${AQGREEN_DOTNET_IMAGE:?Load the qualified .NET runtime image first}
+    pull_policy: never
+    profiles: [bootstrap]
+    network_mode: service:postgres
+    env_file: ${AQGREEN_SECRET_DIR}/api.private.env
+    volumes:
+      - ${AQGREEN_BUNDLE_DIR:?Set the isolated output bundle}/migrator:/qualifier:ro
+    working_dir: /qualifier
+    entrypoint: [dotnet, /qualifier/AqualLifeStyle.Migrator.dll, -q]
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+
+  api:
+    image: ${AQGREEN_DOTNET_IMAGE}
+    pull_policy: never
+    network_mode: service:postgres
+    env_file: ${AQGREEN_SECRET_DIR}/api.private.env
+    volumes:
+      - ${AQGREEN_BUNDLE_DIR}/api:/qualifier:ro
+    working_dir: /qualifier
+    entrypoint: [dotnet, /qualifier/AqualLifeStyle.Web.Host.dll]
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, dotnet, /qualifier/AqualLifeStyle.Web.Host.dll, --health-check]
+      interval: 15s
+      timeout: 8s
+      start_period: 90s
+      retries: 5
+    restart: "no"
+
+  web:
+    image: ${AQGREEN_NODE_IMAGE:?Load the qualified Node image first}
+    pull_policy: never
+    user: node
+    network_mode: service:postgres
+    env_file: ${AQGREEN_SECRET_DIR}/web.private.env
+    volumes:
+      - ${AQGREEN_BUNDLE_DIR}/web:/app
+    working_dir: /app
+    entrypoint: [node, server.js]
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    restart: "no"
+volumes:
+  demo-postgres:
+networks:
+  isolated:
+    internal: true

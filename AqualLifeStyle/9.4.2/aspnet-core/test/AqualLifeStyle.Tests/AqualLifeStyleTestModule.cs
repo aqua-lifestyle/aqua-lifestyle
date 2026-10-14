@@ -25,6 +25,9 @@ namespace AqualLifeStyle.Tests
         )]
     public class AqualLifeStyleTestModule : AbpModule
     {
+        private IDisposable _enquiryConvertedRegistration;
+        private IDisposable _areaSpaceApprovedRegistration;
+
         public AqualLifeStyleTestModule(AqualLifeStyleEntityFrameworkModule abpProjectNameEntityFrameworkModule)
         {
             abpProjectNameEntityFrameworkModule.SkipDbContextRegistration = true;
@@ -79,10 +82,19 @@ namespace AqualLifeStyle.Tests
             // The default event bus resolves handlers from the global IocManager; register the
             // network handlers explicitly against the test's LocalIocManager so conversion/approval
             // side-effects fire within the integrated test's unit of work.
-            Abp.Events.Bus.EventBus.Default.Register<AqualLifeStyle.Domain.Enquiries.EnquiryConvertedEvent>(e =>
+            _enquiryConvertedRegistration = Abp.Events.Bus.EventBus.Default.Register<AqualLifeStyle.Domain.Enquiries.EnquiryConvertedEvent>(e =>
                 IocManager.Resolve<AqualLifeStyle.Application.Enquiries.EnquiryConvertedEventHandler>().HandleEventAsync(e).GetAwaiter().GetResult());
-            Abp.Events.Bus.EventBus.Default.Register<AqualLifeStyle.Domain.AreaLeaders.AreaSpaceApprovedEvent>(e =>
+            _areaSpaceApprovedRegistration = Abp.Events.Bus.EventBus.Default.Register<AqualLifeStyle.Domain.AreaLeaders.AreaSpaceApprovedEvent>(e =>
                 IocManager.Resolve<AqualLifeStyle.Application.AreaLeaders.AreaSpaceApprovedEventHandler>().HandleEventAsync(e).GetAwaiter().GetResult());
+        }
+
+        public override void Shutdown()
+        {
+            // Global callbacks must not retain a disposed test's IoC scope and EF caches.
+            _enquiryConvertedRegistration?.Dispose();
+            _areaSpaceApprovedRegistration?.Dispose();
+            _enquiryConvertedRegistration = null;
+            _areaSpaceApprovedRegistration = null;
         }
 
         private void RegisterFakeService<TService>() where TService : class

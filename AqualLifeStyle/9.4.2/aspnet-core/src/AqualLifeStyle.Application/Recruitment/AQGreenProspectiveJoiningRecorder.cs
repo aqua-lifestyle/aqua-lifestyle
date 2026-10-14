@@ -30,20 +30,20 @@ namespace AqualLifeStyle.Application.Recruitment
         public async Task RecordAsync(EntryParticipation participation, ProgrammeInvitationPlacement invitation,
             long memberUserId, DateTime recordedAt)
         {
-            if (invitation?.InvitationId == null || invitation.RecruiterParticipationId == null ||
+            if (invitation == null || invitation.InvitationId == Guid.Empty || invitation.RecruiterParticipationId == null ||
                 invitation.TenantId != participation.TenantId ||
                 invitation.RecruiterCustomerId != participation.RecruiterCustomerId)
                 throw new InvalidOperationException("Exact authoritative invitation facts are required for V2 joining.");
             var attribution = AQGreenRecruitmentAttribution.Create(
                 participation.TenantId, participation.Id, invitation.RecruiterParticipationId,
                 AQGreenRecruitmentAttributionKind.SponsoredParticipant,
-                AQGreenAcquisitionSource.MemberInvitation, invitation.InvitationId.Value,
+                AQGreenAcquisitionSource.MemberInvitation, invitation.InvitationId,
                 recordedAt, memberUserId, null, AQGreenRecruitmentAttributionRules.CurrentVersion);
             await _attributions.InsertAsync(attribution);
             await _confirmations.InsertAsync(AQGreenRecruitmentAttributionConfirmation.Confirm(
                 attribution, recordedAt, memberUserId,
                 AQGreenAttributionConfirmationMethod.MemberInvitationAcceptance,
-                invitation.InvitationId.Value, AQGreenRecruitmentAttributionRules.CurrentVersion));
+                invitation.InvitationId, AQGreenRecruitmentAttributionRules.CurrentVersion));
         }
 
         public async Task ValidateReplayAsync(EntryParticipation participation, string invitationCode)

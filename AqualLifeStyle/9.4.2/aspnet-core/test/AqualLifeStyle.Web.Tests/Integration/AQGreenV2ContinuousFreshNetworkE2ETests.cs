@@ -40,7 +40,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
     /// graduation, sales decision, commission, or evidence row is directly seeded.
     /// </summary>
     [Collection("WeeklyCommissionPostgreSqlRegression")]
-    public sealed class AQGreenV2ContinuousFreshNetworkE2ETests
+    public sealed partial class AQGreenV2ContinuousFreshNetworkE2ETests
         : AqualLifeStyleWebTestBase
     {
         private const int TenantId = 1;

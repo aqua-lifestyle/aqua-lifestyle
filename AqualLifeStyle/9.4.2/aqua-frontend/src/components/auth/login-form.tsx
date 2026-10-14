@@ -181,7 +181,7 @@ export const LoginForm = () => {
             ) : null}
 
             <Card className="mt-6">
-              <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+              <form className="flex flex-col gap-4" method="post" onSubmit={handleSubmit}>
                 <SelectField
                   label="Workspace"
                   name="tenant"
@@ -239,7 +239,7 @@ export const LoginForm = () => {
                   Remember me
                 </label>
 
-                <Button className="w-full" disabled={isLoading} isLoading={isLoading} type="submit">
+                <Button className="w-full" disabled={!hasMounted || isLoading} isLoading={isLoading} type="submit">
                   Sign in
                 </Button>
                 {requestError ? <StatusMessage tone="error">{requestError}</StatusMessage> : null}

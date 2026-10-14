@@ -17,7 +17,7 @@ type BadgeProps = {
 };
 
 const toneClassNames: Record<BadgeTone, string> = {
-  accent: "bg-accent/10 text-accent-dark ring-accent/20",
+  accent: "bg-accent/10 text-accent-ink ring-accent/20",
   error: "bg-error/10 text-error ring-error/20",
   info: "bg-info/10 text-info ring-info/20",
   neutral: "bg-muted text-muted-foreground ring-border",
@@ -29,7 +29,7 @@ export const Badge = ({ children, className, tone = "neutral" }: BadgeProps) => 
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1",
+        "inline-flex max-w-full items-center wrap-anywhere rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1",
         toneClassNames[tone],
         className,
       )}

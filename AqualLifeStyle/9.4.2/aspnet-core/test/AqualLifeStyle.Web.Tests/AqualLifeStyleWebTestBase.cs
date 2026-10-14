@@ -22,9 +22,10 @@ using Shouldly;
 
 namespace AqualLifeStyle.Web.Tests
 {
-    public abstract class AqualLifeStyleWebTestBase : AbpAspNetCoreIntegratedTestBase<Startup>
+    public abstract class AqualLifeStyleWebTestBase : AbpAspNetCoreIntegratedTestBase<Startup>, IDisposable
     {
         protected static readonly Lazy<string> ContentRootFolder;
+        private bool _disposed;
 
         static AqualLifeStyleWebTestBase()
         {
@@ -41,6 +42,30 @@ namespace AqualLifeStyle.Web.Tests
             if (Environment.GetEnvironmentVariable("REPRO_PILOT") == "true")
                 builder.UseEnvironment(AqualLifeStyle.Web.Host.AQGreenV2Pilot.AQGreenV2PilotConfiguration.EnvironmentName);
             return builder;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            // The ABP web test base does not own teardown. Release every per-test
+            // resource, including the Windsor scope, even if server shutdown fails.
+            try
+            {
+                Client.Dispose();
+            }
+            finally
+            {
+                try
+                {
+                    Server.Dispose();
+                }
+                finally
+                {
+                    IocManager.Dispose();
+                }
+            }
         }
 
         #region Get response

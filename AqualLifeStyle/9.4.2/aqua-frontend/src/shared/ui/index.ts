@@ -5,6 +5,7 @@ export { Button } from "./button";
 export { Card } from "./card";
 export { DataTable } from "./data-table";
 export { Dialog } from "./dialog";
+export { DialogActions } from "./dialog-actions";
 export { DropdownMenu } from "./dropdown-menu";
 export { EmptyState } from "./empty-state";
 export { LinkButton } from "./link-button";

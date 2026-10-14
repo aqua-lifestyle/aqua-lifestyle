@@ -15,7 +15,7 @@ type KpiCardsProps = {
 };
 
 export const KpiCards = ({ isLoading, stats }: KpiCardsProps) => (
-  <section aria-label="Platform overview" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+  <section aria-label="Platform overview" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-4">
     <MetricCard icon={Users} isLoading={isLoading} label="Customer accounts" value={stats.totalCustomerAccounts} />
     <MetricCard icon={ShoppingBag} isLoading={isLoading} label="Total orders" value={stats.totalOrders} />
     <MetricCard icon={PiggyBank} isLoading={isLoading} label="Total savings" value={stats.totalSavings === null ? "Unavailable" : formatCurrency(stats.totalSavings)} />

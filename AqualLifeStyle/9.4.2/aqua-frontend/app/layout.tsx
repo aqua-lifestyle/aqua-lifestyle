@@ -1,20 +1,27 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { Navbar } from "@/src/components/app/navbar";
+import { AQGreenV2DemoBanner } from "@/src/components/members/aqgreen-v2-demo-banner";
 import { PilotBoundary } from "@/src/components/app/pilot-boundary";
 import { WebVitals } from "@/src/shared/observability/web-vitals";
 
 import { AppProviders } from "./providers";
 import "./globals.css";
 
-const geistSans = Geist({
+const geistSans = localFont({
+  src: "./fonts/geist-latin-variable.woff2",
+  weight: "100 900",
+  style: "normal",
+  display: "swap",
   variable: "--font-geist-sans",
-  subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "./fonts/geist-mono-latin-variable.woff2",
+  weight: "100 900",
+  style: "normal",
+  display: "swap",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
@@ -49,6 +56,7 @@ export default function RootLayout({
         <WebVitals />
         <AppProviders>
           <Navbar />
+          <AQGreenV2DemoBanner />
           <PilotBoundary>{children}</PilotBoundary>
         </AppProviders>
       </body>

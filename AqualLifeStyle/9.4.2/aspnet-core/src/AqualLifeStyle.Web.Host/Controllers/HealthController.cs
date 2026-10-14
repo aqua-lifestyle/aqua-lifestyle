@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.Web.Host.Health;
 using AqualLifeStyle.Web.Host.Models;
+using AqualLifeStyle.Web.Host.AQGreenV2Demo;
 using Abp.Dependency;
 using Abp.EntityFrameworkCore;
 using Microsoft.AspNetCore.Hosting;
@@ -87,11 +88,7 @@ namespace AqualLifeStyle.Web.Host.Controllers
                 BuildId = DeploymentMetadata.ResolveBuildId(_configuration),
                 ImageId = DeploymentMetadata.ResolveImageId(_configuration),
                 PaymentContractVersion = DeploymentMetadata.PaymentContractVersion,
-                ContractCapabilities = System.Linq.Enumerable.ToArray(
-                    System.Linq.Enumerable.Where(DeploymentMetadata.ContractCapabilities,
-                        capability => _environment.EnvironmentName != AQGreenV2Pilot.AQGreenV2PilotConfiguration.EnvironmentName ||
-                            capability == "aqgreen-flexible-joining-v1" || capability == "programme-approval-queue-v1" ||
-                            capability == "member-programme-journey-v1")),
+                ContractCapabilities = GetContractCapabilities(),
                 ReleaseDate = AppVersionHelper.ReleaseDate,
                 CheckedAtUtc = DateTime.UtcNow,
                 Environment = _environment.EnvironmentName,
@@ -100,6 +97,19 @@ namespace AqualLifeStyle.Web.Host.Controllers
             return isHealthy
                 ? Ok(response)
                 : StatusCode(503, response);
+        }
+
+        private string[] GetContractCapabilities()
+        {
+            var capabilities = System.Linq.Enumerable.Where(
+                DeploymentMetadata.ContractCapabilities,
+                capability => _environment.EnvironmentName != AQGreenV2Pilot.AQGreenV2PilotConfiguration.EnvironmentName ||
+                    capability == "aqgreen-flexible-joining-v1" ||
+                    capability == "programme-approval-queue-v1" ||
+                    capability == "member-programme-journey-v1");
+            if (AQGreenV2DemoConfiguration.Validate(_environment, _configuration))
+                capabilities = System.Linq.Enumerable.Append(capabilities, "aqgreen-v2-demo-checkout-v1");
+            return System.Linq.Enumerable.ToArray(capabilities);
         }
 
         private async Task<bool> IsRedisReachable()

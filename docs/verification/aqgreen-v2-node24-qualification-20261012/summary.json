@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-12",
+  "acceptedHead": "e9bd8e96d55d03466492ffd40dd657802ae36d4b",
+  "acceptedOriginalSourceManifestSha256": "72219b17d8cd5a55f9c0b542190caa969bb5193131fa2924fdefcdff54d1e26c",
+  "acceptedSnapshotManifestSha256": "a21093f4319ac454a3308ea68a3544b0eddc8d5b51852e84ff1262d3738dd384",
+  "derivativeSnapshotManifestSha256": "5e133be584398b2db14a5c542e27860bd6f02adae0c66c1488ef30e7ee2573e0",
+  "acceptedBuild": "FAILED: external next/font/google fetch on network-denied production build",
+  "derivativeBuild": "PASSED: same locked dependencies, local fonts, Node24 offline production build",
+  "newFocusedTests": {
+    "frontendPassed": 23,
+    "backendIsolationPassed": 13,
+    "layoutLint": "PASSED"
+  },
+  "productionSmoke": [
+    "authentication/session/signup/email verification",
+    "R1200 and R600+R600 synthetic checkout/wrong/repeated confirmations",
+    "pending/Area approval/atomic placement/sponsor attribution",
+    "Area and explicit central sales review; rejected/held/confirmed/shortfall",
+    "cross-Area/cross-Tenant/member denials",
+    "versioned R400 commission, idempotency and placement cutoff",
+    "release and mark-paid backend denials; no released/paid ledger",
+    "production routes, local font body hashes, logout"
+  ],
+  "prior17Cases": "Preserved carried-forward evidence, not rerun as seventeen cases in this qualification",
+  "realProviderRequests": 0,
+  "deployed": false,
+  "verdict": "A. RELEASE CANDIDATE LOCALLY QUALIFIED (separate derivative only)"
+}

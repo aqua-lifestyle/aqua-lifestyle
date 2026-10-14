@@ -21,7 +21,7 @@ using Xunit;
 
 namespace AqualLifeStyle.Tests.EntityFrameworkCore
 {
-    public class AQGreenMigrationRollbackPostgreSqlTests : IAsyncLifetime
+    public partial class AQGreenMigrationRollbackPostgreSqlTests : IAsyncLifetime
     {
         private const string PostgresImage = "postgres:16-alpine";
         private const string MonthlyCheckoutMigration =
@@ -63,7 +63,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             var startInfo = new ProcessStartInfo
             {
                 FileName = "docker",
-                Arguments = $"run -d --name {_containerName} -e POSTGRES_DB=postgres -e POSTGRES_USER=aqualifestyle -e POSTGRES_PASSWORD=aqualifestyle -p {_hostPort}:5432 {PostgresImage}",
+                Arguments = $"run -d --name {_containerName} -e POSTGRES_DB=postgres -e POSTGRES_USER=aqualifestyle -e POSTGRES_PASSWORD=aqualifestyle -p 127.0.0.1:{_hostPort}:5432 {PostgresImage}",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false

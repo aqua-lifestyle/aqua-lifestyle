@@ -107,9 +107,15 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
-        public async Task TenantAdministrator_CannotReadHostWeeklySalesReviewQueue()
+        public async Task TenantAdministratorWithoutAreaAssignment_CannotReadReviewQueue()
         {
             LoginAsDefaultTenantAdmin();
+            UsingDbContext(1, context =>
+            {
+                foreach (var assignment in context.AreaAdminAssignments
+                    .Where(item => item.UserId == AbpSession.UserId && !item.RevokedAt.HasValue))
+                    assignment.Revoke(DateTime.UtcNow);
+            });
             var service = Resolve<IAdminAQGreenWeeklySalesEligibilityAppService>();
 
             await Should.ThrowAsync<AbpAuthorizationException>(() =>

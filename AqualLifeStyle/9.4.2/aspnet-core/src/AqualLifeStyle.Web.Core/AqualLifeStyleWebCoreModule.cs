@@ -13,6 +13,7 @@ using AqualLifeStyle.Authentication.JwtBearer;
 using AqualLifeStyle.Configuration;
 using AqualLifeStyle.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
+using Microsoft.Extensions.Hosting;
 
 namespace AqualLifeStyle
 {
@@ -35,6 +36,9 @@ namespace AqualLifeStyle
 
         public override void PreInitialize()
         {
+            if (_env.IsProduction() || ApplicationRecoveryMode.IsEnabled(_appConfiguration))
+                IocManager.Resolve<AqualLifeStyleEntityFrameworkModule>().SkipDbSeed = true;
+
             Configuration.DefaultNameOrConnectionString = _appConfiguration.GetConnectionString(
                 AqualLifeStyleConsts.ConnectionStringName
             );

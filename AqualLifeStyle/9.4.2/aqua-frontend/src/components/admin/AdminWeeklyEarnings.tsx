@@ -4,6 +4,7 @@ import { HandCoins } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAuthState } from "@/src/providers";
+import { isAQGreenV2DemoCheckout, type SystemHealth } from "@/src/providers/SystemHealth/contract";
 import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
@@ -93,15 +94,25 @@ export const AdminWeeklyEarnings = () => {
   const permissions = session?.user?.permissions ?? [];
   const canView = permissions.includes(VIEW_PERMISSION);
   const canCalculate = permissions.includes(CALCULATE_PERMISSION);
-  const canRelease = modeKnown && !isPilot && permissions.includes(RELEASE_PERMISSION);
-  const canRecordPayment = modeKnown && !isPilot && permissions.includes(RECORD_PAYMENT_PERMISSION);
+  const [demoMode, setDemoMode] = useState<boolean | null>(null);
+  const testMoneyMode = demoMode === true || isPilot;
+  const canRelease = modeKnown && !isPilot && demoMode === false && permissions.includes(RELEASE_PERMISSION);
+  const canRecordPayment = modeKnown && !isPilot && demoMode === false && permissions.includes(RECORD_PAYMENT_PERMISSION);
   const [programme, setProgramme] = useState<Programme>("entry");
-  const [selectedAreaId, setSelectedAreaId] = useState("");
+  const [selectedTenantId, setSelectedTenantId] = useState("");
   const [earnings, setEarnings] = useState<WeeklyEarning[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [error, setError] = useState<string>();
   const [calculationNotice, setCalculationNotice] = useState<string>();
+
+  useEffect(() => {
+    if (!canView) return;
+    void httpClient.get<SystemHealth>(apiEndpoints.health.get)
+      .then((health) => setDemoMode(Boolean(isAQGreenV2DemoCheckout(health))))
+      .catch(() => setDemoMode(null));
+  }, [canView]);
 
   const loadEarnings = useCallback(async () => {
     if (!canView) {
@@ -110,6 +121,7 @@ export const AdminWeeklyEarnings = () => {
     }
 
     setLoading(true);
+    setLoadFailed(false);
     setError(undefined);
     try {
       const result = await httpClient.get<PagedWeeklyEarnings>(
@@ -117,6 +129,7 @@ export const AdminWeeklyEarnings = () => {
       );
       setEarnings(result.items);
     } catch (requestError) {
+      setLoadFailed(true);
       setError(
         getRequestErrorMessage(
           requestError,
@@ -134,9 +147,9 @@ export const AdminWeeklyEarnings = () => {
   }, [loadEarnings]);
 
   const calculateLatestWeek = async () => {
-    const tenantId = Number(selectedAreaId);
+    const tenantId = Number(selectedTenantId);
     if (!Number.isInteger(tenantId) || tenantId <= 0) {
-      setError("Select the Area whose weekly earnings should be prepared.");
+      setError("Select the Tenant whose weekly earnings should be prepared.");
       return;
     }
 
@@ -155,7 +168,7 @@ export const AdminWeeklyEarnings = () => {
       setCalculationNotice(
         result.wasAlreadyCalculated
           ? `${result.programmeName} earnings for ${period} were already prepared. No records were duplicated.`
-          : `${result.programmeName} earnings for ${period} were prepared for ${result.recordsCreated} Club Members. ${result.earnedCount} earned ${formatCurrency(result.totalEarnedAmount, result.currency)} in total${result.heldCount > 0 ? `; ${result.heldCount} are on hold` : ""}.`,
+          : `${result.programmeName} earnings for ${period} were prepared for ${result.recordsCreated} Club Members. ${result.earnedCount} ${demoMode || isPilot ? "had test commissions calculated" : "earned"} ${formatCurrency(result.totalEarnedAmount, result.currency)} in total${result.heldCount > 0 ? `; ${result.heldCount} are on hold` : ""}.`,
       );
       await loadEarnings();
     } catch (requestError) {
@@ -222,9 +235,9 @@ export const AdminWeeklyEarnings = () => {
       sortable: true,
     },
     {
-      header: "Area",
+      header: "Tenant",
       key: "tenantId",
-      render: (item: WeeklyEarning) => `Area ${item.tenantId}`,
+      render: (item: WeeklyEarning) => `Tenant ${item.tenantId}`,
       sortable: true,
     },
     {
@@ -285,7 +298,9 @@ export const AdminWeeklyEarnings = () => {
                   : "neutral"
             }
           >
-            {item.status}
+            {testMoneyMode && item.status === "Earned — awaiting release"
+              ? "Test calculation — no payout"
+              : item.status}
           </Badge>
           {item.holdReason ? (
             <span className="text-xs text-muted-foreground">
@@ -344,11 +359,14 @@ export const AdminWeeklyEarnings = () => {
   const table = loading ? (
     <Skeleton className="h-80" />
   ) : (
-    <DataTable
+      <DataTable
       columns={columns}
       data={earnings}
       emptyState={`No ${programme === "entry" ? "AQGreen" : "Onyx"} weekly earnings have been prepared yet.`}
       keyExtractor={(item) => item.id}
+      label={`${programme === "entry" ? "AQGreen" : "Onyx"} weekly earnings`}
+      loadError={loadFailed}
+      onRetry={() => void loadEarnings()}
       searchFn={(item, query) =>
         `${item.customerName} ${item.email} ${item.status}`
           .toLowerCase()
@@ -385,10 +403,12 @@ export const AdminWeeklyEarnings = () => {
             </div>
             <AdminAreaSelectionField
               className="w-full lg:w-72"
-              onChange={setSelectedAreaId}
-              value={selectedAreaId}
+              scopeLabel="Tenant"
+              onChange={setSelectedTenantId}
+              value={selectedTenantId}
             />
             <Button
+              className="w-full lg:w-auto"
               isLoading={calculating}
               onClick={() => void calculateLatestWeek()}
             >
@@ -405,19 +425,19 @@ export const AdminWeeklyEarnings = () => {
         <section className="grid gap-4 sm:grid-cols-3">
           <Card>
             <p className="text-sm text-muted-foreground">Records shown</p>
-            <p className="mt-2 text-2xl font-bold">{earnings.length}</p>
+            <p className="mt-2 wrap-anywhere text-2xl font-bold">{loading ? "Loading…" : loadFailed ? "Unavailable" : earnings.length}</p>
           </Card>
           <Card>
-            <p className="text-sm text-muted-foreground">Calculated earnings</p>
-            <p className="mt-2 text-2xl font-bold">
-              {formatCurrency(totalEarned, currency)}
+            <p className="text-sm text-muted-foreground">{testMoneyMode ? "Calculated test commission" : "Calculated earnings"}</p>
+            <p className="mt-2 wrap-anywhere text-2xl font-bold tabular-nums">
+              {loading ? "Loading…" : loadFailed ? "Unavailable" : formatCurrency(totalEarned, currency)}
             </p>
           </Card>
           <Card>
             <p className="text-sm text-muted-foreground">On hold</p>
-            <p className="mt-2 flex items-center gap-2 text-2xl font-bold">
-              <HandCoins className="size-6 text-warning" />
-              {heldCount}
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-2xl font-bold">
+              <HandCoins aria-hidden="true" className="size-6 shrink-0 text-warning" />
+              <span className="min-w-0 wrap-anywhere">{loading ? "Loading…" : loadFailed ? "Unavailable" : heldCount}</span>
             </p>
           </Card>
         </section>

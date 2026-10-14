@@ -23,7 +23,7 @@ export const Breadcrumb = ({ className, items }: BreadcrumbProps) => {
           return (
             <li key={item.label} className="flex items-center gap-2">
               {index > 0 ? (
-                <ChevronRight className="size-4 text-muted-foreground" />
+                <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground" />
               ) : null}
               {isLast || !item.href ? (
                 <span

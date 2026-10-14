@@ -111,6 +111,7 @@ Carried-forward evidence is context, not a current rerun.
 | Recruitment structure | Five complete branches per level. AQGreen ends at Level 3 (5, 25, 125); Onyx continues through Level 5 (5, 25, 125, 625, 3,125). |
 | AQGreen commission rates | Per-person rates are confirmed at R30 for Level 1 and R10 for Levels 2–3. Level 3 is final, with a cumulative weekly amount of ZAR 1,650. |
 | Weekly cycle | Friday–Thursday, Johannesburg time. |
+| AQGreen MVP sales-review delegation — `CONFIRMED`, owner instruction 12 October 2026 | All authenticated Aqua administrators are eligible reviewers. Existing review permission is required; Tenant administrators act within active authorized Areas. Central access requires a separately granted broader scope (`AllTenants` in the current model). Administrator role alone grants no global access. Review may hold, confirm or reject evidence; it grants no commission amount, threshold override, release, payout or production enablement. |
 | Initial automated commission terms boundary | 14 August 2026 00:00 Johannesburg. This is the engine's first effective-dated boundary, not necessarily the business model's creation date. |
 | Automatic history | No automatic commission backfill before the initial cycle. |
 | History | Current state and deployment time cannot substitute for business-effective evidence. |

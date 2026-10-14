@@ -54,11 +54,13 @@ export const StatusMessage = ({
 
   return (
     <section
+      aria-atomic="true"
       className={cn(
         "rounded-xl border p-4 transition-all",
         config.className,
         className,
       )}
+      role={tone === "error" ? "alert" : "status"}
     >
       <div className="flex items-start gap-3">
         <Icon className="mt-0.5 size-5 shrink-0" aria-hidden="true" />

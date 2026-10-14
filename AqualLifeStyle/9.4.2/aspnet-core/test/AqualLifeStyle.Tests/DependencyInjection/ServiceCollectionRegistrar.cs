@@ -21,7 +21,7 @@ namespace AqualLifeStyle.Tests.DependencyInjection
 
             services.AddEntityFrameworkSqlite();
 
-            var serviceProvider = WindsorRegistrationHelper.CreateServiceProvider(iocManager.IocContainer, services);
+            WindsorRegistrationHelper.CreateServiceProvider(iocManager.IocContainer, services);
 
             // A SQLite in-memory database only lives while its connection is open, so keep a single
             // shared connection alive for the lifetime of this test's IoC scope. Using a real relational
@@ -31,7 +31,8 @@ namespace AqualLifeStyle.Tests.DependencyInjection
             connection.Open();
 
             var builder = new DbContextOptionsBuilder<AqualLifeStyleDbContext>();
-            builder.UseSqlite(connection).UseInternalServiceProvider(serviceProvider);
+            // Reuse EF's metadata/query services while each test owns its connection and data.
+            builder.UseSqlite(connection);
 
             iocManager.IocContainer.Register(
                 Component

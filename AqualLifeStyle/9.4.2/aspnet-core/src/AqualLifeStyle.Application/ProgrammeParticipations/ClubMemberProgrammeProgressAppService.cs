@@ -149,7 +149,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 onyxNetworkRows,
                 projectedAt);
 
-            var v2Enabled = entryParticipation != null
+            // Placement is created only by approval. A paid but pending member
+            // has a real lifecycle state, not a missing/corrupt V2 placement.
+            var v2Enabled = entryParticipation?.Status == EntryParticipationStatus.Active
                 && await _v2ProgressGate.IsEnabledAsync(tenantId, entryParticipation.Id);
             var v2StructuralResult = v2Enabled &&
                 (!PilotMode.IsEnabled || entryParticipation.Status == EntryParticipationStatus.Active)
@@ -492,7 +494,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                     Code = "Started",
                     Label = "Joining started",
                     State = started ? "Complete" : "Current",
-                    Explanation = started ? "Your programme place has been created." : "Choose a programme to begin."
+                    Explanation = started ? "Your programme application has been created." : "Choose a programme to begin."
                 },
                 new MemberActivationStepDto
                 {
@@ -868,7 +870,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
             var programmeTerms = _programmeTermsProvider.GetEntryTerms();
             var commissionTerms = _commissionTermsProvider.GetEntryTerms();
-            var v2Enabled = participation != null
+            var v2Enabled = participation?.Status == EntryParticipationStatus.Active
                 && await _v2ProgressGate.IsEnabledAsync(tenantId, participation.Id);
             AQGreenStructuralCompletionResult v2StructuralResult = null;
             EntryNetworkLevel entryLevel;
@@ -898,7 +900,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             {
                 // This is the exact legacy V1 projection boundary. V2's current
                 // cutoff must not change the disabled-gate read path.
-                entryLevel = participation == null
+                entryLevel = participation?.Status != EntryParticipationStatus.Active
                     ? EntryNetworkLevel.None
                     : new EntryNetworkQualificationEvaluator().Evaluate(
                         customer.Id,

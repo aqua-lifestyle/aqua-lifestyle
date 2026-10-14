@@ -7,7 +7,7 @@ import { z } from "zod";
 import { useAuthState, useToast } from "@/src/providers";
 import { httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
-import { Button, Dialog, SelectField, StatusMessage, TextAreaField, TextField } from "@/src/shared/ui";
+import { Button, Dialog, DialogActions, SelectField, StatusMessage, TextAreaField, TextField } from "@/src/shared/ui";
 import { AdminAreaSelectionField } from "./AdminAreaSelectionField";
 
 const schema = z.object({
@@ -58,7 +58,7 @@ export const UserDialog = ({ onCreated }: UserDialogProps) => {
 
   if (!canCreate) return null;
   return <>
-    <Button onClick={() => setOpen(true)}><Plus className="size-4" /> Add user</Button>
+    <Button className="shrink-0" onClick={() => setOpen(true)}><Plus className="size-4" /> Add user</Button>
     <Dialog onClose={close} open={open} size="lg" title="Add user">
       <form className="grid gap-4 sm:grid-cols-2" noValidate onSubmit={submit}>
         <AdminAreaSelectionField errorMessage={fieldErrors.tenantId} fixedAreaId={tenantId ?? undefined} />
@@ -72,7 +72,7 @@ export const UserDialog = ({ onCreated }: UserDialogProps) => {
         <p className="sm:col-span-2 text-sm text-muted-foreground">We will email this person a secure invitation. They will confirm their details and choose their own password before the account becomes active.</p>
         <TextAreaField className="sm:col-span-2" errorMessage={fieldErrors.justification} label="Reason for creating this account" maxLength={500} name="justification" required rows={3} />
         {error ? <StatusMessage className="sm:col-span-2" tone="error">{error}</StatusMessage> : null}
-        <div className="flex justify-end gap-3 sm:col-span-2"><Button onClick={close} variant="ghost">Cancel</Button><Button isLoading={isSubmitting} type="submit">Create and invite</Button></div>
+        <DialogActions className="sm:col-span-2"><Button onClick={close} variant="ghost">Cancel</Button><Button isLoading={isSubmitting} type="submit">Create and invite</Button></DialogActions>
       </form>
     </Dialog>
   </>;

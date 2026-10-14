@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Domain.Onyx;
+using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Web.Host.AQGreenV2Demo;
 using Shouldly;
 
@@ -13,6 +14,10 @@ namespace AqualLifeStyle.Tests.WebHost
         public async Task DedicatedDemoSelectors_EnableOnlyTheRequiredV2Seams()
         {
             var participantId = Guid.NewGuid();
+
+            (await new DisabledAQGreenPlacementV2JoiningGate().IsEnabledAsync(1)).ShouldBeFalse();
+            (await new AQGreenV2DemoJoiningGate().IsEnabledAsync(1)).ShouldBeTrue();
+            (await new AQGreenV2DemoApprovalGate().IsEnabledAsync(1, participantId)).ShouldBeTrue();
 
             (await new AQGreenV2DemoProgressGate()
                 .IsEnabledAsync(1, participantId)).ShouldBeTrue();

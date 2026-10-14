@@ -61,6 +61,42 @@ namespace AqualLifeStyle.Tests.Payments
             handler.Body.ShouldBeNull();
         }
 
+        [Fact]
+        public async Task DemoSelection_RealGatewayFailsBeforeAnyProviderRequest()
+        {
+            var handler = new RecordingHandler("{}");
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string>
+                {
+                    ["Yoco:Mode"] = "test",
+                    ["Yoco:SecretKey"] = "sk_test_not-a-real-key",
+                    ["AQGreenV2Demo:Enabled"] = "true"
+                }).Build();
+            var gateway = new YocoCheckoutGateway(new HttpClient(handler), configuration);
+
+            await Should.ThrowAsync<InvalidOperationException>(() =>
+                gateway.CreateAsync(CreateRequest(Guid.NewGuid())));
+            handler.Body.ShouldBeNull();
+        }
+
+        [Fact]
+        public async Task DemoEnvironment_RealGatewayFailsEvenIfDemoFlagIsMissing()
+        {
+            var handler = new RecordingHandler("{}");
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string>
+                {
+                    ["Yoco:Mode"] = "test",
+                    ["Yoco:SecretKey"] = "sk_test_not-a-real-key",
+                    ["ASPNETCORE_ENVIRONMENT"] = "AQGreenV2Demo"
+                }).Build();
+            var gateway = new YocoCheckoutGateway(new HttpClient(handler), configuration);
+
+            await Should.ThrowAsync<InvalidOperationException>(() =>
+                gateway.CreateAsync(CreateRequest(Guid.NewGuid())));
+            handler.Body.ShouldBeNull();
+        }
+
         private static YocoCheckoutGateway CreateGateway(
             HttpMessageHandler handler,
             string mode,

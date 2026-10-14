@@ -8,6 +8,7 @@ import { httpClient } from "@/src/shared/api";
 import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
 import { Avatar, Badge, Breadcrumb, Card, DataTable, Skeleton, StatusMessage } from "@/src/shared/ui";
 import { AdminJustificationDialog } from "./AdminJustificationDialog";
+import { AdminActionDisclosure } from "./AdminActionDisclosure";
 import { formatCurrency } from "@/src/features/admin/model/dashboard";
 
 type AdminFacilitator = {
@@ -58,18 +59,20 @@ export const AdminFacilitators = () => {
     { header: "Referrals", key: "directReferrals", render: (facilitator: AdminFacilitator) => `${facilitator.directReferrals} direct / ${facilitator.indirectReferrals} indirect` },
     { header: "Awards", key: "awardBalance", sortable: true, render: (facilitator: AdminFacilitator) => formatCurrency(facilitator.awardBalance) },
     { header: "Status", key: "isApproved", sortable: true, render: (facilitator: AdminFacilitator) => <Badge tone={facilitator.isApproved ? "success" : "warning"}>{facilitator.isApproved ? "Approved" : "Pending"}</Badge> },
-    { header: "Actions", key: "actions", render: (facilitator: AdminFacilitator) => <div className="flex flex-wrap gap-2">
+    { header: "Actions", key: "actions", render: (facilitator: AdminFacilitator) => <div className="flex flex-wrap items-start gap-2">
       {!facilitator.isApproved && can("Approve") ? <AdminJustificationDialog confirmLabel="Approve" description={`Approve ${facilitator.customerName}'s application and grant facilitator access.`} onConfirm={(reason) => mutateFacilitator("Approve", facilitator, reason)} title="Approve facilitator" triggerLabel="Approve" /> : null}
+      {((facilitator.isApproved && (can("Promote") || can("Demote"))) || can("Remove")) ? <AdminActionDisclosure accessibleLabel={`More actions for ${facilitator.customerName}`}>
       {facilitator.isApproved && can("Promote") ? <AdminJustificationDialog confirmLabel="Promote" description={`Promote ${facilitator.customerName} to the rank earned by direct referrals.`} onConfirm={(reason) => mutateFacilitator("Promote", facilitator, reason)} title="Promote facilitator" triggerLabel="Promote" /> : null}
       {facilitator.isApproved && can("Demote") ? <AdminJustificationDialog confirmLabel="Demote" description={`Demote ${facilitator.customerName} by one rank.`} onConfirm={(reason) => mutateFacilitator("Demote", facilitator, reason)} title="Demote facilitator" triggerLabel="Demote" /> : null}
       {can("Remove") ? <AdminJustificationDialog confirmLabel="Remove" description={`Remove ${facilitator.customerName} from facilitator administration.`} onConfirm={(reason) => mutateFacilitator("Remove", facilitator, reason)} title="Remove facilitator" triggerLabel="Remove" variant="danger" /> : null}
+      </AdminActionDisclosure> : null}
     </div> },
   ];
 
   return <main className="min-h-dvh px-4 py-6 sm:px-6 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-6">
     <header><Breadcrumb items={[{ href: "/admin/dashboard", label: "Administration" }, { label: "Facilitators" }]} /><h1 className="mt-2 text-3xl font-bold">Facilitators</h1><p className="mt-2 text-muted-foreground">Review applications, manage progression, and track referral awards.</p></header>
-    <Card><div className="flex items-center gap-3"><UserCheck className="size-5 text-accent" /><div><p className="text-sm text-muted-foreground">Facilitators</p><p className="text-2xl font-bold">{facilitators.length}</p></div></div></Card>
+    <Card><div className="flex items-center gap-3"><UserCheck className="size-5 text-accent" /><div><p className="text-sm text-muted-foreground">Facilitators</p><p className="text-2xl font-bold">{loading ? "Loading…" : error ? "Unavailable" : facilitators.length}</p></div></div></Card>
     {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
-    {loading ? <Skeleton className="h-72" /> : <DataTable columns={columns} data={facilitators} keyExtractor={(facilitator) => facilitator.id} searchFn={(facilitator, query) => `${facilitator.customerName} ${facilitator.email}`.toLowerCase().includes(query)} />}
+    {loading ? <Skeleton className="h-72" /> : <DataTable columns={columns} data={facilitators} keyExtractor={(facilitator) => facilitator.id} label="Facilitators" loadError={Boolean(error)} onRetry={() => void loadFacilitators()} searchFn={(facilitator, query) => `${facilitator.customerName} ${facilitator.email}`.toLowerCase().includes(query)} />}
   </div></main>;
 };

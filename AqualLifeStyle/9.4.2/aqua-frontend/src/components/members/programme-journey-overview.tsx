@@ -253,16 +253,19 @@ const JoiningCard = ({ journey, action }: { journey: MemberProgrammeJourney; act
   </Card>
 );
 
-const EarningsCard = ({ journey }: { journey: MemberProgrammeJourney }) => {
+const EarningsCard = ({ journey, demoTestMoney }: { journey: MemberProgrammeJourney; demoTestMoney: boolean }) => {
   const latest = journey.earnings.latestRecordedWeek;
+  const displayStatus = (status: string) => demoTestMoney && status === "Earned — awaiting release"
+    ? "Test calculation — no payout"
+    : status;
   return (
     <Card className="flex h-full flex-col gap-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Latest recorded week</p>
-          <h3 className="mt-1 text-xl font-bold">Weekly earnings</h3>
+          <h3 className="mt-1 text-xl font-bold">{demoTestMoney ? "Weekly test commission" : "Weekly earnings"}</h3>
         </div>
-        {latest ? <Badge tone={latest.holdReason ? "warning" : latest.totalAmount > 0 ? "success" : "neutral"}>{latest.status}</Badge> : null}
+        {latest ? <Badge tone={latest.holdReason || demoTestMoney ? "warning" : latest.totalAmount > 0 ? "success" : "neutral"}>{displayStatus(latest.status)}</Badge> : null}
       </div>
       {latest ? (
         <>
@@ -310,7 +313,7 @@ const EarningsCard = ({ journey }: { journey: MemberProgrammeJourney }) => {
                       ) : null}
                     </div>
                     <div className="flex items-center justify-between gap-3 sm:justify-end">
-                      <Badge tone={week.holdReason ? "warning" : week.totalAmount > 0 ? "success" : "neutral"}>{week.status}</Badge>
+                      <Badge tone={week.holdReason || demoTestMoney ? "warning" : week.totalAmount > 0 ? "success" : "neutral"}>{displayStatus(week.status)}</Badge>
                       <span className="font-bold">{formatCurrency(week.totalAmount, journey.earnings.currency)}</span>
                     </div>
                   </li>
@@ -396,11 +399,13 @@ export const ProgrammeJourneyOverview = ({
   joinAction,
   paymentAction,
   canInvite,
+  demoTestMoney = false,
 }: {
   journey: MemberProgrammeJourney;
   joinAction?: ReactNode;
   paymentAction?: ReactNode;
   canInvite: boolean;
+  demoTestMoney?: boolean;
 }) => {
   const target = journey.levels.find((level) => level.state === "Current") ?? journey.levels.at(-1);
   const contextualAction = paymentAction ?? (journey.nextActionCode === "JoinProgramme"
@@ -453,7 +458,7 @@ export const ProgrammeJourneyOverview = ({
 
       <div className="grid gap-5 lg:grid-cols-2">
         <JoiningCard journey={journey} />
-        <EarningsCard journey={journey} />
+        <EarningsCard demoTestMoney={demoTestMoney} journey={journey} />
       </div>
 
       {journey.monthlySubscription ? (

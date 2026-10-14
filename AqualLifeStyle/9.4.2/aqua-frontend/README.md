@@ -2,6 +2,72 @@
 
 Next.js App Router frontend for the AquaLifeStyle ABP backend.
 
+## Admin UI validation
+
+Run the checks in the repository's `docs/development/validation.md` with Node 24.
+The admin presentation regression suite uses the existing Playwright production
+server and mock backend, with synthetic display fixtures and explicit rejection of
+mock UI writes. It does not establish real backend, payment or policy correctness.
+
+```bash
+PLAYWRIGHT_HTML_OPEN=never npm run test:e2e -- --grep "admin UI" --workers=1 --reporter=list,html
+```
+
+If Playwright's managed Chromium is unavailable but Chrome is installed normally,
+select its supported browser channel:
+
+```bash
+PLAYWRIGHT_CHANNEL=chrome PLAYWRIGHT_HTML_OPEN=never npm run test:e2e -- --grep "admin UI" --workers=1 --reporter=list,html
+```
+
+The default remains managed Chromium. Both desktop and mobile projects exercise
+320, 360, 375, 390, 430, 480, 600, 639, 640, 641, 767, 768, 769, 820, 900,
+1023, 1024, 1025, 1279, 1280, 1281, 1366 and 1440 CSS-pixel widths, light/dark
+themes, dense/long tables, loading/empty/error/permission states, keyboard
+disclosures, dialogs, tabs, control boundaries and contrast. Screenshots are
+generated under ignored `test-results/` directories; JSON contrast attachments are
+retained in the HTML report under ignored `playwright-report/`.
+Actual browser zoom and assistive-technology behavior still require separate review.
+
+Failed admin reads render an unavailable state and a GET-only retry action; they
+do not render an empty table or a zero earnings total. Error flags are scoped to
+each dataset so a failed action or checkout read does not hide a successful read.
+Browser diagnostics reject unexpected React, hydration, resource and layout
+warnings; intentionally injected 503 fixture failures are recorded separately.
+Selection regressions cover pending/failed membership choices and unsupported
+current access levels, without applying account writes in the browser mock.
+Use one worker on a constrained host; the matrix includes many navigation and
+screenshot operations, and its execution budgets do not replace the UI assertions.
+
+Admin tables retain their two-dimensional layout in named, focusable contained
+scroll regions. Modal action rows stack below `sm`, wrap above it, and remain in
+the dialog's scrollable viewport. Navigation is a collapsible grid below `lg` and
+a vertical sidebar at `lg`. The sticky desktop navigation has its own viewport-height
+scroll region so lower links remain reachable in short windows. Existing spacing,
+typography and breakpoints are kept. Additional browser coverage exercises 21 dialog
+cases at phone/tablet/desktop widths and 320×300 reduced height, navigation across
+`sm`/`md`/`lg`, orientation-like viewport combinations, final-column table actions,
+representative 200% text enlargement, a real phone toast, touch triggers, and the
+named import-file control with keyboard file selection. Rendered contrast checks
+use RGB-only luminance, composite translucent control boundaries, and reject
+non-finite calculations instead of accepting indeterminate contrast.
+
+Use `accent-ink` for text on accent-tinted surfaces and `error-ink` for destructive
+button text (including hover). Filled surfaces use their paired `*-foreground`
+tokens. Default border and focus rules belong in Tailwind's base layer so component
+utilities can apply the intended contrast and focus colour.
+
+Backdrop dismissal requires a pointer gesture that begins and ends outside the
+dialog. Dragging from a field onto the backdrop retains unsaved form input; Escape,
+explicit close actions and caller-owned close guards remain supported. Text
+enlargement and reduced-height viewport checks are not literal browser zoom or
+physical on-screen-keyboard evidence.
+
+Dashboard section grids reuse the KPI intrinsic-column pattern with font-relative
+minimum widths. Cards and analytics reduce their column count when enlarged text
+needs more space, rather than retaining desktop density solely because the viewport
+still crosses a desktop breakpoint.
+
 ## Current Demo Scope
 
 - Products: read live product data from ABP, open product details, and validate membership-based customer eligibility.
