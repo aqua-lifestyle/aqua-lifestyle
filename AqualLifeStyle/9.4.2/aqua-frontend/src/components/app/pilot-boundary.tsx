@@ -14,6 +14,9 @@ const pilotRoutes = new Set([
 export function PilotBoundary({ children }: { children: React.ReactNode }) {
   const { isPilot, modeKnown } = usePilotStatus();
   const path = usePathname();
+  // Authentication remains available when recovery closes capability discovery.
+  // All business routes still require an authoritative capability result.
+  if (!modeKnown && path === "/login") return children;
   if (!modeKnown) return <main className="p-6"><StatusMessage tone="info">Establishing the application capability boundary…</StatusMessage></main>;
   if (!isPilot) return children;
   return <>
