@@ -16,6 +16,7 @@ using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Moq;
 using Shouldly;
 using Xunit;
@@ -81,6 +82,24 @@ namespace AqualLifeStyle.Tests.Application
                 context.SaveChanges();
             });
             _service = Resolve<IAdminCommissionAppService>();
+        }
+
+        [Fact]
+        public async Task UncommissionedFinancialOperations_DenyEvenAnAuthorizedHostBeforeMutations()
+        {
+            LoginAsHostAdmin();
+            Resolve<IConfiguration>()["App:FinancialOperations:Enabled"] = "false";
+            await Should.ThrowAsync<AbpAuthorizationException>(() => _service.CalculateLatestClosedWeekAsync(
+                new CalculateLatestClosedCommissionWeekInput { TenantId = 1 }));
+            await Should.ThrowAsync<AbpAuthorizationException>(() => _service.ReleaseAsync(
+                new ReleaseWeeklyEarningInput { Id = Guid.NewGuid(), Justification = "Synthetic hold probe" }));
+            await Should.ThrowAsync<AbpAuthorizationException>(() => _service.RecordPaymentAsync(
+                new RecordWeeklyEarningPaymentInput { Id = Guid.NewGuid(), Justification = "Synthetic hold probe", PaymentReference = "synthetic" }));
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.EntryWeeklyCommissions.CountAsync()).ShouldBe(0);
+                (await context.OnyxWeeklyCommissions.CountAsync()).ShouldBe(0);
+            });
         }
 
         [Fact]

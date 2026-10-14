@@ -176,6 +176,8 @@ namespace AqualLifeStyle.Tests.Payments
             var result = await controller.WebhookAsync();
 
             result.ShouldBeOfType<OkResult>();
+            controller.Response.Headers["X-Aqua-Test-Payment"].ToString().ShouldBe("true");
+            controller.Response.Headers["X-Aqua-Business-Payment-Applied"].ToString().ShouldBe("false");
             verifierMock.Verify(v => v.IsValid(
                 webhookId,
                 timestamp,
@@ -267,6 +269,8 @@ namespace AqualLifeStyle.Tests.Payments
             var result = await controller.WebhookAsync();
 
             result.ShouldBeOfType<OkResult>();
+            controller.Response.Headers["X-Aqua-Test-Payment"].ToString().ShouldBe("true");
+            controller.Response.Headers["X-Aqua-Business-Payment-Applied"].ToString().ShouldBe("false");
             processor.LastNotification.ShouldNotBeNull();
             processor.LastNotification.EventId.ShouldBe(webhookId);
         }

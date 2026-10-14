@@ -8,6 +8,7 @@ using Abp.Domain.Uow;
 using AqualLifeStyle.Domain.Email;
 using AqualLifeStyle.Email;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using NSubstitute;
 using Shouldly;
 using Xunit;
@@ -24,6 +25,54 @@ namespace AqualLifeStyle.Tests.Application
             _deliveryGateway = Resolve<ITransactionalEmailDeliveryGateway>();
             _deliveryGateway.ClearReceivedCalls();
             _processor = Resolve<TransactionalEmailOutboxProcessor>();
+        }
+
+        [Fact]
+        public async Task MissingDeliveryBoundary_DoesNotClaimOrSendPendingMessages()
+        {
+            var messageId = await InsertPendingMessageAsync("missing-boundary");
+            Resolve<IConfiguration>()["Bird:DeliveryNotBeforeUtc"] = null;
+
+            await Should.ThrowAsync<InvalidOperationException>(() => _processor.ProcessPendingAsync());
+
+            await _deliveryGateway.DidNotReceive().SendAsync(
+                Arg.Any<TransactionalEmail>(), Arg.Any<CancellationToken>());
+            await UsingDbContextAsync(1, async context =>
+            {
+                var message = await context.TransactionalEmailOutboxMessages.SingleAsync(x => x.Id == messageId);
+                message.Status.ShouldBe(TransactionalEmailStatus.Pending);
+                message.AttemptCount.ShouldBe(0);
+                message.HtmlBody.ShouldNotBeNull();
+            });
+        }
+
+        [Fact]
+        public async Task DeliveryBoundary_HoldsHistoricalMessagesAndDeliversNewMessagesOnce()
+        {
+            var cutoff = DateTime.UtcNow.AddMinutes(-5);
+            Resolve<IConfiguration>()["Bird:DeliveryNotBeforeUtc"] = cutoff.ToString("O");
+            var oldId = await InsertPendingMessageAsync("historical-held");
+            var newId = await InsertPendingMessageAsync("new-authorized");
+            await UsingDbContextAsync(1, context => context.TransactionalEmailOutboxMessages
+                .Where(x => x.Id == oldId).ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.CreationTime, cutoff.AddSeconds(-1))));
+            _deliveryGateway.SendAsync(Arg.Any<TransactionalEmail>(), Arg.Any<CancellationToken>())
+                .Returns("synthetic-delivery");
+
+            await _processor.ProcessPendingAsync();
+            await _processor.ProcessPendingAsync();
+
+            await _deliveryGateway.Received(1).SendAsync(
+                Arg.Is<TransactionalEmail>(x => x.Reference == "new-authorized"), Arg.Any<CancellationToken>());
+            await UsingDbContextAsync(1, async context =>
+            {
+                var old = await context.TransactionalEmailOutboxMessages.SingleAsync(x => x.Id == oldId);
+                old.Status.ShouldBe(TransactionalEmailStatus.Pending);
+                old.AttemptCount.ShouldBe(0);
+                old.HtmlBody.ShouldNotBeNull();
+                (await context.TransactionalEmailOutboxMessages.SingleAsync(x => x.Id == newId))
+                    .Status.ShouldBe(TransactionalEmailStatus.Sent);
+            });
         }
 
         [Fact]
@@ -221,7 +270,7 @@ namespace AqualLifeStyle.Tests.Application
             using (unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
             {
                 firstClaim = await repository.TryClaimAsync(
-                    messageId, Guid.NewGuid(), now, now.AddMinutes(-10));
+                    messageId, Guid.NewGuid(), now, now.AddMinutes(-10), DateTime.UnixEpoch);
                 await unitOfWork.CompleteAsync();
             }
 
@@ -229,7 +278,7 @@ namespace AqualLifeStyle.Tests.Application
             using (unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
             {
                 secondClaim = await repository.TryClaimAsync(
-                    messageId, Guid.NewGuid(), now, now.AddMinutes(-10));
+                    messageId, Guid.NewGuid(), now, now.AddMinutes(-10), DateTime.UnixEpoch);
                 await unitOfWork.CompleteAsync();
             }
 
@@ -295,7 +344,7 @@ namespace AqualLifeStyle.Tests.Application
                     messageId,
                     oldToken,
                     DateTime.UtcNow,
-                    DateTime.UtcNow.AddMinutes(-10))).ShouldNotBeNull();
+                    DateTime.UtcNow.AddMinutes(-10), DateTime.UnixEpoch)).ShouldNotBeNull();
                 await unitOfWork.CompleteAsync();
             }
 
@@ -314,7 +363,7 @@ namespace AqualLifeStyle.Tests.Application
                     messageId,
                     newToken,
                     DateTime.UtcNow,
-                    DateTime.UtcNow.AddMinutes(-10));
+                    DateTime.UtcNow.AddMinutes(-10), DateTime.UnixEpoch);
                 await unitOfWork.CompleteAsync();
             }
 

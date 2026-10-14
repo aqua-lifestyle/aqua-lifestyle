@@ -48,9 +48,10 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
         public async Task<IReadOnlyList<Guid>> GetEligibleMessageIdsAsync(
             DateTime now,
             DateTime staleBefore,
-            int maximumCount)
+            int maximumCount, DateTime deliveryNotBeforeUtc)
         {
             return await GetAll()
+                .Where(message => message.CreationTime >= deliveryNotBeforeUtc)
                 .Where(message =>
                     (message.Status == TransactionalEmailStatus.Pending && message.NextAttemptAt <= now) ||
                     (message.Status == TransactionalEmailStatus.Processing && message.ProcessingStartedAt < staleBefore))
@@ -64,9 +65,10 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
             Guid messageId,
             Guid processingToken,
             DateTime now,
-            DateTime staleBefore)
+            DateTime staleBefore, DateTime deliveryNotBeforeUtc)
         {
             var affected = await GetAll()
+                .Where(message => message.CreationTime >= deliveryNotBeforeUtc)
                 .Where(message =>
                     message.Id == messageId &&
                     ((message.Status == TransactionalEmailStatus.Pending && message.NextAttemptAt <= now) ||
@@ -83,9 +85,10 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
         }
 
         public async Task<IReadOnlyList<TransactionalEmailOutboxMessage>> GetPendingTerminalAlertsAsync(
-            int maximumCount)
+            int maximumCount, DateTime deliveryNotBeforeUtc)
         {
             return await GetAll().AsNoTracking()
+                .Where(message => message.CreationTime >= deliveryNotBeforeUtc)
                 .Where(message =>
                     message.Status == TransactionalEmailStatus.Failed &&
                     message.TerminalAlertEmittedAt == null)

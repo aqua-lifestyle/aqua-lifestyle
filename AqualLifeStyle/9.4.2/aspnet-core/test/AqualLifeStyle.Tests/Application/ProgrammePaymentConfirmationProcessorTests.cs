@@ -19,6 +19,7 @@ using AqualLifeStyle.Email;
 using AqualLifeStyle.Payments;
 using AqualLifeStyle.Payments.Yoco;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using NSubstitute;
 using Shouldly;
 using Xunit;
@@ -27,6 +28,12 @@ namespace AqualLifeStyle.Tests.Application
 {
     public class ProgrammePaymentConfirmationProcessorTests : AqualLifeStyleTestBase
     {
+        public ProgrammePaymentConfirmationProcessorTests()
+        {
+            // Ordinary confirmation regressions model live provider evidence, never test money.
+            Resolve<IConfiguration>()["Yoco:Mode"] = "live";
+        }
+
         private static readonly DateTime EffectiveFrom =
             new(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
 
@@ -787,9 +794,13 @@ namespace AqualLifeStyle.Tests.Application
             });
         }
 
-        [Fact]
-        public async Task YocoNotification_RoutesAQGreenByDocumentedCheckoutIdAndRecordsOneReceipt()
+        [Theory]
+        [InlineData("live", "payment.succeeded")]
+        [InlineData("test", "payment.succeeded")]
+        [InlineData("test", "payment.failed")]
+        public async Task YocoNotification_LiveConfirmsOnce_TestVerifiesWithoutBusinessWrites(string mode, string eventType)
         {
+            Resolve<IConfiguration>()["Yoco:Mode"] = mode;
             var suffix = Guid.NewGuid().ToString("N");
             var userId = await CreateTestUserAsync(
                 1,
@@ -837,7 +848,9 @@ namespace AqualLifeStyle.Tests.Application
                 {
                     CheckoutId = checkout.Id,
                     ParticipationId = participation.Id,
-                    ProviderCheckoutId = providerCheckoutId
+                    ProviderCheckoutId = providerCheckoutId,
+                    OriginalParticipationStatus = participation.Status,
+                    OriginalCheckoutStatus = checkout.Status
                 };
             });
             var unauthorisedAdministratorId = await CreateTestUserAsync(
@@ -866,6 +879,7 @@ namespace AqualLifeStyle.Tests.Application
                 [YocoCheckoutMetadata.Purpose] =
                     JsonSerializer.SerializeToElement(YocoCheckoutMetadata.AQGreenJoiningPurpose)
             };
+            notification.Mode = mode; notification.EventType = eventType;
             var processor = Resolve<YocoPaymentNotificationProcessor>();
 
             var mismatchedMerchantReference = CreateNotification(
@@ -873,6 +887,7 @@ namespace AqualLifeStyle.Tests.Application
                 $"pay_wrong_merchant_{suffix}",
                 persisted.ProviderCheckoutId,
                 120000);
+            mismatchedMerchantReference.Mode = mode;
             var mismatchedMetadata = mismatchedMerchantReference.Metadata
                 .ToDictionary(item => item.Key, item => item.Value);
             mismatchedMetadata[YocoCheckoutMetadata.AQGreenJoiningCheckoutId] =
@@ -891,6 +906,7 @@ namespace AqualLifeStyle.Tests.Application
                 $"pay_conflicting_merchant_{suffix}",
                 persisted.ProviderCheckoutId,
                 120000);
+            conflictingMerchantReference.Mode = mode;
             var conflictingMetadata = conflictingMerchantReference.Metadata
                 .ToDictionary(item => item.Key, item => item.Value);
             conflictingMetadata[YocoCheckoutMetadata.DirectOnyxCheckoutIntentId] =
@@ -906,6 +922,22 @@ namespace AqualLifeStyle.Tests.Application
 
             await processor.ProcessAsync(notification);
             await processor.ProcessAsync(notification);
+
+            if (mode == "test")
+            {
+                await UsingDbContextAsync(1, async context =>
+                {
+                    (await context.MemberPayments.CountAsync()).ShouldBe(0);
+                    (await context.YocoWebhookReceipts.CountAsync()).ShouldBe(0);
+                    (await context.TransactionalEmailOutboxMessages.CountAsync()).ShouldBe(0);
+                    (await context.AQGreenJoiningCheckouts.SingleAsync(item => item.Id == persisted.CheckoutId))
+                        .Status.ShouldBe(persisted.OriginalCheckoutStatus);
+                    (await context.EntryParticipations.SingleAsync(item => item.Id == persisted.ParticipationId))
+                        .Status.ShouldBe(persisted.OriginalParticipationStatus);
+                    (await context.AQGreenNetworkPlacements.CountAsync()).ShouldBe(0);
+                });
+                return;
+            }
 
             await UsingDbContextAsync(1, async context =>
             {
@@ -954,9 +986,12 @@ namespace AqualLifeStyle.Tests.Application
                 processor.ProcessAsync(conflictingReplay));
         }
 
-        [Fact]
-        public async Task YocoNotification_RoutesOnyxByDocumentedCheckoutIdOnly()
+        [Theory]
+        [InlineData("live")]
+        [InlineData("test")]
+        public async Task YocoNotification_RoutesOnyxByDocumentedCheckoutIdOnly(string mode)
         {
+            Resolve<IConfiguration>()["Yoco:Mode"] = mode;
             var suffix = Guid.NewGuid().ToString("N");
             var userId = await CreateTestUserAsync(
                 1,
@@ -1007,6 +1042,7 @@ namespace AqualLifeStyle.Tests.Application
                 $"pay_{suffix}",
                 persisted.ProviderCheckoutId,
                 612000);
+            notification.Mode = mode;
             notification.Metadata = new Dictionary<string, JsonElement>
             {
                 [YocoCheckoutMetadata.ProviderCheckoutId] =
@@ -1021,6 +1057,7 @@ namespace AqualLifeStyle.Tests.Application
                 $"pay_wrong_onyx_merchant_{suffix}",
                 persisted.ProviderCheckoutId,
                 612000);
+            mismatchedMerchantReference.Mode = mode;
             var mismatchedMetadata = mismatchedMerchantReference.Metadata
                 .ToDictionary(item => item.Key, item => item.Value);
             mismatchedMetadata[YocoCheckoutMetadata.DirectOnyxCheckoutIntentId] =
@@ -1035,6 +1072,21 @@ namespace AqualLifeStyle.Tests.Application
             });
 
             await processor.ProcessAsync(notification);
+
+            if (mode == "test")
+            {
+                await processor.ProcessAsync(notification);
+                await UsingDbContextAsync(1, async context =>
+                {
+                    (await context.MemberPayments.CountAsync()).ShouldBe(0);
+                    (await context.YocoWebhookReceipts.CountAsync()).ShouldBe(0);
+                    (await context.OnyxParticipations.CountAsync()).ShouldBe(0);
+                    (await context.TransactionalEmailOutboxMessages.CountAsync()).ShouldBe(0);
+                    (await context.DirectOnyxCheckoutIntents.SingleAsync(x => x.Id == persisted.CheckoutId))
+                        .PaymentId.ShouldBeNull();
+                });
+                return;
+            }
 
             await UsingDbContextAsync(1, async context =>
             {
@@ -1327,7 +1379,7 @@ namespace AqualLifeStyle.Tests.Application
                 PaymentId = paymentId,
                 AmountInCents = amountInCents,
                 Currency = "ZAR",
-                Mode = "test",
+                Mode = "live",
                 ConfirmedAt = new DateTimeOffset(
                     AQGreenSinglePaymentEffectiveFrom.AddMinutes(1),
                     TimeSpan.Zero),

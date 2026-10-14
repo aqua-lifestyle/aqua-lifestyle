@@ -2,7 +2,9 @@
 
 Use this procedure only with a disposable database and fresh test customers. Do
 not use the ambiguous 31 July R600 record, production data, or production
-provider credentials.
+provider credentials. The separately owner-authorized production Test Mode
+transition uses only an approved internal test account and mailbox with secured
+test credentials; its signed callbacks cannot settle real business obligations.
 
 ## Test-mode configuration
 
@@ -17,7 +19,10 @@ Yoco__WebhookSecret=whsec_<obtain-from-Yoco-secret-store>
 
 The API rejects a missing or malformed signing secret and never accepts an
 unsigned request. Test mode uses the same signature, payment-fact, checkout,
-purpose, and idempotency checks as live mode. Never add a placeholder webhook
+and purpose checks as live mode. Test callbacks are deliberately read-only: no
+business receipt, payment, checkout completion, obligation settlement or approval
+eligibility is created. Replay revalidates without applying business effects.
+Never add a placeholder webhook
 secret or a runtime signature bypass.
 
 A hosted checkout redirect proves only that the browser returned. Success,
@@ -67,18 +72,16 @@ shown as an operational error instead of an unusable payment journey.
    instalment request is rejected without creating payment state.
 9. Follow each hosted checkout return route and confirm the UI still says that
    secure confirmation is pending and programme state has not advanced.
-10. Complete one Yoco test payment and confirm exactly one signed success event,
-    receipt, payment record, checkout completion, and transition to
-    `PaymentConfirmedAwaitingApproval`—never directly to `Active`.
-11. For AQGreen, confirm the completed R1,200 joining obligation records one
-    R30,000 funeral-cover inclusion without asserting insurer activation.
-12. Confirm the responsible active Area Administrator with the approval
-    permission sees the durable queue item and receives one transactional email.
-13. Repeat or redeliver the event and confirm no duplicate payment, funeral-cover
-    inclusion, approval requirement, or administrator email is created.
-14. Approve or reject from the Area-scoped portal. Confirm one audit decision,
-    one customer outcome email, and removal from the pending queue. Only approval
-    may transition the participation to `Active`.
+10. Complete one approved Yoco test payment. Verify its signed callback returns
+    `X-Aqua-Test-Payment: true` and `X-Aqua-Business-Payment-Applied: false`.
+11. Confirm payment, participation, obligation, placement and funeral-cover state
+    remain unchanged. The checkout stays unconfirmed, not settled.
+12. Confirm no approval-queue eligibility or payment-confirmation email was created
+    from synthetic payment evidence.
+13. Redeliver the test event and confirm the same no-business-mutation outcome.
+14. Do not approve or activate a customer on the basis of a test payment. Separate
+    synthetic application tests cover real-payment allocation and Area approval;
+    they do not establish production payment finality.
 15. With fresh AQGreen data, test administrator recovery as described below.
 16. Confirm AQGreen and direct-Onyx payment purposes cannot settle one another.
 
@@ -141,15 +144,14 @@ not be rewritten or charged automatically.
 
 ### Not yet verified
 
-Registration and local fixtures do not prove end-to-end provider delivery. A
-real Yoco test payment against the matching deployed API is required before
-claiming successful or failed provider-event delivery, provider duplication,
-payment allocation, AQGreen or Onyx activation, commission/entitlement release,
-or payment-driven progression.
+Registration and local fixtures do not prove end-to-end provider delivery. An
+approved Yoco test payment against the matching deployed API is required before
+claiming actual signed callback delivery. It cannot prove payment allocation,
+activation, commission/entitlement release or historical reconciliation finality.
 
 The exact real `payment.failed` payload and checkout retry semantics remain
 unverified until an authorised tester captures and sanitises a signed test
-delivery. A valid, matching failure is retained as idempotent provider evidence
-but does not terminally close the checkout or block a later authoritative
-success. Do not weaken the event, status, amount, currency, mode,
+delivery. A matching test failure is validated without changing business state.
+For live notifications the existing receipt semantics remain unchanged. Do not
+weaken the event, status, amount, currency, mode,
 checkout-reference, purpose, or replay checks to accommodate an assumed payload.

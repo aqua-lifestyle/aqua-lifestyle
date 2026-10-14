@@ -15,6 +15,7 @@ using AqualLifeStyle.MultiTenancy;
 using AqualLifeStyle.Payments;
 using AqualLifeStyle.Payments.Yoco;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Shouldly;
 using Xunit;
 
@@ -28,6 +29,9 @@ namespace AqualLifeStyle.Tests.Application
 
         public AQGreenMonthlyObligationPaymentTests()
         {
+            // Fake signed notifications exercise real-payment business invariants;
+            // the provider gateway remains substituted and makes no external call.
+            Resolve<IConfiguration>()["Yoco:Mode"] = "live";
             _memberService = Resolve<IClubMemberEntryMonthlyObligationAppService>();
             _confirmationProcessor = Resolve<ProgrammePaymentConfirmationProcessor>();
             _notificationProcessor = Resolve<YocoPaymentNotificationProcessor>();
@@ -171,9 +175,12 @@ namespace AqualLifeStyle.Tests.Application
                     }));
         }
 
-        [Fact]
-        public async Task ProviderConfirmationSettlesOnlyTheSelectedMonthAndReplayIsIdempotent()
+        [Theory]
+        [InlineData("live")]
+        [InlineData("test")]
+        public async Task ProviderConfirmationSettlesOnlyTheSelectedMonthAndReplayIsIdempotent(string mode)
         {
+            Resolve<IConfiguration>()["Yoco:Mode"] = mode;
             var scenario = await CreateScenarioAsync(1);
             SetCurrentUser(scenario.UserId, 1);
             var checkout = await _memberService.CreateCheckoutAsync(
@@ -186,14 +193,36 @@ namespace AqualLifeStyle.Tests.Application
                 providerCheckoutId,
                 "monthly-event-exact",
                 "monthly-payment-exact");
+            notification.Mode = mode;
             var metadataWithoutOptionalReference = notification.Metadata
                 .ToDictionary(item => item.Key, item => item.Value);
             metadataWithoutOptionalReference.Remove(
                 YocoCheckoutMetadata.AQGreenMonthlyObligationCheckoutId);
             notification.Metadata = metadataWithoutOptionalReference;
+            var paymentsBefore = await UsingDbContextAsync(1, context => context.MemberPayments
+                .Select(x => new { x.Id, x.Status, x.Amount, x.ConfirmedAt }).OrderBy(x => x.Id).ToListAsync());
 
             await _notificationProcessor.ProcessAsync(notification);
             await _notificationProcessor.ProcessAsync(notification);
+
+            if (mode == "test")
+            {
+                await UsingDbContextAsync(1, async context =>
+                {
+                    var july = await context.EntryMonthlyObligations.SingleAsync(x => x.Id == scenario.JulyObligationId);
+                    july.Status.ShouldNotBe(EntryMonthlyObligationStatus.Paid);
+                    july.PaymentId.ShouldBeNull();
+                    (await context.AQGreenMonthlyObligationCheckouts.SingleAsync(x => x.Id == checkout.CheckoutId))
+                        .PaymentId.ShouldBeNull();
+                    (await context.MemberPayments.Select(x => new { x.Id, x.Status, x.Amount, x.ConfirmedAt })
+                        .OrderBy(x => x.Id).ToListAsync()).ShouldBe(paymentsBefore);
+                    (await context.MemberPayments.CountAsync(x =>
+                        x.Purpose == MemberPaymentPurpose.EntryMonthlyCommitment)).ShouldBe(0);
+                    (await context.YocoWebhookReceipts.CountAsync()).ShouldBe(0);
+                    (await context.TransactionalEmailOutboxMessages.CountAsync()).ShouldBe(0);
+                });
+                return;
+            }
 
             await UsingDbContextAsync(1, async context =>
             {
@@ -524,7 +553,7 @@ namespace AqualLifeStyle.Tests.Application
                 PaymentId = paymentId,
                 AmountInCents = 60000,
                 Currency = "ZAR",
-                Mode = "test",
+                Mode = "live",
                 ConfirmedAt = DateTimeOffset.UtcNow.AddMinutes(2),
                 PayloadHash = new string('a', 64),
                 Metadata = new Dictionary<string, JsonElement>
