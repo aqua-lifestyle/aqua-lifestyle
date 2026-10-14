@@ -2,7 +2,7 @@ import "@testing-library/jest-dom/vitest";
 
 process.env.NEXT_PUBLIC_ABP_API_URL = "http://localhost:5000";
 
-if (!window.localStorage) {
+if (typeof window !== "undefined" && !window.localStorage) {
   const storage = new Map<string, string>();
   Object.defineProperty(window, "localStorage", {
     configurable: true,

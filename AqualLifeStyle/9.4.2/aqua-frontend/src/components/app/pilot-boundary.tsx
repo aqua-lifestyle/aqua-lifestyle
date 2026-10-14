@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
 import { StatusMessage } from "@/src/shared/ui";
+import { RecoveryAdminWorkspace } from "@/src/features/recovery/recovery-admin-workspace";
 
 const pilotRoutes = new Set([
   "/", "/login", "/signup", "/verify-email", "/verify-email-sent", "/profile", "/member", "/member/programmes", "/member/programme-progress",
@@ -17,6 +18,8 @@ export function PilotBoundary({ children }: { children: React.ReactNode }) {
   // Authentication remains available when recovery closes capability discovery.
   // All business routes still require an authoritative capability result.
   if (!modeKnown && path === "/login") return children;
+  if (!modeKnown && (path === "/admin/dashboard" || path === "/admin/b6-discovery"))
+    return <RecoveryAdminWorkspace discovery={path === "/admin/b6-discovery"} />;
   if (!modeKnown) return <main className="p-6"><StatusMessage tone="info">Establishing the application capability boundary…</StatusMessage></main>;
   if (!isPilot) return children;
   return <>
