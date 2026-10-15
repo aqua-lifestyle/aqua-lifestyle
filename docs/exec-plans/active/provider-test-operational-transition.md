@@ -49,6 +49,16 @@ No migrations or new financial ledger are introduced.
 - Focused independent correctness review: PASS for the current transition guards.
   The reviewer identified no remaining defect in the reviewed paths, and explicitly
   distinguished that result from missing operator evidence/provider delivery.
+- PR #102 publishes reviewed source `7c907dde616a612d65d28347e913e38dfec8ff27`.
+  Its first full CI run exposed two PostgreSQL payout race fixtures that did not
+  select the newly required commissioned financial state. Their calls were held
+  before advisory-lock acquisition. The fixture now explicitly selects that state
+  per synthetic test server, preserving all existing race/idempotency assertions;
+  additional Entry/Onyx PostgreSQL cases assert the default hold denies recording
+  and preserves the released commission. Production code and defaults are unchanged.
+  Focused execution on disposable PostgreSQL 15: all four commissioned-race and
+  uncommissioned-denial cases passed, none skipped. The first CI failure is retained
+  at https://github.com/aqua-lifestyle/aqua-lifestyle/actions/runs/38678242316.
 - Blueprint YAML parsed and eight financial/job/demo/pilot/commissioning/seed holds
   checked; migrator empty, automatic deployment off, Yoco Test Mode. Effective
   production settings were not changed. Read-back confirms the existing recovery
