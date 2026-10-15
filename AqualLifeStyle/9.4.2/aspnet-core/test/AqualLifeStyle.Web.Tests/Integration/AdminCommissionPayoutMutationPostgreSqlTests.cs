@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp;
+using Abp.Authorization;
 using Abp.Authorization.Users;
 using Abp.Domain.Uow;
 using Abp.UI;
@@ -18,7 +19,9 @@ using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using Castle.MicroKernel.Registration;
 using Npgsql;
 using Shouldly;
 using Xunit;
@@ -42,6 +45,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
 
             WriteProvenanceMarker(programme);
             LoginAsHostAdmin();
+            ConfigureFinancialOperations(true);
             var fixture = await SeedReleasedCommissionAsync(programme);
             try
             {
@@ -51,6 +55,48 @@ namespace AqualLifeStyle.Web.Tests.Integration
             {
                 await CleanupFixtureAsync(programme, fixture);
             }
+        }
+
+        [Theory]
+        [InlineData(AdminCommissionProgramme.Entry)]
+        [InlineData(AdminCommissionProgramme.Onyx)]
+        public async Task UncommissionedDeployment_DeniesPaymentRecordingWithoutChangingReleasedCommission(
+            AdminCommissionProgramme programme)
+        {
+            if (!IsPostgreSqlRegressionMode()) return;
+
+            LoginAsHostAdmin();
+            ConfigureFinancialOperations(false);
+            var fixture = await SeedReleasedCommissionAsync(programme);
+            try
+            {
+                var before = await GetPaymentFactsAsync(programme, fixture.CommissionId);
+                var outcome = await CapturePaymentCallAsync(programme, fixture.CommissionId,
+                    "synthetic-uncommissioned-payment");
+                outcome.ShouldBeOfType<AbpAuthorizationException>().Message
+                    .ShouldContain("Financial operations have not been commissioned.");
+                (await GetPaymentFactsAsync(programme, fixture.CommissionId)).ShouldBe(before);
+            }
+            finally
+            {
+                await CleanupFixtureAsync(programme, fixture);
+            }
+        }
+
+        private void ConfigureFinancialOperations(bool enabled)
+        {
+            // Each synthetic server explicitly selects the financial state under test.
+            // Never mutate a shared configuration root or the production default hold.
+            var configuration = new ConfigurationBuilder()
+                .AddConfiguration(IocManager.Resolve<IConfiguration>())
+                .AddInMemoryCollection(new[]
+                {
+                    new System.Collections.Generic.KeyValuePair<string, string>(
+                        "App:FinancialOperations:Enabled", enabled ? "true" : "false")
+                }).Build();
+            IocManager.IocContainer.Register(Component.For<IConfiguration>()
+                .Instance(configuration).Named("payout-configuration-" + Guid.NewGuid().ToString("N"))
+                .IsDefault());
         }
 
         private async Task AssertConcurrentPaymentRaceAsync(

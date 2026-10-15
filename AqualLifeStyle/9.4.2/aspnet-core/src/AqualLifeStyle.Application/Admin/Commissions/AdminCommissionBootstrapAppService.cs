@@ -127,6 +127,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         {
             RequireHostAccess("commission terms bootstrap");
             input ??= new BootstrapInitialCommissionTermsInput();
+            RequireCommissionedWrite(input.DryRun);
 
             var effectiveAt = FirstAutomatedCycleBoundaryUtc();
             var result = new CommissionTermsBootstrapResult
@@ -321,6 +322,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         {
             RequireHostAccess("September due-policy bootstrap");
             input ??= new BootstrapSeptemberDueDatePolicyInput();
+            RequireCommissionedWrite(input.DryRun);
 
             if (input.DueDayOfMonth < 1 || input.DueDayOfMonth > 28)
             {
@@ -1044,6 +1046,12 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             }
 
             return utc;
+        }
+
+        private void RequireCommissionedWrite(bool dryRun)
+        {
+            if (!dryRun && !_configuration.GetValue<bool>("App:FinancialOperations:Enabled"))
+                throw new AbpAuthorizationException("Financial operations have not been commissioned for this deployment.");
         }
 
         private void RequireHostAccess(string operation)

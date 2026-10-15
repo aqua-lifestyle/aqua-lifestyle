@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Transactions;
 using System.Threading.Tasks;
 using Abp.Dependency;
+using AqualLifeStyle.Configuration;
+using Microsoft.Extensions.Configuration;
 using Abp.Domain.Uow;
 using AqualLifeStyle.Domain.Email;
 using Microsoft.Extensions.Logging;
@@ -60,24 +62,27 @@ namespace AqualLifeStyle.Email
         private readonly IUnitOfWorkManager _unitOfWorkManager;
         private readonly ITransactionalEmailBodyProtector _bodyProtector;
         private readonly ILogger<TransactionalEmailOutboxProcessor> _logger;
+        private readonly IConfiguration _configuration;
 
         public TransactionalEmailOutboxProcessor(
             ITransactionalEmailOutboxRepository repository,
             ITransactionalEmailDeliveryGateway deliveryGateway,
             IUnitOfWorkManager unitOfWorkManager,
             ITransactionalEmailBodyProtector bodyProtector,
-            ILogger<TransactionalEmailOutboxProcessor> logger)
+            ILogger<TransactionalEmailOutboxProcessor> logger, IConfiguration configuration)
         {
             _repository = repository;
             _deliveryGateway = deliveryGateway;
             _unitOfWorkManager = unitOfWorkManager;
             _bodyProtector = bodyProtector;
             _logger = logger;
+            _configuration = configuration;
         }
 
         [UnitOfWork(IsDisabled = true)]
         public virtual async Task ProcessPendingAsync()
         {
+            var deliveryNotBeforeUtc = TransactionalEmailDeliveryBoundary.Require(_configuration);
             var now = DateTime.UtcNow;
             IReadOnlyList<Guid> candidateIds;
             using (var unitOfWork = _unitOfWorkManager.Begin(new UnitOfWorkOptions
@@ -89,7 +94,7 @@ namespace AqualLifeStyle.Email
                 candidateIds = await _repository.GetEligibleMessageIdsAsync(
                     now,
                     now.Subtract(StaleProcessingAge),
-                    CandidateScanSize);
+                    CandidateScanSize, deliveryNotBeforeUtc);
                 await unitOfWork.CompleteAsync();
             }
 
@@ -112,7 +117,7 @@ namespace AqualLifeStyle.Email
                         messageId,
                         processingToken,
                         claimedAt,
-                        claimedAt.Subtract(StaleProcessingAge));
+                        claimedAt.Subtract(StaleProcessingAge), deliveryNotBeforeUtc);
                     await unitOfWork.CompleteAsync();
                 }
 
@@ -163,16 +168,16 @@ namespace AqualLifeStyle.Email
 
             }
 
-            await EmitPendingTerminalAlertsAsync();
+            await EmitPendingTerminalAlertsAsync(deliveryNotBeforeUtc);
         }
 
-        private async Task EmitPendingTerminalAlertsAsync()
+        private async Task EmitPendingTerminalAlertsAsync(DateTime deliveryNotBeforeUtc)
         {
             IReadOnlyList<TransactionalEmailOutboxMessage> pendingAlerts;
             using (var unitOfWork = _unitOfWorkManager.Begin(new UnitOfWorkOptions { IsTransactional = false }))
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
             {
-                pendingAlerts = await _repository.GetPendingTerminalAlertsAsync(CandidateScanSize);
+                pendingAlerts = await _repository.GetPendingTerminalAlertsAsync(CandidateScanSize, deliveryNotBeforeUtc);
                 await unitOfWork.CompleteAsync();
             }
 

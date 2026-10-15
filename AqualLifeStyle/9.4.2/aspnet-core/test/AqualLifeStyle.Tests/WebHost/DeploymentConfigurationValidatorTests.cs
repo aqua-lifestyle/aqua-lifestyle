@@ -47,6 +47,7 @@ namespace AqualLifeStyle.Tests.WebHost
                 ["Yoco:WebhookSecret"] = "whsec_" + Convert.ToBase64String(new byte[32]),
                 ["Yoco:Mode"] = "test",
                 ["Bird:Enabled"] = "true",
+                ["Bird:DeliveryNotBeforeUtc"] = "1970-01-01T00:00:00Z",
                 ["Bird:ApiKey"] = "bk_eu1_safe-test-placeholder",
                 ["Bird:FromEmail"] = "hello@example.test",
                 ["Bird:FromName"] = "Aqua Lifestyle Club",
@@ -280,7 +281,8 @@ namespace AqualLifeStyle.Tests.WebHost
         {
             var services = BuildServiceProvider("Development", new Dictionary<string, string>
             {
-                ["Yoco:Mode"] = "live"
+                ["Yoco:Mode"] = "live",
+                ["Yoco:SecretKey"] = "sk_live_safe-test-placeholder"
             });
 
             var ex = Should.Throw<InvalidOperationException>(
@@ -288,6 +290,31 @@ namespace AqualLifeStyle.Tests.WebHost
 
             ex.Message.ShouldContain("Yoco__WebhookSecret");
             ex.Message.ShouldContain("live");
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("not-a-date")]
+        [InlineData("2026-01-01T00:00:00")]
+        [InlineData("2099-01-01T00:00:00Z")]
+        public void ProductionBird_RequiresAnExplicitValidDeliveryBoundary(string cutoff)
+        {
+            var settings = CompleteProductionSettings();
+            settings["Bird:DeliveryNotBeforeUtc"] = cutoff;
+            Should.Throw<InvalidOperationException>(() => DeploymentConfigurationValidator.Validate(
+                BuildServiceProvider("Production", settings))).Message.ShouldContain("Bird__DeliveryNotBeforeUtc");
+        }
+
+        [Theory]
+        [InlineData("App:FinancialOperations:Enabled")]
+        [InlineData("App:WeeklyCommissions:Enabled")]
+        [InlineData("App:EntryMonthlyObligations:Enabled")]
+        [InlineData("App:BackgroundJobs:Enabled")]
+        public void ProductionYocoTest_RequiresFinancialAndHistoricalJobHolds(string key)
+        {
+            var settings = CompleteProductionSettings(); settings[key] = "true";
+            Should.Throw<InvalidOperationException>(() => DeploymentConfigurationValidator.Validate(
+                BuildServiceProvider("Production", settings))).Message.ShouldContain(key.Replace(":", "__"));
         }
 
         [Fact]
@@ -378,13 +405,14 @@ namespace AqualLifeStyle.Tests.WebHost
         }
 
         [Fact]
-        public void Validate_InProduction_WithTestModeAndMissingWebhookSecret_DoesNotThrow()
+        public void Validate_InProduction_WithTestModeAndMissingWebhookSecret_RejectsIncompleteCallbacks()
         {
             var settings = CompleteProductionSettings();
             settings.Remove("Yoco:WebhookSecret");
             var services = BuildServiceProvider("Production", settings);
 
-            Should.NotThrow(() => DeploymentConfigurationValidator.Validate(services));
+            Should.Throw<InvalidOperationException>(() => DeploymentConfigurationValidator.Validate(services))
+                .Message.ShouldContain("Yoco__WebhookSecret");
         }
 
         [Fact]

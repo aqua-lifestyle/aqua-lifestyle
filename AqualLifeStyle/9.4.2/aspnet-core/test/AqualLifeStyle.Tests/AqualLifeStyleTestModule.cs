@@ -49,7 +49,12 @@ namespace AqualLifeStyle.Tests
                         "Default"),
                     new System.Collections.Generic.KeyValuePair<string, string>(
                         "Yoco:Mode",
-                        "test")
+                        "test"),
+                    // Synthetic financial fixtures explicitly exercise commissioned operations.
+                    new System.Collections.Generic.KeyValuePair<string, string>(
+                        "App:FinancialOperations:Enabled", "true"),
+                    new System.Collections.Generic.KeyValuePair<string, string>(
+                        "Bird:DeliveryNotBeforeUtc", "1970-01-01T00:00:00Z")
                 })
                 .Build();
             IocManager.IocContainer.Register(Component.For<IConfiguration>().Instance(configuration));

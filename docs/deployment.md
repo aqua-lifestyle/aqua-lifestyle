@@ -28,11 +28,11 @@ Create a Blueprint from the repository-root `render.yaml`. Before the first depl
 - `App__ClientRootAddress`: the final Vercel production URL with a trailing slash.
 - `App__CorsOrigins`: the allowed Vercel origins, comma-separated and without paths.
 
-The Blueprint provisions the Docker API, PostgreSQL, and Redis. It runs the migration executable as a pre-deploy command, waits on `/api/health`, and deploys only after GitHub checks pass. The free data plans are suitable for evaluation; upgrade them before relying on production availability or retention guarantees.
+The Blueprint describes the Docker API, PostgreSQL, and Redis. For the current controlled transition it leaves automatic deployment off and the pre-deploy command empty. Blueprint automatic synchronization must remain disabled. Schema changes require separate authorization; the compatible recovery schema requires no migration. The free data plans are suitable for evaluation; upgrade them before relying on production availability or retention guarantees.
 
 For a fresh production database, set the secret `AQUA_INITIAL_ADMIN_PASSWORD` before the first migration. It must contain at least 16 characters with uppercase, lowercase, number, and special characters. It is used only to create missing initial administrators and does not rotate existing accounts. Follow [administrator access security](administrator-access-security.md) to replace the bootstrap credential immediately and verify session invalidation.
 
-The API runtime uses the slim Debian ASP.NET image and its built-in non-root `app` user. A shell-less chiseled image is intentionally not used because Render's pre-deploy migration command needs a shell inside the runtime image.
+The API runtime uses the slim Debian ASP.NET image and its built-in non-root `app` user. It also carries the migrator for separately authorized schema operations; the current production deployment must not execute it.
 
 Render supplies `DATABASE_URL`; the application converts it to the Npgsql keyword format without logging credentials. Redis is supplied through `Redis__Configuration` and becomes ABP's distributed cache backing implementation.
 
@@ -53,11 +53,16 @@ not the older Channels API documentation:
    `Bird__ReplyToEmail` directly as secret values. Set `Bird__FromName` to the
    customer-facing sender name. No Bird workspace or channel ID is required by
    this API.
-4. Set `Bird__Enabled=true`, sync the Blueprint, and redeploy. Production startup
+4. Inspect aggregate pending/stale outbox counts through approved read-only access.
+   Record an approved UTC delivery cutoff in `Bird__DeliveryNotBeforeUtc` (ISO8601
+   ending in `Z`). Messages created before that boundary remain unchanged and
+   unsent, including stale claims. Do not backdate it to release the backlog.
+   Set `Bird__Enabled=true` only in the separately reviewed provider transition;
+   do not enable Blueprint synchronization. Production startup
    deliberately fails if transactional email is enabled with incomplete values,
    or if it is disabled while verification is required.
-5. Register a disposable test Club Member, confirm the verification message is
-   delivered, follow the link, sign in, and test one password-reset request.
+5. Use an approved internal test account and mailbox for the delivery check.
+   Provider acceptance alone does not prove delivery; confirm receipt separately.
 
 The API stores delivery intent in `TransactionalEmailOutboxMessages` in the same
 transaction as the business change. Pending message bodies use ASP.NET Core Data
@@ -151,38 +156,48 @@ Before deploying the payment branch:
 2. In the Yoco App, open the Checkout API integration and copy a new **Test
    secret key**. Test keys begin with `sk_test_`.
 3. For checkout-only testing, set `Yoco__SecretKey` to the test secret and
-   `Yoco__Mode` to `test`. `Yoco__WebhookSecret` may remain absent; every webhook
-   is then rejected before its body is read and no payment is confirmed.
+   `Yoco__Mode` to `test`. A matching `Yoco__WebhookSecret` is required for the
+   coordinated payment-testing startup.
 4. Under separate authorisation, register one test webhook for
    `https://aqualifestyle-api.onrender.com/api/payments/yoco/webhook`. The Yoco
    registration response returns a `whsec_` verification secret only once; save
    it directly into the secret store and set `Yoco__WebhookSecret`.
-5. Sync the Blueprint and deploy only when authorised. A hosted checkout and
-   success return do not prove payment confirmation. With a real signed webhook,
-   verify that exactly one participation transition, one payment ledger entry,
-   and one completed checkout exist.
+5. Deploy only when authorised, with Blueprint synchronization still disabled.
+   A signed test callback validates its checkout references, amount, currency and
+   purpose but creates no business payment, approval eligibility, obligation
+   settlement or placement. Its response includes `X-Aqua-Test-Payment: true`
+   and `X-Aqua-Business-Payment-Applied: false`. Checkouts remain unconfirmed;
+   do not present them as settled historical evidence.
 
 The API rejects a mode/key mismatch: `test` requires `sk_test_`, while `live`
 requires `sk_live_`. A successful browser redirect is not proof of payment;
-only a valid Yoco webhook activates AQGreen or creates and activates the Onyx
-participation and network placement.
+test callbacks cannot activate participation or financial qualification. Live
+payment confirmation is a separate operation and never substitutes for required
+AQGreen Area approval.
 The webhook signature uses the raw body, `webhook-id`, and
 `webhook-timestamp`, and rejects notifications more than three minutes old.
 See `docs/development/payment-testing.md` for the disposable-data test order,
 contract diagnostics, administrator recovery permissions, and the boundary of
 what can be verified with a registered test webhook.
 
-For live payments, first verify `https://www.aqualifestyleclub.co.za` in Yoco.
+Live Mode is not authorized during the current testing phase. For a separately
+authorized future live release, first verify `https://www.aqualifestyleclub.co.za` in Yoco.
 Create a live webhook, then update all three Render values together to the live
 secret key, the live webhook's verification secret, and `live`. Keep the test
 and live webhook secrets separate. Do not reuse the test webhook secret in live
 mode.
 
-The Render Blueprint runs the migrator before every API deployment. Deployment
-of migration `20260728110000_AddYocoWebhookReceipts` therefore creates the
-successful-event receipt table and unique event-ID index before the updated API
-starts. Do not run the migrator from a workstation against production; confirm
-the Render pre-deploy step succeeds instead.
+The Render pre-deploy migrator is deliberately empty for this release. Do not run
+migrations from a workstation or restore an automatic migration hook. Confirm the
+existing separately verified schema is compatible before deployment.
+
+During the current Test Mode transition keep `App__FinancialOperations__Enabled`,
+`App__WeeklyCommissions__Enabled`, `App__EntryMonthlyObligations__Enabled` and
+`App__BackgroundJobs__Enabled` false. The first also denies manual commission
+calculation, release and payment recording. Production startup rejects enabling
+these paths with Test Mode. Demo/pilot, startup seeding and D10 commissioning stay
+disabled. See the [bounded transition worklog](exec-plans/active/provider-test-operational-transition.md)
+for the deployment ordering and outstanding operator prerequisites.
 
 ### Payment operations alerts
 

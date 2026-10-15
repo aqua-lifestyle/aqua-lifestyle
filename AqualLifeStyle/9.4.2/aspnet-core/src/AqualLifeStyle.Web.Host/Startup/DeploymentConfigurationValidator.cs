@@ -44,12 +44,6 @@ namespace AqualLifeStyle.Web.Host.Startup
             var hasYocoMode = IsConfigured(yocoMode);
             var hasYocoSecretKey = IsConfigured(yocoSecretKey);
             var hasYocoWebhookSecret = IsConfigured(yocoWebhookSecret);
-            if (string.Equals(yocoMode, "live", StringComparison.Ordinal) &&
-                !hasYocoWebhookSecret)
-            {
-                throw new InvalidOperationException(
-                    "Yoco configuration is incomplete. Yoco__WebhookSecret is required when Yoco__Mode=live.");
-            }
             if (hasYocoWebhookSecret &&
                 !YocoWebhookSignatureVerifier.HasValidSecretFormat(yocoWebhookSecret))
             {
@@ -72,6 +66,10 @@ namespace AqualLifeStyle.Web.Host.Startup
                         "Yoco configuration is invalid. Yoco__Mode must be test or live and must match the Yoco__SecretKey prefix.");
                 }
             }
+
+            if ((yocoMode == "live" || yocoMode == "test") && !hasYocoWebhookSecret)
+                throw new InvalidOperationException(
+                    "Yoco configuration is incomplete. Yoco__WebhookSecret is required when Yoco__Mode=" + yocoMode + ".");
 
             if (!environment.IsProduction())
             {
@@ -131,6 +129,13 @@ namespace AqualLifeStyle.Web.Host.Startup
             ValidateSecurePublicAddress(configuration, "App:ServerRootAddress", "App__ServerRootAddress");
             ValidateSecurePublicAddress(configuration, "App:ClientRootAddress", "App__ClientRootAddress");
             if (recovery) return; // Common security configuration remains mandatory; providers stay unavailable.
+
+            TransactionalEmailDeliveryBoundary.Require(configuration);
+            if (yocoMode == "test")
+                foreach (var key in new[] { "App:FinancialOperations:Enabled", "App:WeeklyCommissions:Enabled",
+                    "App:EntryMonthlyObligations:Enabled", "App:BackgroundJobs:Enabled" })
+                    if (configuration.GetValue<bool>(key))
+                        throw new InvalidOperationException("Production payment testing requires " + key.Replace(":", "__") + "=false.");
 
             if (!BirdOptions.TryResolveRegion(configuration["Bird:ApiKey"], out _))
             {

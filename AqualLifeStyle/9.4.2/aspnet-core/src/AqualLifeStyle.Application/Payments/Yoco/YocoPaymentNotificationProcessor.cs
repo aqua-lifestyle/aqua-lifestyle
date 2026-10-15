@@ -138,6 +138,14 @@ namespace AqualLifeStyle.Payments.Yoco
             try
             {
                 var checkout = await ResolveCheckoutAsync(providerCheckoutId);
+                // Verified test transactions are provider evidence only. They cannot
+                // become ordinary MemberPayments, satisfy obligations or qualify approval.
+                if (string.Equals(configuredMode, "test", StringComparison.OrdinalIgnoreCase))
+                {
+                    EnsureNotificationMatchesCheckout(notification, checkout, paymentPurpose);
+                    _logger.LogInformation("Yoco test notification verified; BusinessPaymentApplied=false.");
+                    return;
+                }
                 await _hostedPaymentCheckoutLock.AcquireCheckoutAsync(
                     checkout.ReferenceId);
                 checkout = await ResolveCheckoutAsync(providerCheckoutId);

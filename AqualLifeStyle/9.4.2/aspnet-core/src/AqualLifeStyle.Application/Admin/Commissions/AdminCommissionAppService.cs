@@ -95,6 +95,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             CalculateLatestClosedWeekAsync(
                 CalculateLatestClosedCommissionWeekInput input)
         {
+            if (!PilotMode.IsEnabled && !_configuration.GetValue<bool>("AQGreenV2Demo:Enabled"))
+                EnsureFinancialOperationsCommissioned();
             if (input == null)
             {
                 throw Failed(
@@ -340,11 +342,18 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 : _payoutMutationLock.AcquireEntryAsync(commissionId);
         }
 
+        private void EnsureFinancialOperationsCommissioned()
+        {
+            if (!_configuration.GetValue<bool>("App:FinancialOperations:Enabled"))
+                throw new AbpAuthorizationException("Financial operations have not been commissioned.");
+        }
+
         private void EnsureNoDemoPayoutMutation()
         {
             if (_configuration.GetValue<bool>("AQGreenV2Demo:Enabled"))
                 throw Failed("Weekly earnings payout",
                     "Simulated demo commissions cannot be released or marked paid.");
+            if (!PilotMode.IsEnabled) EnsureFinancialOperationsCommissioned();
         }
 
         private async Task<PagedResultDto<AdminWeeklyCommissionDto>>

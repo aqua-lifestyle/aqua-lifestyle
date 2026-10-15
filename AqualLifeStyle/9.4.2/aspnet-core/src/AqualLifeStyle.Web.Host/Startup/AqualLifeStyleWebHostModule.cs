@@ -48,8 +48,9 @@ namespace AqualLifeStyle.Web.Host.Startup
 
         public override void PreInitialize()
         {
-            if (ApplicationRecoveryMode.IsEnabled(_appConfiguration))
-                Configuration.BackgroundJobs.IsJobExecutionEnabled = false;
+            Configuration.BackgroundJobs.IsJobExecutionEnabled =
+                !ApplicationRecoveryMode.IsEnabled(_appConfiguration) &&
+                _appConfiguration.GetValue<bool>("App:BackgroundJobs:Enabled");
             var pilot = AQGreenV2PilotConfiguration.Validate(_env, _appConfiguration);
             var demo = AQGreenV2DemoConfiguration.Validate(_env, _appConfiguration);
             if (!pilot && !demo)

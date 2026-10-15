@@ -53,6 +53,25 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public async Task UncommissionedFinancialOperations_BlockHistoricalWritesButAllowReadOnlyPreflight()
+        {
+            Resolve<IConfiguration>()["App:FinancialOperations:Enabled"] = "false";
+            await Should.ThrowAsync<AbpAuthorizationException>(() => _service.BootstrapInitialCommissionTermsAsync(
+                new BootstrapInitialCommissionTermsInput { DryRun = false }));
+            await Should.ThrowAsync<AbpAuthorizationException>(() => _service.BootstrapSeptemberDueDatePolicyAsync(
+                new BootstrapSeptemberDueDatePolicyInput { DryRun = false }));
+            var result = await _service.BootstrapInitialCommissionTermsAsync(
+                new BootstrapInitialCommissionTermsInput { DryRun = true });
+            result.DryRun.ShouldBeTrue();
+            await UsingDbContextAsync(async context =>
+            {
+                (await context.EntryCommissionTermsVersions.CountAsync()).ShouldBe(0);
+                (await context.OnyxCommissionTermsVersions.CountAsync()).ShouldBe(0);
+                (await context.EntryMonthlyObligationDuePolicies.CountAsync()).ShouldBe(0);
+            });
+        }
+
+        [Fact]
         public async Task InitialBootstrap_InsertsExactlyOneEntryAndOneOnyxVersion_WithExpectedFinancialFacts()
         {
             var result = await _service.BootstrapInitialCommissionTermsAsync(

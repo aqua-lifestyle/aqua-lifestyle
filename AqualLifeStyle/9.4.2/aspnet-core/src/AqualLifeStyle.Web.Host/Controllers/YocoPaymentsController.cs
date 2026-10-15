@@ -123,6 +123,11 @@ namespace AqualLifeStyle.Web.Host.Controllers
                     PayloadHash = Convert.ToHexString(SHA256.HashData(rawBody)),
                     Metadata = webhookEvent.Payload.Metadata
                 });
+                if (string.Equals(webhookEvent.Payload.Mode, "test", StringComparison.OrdinalIgnoreCase))
+                {
+                    Response.Headers["X-Aqua-Test-Payment"] = "true";
+                    Response.Headers["X-Aqua-Business-Payment-Applied"] = "false";
+                }
                 return Ok();
             }
             catch (AqualLifeStyle.Payments.Yoco.YocoWebhookTransientException exception)
