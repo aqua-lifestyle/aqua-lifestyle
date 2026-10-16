@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Abp.Dependency;
 using Abp.EntityFrameworkCore;
 using AqualLifeStyle.Domain.AQGreen;
+using AqualLifeStyle.Domain.Customers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -33,12 +34,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 throw new ArgumentOutOfRangeException(nameof(areaAdministratorUserId));
 
             var context = GetReadCommittedPostgreSqlContext();
-            var customer = await context.Customers
-                .FromSqlInterpolated(
-                    $"SELECT * FROM public.\"Customers\" WHERE \"TenantId\" = {tenantId} AND \"Id\" = {customerId} FOR UPDATE")
-                .IgnoreQueryFilters()
-                .AsNoTracking()
-                .SingleOrDefaultAsync(cancellationToken);
+            var customer = await LockCustomerRowAsync(context, tenantId, customerId, cancellationToken);
             if (customer == null || customer.IsDeleted || !customer.AreaId.HasValue)
                 throw new AQGreenPlacementConflictException(
                     "AQGreen approval requires a current participant Area assignment.");
@@ -69,6 +65,20 @@ namespace AqualLifeStyle.EntityFrameworkCore
 
             return areaId;
         }
+
+        public async Task LockCustomerAsync(int tenantId, int customerId, CancellationToken cancellationToken = default)
+        {
+            if (tenantId <= 0) throw new ArgumentOutOfRangeException(nameof(tenantId));
+            if (customerId <= 0) throw new ArgumentOutOfRangeException(nameof(customerId));
+            if (await LockCustomerRowAsync(GetReadCommittedPostgreSqlContext(), tenantId, customerId, cancellationToken) == null)
+                throw new AQGreenPlacementConflictException("The customer no longer exists.");
+        }
+
+        private static Task<Customer> LockCustomerRowAsync(AqualLifeStyleDbContext context,
+            int tenantId, int customerId, CancellationToken cancellationToken) => context.Customers
+            .FromSqlInterpolated(
+                $"SELECT * FROM public.\"Customers\" WHERE \"TenantId\" = {tenantId} AND \"Id\" = {customerId} FOR UPDATE")
+            .IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(cancellationToken);
 
         private AqualLifeStyleDbContext GetReadCommittedPostgreSqlContext()
         {

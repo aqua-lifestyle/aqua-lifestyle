@@ -22,7 +22,7 @@ using Xunit;
 
 namespace AqualLifeStyle.Tests.Application
 {
-    public class AdminCustomerAppServiceTests : AqualLifeStyleTestBase
+    public class AdminCustomerAppServiceTests : AdminCustomerManagementTestBase
     {
         private readonly IAdminCustomerAppService _service;
 

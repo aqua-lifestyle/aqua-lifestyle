@@ -531,6 +531,27 @@ jobs:
             exit 1
           fi
           echo "PostgreSQL transactional regressions ran and passed (neither skipped); visibility + rollback guarded."
+      - name: Run isolated member Area authorization regressions
+        env:
+          MEMBER_AREA_AUTHORIZATION: "true"
+          REPRO_PG_SCHEMA_FROM_MODEL: "true"
+        shell: bash
+        run: |
+          set -euo pipefail
+          export REPRO_PG_CONNECTION="${REPRO_PG_CONNECTION/Host=localhost/Host=127.0.0.1}"
+          export REPRO_PG_CONNECTION="${REPRO_PG_CONNECTION/Database=aqual_ci/Database=member_area_authorization_ci}"
+          dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj \
+            --configuration Release --no-build \
+            --filter FullyQualifiedName~MemberAreaAuthorizationPostgreSqlTests \
+            --logger "trx;LogFileName=member-area-pg.trx" --results-directory TestResults
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse('TestResults/member-area-pg.trx').getroot()
+          results = [node for node in root.iter() if node.tag.endswith('UnitTestResult')]
+          assert len(results) == 14, 'Expected all 14 member authorization regressions'
+          assert len({node.attrib['testName'] for node in results}) == 14
+          assert all(node.attrib['outcome'] == 'Passed' for node in results), 'Member authorization regressions failed or skipped'
+          PY
       # Frozen D10 fixtures require a complete, isolated population. Reuse this
       # job's existing PostgreSQL service, with a fresh model-created database.
       - name: Prepare isolated synthetic D10 population

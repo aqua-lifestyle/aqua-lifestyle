@@ -10,12 +10,15 @@ namespace AqualLifeStyle.Application.Admin.Members.Dto
     {
         [StringLength(256)] public string Keyword { get; set; }
         [Range(1, int.MaxValue)] public int? TenantId { get; set; }
+        public Guid? AreaId { get; set; }
         public bool? IsActive { get; set; }
         [Range(1, int.MaxValue)] public int? MembershipId { get; set; }
     }
     public class AdminMemberDto : EntityDto<int>
     {
         public int TenantId { get; set; }
+        public Guid? AreaId { get; set; }
+        public string AreaName { get; set; }
         public long UserId { get; set; }
         public string FirstName { get; set; }
         public string LastName { get; set; }

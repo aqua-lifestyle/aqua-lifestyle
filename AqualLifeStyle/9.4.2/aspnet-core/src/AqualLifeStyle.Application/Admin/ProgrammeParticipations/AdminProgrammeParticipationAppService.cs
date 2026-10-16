@@ -2329,21 +2329,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 return requestedExists ? new[] { requestedAreaId.Value } : Array.Empty<Guid>();
             }
 
-            var tenantId = AbpSession.TenantId.Value;
-            var userId = AbpSession.GetUserId();
-            var query =
-                from assignment in _areaAdminAssignmentRepository.GetAll()
-                join area in _areaRepository.GetAll()
-                    on new { assignment.TenantId, assignment.AreaId }
-                    equals new { area.TenantId, AreaId = area.Id }
-                where
-                    assignment.TenantId == tenantId &&
-                    assignment.UserId == userId &&
-                    !assignment.IsDeleted &&
-                    !assignment.RevokedAt.HasValue &&
-                    !area.IsDeleted &&
-                    area.IsActive
-                select assignment;
+            var query = ActiveAreaAdministratorAssignments(
+                _areaAdminAssignmentRepository, _areaRepository);
             if (requestedAreaId.HasValue)
                 query = query.Where(assignment => assignment.AreaId == requestedAreaId.Value);
             return await query.Select(assignment => assignment.AreaId).Distinct().ToArrayAsync();
@@ -2364,22 +2351,9 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             if (customer.TenantId.Value != tenantId)
                 throw new AbpAuthorizationException("The participation belongs to another Tenant.");
 
-            var userId = AbpSession.GetUserId();
-            var assigned = await (
-                    from assignment in _areaAdminAssignmentRepository.GetAll()
-                    join area in _areaRepository.GetAll()
-                        on new { assignment.TenantId, assignment.AreaId }
-                        equals new { area.TenantId, AreaId = area.Id }
-                    where
-                        assignment.TenantId == tenantId &&
-                        assignment.AreaId == customer.AreaId.Value &&
-                        assignment.UserId == userId &&
-                        !assignment.IsDeleted &&
-                        !assignment.RevokedAt.HasValue &&
-                        !area.IsDeleted &&
-                        area.IsActive
-                    select assignment)
-                .AnyAsync();
+            var assigned = await ActiveAreaAdministratorAssignments(
+                    _areaAdminAssignmentRepository, _areaRepository)
+                .AnyAsync(assignment => assignment.AreaId == customer.AreaId.Value);
             if (!assigned)
                 throw new AbpAuthorizationException("You are not assigned to administer this Area.");
         }

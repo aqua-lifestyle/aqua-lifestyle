@@ -1,5 +1,10 @@
 ﻿using System;
 using System.Threading.Tasks;
+using System.Linq;
+using Abp.Domain.Repositories;
+using Abp.Timing;
+using AqualLifeStyle.Authorization;
+using AqualLifeStyle.Domain.Areas;
 using Microsoft.AspNetCore.Identity;
 using Abp.Application.Services;
 using Abp.IdentityFramework;
@@ -26,6 +31,45 @@ namespace AqualLifeStyle
         protected AqualLifeStyleAppServiceBase()
         {
             LocalizationSourceName = AqualLifeStyleConsts.LocalizationSourceName;
+        }
+
+        // Shared persisted assignment predicate; a Tenant/role or client filter
+        // never substitutes for active resource-Area administration authority.
+        protected IQueryable<AreaAdminAssignment> ActiveAreaAdministratorAssignments(
+            IRepository<AreaAdminAssignment, Guid> assignments,
+            IRepository<Area, Guid> areas)
+        {
+            var tenantId = AbpSession.GetTenantId();
+            var userId = AbpSession.GetUserId();
+            return from assignment in assignments.GetAll()
+                join area in areas.GetAll()
+                    on new { assignment.TenantId, assignment.AreaId }
+                    equals new { area.TenantId, AreaId = area.Id }
+                where assignment.TenantId == tenantId && assignment.UserId == userId &&
+                      !assignment.IsDeleted && !assignment.RevokedAt.HasValue &&
+                      !area.IsDeleted && area.IsActive
+                select assignment;
+        }
+
+        // Existing customer-account routes also carry member records. Preserve
+        // non-member account authority while applying the same member Area rule.
+        protected async Task<IQueryable<Customer>> RestrictMemberRecordsAsync(
+            IQueryable<Customer> customers,
+            IRepository<AreaAdminAssignment, Guid> assignments,
+            IRepository<Area, Guid> areas)
+        {
+            if (!AbpSession.TenantId.HasValue)
+            {
+                var allTenants = await PermissionChecker.IsGrantedAsync(AquaPermissions.Admin.AllTenants);
+                return allTenants ? customers : customers.Where(customer => !customer.MembershipId.HasValue);
+            }
+            var tenantId = AbpSession.TenantId.Value;
+            var now = Clock.Now.ToUniversalTime();
+            var grants = ActiveAreaAdministratorAssignments(assignments, areas)
+                .Where(assignment => assignment.EffectiveFrom <= now);
+            return customers.Where(customer => customer.TenantId == tenantId &&
+                (!customer.MembershipId.HasValue || (customer.AreaId.HasValue &&
+                    grants.Any(assignment => assignment.AreaId == customer.AreaId.Value))));
         }
 
         protected virtual async Task<User> GetCurrentUserAsync()
