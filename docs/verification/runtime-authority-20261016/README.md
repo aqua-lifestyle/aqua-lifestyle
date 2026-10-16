@@ -24,10 +24,14 @@ case identities, failed counters and raw local TRX hashes without process logs.
 Initial focused application128/128 and Bird gateway13/13 passed without skips.
 After narrowing synthetic dispatch grants to the specific outbox tests, follow-up
 69/69 passed. These intermediate counts predate the final direct-orchestrator change.
-The subsequent direct-service correction passed133/133 without skips; that result
-predates the demo-marker compatibility follow-up. Latest focused execution includes
-the real-calculator demo positive and is pending at publication; final qualification
-results are reported on PR106 after execution. Known local build/discovery
+The subsequent direct-service correction passed133/133 without skips. The expanded
+suite then passed151/151, including the real-calculator demo positive with global
+financial authority held. Five additional negatives reproduced masking of existing
+pilot authorization denials: held workers returned before the pilot check and the
+scheduler threw the generic financial hold first. Ordering now preserves recovery
+no-op, explicit pilot denial and ordinary execution holds. The final focused suite
+and complete hosted CI are pending; results are reported on PR106 after execution.
+Known local build/discovery
 attempts with no matching direct-financial test did not count as executed evidence;
 an explicit rebuild followed by test execution established its failing precondition.
 
@@ -42,8 +46,9 @@ write workflows or production grants. Final runtime-source images were rebuilt a
 the [17-check probe rerun passed](runtime-restart-probe.txt): API image
 `sha256:a0b1e184f74d90d7dabb8fefcdc25e1abc7fede7a3c76a18c9e1d74505a010ca`,
 maintenance image `sha256:1e30a1d95541a5b46e7fb8ddf62378bfdb837c681dfaf87712ed12555bbd423c`.
-These are local working-tree observations, not provider attestations. Hosted CI
-rebuilds from its exact source and retains its source/run/attempt artifact.
+These local images predate the pilot-denial ordering follow-up; they are carried-
+forward observations, not provider attestations. Hosted CI rebuilds final source and
+retains its exact source/run/attempt artifact; final local images are rebuilt too.
 
 Initial probe failures were real failures: one synthetic webhook secret was shorter
 than the valid minimum and startup rejected it. The fixture was corrected; startup
@@ -55,6 +60,13 @@ a fully validated demo composition capability preserves that simulation while gl
 financial authority stays held. Its new integration test initially used the wrong
 test-container accessor, causing a compile failure before execution; the accessor
 was corrected without changing application guards or assertions.
+
+The first hosted run at1ed5c48 failed a PostgreSQL concurrency positive:39 passed,
+one timed out waiting for two advisory-lock waiters. Its synthetic payment now
+correctly stopped at the new financial hold before locking. The isolated test now
+explicitly grants financial execution before racing payment and approval; no lock,
+timing, transaction or business-outcome assertion was weakened. Other runtime holds
+and production configuration remain unchanged. This failed run is not passing evidence.
 
 209 explicit mandatory Node security cases now include the required container probe
 workflow assertion; all208 previous identities are retained and AQUA-SEC-0209 is

@@ -27,6 +27,8 @@ using Xunit;
 using Microsoft.AspNetCore.Hosting;
 using NSubstitute;
 using AqualLifeStyle.Web.Host.AQGreenV2Demo;
+using AqualLifeStyle.Web.Host.AQGreenV2Pilot;
+using Abp.Authorization;
 
 namespace AqualLifeStyle.Tests.WebHost
 {
@@ -79,6 +81,44 @@ namespace AqualLifeStyle.Tests.WebHost
             await InvokeWorkerAsync(typeof(YocoPaymentOperationsMonitor),
                 Construct(typeof(YocoPaymentOperationsMonitor), Configuration(ApplicationRecoveryMode.EnabledSetting)));
         }
+
+        [Theory]
+        [InlineData(typeof(TransactionalEmailOutboxWorker))]
+        [InlineData(typeof(YocoPaymentOperationsMonitor))]
+        [InlineData(typeof(WeeklyCommissionCalculationWorker))]
+        [InlineData(typeof(EntryMonthlyObligationWorker))]
+        public async Task PilotAuthorizationDenial_IsPreservedEvenWhenBackgroundExecutionIsHeld(Type workerType)
+        {
+            var configuration = PilotConfiguration();
+            var environment = Substitute.For<IWebHostEnvironment>();
+            environment.EnvironmentName.Returns(AQGreenV2PilotConfiguration.EnvironmentName);
+            var worker = Construct(workerType, configuration);
+            workerType.GetProperty("PilotMode").SetValue(worker,
+                new AQGreenV2PilotMode(environment, configuration));
+            await Should.ThrowAsync<AbpAuthorizationException>(() => InvokeWorkerAsync(workerType, worker));
+        }
+
+        [Fact]
+        public async Task PilotAuthorizationDenial_IsPreservedBeforeMonthlySchedulingFinancialHold()
+        {
+            var configuration = PilotConfiguration();
+            var environment = Substitute.For<IWebHostEnvironment>();
+            environment.EnvironmentName.Returns(AQGreenV2PilotConfiguration.EnvironmentName);
+            var scheduler = (EntryMonthlyObligationScheduler)Construct(typeof(EntryMonthlyObligationScheduler), configuration);
+            scheduler.PilotMode = new AQGreenV2PilotMode(environment, configuration);
+            await Should.ThrowAsync<AbpAuthorizationException>(() =>
+                scheduler.EnsureObligationsForPeriodAsync(2026, 10, DateTime.UtcNow, "synthetic"));
+            await Should.ThrowAsync<AbpAuthorizationException>(() => scheduler.AssessObligationsAsync(DateTime.UtcNow));
+        }
+
+        private static IConfiguration PilotConfiguration() => new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string>
+            {
+                ["AQGreenV2Pilot:Enabled"] = "true",
+                ["ConnectionStrings:Default"] = "Host=localhost;Database=aqua_aqgreen_v2_pilot;Username=synthetic",
+                ["App:ClientRootAddress"] = "http://localhost:3000",
+                ["App:ServerRootAddress"] = "http://localhost:21021"
+            }).Build();
 
         [Theory]
         [InlineData("App:BackgroundJobs:Enabled")]

@@ -104,3 +104,14 @@ exit0→BLOCKED. Runtime matrix is docs/operations/runtime-authority-qualificati
 Next: finish final focused checks/imageprobe, publish only this feature branch, run
 complete hosted CI/PG and obtain exact-final-commit Agent2 review. Production authority
 and readiness remain BLOCKED; no source guard is promoted to independent privilege.
+
+Follow-up to1ed5c48: expanded local suite151/151 passed, including real calculator
+demo composition. Inspection of the opt-in pilot regression exposed masked explicit
+authorization denial; five added negatives all failed before correction. Restored
+recovery no-op → pilot denial → shared hold ordering in four workers, and pilot denial
+before financial hold in the scheduler. Agent2 independently confirmed causality.
+First hosted PG run39passed/1failed: payment/approval race now stopped its synthetic
+payment before the lock under the new hold. Added an explicit test-only financial
+grant to that isolated positive, preserving all lock/transaction/outcome assertions.
+Final focused, actual-image, complete CI and exact-commit review are rerunning; do
+not promote earlier results to the final source.

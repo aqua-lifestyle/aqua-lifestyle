@@ -57,9 +57,10 @@ namespace AqualLifeStyle.Web.Host.ProgrammeEngine
 
         protected override async Task DoWorkAsync()
         {
+            if (AqualLifeStyle.Configuration.ApplicationRecoveryMode.IsEnabled(_configuration)) return;
+            PilotMode.DenyOutsidePilot("Monthly obligation worker");
             if (!AqualLifeStyle.Configuration.RuntimeOperationGuards.CanRunFinancialWorker(
                 _configuration, "App:EntryMonthlyObligations:Enabled")) return;
-            PilotMode.DenyOutsidePilot("Monthly obligation worker");
 
             var nowUtc = GetUtcNow();
             var currentJohannesburgMonth = EntryMonthlyObligationDuePolicy

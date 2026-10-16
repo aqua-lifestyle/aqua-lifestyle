@@ -28,8 +28,9 @@ namespace AqualLifeStyle.Web.Host.Email
 
         protected override async Task DoWorkAsync()
         {
-            if (!AqualLifeStyle.Configuration.RuntimeOperationGuards.CanDispatchEmail(_configuration)) return;
+            if (AqualLifeStyle.Configuration.ApplicationRecoveryMode.IsEnabled(_configuration)) return;
             PilotMode.DenyOutsidePilot("External email delivery worker");
+            if (!AqualLifeStyle.Configuration.RuntimeOperationGuards.CanDispatchEmail(_configuration)) return;
             await _processor.ProcessPendingAsync();
         }
     }

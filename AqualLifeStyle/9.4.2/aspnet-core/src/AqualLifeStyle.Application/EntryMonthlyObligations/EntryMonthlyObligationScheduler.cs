@@ -46,9 +46,9 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
             DateTime dueAt,
             string duePolicyVersion)
         {
+            PilotMode.DenyOutsidePilot("Monthly obligation scheduling");
             AqualLifeStyle.Configuration.RuntimeOperationGuards.RequireFinancialOperations(_configuration);
             ValidatePeriod(periodYear, periodMonth);
-            PilotMode.DenyOutsidePilot("Monthly obligation scheduling");
             ValidateUtc(dueAt, nameof(dueAt));
             ValidateDuePolicyVersion(duePolicyVersion);
 
@@ -106,8 +106,8 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
         [UnitOfWork]
         public virtual async Task<int> AssessObligationsAsync(DateTime asOf)
         {
-            AqualLifeStyle.Configuration.RuntimeOperationGuards.RequireFinancialOperations(_configuration);
             PilotMode.DenyOutsidePilot("Monthly obligation assessment");
+            AqualLifeStyle.Configuration.RuntimeOperationGuards.RequireFinancialOperations(_configuration);
             ValidateUtc(asOf, nameof(asOf));
 
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))

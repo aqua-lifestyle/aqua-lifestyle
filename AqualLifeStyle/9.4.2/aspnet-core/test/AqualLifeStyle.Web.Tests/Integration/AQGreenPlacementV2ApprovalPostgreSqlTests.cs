@@ -28,6 +28,7 @@ using AqualLifeStyle.Payments;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using Npgsql;
 using Shouldly;
 using Xunit;
@@ -861,6 +862,10 @@ namespace AqualLifeStyle.Web.Tests.Integration
         {
             if (!IsPostgreSqlRegressionMode()) return;
 
+            // This isolated positive races an authorized synthetic payment with
+            // approval. Without its explicit capability, payment correctly stops
+            // before acquiring the lock and cannot exercise the concurrency path.
+            IocManager.Resolve<IConfiguration>()["App:FinancialOperations:Enabled"] = "true";
             LoginAsDefaultTenantAdmin();
             var fixture = await SeedSponsoredAwaitingApprovalAsync(
                 targetPaymentConfirmed: false);

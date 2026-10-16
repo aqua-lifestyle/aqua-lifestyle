@@ -42,8 +42,9 @@ namespace AqualLifeStyle.Web.Host.Payments.Yoco
 
         protected override async Task DoWorkAsync()
         {
-            if (!AqualLifeStyle.Configuration.RuntimeOperationGuards.CanRunBackgroundWork(_configuration)) return;
+            if (AqualLifeStyle.Configuration.ApplicationRecoveryMode.IsEnabled(_configuration)) return;
             PilotMode.DenyOutsidePilot("External payment monitor");
+            if (!AqualLifeStyle.Configuration.RuntimeOperationGuards.CanRunBackgroundWork(_configuration)) return;
             var checkedAtUtc = DateTime.UtcNow;
             var cutoffUtc = checkedAtUtc.AddMinutes(-_staleCheckoutThresholdMinutes);
             StaleYocoCheckoutSnapshot snapshot;
