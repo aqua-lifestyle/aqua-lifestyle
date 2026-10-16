@@ -11,6 +11,17 @@ Browser
 
 Render and Vercel provide the public reverse-proxy and TLS layers. Do not expose the local Compose ports directly to the internet.
 
+### Qualified automatic release (activation blocked)
+
+The [safe automatic deployment runbook](operations/safe-automatic-deployment.md)
+defines the single qualified main release path, immutable source evidence,
+protected exact-release approval, sequential Render/Vercel readiness and rollback.
+It is not enabled by this change. Current live provider settings do not meet its
+recovery-only admission profile. Keep Render auto-deploy and Blueprint sync off;
+do not reconnect Vercel Git or deploy the current merge as part of implementation.
+Deployment does not authorize operational activation. This bounded runbook takes
+precedence over the generic initial-setup instructions below for current releases.
+
 ## Local Docker environment
 
 1. Copy `.env.example` to `.env`.

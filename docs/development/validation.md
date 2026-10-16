@@ -16,6 +16,17 @@ This guide records validation that is supported by the current solution, `packag
 
 CI currently runs the full backend, frontend, production dependency audit, and both container builds for pull requests and configured pushes. Local scope gates reduce feedback time but do not replace required CI.
 
+## Deployment control
+
+From repository root on Node 24+: `node --test tools/deployment/*.test.mjs`.
+These isolated tests cover release qualification, authority/provenance, recovery
+holds, provider sequencing, negative/partial failure, concurrency and retry
+reconciliation. They never call production. CI runs them as `Release safety tests`;
+the qualified-release consumer requires that job and the complete existing CI job
+inventory. Validate workflow syntax with actionlint when changing workflows.
+See the [release runbook](../operations/safe-automatic-deployment.md) for the
+activation blockers and the distinction between mocks and actual provider evidence.
+
 ## Backend
 
 Working directory:

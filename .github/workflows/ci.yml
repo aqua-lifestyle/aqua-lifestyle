@@ -19,6 +19,18 @@ env:
   NEXT_TELEMETRY_DISABLED: 1
 
 jobs:
+  release-safety:
+    name: Release safety tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Test qualification, admission, provider failures and retry boundaries
+        run: node --test tools/deployment/*.test.mjs
+
   backend-application-discovery:
     name: Backend application coverage partition
     runs-on: ubuntu-latest

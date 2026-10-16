@@ -1,0 +1,94 @@
+name: Qualified production release
+
+on:
+  workflow_run:
+    workflows: ["Continuous integration"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+
+# One rollout at a time, including approvals. Never cancel an in-flight provider
+# operation when another main update arrives. Stale waiting commits fail admission.
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    name: Qualify immutable source candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.candidate.outputs.sha }}
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      # workflow_run uses the trusted default branch, never PR code/artifacts.
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Qualify completed main push and publish source evidence
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_DIR: ${{ runner.temp }}/candidate
+        run: |
+          mkdir -p "$CANDIDATE_DIR"
+          node tools/deployment/release-control.mjs candidate
+      - name: Retain immutable candidate and source digest
+        id: upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: source-candidate-${{ steps.candidate.outputs.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/candidate
+          if-no-files-found: error
+          retention-days: 90
+      - name: Candidate evidence
+        env:
+          SOURCE_SHA: ${{ steps.candidate.outputs.sha }}
+          ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
+        run: |
+          printf 'Qualified source: `%s`\n\nImmutable artifact digest: `%s`\n\nDeployment requires separate protected authorization.\n' "$SOURCE_SHA" "$ARTIFACT_DIGEST" >> "$GITHUB_STEP_SUMMARY"
+
+  production:
+    name: Authorized recovery release
+    needs: candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production-release
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.candidate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v7
+        with:
+          artifact-ids: ${{ needs.candidate.outputs.artifact-id }}
+          path: ${{ runner.temp }}/candidate
+          merge-multiple: true
+      - name: Revalidate authority, providers, source and recovery before deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUTO_DEPLOY_ENABLED: ${{ vars.AUTO_DEPLOY_ENABLED }}
+          PRODUCTION_RELEASE_AUTHORIZATION: ${{ secrets.PRODUCTION_RELEASE_AUTHORIZATION }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          CANDIDATE_DIR: ${{ runner.temp }}/candidate
+          RELEASE_REPORT: ${{ runner.temp }}/release-report.jsonl
+        run: node tools/deployment/release-control.mjs deploy
+      - name: Retain redacted release audit
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: production-release-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-report.jsonl
+          if-no-files-found: warn
+          retention-days: 90

@@ -5,6 +5,7 @@
   "buildCommand": "npm run build",
   "git": {
     "deploymentEnabled": {
+      "main": false,
       "feature/aqgreen-v2-accepted-mvp": false,
       "feature/aqgreen-v2-main-integration": false
     }

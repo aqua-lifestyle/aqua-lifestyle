@@ -1,0 +1,29 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+
+const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
+
+test('main releases follow completed CI with protected, serialized deployment', () => {
+  const workflow = read('.github/workflows/release.yml');
+  assert.match(workflow, /workflow_run:/);
+  assert.match(workflow, /workflows: \["Continuous integration"\]/);
+  assert.match(workflow, /types: \[completed\]/);
+  assert.match(workflow, /environment: production-release/);
+  assert.match(workflow, /cancel-in-progress: false/);
+  assert.doesNotMatch(workflow, /workflow_dispatch:|pull_request_target:|deploy-hook/);
+});
+
+test('native Vercel production trigger cannot race the qualified orchestrator', () => {
+  const config = JSON.parse(read('AqualLifeStyle/9.4.2/aqua-frontend/vercel.json'));
+  assert.equal(config.git.deploymentEnabled.main, false);
+  assert.match(read('render.yaml'), /autoDeployTrigger: off/);
+  assert.match(read('render.yaml'), /preDeployCommand: ""/);
+});
+
+test('version-tag publication requires qualification and grants no deployment permission', () => {
+  const workflow = read('.github/workflows/publish-images.yml');
+  assert.match(workflow, /needs: qualify/);
+  assert.match(workflow, /qualify-tag/);
+  assert.doesNotMatch(workflow, /environment:|RENDER_API_KEY|VERCEL_TOKEN/);
+});
