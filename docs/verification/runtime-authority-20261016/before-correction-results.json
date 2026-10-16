@@ -1,0 +1,126 @@
+{
+  "kind": "Local isolated regression observations, not production execution or independent attestation",
+  "startingCommit": "700fadb58ced50ae0d63319ad66db3f0674687ad",
+  "observations": [
+    {
+      "scope": "Starting implementation before runtime restrictions",
+      "rawTrxSha256": "9dc5217771c188041021515421dea84a67bd7ee6437f23713c846edf9c590d58",
+      "counters": {
+        "total": "17",
+        "executed": "17",
+        "passed": "0",
+        "failed": "17",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "results": [
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.FinancialHold_RejectsLegacyReferralAwardsBeforeTheHandlerOpensATransaction",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.DisabledBackgroundExecution_HoldsEachIndependentWorkerAcrossFreshInstances(workerType: typeof(AqualLifeStyle.Web.Host.Email.TransactionalEmailOutboxWorker))",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.DirectOutboxExecution_RejectsBeforeAnyClaimOrProviderDependency(heldSetting: &quot;App:Recovery:Enabled&quot;)",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.DirectOutboxExecution_RejectsBeforeAnyClaimOrProviderDependency(heldSetting: &quot;Bird:Enabled&quot;)",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.DisabledBackgroundExecution_HoldsEachIndependentWorkerAcrossFreshInstances(workerType: typeof(AqualLifeStyle.Web.Host.Payments.Yoco.YocoPaymentOperationsMonitor))",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.FinancialHold_RejectsLiveCheckoutWithCredentialsBeforeProviderRequest",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.ProviderGateway_RejectsAbsentExecutionAuthorityEvenWithAConfiguredKey(heldSetting: &quot;Bird:Enabled&quot;)",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.DisabledBackgroundExecution_HoldsEachIndependentWorkerAcrossFreshInstances(workerType: typeof(AqualLifeStyle.Web.Host.Commissions.WeeklyCommissionCalculationWorker))",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.MissingConfiguration_DoesNotGrantWorkerOrDeliveryAuthority",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.FinancialHold_RejectsLivePaymentNotificationBeforeDependencies",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.ProviderGateway_RejectsAbsentExecutionAuthorityEvenWithAConfiguredKey(heldSetting: &quot;App:BackgroundJobs:Enabled&quot;)",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.IndividualFinancialFlag_CannotOverrideGlobalFinancialHold(workerType: typeof(AqualLifeStyle.Web.Host.ProgrammeEngine.EntryMonthlyObligationWorker))",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.DirectOutboxExecution_RejectsBeforeAnyClaimOrProviderDependency(heldSetting: &quot;App:BackgroundJobs:Enabled&quot;)",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.Recovery_HoldsDirectMonitorExecution",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.DisabledBackgroundExecution_HoldsEachIndependentWorkerAcrossFreshInstances(workerType: typeof(AqualLifeStyle.Web.Host.ProgrammeEngine.EntryMonthlyObligationWorker))",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.ProviderGateway_RejectsAbsentExecutionAuthorityEvenWithAConfiguredKey(heldSetting: &quot;App:Recovery:Enabled&quot;)",
+          "outcome": "Failed"
+        },
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.IndividualFinancialFlag_CannotOverrideGlobalFinancialHold(workerType: typeof(AqualLifeStyle.Web.Host.Commissions.WeeklyCommissionCalculationWorker))",
+          "outcome": "Failed"
+        }
+      ]
+    },
+    {
+      "scope": "After worker/provider holds, before direct financial service holds",
+      "rawTrxSha256": "66ee2091de7dd880c67541386cb7fd432334844cd82d4252744931fde7fbd873",
+      "counters": {
+        "total": "1",
+        "executed": "1",
+        "passed": "0",
+        "failed": "1",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "results": [
+        {
+          "name": "AqualLifeStyle.Tests.WebHost.RuntimeAuthorityTests.DirectFinancialServices_CannotBypassTheHoldAtAWorkerOrWebhook",
+          "outcome": "Failed"
+        }
+      ]
+    }
+  ]
+}

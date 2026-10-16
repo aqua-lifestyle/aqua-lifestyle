@@ -165,6 +165,14 @@ The frontend compatibility guard is a safety feature. Do not bypass it to accept
 
 ## 3. Weekly commission enablement
 
+Runtime execution now also requires the persistent background and financial holds
+to be explicitly released in the separately qualified worker environment. Independent
+periodic workers do not inherit ABP's scheduler switch automatically; registration,
+body and relevant direct processor/provider boundaries enforce the holds. This is
+not a release activation or permission to enable anything here. See
+[runtime authority qualification](../operations/runtime-authority-qualification.md)
+for the capability matrix, image/identity split and remaining production blockers.
+
 `PLANNED / NOT ENABLED`
 
 Repository default: `App:WeeklyCommissions:Enabled=false`.

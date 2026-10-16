@@ -33,7 +33,7 @@ and applications below are paraphrase and interpretation, not additional Scriptu
 | Scripture and context | Principle | Theological application | Chosen engineering obligation |
 | --- | --- | --- | --- |
 | [Proverbs 22:3](https://www.biblegateway.com/passage/?search=Proverbs+22%3A3&version=KJV), wisdom about seeing danger and taking shelter | Prudence anticipates harm. | Stewardship includes preparing for foreseeable failures rather than ignoring them. | Model threats; deny uncertain admission; bound retries; preserve a containment path. |
-| [Luke 14:28–30](https://www.biblegateway.com/passage/?search=Luke+14%3A28-30&version=KJV), an illustration within Jesus' teaching on the cost of discipleship | Consider what responsible completion requires. | By analogy, count recovery, operational and human costs before enabling automation. The passage does not specify a release architecture. | Qualify restoration, compatibility, provider limits, ownership and operational capacity before activation. |
+| [Luke 16:10](https://www.biblegateway.com/passage/?search=Luke+16%3A10&version=KJV), faithfulness in small and large responsibilities within Jesus' teaching about stewardship | Faithfulness includes small responsibilities. | By analogy, attend to startup callbacks, queue claims and retry details as well as the visible release. The passage does not specify a release architecture. | Verify small execution boundaries, repeated starts and durable evidence before claiming broader authority qualification. |
 | [1 Corinthians 4:2](https://www.biblegateway.com/passage/?search=1+Corinthians+4%3A2&version=KJV), faithfulness of stewards in Paul's ministry discussion | Stewards must be faithful. | Entrusted credentials, records and authority require accountable custody. | Separate identities, restrict privileges, record exact provenance and assign an accountable custodian. |
 | [Proverbs 11:1](https://www.biblegateway.com/passage/?search=Proverbs+11%3A1&version=KJV), honest and dishonest measures | Integrity in dealing with others. | Financial evidence and safety reports should not misrepresent value, entitlement or certainty. | Preserve ledger/history facts; no fabricated defaults, concealed skips, payment replay or CI-as-financial-authority. |
 | [1 Thessalonians 5:21–22](https://www.biblegateway.com/passage/?search=1+Thessalonians+5%3A21-22&version=KJV), discernment in concluding community exhortations | Examine claims and retain what is good; reject evil. | Test automation and challenge its claims; technical testing is a prudential application, not an exhaustive definition of spiritual discernment. | Positive and negative tests, independent review, protected tests, honest UNKNOWN/BLOCKED results. |
@@ -42,6 +42,9 @@ and applications below are paraphrase and interpretation, not additional Scriptu
 No specific flag, provider, language, reviewer identity or pipeline is divinely
 mandated. Religious identity is not proof of technical competence or trustworthiness.
 Disagreement with a design choice is not automatically moral wrongdoing.
+Scripture supplies the Christian ethical foundation; it does not guarantee technical
+immunity from compromise. Hypotheses, implemented guards and measured evidence must
+remain distinguishable. See the [runtime capability qualification](runtime-authority-qualification.md).
 
 ## Scope, workflow and protected assets
 

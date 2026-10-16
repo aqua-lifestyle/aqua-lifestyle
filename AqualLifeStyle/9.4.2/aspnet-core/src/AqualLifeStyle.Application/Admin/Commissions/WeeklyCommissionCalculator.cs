@@ -64,6 +64,9 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         private readonly IUnitOfWorkManager _unitOfWorkManager;
         public AqualLifeStyle.Domain.AQGreen.IAQGreenPilotMode PilotMode { get; set; }
             = AqualLifeStyle.Domain.AQGreen.DisabledAQGreenPilotMode.Instance;
+        public IAQGreenDemoCalculationMode DemoCalculationMode { get; set; }
+            = DisabledAQGreenDemoCalculationMode.Instance;
+        private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
 
         public WeeklyCommissionCalculator(
             IRepository<EntryParticipation, Guid> entryParticipationRepository,
@@ -80,9 +83,11 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             IAQGreenCommissionStructuralModelSelector entryStructuralModelSelector,
             IAQGreenCommissionStructuralEvidenceEvaluator entryStructuralEvidenceEvaluator,
             IAQGreenWeeklySalesEligibilityDecisionReader weeklySalesDecisionReader,
-            IUnitOfWorkManager unitOfWorkManager)
+            IUnitOfWorkManager unitOfWorkManager,
+            Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
             _entryParticipationRepository = entryParticipationRepository;
+            _configuration = configuration;
             _onyxParticipationRepository = onyxParticipationRepository;
             _entryObligationRepository = entryObligationRepository;
             _loanAgreementRepository = loanAgreementRepository;
@@ -104,6 +109,9 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             ClosedCommissionWeek closedWeek,
             DateTime calculatedAt)
         {
+            AqualLifeStyle.Configuration.ApplicationRecoveryMode.DenyBusinessOperation(_configuration);
+            if (!PilotMode.IsEnabled && !DemoCalculationMode.IsEnabled)
+                AqualLifeStyle.Configuration.RuntimeOperationGuards.RequireFinancialOperations(_configuration);
             var existingPeriod = await _entryPeriodRepository.FirstOrDefaultAsync(period =>
                 period.TenantId == tenantId &&
                 period.PeriodStart == closedWeek.PeriodStartUtc &&
@@ -294,6 +302,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             DateTime calculatedAt)
         {
             PilotMode.DenyOutsidePilot("Onyx commission calculation");
+            AqualLifeStyle.Configuration.RuntimeOperationGuards.RequireFinancialOperations(_configuration);
             var existingPeriod = await _onyxPeriodRepository.FirstOrDefaultAsync(period =>
                 period.TenantId == tenantId &&
                 period.PeriodStart == closedWeek.PeriodStartUtc &&

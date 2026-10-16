@@ -446,8 +446,35 @@ jobs:
           context: .
           file: docker/api/Dockerfile
           push: false
+          load: true
+          tags: aqualifestyle-runtime-api:qualification
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
+      - name: Build separate maintenance image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/api/Dockerfile
+          target: migrator
+          push: false
+          load: true
+          tags: aqualifestyle-runtime-migrator:qualification
+          cache-from: type=gha,scope=api
+      - name: Qualify actual runtime restart and database authority in isolation
+        run: |
+          set -euo pipefail
+          docker pull postgres:18-alpine
+          docker pull redis:7-alpine
+          mkdir -p TestResults/runtime-authority
+          bash tools/deployment/runtime-restart-probe.sh | tee TestResults/runtime-authority/restart-probe.log
+      - name: Retain runtime authority qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: runtime-authority-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: TestResults/runtime-authority
+          if-no-files-found: error
+          retention-days: 90
       - name: Build web image
         uses: docker/build-push-action@v6
         with:

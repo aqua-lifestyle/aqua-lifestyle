@@ -25,13 +25,16 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
         private readonly IRepository<EntryMonthlyObligation, Guid> _obligationRepository;
         private readonly IRepository<EntryParticipation, Guid> _participationRepository;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
 
         public EntryMonthlyObligationScheduler(
             IRepository<EntryMonthlyObligation, Guid> obligationRepository,
             IRepository<EntryParticipation, Guid> participationRepository,
-            IUnitOfWorkManager unitOfWorkManager)
+            IUnitOfWorkManager unitOfWorkManager,
+            Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
             _obligationRepository = obligationRepository;
+            _configuration = configuration;
             _participationRepository = participationRepository;
             _unitOfWorkManager = unitOfWorkManager;
         }
@@ -43,6 +46,7 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
             DateTime dueAt,
             string duePolicyVersion)
         {
+            AqualLifeStyle.Configuration.RuntimeOperationGuards.RequireFinancialOperations(_configuration);
             ValidatePeriod(periodYear, periodMonth);
             PilotMode.DenyOutsidePilot("Monthly obligation scheduling");
             ValidateUtc(dueAt, nameof(dueAt));
@@ -102,6 +106,7 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
         [UnitOfWork]
         public virtual async Task<int> AssessObligationsAsync(DateTime asOf)
         {
+            AqualLifeStyle.Configuration.RuntimeOperationGuards.RequireFinancialOperations(_configuration);
             PilotMode.DenyOutsidePilot("Monthly obligation assessment");
             ValidateUtc(asOf, nameof(asOf));
 

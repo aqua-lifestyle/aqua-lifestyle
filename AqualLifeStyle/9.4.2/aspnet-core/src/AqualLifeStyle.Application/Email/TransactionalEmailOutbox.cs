@@ -82,7 +82,7 @@ namespace AqualLifeStyle.Email
         [UnitOfWork(IsDisabled = true)]
         public virtual async Task ProcessPendingAsync()
         {
-            var deliveryNotBeforeUtc = TransactionalEmailDeliveryBoundary.Require(_configuration);
+            var deliveryNotBeforeUtc = RuntimeOperationGuards.RequireEmailDispatch(_configuration);
             var now = DateTime.UtcNow;
             IReadOnlyList<Guid> candidateIds;
             using (var unitOfWork = _unitOfWorkManager.Begin(new UnitOfWorkOptions
@@ -101,6 +101,7 @@ namespace AqualLifeStyle.Email
             var claimedCount = 0;
             foreach (var messageId in candidateIds)
             {
+                RuntimeOperationGuards.RequireEmailDispatch(_configuration);
                 if (claimedCount >= BatchSize) break;
 
                 var processingToken = Guid.NewGuid();
@@ -128,6 +129,7 @@ namespace AqualLifeStyle.Email
                 Exception deliveryFailure = null;
                 try
                 {
+                    RuntimeOperationGuards.RequireEmailDispatch(_configuration);
                     providerId = await _deliveryGateway.SendAsync(new TransactionalEmail(
                         claimed.Recipient,
                         claimed.Subject,

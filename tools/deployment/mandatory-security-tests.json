@@ -1040,12 +1040,17 @@
       "id": "AQUA-SEC-0208",
       "file": "tools/deployment/release-control.test.mjs",
       "name": "foreign queued Render deployment blocks automatic mutation"
+    },
+    {
+      "id": "AQUA-SEC-0209",
+      "file": "tools/deployment/workflow.test.mjs",
+      "name": "required container CI executes isolated runtime restart qualification and retains evidence"
     }
   ],
   "sources": [
     {
       "path": ".github/workflows/ci.yml",
-      "sha256": "62f758e9efefebe282766d0225510e7e240fe0fea10bb7a9538e7651e0e21f8f"
+      "sha256": "370a87cc3aa7c5340ecf7ffaa4624f50a03549684836868184c9c05db408a892"
     },
     {
       "path": ".github/workflows/publish-images.yml",
@@ -1101,11 +1106,27 @@
     },
     {
       "path": "tools/deployment/workflow.test.mjs",
-      "sha256": "5e31428e92eea8c1bfb093363caa65c0ba6cb7e213c89237042252b18ce77125"
+      "sha256": "df4cfb6d5b74b9bf954a2b67c96565b170296c2379f971eb82a1df103b786982"
     },
     {
       "path": "tools/deployment/mandatory-security-probe.mjs",
       "sha256": "562626cf810fd9b155b0bfdf896daae3ee4d40877dbd87ed3f0aef9cb17236c0"
+    },
+    {
+      "path": "tools/deployment/runtime-restart-probe.sh",
+      "sha256": "54940f3c3643341638446bb1e6ef47332ddae31c35657de533bf3a985a666f85"
+    },
+    {
+      "path": "docker/api/Dockerfile",
+      "sha256": "b526238b9175800ca815a744487fe68fc9de7034acd2f024e3075c4cfeb33cd4"
+    },
+    {
+      "path": "docker-compose.yml",
+      "sha256": "913bdeb74afcb1afc9f6024a3cc02660ab2e1df246130e464a9d787ab627d86d"
+    },
+    {
+      "path": "docker-compose.maintenance.yml",
+      "sha256": "5db8cee2716c5066dcd0271408bb0ae4b01ba74a68ca9e6a067e6e353874523f"
     }
   ]
 }

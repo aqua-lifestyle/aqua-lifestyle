@@ -207,6 +207,7 @@ Run from the repository root. CI builds these images with Buildx:
 
 ```bash
 docker build --file docker/api/Dockerfile .
+docker build --file docker/api/Dockerfile --target migrator .
 docker build \
   --file docker/web/Dockerfile \
   --build-arg NEXT_PUBLIC_ABP_API_URL=https://api.example.test \
@@ -220,7 +221,20 @@ For Compose validation, copy `.env.example` to an ignored `.env`, replace every 
 docker compose config --quiet
 ```
 
-`docker compose up --build` is an optional local integration environment that starts PostgreSQL, Redis, the migrator, API, and frontend. It requires valid local configuration and provider test credentials; it is not a safe generic validation command for documentation-only changes.
+`docker compose up --build` starts PostgreSQL, Redis, API and frontend with a
+separately provisioned restricted API connection. It does not migrate or seed.
+Only explicitly authorized maintenance loads `docker-compose.maintenance.yml` in
+addition to the base file and supplies a different migration connection; the default
+API image contains no migrator. Compose does not provision safe database grants.
+Neither command is generic validation against a production target.
+
+For actual-image isolated startup/restart and role denials, use the commands in
+[runtime authority qualification](../operations/runtime-authority-qualification.md).
+The fixture requires PostgreSQL18, Redis7 and both newly built local images; it
+accepts no live target, creates an internal Docker network, migrates a fresh schema
+with a separate maintenance identity, and exercises normal Production API restart
+with a restricted non-owner role. It does not prove production grants or complete
+member/admin write functionality. CI requires this probe in Validate container images.
 
 ## Formatting and final review
 

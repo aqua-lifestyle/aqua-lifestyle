@@ -10,6 +10,8 @@ using AqualLifeStyle.Web.Host.Email;
 using Microsoft.Extensions.Options;
 using Shouldly;
 using Xunit;
+using Microsoft.Extensions.Configuration;
+using System.Collections.Generic;
 
 namespace AqualLifeStyle.Web.Tests.Email
 {
@@ -90,7 +92,7 @@ namespace AqualLifeStyle.Web.Tests.Email
             var options = ValidOptions();
             options.Enabled = false;
             var gateway = new BirdTransactionalEmailDeliveryGateway(
-                new HttpClient(handler), Options.Create(options));
+                new HttpClient(handler), Options.Create(options), AuthorizedConfiguration());
 
             await Should.ThrowAsync<InvalidOperationException>(() => gateway.SendAsync(
                 new TransactionalEmail("member@example.test", "Subject", "<p>Body</p>", "Body", "reference")));
@@ -144,7 +146,7 @@ namespace AqualLifeStyle.Web.Tests.Email
             {
                 Timeout = TimeSpan.FromMilliseconds(20)
             };
-            var gateway = new BirdTransactionalEmailDeliveryGateway(client, Options.Create(options));
+            var gateway = new BirdTransactionalEmailDeliveryGateway(client, Options.Create(options), AuthorizedConfiguration());
 
             await Should.ThrowAsync<TaskCanceledException>(() => gateway.SendAsync(
                 new TransactionalEmail("member@example.test", "Subject", "<p>Body</p>", "Body", "reference")));
@@ -155,8 +157,15 @@ namespace AqualLifeStyle.Web.Tests.Email
             var options = ValidOptions();
             options.ApiKey = key;
             return new BirdTransactionalEmailDeliveryGateway(
-                new HttpClient(handler), Options.Create(options));
+                new HttpClient(handler), Options.Create(options), AuthorizedConfiguration());
         }
+
+        private static IConfiguration AuthorizedConfiguration() => new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string>
+            {
+                ["App:BackgroundJobs:Enabled"] = "true", ["Bird:Enabled"] = "true",
+                ["Bird:DeliveryNotBeforeUtc"] = "1970-01-01T00:00:00Z"
+            }).Build();
 
         private static BirdOptions ValidOptions() => new BirdOptions
         {

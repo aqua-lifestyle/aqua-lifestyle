@@ -1,0 +1,43 @@
+{
+  "observedAt": "2026-10-16T19:18:23.425Z",
+  "method": "authenticated GET only; no database session or provider mutation",
+  "render": {
+    "id": "srv-d9f0k8e1a83c73d8n1b0",
+    "flags": {
+      "ASPNETCORE_ENVIRONMENT": "Production",
+      "App__Recovery__Enabled": "false",
+      "App__WeeklyCommissions__Enabled": "false",
+      "App__EntryMonthlyObligations__Enabled": "false",
+      "App__FinancialOperations__Enabled": "false",
+      "App__BackgroundJobs__Enabled": "false",
+      "AQGreenV2Demo__Enabled": "false",
+      "AQGreenV2Pilot__Enabled": "false",
+      "App__AQGreenV2__Commissioning__Enabled": "false",
+      "SEED_DEMO_DATA": "false",
+      "Bird__Enabled": "true",
+      "Yoco__Mode": "test"
+    },
+    "credentialPresence": {
+      "Yoco__SecretKey": true,
+      "Yoco__WebhookSecret": true,
+      "Bird__ApiKey": true,
+      "DATABASE_URL": true,
+      "ConnectionStrings__Default": false,
+      "DataProtection__CertificateBase64": true,
+      "DataProtection__CertificatePassword": true
+    },
+    "databasePrivileges": "UNKNOWN — no database catalog session performed"
+  },
+  "apiHealth": {
+    "http": 200,
+    "status": "Healthy",
+    "sha": "1251fb82979e18be53d1d0e7f5c6fab2d0c50a58",
+    "recovery": null,
+    "environment": "Production",
+    "database": "Healthy",
+    "redis": "Healthy",
+    "keyStore": "Healthy",
+    "paymentContractVersion": "aqua-payments-2026-08-09-flexible-payment-approval"
+  },
+  "providerIAM": "UNKNOWN — read access is not deploy-only or runtime privilege evidence"
+}

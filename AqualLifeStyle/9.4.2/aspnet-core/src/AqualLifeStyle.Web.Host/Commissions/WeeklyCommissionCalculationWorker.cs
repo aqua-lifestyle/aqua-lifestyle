@@ -97,12 +97,9 @@ namespace AqualLifeStyle.Web.Host.Commissions
 
         protected override async Task DoWorkAsync()
         {
-            if (AqualLifeStyle.Configuration.ApplicationRecoveryMode.IsEnabled(_configuration)) return;
+            if (!AqualLifeStyle.Configuration.RuntimeOperationGuards.CanRunFinancialWorker(
+                _configuration, "App:WeeklyCommissions:Enabled")) return;
             PilotMode.DenyOutsidePilot("Automatic programme commission worker");
-            if (!_configuration.GetValue<bool>("App:WeeklyCommissions:Enabled"))
-            {
-                return;
-            }
             if (D10Runtime != null) await D10Runtime.EnsureFinancialWorkersAsync();
 
             var nowUtc = DateTime.UtcNow;

@@ -11,6 +11,10 @@ The fresh authenticated [infrastructure configuration plan](production-infrastru
 records exact live findings, unapplied governance payloads, runtime/transport choices,
 credential custody and recovery actions. It supersedes any interpretation of the
 setup table below as permission to provision broad credentials or change live flags.
+The [runtime authority qualification](runtime-authority-qualification.md) traces
+startup, worker, provider and DB capabilities and documents guarded execution plus
+isolated normal-profile restart evidence. Production role/credential isolation
+remains unverified; this controller's recovery-only admission is not relaxed.
 
 Normal PR review remains merge governance. Restricted financial, messaging, worker
 and migration operations retain their separate boundaries. Deploying code never

@@ -65,6 +65,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             }
 
             WriteProvenanceMarker();
+            IocManager.Resolve<IConfiguration>()["App:FinancialOperations:Enabled"] = "true";
             var suffix = Guid.NewGuid().ToString("N")[..8];
 
             var closedWeek = IocManager
@@ -111,6 +112,8 @@ namespace AqualLifeStyle.Web.Tests.Integration
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new[]
                 {
+                    new KeyValuePair<string, string>("App:BackgroundJobs:Enabled", "true"),
+                    new KeyValuePair<string, string>("App:FinancialOperations:Enabled", "true"),
                     new KeyValuePair<string, string>(
                         "App:WeeklyCommissions:Enabled",
                         "true"),

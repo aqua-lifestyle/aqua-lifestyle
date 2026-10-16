@@ -44,3 +44,16 @@ test('every main push runs CI and successful trusted completion starts CD withou
   const policy = JSON.parse(read('tools/deployment/unattended-policy.json'));
   assert.equal(policy.baseline, 'automatic'); assert.equal(Object.hasOwn(policy, 'bootstrap'), false);
 });
+
+test('required container CI executes isolated runtime restart qualification and retains evidence', () => {
+  const ci = read('.github/workflows/ci.yml');
+  const containers = ci.split('\n  containers:\n')[1].split('\n  postgres-transactional-regression:')[0];
+  assert.match(containers, /name: Validate container images/);
+  assert.match(containers, /target: migrator/);
+  assert.match(containers, /tags: aqualifestyle-runtime-api:qualification/);
+  assert.match(containers, /tags: aqualifestyle-runtime-migrator:qualification/);
+  assert.match(containers, /set -euo pipefail/);
+  assert.match(containers, /bash tools\/deployment\/runtime-restart-probe\.sh \| tee/);
+  assert.match(containers, /name: runtime-authority-\$\{\{ github.sha \}\}-/);
+  assert.doesNotMatch(containers, /continue-on-error:|secrets\./);
+});
