@@ -2,8 +2,13 @@
 
 Assessment date: 2026-10-16. Starting qualified source:
 `9581655e4ba0ab22c8578a7536439eda1bbf6fbc`, PR106. **Production readiness: BLOCKED.**
-This plan proposes persistent infrastructure; it does not authorize changes. No live
-settings, credentials, database contents or deployments were changed. No production
+This plan proposes persistent infrastructure; it does not authorize changes.
+See the subsequent [production privilege assessment](production-privilege-isolation.md)
+for newly authorized catalog-only inspection, its transport blocker and the current
+normal API write/custody requirements. The source/runtime descriptions below are
+the observations of this earlier assessment, not current proof of privilege isolation.
+
+No live settings, credentials, database contents or deployments were changed. No production
 release, financial processing, Bird delivery or worker activation was attempted.
 
 The intended sequence remains merge → main CI PASS → Render exact commit → API

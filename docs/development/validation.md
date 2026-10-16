@@ -235,6 +235,10 @@ accepts no live target, creates an internal Docker network, migrates a fresh sch
 with a separate maintenance identity, and exercises normal Production API restart
 with a restricted non-owner role. It does not prove production grants or complete
 member/admin write functionality. CI requires this probe in Validate container images.
+The extended probe also executes the catalog-only audit and temporary SQL grant
+counterexamples described in [production privilege isolation](../operations/production-privilege-isolation.md).
+Its23 checks include rejection of unsafe grant proposals; they do not establish
+successful HTTP workflows under a complete production least-privilege role.
 
 ## Formatting and final review
 

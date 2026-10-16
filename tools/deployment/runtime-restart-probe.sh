@@ -42,8 +42,8 @@ probe_migrator_image=$("${probe_docker[@]}" image inspect aqualifestyle-runtime-
 probe_pg_image=$("${probe_docker[@]}" image inspect postgres:18-alpine --format '{{.Id}}')
 probe_redis_image=$("${probe_docker[@]}" image inspect redis:7-alpine --format '{{.Id}}')
 passed() { probe_checks=$((probe_checks + 1)); printf 'PASS: %s\n' "$1"; }
-admin_sql() { "${probe_docker[@]}" exec -i "$probe_pg" psql -X -At -v ON_ERROR_STOP=1 -v VERBOSITY=verbose -U postgres -d aqua_runtime; }
-api_sql() { "${probe_docker[@]}" exec -i --env "PGPASSWORD=$probe_api_password" "$probe_pg" psql -X -At -v ON_ERROR_STOP=1 -v VERBOSITY=verbose -h 127.0.0.1 -U aqua_runtime_api -d aqua_runtime; }
+admin_sql() { "${probe_docker[@]}" exec -i "$probe_pg" psql -X -qAt -v ON_ERROR_STOP=1 -v VERBOSITY=verbose -U postgres -d aqua_runtime; }
+api_sql() { "${probe_docker[@]}" exec -i --env "PGPASSWORD=$probe_api_password" "$probe_pg" psql -X -qAt -v ON_ERROR_STOP=1 -v VERBOSITY=verbose -h 127.0.0.1 -U aqua_runtime_api -d aqua_runtime; }
 denied() {
   if printf '%s\n' "$1" | api_sql >"$probe_dir/denied.log" 2>&1; then echo "FAIL: forbidden operation succeeded: $2" >&2; exit 1; fi
   grep -q '42501' "$probe_dir/denied.log" || { echo 'FAIL: denial was not insufficient_privilege SQLSTATE42501' >&2; exit 1; }
@@ -117,6 +117,79 @@ denied 'DELETE FROM "EntryWeeklyCommissions";' 'API role cannot mutate AQGreen c
 denied 'UPDATE "AbpUsers" SET "IsActive"="IsActive";' 'API role cannot mutate administrator identities in this fixture'
 denied 'UPDATE "TransactionalEmailOutboxMessages" SET "AttemptCount"="AttemptCount"+1;' 'enqueue-only API role cannot claim outbox delivery'
 fingerprint >"$probe_dir/before"
+
+# Audit the same real schema under both identities. This is bounded database
+# authority evidence; no result claims production custody or full API permission.
+probe_phase=catalog_authority
+admin_sql <"$probe_root/tools/operations/database-authority-readonly.sql" >"$probe_dir/owner-catalog.json"
+api_sql <"$probe_root/tools/operations/database-authority-readonly.sql" >"$probe_dir/api-catalog.json"
+node --input-type=module - "$probe_dir/owner-catalog.json" "$probe_dir/api-catalog.json" <<'JS'
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const [owner,api]=process.argv.slice(2).map(p=>JSON.parse(fs.readFileSync(p,'utf8')));
+for (const r of [owner,api]) { assert.equal(r.transactionReadOnly,'on'); assert.equal(r.serverMajor,18); assert.ok(r.publicTables.count>0); }
+assert.equal(owner.role.superuser,true); assert.equal(owner.database.currentRoleOwns,true);
+assert.ok(owner.publicTables.ownedByCurrentRole>0);
+for (const flag of ['superuser','createRole','createDatabase','replication','bypassRls','inherit']) assert.equal(api.role[flag],false);
+for (const flag of ['currentRoleOwns','inheritsOwner','canSetOwnerRole','canCreateSchema','canCreateTemporary']) assert.equal(api.database[flag],false);
+for (const flag of ['currentRoleOwns','inheritsOwner','canSetOwnerRole','create']) assert.equal(api.publicSchema[flag],false);
+for (const count of ['ownedByCurrentRole','ownerPrivilegeInherited','ownerRoleSettable']) assert.equal(api.publicTables[count],0);
+assert.deepEqual(api.reachableDangerousRoles,[]); assert.equal(api.roleAdministrationMemberships,0);
+JS
+passed 'catalog-only read distinguishes the actual fixture owner from a non-owner API without role escalation'
+
+# Deliberately reject two inadequate grants proposals. Never deploy these temporary
+# grants. Normal password/profile operations and administrative takeover share the
+# same columns; an enqueue-only table INSERT can also forge a Sent receipt.
+probe_phase=unsafe_grants_counterexamples
+denied 'UPDATE "AbpUsers" SET "Name"="Name" WHERE "TenantId"=1;' \
+  'readiness-only API grants reject even profile SQL and are not a normal API role'
+admin_sql >/dev/null <<'SQL'
+GRANT UPDATE ("Name","Password") ON "AbpUsers" TO aqua_runtime_api;
+SQL
+api_sql <"$probe_root/tools/operations/database-authority-readonly.sql" >"$probe_dir/column-catalog.json"
+node --input-type=module - "$probe_dir/column-catalog.json" <<'JS'
+import fs from 'node:fs'; import assert from 'node:assert/strict';
+const r=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+const users=r.sensitiveTables.find(t=>t.table==='AbpUsers');
+assert.equal(users.update,false); assert.equal(users.updateAnyColumn,true);
+assert.equal(r.sensitiveColumns.find(c=>c.table==='AbpUsers'&&c.column==='Password').update,true);
+JS
+api_sql >"$probe_dir/profile-private.log" <<'SQL'
+BEGIN;
+DO $$ DECLARE n int; BEGIN
+  UPDATE "AbpUsers" SET "Name"='Synthetic profile' WHERE "TenantId"=1 AND "UserName"='admin';
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n<>1 THEN RAISE EXCEPTION 'Synthetic profile fixture missing or ambiguous'; END IF;
+END $$;
+ROLLBACK;
+SQL
+passed 'temporary column grant permits required profile SQL; this is not an HTTP workflow proof'
+api_sql >"$probe_dir/administration-private.log" <<'SQL'
+BEGIN;
+DO $$ DECLARE n int; BEGIN
+  UPDATE "AbpUsers" SET "Password"='synthetic-invalid-hash' WHERE "TenantId" IS NULL AND "UserName"='admin';
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n<>1 THEN RAISE EXCEPTION 'Synthetic administrator fixture missing or ambiguous'; END IF;
+END $$;
+ROLLBACK;
+SQL
+passed 'UNSAFE PROPOSAL REJECTED: password column grant also permits host administrator credential mutation'
+api_sql >"$probe_dir/outbox-forgery-private.log" <<'SQL'
+BEGIN;
+INSERT INTO "TransactionalEmailOutboxMessages"
+("Id","TenantId","NotificationType","IdempotencyKey","Recipient","Subject","HtmlBody","TextBody","Status","AttemptCount","NextAttemptAt","CreationTime","IsDeleted","ProviderMessageId","SentAt")
+VALUES ('22222222-2222-2222-2222-222222222222',NULL,'Synthetic','forged-receipt','synthetic@example.test','Synthetic','held-body','held-body',2,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,FALSE,'synthetic-forged-provider-id',CURRENT_TIMESTAMP);
+ROLLBACK;
+SQL
+passed 'UNSAFE PROPOSAL REJECTED: unrestricted outbox INSERT can fabricate Sent evidence without provider delivery'
+admin_sql >/dev/null <<'SQL'
+REVOKE UPDATE ("Name","Password") ON "AbpUsers" FROM aqua_runtime_api;
+SQL
+[[ $(printf "SELECT has_any_column_privilege(current_user,'\"AbpUsers\"','UPDATE');\n" | api_sql) == f ]]
+fingerprint >"$probe_dir/after-counterexamples"
+cmp "$probe_dir/before" "$probe_dir/after-counterexamples"
+passed 'counterexample writes rolled back and temporary profile/password grants removed before runtime qualification'
 
 probe_phase=api_configuration
 openssl req -x509 -newkey rsa:2048 -nodes -keyout "$probe_dir/key.pem" -out "$probe_dir/cert.pem" \

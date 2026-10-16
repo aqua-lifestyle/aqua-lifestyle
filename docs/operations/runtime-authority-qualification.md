@@ -4,6 +4,10 @@ Starting source: `700fadb58ced50ae0d63319ad66db3f0674687ad`, PR106. The current 
 instruction authorizes repository corrections and isolated qualification, not a live
 release, provider setting/credential change, production database session or operation.
 **Production runtime authority: BLOCKED.** Source guards are not independent IAM.
+The subsequent [production privilege assessment](production-privilege-isolation.md)
+records the owner-authorized catalog access attempt, normal-write overlaps and
+extended23-check disposable evidence. Its unsuccessful live transport did not
+establish production ownership or grants.
 
 ## Governing foundation and evidence vocabulary
 
