@@ -110,3 +110,60 @@ can identify an immutable commit without recursive evidence-only commits. The
 [current runbook](../../operations/safe-automatic-deployment.md) contains exact owner
 prerequisites, effective-runtime evidence limits, safe rollback/recovery procedure
 and observability custody. No merge, production deployment or activation occurred.
+
+## Read-only production-readiness follow-up, 16 October 2026
+
+The owner authorized read-only inspection, isolated testing and documentation at
+`8185fb5742fd341b6465ccb435004bc26a046503`, not implementation/provider changes.
+PR #105 remains open; main remains ac7dfe9. Full publication CI and independent
+preparation review are recorded in the PR. A new independent adversarial probe
+found one CI-attempt binding gap inside an already admitted rollout: later qualify
+results are discarded, so successful attempt2 can replace frozen attempt1 while
+Vercel proceeds. A failed attempt2 correctly blocks Vercel. Both agents reproduced
+this using existing mocks, with no provider POST. The original 73-case suite still
+passes; it does not cover this edge. Code readiness for frozen-attempt acceptance
+is FAIL until separately authorized correction/regressions/review. No product code
+was changed. Earlier preparation PASS is not production acceptance or closure of
+this finding.
+
+Fresh provider/governance observations and exact owner actions are in the
+[production-readiness matrix](../../operations/pr105-production-readiness.md).
+Recovery cannot preserve today's normal Bird/Yoco/business capabilities. Main lacks
+required PR/CI rules; release environment is absent; two admin identities do not
+establish independent humans; Vercel remains disconnected/public values redacted.
+Render auto-deploy remains off and Blueprint auto-sync false. Deployment authority
+and production operational readiness remain BLOCKED. No credential or configuration
+change, merge, deployment, resume, payment, email or restricted operation occurred.
+
+## Authorized CI-attempt binding correction
+
+Owner task: correct the independently confirmed gap on the existing PR #105 branch;
+commit, push and update that PR, with complete CI and fresh Agent 2 review. No
+production/provider operation, merge or activation is authorized. No Python used.
+
+- Before changing the implementation, two new regressions failed with missing
+  expected rejection: successful CI attempt 2 replaced frozen attempt 1 before
+  Render and after Render/before Vercel. The original deploy discarded returned
+  requalification identities and authority omitted CI attempt. Retry inference from
+  source SHA also lacked sufficient attempt provenance.
+- Version 2 candidates and authority now bind the complete source/CI/release/target
+  identity. Latest-run reads bracket attempt-specific job inventories; every fresh
+  qualification must equal the frozen candidate before further provider mutation.
+- Retries require renewed current-attempt authority plus an immutable prior audit
+  receipt from the same release run and CI attempt. Exact provider IDs/original
+  requesting attempts survive partial failures. Contradictory, unavailable, legacy,
+  completed or ambiguous evidence fails closed; matching SHA alone cannot authorize
+  adoption. Rerun all release jobs to produce a current-attempt candidate.
+- Expanded release-safety suite: 116 passed, zero failed/skipped, including both
+  formerly failing cases, failed reruns, changed identity, stale approval, partial
+  Render completion, concurrent releases, lost IDs and ambiguous responses. Node 24
+  also passed in a read-only, network-disabled container. These are mocks/contract
+  tests, not provider deployment, recovery or rollback execution.
+- actionlint 1.7.12 passed all workflows (optional shellcheck/pyflakes disabled;
+  no Python execution). Full final-head CI/skip evidence and fresh exact-commit
+  Agent 2 review will be recorded in PR #105 after publication. Earlier PASS is
+  superseded; preliminary source review found no material defect.
+
+Status: correction IMPLEMENTED and locally TESTED. Production activation remains
+BLOCKED by the carried-forward governance, recovery-baseline and Vercel prerequisites
+in the current runbook/readiness matrix. No settings or production state changed.

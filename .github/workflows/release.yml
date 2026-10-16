@@ -74,6 +74,22 @@ jobs:
           artifact-ids: ${{ needs.candidate.outputs.artifact-id }}
           path: ${{ runner.temp }}/candidate
           merge-multiple: true
+      - name: Admit exact release and identify trusted prior audit for an authorized retry
+        id: admission
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUTO_DEPLOY_ENABLED: ${{ vars.AUTO_DEPLOY_ENABLED }}
+          PRODUCTION_RELEASE_AUTHORIZATION: ${{ secrets.PRODUCTION_RELEASE_AUTHORIZATION }}
+          CANDIDATE_DIR: ${{ runner.temp }}/candidate
+          RELEASE_REPORT: ${{ runner.temp }}/release-report.jsonl
+        run: node tools/deployment/release-control.mjs admit
+      - name: Read immutable audit from the authorized earlier attempt of this release run
+        if: steps.admission.outputs.receipt-artifact-id != ''
+        uses: actions/download-artifact@v7
+        with:
+          artifact-ids: ${{ steps.admission.outputs.receipt-artifact-id }}
+          path: ${{ runner.temp }}/prior-release
+          merge-multiple: true
       - name: Revalidate authority, providers, source and recovery before deployment
         env:
           GH_TOKEN: ${{ github.token }}
@@ -83,6 +99,8 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           CANDIDATE_DIR: ${{ runner.temp }}/candidate
           RELEASE_REPORT: ${{ runner.temp }}/release-report.jsonl
+          RESUME_ARTIFACT_ID: ${{ steps.admission.outputs.receipt-artifact-id }}
+          RESUME_RECEIPT_FILE: ${{ runner.temp }}/prior-release/release-report.jsonl
         run: node tools/deployment/release-control.mjs deploy
       - name: Retain redacted release audit
         if: always()

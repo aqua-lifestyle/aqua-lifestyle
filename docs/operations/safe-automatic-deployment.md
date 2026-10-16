@@ -5,6 +5,12 @@ investigation, code, tests and a PR, not a deployment or service resumption.
 `ac7dfe968ec13fd8c743504e4b531ab5afd2e5e7` is explicitly excluded. Do not rerun its
 CI as a deployment shortcut. No production action is required to test this change.
 
+The [PR #105 production-readiness follow-up](pr105-production-readiness.md)
+preserves the reproduced CI-attempt binding gap at historical commit `8185fb5`
+and outstanding governance/provider prerequisites. The correction uses the version
+2 contract below. Final-commit CI and fresh independent review are recorded in
+PR #105; earlier preparation PASS is superseded. No activation is authorized.
+
 ## Verified investigation, 16 October 2026
 
 | Surface | Read-only evidence | Meaning |
@@ -40,13 +46,19 @@ flowchart LR
 
 CI validates the full configured inventory. `release.yml` consumes only completed
 successful **push** runs of `ci.yml` from this repository's main branch. It verifies
-all 17 required job identities/conclusions, latest run attempt, current main HEAD,
+all 17 required job identities/conclusions from the same explicit CI attempt,
+latest run attempt, current main HEAD,
 checked-out source, and the explicit exclusion before publishing anything.
 Failure, cancellation, skipped/missing/duplicate jobs, PR/manual CI, fork inputs or
-stale main fail closed. No PR artifact or script is used by `workflow_run`.
+stale main fail closed. Latest-run reads bracket the attempt-specific job inventory;
+a rerun during inspection fails closed. Partial CI reruns cannot borrow successful
+jobs from an older attempt: rerun all CI jobs to establish a complete new attempt.
+No PR artifact or script is used by `workflow_run`.
 
 The candidate is a deterministic `git archive --format=tar` plus a manifest binding
-repository, exact SHA, CI run/attempt and SHA-256. Actions stores the immutable
+repository, exact SHA, CI run/attempt, producing release run/attempt, authorized
+environment/profile/provider targets and SHA-256. Version 1 manifests are rejected.
+Actions stores the immutable
 artifact with its own digest for 90 days. Deployment downloads the candidate by
 the trusted producing job's artifact ID and compares its bytes with a fresh archive
 of the qualified Git commit. The archive is **source/qualification evidence**.
@@ -122,11 +134,18 @@ Before a future separately authorized release, the owner/custodian must:
 
 ```json
 {
+  "version": 2,
+  "repository": "aqua-lifestyle/aqua-lifestyle",
   "profile": "recovery-only",
+  "environment": "production-release",
+  "renderServiceId": "srv-d9f0k8e1a83c73d8n1b0",
+  "vercelProjectId": "prj_6qL1e43KhsWrRshY5GxdmGl3HGMz",
+  "vercelTeamId": "team_Hc3BWfhTLfwLzwbgbtaasBUY",
   "commit": "EXACT_40_CHARACTER_COMMIT",
   "ciRunId": "EXACT_SUCCESSFUL_PUSH_CI_RUN_ID",
+  "ciRunAttempt": 1,
   "releaseRunId": "EXACT_QUALIFIED_RELEASE_WORKFLOW_RUN_ID",
-  "releaseRunAttempt": "1",
+  "releaseRunAttempt": 1,
   "expiresAt": "OWNER_APPROVED_UTC_EXPIRY_WITHIN_24_HOURS",
   "authorityReference": "opaque-owner-evidence-reference",
   "baselineRenderDeployId": "dep-APPROVED_BASELINE_ID",
@@ -141,10 +160,26 @@ Before a future separately authorized release, the owner/custodian must:
 
 Freeze provider configuration/other deployment mechanisms for the authorized window.
 These fields are required evidence references, not example approval to deploy.
-Authority is bound to commit, CI, release run **and attempt**, expires within 24
-hours, and is rechecked before each new provider POST. An unchanged retry requires
-renewed attempt-specific authority/approval. The current merge cannot be authorized
-through this template because its SHA is independently excluded.
+Authority binds every manifest identity field, including **both CI and release run
+attempts** and exact production targets. It expires within 24 hours and is rechecked
+before each new provider POST. Every later qualification must equal the frozen
+repository/SHA/CI run/attempt; a newer successful CI attempt is not interchangeable.
+Missing, failed, contradictory or unavailable evidence blocks progression.
+An unchanged retry requires renewed attempt-specific authority/approval and
+**rerun all release jobs** to produce a candidate for that release attempt. A
+failed-job-only retry reuses an old candidate and is rejected. The current merge
+cannot be authorized through this template because its SHA is independently excluded.
+
+For an authorized partial-release retry only, add numeric `resumeFromReleaseAttempt`
+referencing an earlier attempt of the **same release run**. Admission resolves the
+unique, unexpired `production-release-audit-{runId}-{attempt}` artifact from that
+run, verifies its source metadata and downloads its immutable artifact ID. Every
+receipt row must match the source, CI run **and attempt**, targets and prior release
+attempt. Provider IDs and their original requesting attempts are retained. No
+cross-run, legacy, contradictory, missing or already-verified receipt can authorize
+adoption. An unavailable receipt or lost provider response ID requires custodian
+reconciliation; matching SHA alone is insufficient. CI-attempt drift cannot be
+repaired by reusing the old receipt or approval.
 
 ## Readiness, concurrency and failure handling
 
@@ -152,7 +187,9 @@ through this template because its SHA is independently excluded.
   running provider rollout. GitHub may replace an older **pending** concurrency run;
   inspect cancelled/superseded runs. The newest candidate must still pass current-main
   qualification; this is not a promise to release every intermediate main commit.
-- After approval, qualification is repeated. Provider preflight rejects suspension,
+- After approval, qualification is repeated and compared with the frozen candidate.
+  The same comparison gates Render admission, Vercel admission and final verification.
+  Provider preflight rejects suspension,
   wrong targets/build/start/pre-deploy settings, changed baseline, operational flags,
   secrets, wrong frontend build target or foreign in-flight deploys. Unknown states,
   incomplete inventories or repeated pagination cursors fail closed. History inspection
@@ -163,21 +200,28 @@ through this template because its SHA is independently excluded.
 - Render receives `commitId` (never branch latest). Poll for `live`, verify resolved
   commit, re-read safety configuration and health build ID, Production/dependency
   readiness and the effective latched recovery header. Failure stops Vercel.
-- Recheck current main and authority before Vercel. Its production request has
+- Recheck the exact frozen CI identity, current main and authority before Vercel.
+  Its production request has
   exact `gitSource.sha/ref`, project and repository ID. Poll READY, require provider
-  Git source/project, no alias error, actual production target ID and production
+  Git source/project, CI run/attempt metadata and canonical release-identity digest,
+  no alias error, actual production target ID and production
   HTTP 200. These checks prove infrastructure identity/readiness, not a business
   workflow, authentication acceptance or provider delivery.
 - Polling is bounded (20 minutes per provider; overall 45-minute job). A timeout,
   lost POST response or workflow cancellation **does not mean the provider stopped**.
   Do not automatically retry POST, roll back, resume, or repair settings. A renewed
-  authorized retry inspects provider history and adopts the same exact-source
-  operation; ambiguous duplicates/terminal failed candidates require operator action.
+  authorized retry inspects provider history and adopts only an operation recorded
+  by its validated immutable audit receipt. Render has no native CI-attempt metadata;
+  the receipt supplies that binding. Ambiguous duplicates, unrecorded same-source
+  operations and terminal failed candidates require operator action.
   Provider eventual consistency still requires custodian inspection after an
   ambiguous POST; do not use rapid reruns as an exactly-once mechanism.
 - GitHub environment/deployment records, candidate digest, workflow step summaries
   and redacted `production-release-audit-*` artifacts record the result and provider
-  IDs, including partial completion. Enable owner Actions failure notifications;
+  IDs, including partial completion. Each audit row carries the full release identity;
+  failure rows retain known provider IDs and original requesting attempts. Failures
+  before identity verification are explicitly marked unverified. Each retry writes
+  a separate artifact, preserving earlier records. Enable owner Actions failure notifications;
   verify their delivery separately. Render currently declares notify-on-fail.
   Vercel alert delivery and GitHub notification receipt have not been verified.
   Provider bodies, configuration, keys, identity information and business data are
@@ -203,7 +247,9 @@ through this template because its SHA is independently excluded.
    dependency readiness and the production alias. Old binaries must retain safe
    guards/schema compatibility. No automatic database rollback is implied.
 5. Preserve failed/partial evidence and configuration custody. After reconciliation,
-   issue fresh exact-attempt authority and approve the appropriate qualified run.
+   issue fresh exact-attempt authority, rerun all release jobs and approve the
+   appropriate qualified run. Partial retries require the matching prior audit
+   receipt described above; changed CI attempts cannot adopt the old attempt's work.
    A failed earlier Render candidate must be explicitly resolved by the custodian;
    the pipeline will not silently create another one. If source has advanced, the
    old candidate is stale: qualify the new current main revision instead.
@@ -217,6 +263,11 @@ and archive provenance, protected authority, runtime holds, target/build inputs,
 sequential success, stale heads, provider failure, rollback holds, pagination,
 concurrency, retry adoption and lost-response redaction. Workflow checks also failed
 before adding the missing release path/main exclusion/tag qualification.
+The attempt-binding correction first reproduced two failing regressions (successful
+CI attempt 2 replacing attempt 1 before Render or after Render/before Vercel).
+The expanded 116-case suite passes, including failed/missing/changed CI evidence,
+stale authority, partial receipts, concurrent releases and ambiguous responses.
+These provider simulations assert that mismatches cause no further mutation.
 
 CI additionally runs the full existing backend/frontend/PostgreSQL inventory and
 both container builds. Final commit/run results and independent Agent 2 review are

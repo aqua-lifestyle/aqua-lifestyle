@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
-import { clients, deploy, deploymentHistory, qualify, requiredJobs, targets, validateAuthority,
+import { clients, createAuditWriter, deploy, deploymentHistory, freezeCandidate, qualify, requalify,
+  releaseKey, requiredJobs, resumeArtifact, targets, validateAuthority, validateResumeReceipt,
   validateEnvironment, validateHealth, validateRender, validateRun, validateVercel,
   validateVercelVariables, verifyCandidate, waitFor } from './release-control.mjs';
 
@@ -10,16 +11,19 @@ const run = () => ({ id: 123, run_attempt: 1, repository: { full_name: targets.r
   head_repository: { full_name: targets.repository }, event: 'push', head_branch: 'main',
   head_sha: source, path: '.github/workflows/ci.yml', name: 'Continuous integration',
   status: 'completed', conclusion: 'success', html_url: 'https://github.com/example/ci/123' });
-const jobs = () => requiredJobs.map(name => ({ name, status: 'completed', conclusion: 'success' }));
-const qualified = () => validateRun(run(), jobs(), source);
+const jobs = (attempt = 1) => requiredJobs.map(name => ({ name, status: 'completed', conclusion: 'success',
+  run_id: 123, run_attempt: attempt }));
+const ciQualified = () => validateRun(run(), jobs(), source);
+const qualified = () => freezeCandidate(ciQualified(), runnerEnv());
 const environment = () => ({ can_admins_bypass: false,
   deployment_branch_policy: { custom_branch_policies: true, protected_branches: false },
   protection_rules: [{ type: 'required_reviewers', prevent_self_review: true,
     reviewers: [{ type: 'User', reviewer: { id: 1 } }] }] });
 const branches = () => [{ name: 'main', type: 'branch' }];
-const runnerEnv = () => ({ AUTO_DEPLOY_ENABLED: 'true', GITHUB_RUN_ID: '456', GITHUB_RUN_ATTEMPT: '1' });
-const authority = () => ({ profile: 'recovery-only', commit: source, ciRunId: '123', releaseRunId: '456',
-  releaseRunAttempt: '1', expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+const runnerEnv = (attempt = 1) => ({ AUTO_DEPLOY_ENABLED: 'true', GITHUB_REPOSITORY: targets.repository,
+  GITHUB_RUN_ID: '456', GITHUB_RUN_ATTEMPT: String(attempt) });
+const authority = (candidate = qualified()) => ({ ...candidate, commit: candidate.sha,
+  expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
   authorityReference: 'owner/recovery-release-001', baselineRenderDeployId: 'dep-baseline',
   baselineVercelDeployId: 'dpl_Baseline', schemaCompatibilityVerified: true, rollbackVerified: true,
   effectiveRuntimeVerified: true, singleTriggerVerified: true, configurationFreezeVerified: true });
@@ -48,7 +52,7 @@ const health = sha => ({ status: 200, recovery: 'true', body: { result: { status
 const immediate = { attempts: 3, pause: async () => {} };
 
 test('successful full push inventory qualifies the exact current main source', () => {
-  assert.deepEqual(qualified(), { version: 1, repository: targets.repository, sha: source,
+  assert.deepEqual(ciQualified(), { version: 1, repository: targets.repository, sha: source,
     ciRunId: '123', ciRunAttempt: 1, ciUrl: 'https://github.com/example/ci/123' });
 });
 for (const [field, value] of [['conclusion', 'failure'], ['conclusion', 'cancelled'], ['status', 'in_progress'],
@@ -81,7 +85,8 @@ test('candidate source bytes and CI identity are bound, not a mutable branch lab
   assert.throws(() => verifyCandidate(manifest, qualified(), Buffer.from('changed'), archive));
   assert.throws(() => verifyCandidate(manifest, qualified(), archive, Buffer.from('actual Git source')),
     /NOT_QUALIFIED_GIT_SOURCE/);
-  for (const field of ['version', 'repository', 'sha', 'ciRunId', 'ciRunAttempt'])
+  for (const field of ['version', 'repository', 'sha', 'ciRunId', 'ciRunAttempt', 'releaseRunId',
+    'releaseRunAttempt', 'environment', 'profile', 'renderServiceId', 'vercelProjectId', 'vercelTeamId'])
     assert.throws(() => verifyCandidate({ ...manifest, [field]: 'forged' }, qualified(), archive, archive));
 });
 test('API qualification rejects truncated inventory even if the run says success', async () => {
@@ -94,7 +99,10 @@ test('production activation has no permissive default', () => {
   assert.throws(() => validateAuthority('', qualified(), runnerEnv()), /AUTHORITY_REQUIRED/);
   assert.throws(() => validateAuthority('{secret-invalid', qualified(), runnerEnv()), /AUTHORITY_REQUIRED/);
 });
-for (const [field, value] of [['profile', 'normal'], ['commit', previous], ['ciRunId', '999'],
+for (const [field, value] of [['version', 1], ['repository', 'untrusted/other'], ['profile', 'normal'],
+  ['commit', previous], ['ciRunId', '999'], ['ciRunAttempt', 2], ['ciRunAttempt', undefined],
+  ['environment', 'preview'], ['renderServiceId', 'srv-other'], ['vercelProjectId', 'prj_other'],
+  ['vercelTeamId', 'team_other'],
   ['releaseRunId', '999'], ['releaseRunAttempt', '2'], ['schemaCompatibilityVerified', false],
   ['rollbackVerified', false], ['effectiveRuntimeVerified', false], ['singleTriggerVerified', false],
   ['configurationFreezeVerified', false], ['baselineRenderDeployId', 'unknown'],
@@ -168,6 +176,7 @@ function fixture() {
   const state = { service: service(), vars: variables(), project: project(),
     main: source, jobCount: requiredJobs.length, files: [], renderRows: [
       { id: 'dep-baseline', status: 'live', commit: { id: previous } }], vercelRows: [],
+    candidate: qualified(), authority: authority(), receiptRows: undefined,
     publicVars: publicVars(), newRender: undefined, newVercel: undefined, renderReads: 0, vercelReads: 0 };
   const posts = [], reports = [];
   const api = {
@@ -195,7 +204,7 @@ function fixture() {
     vercel: async (route, body) => {
       if (body) { posts.push({ provider: 'vercel', route, body });
         state.newVercel = { id: 'dpl_New', readyState: 'BUILDING', target: 'production',
-          projectId: targets.vercel.id, gitSource: { sha: source }, meta: { aquaCiRunId: '123' } };
+          projectId: targets.vercel.id, gitSource: { sha: source, repoId: '789' }, meta: body.meta };
         return structuredClone(state.newVercel); }
       if (route.startsWith('/v9/')) return state.project;
       if (route.startsWith('/v10/')) return { envs: state.publicVars };
@@ -211,7 +220,11 @@ function fixture() {
     health: async () => health(state.newRender?.status === 'live' ? source : previous),
     web: async () => {}
   };
-  const execute = () => deploy(api, qualified(), authority(), r => reports.push(r), immediate);
+  const execute = async () => {
+    validateAuthority(JSON.stringify(state.authority), state.candidate, runnerEnv(state.candidate.releaseRunAttempt));
+    return deploy(api, state.candidate, state.authority,
+      createAuditWriter(state.candidate, r => reports.push(r)), { ...immediate, receiptRows: state.receiptRows });
+  };
   return { state, api, posts, reports, execute };
 }
 
@@ -224,8 +237,10 @@ test('isolated rollout uses exact source, Render readiness before Vercel, and re
   assert.equal(f.posts[1].body.gitSource.ref, source);
   assert.equal(f.posts[1].body.target, 'production');
   assert.deepEqual(f.reports.map(x => x.phase), ['admitted', 'render-requested', 'render-ready', 'vercel-requested', 'verified']);
-  assert.deepEqual(f.reports.at(-1), { phase: 'verified', sha: source,
-    renderDeployId: 'dep-new', vercelDeployId: 'dpl_New' });
+  const { ciUrl, ...identity } = qualified();
+  assert.deepEqual(f.reports.at(-1), { phase: 'verified', ...identity,
+    renderDeployId: 'dep-new', vercelDeployId: 'dpl_New',
+    renderReleaseRunAttempt: 1, vercelReleaseRunAttempt: 1 });
 });
 for (const [name, modify] of [
   ['suspension', f => { f.state.service.suspended = 'suspended'; }],
@@ -300,6 +315,25 @@ test('a newer main after API completion stops the stale frontend rollout', async
   f.api.health = async () => { const h = await read(); if (f.state.newRender?.status === 'live') f.state.main = previous; return h; };
   await assert.rejects(f.execute(), /STALE/); assert.equal(f.posts.length, 1);
 });
+for (const boundary of ['before Render', 'after Render']) {
+  test(`frozen CI attempt rejects a successful rerun ${boundary}`, async () => {
+    const f = fixture(); const read = f.api.gh;
+    f.api.gh = async route => {
+      const value = await read(route);
+      if (route.includes('/attempts/2/jobs')) return { total_count: requiredJobs.length, jobs: jobs(2) };
+      if (route === '/actions/runs/123' &&
+          (boundary === 'before Render' || f.state.newRender?.status === 'live'))
+        return { ...value, run_attempt: 2 };
+      return value;
+    };
+    await assert.rejects(f.execute(), /CI_QUALIFICATION_CHANGED/);
+    assert.deepEqual(f.posts.map(x => x.provider), boundary === 'before Render' ? [] : ['render']);
+    if (boundary === 'after Render') {
+      assert.equal(f.reports.at(-1).phase, 'render-ready');
+      assert.equal(f.reports.at(-1).renderDeployId, 'dep-new');
+    }
+  });
+}
 test('authority expiring during API build cannot authorize the later Vercel POST', async () => {
   const f = fixture(); let checks = 0;
   await assert.rejects(deploy(f.api, qualified(), authority(), r => f.reports.push(r), {
@@ -307,27 +341,44 @@ test('authority expiring during API build cannot authorize the later Vercel POST
   }), /AUTHORITY_EXPIRED/);
   assert.equal(f.posts.length, 1); assert.equal(f.posts[0].provider, 'render');
 });
-test('a retry reconciles the completed API and existing Vercel build without duplicate POSTs', async () => {
+function resumeFixture({ includeVercel = true } = {}) {
   const f = fixture();
+  f.state.candidate = freezeCandidate(ciQualified(), runnerEnv(2));
+  f.state.authority = { ...authority(f.state.candidate), resumeFromReleaseAttempt: 1 };
+  const receiptRows = [];
+  const record = createAuditWriter(qualified(), row => receiptRows.push(row));
+  record({ phase: 'render-requested', renderDeployId: 'dep-new', renderReleaseRunAttempt: 1 });
   f.state.renderRows[0].status = 'deactivated';
   f.state.renderRows.unshift({ id: 'dep-new', status: 'live', commit: { id: source } });
   f.state.newRender = f.state.renderRows[0]; f.state.renderReads = 1;
-  f.state.newVercel = { id: 'dpl_New', readyState: 'BUILDING', target: 'production',
-    projectId: targets.vercel.id, gitSource: { sha: source }, meta: { aquaCiRunId: '123' } };
-  f.state.vercelRows = [{ uid: 'dpl_New', state: 'BUILDING', meta: { aquaCiRunId: '123' } }];
+  if (includeVercel) {
+    const meta = { aquaCiRunId: '123', aquaCiRunAttempt: '1', aquaSourceSha: source,
+      aquaReleaseIdentity: releaseKey(qualified()) };
+    f.state.newVercel = { id: 'dpl_New', readyState: 'BUILDING', target: 'production',
+      projectId: targets.vercel.id, gitSource: { sha: source, repoId: '789' }, meta };
+    f.state.vercelRows = [{ uid: 'dpl_New', state: 'BUILDING', meta }];
+    record({ phase: 'vercel-requested', vercelDeployId: 'dpl_New', vercelReleaseRunAttempt: 1 });
+  }
+  record({ phase: 'failed', code: 'PROVIDER_TIMEOUT_RECONCILE_BEFORE_RETRY' });
+  f.state.receiptRows = receiptRows;
   // Baseline lookup is independent of the order of current deployments.
   const read = f.api.render;
   f.api.render = async (route, body) => route.endsWith('/dep-baseline') ?
     { id: 'dep-baseline', commit: { id: previous }, status: 'deactivated' } : read(route, body);
+  return f;
+}
+test('a retry reconciles the completed API and existing Vercel build without duplicate POSTs', async () => {
+  const f = resumeFixture();
   await f.execute(); assert.equal(f.posts.length, 0); assert.equal(f.reports.at(-1).phase, 'verified');
+  assert.equal(f.reports.at(-1).ciRunAttempt, 1);
+  assert.equal(f.reports.at(-1).releaseRunAttempt, 2);
+  assert.equal(f.reports.at(-1).renderReleaseRunAttempt, 1);
+  assert.equal(f.reports.at(-1).vercelReleaseRunAttempt, 1);
 });
 test('failed existing candidate and duplicate Vercel candidates require operator reconciliation', async () => {
-  const f = fixture(); f.state.renderRows.push({ id: 'dep-new', status: 'build_failed', commit: { id: source } });
+  const f = resumeFixture(); f.state.renderRows[0].status = 'build_failed'; f.state.renderRows[1].status = 'live';
   await assert.rejects(f.execute(), /PRIOR_RENDER_FAILURE/); assert.equal(f.posts.length, 0);
-  const duplicate = fixture();
-  duplicate.state.newVercel = { id: 'dpl_New', readyState: 'BUILDING', target: 'production',
-    projectId: targets.vercel.id, gitSource: { sha: source }, meta: { aquaCiRunId: '123' } };
-  duplicate.state.vercelRows = [1, 2].map(() => ({ uid: 'dpl_New', state: 'BUILDING', meta: { aquaCiRunId: '123' } }));
+  const duplicate = resumeFixture(); duplicate.state.vercelRows.push({ ...duplicate.state.vercelRows[0] });
   await assert.rejects(duplicate.execute(), /AMBIGUOUS/); assert.equal(duplicate.posts.length, 0);
 });
 test('Vercel READY alone cannot prove source or production alias assignment', async () => {
@@ -359,4 +410,158 @@ test('provider client never retries ambiguous POST or exposes tokens and respons
   assert.equal(calls.length, 1); assert.equal(calls[0][1].redirect, 'error');
   const denied = clients({ VERCEL_TOKEN: token }, async () => new Response(token, { status: 403 }));
   await assert.rejects(denied.vercel('/v13/deployments', {}), error => !error.message.includes(token));
+});
+
+for (const attempt of [undefined, null, 0, -1, 1.5, '1']) {
+  test(`missing or invalid CI attempt ${String(attempt)} cannot qualify`, () => {
+    assert.throws(() => validateRun({ ...run(), run_attempt: attempt }, jobs(), source), /CI_IDENTITY_UNVERIFIABLE/);
+  });
+}
+test('attempt-specific job evidence cannot borrow earlier successes or another run identity', async () => {
+  assert.throws(() => validateRun({ ...run(), run_attempt: 2 }, jobs(1), source), /CI_INVENTORY_NOT_QUALIFIED/);
+  const otherRun = jobs(); otherRun[0].run_id = 999;
+  assert.throws(() => validateRun(run(), otherRun, source), /CI_INVENTORY_NOT_QUALIFIED/);
+  const f = fixture(); const seen = [], read = f.api.gh;
+  f.api.gh = async route => { seen.push(route); return read(route); };
+  await qualify(f.api, 123);
+  assert(seen.includes('/actions/runs/123/attempts/1/jobs?per_page=100'));
+  assert(!seen.some(route => route.includes('filter=latest')));
+});
+test('a rerun starting while job evidence is read invalidates the snapshot', async () => {
+  const f = fixture(), read = f.api.gh; let reads = 0;
+  f.api.gh = async route => { const value = await read(route);
+    return route === '/actions/runs/123' && ++reads > 1 ? { ...value, run_attempt: 2 } : value; };
+  await assert.rejects(f.execute(), /CI_QUALIFICATION_CHANGED/);
+  assert.equal(f.posts.length, 0);
+});
+for (const boundary of ['before Render', 'after Render']) {
+  for (const failure of ['failed rerun', 'changed run', 'changed source', 'missing attempt', 'unavailable evidence']) {
+    test(`${failure} ${boundary} stops all subsequent provider mutations`, async () => {
+      const f = fixture(), read = f.api.gh;
+      f.api.gh = async route => {
+        const changed = boundary === 'before Render' || f.state.newRender?.status === 'live';
+        if (changed && failure === 'unavailable evidence') throw new Error('mock unavailable');
+        const value = await read(route);
+        if (!changed) return value;
+        if (route === '/actions/runs/123') {
+          if (failure === 'failed rerun') return { ...value, run_attempt: 2, conclusion: 'failure' };
+          if (failure === 'changed run') return { ...value, id: 999 };
+          if (failure === 'changed source') return { ...value, head_sha: previous };
+          if (failure === 'missing attempt') return { ...value, run_attempt: undefined };
+        }
+        if (failure === 'failed rerun' && route.includes('/attempts/2/jobs'))
+          return { total_count: requiredJobs.length, jobs: jobs(2) };
+        if (failure === 'changed source' && route === '/git/ref/heads/main') return { object: { sha: previous } };
+        return value;
+      };
+      await assert.rejects(f.execute());
+      assert.deepEqual(f.posts.map(x => x.provider), boundary === 'before Render' ? [] : ['render']);
+      if (boundary === 'after Render') assert.equal(f.reports.at(-1).renderDeployId, 'dep-new');
+    });
+  }
+}
+test('candidate and owner authorization cannot be replayed into a later release or attempt', async () => {
+  const original = qualified(), archive = Buffer.from('source');
+  const manifest = { ...original, sourceSha256: createHash('sha256').update(archive).digest('hex') };
+  const retry = freezeCandidate(ciQualified(), runnerEnv(2));
+  assert.throws(() => verifyCandidate(manifest, retry, archive, archive), /PROVENANCE_MISMATCH/);
+  assert.throws(() => validateAuthority(JSON.stringify(authority()), retry, runnerEnv(2)), /AUTHORITY_REQUIRED/);
+  const second = freezeCandidate(ciQualified(), { ...runnerEnv(), GITHUB_RUN_ID: '999' });
+  assert.throws(() => validateAuthority(JSON.stringify(authority()), second,
+    { ...runnerEnv(), GITHUB_RUN_ID: '999' }), /AUTHORITY_REQUIRED/);
+  const f = fixture(); f.state.authority.ciRunAttempt = 2;
+  await assert.rejects(f.execute(), /AUTHORITY_REQUIRED/); assert.equal(f.posts.length, 0);
+});
+test('a changed candidate CI attempt cannot reuse an immutable partial receipt', async () => {
+  const f = resumeFixture();
+  f.state.candidate = freezeCandidate({ ...ciQualified(), ciRunAttempt: 2 }, runnerEnv(2));
+  f.state.authority = { ...authority(f.state.candidate), resumeFromReleaseAttempt: 1 };
+  const read = f.api.gh;
+  f.api.gh = async route => route === '/actions/runs/123' ? { ...run(), run_attempt: 2 } :
+    route.includes('/attempts/2/jobs') ? { total_count: requiredJobs.length, jobs: jobs(2) } : read(route);
+  await assert.rejects(f.execute(), /RESUME_RECEIPT_IDENTITY_MISMATCH/);
+  assert.equal(f.posts.length, 0);
+});
+test('same-attempt partial Render completion can resume only the pending Vercel operation', async () => {
+  const f = resumeFixture({ includeVercel: false });
+  await f.execute();
+  assert.deepEqual(f.posts.map(x => x.provider), ['vercel']);
+  assert.equal(f.posts[0].body.meta.aquaCiRunAttempt, '1');
+  assert.equal(f.posts[0].body.meta.aquaReleaseIdentity, releaseKey(f.state.candidate));
+  assert.equal(f.reports.at(-1).renderReleaseRunAttempt, 1);
+  assert.equal(f.reports.at(-1).vercelReleaseRunAttempt, 2);
+});
+test('Render completion plus a successful CI rerun blocks Vercel retry admission', async () => {
+  const f = resumeFixture({ includeVercel: false }), read = f.api.gh;
+  f.api.gh = async route => route === '/actions/runs/123' ? { ...run(), run_attempt: 2 } :
+    route.includes('/attempts/2/jobs') ? { total_count: requiredJobs.length, jobs: jobs(2) } : read(route);
+  await assert.rejects(f.execute(), /CI_QUALIFICATION_CHANGED/);
+  assert.equal(f.posts.length, 0);
+});
+for (const mismatch of ['ciRunAttempt', 'releaseRunId', 'releaseRunAttempt', 'environment', 'renderServiceId']) {
+  test(`retry receipt with another ${mismatch} cannot adopt any provider deployment`, async () => {
+    const f = resumeFixture();
+    f.state.receiptRows = f.state.receiptRows.map(row => ({ ...row,
+      [mismatch]: typeof row[mismatch] === 'number' ? row[mismatch] + 1 : 'another-value' }));
+    await assert.rejects(f.execute()); assert.equal(f.posts.length, 0);
+  });
+}
+test('contradictory, legacy, completed or unapproved receipts cannot authorize another release', async () => {
+  for (const kind of ['contradictory', 'legacy', 'completed', 'unapproved', 'missing', 'future-origin']) {
+    const f = resumeFixture();
+    if (kind === 'contradictory') f.state.receiptRows.at(-1).renderDeployId = 'dep-another';
+    if (kind === 'legacy') f.state.receiptRows.forEach(row => { delete row.ciRunAttempt; });
+    if (kind === 'completed') f.state.receiptRows.at(-1).phase = 'verified';
+    if (kind === 'unapproved') delete f.state.authority.resumeFromReleaseAttempt;
+    if (kind === 'missing') f.state.receiptRows = undefined;
+    if (kind === 'future-origin') f.state.receiptRows.forEach(row => { row.renderReleaseRunAttempt = 2; });
+    await assert.rejects(f.execute()); assert.equal(f.posts.length, 0);
+  }
+});
+test('CI attempt metadata and original release identity must match even with a valid receipt', async () => {
+  for (const field of ['aquaCiRunAttempt', 'aquaReleaseIdentity', 'aquaCiRunId']) {
+    const f = resumeFixture(); f.state.newVercel.meta[field] = 'different';
+    await assert.rejects(f.execute()); assert.equal(f.posts.length, 0);
+  }
+});
+test('an ambiguous POST without a recorded provider ID cannot be retried by inferring from SHA', async () => {
+  const f = resumeFixture({ includeVercel: false });
+  f.state.receiptRows = f.state.receiptRows.map(row => {
+    const { renderDeployId, renderReleaseRunAttempt, ...withoutId } = row; return withoutId;
+  });
+  await assert.rejects(f.execute(), /RENDER_BASELINE_DRIFT|PROVENANCE_RECEIPT/);
+  assert.equal(f.posts.length, 0);
+});
+test('a foreign concurrent release cannot be adopted even when its SHA and CI run match', async () => {
+  const f = resumeFixture(); f.state.vercelRows.push({ uid: 'dpl_Foreign', state: 'BUILDING',
+    meta: { ...f.state.newVercel.meta } });
+  await assert.rejects(f.execute(), /CONCURRENT_VERCEL/); assert.equal(f.posts.length, 0);
+  const render = resumeFixture(); render.state.renderRows.push({ id: 'dep-foreign', status: 'build_in_progress',
+    commit: { id: source } });
+  await assert.rejects(render.execute(), /CONCURRENT_RENDER/); assert.equal(render.posts.length, 0);
+});
+test('every partial/failure audit retains the immutable identity and already accepted deployment IDs', () => {
+  const rows = [], writer = createAuditWriter(qualified(), row => rows.push(row));
+  writer({ phase: 'render-requested', renderDeployId: 'dep-new', renderReleaseRunAttempt: 1 });
+  writer({ phase: 'failed', code: 'CI_QUALIFICATION_CHANGED', ciRunAttempt: 999 });
+  assert.equal(rows[1].ciRunAttempt, 1); assert.equal(rows[1].renderDeployId, 'dep-new');
+  assert.equal(rows[1].renderReleaseRunAttempt, 1); assert.equal(rows[1].environment, targets.environment);
+});
+test('resume requires a unique, unexpired artifact from the exact earlier attempt of this release run', async () => {
+  const candidate = freezeCandidate(ciQualified(), runnerEnv(2));
+  const auth = { ...authority(candidate), resumeFromReleaseAttempt: 1 };
+  const artifact = { id: 789, name: 'production-release-audit-456-1', expired: false,
+    workflow_run: { id: 456, head_sha: source } };
+  const api = { gh: async route => { assert.equal(route, '/actions/runs/456/artifacts?per_page=100');
+    return { total_count: 1, artifacts: [artifact] }; } };
+  assert.equal(await resumeArtifact(api, candidate, auth), '789');
+  for (const change of [{ expired: true }, { name: 'production-release-audit-999-1' },
+    { workflow_run: { id: 999, head_sha: source } }, { workflow_run: { id: 456, head_sha: previous } }]) {
+    const bad = { gh: async () => ({ total_count: 1, artifacts: [{ ...artifact, ...change }] }) };
+    await assert.rejects(resumeArtifact(bad, candidate, auth));
+  }
+  await assert.rejects(resumeArtifact({ gh: async () => ({ total_count: 2, artifacts: [artifact, artifact] }) },
+    candidate, auth), /TRUSTED_RESUME/);
+  await assert.rejects(resumeArtifact({ gh: async () => ({ total_count: 101, artifacts: [artifact] }) },
+    candidate, auth), /INVENTORY_INCOMPLETE/);
 });

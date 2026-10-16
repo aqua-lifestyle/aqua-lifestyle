@@ -19,12 +19,21 @@ const activeVercel = new Set(['QUEUED', 'INITIALIZING', 'BUILDING']);
 const renderStates = new Set([...activeRender, 'live', 'deactivated', 'build_failed',
   'pre_deploy_failed', 'update_failed', 'canceled']);
 const vercelStates = new Set([...activeVercel, 'READY', 'ERROR', 'CANCELED']);
+const sourceIdentityFields = ['repository', 'sha', 'ciRunId', 'ciRunAttempt'];
+const targetIdentity = Object.freeze({ environment: targets.environment, profile: targets.profile,
+  renderServiceId: targets.render.id, vercelProjectId: targets.vercel.id, vercelTeamId: targets.vercel.teamId });
+const releaseIdentityFields = ['version', ...sourceIdentityFields, 'releaseRunId', 'releaseRunAttempt',
+  ...Object.keys(targetIdentity)];
+const positiveId = value => typeof value === 'string' && /^[1-9]\d*$/.test(value);
+const positiveAttempt = value => Number.isSafeInteger(value) && value > 0;
 
 export class ReleaseFailure extends Error {}
 export function requireThat(condition, code) {
   if (!condition) throw new ReleaseFailure(code);
 }
 export function validateRun(run, jobs, mainSha) {
+  requireThat(positiveId(String(run.id)) && Number.isSafeInteger(run.id) &&
+    positiveAttempt(run.run_attempt), 'CI_IDENTITY_UNVERIFIABLE');
   requireThat(run.repository?.full_name === targets.repository &&
     run.head_repository?.full_name === targets.repository, 'CI_REPOSITORY_MISMATCH');
   requireThat(run.event === 'push' && run.head_branch === 'main' &&
@@ -33,14 +42,40 @@ export function validateRun(run, jobs, mainSha) {
   requireThat(shaPattern.test(run.head_sha) && run.head_sha === mainSha, 'STALE_OR_INVALID_SOURCE');
   requireThat(!targets.excludedCommits.includes(run.head_sha), 'CURRENT_MERGE_NOT_AUTHORIZED');
   requireThat(jobs.length === requiredJobs.length && new Set(jobs.map(j => j.name)).size === jobs.length &&
+    jobs.every(j => j.run_id === run.id && j.run_attempt === run.run_attempt) &&
     requiredJobs.every(name => jobs.some(j => j.name === name && j.status === 'completed' &&
       j.conclusion === 'success')), 'CI_INVENTORY_NOT_QUALIFIED');
   return { version: 1, repository: targets.repository, sha: run.head_sha,
     ciRunId: String(run.id), ciRunAttempt: run.run_attempt, ciUrl: run.html_url };
 }
 
+export function freezeCandidate(qualified, env) {
+  requireThat(env.GITHUB_REPOSITORY === targets.repository && positiveId(env.GITHUB_RUN_ID) &&
+    positiveId(env.GITHUB_RUN_ATTEMPT) && positiveAttempt(Number(env.GITHUB_RUN_ATTEMPT)),
+  'RELEASE_CONTEXT_UNVERIFIABLE');
+  const candidate = { ...qualified, version: 2, releaseRunId: env.GITHUB_RUN_ID,
+    releaseRunAttempt: Number(env.GITHUB_RUN_ATTEMPT), ...targetIdentity };
+  validateReleaseIdentity(candidate);
+  return Object.freeze(candidate);
+}
+
+function validateReleaseIdentity(identity) {
+  requireThat(identity?.version === 2 && identity.repository === targets.repository &&
+    shaPattern.test(identity.sha) && positiveId(identity.ciRunId) && positiveAttempt(identity.ciRunAttempt) &&
+    positiveId(identity.releaseRunId) && positiveAttempt(identity.releaseRunAttempt) &&
+    Object.entries(targetIdentity).every(([key, value]) => identity[key] === value),
+  'RELEASE_IDENTITY_UNVERIFIABLE');
+}
+
+export function releaseKey(identity) {
+  validateReleaseIdentity(identity);
+  return createHash('sha256').update(JSON.stringify(
+    releaseIdentityFields.map(key => [key, identity[key]]))).digest('hex');
+}
+
 export function verifyCandidate(candidate, qualified, archive, trustedArchive) {
-  for (const key of ['version', 'repository', 'sha', 'ciRunId', 'ciRunAttempt'])
+  validateReleaseIdentity(candidate);
+  for (const key of releaseIdentityFields)
     requireThat(candidate[key] === qualified[key], 'CANDIDATE_PROVENANCE_MISMATCH');
   requireThat(candidate.sourceSha256 === createHash('sha256').update(archive).digest('hex'),
     'CANDIDATE_CONTENT_MISMATCH');
@@ -49,12 +84,18 @@ export function verifyCandidate(candidate, qualified, archive, trustedArchive) {
 }
 
 export function validateAuthority(raw, qualified, env, now = Date.now()) {
+  validateReleaseIdentity(qualified);
   requireThat(env.AUTO_DEPLOY_ENABLED === 'true', 'ACTIVATION_BLOCKED_AUTO_DEPLOY_NOT_AUTHORIZED');
   let a;
   try { a = JSON.parse(raw); } catch { throw new ReleaseFailure('EXACT_RELEASE_AUTHORITY_REQUIRED'); }
-  requireThat(a.profile === targets.profile && a.commit === qualified.sha &&
-    String(a.ciRunId) === qualified.ciRunId && String(a.releaseRunId) === env.GITHUB_RUN_ID &&
-    String(a.releaseRunAttempt) === env.GITHUB_RUN_ATTEMPT, 'EXACT_RELEASE_AUTHORITY_REQUIRED');
+  requireThat(a && a.version === 2 && a.commit === qualified.sha &&
+    [...sourceIdentityFields.filter(key => key !== 'sha'), 'releaseRunId', 'releaseRunAttempt',
+      ...Object.keys(targetIdentity)].every(key => a[key] === qualified[key]) &&
+    env.GITHUB_REPOSITORY === qualified.repository && env.GITHUB_RUN_ID === qualified.releaseRunId &&
+    env.GITHUB_RUN_ATTEMPT === String(qualified.releaseRunAttempt), 'EXACT_RELEASE_AUTHORITY_REQUIRED');
+  requireThat(a.resumeFromReleaseAttempt === undefined ||
+    (positiveAttempt(a.resumeFromReleaseAttempt) && a.resumeFromReleaseAttempt < qualified.releaseRunAttempt),
+  'RESUME_AUTHORITY_INVALID');
   const until = Date.parse(a.expiresAt);
   requireThat(Number.isFinite(until) && until > now && until <= now + 24 * 60 * 60 * 1000,
     'AUTHORITY_EXPIRED_OR_UNBOUNDED');
@@ -63,7 +104,7 @@ export function validateAuthority(raw, qualified, env, now = Date.now()) {
     a.schemaCompatibilityVerified === true && a.rollbackVerified === true &&
     a.effectiveRuntimeVerified === true && a.singleTriggerVerified === true &&
     a.configurationFreezeVerified === true, 'RECOVERY_EVIDENCE_REQUIRED');
-  return a;
+  return Object.freeze(a);
 }
 
 export function validateEnvironment(environment, branches) {
@@ -163,10 +204,74 @@ export function clients(env, fetcher = fetch) {
 export async function qualify(api, runId) {
   requireThat(/^\d+$/.test(String(runId)), 'CI_RUN_ID_INVALID');
   const run = await api.gh(`/actions/runs/${runId}`);
-  const page = await api.gh(`/actions/runs/${runId}/jobs?filter=latest&per_page=100`);
+  requireThat(String(run.id) === String(runId) && positiveAttempt(run.run_attempt), 'CI_IDENTITY_UNVERIFIABLE');
+  const page = await api.gh(`/actions/runs/${runId}/attempts/${run.run_attempt}/jobs?per_page=100`);
   requireThat(page.total_count === page.jobs?.length, 'CI_INVENTORY_INCOMPLETE');
   const main = await api.gh('/git/ref/heads/main');
-  return validateRun(run, page.jobs, main.object.sha);
+  const qualified = validateRun(run, page.jobs, main.object.sha);
+  // The latest run can change while its attempt-specific jobs are being read.
+  const current = await api.gh(`/actions/runs/${runId}`);
+  requireThat(current.id === run.id && current.run_attempt === run.run_attempt, 'CI_QUALIFICATION_CHANGED');
+  const currentQualified = validateRun(current, page.jobs, main.object.sha);
+  requireThat(sourceIdentityFields.every(key => currentQualified[key] === qualified[key]), 'CI_QUALIFICATION_CHANGED');
+  return Object.freeze(qualified);
+}
+
+export async function requalify(api, frozen) {
+  const fresh = await qualify(api, frozen.ciRunId);
+  requireThat(sourceIdentityFields.every(key => fresh[key] === frozen[key]), 'CI_QUALIFICATION_CHANGED');
+  return fresh;
+}
+
+export function createAuditWriter(identity, emit) {
+  validateReleaseIdentity(identity);
+  const known = {};
+  return row => {
+    for (const key of ['renderDeployId', 'vercelDeployId', 'renderReleaseRunAttempt', 'vercelReleaseRunAttempt'])
+      if (row[key] !== undefined) known[key] = row[key];
+    emit({ ...row, ...Object.fromEntries(releaseIdentityFields.map(key => [key, identity[key]])), ...known });
+  };
+}
+
+export function validateResumeReceipt(rows, frozen, authority) {
+  requireThat(positiveAttempt(authority.resumeFromReleaseAttempt) && rows.length > 0 && rows.length <= 100,
+    'RESUME_RECEIPT_REQUIRED');
+  const known = {};
+  for (const row of rows) {
+    validateReleaseIdentity(row);
+    requireThat(releaseIdentityFields.filter(key => key !== 'releaseRunAttempt')
+      .every(key => row[key] === frozen[key]) && row.releaseRunAttempt === authority.resumeFromReleaseAttempt,
+    'RESUME_RECEIPT_IDENTITY_MISMATCH');
+    requireThat(['admitted', 'render-requested', 'render-ready', 'vercel-requested', 'verified', 'failed'].includes(row.phase),
+      'RESUME_RECEIPT_UNVERIFIABLE');
+    requireThat(row.phase !== 'verified', 'RELEASE_ALREADY_VERIFIED');
+    for (const key of ['renderDeployId', 'vercelDeployId', 'renderReleaseRunAttempt', 'vercelReleaseRunAttempt']) {
+      if (row[key] === undefined) continue;
+      requireThat(known[key] === undefined || known[key] === row[key], 'CONTRADICTORY_RESUME_RECEIPT');
+      known[key] = row[key];
+    }
+  }
+  for (const provider of ['render', 'vercel']) {
+    const id = known[`${provider}DeployId`], attempt = known[`${provider}ReleaseRunAttempt`];
+    requireThat(id === undefined ? attempt === undefined :
+      (positiveAttempt(attempt) && attempt <= authority.resumeFromReleaseAttempt &&
+        (provider === 'render' ? /^dep-[a-z0-9]+$/ : /^dpl_[A-Za-z0-9]+$/).test(id)),
+    'RESUME_RECEIPT_UNVERIFIABLE');
+  }
+  requireThat(!known.vercelDeployId || known.renderDeployId, 'CONTRADICTORY_RESUME_RECEIPT');
+  return Object.freeze(known);
+}
+
+export async function resumeArtifact(api, candidate, authority) {
+  if (authority.resumeFromReleaseAttempt === undefined) return '';
+  const inventory = await api.gh(`/actions/runs/${candidate.releaseRunId}/artifacts?per_page=100`);
+  requireThat(inventory.total_count === inventory.artifacts?.length, 'AUDIT_ARTIFACT_INVENTORY_INCOMPLETE');
+  const name = `production-release-audit-${candidate.releaseRunId}-${authority.resumeFromReleaseAttempt}`;
+  const selected = inventory.artifacts.filter(a => a.name === name && !a.expired);
+  requireThat(selected.length === 1 && positiveId(String(selected[0].id)) &&
+    selected[0].workflow_run?.id === Number(candidate.releaseRunId) &&
+    selected[0].workflow_run?.head_sha === candidate.sha, 'TRUSTED_RESUME_ARTIFACT_REQUIRED');
+  return String(selected[0].id);
 }
 
 export async function waitFor(read, state, good, pending, options) {
@@ -209,6 +314,13 @@ export async function deploymentHistory(api, provider) {
 }
 
 export async function deploy(api, qualified, authority, report, options) {
+  validateReleaseIdentity(qualified);
+  await requalify(api, qualified);
+  const prior = options?.receiptRows ? validateResumeReceipt(options.receiptRows, qualified, authority) : {};
+  requireThat(authority.resumeFromReleaseAttempt === undefined || options?.receiptRows,
+    'RESUME_RECEIPT_REQUIRED');
+  requireThat(authority.resumeFromReleaseAttempt !== undefined || !options?.receiptRows,
+    'UNAUTHORIZED_RESUME_RECEIPT');
   const servicePath = `/services/${targets.render.id}`;
   const projectPath = `/v9/projects/${targets.vercel.id}`;
   const repository = await api.gh('');
@@ -235,39 +347,52 @@ export async function deploy(api, qualified, authority, report, options) {
   const renderDeploys = await deploymentHistory(api, 'render');
   const live = renderDeploys.filter(x => x.status === 'live');
   requireThat(live.length === 1 && (live[0].id === authority.baselineRenderDeployId ||
-    live[0].commit?.id === qualified.sha), 'RENDER_BASELINE_DRIFT');
+    (live[0].id === prior.renderDeployId && live[0].commit?.id === qualified.sha)), 'RENDER_BASELINE_DRIFT');
   validateHealth(await api.health(), live[0].commit.id);
-  requireThat(renderDeploys.every(x => !activeRender.has(x.status) || x.commit?.id === qualified.sha),
+  requireThat(renderDeploys.every(x => !activeRender.has(x.status) || x.id === prior.renderDeployId),
     'CONCURRENT_RENDER_DEPLOYMENT');
+  let render = prior.renderDeployId ? renderDeploys.find(x => x.id === prior.renderDeployId) : undefined;
+  requireThat(!prior.renderDeployId || (render && render.commit?.id === qualified.sha),
+    'RENDER_RECEIPT_DEPLOYMENT_MISMATCH');
+  requireThat(renderDeploys.every(x => x.commit?.id !== qualified.sha || x.id === prior.renderDeployId),
+    'RENDER_PROVENANCE_RECEIPT_REQUIRED');
   const vercelDeploys = await deploymentHistory(api, 'vercel');
   requireThat(vercelDeploys.every(x => !activeVercel.has(x.state ?? x.readyState) ||
-    x.meta?.aquaCiRunId === qualified.ciRunId), 'CONCURRENT_VERCEL_DEPLOYMENT');
+    x.uid === prior.vercelDeployId), 'CONCURRENT_VERCEL_DEPLOYMENT');
+  requireThat(vercelDeploys.every(x =>
+    (x.meta?.aquaCiRunId !== qualified.ciRunId && x.meta?.aquaSourceSha !== qualified.sha) ||
+    x.uid === prior.vercelDeployId), 'VERCEL_PROVENANCE_RECEIPT_REQUIRED');
+  const origin = { ...qualified, releaseRunAttempt: prior.vercelReleaseRunAttempt ?? qualified.releaseRunAttempt };
   const isOurs = x => x.gitSource?.sha === qualified.sha &&
-    String(x.meta?.aquaCiRunId) === qualified.ciRunId && x.target === 'production';
+    String(x.gitSource?.repoId) === String(repository.id) && x.projectId === targets.vercel.id &&
+    x.meta?.aquaCiRunId === qualified.ciRunId && x.meta?.aquaCiRunAttempt === String(qualified.ciRunAttempt) &&
+    x.meta?.aquaReleaseIdentity === releaseKey(origin) && x.target === 'production';
   let existingVercel;
-  for (const d of vercelDeploys.filter(x => String(x.meta?.aquaCiRunId) === qualified.ciRunId)) {
+  for (const d of vercelDeploys.filter(x => x.uid === prior.vercelDeployId)) {
     requireThat(/^dpl_[A-Za-z0-9]+$/.test(d.uid), 'VERCEL_DEPLOYMENT_ID_UNAVAILABLE');
     const full = await api.vercel(`/v13/deployments/${d.uid}`);
     requireThat(isOurs(full), 'VERCEL_SOURCE_PROVENANCE_MISMATCH');
+    requireThat(full.readyState === 'READY' || activeVercel.has(full.readyState), 'PRIOR_VERCEL_FAILURE_REQUIRES_OPERATOR');
     requireThat(!existingVercel, 'AMBIGUOUS_VERCEL_DEPLOYMENTS');
     existingVercel = full;
   }
+  requireThat(!prior.vercelDeployId || existingVercel, 'VERCEL_RECEIPT_DEPLOYMENT_MISMATCH');
   requireThat(project.targets?.production?.id === authority.baselineVercelDeployId ||
     (existingVercel && project.targets?.production?.id === existingVercel.id), 'VERCEL_BASELINE_DRIFT');
 
   report({ phase: 'admitted', sha: qualified.sha, ciRunId: qualified.ciRunId,
     authorityReference: authority.authorityReference, baselineRenderDeployId: authority.baselineRenderDeployId,
-    baselineVercelDeployId: authority.baselineVercelDeployId });
-  let render = renderDeploys.find(x => x.commit?.id === qualified.sha);
+    baselineVercelDeployId: authority.baselineVercelDeployId, ...prior });
   if (render) requireThat(render.status === 'live' || activeRender.has(render.status), 'PRIOR_RENDER_FAILURE_REQUIRES_OPERATOR');
   else {
     // Recheck freshness immediately before the irreversible provider request.
-    await qualify(api, qualified.ciRunId);
+    await requalify(api, qualified);
     requireThat(Date.parse(authority.expiresAt) > (options?.now ?? Date.now)(), 'AUTHORITY_EXPIRED');
     render = await api.render(`${servicePath}/deploys`, { commitId: qualified.sha, clearCache: 'do_not_clear' });
   }
   requireThat(/^dep-[a-z0-9]+$/.test(render.id), 'RENDER_DEPLOYMENT_ID_UNAVAILABLE');
-  report({ phase: 'render-requested', renderDeployId: render.id });
+  report({ phase: 'render-requested', renderDeployId: render.id,
+    renderReleaseRunAttempt: prior.renderReleaseRunAttempt ?? qualified.releaseRunAttempt });
   render = await waitFor(() => api.render(`${servicePath}/deploys/${render.id}`),
     x => x.status, 'live', activeRender, options);
   requireThat(render.commit?.id === qualified.sha, 'RENDER_SOURCE_PROVENANCE_MISMATCH');
@@ -275,20 +400,23 @@ export async function deploy(api, qualified, authority, report, options) {
   validateHealth(await api.health(), qualified.sha);
   report({ phase: 'render-ready', renderDeployId: render.id, sha: render.commit.id });
 
-  await qualify(api, qualified.ciRunId);
+  await requalify(api, qualified);
   project = await api.vercel(projectPath);
   validateVercel(project, repository.id);
   await readVercelVariables();
   if (!existingVercel) {
+    await requalify(api, qualified);
     requireThat(Date.parse(authority.expiresAt) > (options?.now ?? Date.now)(), 'AUTHORITY_EXPIRED');
     existingVercel = await api.vercel('/v13/deployments', {
       name: targets.vercel.name, project: targets.vercel.id, target: 'production',
       gitSource: { type: 'github', repoId: String(repository.id), ref: qualified.sha, sha: qualified.sha },
-      meta: { aquaCiRunId: qualified.ciRunId, aquaSourceSha: qualified.sha }
+      meta: { aquaCiRunId: qualified.ciRunId, aquaCiRunAttempt: String(qualified.ciRunAttempt),
+        aquaSourceSha: qualified.sha, aquaReleaseIdentity: releaseKey(qualified) }
     });
   }
   requireThat(/^dpl_[A-Za-z0-9]+$/.test(existingVercel.id), 'VERCEL_DEPLOYMENT_ID_UNAVAILABLE');
-  report({ phase: 'vercel-requested', vercelDeployId: existingVercel.id });
+  report({ phase: 'vercel-requested', vercelDeployId: existingVercel.id,
+    vercelReleaseRunAttempt: prior.vercelReleaseRunAttempt ?? qualified.releaseRunAttempt });
   const vercel = await waitFor(() => api.vercel(`/v13/deployments/${existingVercel.id}`),
     x => x.readyState, 'READY', activeVercel, options);
   requireThat(isOurs(vercel) && vercel.projectId === targets.vercel.id && !vercel.aliasError,
@@ -296,9 +424,11 @@ export async function deploy(api, qualified, authority, report, options) {
   project = await api.vercel(projectPath);
   requireThat(project.targets?.production?.id === vercel.id, 'VERCEL_PRODUCTION_ALIAS_NOT_ASSIGNED');
   await api.web();
+  await requalify(api, qualified);
   report({ phase: 'verified', sha: qualified.sha, renderDeployId: render.id, vercelDeployId: vercel.id });
 }
 
+let failureReport;
 async function main(env) {
   const api = clients(env);
   const mode = process.argv[2];
@@ -316,9 +446,10 @@ async function main(env) {
   const event = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH));
   requireThat(event.action === 'completed' && event.workflow_run?.event === 'push' &&
     event.workflow_run?.head_branch === 'main', 'COMPLETED_MAIN_PUSH_REQUIRED');
-  const q = await qualify(api, event.workflow_run.id);
-  requireThat(q.sha === event.workflow_run.head_sha && q.ciRunAttempt === event.workflow_run.run_attempt,
+  const qualified = await qualify(api, event.workflow_run.id);
+  requireThat(qualified.sha === event.workflow_run.head_sha && qualified.ciRunAttempt === event.workflow_run.run_attempt,
     'CI_EVENT_PROVENANCE_MISMATCH');
+  const q = freezeCandidate(qualified, env);
   requireThat(execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() === q.sha,
     'CHECKOUT_SOURCE_MISMATCH');
   if (mode === 'candidate') {
@@ -329,23 +460,39 @@ async function main(env) {
     appendFileSync(env.GITHUB_OUTPUT, `sha=${q.sha}\n`);
     return;
   }
-  requireThat(mode === 'deploy', 'RELEASE_MODE_INVALID');
+  requireThat(mode === 'deploy' || mode === 'admit', 'RELEASE_MODE_INVALID');
   verifyCandidate(JSON.parse(readFileSync(`${env.CANDIDATE_DIR}/candidate.json`)), q,
     readFileSync(`${env.CANDIDATE_DIR}/source.tar`),
     execFileSync('git', ['archive', '--format=tar', q.sha], { maxBuffer: 100 * 1024 * 1024 }));
+  const report = createAuditWriter(q, row => appendFileSync(env.RELEASE_REPORT, JSON.stringify(row) + '\n'));
+  failureReport = code => report({ phase: 'failed', code });
   const authority = validateAuthority(env.PRODUCTION_RELEASE_AUTHORIZATION, q, env);
   const environment = await api.gh(`/environments/${targets.environment}`);
   const branches = await api.gh(`/environments/${targets.environment}/deployment-branch-policies`);
   validateEnvironment(environment, branches.branch_policies);
-  const report = row => appendFileSync(env.RELEASE_REPORT, JSON.stringify(row) + '\n');
-  await deploy(api, q, authority, report);
+  if (mode === 'admit') {
+    appendFileSync(env.GITHUB_OUTPUT, `receipt-artifact-id=${await resumeArtifact(api, q, authority)}\n`);
+    return;
+  }
+  let receiptRows;
+  if (authority.resumeFromReleaseAttempt !== undefined) {
+    requireThat(positiveId(env.RESUME_ARTIFACT_ID) &&
+      env.RESUME_ARTIFACT_ID === await resumeArtifact(api, q, authority), 'TRUSTED_RESUME_ARTIFACT_REQUIRED');
+    let text;
+    try { text = readFileSync(env.RESUME_RECEIPT_FILE, 'utf8');
+      requireThat(text.length <= 1024 * 1024, 'RESUME_RECEIPT_UNVERIFIABLE');
+      receiptRows = text.trim().split('\n').map(line => JSON.parse(line));
+    } catch { throw new ReleaseFailure('RESUME_RECEIPT_UNVERIFIABLE'); }
+  }
+  await deploy(api, q, authority, report, { receiptRows });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main(process.env).catch(error => {
     const code = error instanceof ReleaseFailure ? error.message : 'UNEXPECTED_RELEASE_ERROR';
-    if (process.env.RELEASE_REPORT)
-      appendFileSync(process.env.RELEASE_REPORT, JSON.stringify({ phase: 'failed', code }) + '\n');
+    if (failureReport) failureReport(code);
+    else if (process.env.RELEASE_REPORT)
+      appendFileSync(process.env.RELEASE_REPORT, JSON.stringify({ phase: 'blocked', code, identityVerified: false }) + '\n');
     console.error(`::error::${code}. See the safe-release runbook; do not resume or retry provider requests blindly.`);
     if (process.env.GITHUB_STEP_SUMMARY)
       appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Release blocked/failed: **${code}**.\nSee docs/operations/safe-automatic-deployment.md. No automatic rollback or configuration repair.\n`);
