@@ -8,6 +8,12 @@ remains merge governance. Operational activation remains separate from deploymen
 No merge, production deployment, provider configuration change or service resumption
 is authorized by the implementation task.
 
+The [Scripture-governed safety contract](cicd-safety-contract.md) defines protected
+assets, independent control/identity requirements, executable evidence and remaining
+uncertainty. Same-repository passing tests do not establish independently protected
+security tests, production privilege separation or authenticated backup evidence.
+Those properties remain activation blockers in addition to the setup below.
+
 ## Verified cause and current blockers
 
 PR #105 merged at `23f176db6eb13af5ee01ff69f1a9f7bbe6b880ff`.

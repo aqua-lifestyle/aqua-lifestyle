@@ -110,3 +110,50 @@ environment custody as material requirements. Final review is pending implementa
 Next: publish the exact corrected commit/PR, complete all current CI jobs and inspect
 TRX/discovery skips, then obtain fresh Agent 2 review at that immutable SHA. Record
 final publication evidence in the PR to avoid recursive evidence-only commits.
+
+## Scripture-governed safety contract follow-up
+
+Latest owner task requests Scripture as the Christian ethical foundation, a
+risk-by-risk verifiable contract and independently enforced CI/CD safety; engineering
+choices must not be presented as divine commands. Continue PR #106/its branch from
+6a5950d; no merge, provider changes, deployment, secrets or restricted activation.
+
+Investigation: root instructions, validation/stateful/workflow skills, system index,
+operations/decision register, administrator security, ADR001-003, current workflows,
+controller, runbooks and primary Scripture/NIST SSDF/OWASP/SLSA sources inspected.
+Fresh read-only GitHub checks still show only deletion/non-fast-forward main rules,
+production-release with no protection/branch policy and admin bypass=true. Provider
+observations from the previous phase are carried-forward, not newly verified here.
+
+Agent 2 independently identifies same-repository test/control editability, unknown
+runtime DB/provider privilege separation, unauthenticated bootstrap evidence
+references and source-vs-build provenance limitations. None demonstrates exploitation
+or authorizes infrastructure changes. Plan: document all ten contract fields for each
+risk; implement an assessment-only immutable-base change classifier plus executable
+synthetic PostgreSQL restore/least-privilege negative fixtures; keep live independent
+enforcement BLOCKED until actual outside-candidate controls/identities are verified.
+The new restore fixture must use only its own disposable local container, never an
+existing application database or production backup. Add it to the existing required
+PostgreSQL CI job, without adding a competing release path. Run relevant tests/full
+CI inventory and obtain fresh Agent 2 review at the resulting exact SHA. No Python.
+
+Follow-up implementation: six-verse contextual mapping and eight ten-field risk
+contracts now distinguish ethical authority, interpretation, engineering evidence,
+standards and implementation. NIST1.1final/1.2draft, OWASP risk taxonomy and SLSA1.2
+source/build requirements compared without compliance claims. Existing actual-schema
+PostgreSQL recovery/restore test is reused; the new standalone shell fixture adds
+15 real-role/ACL/FK/restore-conflict/truncated-archive checks in its own hardened local
+container, also wired into the existing required PG job. No business/schema/release
+controller/policy activation code changed. Classifier is assessment-only, comparing
+immutable Git revisions with narrow regular presentation paths; external gate and
+custodian identities remain unconfigured, not invented.
+
+Validation checkpoint:171/171 release/classifier tests passed in isolated read-only
+network-disabled Node24+Git;15/15 disposable PostgreSQL checks passed in repeated
+local runs; bash syntax/actionlint/diff/link checks passed. Agent2 preliminary review
+found no material defect; clarified path-only classification and data/schema-history
+snapshot claim. An isolated archive of6a5950d with only a critical test changed to
+test.skip returned exit0/155passed/1skipped, proving the current job-success signal
+does not establish mandatory security-case execution. No mutant source was pushed.
+Final exact-commit CI/artifact/skip accounting and fresh review will be recorded in
+PR106, preserving the independent-enforcement FAIL and production UNKNOWN/BLOCKED.

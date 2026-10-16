@@ -496,6 +496,14 @@ jobs:
           test "$REPRO_TRANSACTIONAL" = "true"
           test -n "$REPRO_PG_CONNECTION"
           echo "Reproduction mode active: REPRO_PG=$REPRO_PG REPRO_TRANSACTIONAL=$REPRO_TRANSACTIONAL"
+      - name: Verify disposable backup restoration and runtime privilege denials
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull postgres:16-alpine
+          mkdir -p AqualLifeStyle/9.4.2/aspnet-core/TestResults
+          bash tools/deployment/disposable-recovery.sh | tee AqualLifeStyle/9.4.2/aspnet-core/TestResults/disposable-recovery.log
       - name: Restore web tests
         run: dotnet restore test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj
       - name: Build web tests

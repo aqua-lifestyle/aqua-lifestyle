@@ -36,6 +36,15 @@ provenance with synthetic clients; no production deployment is required.
 See the [release runbook](../operations/safe-automatic-deployment.md) for the
 activation blockers and the distinction between mocks and actual provider evidence.
 
+The [safety contract](../operations/cicd-safety-contract.md) distinguishes Scripture,
+interpretation, engineering requirements and evidence. Its immutable-base change
+classifier is assessment only; it is not an independently enforced GitHub gate.
+Run `docker pull postgres:16-alpine` then
+`bash tools/deployment/disposable-recovery.sh` from repository root for synthetic
+restore/privilege positives and denials. It accepts no production target or backup.
+CI also runs it in the existing PostgreSQL job and retains its summary; the actual
+application-schema restore remains covered by AQGreenRecoveryReleasePostgreSqlTests.
+
 ## Backend
 
 Working directory:
