@@ -77,6 +77,12 @@ from TRX. That case alone now grants test-local financial execution after its
 PostgreSQL-mode assertion, preserving its D10 scope/error, no-write, provenance,
 Tenant/Area and provider-call assertions. Final hosted evidence must pass all78
 dedicated PostgreSQL cases with no skips; these earlier failures are retained.
+The first attempted D10 fixture grant was attached to configuration that the D10
+setup then replaced. Both d1e549a hosted runs therefore still failed13/1 in D10.
+The corrected case grants on the returned D10 configuration after replacement and
+asserts IoC resolves that exact instance. The complete14-case local D10 suite passed
+on fresh PostgreSQL18 in an internal Docker network, with no provider access or
+host credential mounts. This isolated test result does not qualify production grants.
 
 209 explicit mandatory Node security cases now include the required container probe
 workflow assertion; all208 previous identities are retained and AQUA-SEC-0209 is

@@ -124,3 +124,13 @@ case after its PostgreSQL-mode assertion; all D10 scope, no-write and call-count
 assertions remain. Runtime code is unchanged by this last fixture correction.
 Complete final hosted CI and exact-head review remain required; final results are
 recorded on PR106 to avoid falsely self-attesting the source commit in its own tree.
+
+The first D10 grant placement in d1e549a was incorrect: ConfigureD10Async installs
+a replacement IConfiguration after the grant. Both hosted runs still failed13/1 in
+D10. The correction now grants only on the returned case-local configuration and
+asserts resolved instance identity before service construction. Rebuilt web tests;
+all14 D10 cases passed locally against fresh PostgreSQL18 using an internal-network,
+read-only SDK container without host credential mounts. Repeated execution passed14/14
+again; local evidence is console summary only (logger options produced no retained TRX);
+final hosted TRX identity/count verification remains required;
+no runtime guard, D10 assertion or production configuration was changed.

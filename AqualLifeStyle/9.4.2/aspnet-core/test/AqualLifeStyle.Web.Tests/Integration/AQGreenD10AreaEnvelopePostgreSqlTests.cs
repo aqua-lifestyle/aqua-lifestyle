@@ -38,11 +38,12 @@ namespace AqualLifeStyle.Web.Tests.Integration
         public async Task D10Area_ProspectiveJoinAndRetryAllowA_OnyxMoveToBDeniesFinancialSelectionWithoutDiscardingEvidence()
         {
             IsPostgreSqlRegressionMode().ShouldBeTrue(); LoginAsDefaultTenantAdmin();
-            // Exercise authorized synthetic payment before testing the independent
-            // D10 scope denial; a global hold must not short-circuit that evidence.
-            Resolve<IConfiguration>()["App:FinancialOperations:Enabled"] = "true";
             var fixture = await SeedSponsoredAwaitingApprovalAsync(recordedAt: AQGreenD10SyntheticEvidence.EffectiveAt.AddDays(-3));
-            var (_, runtime, _, evidence) = await ConfigureD10Async();
+            var (_, runtime, configuration, evidence) = await ConfigureD10Async();
+            // ConfigureD10Async replaces the default configuration. Grant only
+            // this synthetic case on that exact instance before resolving services.
+            configuration["App:FinancialOperations:Enabled"] = "true";
+            Resolve<IConfiguration>().ShouldBeSameAs(configuration);
             var gateway = ConfigureAreaJoiningGate(runtime);
             var member = await CreateD10InviteeAsync(fixture.AreaId);
             var code = await AQGreenInvitationCodeAsync(fixture.SponsorParticipantId);
