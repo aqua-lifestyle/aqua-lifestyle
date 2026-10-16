@@ -115,13 +115,13 @@ test('standing deployment activation has no permissive default', () => {
 });
 for (const [field, value] of [['version', 2], ['epoch', 'different-policy'], ['epoch', undefined],
   ['profile', 'normal'], ['bootstrap', null], ['unexpectedPermission', true]]) {
-  test(`standing policy rejects ${field} mismatch/missing evidence`, () => {
+  test(`standing policy rejects ${field}=${JSON.stringify(value)} mismatch/missing evidence`, () => {
     assert.throws(() => validatePolicy(qualified(), runnerEnv(), { ...policy(), [field]: value }));
   });
 }
 for (const [field, value] of [['renderDeployId', 'unknown'], ['vercelDeployId', 'unknown'], ['renderSha', 'main'],
   ['vercelSha', 'main'], ['releaseFloor', -1], ['releaseFloor', undefined], ['evidenceReference', 'http://unsafe/?secret']]) {
-  test(`bootstrap rejects unverifiable ${field}`, () => {
+  test(`bootstrap rejects unverifiable ${field}=${JSON.stringify(value)}`, () => {
     const p = policy(); p.bootstrap[field] = value;
     assert.throws(() => validatePolicy(freezeCandidate(ciQualified(), runnerEnv(), p), runnerEnv(), p), /BOOTSTRAP_REQUIRED/);
   });

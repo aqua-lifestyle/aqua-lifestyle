@@ -18,7 +18,13 @@ CI currently runs the full backend, frontend, production dependency audit, and b
 
 ## Deployment control
 
-From repository root on Node 24+: `node --test tools/deployment/*.test.mjs`.
+From repository root on Node 24+: `node tools/deployment/run-security-tests.mjs --local`.
+Run `node tools/deployment/mandatory-security-probe.mjs` for disposable candidate
+tampering probes. CI runs the same classifier with exact SHA/run/attempt metadata.
+The explicit inventory requires each case to execute once and pass; raw
+`node --test` exit status permits skips and is not qualification. Inventory changes
+are control changes. See [independent custody requirements](../operations/mandatory-security-verification.md);
+this candidate-controlled command does not supply independent enforcement.
 These isolated tests cover release qualification, authority/provenance, recovery
 holds, provider sequencing, negative/partial failure, concurrency and retry
 reconciliation. They never call production. CI runs them as `Release safety tests`;

@@ -29,7 +29,14 @@ jobs:
         with:
           node-version: 24
       - name: Test qualification, admission, provider failures and retry boundaries
-        run: node --test tools/deployment/*.test.mjs
+        run: node tools/deployment/run-security-tests.mjs
+      - name: Retain exact mandatory case evidence
+        uses: actions/upload-artifact@v6
+        with:
+          name: mandatory-security-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: TestResults/mandatory-security/report.json
+          if-no-files-found: error
+          retention-days: 90
 
   backend-application-discovery:
     name: Backend application coverage partition

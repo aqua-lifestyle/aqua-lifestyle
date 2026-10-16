@@ -409,3 +409,13 @@ leaves activation BLOCKED. Scripture supplies the ethical foundation; human auth
 and independent technical evidence determine whether these chosen obligations have
 been met. No absolute safety, compliance certification or production acceptance is
 claimed.
+
+## Mandatory security-case hardening follow-up
+
+[Mandatory verification and custody](mandatory-security-verification.md) records
+PR 106's exact 170-pass/one-skip reproduction, versioned case inventory, strict
+classifier, source/run/attempt evidence, signature-consumer tests and executable
+candidate tampering probes. The CI job now runs the classifier and retains case
+results. This is candidate-controlled hardening: independent verifier custody,
+required GitHub enforcement and the pre-credential boundary remain BLOCKED. No
+same-repository inventory, signer fixture or artifact name establishes that boundary.
