@@ -24,11 +24,15 @@ holds, provider sequencing, negative/partial failure, concurrency and retry
 reconciliation. They never call production. CI runs them as `Release safety tests`;
 the qualified-release consumer requires that job and the complete existing CI job
 inventory. Validate workflow syntax with actionlint when changing workflows.
-The version 2 candidate/authority contract freezes source, CI run and attempt,
-release run and attempt, environment and provider targets. Negative cases must
+The version 3 candidate/standing-policy contract freezes source, CI run and attempt,
+release run and attempt, policy digest, environment and provider targets. Negative cases must
 assert no further provider POST after qualification drift, including after partial
-Render completion. Retry adoption requires an immutable same-run audit receipt;
+Render completion. Retry adoption requires the immutable same-run audit chain;
 matching source SHA alone is insufficient. These remain simulated provider tests.
+Include no-token/no-human-gate positives, successive verified-baseline rollout,
+failed-rerun preservation, preflight failure between partial retries, and foreign
+provider work starting during Render. Full workflow entry tests use real Git archive
+provenance with synthetic clients; no production deployment is required.
 See the [release runbook](../operations/safe-automatic-deployment.md) for the
 activation blockers and the distinction between mocks and actual provider evidence.
 

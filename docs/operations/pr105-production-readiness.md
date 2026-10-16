@@ -1,5 +1,11 @@
 # PR #105 production readiness assessment and correction
 
+The later unattended-deployment owner instruction supersedes this historical
+document's per-release human authority/environment approval requirements. The
+[current runbook](safe-automatic-deployment.md) defines standing policy and one-time
+setup instead. Runtime/financial safety is retained; no provider transition or
+production acceptance is granted by that instruction.
+
 ## CI-attempt correction checkpoint
 
 The assessment below is historical evidence at `8185fb5`, not the readiness verdict

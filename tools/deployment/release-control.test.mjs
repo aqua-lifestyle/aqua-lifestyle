@@ -1,8 +1,14 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
-import { clients, createAuditWriter, deploy, deploymentHistory, freezeCandidate, qualify, requalify,
-  releaseKey, requiredJobs, resumeArtifact, targets, validateAuthority, validateResumeReceipt,
+import { auditArtifact, clients, createAuditWriter, deploy, deploymentHistory, evidencePlan, freezeCandidate,
+  main, policyDigest, qualify, requalify, releaseKey, requiredJobs, run as runRelease,
+  standingPolicy, targets, validatePolicy, validateCandidateReview,
+  validateBaselineReceipt, validateInfrastructure, validateResumeReceipt,
   validateEnvironment, validateHealth, validateRender, validateRun, validateVercel,
   validateVercelVariables, verifyCandidate, waitFor } from './release-control.mjs';
 
@@ -14,19 +20,25 @@ const run = () => ({ id: 123, run_attempt: 1, repository: { full_name: targets.r
 const jobs = (attempt = 1) => requiredJobs.map(name => ({ name, status: 'completed', conclusion: 'success',
   run_id: 123, run_attempt: attempt }));
 const ciQualified = () => validateRun(run(), jobs(), source);
-const qualified = () => freezeCandidate(ciQualified(), runnerEnv());
-const environment = () => ({ can_admins_bypass: false,
+const qualified = () => freezeCandidate(ciQualified(), runnerEnv(), policy());
+const environment = () => ({ name: targets.environment, can_admins_bypass: false,
   deployment_branch_policy: { custom_branch_policies: true, protected_branches: false },
-  protection_rules: [{ type: 'required_reviewers', prevent_self_review: true,
-    reviewers: [{ type: 'User', reviewer: { id: 1 } }] }] });
+  protection_rules: [{ type: 'branch_policy' }] });
 const branches = () => [{ name: 'main', type: 'branch' }];
 const runnerEnv = (attempt = 1) => ({ AUTO_DEPLOY_ENABLED: 'true', GITHUB_REPOSITORY: targets.repository,
-  GITHUB_RUN_ID: '456', GITHUB_RUN_ATTEMPT: String(attempt) });
-const authority = (candidate = qualified()) => ({ ...candidate, commit: candidate.sha,
-  expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
-  authorityReference: 'owner/recovery-release-001', baselineRenderDeployId: 'dep-baseline',
-  baselineVercelDeployId: 'dpl_Baseline', schemaCompatibilityVerified: true, rollbackVerified: true,
-  effectiveRuntimeVerified: true, singleTriggerVerified: true, configurationFreezeVerified: true });
+  GITHUB_RUN_ID: '456', GITHUB_RUN_ATTEMPT: String(attempt), GITHUB_REF: 'refs/heads/main',
+  GITHUB_WORKFLOW_REF: `${targets.repository}/.github/workflows/release.yml@refs/heads/main`,
+  RENDER_API_KEY: 'synthetic-render-key', VERCEL_TOKEN: 'synthetic-vercel-token' });
+const policy = () => ({ ...standingPolicy, bootstrap: { renderDeployId: 'dep-baseline', renderSha: previous,
+  vercelDeployId: 'dpl_Baseline', vercelSha: previous, releaseFloor: 1,
+  evidenceReference: 'isolated/qualified-bootstrap' } });
+const governance = () => [
+  { type: 'deletion' }, { type: 'non_fast_forward' },
+  { type: 'pull_request', parameters: { required_approving_review_count: 1,
+    dismiss_stale_reviews_on_push: true, require_last_push_approval: true, required_review_thread_resolution: true } },
+  { type: 'required_status_checks', parameters: { strict_required_status_checks_policy: true,
+    required_status_checks: requiredJobs.map(context => ({ context, integration_id: 15368 })) } }
+].map(r => ({ ...r, ruleset_source_type: 'Repository', ruleset_id: 1 }));
 const service = () => ({ id: targets.render.id, name: targets.render.name,
   repo: 'https://github.com/' + targets.repository, branch: 'main', suspended: 'not_suspended',
   autoDeployTrigger: 'off', autoDeploy: 'no', rootDir: '', serviceDetails: {
@@ -94,36 +106,38 @@ test('API qualification rejects truncated inventory even if the run says success
   await assert.rejects(qualify(f.api, 123), /INVENTORY_INCOMPLETE/);
   assert.equal(f.posts.length, 0);
 });
-test('production activation has no permissive default', () => {
-  assert.throws(() => validateAuthority(JSON.stringify(authority()), qualified(), {}), /ACTIVATION_BLOCKED/);
-  assert.throws(() => validateAuthority('', qualified(), runnerEnv()), /AUTHORITY_REQUIRED/);
-  assert.throws(() => validateAuthority('{secret-invalid', qualified(), runnerEnv()), /AUTHORITY_REQUIRED/);
+test('standing deployment activation has no permissive default', () => {
+  for (const value of [undefined, 'false', 'TRUE'])
+    assert.throws(() => validatePolicy(qualified(), { ...runnerEnv(), AUTO_DEPLOY_ENABLED: value }, policy()), /STANDING_SWITCH/);
+  assert.throws(() => validatePolicy(freezeCandidate(ciQualified(), runnerEnv()), runnerEnv()), /BOOTSTRAP_REQUIRED/);
+  for (const field of ['RENDER_API_KEY', 'VERCEL_TOKEN'])
+    assert.throws(() => validatePolicy(qualified(), { ...runnerEnv(), [field]: '' }, policy()), /CREDENTIALS_REQUIRED/);
 });
-for (const [field, value] of [['version', 1], ['repository', 'untrusted/other'], ['profile', 'normal'],
-  ['commit', previous], ['ciRunId', '999'], ['ciRunAttempt', 2], ['ciRunAttempt', undefined],
-  ['environment', 'preview'], ['renderServiceId', 'srv-other'], ['vercelProjectId', 'prj_other'],
-  ['vercelTeamId', 'team_other'],
-  ['releaseRunId', '999'], ['releaseRunAttempt', '2'], ['schemaCompatibilityVerified', false],
-  ['rollbackVerified', false], ['effectiveRuntimeVerified', false], ['singleTriggerVerified', false],
-  ['configurationFreezeVerified', false], ['baselineRenderDeployId', 'unknown'],
-  ['baselineVercelDeployId', 'unknown'], ['authorityReference', 'http://unsafe.test/?token=secret']]) {
-  test(`exact protected authority rejects ${field} mismatch/missing evidence`, () => {
-    assert.throws(() => validateAuthority(JSON.stringify({ ...authority(), [field]: value }), qualified(), runnerEnv()));
+for (const [field, value] of [['version', 2], ['epoch', 'different-policy'], ['epoch', undefined],
+  ['profile', 'normal'], ['bootstrap', null], ['unexpectedPermission', true]]) {
+  test(`standing policy rejects ${field} mismatch/missing evidence`, () => {
+    assert.throws(() => validatePolicy(qualified(), runnerEnv(), { ...policy(), [field]: value }));
   });
 }
-test('expired or unbounded authority cannot be used, valid authority is accepted', () => {
-  for (const expiresAt of [null, 'invalid', new Date(Date.now() - 1).toISOString(),
-    new Date(Date.now() + 86_500_000).toISOString()])
-    assert.throws(() => validateAuthority(JSON.stringify({ ...authority(), expiresAt }), qualified(), runnerEnv()));
-  assert.equal(validateAuthority(JSON.stringify(authority()), qualified(), runnerEnv()).commit, source);
+for (const [field, value] of [['renderDeployId', 'unknown'], ['vercelDeployId', 'unknown'], ['renderSha', 'main'],
+  ['vercelSha', 'main'], ['releaseFloor', -1], ['releaseFloor', undefined], ['evidenceReference', 'http://unsafe/?secret']]) {
+  test(`bootstrap rejects unverifiable ${field}`, () => {
+    const p = policy(); p.bootstrap[field] = value;
+    assert.throws(() => validatePolicy(freezeCandidate(ciQualified(), runnerEnv(), p), runnerEnv(), p), /BOOTSTRAP_REQUIRED/);
+  });
+}
+test('standing policy is source-bound and needs no expiring per-release token', () => {
+  const setup = validatePolicy(qualified(), runnerEnv(), policy());
+  assert.equal(setup.renderSha, previous); assert(Object.isFrozen(setup));
+  assert.equal(qualified().policySha256, policyDigest(policy()));
 });
-test('environment requires independent reviewer, no admin bypass and main-only branch policy', () => {
+test('unattended environment forbids manual gates and admin bypass and requires main-only branch policy', () => {
   validateEnvironment(environment(), branches());
-  for (const change of [{ can_admins_bypass: true }, { protection_rules: [] },
+  for (const change of [{ can_admins_bypass: true }, { protection_rules: [{ type: 'required_reviewers' }] },
+    { protection_rules: [{ type: 'wait_timer' }] }, { protection_rules: [{ type: 'custom' }] },
+    { name: 'Production' },
     { deployment_branch_policy: null }])
     assert.throws(() => validateEnvironment({ ...environment(), ...change }, branches()));
-  const self = environment(); self.protection_rules[0].prevent_self_review = false;
-  assert.throws(() => validateEnvironment(self, branches()));
   for (const rows of [[], [...branches(), { name: '*', type: 'tag' }], [{ name: '*', type: 'branch' }]])
     assert.throws(() => validateEnvironment(environment(), rows));
 });
@@ -176,7 +190,15 @@ function fixture() {
   const state = { service: service(), vars: variables(), project: project(),
     main: source, jobCount: requiredJobs.length, files: [], renderRows: [
       { id: 'dep-baseline', status: 'live', commit: { id: previous } }], vercelRows: [],
-    candidate: qualified(), authority: authority(), receiptRows: undefined,
+    candidate: qualified(), policy: policy(), env: runnerEnv(), receiptRows: undefined, baselineRows: undefined,
+    rules: governance(), ruleset: { id: 1, enforcement: 'active', target: 'branch', bypass_actors: [] },
+    environment: environment(), branches: branches(),
+    pr: { number: 1, merged: true, state: 'closed', merge_commit_sha: source,
+      base: { ref: 'main', repo: { full_name: targets.repository } }, head: { sha: 'd'.repeat(40) },
+      user: { login: 'author', id: 1 }, merged_at: '2026-10-16T10:00:00Z' },
+    reviews: [{ id: 1, user: { login: 'reviewer', id: 2, type: 'User' }, state: 'APPROVED',
+      commit_id: 'd'.repeat(40), submitted_at: '2026-10-16T09:00:00Z' }],
+    reviewerPermission: { permission: 'write', user: { id: 2, login: 'reviewer' } },
     publicVars: publicVars(), newRender: undefined, newVercel: undefined, renderReads: 0, vercelReads: 0 };
   const posts = [], reports = [];
   const api = {
@@ -186,17 +208,30 @@ function fixture() {
       if (route.includes('/jobs?')) return { total_count: state.jobCount, jobs: jobs() };
       if (route === '/git/ref/heads/main') return { object: { sha: state.main } };
       if (route.startsWith('/compare/')) return { status: 'ahead', files: state.files };
+      if (route === '/rules/branches/main?per_page=100') return state.rules;
+      if (route === '/rulesets/1') return state.ruleset;
+      if (route.endsWith('/deployment-branch-policies?per_page=100'))
+        return { total_count: state.branches.length, branch_policies: state.branches };
+      if (route === `/environments/${targets.environment}`) return state.environment;
+      if (route.startsWith('/commits/') && route.endsWith('/pulls?per_page=100')) return [state.pr];
+      if (route === '/pulls/1') return structuredClone(state.pr);
+      if (route === '/pulls/1/reviews?per_page=100') return state.reviews;
+      if (route.startsWith('/collaborators/')) return state.reviewerPermission;
       throw new Error('Unexpected GitHub fixture route');
     },
     render: async (route, body) => {
       if (body) { posts.push({ provider: 'render', route, body });
         state.newRender = { id: 'dep-new', status: 'build_in_progress', commit: { id: source } };
+        state.renderRows.unshift(state.newRender);
         return structuredClone(state.newRender); }
       if (route.endsWith('/env-vars?limit=100')) return state.vars;
       if (route.endsWith('/deploys?limit=100')) return state.renderRows.map(deploy => ({ deploy }));
-      if (route.endsWith('/deploys/dep-baseline')) return state.renderRows[0];
+      if (route.endsWith('/deploys/dep-baseline')) return state.renderRows.find(x => x.id === 'dep-baseline');
       if (route.endsWith('/deploys/dep-new')) {
-        if (++state.renderReads > 1) state.newRender.status = 'live';
+        if (++state.renderReads > 1) {
+          state.newRender.status = 'live';
+          for (const row of state.renderRows) if (row.id !== state.newRender.id && row.status === 'live') row.status = 'deactivated';
+        }
         return state.newRender;
       }
       return state.service;
@@ -209,6 +244,8 @@ function fixture() {
       if (route.startsWith('/v9/')) return state.project;
       if (route.startsWith('/v10/')) return { envs: state.publicVars };
       if (route.startsWith('/v6/')) return { deployments: state.vercelRows };
+      if (route.endsWith('/dpl_Baseline')) return { id: 'dpl_Baseline', projectId: targets.vercel.id,
+        target: 'production', readyState: 'READY', gitSource: { sha: previous, repoId: '789' } };
       if (route.endsWith('/dpl_New')) {
         if (++state.vercelReads > 1) {
           state.newVercel.readyState = 'READY'; state.project.targets.production.id = 'dpl_New';
@@ -221,9 +258,10 @@ function fixture() {
     web: async () => {}
   };
   const execute = async () => {
-    validateAuthority(JSON.stringify(state.authority), state.candidate, runnerEnv(state.candidate.releaseRunAttempt));
-    return deploy(api, state.candidate, state.authority,
-      createAuditWriter(state.candidate, r => reports.push(r)), { ...immediate, receiptRows: state.receiptRows });
+    return deploy(api, state.candidate, state.policy,
+      createAuditWriter(state.candidate, r => reports.push(r)), { ...immediate, env: state.env,
+        evidencePlan: state.plan ?? { policySha256: state.candidate.policySha256, baseline: null, resume: null },
+        receiptRows: state.receiptRows, baselineRows: state.baselineRows });
   };
   return { state, api, posts, reports, execute };
 }
@@ -236,11 +274,24 @@ test('isolated rollout uses exact source, Render readiness before Vercel, and re
   assert.equal(f.posts[1].body.gitSource.sha, source);
   assert.equal(f.posts[1].body.gitSource.ref, source);
   assert.equal(f.posts[1].body.target, 'production');
-  assert.deepEqual(f.reports.map(x => x.phase), ['admitted', 'render-requested', 'render-ready', 'vercel-requested', 'verified']);
+  assert.deepEqual(f.reports.map(x => x.phase), ['baseline-selected', 'admitted', 'render-requesting',
+    'render-requested', 'render-ready', 'vercel-requesting', 'vercel-requested', 'verified']);
   const { ciUrl, ...identity } = qualified();
   assert.deepEqual(f.reports.at(-1), { phase: 'verified', ...identity,
     renderDeployId: 'dep-new', vercelDeployId: 'dpl_New',
+    baselineRenderDeployId: 'dep-baseline', baselineVercelDeployId: 'dpl_Baseline',
+    baselineRenderSha: previous, baselineVercelSha: previous,
     renderReleaseRunAttempt: 1, vercelReleaseRunAttempt: 1 });
+});
+test('qualified main deploys with standing setup and no per-release authority', async () => {
+  const f = fixture();
+  assert.equal(Object.hasOwn(f.state.env, 'PRODUCTION_RELEASE_AUTHORIZATION'), false);
+  await f.execute();
+  assert.deepEqual(f.posts.map(x => x.provider), ['render', 'vercel']);
+  assert.equal(f.reports.at(-1).phase, 'verified');
+});
+test('unattended environment needs no human approval', () => {
+  validateEnvironment({ ...environment(), protection_rules: [] }, branches());
 });
 for (const [name, modify] of [
   ['suspension', f => { f.state.service.suspended = 'suspended'; }],
@@ -334,17 +385,22 @@ for (const boundary of ['before Render', 'after Render']) {
     }
   });
 }
-test('authority expiring during API build cannot authorize the later Vercel POST', async () => {
-  const f = fixture(); let checks = 0;
-  await assert.rejects(deploy(f.api, qualified(), authority(), r => f.reports.push(r), {
-    ...immediate, now: () => ++checks === 1 ? Date.now() : Date.now() + 86_400_000
-  }), /AUTHORITY_EXPIRED/);
+test('governance revocation during API build blocks the later Vercel POST', async () => {
+  const f = fixture(), read = f.api.health;
+  f.api.health = async () => { const value = await read();
+    if (f.state.newRender?.status === 'live')
+      f.state.rules.find(r => r.type === 'pull_request').parameters.required_approving_review_count = 0;
+    return value;
+  };
+  await assert.rejects(f.execute(), /MAIN_PR_AND_CI_GOVERNANCE_REQUIRED/);
   assert.equal(f.posts.length, 1); assert.equal(f.posts[0].provider, 'render');
 });
 function resumeFixture({ includeVercel = true } = {}) {
   const f = fixture();
-  f.state.candidate = freezeCandidate(ciQualified(), runnerEnv(2));
-  f.state.authority = { ...authority(f.state.candidate), resumeFromReleaseAttempt: 1 };
+  f.state.candidate = freezeCandidate(ciQualified(), runnerEnv(2), f.state.policy);
+  f.state.env = runnerEnv(2);
+  f.state.plan = { policySha256: f.state.candidate.policySha256, baseline: null,
+    resume: { artifactId: '789', runId: '456', runAttempt: 1, sha: source } };
   const receiptRows = [];
   const record = createAuditWriter(qualified(), row => receiptRows.push(row));
   record({ phase: 'render-requested', renderDeployId: 'dep-new', renderReleaseRunAttempt: 1 });
@@ -460,22 +516,20 @@ for (const boundary of ['before Render', 'after Render']) {
     });
   }
 }
-test('candidate and owner authorization cannot be replayed into a later release or attempt', async () => {
+test('candidate cannot be replayed into a later release or attempt despite standing permission', async () => {
   const original = qualified(), archive = Buffer.from('source');
   const manifest = { ...original, sourceSha256: createHash('sha256').update(archive).digest('hex') };
-  const retry = freezeCandidate(ciQualified(), runnerEnv(2));
+  const retry = freezeCandidate(ciQualified(), runnerEnv(2), policy());
   assert.throws(() => verifyCandidate(manifest, retry, archive, archive), /PROVENANCE_MISMATCH/);
-  assert.throws(() => validateAuthority(JSON.stringify(authority()), retry, runnerEnv(2)), /AUTHORITY_REQUIRED/);
-  const second = freezeCandidate(ciQualified(), { ...runnerEnv(), GITHUB_RUN_ID: '999' });
-  assert.throws(() => validateAuthority(JSON.stringify(authority()), second,
-    { ...runnerEnv(), GITHUB_RUN_ID: '999' }), /AUTHORITY_REQUIRED/);
-  const f = fixture(); f.state.authority.ciRunAttempt = 2;
-  await assert.rejects(f.execute(), /AUTHORITY_REQUIRED/); assert.equal(f.posts.length, 0);
+  assert.throws(() => validatePolicy(original, runnerEnv(2), policy()), /RELEASE_CONTEXT_REQUIRED/);
+  const second = freezeCandidate(ciQualified(), { ...runnerEnv(), GITHUB_RUN_ID: '999' }, policy());
+  assert.throws(() => verifyCandidate(manifest, second, archive, archive), /PROVENANCE_MISMATCH/);
+  const f = fixture(); f.state.candidate = { ...f.state.candidate, ciRunAttempt: 2 };
+  await assert.rejects(f.execute(), /CI_QUALIFICATION_CHANGED/); assert.equal(f.posts.length, 0);
 });
 test('a changed candidate CI attempt cannot reuse an immutable partial receipt', async () => {
   const f = resumeFixture();
-  f.state.candidate = freezeCandidate({ ...ciQualified(), ciRunAttempt: 2 }, runnerEnv(2));
-  f.state.authority = { ...authority(f.state.candidate), resumeFromReleaseAttempt: 1 };
+  f.state.candidate = freezeCandidate({ ...ciQualified(), ciRunAttempt: 2 }, runnerEnv(2), f.state.policy);
   const read = f.api.gh;
   f.api.gh = async route => route === '/actions/runs/123' ? { ...run(), run_attempt: 2 } :
     route.includes('/attempts/2/jobs') ? { total_count: requiredJobs.length, jobs: jobs(2) } : read(route);
@@ -506,13 +560,13 @@ for (const mismatch of ['ciRunAttempt', 'releaseRunId', 'releaseRunAttempt', 'en
     await assert.rejects(f.execute()); assert.equal(f.posts.length, 0);
   });
 }
-test('contradictory, legacy, completed or unapproved receipts cannot authorize another release', async () => {
-  for (const kind of ['contradictory', 'legacy', 'completed', 'unapproved', 'missing', 'future-origin']) {
+test('contradictory, legacy, completed or unsolicited receipts cannot authorize another release', async () => {
+  for (const kind of ['contradictory', 'legacy', 'completed', 'unsolicited', 'missing', 'future-origin']) {
     const f = resumeFixture();
     if (kind === 'contradictory') f.state.receiptRows.at(-1).renderDeployId = 'dep-another';
     if (kind === 'legacy') f.state.receiptRows.forEach(row => { delete row.ciRunAttempt; });
     if (kind === 'completed') f.state.receiptRows.at(-1).phase = 'verified';
-    if (kind === 'unapproved') delete f.state.authority.resumeFromReleaseAttempt;
+    if (kind === 'unsolicited') { f.state.candidate = qualified(); f.state.env = runnerEnv(); }
     if (kind === 'missing') f.state.receiptRows = undefined;
     if (kind === 'future-origin') f.state.receiptRows.forEach(row => { row.renderReleaseRunAttempt = 2; });
     await assert.rejects(f.execute()); assert.equal(f.posts.length, 0);
@@ -548,20 +602,335 @@ test('every partial/failure audit retains the immutable identity and already acc
   assert.equal(rows[1].renderReleaseRunAttempt, 1); assert.equal(rows[1].environment, targets.environment);
 });
 test('resume requires a unique, unexpired artifact from the exact earlier attempt of this release run', async () => {
-  const candidate = freezeCandidate(ciQualified(), runnerEnv(2));
-  const auth = { ...authority(candidate), resumeFromReleaseAttempt: 1 };
+  const candidate = freezeCandidate(ciQualified(), runnerEnv(2), policy());
+  const producing = { id: 456, head_sha: source };
   const artifact = { id: 789, name: 'production-release-audit-456-1', expired: false,
     workflow_run: { id: 456, head_sha: source } };
   const api = { gh: async route => { assert.equal(route, '/actions/runs/456/artifacts?per_page=100');
     return { total_count: 1, artifacts: [artifact] }; } };
-  assert.equal(await resumeArtifact(api, candidate, auth), '789');
+  assert.deepEqual(await auditArtifact(api, producing, 1),
+    { artifactId: '789', runId: '456', runAttempt: 1, sha: source });
   for (const change of [{ expired: true }, { name: 'production-release-audit-999-1' },
     { workflow_run: { id: 999, head_sha: source } }, { workflow_run: { id: 456, head_sha: previous } }]) {
     const bad = { gh: async () => ({ total_count: 1, artifacts: [{ ...artifact, ...change }] }) };
-    await assert.rejects(resumeArtifact(bad, candidate, auth));
+    await assert.rejects(auditArtifact(bad, producing, 1));
   }
-  await assert.rejects(resumeArtifact({ gh: async () => ({ total_count: 2, artifacts: [artifact, artifact] }) },
-    candidate, auth), /TRUSTED_RESUME/);
-  await assert.rejects(resumeArtifact({ gh: async () => ({ total_count: 101, artifacts: [artifact] }) },
-    candidate, auth), /INVENTORY_INCOMPLETE/);
+  await assert.rejects(auditArtifact({ gh: async () => ({ total_count: 2, artifacts: [artifact, artifact] }) },
+    producing, 1), /TRUSTED_AUDIT/);
+  await assert.rejects(auditArtifact({ gh: async () => ({ total_count: 101, artifacts: [artifact] }) },
+    producing, 1), /INVENTORY_INCOMPLETE/);
+});
+
+const releaseRun = (overrides = {}) => ({ id: 456, run_attempt: 1, run_number: 2,
+  head_sha: source, event: 'workflow_run', head_branch: 'main',
+  repository: { full_name: targets.repository }, head_repository: { full_name: targets.repository },
+  path: '.github/workflows/release.yml', name: 'Qualified production release',
+  status: 'in_progress', conclusion: null, ...overrides });
+function planFixture(candidate = qualified()) {
+  const current = releaseRun({ run_attempt: candidate.releaseRunAttempt, head_sha: candidate.sha });
+  const state = { current, runs: [current], artifacts: [] };
+  const api = { gh: async route => {
+    if (route === '/actions/runs/456') return structuredClone(state.current);
+    if (route.includes('/workflows/release.yml/runs?'))
+      return { total_count: state.runs.length, workflow_runs: structuredClone(state.runs) };
+    if (route.includes('/artifacts?'))
+      return { total_count: state.artifacts.length, artifacts: structuredClone(state.artifacts) };
+    throw new Error('unexpected evidence route');
+  } };
+  return { state, api };
+}
+const artifactFor = (run, attempt = run.run_attempt) => ({ id: 789,
+  name: `production-release-audit-${run.id}-${attempt}`, expired: false,
+  workflow_run: { id: run.id, head_sha: run.head_sha } });
+
+test('standing policy selects bootstrap once, then the immutable verified predecessor automatically', async () => {
+  const f = planFixture();
+  assert.deepEqual(await evidencePlan(f.api, qualified(), policy()),
+    { policySha256: qualified().policySha256, baseline: null, resume: null, resumeChain: [] });
+  const previousRun = releaseRun({ id: 455, run_number: 2, head_sha: previous,
+    status: 'completed', conclusion: 'success' });
+  f.state.current.run_number = 3; f.state.runs = [f.state.current, previousRun];
+  f.state.artifacts = [artifactFor(previousRun)];
+  const selected = await evidencePlan(f.api, qualified(), policy());
+  assert.deepEqual(selected.baseline, { artifactId: '789', runId: '455', runAttempt: 1, sha: previous });
+  assert.equal(selected.resume, null);
+});
+test('own previous-attempt receipt is selected automatically without a resume token', async () => {
+  const candidate = freezeCandidate(ciQualified(), runnerEnv(2), policy());
+  const f = planFixture(candidate); f.state.artifacts = [artifactFor(f.state.current, 1)];
+  assert.deepEqual((await evidencePlan(f.api, candidate, policy())).resume,
+    { artifactId: '789', runId: '456', runAttempt: 1, sha: source });
+});
+for (const kind of ['deleted receipt', 'expired receipt', 'truncated history', 'deleted run',
+  'foreign workflow', 'fork', 'duplicate run', 'changed release attempt', 'newer completed release']) {
+  test(`evidence discovery rejects ${kind} without resetting to bootstrap`, async () => {
+    const f = planFixture();
+    const old = releaseRun({ id: 455, run_number: 2, head_sha: previous, status: 'completed', conclusion: 'success' });
+    f.state.current.run_number = 3; f.state.runs = [f.state.current, old];
+    f.state.artifacts = [artifactFor(old)];
+    if (kind === 'deleted receipt') f.state.artifacts = [];
+    if (kind === 'expired receipt') f.state.artifacts[0].expired = true;
+    if (kind === 'truncated history') f.api.gh = async () => ({ ...f.state.current, total_count: 101, workflow_runs: [] });
+    if (kind === 'deleted run') f.state.runs.pop();
+    if (kind === 'foreign workflow') old.path = '.github/workflows/other.yml';
+    if (kind === 'fork') old.head_repository = { full_name: 'untrusted/fork' };
+    if (kind === 'duplicate run') f.state.runs.push(old);
+    if (kind === 'changed release attempt') f.state.current.run_attempt = 2;
+    if (kind === 'newer completed release') old.run_number = 4;
+    await assert.rejects(evidencePlan(f.api, qualified(), policy()));
+  });
+}
+
+test('a second qualified commit uses the verified receipt baseline without new owner approval', async () => {
+  const first = fixture(); await first.execute();
+  const second = fixture(), predecessor = first.reports.at(-1);
+  const next = 'e'.repeat(40);
+  second.state.candidate = freezeCandidate({ ...ciQualified(), sha: next, ciRunId: '124' },
+    { ...runnerEnv(), GITHUB_RUN_ID: '457' }, second.state.policy);
+  second.state.env = { ...runnerEnv(), GITHUB_RUN_ID: '457' };
+  second.state.baselineRows = first.reports;
+  second.state.plan = { policySha256: second.state.candidate.policySha256,
+    baseline: { artifactId: '789', runId: '456', runAttempt: 1, sha: source }, resume: null };
+  second.state.renderRows = [{ id: 'dep-new', status: 'live', commit: { id: source } }];
+  second.state.project.targets.production.id = 'dpl_New';
+  const gh = second.api.gh;
+  second.api.gh = async route => route === '/actions/runs/124' ? { ...run(), id: 124, head_sha: next } :
+    route.includes('/attempts/1/jobs') ? { total_count: requiredJobs.length,
+      jobs: jobs().map(j => ({ ...j, run_id: 124 })) } :
+    route === '/git/ref/heads/main' ? { object: { sha: next } } :
+    route.startsWith('/commits/') ? [{ ...second.state.pr, merge_commit_sha: next }] :
+    route === '/pulls/1' ? { ...second.state.pr, merge_commit_sha: next } : gh(route);
+  const render = second.api.render, web = second.api.vercel;
+  second.api.render = async (route, body) => {
+    if (route.endsWith('/dep-new')) return { id: 'dep-new', status: 'deactivated', commit: { id: source } };
+    if (route.endsWith('/dep-next')) return { id: 'dep-next', status: 'live', commit: { id: next } };
+    if (body) {
+      second.posts.push({ provider: 'render', body });
+      second.state.renderRows[0].status = 'deactivated';
+      second.state.renderRows.unshift({ id: 'dep-next', status: 'live', commit: { id: next } });
+      return second.state.renderRows[0];
+    }
+    return render(route, body);
+  };
+  second.api.vercel = async (route, body) => {
+    if (route.endsWith('/dpl_New')) return { ...first.state.newVercel, readyState: 'READY' };
+    if (body) {
+      second.posts.push({ provider: 'vercel', body });
+      second.state.project.targets.production.id = 'dpl_Next';
+      second.state.newVercel = { id: 'dpl_Next', target: 'production', readyState: 'READY',
+        projectId: targets.vercel.id, gitSource: { sha: next, repoId: '789' }, meta: body.meta };
+      return second.state.newVercel;
+    }
+    if (route.endsWith('/dpl_Next')) return second.state.newVercel;
+    return web(route, body);
+  };
+  second.api.health = async () => health(second.posts.length ? next : source);
+  await second.execute();
+  assert.deepEqual(second.posts.map(p => p.provider), ['render', 'vercel']);
+  assert.equal(second.reports.at(-1).baselineRenderDeployId, predecessor.renderDeployId);
+  assert.equal(second.reports.at(-1).sha, next);
+  assert.equal(second.reports.at(-1).ciRunId, '124');
+});
+for (const kind of ['not verified', 'wrong run', 'changed policy', 'contradictory ID', 'missing origin']) {
+  test(`verified predecessor rejects ${kind}`, async () => {
+    const f = fixture(); await f.execute();
+    const rows = structuredClone(f.reports);
+    const descriptor = { runId: '456', runAttempt: 1, sha: source };
+    if (kind === 'not verified') rows.at(-1).phase = 'failed';
+    if (kind === 'wrong run') descriptor.runId = '999';
+    if (kind === 'changed policy') rows.forEach(r => { r.policySha256 = 'f'.repeat(64); });
+    if (kind === 'contradictory ID') rows[1].renderDeployId = 'dep-foreign';
+    if (kind === 'missing origin') delete rows.at(-1).vercelReleaseRunAttempt;
+    assert.throws(() => validateBaselineReceipt(rows, descriptor, qualified()));
+  });
+}
+test('completed release or later successful CI rerun cannot authorize another deployment of that source', async () => {
+  const first = fixture(); await first.execute();
+  for (const attempt of [1, 2]) {
+    const f = fixture(); f.state.candidate = freezeCandidate({ ...ciQualified(), ciRunAttempt: attempt }, runnerEnv(), policy());
+    f.state.baselineRows = first.reports;
+    f.state.plan = { policySha256: f.state.candidate.policySha256,
+      baseline: { runId: '456', runAttempt: 1, sha: source }, resume: null };
+    const read = f.api.gh;
+    f.api.gh = async route => route === '/actions/runs/123' ? { ...run(), run_attempt: attempt } :
+      route.includes(`/attempts/${attempt}/jobs`) ? { total_count: requiredJobs.length, jobs: jobs(attempt) } : read(route);
+    await assert.rejects(f.execute(), /SOURCE_ALREADY_DEPLOYED/);
+    assert.equal(f.posts.length, 0);
+    assert.equal(first.reports.at(-1).ciRunAttempt, 1);
+  }
+});
+for (const kind of ['direct push', 'stale approval', 'dismissed approval', 'request changes', 'self approval',
+  'bot approval', 'post-merge approval', 'reviewer revoked', 'unknown permission', 'incomplete reviews']) {
+  test(`candidate review rejects ${kind} before any mutation`, async () => {
+    const f = fixture();
+    if (kind === 'direct push') f.state.pr.merge_commit_sha = previous;
+    if (kind === 'stale approval') f.state.reviews[0].commit_id = previous;
+    if (kind === 'dismissed approval') f.state.reviews[0].state = 'DISMISSED';
+    if (kind === 'request changes') f.state.reviews.push({ ...f.state.reviews[0], id: 2, state: 'CHANGES_REQUESTED' });
+    if (kind === 'self approval') f.state.reviews[0].user = { ...f.state.pr.user, type: 'User' };
+    if (kind === 'bot approval') f.state.reviews[0].user.type = 'Bot';
+    if (kind === 'post-merge approval') f.state.reviews[0].submitted_at = '2026-10-17T00:00:00Z';
+    if (kind === 'reviewer revoked') f.state.reviewerPermission.permission = 'read';
+    if (kind === 'unknown permission') f.state.reviewerPermission.user.id = 999;
+    if (kind === 'incomplete reviews') f.state.reviews = Array.from({ length: 100 }, () => f.state.reviews[0]);
+    await assert.rejects(f.execute()); assert.equal(f.posts.length, 0);
+  });
+}
+test('review revocation after Render completion blocks Vercel', async () => {
+  const f = fixture(), read = f.api.health;
+  f.api.health = async () => { const value = await read();
+    if (f.state.newRender?.status === 'live') f.state.reviews[0].state = 'DISMISSED'; return value; };
+  await assert.rejects(f.execute(), /PREMERGE_EXACT_HEAD_REVIEW_REQUIRED/);
+  assert.deepEqual(f.posts.map(x => x.provider), ['render']);
+});
+for (const kind of ['missing rules', 'wrong app', 'missing job', 'no latest approval', 'manual environment gate', 'wrong branch type']) {
+  test(`infrastructure rejects ${kind} before entering provider rollout`, async () => {
+    const f = fixture();
+    if (kind === 'missing rules') f.state.rules = [];
+    if (kind === 'wrong app') f.state.rules.at(-1).parameters.required_status_checks[0].integration_id = 999;
+    if (kind === 'missing job') f.state.rules.at(-1).parameters.required_status_checks.pop();
+    if (kind === 'no latest approval') f.state.rules[2].parameters.require_last_push_approval = false;
+    if (kind === 'manual environment gate') f.state.environment.protection_rules.push({ type: 'required_reviewers' });
+    if (kind === 'wrong branch type') f.state.branches[0].type = 'tag';
+    await assert.rejects(f.execute()); assert.equal(f.posts.length, 0);
+  });
+}
+
+test('workflow entry qualifies, archives, admits and deploys automatically with no per-release secret', async () => {
+  const temp = mkdtempSync(join(tmpdir(), 'aqua-unattended-entry-'));
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  const f = fixture(), original = f.api.gh;
+  const replace = value => JSON.parse(JSON.stringify(value).replaceAll(source, head));
+  const current = releaseRun({ head_sha: head });
+  f.api.gh = async route => route === '/actions/runs/456' ? current :
+    route.includes('/workflows/release.yml/runs?') ? { total_count: 1, workflow_runs: [current] } :
+    replace(await original(route));
+  for (const key of ['render', 'vercel', 'health']) {
+    const read = f.api[key]; f.api[key] = async (...args) => replace(await read(...args));
+  }
+  const env = { ...runnerEnv(), GITHUB_EVENT_NAME: 'workflow_run', GITHUB_EVENT_PATH: join(temp, 'event.json'),
+    GITHUB_OUTPUT: join(temp, 'output'), CANDIDATE_DIR: join(temp, 'candidate'),
+    RELEASE_REPORT: join(temp, 'report.jsonl'), GITHUB_STEP_SUMMARY: join(temp, 'summary') };
+  mkdirSync(env.CANDIDATE_DIR);
+  writeFileSync(env.GITHUB_EVENT_PATH, JSON.stringify({ action: 'completed', workflow_run: { ...run(), head_sha: head } }));
+  try {
+    const options = { api: f.api, policy: policy(), deploymentOptions: immediate };
+    await main(env, { ...options, mode: 'candidate' });
+    const manifest = JSON.parse(readFileSync(join(env.CANDIDATE_DIR, 'candidate.json')));
+    assert.equal(manifest.sha, head); assert.equal(manifest.version, 3);
+    await main(env, { ...options, mode: 'admit' });
+    await main(env, { ...options, mode: 'deploy' });
+    assert.deepEqual(f.posts.map(x => x.provider), ['render', 'vercel']);
+    const rows = readFileSync(env.RELEASE_REPORT, 'utf8').trim().split('\n').map(x => JSON.parse(x));
+    assert.equal(rows.at(-1).phase, 'verified'); assert.equal(rows.at(-1).ciRunAttempt, 1);
+    assert.equal(rows.at(-1).policySha256, policyDigest(policy()));
+    f.state.reviews[0].state = 'DISMISSED';
+    assert.equal(await runRelease(env, { ...options, mode: 'deploy' }), 1);
+    const failed = JSON.parse(readFileSync(env.RELEASE_REPORT, 'utf8').trim().split('\n').at(-1));
+    assert.equal(failed.code, 'PREMERGE_EXACT_HEAD_REVIEW_REQUIRED');
+    assert.equal(failed.policySha256, policyDigest(policy()));
+  } finally { rmSync(temp, { recursive: true, force: true }); }
+});
+
+test('retry chain retains attempt1 operations across attempt2 preflight failure and attempt3 reconciliation', async () => {
+  const f = resumeFixture();
+  const attempt2 = createAuditWriter(f.state.candidate, row => f.state.receiptRows.push(row));
+  attempt2({ phase: 'failed', code: 'MAIN_PR_AND_CI_GOVERNANCE_REQUIRED' });
+  f.state.candidate = freezeCandidate(ciQualified(), runnerEnv(3), f.state.policy);
+  f.state.env = runnerEnv(3); f.state.plan.resume.runAttempt = 2;
+  await f.execute();
+  assert.equal(f.posts.length, 0);
+  assert.equal(f.reports.at(-1).renderReleaseRunAttempt, 1);
+  assert.equal(f.reports.at(-1).vercelReleaseRunAttempt, 1);
+  assert.equal(f.reports.at(-1).releaseRunAttempt, 3);
+});
+test('retry chain cannot cross an ambiguous request or omit an earlier attempt', async () => {
+  for (const kind of ['ambiguous', 'missing first', 'gap']) {
+    const f = resumeFixture();
+    const rows = f.state.receiptRows;
+    f.state.candidate = freezeCandidate(ciQualified(), runnerEnv(3), f.state.policy);
+    f.state.env = runnerEnv(3); f.state.plan.resume.runAttempt = 2;
+    const writer = createAuditWriter(freezeCandidate(ciQualified(), runnerEnv(2), policy()), row => rows.push(row));
+    writer({ phase: 'failed', code: kind === 'ambiguous' ? 'AMBIGUOUS_PROVIDER_POST_INSPECT_BEFORE_RETRY' : 'MAIN_PR_AND_CI_GOVERNANCE_REQUIRED' });
+    if (kind === 'missing first') rows.splice(0, rows.length - 1);
+    if (kind === 'gap') rows.at(-1).releaseRunAttempt = 4;
+    await assert.rejects(f.execute()); assert.equal(f.posts.length, 0);
+  }
+});
+test('failed rerun preserves the earlier successful attempt as a future release baseline', async () => {
+  const f = planFixture();
+  const prior = releaseRun({ id: 455, run_number: 2, head_sha: previous,
+    run_attempt: 2, status: 'completed', conclusion: 'failure' });
+  f.state.current.run_number = 3; f.state.runs = [f.state.current, prior];
+  f.state.artifacts = [artifactFor(prior, 1)];
+  const read = f.api.gh;
+  f.api.gh = async route => route === '/actions/runs/455/attempts/1' ?
+    { ...prior, run_attempt: 1, conclusion: 'success' } : read(route);
+  const plan = await evidencePlan(f.api, qualified(), policy());
+  assert.deepEqual(plan.baseline, { artifactId: '789', runId: '455', runAttempt: 1, sha: previous });
+});
+test('foreign Vercel build starting while Render deploys blocks the Vercel POST', async () => {
+  const f = fixture(), read = f.api.health;
+  f.api.health = async () => { const value = await read();
+    if (f.state.newRender?.status === 'live') f.state.vercelRows.push({ uid: 'dpl_Foreign', state: 'BUILDING' });
+    return value;
+  };
+  await assert.rejects(f.execute(), /VERCEL_CHANGED_BEFORE_REQUEST/);
+  assert.deepEqual(f.posts.map(x => x.provider), ['render']);
+});
+test('foreign Render build starting during admission blocks Render POST', async () => {
+  const f = fixture(), read = f.api.vercel;
+  f.api.vercel = async (route, body) => { const value = await read(route, body);
+    if (route.startsWith('/v6/')) f.state.renderRows.push({ id: 'dep-foreign', status: 'build_in_progress', commit: { id: previous } });
+    return value;
+  };
+  await assert.rejects(f.execute(), /RENDER_CHANGED_BEFORE_REQUEST/);
+  assert.equal(f.posts.length, 0);
+});
+
+for (const drift of ['Render identity', 'runtime restriction', 'recovery health']) {
+  test(`${drift} drift during Vercel build cannot mint a verified receipt`, async () => {
+    const f = fixture(), read = f.api.vercel;
+    f.api.vercel = async (route, body) => {
+      const value = await read(route, body);
+      if (route.endsWith('/dpl_New') && value.readyState === 'READY') {
+        if (drift === 'Render identity') {
+          f.state.renderRows.forEach(r => { r.status = 'deactivated'; });
+          f.state.renderRows.unshift({ id: 'dep-foreign', status: 'live', commit: { id: source } });
+        }
+        if (drift === 'runtime restriction') f.state.vars.find(x => x.envVar.key === 'Bird__Enabled').envVar.value = 'true';
+        if (drift === 'recovery health') f.api.health = async () => ({ ...health(source), recovery: null });
+      }
+      return value;
+    };
+    await assert.rejects(f.execute());
+    assert.equal(f.reports.some(r => r.phase === 'verified'), false);
+    assert.deepEqual(f.posts.map(x => x.provider), ['render', 'vercel']);
+  });
+}
+
+test('cancellation after request intent and before recorded provider ID cannot be retried blindly', async () => {
+  const f = resumeFixture();
+  f.state.receiptRows = [];
+  const writer = createAuditWriter(qualified(), r => f.state.receiptRows.push(r));
+  writer({ phase: 'render-requesting' });
+  await assert.rejects(f.execute(), /AMBIGUOUS_PRIOR_REQUEST_REQUIRES_RECONCILIATION/);
+  assert.equal(f.posts.length, 0);
+});
+test('a later main can supersede a pre-provider failure but cannot supersede an ambiguous prior release', async () => {
+  for (const providerConclusion of ['skipped', 'failure', 'cancelled', 'success']) {
+    const f = planFixture();
+    const old = releaseRun({ id: 455, run_number: 2, head_sha: previous, status: 'completed', conclusion: 'failure' });
+    f.state.current.run_number = 3; f.state.runs = [f.state.current, old];
+    const read = f.api.gh;
+    f.api.gh = async route => route === '/actions/runs/455/attempts/1/jobs?per_page=100' ? {
+      total_count: 2, jobs: [
+        { name: 'Qualify immutable source candidate', run_id: 455, run_attempt: 1, status: 'completed', conclusion: 'success' },
+        { name: 'Unattended recovery release', run_id: 455, run_attempt: 1, status: 'completed', conclusion: 'failure',
+          steps: [{ name: 'Revalidate policy, provenance, providers and recovery before automatic deployment', conclusion: providerConclusion }] }
+      ]
+    } : read(route);
+    if (providerConclusion === 'skipped') assert.equal((await evidencePlan(f.api, qualified(), policy())).baseline, null);
+    else await assert.rejects(evidencePlan(f.api, qualified(), policy()), /UNVERIFIED_PRIOR_RELEASE_REQUIRES_RECONCILIATION/);
+  }
 });

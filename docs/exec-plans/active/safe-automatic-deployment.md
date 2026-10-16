@@ -3,6 +3,12 @@
 
 # Safe automatic deployment
 
+Historical workstream: the later owner instruction for unattended deployment
+supersedes per-release human authorization. See the
+[unattended implementation worklog](unattended-production-deployment.md) and
+[current contract](../../operations/safe-automatic-deployment.md). Runtime and
+financial restrictions remain; earlier review does not accept the new implementation.
+
 ## Goal and authority
 
 Owner task: investigate, implement, test, independently review and open a PR for

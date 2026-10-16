@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 export const targets = JSON.parse(readFileSync(new URL('./targets.json', import.meta.url)));
+export const standingPolicy = JSON.parse(readFileSync(new URL('./unattended-policy.json', import.meta.url)));
 export const requiredJobs = [
   'Backend application coverage partition', 'Backend web coverage partition',
   ...['application-administration', 'application-membership', 'application-authentication',
@@ -22,7 +23,7 @@ const vercelStates = new Set([...activeVercel, 'READY', 'ERROR', 'CANCELED']);
 const sourceIdentityFields = ['repository', 'sha', 'ciRunId', 'ciRunAttempt'];
 const targetIdentity = Object.freeze({ environment: targets.environment, profile: targets.profile,
   renderServiceId: targets.render.id, vercelProjectId: targets.vercel.id, vercelTeamId: targets.vercel.teamId });
-const releaseIdentityFields = ['version', ...sourceIdentityFields, 'releaseRunId', 'releaseRunAttempt',
+const releaseIdentityFields = ['version', ...sourceIdentityFields, 'releaseRunId', 'releaseRunAttempt', 'policySha256',
   ...Object.keys(targetIdentity)];
 const positiveId = value => typeof value === 'string' && /^[1-9]\d*$/.test(value);
 const positiveAttempt = value => Number.isSafeInteger(value) && value > 0;
@@ -49,20 +50,34 @@ export function validateRun(run, jobs, mainSha) {
     ciRunId: String(run.id), ciRunAttempt: run.run_attempt, ciUrl: run.html_url };
 }
 
-export function freezeCandidate(qualified, env) {
+export function policyDigest(policy) {
+  requireThat(policy?.version === 1 && /^[a-z0-9-]{1,80}$/.test(policy.epoch) &&
+    policy.profile === targets.profile && Object.hasOwn(policy, 'bootstrap') &&
+    Object.keys(policy).every(key => ['version', 'epoch', 'profile', 'bootstrap'].includes(key)),
+  'STANDING_POLICY_INVALID');
+  const canonical = value => value && typeof value === 'object' ?
+    (Array.isArray(value) ? value.map(canonical) :
+      Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])]))) : value;
+  return createHash('sha256').update(JSON.stringify(canonical(policy))).digest('hex');
+}
+
+export function freezeCandidate(qualified, env, policy = standingPolicy) {
   requireThat(env.GITHUB_REPOSITORY === targets.repository && positiveId(env.GITHUB_RUN_ID) &&
-    positiveId(env.GITHUB_RUN_ATTEMPT) && positiveAttempt(Number(env.GITHUB_RUN_ATTEMPT)),
+    positiveId(env.GITHUB_RUN_ATTEMPT) && positiveAttempt(Number(env.GITHUB_RUN_ATTEMPT)) &&
+    env.GITHUB_REF === 'refs/heads/main' &&
+    env.GITHUB_WORKFLOW_REF === `${targets.repository}/.github/workflows/release.yml@refs/heads/main`,
   'RELEASE_CONTEXT_UNVERIFIABLE');
-  const candidate = { ...qualified, version: 2, releaseRunId: env.GITHUB_RUN_ID,
-    releaseRunAttempt: Number(env.GITHUB_RUN_ATTEMPT), ...targetIdentity };
+  const candidate = { ...qualified, version: 3, releaseRunId: env.GITHUB_RUN_ID,
+    releaseRunAttempt: Number(env.GITHUB_RUN_ATTEMPT), policySha256: policyDigest(policy), ...targetIdentity };
   validateReleaseIdentity(candidate);
   return Object.freeze(candidate);
 }
 
 function validateReleaseIdentity(identity) {
-  requireThat(identity?.version === 2 && identity.repository === targets.repository &&
+  requireThat(identity?.version === 3 && identity.repository === targets.repository &&
     shaPattern.test(identity.sha) && positiveId(identity.ciRunId) && positiveAttempt(identity.ciRunAttempt) &&
     positiveId(identity.releaseRunId) && positiveAttempt(identity.releaseRunAttempt) &&
+    /^[a-f0-9]{64}$/.test(identity.policySha256) &&
     Object.entries(targetIdentity).every(([key, value]) => identity[key] === value),
   'RELEASE_IDENTITY_UNVERIFIABLE');
 }
@@ -83,36 +98,92 @@ export function verifyCandidate(candidate, qualified, archive, trustedArchive) {
     'CANDIDATE_NOT_QUALIFIED_GIT_SOURCE');
 }
 
-export function validateAuthority(raw, qualified, env, now = Date.now()) {
+export function validatePolicy(qualified, env, policy = standingPolicy) {
   validateReleaseIdentity(qualified);
-  requireThat(env.AUTO_DEPLOY_ENABLED === 'true', 'ACTIVATION_BLOCKED_AUTO_DEPLOY_NOT_AUTHORIZED');
-  let a;
-  try { a = JSON.parse(raw); } catch { throw new ReleaseFailure('EXACT_RELEASE_AUTHORITY_REQUIRED'); }
-  requireThat(a && a.version === 2 && a.commit === qualified.sha &&
-    [...sourceIdentityFields.filter(key => key !== 'sha'), 'releaseRunId', 'releaseRunAttempt',
-      ...Object.keys(targetIdentity)].every(key => a[key] === qualified[key]) &&
-    env.GITHUB_REPOSITORY === qualified.repository && env.GITHUB_RUN_ID === qualified.releaseRunId &&
-    env.GITHUB_RUN_ATTEMPT === String(qualified.releaseRunAttempt), 'EXACT_RELEASE_AUTHORITY_REQUIRED');
-  requireThat(a.resumeFromReleaseAttempt === undefined ||
-    (positiveAttempt(a.resumeFromReleaseAttempt) && a.resumeFromReleaseAttempt < qualified.releaseRunAttempt),
-  'RESUME_AUTHORITY_INVALID');
-  const until = Date.parse(a.expiresAt);
-  requireThat(Number.isFinite(until) && until > now && until <= now + 24 * 60 * 60 * 1000,
-    'AUTHORITY_EXPIRED_OR_UNBOUNDED');
-  requireThat(typeof a.authorityReference === 'string' && /^[A-Za-z0-9_.\/-]{1,160}$/.test(a.authorityReference) &&
-    /^dep-[a-z0-9]+$/.test(a.baselineRenderDeployId) && /^dpl_[A-Za-z0-9]+$/.test(a.baselineVercelDeployId) &&
-    a.schemaCompatibilityVerified === true && a.rollbackVerified === true &&
-    a.effectiveRuntimeVerified === true && a.singleTriggerVerified === true &&
-    a.configurationFreezeVerified === true, 'RECOVERY_EVIDENCE_REQUIRED');
-  return Object.freeze(a);
+  requireThat(env.AUTO_DEPLOY_ENABLED === 'true', 'DEPLOYMENT_DISABLED_STANDING_SWITCH');
+  requireThat(env.GITHUB_REPOSITORY === qualified.repository && env.GITHUB_RUN_ID === qualified.releaseRunId &&
+    env.GITHUB_RUN_ATTEMPT === String(qualified.releaseRunAttempt) &&
+    env.GITHUB_REF === 'refs/heads/main' &&
+    env.GITHUB_WORKFLOW_REF === `${targets.repository}/.github/workflows/release.yml@refs/heads/main`,
+  'TRUSTED_RELEASE_CONTEXT_REQUIRED');
+  requireThat(qualified.policySha256 === policyDigest(policy), 'STANDING_POLICY_CHANGED');
+  const b = policy.bootstrap;
+  requireThat(b && /^dep-[a-z0-9]+$/.test(b.renderDeployId) && /^dpl_[A-Za-z0-9]+$/.test(b.vercelDeployId) &&
+    shaPattern.test(b.renderSha) && shaPattern.test(b.vercelSha) &&
+    Number.isSafeInteger(b.releaseFloor) && b.releaseFloor >= 0 &&
+    typeof b.evidenceReference === 'string' && /^[A-Za-z0-9_.\/-]{1,160}$/.test(b.evidenceReference),
+  'QUALIFIED_RECOVERY_BOOTSTRAP_REQUIRED');
+  requireThat(env.RENDER_API_KEY?.trim() && env.VERCEL_TOKEN?.trim(), 'DEPLOYMENT_CREDENTIALS_REQUIRED');
+  return Object.freeze({ ...b });
 }
 
 export function validateEnvironment(environment, branches) {
-  requireThat(environment.can_admins_bypass === false &&
-    environment.protection_rules?.some(r => r.type === 'required_reviewers' && r.prevent_self_review === true &&
-      r.reviewers?.length > 0) && environment.deployment_branch_policy?.custom_branch_policies === true &&
+  requireThat(environment.name === targets.environment && environment.can_admins_bypass === false &&
+    Array.isArray(environment.protection_rules) &&
+    environment.protection_rules.every(r => r.type === 'branch_policy') &&
+    environment.deployment_branch_policy?.custom_branch_policies === true &&
     environment.deployment_branch_policy?.protected_branches === false && branches.length === 1 &&
-    branches[0].name === 'main' && branches[0].type === 'branch', 'PROTECTED_ENVIRONMENT_REQUIRED');
+    branches[0].name === 'main' && branches[0].type === 'branch', 'UNATTENDED_MAIN_ONLY_ENVIRONMENT_REQUIRED');
+}
+
+export async function validateInfrastructure(api) {
+  const rules = await api.gh('/rules/branches/main?per_page=100');
+  requireThat(rules.length > 0 && rules.length < 100 &&
+    rules.every(r => ['Repository', 'Organization'].includes(r.ruleset_source_type) && positiveAttempt(r.ruleset_id)),
+  'MAIN_GOVERNANCE_UNVERIFIABLE');
+  // Bypass actors are hidden from read-only tokens. Do not infer an empty list:
+  // concrete candidate review is checked separately; settings custody is qualified once.
+  requireThat(['deletion', 'non_fast_forward'].every(type => rules.some(r => r.type === type)) &&
+    rules.some(r => r.type === 'pull_request' && r.parameters?.required_approving_review_count >= 1 &&
+      r.parameters.dismiss_stale_reviews_on_push === true && r.parameters.require_last_push_approval === true &&
+      r.parameters.required_review_thread_resolution === true) &&
+    rules.some(r => r.type === 'required_status_checks' &&
+      r.parameters?.strict_required_status_checks_policy === true &&
+      requiredJobs.every(name => r.parameters.required_status_checks?.some(c =>
+        c.context === name && c.integration_id === 15368))), 'MAIN_PR_AND_CI_GOVERNANCE_REQUIRED');
+  const environment = await api.gh(`/environments/${targets.environment}`);
+  const page = await api.gh(`/environments/${targets.environment}/deployment-branch-policies?per_page=100`);
+  requireThat(page.total_count === page.branch_policies?.length, 'ENVIRONMENT_BRANCH_INVENTORY_INCOMPLETE');
+  validateEnvironment(environment, page.branch_policies);
+}
+
+export async function validateCandidateReview(api, candidate) {
+  const list = await api.gh(`/commits/${candidate.sha}/pulls?per_page=100`);
+  requireThat(Array.isArray(list) && list.length < 100, 'MERGED_PR_INVENTORY_UNVERIFIABLE');
+  const matches = list.filter(p => p.merge_commit_sha === candidate.sha && p.merged_at &&
+    p.base?.ref === 'main' && p.base.repo?.full_name === targets.repository);
+  requireThat(matches.length === 1 && positiveAttempt(matches[0].number), 'QUALIFIED_MERGED_MAIN_PR_REQUIRED');
+  const path = `/pulls/${matches[0].number}`;
+  const pr = await api.gh(path);
+  requireThat(pr.merged === true && pr.state === 'closed' && pr.merge_commit_sha === candidate.sha &&
+    pr.base?.ref === 'main' && pr.base.repo?.full_name === targets.repository && shaPattern.test(pr.head?.sha) &&
+    Number.isFinite(Date.parse(pr.merged_at)) && positiveAttempt(pr.user?.id), 'MERGED_PR_PROVENANCE_UNVERIFIABLE');
+  const reviews = await api.gh(`${path}/reviews?per_page=100`);
+  requireThat(Array.isArray(reviews) && reviews.length < 100 && reviews.every(r =>
+    positiveAttempt(r.id) && positiveAttempt(r.user?.id) &&
+    ['APPROVED', 'CHANGES_REQUESTED', 'COMMENTED', 'DISMISSED'].includes(r.state) &&
+    Number.isFinite(Date.parse(r.submitted_at))), 'MERGED_PR_REVIEW_EVIDENCE_UNVERIFIABLE');
+  const latest = new Map();
+  for (const review of [...reviews].sort((a, b) => a.id - b.id))
+    if (review.state !== 'COMMENTED') latest.set(review.user.id, review);
+  requireThat(![...latest.values()].some(r => r.state === 'CHANGES_REQUESTED'), 'UNRESOLVED_PR_CHANGES_REQUESTED');
+  let approved = false;
+  for (const r of latest.values()) {
+    if (r.state !== 'APPROVED' || r.commit_id !== pr.head.sha || r.user.type !== 'User' ||
+      r.user.id === pr.user.id || r.user.login === pr.user.login ||
+      Date.parse(r.submitted_at) > Date.parse(pr.merged_at)) continue;
+    requireThat(typeof r.user.login === 'string' && /^[a-zA-Z0-9-]{1,39}$/.test(r.user.login),
+      'REVIEWER_IDENTITY_UNVERIFIABLE');
+    const permission = await api.gh(`/collaborators/${r.user.login}/permission`);
+    if (['admin', 'write'].includes(permission.permission) && permission.user?.id === r.user.id &&
+      permission.user.login === r.user.login) approved = true;
+  }
+  requireThat(approved, 'PREMERGE_EXACT_HEAD_REVIEW_REQUIRED');
+  const current = await api.gh(path);
+  requireThat(current.merged === true && current.merge_commit_sha === pr.merge_commit_sha &&
+    current.head?.sha === pr.head.sha && current.merged_at === pr.merged_at &&
+    current.user?.id === pr.user.id && current.base?.ref === 'main' &&
+    current.base.repo?.full_name === targets.repository, 'MERGED_PR_EVIDENCE_CHANGED');
 }
 
 export function validateRender(service, rows) {
@@ -227,34 +298,51 @@ export function createAuditWriter(identity, emit) {
   validateReleaseIdentity(identity);
   const known = {};
   return row => {
-    for (const key of ['renderDeployId', 'vercelDeployId', 'renderReleaseRunAttempt', 'vercelReleaseRunAttempt'])
+    for (const key of ['renderDeployId', 'vercelDeployId', 'renderReleaseRunAttempt', 'vercelReleaseRunAttempt',
+      'baselineRenderDeployId', 'baselineVercelDeployId', 'baselineRenderSha', 'baselineVercelSha'])
       if (row[key] !== undefined) known[key] = row[key];
     emit({ ...row, ...Object.fromEntries(releaseIdentityFields.map(key => [key, identity[key]])), ...known });
   };
 }
 
-export function validateResumeReceipt(rows, frozen, authority) {
-  requireThat(positiveAttempt(authority.resumeFromReleaseAttempt) && rows.length > 0 && rows.length <= 100,
+export function validateResumeReceipt(rows, frozen) {
+  requireThat(frozen.releaseRunAttempt > 1 && rows.length > 0 && rows.length <= 100,
     'RESUME_RECEIPT_REQUIRED');
   const known = {};
+  let attempt = 1;
+  const pending = new Set();
   for (const row of rows) {
     validateReleaseIdentity(row);
     requireThat(releaseIdentityFields.filter(key => key !== 'releaseRunAttempt')
-      .every(key => row[key] === frozen[key]) && row.releaseRunAttempt === authority.resumeFromReleaseAttempt,
+      .every(key => row[key] === frozen[key]) && row.releaseRunAttempt >= attempt &&
+      row.releaseRunAttempt <= attempt + 1 && row.releaseRunAttempt < frozen.releaseRunAttempt,
     'RESUME_RECEIPT_IDENTITY_MISMATCH');
-    requireThat(['admitted', 'render-requested', 'render-ready', 'vercel-requested', 'verified', 'failed'].includes(row.phase),
+    attempt = row.releaseRunAttempt;
+    requireThat(['evidence-selected', 'baseline-selected', 'admitted', 'render-requesting', 'render-requested',
+      'render-ready', 'vercel-requesting', 'vercel-requested', 'verified', 'failed'].includes(row.phase),
       'RESUME_RECEIPT_UNVERIFIABLE');
     requireThat(row.phase !== 'verified', 'RELEASE_ALREADY_VERIFIED');
+    requireThat(!['AMBIGUOUS_PROVIDER_POST_INSPECT_BEFORE_RETRY', 'INVALID_PROVIDER_RESPONSE',
+      'RENDER_DEPLOYMENT_ID_UNAVAILABLE', 'VERCEL_DEPLOYMENT_ID_UNAVAILABLE',
+      'PROVIDER_POST_REJECTED_INSPECT_BEFORE_RETRY', 'UNEXPECTED_RELEASE_ERROR'].includes(row.code),
+    'AMBIGUOUS_PRIOR_REQUEST_REQUIRES_RECONCILIATION');
+    for (const provider of ['render', 'vercel']) {
+      if (row.phase === `${provider}-requesting`) pending.add(provider);
+      if (row.phase === `${provider}-requested` && row[`${provider}DeployId`]) pending.delete(provider);
+    }
     for (const key of ['renderDeployId', 'vercelDeployId', 'renderReleaseRunAttempt', 'vercelReleaseRunAttempt']) {
       if (row[key] === undefined) continue;
       requireThat(known[key] === undefined || known[key] === row[key], 'CONTRADICTORY_RESUME_RECEIPT');
       known[key] = row[key];
     }
   }
+  requireThat(rows[0].releaseRunAttempt === 1 && attempt === frozen.releaseRunAttempt - 1,
+    'RESUME_RECEIPT_CHAIN_INCOMPLETE');
+  requireThat(pending.size === 0, 'AMBIGUOUS_PRIOR_REQUEST_REQUIRES_RECONCILIATION');
   for (const provider of ['render', 'vercel']) {
     const id = known[`${provider}DeployId`], attempt = known[`${provider}ReleaseRunAttempt`];
     requireThat(id === undefined ? attempt === undefined :
-      (positiveAttempt(attempt) && attempt <= authority.resumeFromReleaseAttempt &&
+      (positiveAttempt(attempt) && attempt < frozen.releaseRunAttempt &&
         (provider === 'render' ? /^dep-[a-z0-9]+$/ : /^dpl_[A-Za-z0-9]+$/).test(id)),
     'RESUME_RECEIPT_UNVERIFIABLE');
   }
@@ -262,16 +350,105 @@ export function validateResumeReceipt(rows, frozen, authority) {
   return Object.freeze(known);
 }
 
-export async function resumeArtifact(api, candidate, authority) {
-  if (authority.resumeFromReleaseAttempt === undefined) return '';
-  const inventory = await api.gh(`/actions/runs/${candidate.releaseRunId}/artifacts?per_page=100`);
+export async function auditArtifact(api, run, attempt) {
+  const inventory = await api.gh(`/actions/runs/${run.id}/artifacts?per_page=100`);
   requireThat(inventory.total_count === inventory.artifacts?.length, 'AUDIT_ARTIFACT_INVENTORY_INCOMPLETE');
-  const name = `production-release-audit-${candidate.releaseRunId}-${authority.resumeFromReleaseAttempt}`;
-  const selected = inventory.artifacts.filter(a => a.name === name && !a.expired);
-  requireThat(selected.length === 1 && positiveId(String(selected[0].id)) &&
-    selected[0].workflow_run?.id === Number(candidate.releaseRunId) &&
-    selected[0].workflow_run?.head_sha === candidate.sha, 'TRUSTED_RESUME_ARTIFACT_REQUIRED');
-  return String(selected[0].id);
+  const name = `production-release-audit-${run.id}-${attempt}`;
+  const selected = inventory.artifacts.filter(a => a.name === name);
+  requireThat(selected.length === 1 && !selected[0].expired && positiveId(String(selected[0].id)) &&
+    selected[0].workflow_run?.id === run.id && selected[0].workflow_run?.head_sha === run.head_sha,
+  'TRUSTED_AUDIT_ARTIFACT_REQUIRED');
+  return { artifactId: String(selected[0].id), runId: String(run.id), runAttempt: attempt, sha: run.head_sha };
+}
+
+function validateReleaseRun(run) {
+  requireThat(Number.isSafeInteger(run.id) && positiveId(String(run.id)) && positiveAttempt(run.run_attempt) &&
+    positiveAttempt(run.run_number) && shaPattern.test(run.head_sha) &&
+    run.repository?.full_name === targets.repository && run.head_repository?.full_name === targets.repository &&
+    run.event === 'workflow_run' && run.head_branch === 'main' &&
+    run.path === '.github/workflows/release.yml' && run.name === 'Qualified production release',
+  'RELEASE_WORKFLOW_PROVENANCE_REQUIRED');
+}
+
+export async function evidencePlan(api, candidate, policy) {
+  const current = await api.gh(`/actions/runs/${candidate.releaseRunId}`);
+  validateReleaseRun(current);
+  requireThat(current.head_sha === candidate.sha && current.run_attempt === candidate.releaseRunAttempt &&
+    current.run_number > policy.bootstrap.releaseFloor, 'RELEASE_CONTEXT_OR_POLICY_EPOCH_MISMATCH');
+  const runs = [];
+  let count;
+  for (let page = 1; page <= 20; page++) {
+    const result = await api.gh(`/actions/workflows/release.yml/runs?branch=main&event=workflow_run&per_page=100&page=${page}`);
+    requireThat(Number.isSafeInteger(result.total_count) && Array.isArray(result.workflow_runs) &&
+      (count === undefined || count === result.total_count), 'RELEASE_HISTORY_UNVERIFIABLE');
+    count = result.total_count;
+    runs.push(...result.workflow_runs);
+    requireThat(new Set(runs.map(r => r.id)).size === runs.length && runs.length <= count,
+      'RELEASE_HISTORY_UNVERIFIABLE');
+    if (runs.length === count) break;
+    requireThat(result.workflow_runs.length === 100 && page < 20, 'RELEASE_HISTORY_INCOMPLETE');
+  }
+  for (const run of runs) validateReleaseRun(run);
+  const era = runs.filter(r => r.run_number > policy.bootstrap.releaseFloor && r.run_number <= current.run_number);
+  requireThat(era.length === current.run_number - policy.bootstrap.releaseFloor &&
+    new Set(era.map(r => r.run_number)).size === era.length &&
+    era.some(r => r.id === current.id && r.run_attempt === current.run_attempt), 'RELEASE_HISTORY_GAP_RECONCILE');
+  const successful = [];
+  for (const run of runs.filter(r => r.id !== current.id && r.run_number > policy.bootstrap.releaseFloor)) {
+    requireThat(run.status === 'completed', 'CONCURRENT_RELEASE_RUN');
+    requireThat(run.run_attempt <= 20, 'RELEASE_ATTEMPT_HISTORY_TOO_LARGE');
+    for (let attempt = run.run_attempt; attempt >= 1; attempt--) {
+      const past = attempt === run.run_attempt ? run : await api.gh(`/actions/runs/${run.id}/attempts/${attempt}`);
+      validateReleaseRun(past);
+      requireThat(past.id === run.id && past.run_attempt === attempt && past.head_sha === run.head_sha &&
+        past.run_number === run.run_number && past.status === 'completed', 'RELEASE_ATTEMPT_HISTORY_UNVERIFIABLE');
+      if (past.conclusion === 'success') { successful.push(past); break; }
+    }
+  }
+  requireThat(successful.every(r => r.run_number < current.run_number), 'NEWER_RELEASE_ALREADY_COMPLETED');
+  const latest = successful.sort((a, b) => b.run_number - a.run_number)[0];
+  for (const run of runs.filter(r => r.id !== current.id &&
+    r.run_number > (latest?.run_number ?? policy.bootstrap.releaseFloor))) {
+    // A failed prior run may have submitted a request whose history is not visible
+    // yet. Only a positively unexecuted provider step is safe to supersede.
+    for (let attempt = 1; attempt <= run.run_attempt; attempt++) {
+      const jobs = await api.gh(`/actions/runs/${run.id}/attempts/${attempt}/jobs?per_page=100`);
+      requireThat(jobs.total_count === jobs.jobs?.length && jobs.jobs.length === 2 &&
+        jobs.jobs.every(j => j.run_id === run.id && j.run_attempt === attempt && j.status === 'completed'),
+      'PRIOR_RELEASE_EXECUTION_UNVERIFIABLE');
+      const production = jobs.jobs.find(j => j.name === 'Unattended recovery release');
+      requireThat(production && (production.conclusion === 'skipped' ||
+        production.steps?.some(s => s.name === 'Revalidate policy, provenance, providers and recovery before automatic deployment' &&
+          s.conclusion === 'skipped')), 'UNVERIFIED_PRIOR_RELEASE_REQUIRES_RECONCILIATION');
+    }
+  }
+  requireThat(candidate.releaseRunAttempt <= 20, 'RELEASE_ATTEMPT_HISTORY_TOO_LARGE');
+  const resumeChain = [];
+  for (let attempt = 1; attempt < candidate.releaseRunAttempt; attempt++)
+    resumeChain.push(await auditArtifact(api, current, attempt));
+  return { policySha256: candidate.policySha256,
+    baseline: latest ? await auditArtifact(api, latest, latest.run_attempt) : null,
+    resume: resumeChain.at(-1) ?? null, resumeChain };
+}
+
+export function validateBaselineReceipt(rows, descriptor, candidate) {
+  requireThat(rows.length > 0 && rows.length <= 100, 'VERIFIED_BASELINE_RECEIPT_REQUIRED');
+  const first = rows[0], last = rows.at(-1);
+  for (const row of rows) {
+    validateReleaseIdentity(row);
+    requireThat(releaseIdentityFields.every(key => row[key] === first[key]) &&
+      row.releaseRunId === descriptor.runId && row.releaseRunAttempt === descriptor.runAttempt &&
+      row.sha === descriptor.sha && row.policySha256 === candidate.policySha256,
+    'BASELINE_RECEIPT_PROVENANCE_MISMATCH');
+  }
+  requireThat(last.phase === 'verified' && rows.filter(r => r.phase === 'verified').length === 1 &&
+    /^dep-[a-z0-9]+$/.test(last.renderDeployId) && /^dpl_[A-Za-z0-9]+$/.test(last.vercelDeployId) &&
+    ['renderReleaseRunAttempt', 'vercelReleaseRunAttempt'].every(key =>
+      positiveAttempt(last[key]) && last[key] <= last.releaseRunAttempt), 'VERIFIED_BASELINE_RECEIPT_REQUIRED');
+  for (const key of ['renderDeployId', 'vercelDeployId', 'renderReleaseRunAttempt', 'vercelReleaseRunAttempt'])
+    requireThat(rows.every(row => row[key] === undefined || row[key] === last[key]), 'CONTRADICTORY_BASELINE_RECEIPT');
+  return Object.freeze({ renderDeployId: last.renderDeployId, renderSha: last.sha,
+    vercelDeployId: last.vercelDeployId, vercelSha: last.sha, origin: last });
 }
 
 export async function waitFor(read, state, good, pending, options) {
@@ -313,14 +490,33 @@ export async function deploymentHistory(api, provider) {
   throw new ReleaseFailure('PROVIDER_HISTORY_INVENTORY_TOO_LARGE');
 }
 
-export async function deploy(api, qualified, authority, report, options) {
+export async function deploy(api, qualified, policy, report, options = {}) {
   validateReleaseIdentity(qualified);
-  await requalify(api, qualified);
-  const prior = options?.receiptRows ? validateResumeReceipt(options.receiptRows, qualified, authority) : {};
-  requireThat(authority.resumeFromReleaseAttempt === undefined || options?.receiptRows,
-    'RESUME_RECEIPT_REQUIRED');
-  requireThat(authority.resumeFromReleaseAttempt !== undefined || !options?.receiptRows,
-    'UNAUTHORIZED_RESUME_RECEIPT');
+  const guard = async () => {
+    validatePolicy(qualified, options.env ?? process.env, policy);
+    await requalify(api, qualified);
+    await validateInfrastructure(api);
+    await validateCandidateReview(api, qualified);
+  };
+  await guard();
+  const bootstrap = validatePolicy(qualified, options.env ?? process.env, policy);
+  const plan = options.evidencePlan;
+  requireThat(plan && plan.policySha256 === qualified.policySha256, 'FROZEN_EVIDENCE_PLAN_REQUIRED');
+  requireThat(!!plan.baseline === !!options.baselineRows, 'BASELINE_RECEIPT_REQUIRED');
+  const baselineProof = plan.baseline ? validateBaselineReceipt(options.baselineRows, plan.baseline, qualified) : bootstrap;
+  requireThat(qualified.releaseRunAttempt === 1 ? !plan.resume && !options.receiptRows :
+    plan.resume?.runId === qualified.releaseRunId && plan.resume.runAttempt === qualified.releaseRunAttempt - 1 &&
+    plan.resume.sha === qualified.sha && options.receiptRows, 'RESUME_RECEIPT_REQUIRED');
+  const prior = options.receiptRows ? validateResumeReceipt(options.receiptRows, qualified) : {};
+  const baselineFields = { baselineRenderDeployId: baselineProof.renderDeployId,
+    baselineVercelDeployId: baselineProof.vercelDeployId, baselineRenderSha: baselineProof.renderSha,
+    baselineVercelSha: baselineProof.vercelSha };
+  report({ phase: 'baseline-selected', ...baselineFields });
+  requireThat(baselineProof.renderSha !== qualified.sha && baselineProof.vercelSha !== qualified.sha,
+    'SOURCE_ALREADY_DEPLOYED_RETAIN_ORIGINAL_CI_PROVENANCE');
+  for (const key of Object.keys(baselineFields))
+    requireThat(!options.receiptRows || options.receiptRows.every(row => row[key] === undefined ||
+      row[key] === baselineFields[key]), 'RESUME_BASELINE_MISMATCH');
   const servicePath = `/services/${targets.render.id}`;
   const projectPath = `/v9/projects/${targets.vercel.id}`;
   const repository = await api.gh('');
@@ -337,8 +533,20 @@ export async function deploy(api, qualified, authority, report, options) {
   const readVercelVariables = async () => validateVercelVariables(
     (await api.vercel(`/v10/projects/${targets.vercel.id}/env?decrypt=true`)).envs);
   await readVercelVariables();
-  const baseline = await api.render(`${servicePath}/deploys/${authority.baselineRenderDeployId}`);
-  requireThat(shaPattern.test(baseline.commit?.id), 'ROLLBACK_BASELINE_REVISION_UNAVAILABLE');
+  const baseline = await api.render(`${servicePath}/deploys/${baselineProof.renderDeployId}`);
+  requireThat(baseline.id === baselineProof.renderDeployId && baseline.commit?.id === baselineProof.renderSha &&
+    ['live', 'deactivated'].includes(baseline.status), 'ROLLBACK_BASELINE_REVISION_UNAVAILABLE');
+  const oldWeb = await api.vercel(`/v13/deployments/${baselineProof.vercelDeployId}`);
+  requireThat(oldWeb.id === baselineProof.vercelDeployId && oldWeb.projectId === targets.vercel.id &&
+    oldWeb.target === 'production' && oldWeb.readyState === 'READY' && !oldWeb.aliasError &&
+    oldWeb.gitSource?.sha === baselineProof.vercelSha &&
+    String(oldWeb.gitSource?.repoId) === String(repository.id), 'ROLLBACK_FRONTEND_PROVENANCE_UNVERIFIED');
+  if (baselineProof.origin) {
+    const origin = { ...baselineProof.origin, releaseRunAttempt: baselineProof.origin.vercelReleaseRunAttempt };
+    requireThat(oldWeb.meta?.aquaReleaseIdentity === releaseKey(origin) &&
+      oldWeb.meta?.aquaCiRunId === origin.ciRunId && oldWeb.meta?.aquaCiRunAttempt === String(origin.ciRunAttempt),
+    'ROLLBACK_FRONTEND_PROVENANCE_UNVERIFIED');
+  }
   const compare = await api.gh(`/compare/${baseline.commit.id}...${qualified.sha}`);
   requireThat(compare.status === 'ahead' || compare.status === 'identical', 'SOURCE_NOT_BASELINE_DESCENDANT');
   requireThat(compare.files?.length < 300 && !compare.files.some(f =>
@@ -346,7 +554,7 @@ export async function deploy(api, qualified, authority, report, options) {
   'SCHEMA_CHANGE_REQUIRES_SEPARATE_AUTHORIZATION');
   const renderDeploys = await deploymentHistory(api, 'render');
   const live = renderDeploys.filter(x => x.status === 'live');
-  requireThat(live.length === 1 && (live[0].id === authority.baselineRenderDeployId ||
+  requireThat(live.length === 1 && (live[0].id === baselineProof.renderDeployId ||
     (live[0].id === prior.renderDeployId && live[0].commit?.id === qualified.sha)), 'RENDER_BASELINE_DRIFT');
   validateHealth(await api.health(), live[0].commit.id);
   requireThat(renderDeploys.every(x => !activeRender.has(x.status) || x.id === prior.renderDeployId),
@@ -377,17 +585,22 @@ export async function deploy(api, qualified, authority, report, options) {
     existingVercel = full;
   }
   requireThat(!prior.vercelDeployId || existingVercel, 'VERCEL_RECEIPT_DEPLOYMENT_MISMATCH');
-  requireThat(project.targets?.production?.id === authority.baselineVercelDeployId ||
+  requireThat(project.targets?.production?.id === baselineProof.vercelDeployId ||
     (existingVercel && project.targets?.production?.id === existingVercel.id), 'VERCEL_BASELINE_DRIFT');
 
   report({ phase: 'admitted', sha: qualified.sha, ciRunId: qualified.ciRunId,
-    authorityReference: authority.authorityReference, baselineRenderDeployId: authority.baselineRenderDeployId,
-    baselineVercelDeployId: authority.baselineVercelDeployId, ...prior });
+    ...baselineFields, ...prior });
   if (render) requireThat(render.status === 'live' || activeRender.has(render.status), 'PRIOR_RENDER_FAILURE_REQUIRES_OPERATOR');
   else {
     // Recheck freshness immediately before the irreversible provider request.
-    await requalify(api, qualified);
-    requireThat(Date.parse(authority.expiresAt) > (options?.now ?? Date.now)(), 'AUTHORITY_EXPIRED');
+    await guard();
+    await readRender();
+    const latestRender = await deploymentHistory(api, 'render');
+    requireThat(latestRender.filter(x => x.status === 'live').length === 1 &&
+      latestRender.some(x => x.id === baselineProof.renderDeployId && x.status === 'live' &&
+        x.commit?.id === baselineProof.renderSha) && latestRender.every(x => !activeRender.has(x.status)) &&
+      latestRender.every(x => x.commit?.id !== qualified.sha), 'RENDER_CHANGED_BEFORE_REQUEST');
+    report({ phase: 'render-requesting' });
     render = await api.render(`${servicePath}/deploys`, { commitId: qualified.sha, clearCache: 'do_not_clear' });
   }
   requireThat(/^dep-[a-z0-9]+$/.test(render.id), 'RENDER_DEPLOYMENT_ID_UNAVAILABLE');
@@ -400,13 +613,24 @@ export async function deploy(api, qualified, authority, report, options) {
   validateHealth(await api.health(), qualified.sha);
   report({ phase: 'render-ready', renderDeployId: render.id, sha: render.commit.id });
 
-  await requalify(api, qualified);
+  await guard();
+  const currentRender = await deploymentHistory(api, 'render');
+  requireThat(currentRender.filter(x => x.status === 'live').length === 1 &&
+    currentRender.some(x => x.status === 'live' && x.id === render.id && x.commit?.id === qualified.sha) &&
+    currentRender.every(x => !activeRender.has(x.status) || x.id === render.id), 'RENDER_CHANGED_AFTER_READINESS');
   project = await api.vercel(projectPath);
   validateVercel(project, repository.id);
   await readVercelVariables();
+  requireThat(project.targets?.production?.id === baselineProof.vercelDeployId ||
+    (existingVercel && project.targets?.production?.id === existingVercel.id), 'VERCEL_BASELINE_DRIFT');
   if (!existingVercel) {
-    await requalify(api, qualified);
-    requireThat(Date.parse(authority.expiresAt) > (options?.now ?? Date.now)(), 'AUTHORITY_EXPIRED');
+    await guard();
+    await readRender();
+    const latestVercel = await deploymentHistory(api, 'vercel');
+    requireThat(latestVercel.every(x => !activeVercel.has(x.state ?? x.readyState) &&
+      x.meta?.aquaCiRunId !== qualified.ciRunId && x.meta?.aquaSourceSha !== qualified.sha),
+    'VERCEL_CHANGED_BEFORE_REQUEST');
+    report({ phase: 'vercel-requesting' });
     existingVercel = await api.vercel('/v13/deployments', {
       name: targets.vercel.name, project: targets.vercel.id, target: 'production',
       gitSource: { type: 'github', repoId: String(repository.id), ref: qualified.sha, sha: qualified.sha },
@@ -424,14 +648,30 @@ export async function deploy(api, qualified, authority, report, options) {
   project = await api.vercel(projectPath);
   requireThat(project.targets?.production?.id === vercel.id, 'VERCEL_PRODUCTION_ALIAS_NOT_ASSIGNED');
   await api.web();
-  await requalify(api, qualified);
+  await guard();
+  await readRender();
+  validateHealth(await api.health(), qualified.sha);
+  const finalRender = await deploymentHistory(api, 'render');
+  requireThat(finalRender.filter(x => x.status === 'live').length === 1 &&
+    finalRender.some(x => x.id === render.id && x.status === 'live' && x.commit?.id === qualified.sha) &&
+    finalRender.every(x => !activeRender.has(x.status)), 'RENDER_CHANGED_BEFORE_VERIFICATION');
+  validateVercel(project = await api.vercel(projectPath), repository.id);
+  await readVercelVariables();
+  const finalWeb = await api.vercel(`/v13/deployments/${vercel.id}`);
+  requireThat(project.targets?.production?.id === vercel.id && finalWeb.readyState === 'READY' &&
+    isOurs(finalWeb) && !finalWeb.aliasError, 'VERCEL_CHANGED_BEFORE_VERIFICATION');
+  const finalVercel = await deploymentHistory(api, 'vercel');
+  requireThat(finalVercel.every(x => !activeVercel.has(x.state ?? x.readyState) || x.uid === vercel.id),
+    'CONCURRENT_VERCEL_BEFORE_VERIFICATION');
   report({ phase: 'verified', sha: qualified.sha, renderDeployId: render.id, vercelDeployId: vercel.id });
 }
 
 let failureReport;
-async function main(env) {
-  const api = clients(env);
-  const mode = process.argv[2];
+export async function main(env, options = {}) {
+  failureReport = undefined;
+  const api = options.api ?? clients(env);
+  const policy = options.policy ?? standingPolicy;
+  const mode = options.mode ?? process.argv[2];
   if (mode === 'qualify-tag') {
     requireThat(env.GITHUB_EVENT_NAME === 'push' && /^refs\/tags\/v\d+\.\d+\.\d+$/.test(env.GITHUB_REF), 'VERSION_TAG_REQUIRED');
     const runs = await api.gh(`/actions/workflows/ci.yml/runs?branch=main&event=push&head_sha=${env.GITHUB_SHA}&per_page=100`);
@@ -449,10 +689,13 @@ async function main(env) {
   const qualified = await qualify(api, event.workflow_run.id);
   requireThat(qualified.sha === event.workflow_run.head_sha && qualified.ciRunAttempt === event.workflow_run.run_attempt,
     'CI_EVENT_PROVENANCE_MISMATCH');
-  const q = freezeCandidate(qualified, env);
+  const q = freezeCandidate(qualified, env, policy);
   requireThat(execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() === q.sha,
     'CHECKOUT_SOURCE_MISMATCH');
   if (mode === 'candidate') {
+    // Detect accidental reviewer/wait gates before entering the environment job.
+    await validateInfrastructure(api);
+    await validateCandidateReview(api, q);
     const archive = execFileSync('git', ['archive', '--format=tar', q.sha], { maxBuffer: 100 * 1024 * 1024 });
     writeFileSync(`${env.CANDIDATE_DIR}/source.tar`, archive);
     writeFileSync(`${env.CANDIDATE_DIR}/candidate.json`, JSON.stringify({ ...q,
@@ -466,36 +709,50 @@ async function main(env) {
     execFileSync('git', ['archive', '--format=tar', q.sha], { maxBuffer: 100 * 1024 * 1024 }));
   const report = createAuditWriter(q, row => appendFileSync(env.RELEASE_REPORT, JSON.stringify(row) + '\n'));
   failureReport = code => report({ phase: 'failed', code });
-  const authority = validateAuthority(env.PRODUCTION_RELEASE_AUTHORIZATION, q, env);
-  const environment = await api.gh(`/environments/${targets.environment}`);
-  const branches = await api.gh(`/environments/${targets.environment}/deployment-branch-policies`);
-  validateEnvironment(environment, branches.branch_policies);
+  validatePolicy(q, env, policy);
+  await validateInfrastructure(api);
+  await validateCandidateReview(api, q);
+  const plan = await evidencePlan(api, q, policy);
   if (mode === 'admit') {
-    appendFileSync(env.GITHUB_OUTPUT, `receipt-artifact-id=${await resumeArtifact(api, q, authority)}\n`);
+    report({ phase: 'evidence-selected' });
+    writeFileSync(`${env.CANDIDATE_DIR}/evidence-plan.json`, JSON.stringify(plan) + '\n');
+    appendFileSync(env.GITHUB_OUTPUT, `baseline-artifact-id=${plan.baseline?.artifactId ?? ''}\n` +
+      `baseline-run-id=${plan.baseline?.runId ?? ''}\nreceipt-artifact-id=${plan.resumeChain.map(x => x.artifactId).join(',')}\n`);
     return;
   }
-  let receiptRows;
-  if (authority.resumeFromReleaseAttempt !== undefined) {
-    requireThat(positiveId(env.RESUME_ARTIFACT_ID) &&
-      env.RESUME_ARTIFACT_ID === await resumeArtifact(api, q, authority), 'TRUSTED_RESUME_ARTIFACT_REQUIRED');
+  let admittedPlan;
+  try { admittedPlan = JSON.parse(readFileSync(`${env.CANDIDATE_DIR}/evidence-plan.json`, 'utf8')); }
+  catch { throw new ReleaseFailure('FROZEN_EVIDENCE_PLAN_REQUIRED'); }
+  requireThat(JSON.stringify(admittedPlan) === JSON.stringify(plan), 'RELEASE_EVIDENCE_PLAN_CHANGED');
+  const readAudit = file => {
     let text;
-    try { text = readFileSync(env.RESUME_RECEIPT_FILE, 'utf8');
-      requireThat(text.length <= 1024 * 1024, 'RESUME_RECEIPT_UNVERIFIABLE');
-      receiptRows = text.trim().split('\n').map(line => JSON.parse(line));
-    } catch { throw new ReleaseFailure('RESUME_RECEIPT_UNVERIFIABLE'); }
+    try { text = readFileSync(file, 'utf8');
+      requireThat(text.length <= 1024 * 1024, 'AUDIT_RECEIPT_UNVERIFIABLE');
+      return text.trim().split('\n').map(line => JSON.parse(line));
+    } catch { throw new ReleaseFailure('AUDIT_RECEIPT_UNVERIFIABLE'); }
+  };
+  await deploy(api, q, policy, report, { env, evidencePlan: plan,
+    ...options.deploymentOptions,
+    baselineRows: plan.baseline ? readAudit(env.BASELINE_RECEIPT_FILE) : undefined,
+    receiptRows: plan.resume ? plan.resumeChain.flatMap(d => readAudit(plan.resumeChain.length === 1 ?
+      `${env.RESUME_RECEIPT_DIR}/release-report.jsonl` :
+      `${env.RESUME_RECEIPT_DIR}/production-release-audit-${d.runId}-${d.runAttempt}/release-report.jsonl`)) : undefined });
+}
+
+export async function run(env, options = {}) {
+  try { await main(env, options); return 0; }
+  catch (error) {
+    const code = error instanceof ReleaseFailure ? error.message : 'UNEXPECTED_RELEASE_ERROR';
+    if (failureReport) failureReport(code);
+    else if (env.RELEASE_REPORT)
+      appendFileSync(env.RELEASE_REPORT, JSON.stringify({ phase: 'blocked', code, identityVerified: false }) + '\n');
+    console.error(`::error::${code}. See the safe-release runbook; do not resume or retry provider requests blindly.`);
+    if (env.GITHUB_STEP_SUMMARY)
+      appendFileSync(env.GITHUB_STEP_SUMMARY, `Release blocked/failed: **${code}**.\nSee docs/operations/safe-automatic-deployment.md. No automatic rollback or configuration repair.\n`);
+    return 1;
   }
-  await deploy(api, q, authority, report, { receiptRows });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main(process.env).catch(error => {
-    const code = error instanceof ReleaseFailure ? error.message : 'UNEXPECTED_RELEASE_ERROR';
-    if (failureReport) failureReport(code);
-    else if (process.env.RELEASE_REPORT)
-      appendFileSync(process.env.RELEASE_REPORT, JSON.stringify({ phase: 'blocked', code, identityVerified: false }) + '\n');
-    console.error(`::error::${code}. See the safe-release runbook; do not resume or retry provider requests blindly.`);
-    if (process.env.GITHUB_STEP_SUMMARY)
-      appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Release blocked/failed: **${code}**.\nSee docs/operations/safe-automatic-deployment.md. No automatic rollback or configuration repair.\n`);
-    process.exitCode = 1;
-  });
+  process.exitCode = await run(process.env);
 }

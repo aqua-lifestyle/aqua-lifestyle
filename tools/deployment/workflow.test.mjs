@@ -12,6 +12,10 @@ test('main releases follow completed CI with protected, serialized deployment', 
   assert.match(workflow, /environment: production-release/);
   assert.match(workflow, /cancel-in-progress: false/);
   assert.doesNotMatch(workflow, /workflow_dispatch:|pull_request_target:|deploy-hook/);
+  assert.doesNotMatch(workflow, /PRODUCTION_RELEASE_AUTHORIZATION|AUTHORITY_REQUIRED/);
+  assert.match(workflow, /pull-requests: read/);
+  assert.match(workflow, /RESUME_RECEIPT_DIR:/);
+  assert.match(read('tools/deployment/release-control.mjs'), /await validateInfrastructure\(api\);/);
 });
 
 test('native Vercel production trigger cannot race the qualified orchestrator', () => {

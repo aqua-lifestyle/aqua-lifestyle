@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "epoch": "recovery-unattended-v1",
+  "profile": "recovery-only",
+  "bootstrap": null
+}
