@@ -22,6 +22,10 @@ namespace AqualLifeStyle.Tests.Application
                 .Returns(call => UsingDbContextAsync(context => context.Customers
                     .Where(customer => customer.Id == call.ArgAt<int>(1) && customer.TenantId == call.ArgAt<int>(0))
                     .Select(customer => customer.AreaId.Value).SingleAsync()));
+            authority.StabilizeRemovedCustomerAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<long>(), Arg.Any<CancellationToken>())
+                .Returns(call => UsingDbContextAsync(context => context.Customers.IgnoreQueryFilters()
+                    .Where(customer => customer.Id == call.ArgAt<int>(1) && customer.TenantId == call.ArgAt<int>(0) && customer.IsDeleted)
+                    .Select(customer => customer.AreaId.Value).SingleAsync()));
             LocalIocManager.IocContainer.Register(Component.For<IAQGreenApprovalAuthorityStabilizer>()
                 .Instance(authority).IsDefault());
         }

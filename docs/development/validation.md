@@ -70,7 +70,12 @@ ASPNETCORE_ENVIRONMENT=Development dotnet test test/AqualLifeStyle.Web.Tests/Aqu
   --filter FullyQualifiedName~MemberAreaAuthorizationPostgreSqlTests
 ```
 
-All fourteen cases must pass with zero skipped. Schema is model-created; this does
+All twenty-four cases must pass with zero skipped. The additional import and
+restoration regressions exercise the real CSV preview/import API, absent/revoked/
+future/insufficient Area authority, explicit Host permissions, per-row rollback,
+both revocation/restore orderings, restore-with-demotion and strict removed-record
+lock semantics. CI validates the TRX with a PowerShell shell/XML check.
+Schema is model-created; this does
 not prove migration behavior. CI runs a dedicated step on its existing PostgreSQL
 service in a separate disposable database and rejects missing/skipped cases.
 Without opt-in, default web-suite skips are intentional and are not PG evidence.

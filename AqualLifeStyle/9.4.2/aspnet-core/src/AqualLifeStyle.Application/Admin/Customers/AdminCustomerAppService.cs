@@ -29,6 +29,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
     public class AdminCustomerAppService : AdminAppServiceBase, IAdminCustomerAppService
     {
         private readonly IAdminCustomerAccountManager _accountManager;
+        private readonly IAdminMemberRecordAuthority _memberRecordAuthority;
         private readonly IRepository<Area, Guid> _areas;
         private readonly IRepository<AreaAdminAssignment, Guid> _areaAdministrators;
         private readonly IAQGreenApprovalAuthorityStabilizer _areaAuthorityStabilizer;
@@ -53,9 +54,11 @@ namespace AqualLifeStyle.Application.Admin.Customers
             IRepository<Area, Guid> areas,
             IRepository<AreaAdminAssignment, Guid> areaAdministrators,
             IAQGreenApprovalAuthorityStabilizer areaAuthorityStabilizer,
-            IUnitOfWorkManager unitOfWorkManager)
+            IUnitOfWorkManager unitOfWorkManager,
+            IAdminMemberRecordAuthority memberRecordAuthority)
         {
             _accountManager = accountManager;
+            _memberRecordAuthority = memberRecordAuthority;
             _areas = areas;
             _areaAdministrators = areaAdministrators;
             _areaAuthorityStabilizer = areaAuthorityStabilizer;
@@ -153,7 +156,6 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 });
                 if (accountResult.RemovedCustomer != null)
                 {
-                    await RequireMemberRecordAuthorityAsync(accountResult.RemovedCustomer, forMutation: false);
                     return new AdminCustomerOnboardingResultDto
                     {
                         RequiresRestoreConfirmation = true,
@@ -169,7 +171,6 @@ namespace AqualLifeStyle.Application.Admin.Customers
 
                 await CurrentUnitOfWork.SaveChangesAsync();
                 var customer = accountResult.Customer;
-                await RequireMemberRecordAuthorityAsync(customer, forMutation: true);
                 await ScheduleVerificationIfRequiredAsync(customer, "admin-created");
                 LogAdminMutation("Customer", "created", customer.Id, tenantId, input.Justification);
                 return new AdminCustomerOnboardingResultDto
@@ -201,7 +202,6 @@ namespace AqualLifeStyle.Application.Admin.Customers
                     IsActive = input.IsActive
                 });
                 await CurrentUnitOfWork.SaveChangesAsync();
-                await RequireMemberRecordAuthorityAsync(customer, forMutation: true);
                 var tenant = await TenantManager.GetByIdAsync(tenantId);
                 var passwordSetupUrl = await _passwordSetupLinkGenerator.GenerateAsync(customer.User, tenant.TenancyName);
                 await ScheduleVerificationIfRequiredAsync(
@@ -245,7 +245,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
                         MembershipId = input.MembershipId, IsActive = input.IsActive
                     });
                     await CurrentUnitOfWork.SaveChangesAsync();
-                    await RequireMemberRecordAuthorityAsync(customer, forMutation: true);
+                    await _memberRecordAuthority.RequireLiveAsync(tenantId, customer.Id);
                     if (customer.User.IsActive &&
                         !customer.User.IsEmailConfirmed &&
                         !string.Equals(originalSecurityStamp, customer.User.SecurityStamp, StringComparison.Ordinal))
@@ -319,7 +319,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 query = await RestrictMemberRecordsAsync(query, _areaAdministrators, _areas);
                 var hint = await query.AsNoTracking().Select(item => new { item.Id, item.TenantId }).SingleOrDefaultAsync();
                 if (hint == null) throw new AbpAuthorizationException("The removed customer was not found in your authorized scope.");
-                await _areaAuthorityStabilizer.LockCustomerAsync(hint.TenantId.Value, hint.Id);
+                await _memberRecordAuthority.RequireRemovedAsync(hint.TenantId.Value, hint.Id);
                 var customer = await query.SingleOrDefaultAsync();
                 if (customer == null)
                     throw new AbpAuthorizationException("The removed customer was not found in your authorized scope.");
@@ -339,26 +339,6 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 var result = await command();
                 await uow.CompleteAsync();
                 return result;
-            }
-        }
-
-        private async Task RequireMemberRecordAuthorityAsync(Customer customer, bool forMutation)
-        {
-            using (DisableAllTenantDataFiltersForHost())
-            using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.SoftDelete))
-            {
-                await _areaAuthorityStabilizer.LockCustomerAsync(customer.TenantId.Value, customer.Id);
-                var query = await RestrictMemberRecordsAsync(_customerRepository.GetAll()
-                    .Where(item => item.Id == customer.Id), _areaAdministrators, _areas);
-                var current = await query.AsNoTracking().Select(item => new { item.MembershipId }).SingleOrDefaultAsync();
-                if (current == null)
-                    throw new AbpAuthorizationException("The member is outside your authorized Tenant/Area scope.");
-                if (forMutation && current.MembershipId.HasValue && AbpSession.TenantId.HasValue)
-                {
-                    await _areaAuthorityStabilizer.StabilizeAsync(customer.TenantId.Value, customer.Id, AbpSession.GetUserId());
-                    if (!await query.AnyAsync())
-                        throw new AbpAuthorizationException("The member is outside your authorized Tenant/Area scope.");
-                }
             }
         }
 

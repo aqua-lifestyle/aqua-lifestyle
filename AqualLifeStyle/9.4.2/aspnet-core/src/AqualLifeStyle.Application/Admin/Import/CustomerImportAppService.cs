@@ -37,7 +37,7 @@ namespace AqualLifeStyle.Application.Admin.Import
         private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
 
         private readonly ICustomerRepository _customerRepository;
-        private readonly IMembershipRepository _membershipRepository;
+        private readonly IRepository<Membership> _membershipRepository;
         private readonly IRepository<User, long> _userRepository;
         private readonly IAdminCustomerAccountManager _accountManager;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
@@ -45,7 +45,7 @@ namespace AqualLifeStyle.Application.Admin.Import
 
         public CustomerImportAppService(
             ICustomerRepository customerRepository,
-            IMembershipRepository membershipRepository,
+            IRepository<Membership> membershipRepository,
             IRepository<User, long> userRepository,
             IAdminCustomerAccountManager accountManager,
             IUnitOfWorkManager unitOfWorkManager,
@@ -133,7 +133,12 @@ namespace AqualLifeStyle.Application.Admin.Import
             {
                 try
                 {
-                    using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions { IsTransactional = true }))
+                    using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+                    {
+                        Scope = System.Transactions.TransactionScopeOption.RequiresNew,
+                        IsTransactional = true,
+                        IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted
+                    }))
                     using (_unitOfWorkManager.Current.SetTenantId(preview.TenantId))
                     {
                         await ImportRowAsync(preview.TenantId, row);

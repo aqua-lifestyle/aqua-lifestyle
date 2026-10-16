@@ -19,6 +19,7 @@ using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Roles;
 using AqualLifeStyle.Authorization.Users;
 using AqualLifeStyle.Domain.Areas;
+using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Domain.Common;
 using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enums;
@@ -426,7 +427,313 @@ namespace AqualLifeStyle.Web.Tests.Controllers
             (await FingerprintAsync(f.MemberId)).ShouldBe(before);
         }
 
-        private async Task<Fixture> SeedAsync(bool host = false, bool allTenants = false, string[] permissions = null, bool customerPermissions = false)
+        [MemberAreaPostgreSqlFact]
+        public async Task ImportWithoutAreaAuthorityRollsBackMemberIdentityAndCustomer()
+        {
+            var f = await SeedAsync(customerPermissions: true);
+            await PrepareImportAreaAsync(f);
+            await SignInAsync(f);
+            var email = "import-denied-" + f.Keyword + "@example.test";
+            var preview = await PreviewImportAsync(f, email, f.PlanId);
+            await UsingDbContextAsync(async db => db.AreaAdminAssignments.Remove(
+                await db.AreaAdminAssignments.IgnoreQueryFilters().SingleAsync(a => a.Id == f.AssignmentId)));
+            var result = await ConfirmImportAsync(preview);
+            result.GetProperty("importedRows").GetInt32().ShouldBe(0);
+            result.GetProperty("failedRows").GetInt32().ShouldBe(1);
+            result.GetProperty("errors")[0].GetProperty("message").GetString().ShouldBe("Authorization failed while importing this row.");
+            await AssertNoIdentityOrCustomerAsync(email);
+        }
+
+        [MemberAreaPostgreSqlFact]
+        public async Task RestoreWithDemotionHoldsOriginalAreaAndGrantThroughCommit()
+        {
+            var f = await SeedAsync(customerPermissions: true);
+            await UsingDbContextAsync(async db => (await db.Customers.IgnoreQueryFilters().SingleAsync(c => c.Id == f.MemberId)).IsDeleted = true);
+            var pause = new PausedUpdater(IocManager.Resolve<IAdminCustomerProfileUpdater>());
+            IocManager.IocContainer.Register(Component.For<IAdminCustomerProfileUpdater>().Instance(pause).IsDefault());
+            await SignInAsync(f);
+            var restore = CustomerCommandAsync("Restore", DemotingRestore(f), HttpStatusCode.OK);
+            try
+            {
+                await pause.Entered.Task.WaitAsync(TimeSpan.FromSeconds(20));
+                foreach (var sql in new[] {
+                    "UPDATE public.\"Areas\" SET \"IsActive\"=false WHERE \"Id\"=@id",
+                    "UPDATE public.\"AreaAdminAssignments\" SET \"RevokedAt\"=NOW() WHERE \"Id\"=@id" })
+                {
+                    await using var connection = new NpgsqlConnection(Environment.GetEnvironmentVariable("REPRO_PG_CONNECTION"));
+                    await connection.OpenAsync();
+                    await using (var timeout = new NpgsqlCommand("SET lock_timeout='300ms'", connection)) await timeout.ExecuteNonQueryAsync();
+                    await using var command = new NpgsqlCommand(sql, connection);
+                    command.Parameters.AddWithValue("id", sql.Contains("\"Areas\"") ? (object)f.AreaId : f.AssignmentId);
+                    (await Should.ThrowAsync<PostgresException>(() => command.ExecuteNonQueryAsync())).SqlState.ShouldBe("55P03");
+                }
+            }
+            finally { pause.Continue.TrySetResult(true); await restore; }
+            await UsingDbContextAsync(async db =>
+            {
+                var restored = await db.Customers.IgnoreQueryFilters().SingleAsync(c => c.Id == f.MemberId);
+                restored.IsDeleted.ShouldBeFalse(); restored.MembershipId.ShouldBeNull();
+                (await db.AreaAdminAssignments.IgnoreQueryFilters().SingleAsync(a => a.Id == f.AssignmentId)).Revoke(DateTime.UtcNow);
+            });
+        }
+
+        [MemberAreaPostgreSqlFact]
+        public async Task ImportAllowsAssignedMembersAndPreservesNonmemberRows()
+        {
+            foreach (var host in new[] { false, true })
+            {
+                var f = await SeedAsync(host, allTenants: host, customerPermissions: true);
+                await PrepareImportAreaAsync(f);
+                await SignInAsync(f);
+                var email = "import-allowed-" + f.Keyword + "@example.test";
+                var preview = await PreviewImportAsync(f, email, f.PlanId);
+                var result = await ConfirmImportAsync(preview);
+                result.GetProperty("importedRows").GetInt32().ShouldBe(1,
+                    $"Host={host}; row errors={result.GetProperty("errors").GetRawText()}");
+                result.GetProperty("failedRows").GetInt32().ShouldBe(0);
+                await UsingDbContextAsync(async db =>
+                {
+                    var customer = await db.Customers.IgnoreQueryFilters().Include(c => c.User).SingleAsync(c => c.Email.Value == email);
+                    customer.AreaId.ShouldBe(f.AreaId); customer.TenantId.ShouldBe(1);
+                    customer.MembershipId.ShouldBe(f.PlanId); customer.User.TenantId.ShouldBe(1);
+                });
+            }
+            // Import permission still authorizes a non-member without member Area authority.
+            var nonmember = await SeedAsync(customerPermissions: true);
+            await PrepareImportAreaAsync(nonmember);
+            await SignInAsync(nonmember);
+            await UsingDbContextAsync(async db => (await db.AreaAdminAssignments.IgnoreQueryFilters()
+                .SingleAsync(a => a.Id == nonmember.AssignmentId)).Revoke(DateTime.UtcNow));
+            var nonmemberEmail = "nonmember-" + nonmember.Keyword + "@example.test";
+            var nonmemberPreview = await PreviewImportAsync(nonmember, nonmemberEmail, null);
+            (await ConfirmImportAsync(nonmemberPreview)).GetProperty("importedRows").GetInt32().ShouldBe(1);
+            await UsingDbContextAsync(async db => (await db.Customers.IgnoreQueryFilters()
+                .SingleAsync(c => c.Email.Value == nonmemberEmail)).MembershipId.ShouldBeNull());
+        }
+
+        [MemberAreaPostgreSqlFact]
+        public async Task ImportRechecksRevokedFutureInactiveAndInsufficientAreaAuthority()
+        {
+            foreach (var state in new[] { "revoked", "future", "inactive", "other-area", "host-without-alltenants" })
+            {
+                var f = await SeedAsync(host: state == "host-without-alltenants", customerPermissions: true);
+                await PrepareImportAreaAsync(f);
+                await SignInAsync(f);
+                var email = "import-state-" + f.Keyword + "@example.test";
+                var preview = await PreviewImportAsync(f, email, f.PlanId);
+                await UsingDbContextAsync(async db =>
+                {
+                    if (f.AssignmentId.HasValue)
+                    {
+                        var assignment = await db.AreaAdminAssignments.IgnoreQueryFilters().SingleAsync(a => a.Id == f.AssignmentId);
+                        assignment.Revoke(DateTime.UtcNow);
+                        var area = await db.Areas.IgnoreQueryFilters().SingleAsync(a => a.Id == f.AreaId);
+                        if (state == "future") db.AreaAdminAssignments.Add(AreaAdminAssignment.Assign(area,
+                            f.Administrator.Id, 1, DateTime.UtcNow.AddDays(1)));
+                        if (state == "other-area")
+                        {
+                            var other = await db.Areas.IgnoreQueryFilters().SingleAsync(a => a.Id == f.OtherAreaId);
+                            other.Activate();
+                            db.AreaAdminAssignments.Add(AreaAdminAssignment.Assign(other, f.Administrator.Id, 1, DateTime.UtcNow.AddMinutes(-1)));
+                            other.Deactivate();
+                        }
+                        if (state == "inactive") area.Deactivate();
+                    }
+                });
+                var result = await ConfirmImportAsync(preview);
+                result.GetProperty("importedRows").GetInt32().ShouldBe(0, state);
+                result.GetProperty("failedRows").GetInt32().ShouldBe(1, state);
+                if (state != "inactive") result.GetProperty("errors")[0].GetProperty("message").GetString()
+                    .ShouldBe("Authorization failed while importing this row.", state);
+                await AssertNoIdentityOrCustomerAsync(email);
+            }
+        }
+
+        [MemberAreaPostgreSqlFact]
+        public async Task ImportWaitingOnAreaLockDeniesCommittedRevocationAndRollsBack()
+        {
+            var f = await SeedAsync(customerPermissions: true);
+            await PrepareImportAreaAsync(f); await SignInAsync(f);
+            var email = "import-race-" + f.Keyword + "@example.test";
+            var preview = await PreviewImportAsync(f, email, f.PlanId);
+            await using var blocker = new NpgsqlConnection(Environment.GetEnvironmentVariable("REPRO_PG_CONNECTION"));
+            await blocker.OpenAsync(); await using var transaction = await blocker.BeginTransactionAsync();
+            await using (var command = new NpgsqlCommand("SELECT 1 FROM public.\"Areas\" WHERE \"Id\"=@id FOR UPDATE", blocker, transaction))
+            { command.Parameters.AddWithValue("id", f.AreaId); await command.ExecuteScalarAsync(); }
+            var import = ConfirmImportAsync(preview);
+            try
+            {
+                await WaitForLockWaiterAsync();
+                await using var revoke = new NpgsqlCommand("UPDATE public.\"AreaAdminAssignments\" SET \"RevokedAt\"=NOW() WHERE \"Id\"=@id", blocker, transaction);
+                revoke.Parameters.AddWithValue("id", f.AssignmentId); await revoke.ExecuteNonQueryAsync();
+            }
+            finally { await transaction.CommitAsync(); }
+            var result = await import;
+            result.GetProperty("importedRows").GetInt32().ShouldBe(0);
+            result.GetProperty("errors")[0].GetProperty("message").GetString().ShouldBe("Authorization failed while importing this row.");
+            await AssertNoIdentityOrCustomerAsync(email);
+        }
+
+        [MemberAreaPostgreSqlFact]
+        public async Task RestoreWithDemotionDeniesRevocationCommittedDuringCustomerLockWait()
+        {
+            var f = await SeedAsync(customerPermissions: true);
+            await UsingDbContextAsync(async db => (await db.Customers.IgnoreQueryFilters().SingleAsync(c => c.Id == f.MemberId)).IsDeleted = true);
+            var before = await FingerprintAsync(f.MemberId); await SignInAsync(f);
+            await using var blocker = new NpgsqlConnection(Environment.GetEnvironmentVariable("REPRO_PG_CONNECTION"));
+            await blocker.OpenAsync(); await using var transaction = await blocker.BeginTransactionAsync();
+            await using (var command = new NpgsqlCommand("SELECT 1 FROM public.\"Customers\" WHERE \"Id\"=@id FOR UPDATE", blocker, transaction))
+            { command.Parameters.AddWithValue("id", f.MemberId); await command.ExecuteScalarAsync(); }
+            var restore = CustomerCommandAsync("Restore", DemotingRestore(f), HttpStatusCode.Forbidden);
+            try
+            {
+                await WaitForLockWaiterAsync();
+                await using var revoke = new NpgsqlCommand("UPDATE public.\"AreaAdminAssignments\" SET \"RevokedAt\"=NOW() WHERE \"Id\"=@id", blocker, transaction);
+                revoke.Parameters.AddWithValue("id", f.AssignmentId); await revoke.ExecuteNonQueryAsync();
+            }
+            finally { await transaction.CommitAsync(); }
+            await restore; (await FingerprintAsync(f.MemberId)).ShouldBe(before);
+        }
+
+        [MemberAreaPostgreSqlFact]
+        public async Task RestoreWithDemotionRollsBackFlushedDeletedCustomerAndIdentityOnFailure()
+        {
+            var f = await SeedAsync(customerPermissions: true);
+            await UsingDbContextAsync(async db => (await db.Customers.IgnoreQueryFilters().SingleAsync(c => c.Id == f.MemberId)).IsDeleted = true);
+            var before = await FingerprintAsync(f.MemberId);
+            var failing = new FailingAfterSaveUpdater(IocManager.Resolve<IAdminCustomerProfileUpdater>(), IocManager.Resolve<IUnitOfWorkManager>());
+            IocManager.IocContainer.Register(Component.For<IAdminCustomerProfileUpdater>().Instance(failing).IsDefault());
+            await SignInAsync(f);
+            await CustomerCommandAsync("Restore", DemotingRestore(f), HttpStatusCode.InternalServerError);
+            failing.Flushed.ShouldBeTrue(); (await FingerprintAsync(f.MemberId)).ShouldBe(before);
+            await UsingDbContextAsync(async db => (await db.TransactionalEmailOutboxMessages.IgnoreQueryFilters()
+                .AnyAsync(m => m.Recipient == f.Keyword + "-first@example.test")).ShouldBeFalse());
+        }
+
+        private async Task PrepareImportAreaAsync(Fixture f)
+        {
+            await UsingDbContextAsync(async db =>
+            {
+                foreach (var area in await db.Areas.IgnoreQueryFilters().Where(a => a.TenantId == 1 && a.Id != f.AreaId).ToListAsync())
+                    area.Deactivate();
+                if (!await db.Roles.IgnoreQueryFilters().AnyAsync(r => r.TenantId == 1 && r.Name == "Guest"))
+                    db.Roles.Add(new Role(1, "Guest", "Guest"));
+            });
+        }
+
+        private async Task<string> PreviewImportAsync(Fixture f, string email, int? membershipId)
+        {
+            var csv = "FirstName,LastName,Email,ContactNumber,HomeAddress,MembershipId,IsActive\r\n" +
+                $"TEST,Import,{email},+12025550100,TEST isolated import,{membershipId},true\r\n";
+            return await PreviewCsvAsync(csv);
+        }
+
+        private async Task<string> PreviewCsvAsync(string csv, int tenantId = 1)
+        {
+            using var response = await Client.PostAsync("/api/services/app/CustomerImport/Preview",
+                new StringContent(JsonSerializer.Serialize(new { tenantId, fileName = "synthetic.csv",
+                    contentBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(csv)) }, Json), Encoding.UTF8, "application/json"));
+            var result = await ReadAsync(response, HttpStatusCode.OK);
+            result.GetProperty("canImport").GetBoolean().ShouldBeTrue(result.GetProperty("errors").GetRawText());
+            return result.GetProperty("previewId").GetString();
+        }
+
+        private async Task<JsonElement> ConfirmImportAsync(string preview)
+        {
+            using var response = await Client.PostAsync("/api/services/app/CustomerImport/Import",
+                new StringContent(JsonSerializer.Serialize(new { previewId = preview }, Json), Encoding.UTF8, "application/json"));
+            return await ReadAsync(response, HttpStatusCode.OK);
+        }
+
+        private async Task AssertNoIdentityOrCustomerAsync(string email)
+        {
+            await UsingDbContextAsync(async db =>
+            {
+                (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.EmailAddress == email)).ShouldBeFalse();
+                (await db.Customers.IgnoreQueryFilters().AnyAsync(c => c.Email.Value == email)).ShouldBeFalse();
+                (await db.TransactionalEmailOutboxMessages.IgnoreQueryFilters().AnyAsync(m => m.Recipient == email)).ShouldBeFalse();
+            });
+        }
+
+        private static object DemotingRestore(Fixture f) => new { customerId = f.MemberId,
+            firstName = "TEST", lastName = "Restored Nonmember", email = f.Keyword + "-first@example.test",
+            contactNumber = "+12025550100", homeAddress = "TEST restored isolated fixture",
+            membershipId = (int?)null, isActive = true, justification = "TEST source-member restore with demotion" };
+
+        [MemberAreaPostgreSqlFact]
+        public async Task ImportKeepsSuccessfulNonmemberRowsWhenMemberRowIsDenied()
+        {
+            var f = await SeedAsync(customerPermissions: true);
+            await PrepareImportAreaAsync(f); await SignInAsync(f);
+            var guest1 = "mixed-first-" + f.Keyword + "@example.test";
+            var denied = "mixed-denied-" + f.Keyword + "@example.test";
+            var guest2 = "mixed-last-" + f.Keyword + "@example.test";
+            var csv = "FirstName,LastName,Email,ContactNumber,HomeAddress,MembershipId,IsActive\r\n" +
+                $"TEST,First,{guest1},+12025550100,TEST isolated import,,true\r\n" +
+                $"TEST,Denied,{denied},+12025550100,TEST isolated import,{f.PlanId},true\r\n" +
+                $"TEST,Last,{guest2},+12025550100,TEST isolated import,,true\r\n";
+            var preview = await PreviewCsvAsync(csv);
+            await UsingDbContextAsync(async db => (await db.AreaAdminAssignments.IgnoreQueryFilters()
+                .SingleAsync(a => a.Id == f.AssignmentId)).Revoke(DateTime.UtcNow));
+            var result = await ConfirmImportAsync(preview);
+            result.GetProperty("totalRows").GetInt32().ShouldBe(3);
+            result.GetProperty("importedRows").GetInt32().ShouldBe(2);
+            result.GetProperty("failedRows").GetInt32().ShouldBe(1);
+            result.GetProperty("errors")[0].GetProperty("rowNumber").GetInt32().ShouldBe(3);
+            await AssertNoIdentityOrCustomerAsync(denied);
+            await UsingDbContextAsync(async db =>
+            {
+                (await db.Customers.IgnoreQueryFilters().CountAsync(c => c.Email.Value == guest1 || c.Email.Value == guest2)).ShouldBe(2);
+                (await db.Users.IgnoreQueryFilters().CountAsync(u => u.EmailAddress == guest1 || u.EmailAddress == guest2)).ShouldBe(2);
+            });
+        }
+
+        [MemberAreaPostgreSqlFact]
+        public async Task ImportPermissionAndTenantCannotBeReplacedByMemberOrHostPermissions()
+        {
+            var f = await SeedAsync(customerPermissions: true, importPermission: false);
+            await PrepareImportAreaAsync(f); await SignInAsync(f);
+            using (var response = await Client.PostAsync("/api/services/app/CustomerImport/Preview",
+                new StringContent(JsonSerializer.Serialize(new { tenantId = 1, fileName = "synthetic.csv",
+                    contentBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("TEST")) }, Json), Encoding.UTF8, "application/json")))
+                await ReadAsync(response, HttpStatusCode.Forbidden);
+            // Assert the actual action boundary, independently of preview parsing.
+            using (var response = await Client.PostAsync("/api/services/app/CustomerImport/Import",
+                new StringContent("{\"previewId\":\"synthetic-unissued-preview\"}", Encoding.UTF8, "application/json")))
+                await ReadAsync(response, HttpStatusCode.Forbidden);
+            var tenant = await SeedAsync(customerPermissions: true, allTenants: true);
+            await PrepareImportAreaAsync(tenant); await SignInAsync(tenant);
+            using var crossTenant = await Client.PostAsync("/api/services/app/CustomerImport/Preview",
+                new StringContent(JsonSerializer.Serialize(new { tenantId = tenant.ForeignTenantId,
+                    fileName = "synthetic.csv", contentBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("TEST")) }, Json), Encoding.UTF8, "application/json"));
+            await ReadAsync(crossTenant, HttpStatusCode.Forbidden);
+        }
+
+        [MemberAreaPostgreSqlFact]
+        public async Task RemovedAuthorityLockApiRejectsLiveRowsAndLiveApprovalStillRejectsRemovedRows()
+        {
+            var f = await SeedAsync();
+            var manager = IocManager.Resolve<IUnitOfWorkManager>();
+            var stabilizer = IocManager.Resolve<IAQGreenApprovalAuthorityStabilizer>();
+            var options = new UnitOfWorkOptions { Scope = System.Transactions.TransactionScopeOption.RequiresNew,
+                IsTransactional = true, IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted };
+            using (var uow = manager.Begin(options))
+            {
+                await Should.ThrowAsync<AQGreenPlacementConflictException>(() => stabilizer.StabilizeRemovedCustomerAsync(1, f.MemberId, f.Administrator.Id));
+                await uow.CompleteAsync();
+            }
+            await UsingDbContextAsync(async db => (await db.Customers.IgnoreQueryFilters().SingleAsync(c => c.Id == f.MemberId)).IsDeleted = true);
+            using (var uow = manager.Begin(options))
+            {
+                await Should.ThrowAsync<AQGreenPlacementConflictException>(() => stabilizer.StabilizeAsync(1, f.MemberId, f.Administrator.Id));
+                (await stabilizer.StabilizeRemovedCustomerAsync(1, f.MemberId, f.Administrator.Id)).ShouldBe(f.AreaId);
+                await uow.CompleteAsync();
+            }
+            await UsingDbContextAsync(async db => (await db.Customers.IgnoreQueryFilters().SingleAsync(c => c.Id == f.MemberId)).IsDeleted.ShouldBeTrue());
+        }
+
+        private async Task<Fixture> SeedAsync(bool host = false, bool allTenants = false, string[] permissions = null,
+            bool customerPermissions = false, bool importPermission = true)
         {
             return await UsingDbContextAsync(async db =>
             {
@@ -463,6 +770,7 @@ namespace AqualLifeStyle.Web.Tests.Controllers
                 if (customerPermissions) granted.AddRange(new[] { AquaPermissions.Admin.Customers.Default,
                     AquaPermissions.Admin.Customers.View, AquaPermissions.Admin.Customers.Edit, AquaPermissions.Admin.Customers.Delete,
                     AquaPermissions.Admin.Customers.Create, AquaPermissions.Members.View });
+                if (customerPermissions && importPermission) granted.Add(AquaPermissions.Admin.Customers.Import);
                 if (allTenants) granted.Add(AquaPermissions.Admin.AllTenants);
                 db.Permissions.AddRange(granted.Select(name => new RolePermissionSetting { TenantId = admin.TenantId, RoleId = role.Id, Name = name, IsGranted = true }));
                 var assignment = host ? null : AreaAdminAssignment.Assign(area, admin.Id, 1, DateTime.UtcNow.AddMinutes(-1));
@@ -474,8 +782,9 @@ namespace AqualLifeStyle.Web.Tests.Controllers
                     db.Customers.Add(operatorCustomer);
                 }
                 foreach (var tenantId in new[] { 1, foreignTenant.Id })
-                    if (!await db.Roles.IgnoreQueryFilters().AnyAsync(r => r.TenantId == tenantId && r.Name == "Member"))
-                        db.Roles.Add(new Role(tenantId, "Member", "Member"));
+                    foreach (var roleName in new[] { "Member", "Guest" })
+                        if (!await db.Roles.IgnoreQueryFilters().AnyAsync(r => r.TenantId == tenantId && r.Name == roleName))
+                            db.Roles.Add(new Role(tenantId, roleName, roleName));
                 await db.SaveChangesAsync();
                 async Task<Customer> Member(string name, int tenantId, Area memberArea, int membershipId)
                 {
@@ -572,8 +881,10 @@ namespace AqualLifeStyle.Web.Tests.Controllers
         {
             var member = await db.Customers.IgnoreQueryFilters().Include(c => c.User).SingleAsync(c => c.Id == id);
             return JsonSerializer.Serialize(new { member.Name, member.MembershipId, member.AreaId, member.IsActive, member.IsDeleted,
+                member.DeletionTime, member.DeleterUserId,
                 UserName = member.User.Name, member.User.Surname, member.User.EmailAddress, member.User.PhoneNumber, member.User.HomeAddress,
-                UserActive = member.User.IsActive, member.User.SecurityStamp });
+                UserActive = member.User.IsActive, member.User.SecurityStamp, member.User.IsEmailConfirmed,
+                RequiresPasswordReset = member.User.RequiresPasswordReset() });
         });
 
         private static object Edit(Fixture f, int? target = null) => new { id = target ?? f.MemberId,

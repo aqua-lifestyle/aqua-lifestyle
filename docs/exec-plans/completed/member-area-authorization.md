@@ -3,6 +3,12 @@
 > **NOT BUSINESS AUTHORITY.** This worklog records execution state and evidence. It
 > cannot confirm or supersede a business-policy decision.
 
+> The owner's subsequent independent security review of `cc2709c` found a customer
+> import bypass and a restoration source-authority race. The PASS below records
+> the earlier review only and does not establish acceptance. Follow
+> [security remediation](../active/member-area-security-remediation.md) for the
+> corrections, new regression evidence and fresh final-commit review.
+
 ## Goal
 
 Correct general member reads/mutations using existing Tenant/Area assignment and

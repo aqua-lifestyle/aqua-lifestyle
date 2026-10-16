@@ -52,6 +52,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
         private readonly UserManager _userManager;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
         private readonly IAreaAssignmentResolver _areaAssignmentResolver;
+        private readonly IAdminMemberRecordAuthority _memberRecordAuthority;
 
         public AdminCustomerAccountManager(
             ICustomerRepository customerRepository,
@@ -60,7 +61,8 @@ namespace AqualLifeStyle.Application.Admin.Customers
             IRepository<User, long> userRepository,
             UserManager userManager,
             IUnitOfWorkManager unitOfWorkManager,
-            IAreaAssignmentResolver areaAssignmentResolver)
+            IAreaAssignmentResolver areaAssignmentResolver,
+            IAdminMemberRecordAuthority memberRecordAuthority)
         {
             _customerRepository = customerRepository;
             _membershipPlanAssignmentValidator = membershipPlanAssignmentValidator;
@@ -69,11 +71,13 @@ namespace AqualLifeStyle.Application.Admin.Customers
             _userManager = userManager;
             _unitOfWorkManager = unitOfWorkManager;
             _areaAssignmentResolver = areaAssignmentResolver;
+            _memberRecordAuthority = memberRecordAuthority;
         }
 
         public async Task<AdminCustomerAccountResult> CreateOrFindRemovedAsync(AdminCustomerAccountInput input)
         {
             Validate(input);
+            _memberRecordAuthority.RequireTransaction();
             var email = input.Email.Trim();
             var normalizedEmail = email.ToUpperInvariant();
 
@@ -91,6 +95,7 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 {
                     if (!existingCustomer.IsDeleted || existingCustomer.TenantId != input.TenantId)
                         throw new UserFriendlyException("Customer creation failed.", "The email address belongs to an existing account.");
+                    await _memberRecordAuthority.RequireRemovedAsync(input.TenantId, existingCustomer.Id);
                     return new AdminCustomerAccountResult
                     {
                         RemovedCustomer = existingCustomer
@@ -143,6 +148,10 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 customer.AssignInitialArea(area, DateTime.UtcNow, "Administrator customer creation");
                 if (!input.IsActive) customer.Deactivate();
                 await _customerRepository.InsertAsync(customer);
+                // Every caller (including per-row import) must authorize the
+                // persisted record before committing either identity or Customer.
+                await _unitOfWorkManager.Current.SaveChangesAsync();
+                await _memberRecordAuthority.RequireLiveAsync(input.TenantId, customer.Id);
                 return new AdminCustomerAccountResult
                 {
                     Customer = customer
@@ -153,10 +162,12 @@ namespace AqualLifeStyle.Application.Admin.Customers
         public async Task<Customer> RestoreAsync(int customerId, AdminCustomerAccountInput input)
         {
             Validate(input);
+            _memberRecordAuthority.RequireTransaction();
             using (_unitOfWorkManager.Current.SetTenantId(input.TenantId))
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.SoftDelete))
             {
+                await _memberRecordAuthority.RequireRemovedAsync(input.TenantId, customerId);
                 var customer = await _customerRepository.GetAllIncluding(item => item.User)
                     .SingleOrDefaultAsync(item => item.Id == customerId && item.TenantId == input.TenantId);
                 if (customer == null || !customer.IsDeleted)
@@ -178,6 +189,8 @@ namespace AqualLifeStyle.Application.Admin.Customers
                 await _userManager.InitializeOptionsAsync(input.TenantId);
                 customer.User.RequirePasswordReset();
                 EnsureSuccess(await _userManager.UpdateSecurityStampAsync(customer.User));
+                await _unitOfWorkManager.Current.SaveChangesAsync();
+                await _memberRecordAuthority.RequireLiveAsync(input.TenantId, customer.Id);
                 return customer;
             }
         }

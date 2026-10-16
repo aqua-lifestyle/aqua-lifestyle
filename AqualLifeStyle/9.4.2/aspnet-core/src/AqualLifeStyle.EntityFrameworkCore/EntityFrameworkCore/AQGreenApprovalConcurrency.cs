@@ -22,11 +22,19 @@ namespace AqualLifeStyle.EntityFrameworkCore
             _dbContextProvider = dbContextProvider;
         }
 
-        public async Task<Guid> StabilizeAsync(
+        public Task<Guid> StabilizeAsync(
             int tenantId,
             int customerId,
             long? areaAdministratorUserId,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default) =>
+            StabilizeCustomerAsync(tenantId, customerId, areaAdministratorUserId, removed: false, cancellationToken);
+
+        public Task<Guid> StabilizeRemovedCustomerAsync(int tenantId, int customerId,
+            long areaAdministratorUserId, CancellationToken cancellationToken = default) =>
+            StabilizeCustomerAsync(tenantId, customerId, areaAdministratorUserId, removed: true, cancellationToken);
+
+        private async Task<Guid> StabilizeCustomerAsync(int tenantId, int customerId,
+            long? areaAdministratorUserId, bool removed, CancellationToken cancellationToken)
         {
             if (tenantId <= 0) throw new ArgumentOutOfRangeException(nameof(tenantId));
             if (customerId <= 0) throw new ArgumentOutOfRangeException(nameof(customerId));
@@ -35,7 +43,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
 
             var context = GetReadCommittedPostgreSqlContext();
             var customer = await LockCustomerRowAsync(context, tenantId, customerId, cancellationToken);
-            if (customer == null || customer.IsDeleted || !customer.AreaId.HasValue)
+            if (customer == null || customer.IsDeleted != removed || !customer.AreaId.HasValue)
                 throw new AQGreenPlacementConflictException(
                     "AQGreen approval requires a current participant Area assignment.");
 
