@@ -1,0 +1,133 @@
+{
+  "observedAt": "2026-10-16T18:08:16.309Z",
+  "method": "authenticated GET only",
+  "main": {
+    "status": 200,
+    "data": {
+      "sha": "23f176db6eb13af5ee01ff69f1a9f7bbe6b880ff",
+      "protected": true
+    }
+  },
+  "classic": {
+    "status": 404
+  },
+  "rulesets": {
+    "status": 200,
+    "data": [
+      {
+        "id": 19085283,
+        "name": "gatekeeper",
+        "target": "branch",
+        "source_type": "Repository",
+        "source": "aqua-lifestyle/aqua-lifestyle",
+        "enforcement": "active",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5MGLgmzgEjN-M",
+        "_links": {
+          "self": {
+            "href": "https://api.github.com/repos/aqua-lifestyle/aqua-lifestyle/rulesets/19085283"
+          },
+          "html": {
+            "href": "https://github.com/aqua-lifestyle/aqua-lifestyle/rules/19085283"
+          }
+        },
+        "created_at": "2026-07-17T06:42:23.917+02:00",
+        "updated_at": "2026-08-25T09:53:28.830+02:00"
+      }
+    ]
+  },
+  "actions": {
+    "status": 200,
+    "data": {
+      "enabled": true,
+      "allowed_actions": "all",
+      "sha_pinning_required": false
+    }
+  },
+  "workflow": {
+    "status": 200,
+    "data": {
+      "default_workflow_permissions": "read",
+      "can_approve_pull_request_reviews": false
+    }
+  },
+  "environment": {
+    "status": 200,
+    "data": {
+      "name": "production-release",
+      "can_admins_bypass": true,
+      "protection_rules": [],
+      "deployment_branch_policy": null
+    }
+  },
+  "branches": {
+    "status": 404
+  },
+  "repoSecrets": {
+    "status": 200,
+    "data": {
+      "total_count": 0,
+      "secrets": []
+    }
+  },
+  "environmentSecrets": {
+    "status": 200,
+    "data": {
+      "total_count": 0,
+      "secrets": []
+    }
+  },
+  "organizationSecrets": {
+    "status": 200,
+    "data": {
+      "total_count": 0,
+      "secrets": []
+    }
+  },
+  "ruleDetails": [
+    {
+      "status": 200,
+      "data": {
+        "id": 19085283,
+        "name": "gatekeeper",
+        "target": "branch",
+        "source_type": "Repository",
+        "source": "aqua-lifestyle/aqua-lifestyle",
+        "enforcement": "active",
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          }
+        ],
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5MGLgmzgEjN-M",
+        "created_at": "2026-07-17T06:42:23.917+02:00",
+        "updated_at": "2026-08-25T09:53:28.830+02:00",
+        "bypass_actors": [],
+        "current_user_can_bypass": "never",
+        "_links": {
+          "self": {
+            "href": "https://api.github.com/repos/aqua-lifestyle/aqua-lifestyle/rulesets/19085283"
+          },
+          "html": {
+            "href": "https://github.com/aqua-lifestyle/aqua-lifestyle/rules/19085283"
+          }
+        }
+      }
+    }
+  ],
+  "organizationRulesetInspection": {
+    "status": 404,
+    "requiredScope": "admin:org",
+    "available": false
+  }
+}

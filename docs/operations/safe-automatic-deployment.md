@@ -7,6 +7,11 @@ additional approval after merging. Repository implementation supports this seque
 Initial persistent infrastructure configuration is currently incomplete; no production
 deployment or settings change was performed during preparation.
 
+The fresh authenticated [infrastructure configuration plan](production-infrastructure-plan.md)
+records exact live findings, unapplied governance payloads, runtime/transport choices,
+credential custody and recovery actions. It supersedes any interpretation of the
+setup table below as permission to provision broad credentials or change live flags.
+
 Normal PR review remains merge governance. Restricted financial, messaging, worker
 and migration operations retain their separate boundaries. Deploying code never
 authorizes those operations. The [safety contract](cicd-safety-contract.md) and
@@ -95,11 +100,11 @@ Fresh GET-only inspection on 2026-10-16 at 17:33 UTC:
 | --- | --- | --- |
 | GitHub main | Only deletion/non-fast-forward rules | Required PR review, latest-head approval and strict checks for all 17 jobs; qualify settings/bypass custody |
 | production-release | No protection rules/branch policy; admin bypass=true | Main-only branch policy, no human/wait/custom approval gate, admin bypass disabled |
-| Actions credentials | Repository and production-release secret inventories empty | Persistent RENDER_API_KEY and VERCEL_TOKEN in the intended environment; github.token supplies read-only GitHub access |
+| Actions credentials | Repository and production-release secret inventories empty | Establish protected exact-target credential issuance first; persistent authentication alone in candidate-owned workflows does not protect secrets. github.token supplies read-only GitHub access |
 | Render integration | Correct existing repository/main/Docker context/API health path; native auto-deploy off; hooks and command empty; not suspended | Retain single orchestrator; qualify actual deploy permission using separately authorized non-production capability tests |
 | Render runtime | Live `1251fb8`; API/DB/Redis/key store Healthy; recovery=false and recovery header absent; Bird=true; Yoco=test and Bird/Yoco keys present | Current runtime fails the unchanged recovery-only contract. A separately authorized infrastructure task must establish a compatible profile; this preparation does not change flags or remove keys |
 | Other restrictions | Financial/weekly/monthly/jobs/demo/pilot/commissioning/seed flags false | Keep held; deployment never enables them |
-| Vercel integration | Expected existing project/team/root/Node24; no build overrides; Git link absent | Restore Git access to the same repository, main production branch, native main deployment disabled |
+| Vercel integration | Expected existing project/team/root/Node24; no build overrides; Git link absent | Qualify the implemented linked-Git path with native deployment disabled, or explicitly implement/test an exact-source alternative; see infrastructure plan |
 | Vercel baseline | Current target READY without authoritative Git SHA | Establish an actual Git-provenance baseline; do not invent a source SHA for the existing deployment |
 | Public frontend inputs | API/Tenant values sensitive/redacted and unverifiable | Make expected non-secret build inputs verifiable to the deployment identity; unknown values fail admission |
 

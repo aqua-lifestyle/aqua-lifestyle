@@ -233,3 +233,48 @@ correction in scope, not relaxed unknown-state handling. Source/inventory pins w
 refreshed and original IDs preserved with15 append-only cases since64cbb5c. Current
 runbook/evidence records distinguish initial setup, technical failures, independent
 verifier limitation and actual untested production writes.
+
+## Infrastructure integration assessment — 2026-10-16
+
+Owner-authorized scope: authenticated read-only GitHub/Render/Vercel inspection,
+repository corrections on PR106, isolated tests, documentation, commits and PR
+updates. Production deployment, main merge, database access/mutation, live credential
+or provider-setting changes and restricted capability activation remain unauthorized.
+Starting qualified source:9581655e4ba0ab22c8578a7536439eda1bbf6fbc; dedicated feature
+worktree initially clean. Detailed current configuration and proposed persistent
+actions are recorded in docs/operations/production-infrastructure-plan.md.
+
+FACT: authenticated GETs at18:05–18:08UTC confirm absent main PR/required-check rules,
+unrestricted production-release environment, empty deployment-secret inventories,
+Render normal profile with Bird=true/Yoco=test, Vercel link=null and missing baseline
+Git source. Sensitive public Vercel variables return empty strings with decrypted=false;
+their actual values are UNKNOWN, not proven incorrect. Both listed database export
+inventories are empty. Follow-up18:13UTC recovery GET reports PITR AVAILABLE for the
+application DB, startsAt2026-10-13T02:44:00Z; exercised restore readiness and runtime
+role privileges remain UNKNOWN. Organization-ruleset GET404 explicitly requires the
+unavailable admin:org scope.
+No raw environment payload, secret value, export URL or database content was retained.
+
+REPOSITORY EVIDENCE: BackgroundJobs=false controls ABP job execution, but normal host
+startup separately registers periodic workers. Bird outbox delivery checks Bird=true,
+not that ABP flag. Recovery also suspends business routes. Removing recovery checks
+to match the live service would not preserve demonstrated holds; no such patch is
+justified. Normal-operation profile qualification remains an explicit design/owner
+decision, not a recurring release authorization.
+
+GitSource can be supplied explicitly to Vercel's create API; its schema alone does not
+prove the unlinked project has GitHub access. File upload avoids Git linking but
+requires a new attested source/artifact path and real baseline provenance. Neither
+was silently substituted for the currently implemented Git-source path. Candidate CI
+cannot protect itself or credential custody; main-only environment matching alone
+does not block pull_request_target or a malicious main workflow. Keep deploy secrets
+absent until the external trust boundary is qualified.
+
+Fresh isolated validation:208 mandatory cases pass without failures/skips; all retained
+tampering negatives pass, including exit0/170passed/1skip→BLOCKED. Disposable PostgreSQL
+recovery/privilege fixture15/15 passes. This is not production DB/provider evidence.
+
+Next: publish the evidence and actionable configuration proposal, complete hosted CI
+on the documentation commit, obtain
+fresh Agent2 assessment, and report BLOCKED infrastructure separately from tested
+controller behavior. No provider or production mutation is part of this task.
