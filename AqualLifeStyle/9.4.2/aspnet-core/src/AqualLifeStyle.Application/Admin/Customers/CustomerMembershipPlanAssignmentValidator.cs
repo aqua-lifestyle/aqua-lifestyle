@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using Abp.Dependency;
 using Abp.Domain.Uow;
+using Abp.Domain.Repositories;
 using Abp.MultiTenancy;
 using Abp.UI;
 using AqualLifeStyle.Domain.Memberships;
@@ -14,11 +15,11 @@ namespace AqualLifeStyle.Application.Admin.Customers
 
     public class CustomerMembershipPlanAssignmentValidator : ICustomerMembershipPlanAssignmentValidator, ITransientDependency
     {
-        private readonly IMembershipRepository _membershipRepository;
+        private readonly IRepository<Membership> _membershipRepository;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public CustomerMembershipPlanAssignmentValidator(
-            IMembershipRepository membershipRepository,
+            IRepository<Membership> membershipRepository,
             IUnitOfWorkManager unitOfWorkManager)
         {
             _membershipRepository = membershipRepository;

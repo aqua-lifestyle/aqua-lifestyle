@@ -13,7 +13,7 @@ using Xunit;
 
 namespace AqualLifeStyle.Tests.Application
 {
-    public class AdminMemberAppServiceTests : AqualLifeStyleTestBase
+    public class AdminMemberAppServiceTests : AdminCustomerManagementTestBase
     {
         private readonly IAdminCustomerAppService _customerAdministration;
         private readonly IAdminMemberAppService _memberAdministration;

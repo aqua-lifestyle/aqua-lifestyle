@@ -56,6 +56,58 @@ Recruiter correction authorises against the target participant's Area, not the p
 
 ## API and interface boundary
 
+### General member management
+
+General member-management records (Customers with a legacy membership plan) use
+the same persisted Area Administrator assignments as participation administration.
+Tenant-scoped list, individual lookup, membership options, profile edits, plan
+changes and suspension require current assignments to the Customer's active Area.
+Revoked, future-effective or deleted assignments and inactive/deleted Areas grant
+no member access. Tenant users cannot acquire cross-Tenant authority through a
+client filter or the Host permission. Host access requires the endpoint's granular
+permission and explicit `Aqua.Admin.AllTenants`.
+
+The same member-record restriction applies when customer-account list, lookup,
+update, removal, restoration or creation paths address those records, including
+promotion of an account to a member record. The legacy customer list applies the
+same member restriction. Non-member customer-account authority, member self-service
+ownership checks and the distinct User-account security permissions remain separate.
+This correction does not reinterpret AQGreen/Onyx participation activation as a
+legacy membership plan.
+
+Administrative customer creation, removed-candidate lookup and restoration enforce
+the member invariant inside the shared account manager, including CSV/XLSX import
+callers. The manager requires a caller-owned READ COMMITTED transaction before
+writing. Each imported row owns a separate transaction; a rejected member row
+rolls back its Customer and identity without rolling back authorized rows. Import
+permission still permits non-member rows under the existing customer contract.
+The actor's session, not a target Tenant selected for persistence, controls authority.
+
+Restoration locks the stored Customer first, then its original member Area and
+administrator grant before changing deletion state or membership. Demoting a
+removed member does not remove the source authorization requirement. A strictly
+removed-only lock operation supports this path; normal live approval stabilization
+continues to reject deleted Customers. Original locks remain held through restore
+completion or rollback. Revocation that commits before acquisition denies restore;
+revocation after acquisition waits until the restore transaction finishes. The
+restored target state is also authorized before any setup link or outbox intent.
+
+Member SQL queries apply scope and membership validity before count/pagination,
+with a stable creation-time/ID order. The original portal uses server totals and
+pages; search covers accessible records, while column sorting is explicitly local
+to the current page. Area names/IDs are current Area facts; Tenant has a separate
+label. Missing Area evidence is presented as unavailable. Explicit Host oversight
+can inspect such records without claiming that they have valid Area evidence.
+
+Tenant member mutations reuse existing PostgreSQL Customer/Area/administrator
+assignment locks and re-read authorization after lock acquisition, within a caller-
+owned READ COMMITTED transaction. Identity/profile changes and outbox intent commit
+or roll back together. Component-only SQLite fixtures do not establish this locking
+behavior; the dedicated isolated PostgreSQL regression step must run without skips.
+
+These are implementation contracts. Source inspection identifies a pre-existing
+authorization weakness; it does not establish actual production access or misuse.
+
 Member/customer projections expose `AreaId` and `AreaName`. Administration exposes assigned Areas and Area-scoped participation filtering. Customer creation and registration accept an optional Area identifier; omission is accepted only when the Tenant has exactly one active Area. Reconciliation projections preserve authorised completed checkout facts even if a dependent obligation, participation, Customer, or Area was later soft-deleted; nullable recorded state and explicit availability flags distinguish a missing dependency from an inferred business outcome.
 
 Some authentication contracts still use a legacy `area` URL/query label for the technical Tenant workspace (`Default`). Programme invitation preview exposes this workspace separately from the recruiter's business Area so authentication routing cannot be mistaken for Area assignment or authorization. Invitation registration derives its authoritative Tenant from the persisted invitation and rejects a conflicting ambient Tenant; the browser query does not select the security boundary.

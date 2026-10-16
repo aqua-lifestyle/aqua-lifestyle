@@ -11,6 +11,8 @@ using Abp.MultiTenancy;
 using Abp.ObjectMapping;
 using Abp.Runtime.Session;
 using Abp.UI;
+using AqualLifeStyle.Domain.Areas;
+using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Application.Admin.Customers.Dto;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Authorization.Accounts;
@@ -27,6 +29,11 @@ namespace AqualLifeStyle.Application.Admin.Customers
     public class AdminCustomerAppService : AdminAppServiceBase, IAdminCustomerAppService
     {
         private readonly IAdminCustomerAccountManager _accountManager;
+        private readonly IAdminMemberRecordAuthority _memberRecordAuthority;
+        private readonly IRepository<Area, Guid> _areas;
+        private readonly IRepository<AreaAdminAssignment, Guid> _areaAdministrators;
+        private readonly IAQGreenApprovalAuthorityStabilizer _areaAuthorityStabilizer;
+        private readonly IUnitOfWorkManager _unitOfWorkManager;
         private readonly ICustomerRepository _customerRepository;
         private readonly UserManager _userManager;
         private readonly IObjectMapper _objectMapper;
@@ -43,9 +50,19 @@ namespace AqualLifeStyle.Application.Admin.Customers
             IAdminCustomerProfileUpdater customerProfileUpdater,
             IMembershipRepository membershipRepository,
             IUserPasswordSetupLinkGenerator passwordSetupLinkGenerator,
-            AccountEmailVerificationScheduler emailVerificationScheduler)
+            AccountEmailVerificationScheduler emailVerificationScheduler,
+            IRepository<Area, Guid> areas,
+            IRepository<AreaAdminAssignment, Guid> areaAdministrators,
+            IAQGreenApprovalAuthorityStabilizer areaAuthorityStabilizer,
+            IUnitOfWorkManager unitOfWorkManager,
+            IAdminMemberRecordAuthority memberRecordAuthority)
         {
             _accountManager = accountManager;
+            _memberRecordAuthority = memberRecordAuthority;
+            _areas = areas;
+            _areaAdministrators = areaAdministrators;
+            _areaAuthorityStabilizer = areaAuthorityStabilizer;
+            _unitOfWorkManager = unitOfWorkManager;
             _customerRepository = customerRepository;
             _userManager = userManager;
             _objectMapper = objectMapper;
@@ -79,8 +96,9 @@ namespace AqualLifeStyle.Application.Admin.Customers
                         customer.Email.Value.ToLower().Contains(keyword));
                 }
 
+                query = await RestrictMemberRecordsAsync(query, _areaAdministrators, _areas);
                 var total = await query.CountAsync();
-                var customers = await query.OrderByDescending(customer => customer.CreationTime)
+                var customers = await query.OrderByDescending(customer => customer.CreationTime).ThenByDescending(customer => customer.Id)
                     .Skip(input.SkipCount)
                     .Take(input.MaxResultCount)
                     .ToListAsync();
@@ -119,77 +137,83 @@ namespace AqualLifeStyle.Application.Admin.Customers
         [AbpAuthorize(AquaPermissions.Admin.Customers.Create)]
         public async Task<AdminCustomerOnboardingResultDto> CreateAsync(AdminCreateCustomerInput input)
         {
-            if (input == null) throw new UserFriendlyException("Customer creation failed.", "The request body was empty.");
-            var tenantId = ResolveTargetTenant(input.TenantId, "Customer", "creation");
-            await EnsureTenantExistsAsync(tenantId);
-            var accountResult = await _accountManager.CreateOrFindRemovedAsync(new AdminCustomerAccountInput
+            return await InCustomerTransactionAsync(async () =>
             {
-                TenantId = tenantId,
-                FirstName = input.FirstName,
-                LastName = input.LastName,
-                Email = input.Email,
-                ContactNumber = input.ContactNumber,
-                HomeAddress = input.HomeAddress,
-                Password = input.Password,
-                MembershipId = input.MembershipId,
-                IsActive = input.IsActive
-            });
-            if (accountResult.RemovedCustomer != null)
-            {
+                if (input == null) throw new UserFriendlyException("Customer creation failed.", "The request body was empty.");
+                var tenantId = ResolveTargetTenant(input.TenantId, "Customer", "creation");
+                await EnsureTenantExistsAsync(tenantId);
+                var accountResult = await _accountManager.CreateOrFindRemovedAsync(new AdminCustomerAccountInput
+                {
+                    TenantId = tenantId,
+                    FirstName = input.FirstName,
+                    LastName = input.LastName,
+                    Email = input.Email,
+                    ContactNumber = input.ContactNumber,
+                    HomeAddress = input.HomeAddress,
+                    Password = input.Password,
+                    MembershipId = input.MembershipId,
+                    IsActive = input.IsActive
+                });
+                if (accountResult.RemovedCustomer != null)
+                {
+                    return new AdminCustomerOnboardingResultDto
+                    {
+                        RequiresRestoreConfirmation = true,
+                        RemovedCustomer = new AdminRemovedCustomerCandidateDto
+                        {
+                            CustomerId = accountResult.RemovedCustomer.Id,
+                            Name = accountResult.RemovedCustomer.Name,
+                            Email = accountResult.RemovedCustomer.Email.Value,
+                            RemovalTime = accountResult.RemovedCustomer.DeletionTime
+                        }
+                    };
+                }
+
+                await CurrentUnitOfWork.SaveChangesAsync();
+                var customer = accountResult.Customer;
+                await ScheduleVerificationIfRequiredAsync(customer, "admin-created");
+                LogAdminMutation("Customer", "created", customer.Id, tenantId, input.Justification);
                 return new AdminCustomerOnboardingResultDto
                 {
-                    RequiresRestoreConfirmation = true,
-                    RemovedCustomer = new AdminRemovedCustomerCandidateDto
-                    {
-                        CustomerId = accountResult.RemovedCustomer.Id,
-                        Name = accountResult.RemovedCustomer.Name,
-                        Email = accountResult.RemovedCustomer.Email.Value,
-                        RemovalTime = accountResult.RemovedCustomer.DeletionTime
-                    }
+                    Customer = await MapCustomerAsync(customer)
                 };
-            }
-
-            await CurrentUnitOfWork.SaveChangesAsync();
-            var customer = accountResult.Customer;
-            await ScheduleVerificationIfRequiredAsync(customer, "admin-created");
-            LogAdminMutation("Customer", "created", customer.Id, tenantId, input.Justification);
-            return new AdminCustomerOnboardingResultDto
-            {
-                Customer = await MapCustomerAsync(customer)
-            };
+            });
         }
 
         [DisableAuditing]
         [AbpAuthorize(AquaPermissions.Admin.Customers.Create)]
         public async Task<AdminCustomerOnboardingResultDto> RestoreAsync(AdminRestoreCustomerInput input)
         {
-            if (input == null) throw new UserFriendlyException("Customer restoration failed.", "The request body was empty.");
-            ValidatePositiveId(input.CustomerId, "Customer");
-            var removedCustomer = await GetRemovedCustomerAsync(input.CustomerId);
-            var tenantId = removedCustomer.TenantId.Value;
-            var customer = await _accountManager.RestoreAsync(input.CustomerId, new AdminCustomerAccountInput
+            return await InCustomerTransactionAsync(async () =>
             {
-                TenantId = tenantId,
-                FirstName = input.FirstName,
-                LastName = input.LastName,
-                Email = input.Email,
-                ContactNumber = input.ContactNumber,
-                HomeAddress = input.HomeAddress,
-                MembershipId = input.MembershipId,
-                IsActive = input.IsActive
+                if (input == null) throw new UserFriendlyException("Customer restoration failed.", "The request body was empty.");
+                ValidatePositiveId(input.CustomerId, "Customer");
+                var removedCustomer = await GetRemovedCustomerAsync(input.CustomerId);
+                var tenantId = removedCustomer.TenantId.Value;
+                var customer = await _accountManager.RestoreAsync(input.CustomerId, new AdminCustomerAccountInput
+                {
+                    TenantId = tenantId,
+                    FirstName = input.FirstName,
+                    LastName = input.LastName,
+                    Email = input.Email,
+                    ContactNumber = input.ContactNumber,
+                    HomeAddress = input.HomeAddress,
+                    MembershipId = input.MembershipId,
+                    IsActive = input.IsActive
+                });
+                await CurrentUnitOfWork.SaveChangesAsync();
+                var tenant = await TenantManager.GetByIdAsync(tenantId);
+                var passwordSetupUrl = await _passwordSetupLinkGenerator.GenerateAsync(customer.User, tenant.TenancyName);
+                await ScheduleVerificationIfRequiredAsync(
+                    customer,
+                    "restored:" + customer.User.SecurityStamp);
+                LogAdminMutation("Customer", "restored with password setup required", customer.Id, tenantId, input.Justification);
+                return new AdminCustomerOnboardingResultDto
+                {
+                    Customer = await MapCustomerAsync(customer),
+                    PasswordSetupUrl = passwordSetupUrl
+                };
             });
-            await CurrentUnitOfWork.SaveChangesAsync();
-            var tenant = await TenantManager.GetByIdAsync(tenantId);
-            var passwordSetupUrl = await _passwordSetupLinkGenerator.GenerateAsync(customer.User, tenant.TenancyName);
-            await ScheduleVerificationIfRequiredAsync(
-                customer,
-                "restored:" + customer.User.SecurityStamp);
-            LogAdminMutation("Customer", "restored with password setup required", customer.Id, tenantId, input.Justification);
-            return new AdminCustomerOnboardingResultDto
-            {
-                Customer = await MapCustomerAsync(customer),
-                PasswordSetupUrl = passwordSetupUrl
-            };
         }
 
         private async Task ScheduleVerificationIfRequiredAsync(Customer customer, string lifecycleKey)
@@ -205,52 +229,60 @@ namespace AqualLifeStyle.Application.Admin.Customers
         [AbpAuthorize(AquaPermissions.Admin.Customers.Edit)]
         public async Task<AdminCustomerDto> UpdateAsync(AdminUpdateCustomerInput input)
         {
-            if (input == null) throw new UserFriendlyException("Customer update failed.", "The request body was empty.");
-            ValidatePositiveId(input.Id, "Customer");
-            var customer = await GetCustomerAsync(input.Id);
-            var tenantId = customer.TenantId.Value;
-            using (CurrentUnitOfWork.SetTenantId(tenantId))
+            return await InCustomerTransactionAsync(async () =>
             {
-                var originalSecurityStamp = customer.User.SecurityStamp;
-                await _customerProfileUpdater.UpdateAsync(customer, new AdminCustomerProfileUpdate
+                if (input == null) throw new UserFriendlyException("Customer update failed.", "The request body was empty.");
+                ValidatePositiveId(input.Id, "Customer");
+                var customer = await GetCustomerAsync(input.Id, forMutation: true);
+                var tenantId = customer.TenantId.Value;
+                using (CurrentUnitOfWork.SetTenantId(tenantId))
                 {
-                    FirstName = input.FirstName, LastName = input.LastName, Email = input.Email,
-                    ContactNumber = input.ContactNumber, HomeAddress = input.HomeAddress,
-                    MembershipId = input.MembershipId, IsActive = input.IsActive
-                });
-                await CurrentUnitOfWork.SaveChangesAsync();
-                if (customer.User.IsActive &&
-                    !customer.User.IsEmailConfirmed &&
-                    !string.Equals(originalSecurityStamp, customer.User.SecurityStamp, StringComparison.Ordinal))
-                {
-                    await ScheduleVerificationIfRequiredAsync(
-                        customer,
-                        "admin-profile-change:" + customer.User.SecurityStamp);
+                    var originalSecurityStamp = customer.User.SecurityStamp;
+                    await _customerProfileUpdater.UpdateAsync(customer, new AdminCustomerProfileUpdate
+                    {
+                        FirstName = input.FirstName, LastName = input.LastName, Email = input.Email,
+                        ContactNumber = input.ContactNumber, HomeAddress = input.HomeAddress,
+                        MembershipId = input.MembershipId, IsActive = input.IsActive
+                    });
+                    await CurrentUnitOfWork.SaveChangesAsync();
+                    await _memberRecordAuthority.RequireLiveAsync(tenantId, customer.Id);
+                    if (customer.User.IsActive &&
+                        !customer.User.IsEmailConfirmed &&
+                        !string.Equals(originalSecurityStamp, customer.User.SecurityStamp, StringComparison.Ordinal))
+                    {
+                        await ScheduleVerificationIfRequiredAsync(
+                            customer,
+                            "admin-profile-change:" + customer.User.SecurityStamp);
+                    }
                 }
-            }
 
-            LogAdminMutation("Customer", "updated", customer.Id, tenantId, input.Justification);
-            return await MapCustomerAsync(customer);
+                LogAdminMutation("Customer", "updated", customer.Id, tenantId, input.Justification);
+                return await MapCustomerAsync(customer);
+            });
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Customers.Delete)]
         public async Task DeleteAsync(AdminDeleteCustomerInput input)
         {
-            if (input == null) throw new UserFriendlyException("Customer removal failed.", "The request body was empty.");
-            ValidatePositiveId(input.Id, "Customer");
-            var customer = await GetCustomerAsync(input.Id);
-            var tenantId = customer.TenantId.Value;
-            using (CurrentUnitOfWork.SetTenantId(tenantId))
+            await InCustomerTransactionAsync(async () =>
             {
-                customer.Deactivate();
-                customer.User.IsActive = false;
-                CheckErrors(await _userManager.UpdateSecurityStampAsync(customer.User));
-                await _customerRepository.DeleteAsync(customer);
-            }
-            LogAdminMutation("Customer", "removed", customer.Id, tenantId, input.Justification);
+                if (input == null) throw new UserFriendlyException("Customer removal failed.", "The request body was empty.");
+                ValidatePositiveId(input.Id, "Customer");
+                var customer = await GetCustomerAsync(input.Id, forMutation: true);
+                var tenantId = customer.TenantId.Value;
+                using (CurrentUnitOfWork.SetTenantId(tenantId))
+                {
+                    customer.Deactivate();
+                    customer.User.IsActive = false;
+                    CheckErrors(await _userManager.UpdateSecurityStampAsync(customer.User));
+                    await _customerRepository.DeleteAsync(customer);
+                }
+                LogAdminMutation("Customer", "removed", customer.Id, tenantId, input.Justification);
+                return true;
+            });
         }
 
-        private async Task<Customer> GetCustomerAsync(int id)
+        private async Task<Customer> GetCustomerAsync(int id, bool forMutation = false)
         {
             using (DisableTenantFilterForHost())
             {
@@ -258,8 +290,19 @@ namespace AqualLifeStyle.Application.Admin.Customers
                     .Where(customer => customer.Id == id && customer.TenantId.HasValue);
                 if (AbpSession.TenantId.HasValue)
                     query = query.Where(customer => customer.TenantId == AbpSession.TenantId.Value);
+                query = await RestrictMemberRecordsAsync(query, _areaAdministrators, _areas);
+                if (forMutation)
+                {
+                    var hint = await query.AsNoTracking().Select(item => new { item.Id, item.TenantId, item.MembershipId }).SingleOrDefaultAsync();
+                    if (hint == null) throw new AbpAuthorizationException("The customer was not found in your authorized scope.");
+                    await _areaAuthorityStabilizer.LockCustomerAsync(hint.TenantId.Value, hint.Id);
+                    var current = await query.AsNoTracking().Select(item => new { item.Id, item.TenantId, item.MembershipId }).SingleOrDefaultAsync();
+                    if (current == null) throw new AbpAuthorizationException("The customer was not found in your authorized scope.");
+                    if (current.MembershipId.HasValue && AbpSession.TenantId.HasValue)
+                        await _areaAuthorityStabilizer.StabilizeAsync(current.TenantId.Value, current.Id, AbpSession.GetUserId());
+                }
                 var customer = await query.SingleOrDefaultAsync();
-                if (customer == null) throw new UserFriendlyException("Customer lookup failed.", "The customer was not found.");
+                if (customer == null) throw new AbpAuthorizationException("The customer was not found in your authorized scope.");
                 return customer;
             }
         }
@@ -273,10 +316,29 @@ namespace AqualLifeStyle.Application.Admin.Customers
                     .Where(customer => customer.Id == id && customer.IsDeleted && customer.TenantId.HasValue);
                 if (AbpSession.TenantId.HasValue)
                     query = query.Where(customer => customer.TenantId == AbpSession.TenantId.Value);
+                query = await RestrictMemberRecordsAsync(query, _areaAdministrators, _areas);
+                var hint = await query.AsNoTracking().Select(item => new { item.Id, item.TenantId }).SingleOrDefaultAsync();
+                if (hint == null) throw new AbpAuthorizationException("The removed customer was not found in your authorized scope.");
+                await _memberRecordAuthority.RequireRemovedAsync(hint.TenantId.Value, hint.Id);
                 var customer = await query.SingleOrDefaultAsync();
                 if (customer == null)
-                    throw new UserFriendlyException("Customer restoration failed.", "The removed customer account was not found.");
+                    throw new AbpAuthorizationException("The removed customer was not found in your authorized scope.");
                 return customer;
+            }
+        }
+
+        private async Task<T> InCustomerTransactionAsync<T>(Func<Task<T>> command)
+        {
+            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+            {
+                Scope = System.Transactions.TransactionScopeOption.RequiresNew,
+                IsTransactional = true,
+                IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted
+            }))
+            {
+                var result = await command();
+                await uow.CompleteAsync();
+                return result;
             }
         }
 

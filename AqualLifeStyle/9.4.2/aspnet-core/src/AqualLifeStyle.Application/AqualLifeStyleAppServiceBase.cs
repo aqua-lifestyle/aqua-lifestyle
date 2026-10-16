@@ -1,5 +1,10 @@
 ﻿using System;
 using System.Threading.Tasks;
+using System.Linq;
+using Abp.Domain.Repositories;
+using AqualLifeStyle.Application.Admin.Customers;
+using AqualLifeStyle.Authorization;
+using AqualLifeStyle.Domain.Areas;
 using Microsoft.AspNetCore.Identity;
 using Abp.Application.Services;
 using Abp.IdentityFramework;
@@ -27,6 +32,22 @@ namespace AqualLifeStyle
         {
             LocalizationSourceName = AqualLifeStyleConsts.LocalizationSourceName;
         }
+
+        // Shared persisted assignment predicate; a Tenant/role or client filter
+        // never substitutes for active resource-Area administration authority.
+        protected IQueryable<AreaAdminAssignment> ActiveAreaAdministratorAssignments(
+            IRepository<AreaAdminAssignment, Guid> assignments,
+            IRepository<Area, Guid> areas)
+            => AdminMemberRecordAuthority.ActiveAssignments(assignments, areas,
+                AbpSession.GetTenantId(), AbpSession.GetUserId());
+
+        // Existing customer-account routes also carry member records. Preserve
+        // non-member account authority while applying the same member Area rule.
+        protected Task<IQueryable<Customer>> RestrictMemberRecordsAsync(
+            IQueryable<Customer> customers,
+            IRepository<AreaAdminAssignment, Guid> assignments,
+            IRepository<Area, Guid> areas)
+            => AdminMemberRecordAuthority.RestrictAsync(customers, AbpSession, PermissionChecker, assignments, areas);
 
         protected virtual async Task<User> GetCurrentUserAsync()
         {

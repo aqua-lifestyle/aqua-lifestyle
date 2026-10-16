@@ -29,7 +29,7 @@ Local restore, Release build, and full test suite:
 ```bash
 dotnet restore AqualLifeStyle.sln
 dotnet build AqualLifeStyle.sln --configuration Release --no-restore
-dotnet test AqualLifeStyle.sln --configuration Release --no-build --logger "trx;LogFileName=backend-tests.trx" --results-directory TestResults
+ASPNETCORE_ENVIRONMENT=Development dotnet test AqualLifeStyle.sln --configuration Release --no-build --logger "trx;LogFileName=backend-tests.trx" --results-directory TestResults
 ```
 
 CI executes the same application inventory in eight disjoint partitions:
@@ -42,13 +42,45 @@ The explicit PostgreSQL job remains separate: default web skips and provider-gat
 bodies do not establish PostgreSQL execution. See the workflow's required passing
 cases and execution markers.
 
+Use `ASPNETCORE_ENVIRONMENT=Development` for local tests, matching CI. The default
+Production environment deliberately disables seed data and cannot establish the
+seeded web-test fixture prerequisites.
+
 The full application test project includes PostgreSQL migration tests that start `postgres:16-alpine`; Docker must be running. A focused xUnit test can be selected with its fully qualified name:
 
 ```bash
-dotnet test test/AqualLifeStyle.Tests/AqualLifeStyle.Tests.csproj --configuration Release --filter "FullyQualifiedName~Namespace.ClassName"
+ASPNETCORE_ENVIRONMENT=Development dotnet test test/AqualLifeStyle.Tests/AqualLifeStyle.Tests.csproj --configuration Release --filter "FullyQualifiedName~Namespace.ClassName"
 ```
 
 Use `--no-build` only after a successful build containing the current changes.
+
+## Isolated member Area authorization
+
+`MemberAreaAuthorizationPostgreSqlTests` exercises real authentication, persisted
+permissions, list/count/paging, member/customer aliases, mutations and authority
+lock races using synthetic records. It requires `MEMBER_AREA_AUTHORIZATION=true`,
+`REPRO_PG=true`, `REPRO_TRANSACTIONAL=true`, `REPRO_PG_SCHEMA_FROM_MODEL=true` and
+a secured `REPRO_PG_CONNECTION` with `Host=127.0.0.1` and a disposable database name
+starting `member_area_authorization_`. Never supply a production connection.
+The host checks these guards before database initialization. From the backend:
+
+```bash
+ASPNETCORE_ENVIRONMENT=Development dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj \
+  --configuration Release \
+  --filter FullyQualifiedName~MemberAreaAuthorizationPostgreSqlTests
+```
+
+All twenty-four cases must pass with zero skipped. The additional import and
+restoration regressions exercise the real CSV preview/import API, absent/revoked/
+future/insufficient Area authority, explicit Host permissions, per-row rollback,
+both revocation/restore orderings, restore-with-demotion and strict removed-record
+lock semantics. CI validates the TRX with a PowerShell shell/XML check.
+Schema is model-created; this does
+not prove migration behavior. CI runs a dedicated step on its existing PostgreSQL
+service in a separate disposable database and rejects missing/skipped cases.
+Without opt-in, default web-suite skips are intentional and are not PG evidence.
+Member/customer component fixtures use SQLite with an explicit lock double;
+their lifecycle results cannot be promoted to PostgreSQL concurrency evidence.
 
 ## Entity Framework Core
 

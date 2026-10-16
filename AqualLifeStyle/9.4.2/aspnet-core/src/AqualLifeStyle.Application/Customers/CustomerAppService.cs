@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Authorization;
+using Abp.Domain.Repositories;
+using AqualLifeStyle.Domain.Areas;
 using Abp.ObjectMapping;
 using Abp.UI;
 using AqualLifeStyle.Application.Customers.Dto;
@@ -21,6 +23,8 @@ namespace AqualLifeStyle.Application.Customers
         private readonly IMembershipRepository _membershipRepository;
         private readonly IObjectMapper _objectMapper;
         private readonly IAreaAssignmentResolver _areaAssignmentResolver;
+        public IRepository<Area, Guid> AdministrativeAreas { get; set; }
+        public IRepository<AreaAdminAssignment, Guid> AreaAdministrators { get; set; }
 
         public CustomerAppService(ICustomerRepository customerRepository, IMembershipRepository membershipRepository, IObjectMapper objectMapper)
             : this(customerRepository, membershipRepository, objectMapper, null)
@@ -43,9 +47,10 @@ namespace AqualLifeStyle.Application.Customers
         public async Task<IReadOnlyList<CustomerDto>> GetAllAsync()
         {
             var tenantId = GetRequiredTenantId("Customer lookup failed.");
-            var customers = await _customerRepository.GetAllIncluding(customer => customer.Area)
-                .Where(customer => customer.TenantId == tenantId)
-                .ToListAsync();
+            var query = await RestrictMemberRecordsAsync(
+                _customerRepository.GetAllIncluding(customer => customer.Area)
+                    .Where(customer => customer.TenantId == tenantId), AreaAdministrators, AdministrativeAreas);
+            var customers = await query.ToListAsync();
             return _objectMapper.Map<List<CustomerDto>>(customers);
         }
 
