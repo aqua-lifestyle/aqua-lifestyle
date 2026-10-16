@@ -115,3 +115,12 @@ payment before the lock under the new hold. Added an explicit test-only financia
 grant to that isolated positive, preserving all lock/transaction/outcome assertions.
 Final focused, actual-image, complete CI and exact-commit review are rerunning; do
 not promote earlier results to the final source.
+
+Final runtime-source focused suite156/156, zero skips, and rebuilt API actual-image
+probe17/17 passed. The4d25f72 hosted PG job passed base40+memberArea24; D10had13pass/
+1fail at the first synthetic payment's financial hold. Agent2 established exact
+TRX/source causality. Added explicit financial authority only in that isolated D10
+case after its PostgreSQL-mode assertion; all D10 scope, no-write and call-count
+assertions remain. Runtime code is unchanged by this last fixture correction.
+Complete final hosted CI and exact-head review remain required; final results are
+recorded on PR106 to avoid falsely self-attesting the source commit in its own tree.

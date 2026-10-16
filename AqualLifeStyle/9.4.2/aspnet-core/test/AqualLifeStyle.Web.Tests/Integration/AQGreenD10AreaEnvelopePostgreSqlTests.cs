@@ -24,6 +24,7 @@ using AqualLifeStyle.Payments;
 using AqualLifeStyle.Tests.WebHost;
 using Castle.MicroKernel.Registration;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Npgsql;
 using Shouldly;
 using Xunit;
@@ -37,6 +38,9 @@ namespace AqualLifeStyle.Web.Tests.Integration
         public async Task D10Area_ProspectiveJoinAndRetryAllowA_OnyxMoveToBDeniesFinancialSelectionWithoutDiscardingEvidence()
         {
             IsPostgreSqlRegressionMode().ShouldBeTrue(); LoginAsDefaultTenantAdmin();
+            // Exercise authorized synthetic payment before testing the independent
+            // D10 scope denial; a global hold must not short-circuit that evidence.
+            Resolve<IConfiguration>()["App:FinancialOperations:Enabled"] = "true";
             var fixture = await SeedSponsoredAwaitingApprovalAsync(recordedAt: AQGreenD10SyntheticEvidence.EffectiveAt.AddDays(-3));
             var (_, runtime, _, evidence) = await ConfigureD10Async();
             var gateway = ConfigureAreaJoiningGate(runtime);

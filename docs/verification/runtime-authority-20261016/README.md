@@ -30,7 +30,8 @@ financial authority held. Five additional negatives reproduced masking of existi
 pilot authorization denials: held workers returned before the pilot check and the
 scheduler threw the generic financial hold first. Ordering now preserves recovery
 no-op, explicit pilot denial and ordinary execution holds. The final focused suite
-and complete hosted CI are pending; results are reported on PR106 after execution.
+passed156/156 with zero failures/skips after restoring that ordering. Complete hosted
+CI results are reported on PR106 after execution.
 Known local build/discovery
 attempts with no matching direct-financial test did not count as executed evidence;
 an explicit rebuild followed by test execution established its failing precondition.
@@ -48,7 +49,9 @@ the [17-check probe rerun passed](runtime-restart-probe.txt): API image
 maintenance image `sha256:1e30a1d95541a5b46e7fb8ddf62378bfdb837c681dfaf87712ed12555bbd423c`.
 These local images predate the pilot-denial ordering follow-up; they are carried-
 forward observations, not provider attestations. Hosted CI rebuilds final source and
-retains its exact source/run/attempt artifact; final local images are rebuilt too.
+retains its exact source/run/attempt artifact. Final runtime-source API image
+`sha256:36b454eb90b2498ea1ec33f5062af1bf711f8f5d9875c4b6eaf5928b40ee3d1e`
+was rebuilt; maintenance content ID was unchanged. Its probe rerun also passed17/17.
 
 Initial probe failures were real failures: one synthetic webhook secret was shorter
 than the valid minimum and startup rejected it. The fixture was corrected; startup
@@ -67,6 +70,13 @@ correctly stopped at the new financial hold before locking. The isolated test no
 explicitly grants financial execution before racing payment and approval; no lock,
 timing, transaction or business-outcome assertion was weakened. Other runtime holds
 and production configuration remain unchanged. This failed run is not passing evidence.
+The next hosted PG job passed the base40 and member/Area24, then D10 passed13 and
+failed1: the prospective-AQGreen/Onyx case likewise lacked explicit synthetic
+financial authority at its first payment. Agent2 confirmed the exact guard stack
+from TRX. That case alone now grants test-local financial execution after its
+PostgreSQL-mode assertion, preserving its D10 scope/error, no-write, provenance,
+Tenant/Area and provider-call assertions. Final hosted evidence must pass all78
+dedicated PostgreSQL cases with no skips; these earlier failures are retained.
 
 209 explicit mandatory Node security cases now include the required container probe
 workflow assertion; all208 previous identities are retained and AQUA-SEC-0209 is
