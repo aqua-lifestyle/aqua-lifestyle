@@ -1,0 +1,17 @@
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"unmodified-reviewed-case-set","verdict":"PASS","tests":171}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"mandatory-skip","processExit":0,"summary":{"tests":171,"failed":0,"passed":170,"cancelled":0,"skipped":1,"todo":0,"topLevel":171,"suites":0},"qualification":"BLOCKED"}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"mandatory-delete","processExit":0,"summary":{"tests":170,"failed":0,"passed":170,"cancelled":0,"skipped":0,"todo":0,"topLevel":170,"suites":0},"qualification":"BLOCKED"}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"mandatory-rename","processExit":0,"summary":{"tests":170,"failed":0,"passed":170,"cancelled":0,"skipped":0,"todo":0,"topLevel":170,"suites":0},"qualification":"BLOCKED"}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"remove-.github/workflows/ci.yml","qualification":"BLOCKED"}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"replace-.github/workflows/ci.yml","qualification":"BLOCKED"}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"remove-.github/workflows/release.yml","qualification":"BLOCKED"}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"replace-.github/workflows/release.yml","qualification":"BLOCKED"}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"remove-tools/deployment/run-security-tests.mjs","qualification":"BLOCKED"}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"replace-tools/deployment/run-security-tests.mjs","qualification":"BLOCKED"}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"candidate-inventory-replacement","qualification":"BLOCKED"}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"missing-file","qualification":"BLOCKED"}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"forged-file","qualification":"BLOCKED"}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"wrong-commit","qualification":"BLOCKED"}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"wrong-attempt","qualification":"BLOCKED"}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","probe":"forged-signature","qualification":"BLOCKED"}
+{"fixtureOnly":true,"independentEnforcement":"UNVERIFIED","verdict":"PASS","scope":"local classifier and separately retained custody fixture","liveGitHubEnforcement":"BLOCKED","credentialBoundary":"BLOCKED"}

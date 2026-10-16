@@ -69,12 +69,12 @@
     {
       "id": "AQUA-SEC-0014",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "standing deployment activation has no permissive default"
+      "name": "persistent deployment configuration requires real credentials and exact release context"
     },
     {
       "id": "AQUA-SEC-0015",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "standing policy rejects version=2 mismatch/missing evidence"
+      "name": "standing policy rejects version=1 mismatch/missing evidence"
     },
     {
       "id": "AQUA-SEC-0016",
@@ -94,7 +94,7 @@
     {
       "id": "AQUA-SEC-0019",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "standing policy rejects bootstrap=null mismatch/missing evidence"
+      "name": "standing policy rejects baseline=\"manual\" mismatch/missing evidence"
     },
     {
       "id": "AQUA-SEC-0020",
@@ -104,37 +104,37 @@
     {
       "id": "AQUA-SEC-0021",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "bootstrap rejects unverifiable renderDeployId=\"unknown\""
+      "name": "automatic baseline rejects missing Render SHA"
     },
     {
       "id": "AQUA-SEC-0022",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "bootstrap rejects unverifiable vercelDeployId=\"unknown\""
+      "name": "automatic baseline rejects missing Vercel SHA"
     },
     {
       "id": "AQUA-SEC-0023",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "bootstrap rejects unverifiable renderSha=\"main\""
+      "name": "automatic baseline rejects wrong Vercel project"
     },
     {
       "id": "AQUA-SEC-0024",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "bootstrap rejects unverifiable vercelSha=\"main\""
+      "name": "automatic baseline rejects failed Vercel baseline"
     },
     {
       "id": "AQUA-SEC-0025",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "bootstrap rejects unverifiable releaseFloor=-1"
+      "name": "automatic baseline rejects missing production target"
     },
     {
       "id": "AQUA-SEC-0026",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "bootstrap rejects unverifiable releaseFloor=undefined"
+      "name": "automatic baseline rejects invalid Render ID"
     },
     {
       "id": "AQUA-SEC-0027",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "bootstrap rejects unverifiable evidenceReference=\"http://unsafe/?secret\""
+      "name": "automatic baseline rejects non-SHA Vercel source"
     },
     {
       "id": "AQUA-SEC-0028",
@@ -539,7 +539,7 @@
     {
       "id": "AQUA-SEC-0108",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "standing policy selects bootstrap once, then the immutable verified predecessor automatically"
+      "name": "automatic policy selects the first provider baseline, then the immutable verified predecessor"
     },
     {
       "id": "AQUA-SEC-0109",
@@ -549,47 +549,47 @@
     {
       "id": "AQUA-SEC-0110",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "evidence discovery rejects deleted receipt without resetting to bootstrap"
+      "name": "evidence discovery rejects deleted receipt without silently replacing missing historical evidence"
     },
     {
       "id": "AQUA-SEC-0111",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "evidence discovery rejects expired receipt without resetting to bootstrap"
+      "name": "evidence discovery rejects expired receipt without silently replacing missing historical evidence"
     },
     {
       "id": "AQUA-SEC-0112",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "evidence discovery rejects truncated history without resetting to bootstrap"
+      "name": "evidence discovery rejects truncated history without silently replacing missing historical evidence"
     },
     {
       "id": "AQUA-SEC-0113",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "evidence discovery rejects deleted run without resetting to bootstrap"
+      "name": "evidence discovery rejects deleted run without silently replacing missing historical evidence"
     },
     {
       "id": "AQUA-SEC-0114",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "evidence discovery rejects foreign workflow without resetting to bootstrap"
+      "name": "evidence discovery rejects foreign workflow without silently replacing missing historical evidence"
     },
     {
       "id": "AQUA-SEC-0115",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "evidence discovery rejects fork without resetting to bootstrap"
+      "name": "evidence discovery rejects fork without silently replacing missing historical evidence"
     },
     {
       "id": "AQUA-SEC-0116",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "evidence discovery rejects duplicate run without resetting to bootstrap"
+      "name": "evidence discovery rejects duplicate run without silently replacing missing historical evidence"
     },
     {
       "id": "AQUA-SEC-0117",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "evidence discovery rejects changed release attempt without resetting to bootstrap"
+      "name": "evidence discovery rejects changed release attempt without silently replacing missing historical evidence"
     },
     {
       "id": "AQUA-SEC-0118",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "evidence discovery rejects newer completed release without resetting to bootstrap"
+      "name": "evidence discovery rejects newer completed release without silently replacing missing historical evidence"
     },
     {
       "id": "AQUA-SEC-0119",
@@ -965,6 +965,81 @@
       "id": "AQUA-SEC-0193",
       "file": "tools/deployment/mandatory-security.test.mjs",
       "name": "release safety CI classifies mandatory cases and retains exact-attempt evidence"
+    },
+    {
+      "id": "AQUA-SEC-0194",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "persistent provider credentials need no activation switch at any release"
+    },
+    {
+      "id": "AQUA-SEC-0195",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "checked-in policy discovers the first live baseline without a manual bootstrap record"
+    },
+    {
+      "id": "AQUA-SEC-0196",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "workflow entry rejects failed CI without provider mutations"
+    },
+    {
+      "id": "AQUA-SEC-0197",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "workflow entry rejects neutral CI without provider mutations"
+    },
+    {
+      "id": "AQUA-SEC-0198",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "workflow entry rejects unfinished CI without provider mutations"
+    },
+    {
+      "id": "AQUA-SEC-0199",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "workflow entry rejects PR CI without provider mutations"
+    },
+    {
+      "id": "AQUA-SEC-0200",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "workflow entry rejects fork CI without provider mutations"
+    },
+    {
+      "id": "AQUA-SEC-0201",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "workflow entry rejects manual CI without provider mutations"
+    },
+    {
+      "id": "AQUA-SEC-0202",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "legacy release blocked before its provider step needs no manual history reset"
+    },
+    {
+      "id": "AQUA-SEC-0203",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "a partial retry cannot rediscover its advanced baseline after losing original baseline evidence"
+    },
+    {
+      "id": "AQUA-SEC-0204",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "verified predecessor explicitly binds both provider revisions"
+    },
+    {
+      "id": "AQUA-SEC-0205",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "an automatically skipped release after failed CI cannot become a verified baseline"
+    },
+    {
+      "id": "AQUA-SEC-0206",
+      "file": "tools/deployment/workflow.test.mjs",
+      "name": "every main push runs CI and successful trusted completion starts CD without activation"
+    },
+    {
+      "id": "AQUA-SEC-0207",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "documented queued Render deployment is polled to readiness before Vercel"
+    },
+    {
+      "id": "AQUA-SEC-0208",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "foreign queued Render deployment blocks automatic mutation"
     }
   ],
   "sources": [
@@ -978,7 +1053,7 @@
     },
     {
       "path": ".github/workflows/release.yml",
-      "sha256": "44f2aa3004886e10077241fac602e1614e843bff1c2454410e8c918b4d84e709"
+      "sha256": "8b1233399ad0e87ed2ecc81f5e0af6380482bcf3216dbbfc428bb391c6ceecc8"
     },
     {
       "path": "tools/deployment/disposable-recovery.sh",
@@ -994,11 +1069,11 @@
     },
     {
       "path": "tools/deployment/release-control.mjs",
-      "sha256": "b8b073f96570a769e262a41297eda2de949d11064f677867015b704a20b9be88"
+      "sha256": "04e6f51f3a04f403f56aaa26a663ce599fc48b218ab28c4a37235b63650c444d"
     },
     {
       "path": "tools/deployment/release-control.test.mjs",
-      "sha256": "98298ef643572716b6faecb2f5b4cb261c501886797740c87329cf7a62b09351"
+      "sha256": "dfdc115759fc67c981c9690a07f24fa83bba6bce2d4bf161a14f74d2d7633bb3"
     },
     {
       "path": "tools/deployment/run-security-tests.mjs",
@@ -1022,11 +1097,15 @@
     },
     {
       "path": "tools/deployment/unattended-policy.json",
-      "sha256": "c419f64bb68a83a4ba3664a7e467188f34625d4549fb62b40dbab8820f99eee3"
+      "sha256": "a30d35e81aada8f092587bf71c10e7ae1c0c381c0c2ac2bcf2d82922cee83d8c"
     },
     {
       "path": "tools/deployment/workflow.test.mjs",
-      "sha256": "618463d45c4a63496b1e82e6e6fa484be9fd10ea5740e6fae098d41ce4e4021f"
+      "sha256": "5e31428e92eea8c1bfb093363caa65c0ba6cb7e213c89237042252b18ce77125"
+    },
+    {
+      "path": "tools/deployment/mandatory-security-probe.mjs",
+      "sha256": "562626cf810fd9b155b0bfdf896daae3ee4d40877dbd87ed3f0aef9cb17236c0"
     }
   ]
 }

@@ -157,3 +157,79 @@ test.skip returned exit0/155passed/1skipped, proving the current job-success sig
 does not establish mandatory security-case execution. No mutant source was pushed.
 Final exact-commit CI/artifact/skip accounting and fresh review will be recorded in
 PR106, preserving the independent-enforcement FAIL and production UNKNOWN/BLOCKED.
+
+## Finalization owner task from 64cbb5c (current execution scope)
+
+Latest explicit owner instruction, 2026-10-16: complete code for every qualified
+main merge → CI PASS → Render → API verification → Vercel → production verification,
+without a standing activation switch, hand-authored release/bootstrap token,
+workflow dispatch dependency or post-merge approval. Persistent provider credentials
+and initial infrastructure setup remain necessary. This supersedes the earlier
+standing-switch/null-bootstrap implementation choice, not recovery/runtime holds.
+Independent verifier custody remains a disclosed limitation, not an assertion of
+independent protection. Authorized: repository edits/tests/docs/commit/push on PR106
+and fresh Agent2 review. Forbidden: merge, production deployment, live provider
+settings/credentials changes, restricted operation activation.
+
+EXPERIMENT RESULT before patch: two newly added regressions fail on the starting
+implementation with DEPLOYMENT_DISABLED_STANDING_SWITCH and
+QUALIFIED_RECOVERY_BOOTSTRAP_REQUIRED. ROOT CAUSE: explicit activation comparison
+and mandatory source-authored bootstrap in validatePolicy. Removal is owner-directed;
+no safety failure is converted into success. New policy version2 uses automatic
+provider baseline discovery only when no verified predecessor exists; partial
+retries retain their original immutable baseline. Missing/corrupt history still
+blocks rather than resetting a floor or discarding receipts. All operational holds,
+source/CI/attempt/provenance and current-main checks remain.
+
+Fresh read-only provider/GitHub observations at 2026-10-16T17:33Z:
+- Render target/repo/main/Dockerfile/health path match, native deployment off,
+  hooks/command empty, not suspended. Live1251fb8; API200 and DB/Redis/key-store
+  Healthy. Recovery=false, Bird=true, Yoco=test and Bird/Yoco keys present; all other
+  checked financial/worker/demo/pilot/seed flags false. Recovery header absent.
+  Runtime is incompatible with recovery-only automated release. No flags/keys changed.
+- Vercel expected project/team/root/Node24, no custom build overrides; Git link
+  absent. Current production target READY but no authoritative Git SHA. Public
+  API/Tenant variables are sensitive and cannot be verified from returned values.
+  No values, credentials or raw provider responses retained in repository.
+- Repository Actions secrets and production-release secrets inventories are empty.
+  Environment is unprotected, branch policy absent and admin bypass=true. Main
+  governance remains missing required PR/CI controls. These are persistent setup
+  blockers, not recurring release approval.
+- Historical real main-push CI38911525858 passed for23f176d and automatically
+  started workflow_run release38912818702, which stopped before provider mutation
+  on the old authorization requirement. Its known legacy provider step was skipped.
+  No new main push, production release or live provider mutation was initiated.
+
+Next: complete code/regressions/docs; qualify legacy skipped release history without
+silently ignoring potentially executed attempts; update explicit mandatory inventory
+under this owner-authorized control change; run complete CI once final source is
+published and obtain Agent2 review. Report initial infrastructure blockers and the
+independent verifier/runtime privilege limitations separately from code readiness.
+
+Finalization implementation checkpoint:206 local cases pass, including switch-free
+first baseline, exact completed-event positives and six untrusted-event negatives,
+legacy skipped provider step, lost baseline retry rejection, explicit final provider
+revisions and all-skipped workflow handling. The skipped-workflow regression failed
+before its production-job check and now passes. All17 required CI names remain;
+no backend/frontend business behavior or runtime restriction changed. Stable mandatory
+IDs preserved and13 new cases appended, with owner-directed activation/bootstrap
+assertions replaced by real credential/context/provenance checks. No automatic
+candidate discovery shrinks the normal mandatory inventory. The focused mutation
+fixture uses171 exact reviewed identities to preserve the170-pass/one-skip negative.
+
+Validation checkpoint:206/206 current cases pass with zero skips on Node26.6.0 and
+isolated network-disabled/read-only Node24.21.0. The focused171-case custody fixture
+passes its positive and all mutation denials, including170 passed/one skipped with
+raw exit0 but blocked classification. Disposable PostgreSQL fixture:15 checks pass.
+Actionlint and diff checks pass. Preliminary Agent2 code review found no additional
+actionable defect; final exact-commit verdict and complete hosted CI remain pending.
+No live provider/GitHub configuration or production data was modified.
+
+Provider protocol follow-up: Render's current official create-deploy API documents
+queued as a valid pending state. Two regressions failed before adding it to the
+active-state set; ours now polls and foreign queued work blocks. Final local suite
+is208/208 on Node26 and isolated Node24 with zero skips. This is an integration
+correction in scope, not relaxed unknown-state handling. Source/inventory pins were
+refreshed and original IDs preserved with15 append-only cases since64cbb5c. Current
+runbook/evidence records distinguish initial setup, technical failures, independent
+verifier limitation and actual untested production writes.

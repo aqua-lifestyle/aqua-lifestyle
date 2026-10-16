@@ -54,8 +54,10 @@ not a new approval for every deployment.
 The existing single release orchestrator retains exact source, CI run/attempt,
 release run/attempt, target, policy digest and source-byte checks. Render must
 become healthy at the exact revision before Vercel admission. A verified final
-pair produces an audit receipt. The standing kill switch and null bootstrap remain
-unchanged; this contract does not add a competing release path.
+pair produces an audit receipt. The latest finalization instruction removes the deployment activation switch and
+manual bootstrap. Policy version2 selects the first proven provider baseline
+automatically and retains immutable predecessor/retry evidence thereafter. Runtime
+recovery/financial/worker holds remain unchanged; there is one release path.
 
 | Asset/person | Trust boundaries and adversaries/failures |
 | --- | --- |
@@ -383,8 +385,10 @@ pair, backup and key material before separately authorized rollback/restore. A m
 rollback changes the live pair and requires explicit baseline reconciliation; no
 automatic database Down, service resume, payment replay or queue draining is allowed.
 
-Before a standing bootstrap/activation can be qualified, accountable independent
-custodians must establish:
+The following independent-security and operational properties remain unestablished.
+The latest owner task requests unattended code preparation with these limits
+disclosed, rather than a claim of independent enforcement or production acceptance.
+Separate custodians must qualify:
 
 1. Protected verifier location/revision, actual required check source and no-bypass
    path/change governance; eligible security reviewer/settings custody without
@@ -393,9 +397,9 @@ custodians must establish:
 2. Read-back principal/grant/network evidence proving distinct deploy/runtime/
    migration/restore/financial/messaging/agent capabilities; actual negative IAM
    tests on disposable identities. Provider API key permission scope is not inferred.
-3. A separately qualified safe runtime and Vercel source/build configuration. Earlier
-   Render recovery=false/Bird=true and disconnected Vercel findings are carried-forward
-   observations, not refreshed provider verification in this task.
+3. A separately qualified safe runtime and Vercel source/build configuration. Fresh finalization GETs on2026-10-16 confirm
+   Render recovery=false/Bird=true and disconnected Vercel; see the updated release
+   runbook. No live settings were changed.
 4. Authenticated restore evidence binding backup digest/snapshot, schema/build,
    roles/extensions, keys/certificate recovery, observed outcome, verifier identity,
    approved retention/freshness and owner-selected recovery objectives. An opaque
@@ -405,7 +409,8 @@ custodians must establish:
 
 These are one-time infrastructure/operational qualification and continuing automated
 policy obligations, not recurring release approvals. Missing authority/evidence
-leaves activation BLOCKED. Scripture supplies the ethical foundation; human authority
+leaves independent-security/production acceptance BLOCKED. The release code itself
+uses automatic technical checks, not a manual activation token. Scripture supplies the ethical foundation; human authority
 and independent technical evidence determine whether these chosen obligations have
 been met. No absolute safety, compliance certification or production acceptance is
 claimed.

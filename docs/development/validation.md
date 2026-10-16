@@ -35,7 +35,8 @@ release run and attempt, policy digest, environment and provider targets. Negati
 assert no further provider POST after qualification drift, including after partial
 Render completion. Retry adoption requires the immutable same-run audit chain;
 matching source SHA alone is insufficient. These remain simulated provider tests.
-Include no-token/no-human-gate positives, successive verified-baseline rollout,
+Include no-token/no-human-gate/no-activation-switch positives, automatic first
+provider baseline, all-skipped workflow exclusion, successive verified-baseline rollout,
 failed-rerun preservation, preflight failure between partial retries, and foreign
 provider work starting during Render. Full workflow entry tests use real Git archive
 provenance with synthetic clients; no production deployment is required.

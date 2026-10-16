@@ -15,7 +15,7 @@ export const requiredJobs = [
   'Validate container images', 'Release safety tests'
 ];
 const shaPattern = /^[a-f0-9]{40}$/;
-const activeRender = new Set(['created', 'build_in_progress', 'pre_deploy_in_progress', 'update_in_progress']);
+const activeRender = new Set(['created', 'queued', 'build_in_progress', 'pre_deploy_in_progress', 'update_in_progress']);
 const activeVercel = new Set(['QUEUED', 'INITIALIZING', 'BUILDING']);
 const renderStates = new Set([...activeRender, 'live', 'deactivated', 'build_failed',
   'pre_deploy_failed', 'update_failed', 'canceled']);
@@ -51,9 +51,9 @@ export function validateRun(run, jobs, mainSha) {
 }
 
 export function policyDigest(policy) {
-  requireThat(policy?.version === 1 && /^[a-z0-9-]{1,80}$/.test(policy.epoch) &&
-    policy.profile === targets.profile && Object.hasOwn(policy, 'bootstrap') &&
-    Object.keys(policy).every(key => ['version', 'epoch', 'profile', 'bootstrap'].includes(key)),
+  requireThat(policy?.version === 2 && /^[a-z0-9-]{1,80}$/.test(policy.epoch) &&
+    policy.profile === targets.profile && policy.baseline === 'automatic' &&
+    Object.keys(policy).every(key => ['version', 'epoch', 'profile', 'baseline'].includes(key)),
   'STANDING_POLICY_INVALID');
   const canonical = value => value && typeof value === 'object' ?
     (Array.isArray(value) ? value.map(canonical) :
@@ -100,21 +100,13 @@ export function verifyCandidate(candidate, qualified, archive, trustedArchive) {
 
 export function validatePolicy(qualified, env, policy = standingPolicy) {
   validateReleaseIdentity(qualified);
-  requireThat(env.AUTO_DEPLOY_ENABLED === 'true', 'DEPLOYMENT_DISABLED_STANDING_SWITCH');
   requireThat(env.GITHUB_REPOSITORY === qualified.repository && env.GITHUB_RUN_ID === qualified.releaseRunId &&
     env.GITHUB_RUN_ATTEMPT === String(qualified.releaseRunAttempt) &&
     env.GITHUB_REF === 'refs/heads/main' &&
     env.GITHUB_WORKFLOW_REF === `${targets.repository}/.github/workflows/release.yml@refs/heads/main`,
   'TRUSTED_RELEASE_CONTEXT_REQUIRED');
   requireThat(qualified.policySha256 === policyDigest(policy), 'STANDING_POLICY_CHANGED');
-  const b = policy.bootstrap;
-  requireThat(b && /^dep-[a-z0-9]+$/.test(b.renderDeployId) && /^dpl_[A-Za-z0-9]+$/.test(b.vercelDeployId) &&
-    shaPattern.test(b.renderSha) && shaPattern.test(b.vercelSha) &&
-    Number.isSafeInteger(b.releaseFloor) && b.releaseFloor >= 0 &&
-    typeof b.evidenceReference === 'string' && /^[A-Za-z0-9_.\/-]{1,160}$/.test(b.evidenceReference),
-  'QUALIFIED_RECOVERY_BOOTSTRAP_REQUIRED');
   requireThat(env.RENDER_API_KEY?.trim() && env.VERCEL_TOKEN?.trim(), 'DEPLOYMENT_CREDENTIALS_REQUIRED');
-  return Object.freeze({ ...b });
 }
 
 export function validateEnvironment(environment, branches) {
@@ -370,11 +362,25 @@ function validateReleaseRun(run) {
   'RELEASE_WORKFLOW_PROVENANCE_REQUIRED');
 }
 
+async function releaseProductionJob(api, run, attempt) {
+  const page = await api.gh(`/actions/runs/${run.id}/attempts/${attempt}/jobs?per_page=100`);
+  const jobs = page.jobs;
+  requireThat(page.total_count === jobs?.length && jobs.length === 2 &&
+    new Set(jobs.map(j => j.name)).size === 2 &&
+    jobs.every(j => j.run_id === run.id && j.run_attempt === attempt && j.status === 'completed'),
+  'PRIOR_RELEASE_EXECUTION_UNVERIFIABLE');
+  const candidate = jobs.find(j => j.name === 'Qualify immutable source candidate');
+  const production = jobs.find(j => ['Unattended recovery release', 'Authorized recovery release'].includes(j.name));
+  requireThat(candidate && production && (production.conclusion !== 'success' || candidate.conclusion === 'success'),
+    'PRIOR_RELEASE_EXECUTION_UNVERIFIABLE');
+  return production;
+}
+
 export async function evidencePlan(api, candidate, policy) {
   const current = await api.gh(`/actions/runs/${candidate.releaseRunId}`);
   validateReleaseRun(current);
   requireThat(current.head_sha === candidate.sha && current.run_attempt === candidate.releaseRunAttempt &&
-    current.run_number > policy.bootstrap.releaseFloor, 'RELEASE_CONTEXT_OR_POLICY_EPOCH_MISMATCH');
+    candidate.policySha256 === policyDigest(policy), 'RELEASE_CONTEXT_OR_POLICY_EPOCH_MISMATCH');
   const runs = [];
   let count;
   for (let page = 1; page <= 20; page++) {
@@ -389,12 +395,12 @@ export async function evidencePlan(api, candidate, policy) {
     requireThat(result.workflow_runs.length === 100 && page < 20, 'RELEASE_HISTORY_INCOMPLETE');
   }
   for (const run of runs) validateReleaseRun(run);
-  const era = runs.filter(r => r.run_number > policy.bootstrap.releaseFloor && r.run_number <= current.run_number);
-  requireThat(era.length === current.run_number - policy.bootstrap.releaseFloor &&
+  const era = runs.filter(r => r.run_number <= current.run_number);
+  requireThat(era.length === current.run_number &&
     new Set(era.map(r => r.run_number)).size === era.length &&
     era.some(r => r.id === current.id && r.run_attempt === current.run_attempt), 'RELEASE_HISTORY_GAP_RECONCILE');
   const successful = [];
-  for (const run of runs.filter(r => r.id !== current.id && r.run_number > policy.bootstrap.releaseFloor)) {
+  for (const run of runs.filter(r => r.id !== current.id)) {
     requireThat(run.status === 'completed', 'CONCURRENT_RELEASE_RUN');
     requireThat(run.run_attempt <= 20, 'RELEASE_ATTEMPT_HISTORY_TOO_LARGE');
     for (let attempt = run.run_attempt; attempt >= 1; attempt--) {
@@ -402,24 +408,30 @@ export async function evidencePlan(api, candidate, policy) {
       validateReleaseRun(past);
       requireThat(past.id === run.id && past.run_attempt === attempt && past.head_sha === run.head_sha &&
         past.run_number === run.run_number && past.status === 'completed', 'RELEASE_ATTEMPT_HISTORY_UNVERIFIABLE');
-      if (past.conclusion === 'success') { successful.push(past); break; }
+      if (past.conclusion === 'success') {
+        const production = await releaseProductionJob(api, run, attempt);
+        // GitHub can conclude an entirely skipped workflow successfully. It is
+        // positive evidence of no deployment, never a VERIFIED predecessor.
+        if (production.conclusion === 'skipped') continue;
+        requireThat(production.conclusion === 'success', 'RELEASE_SUCCESS_WITHOUT_VERIFICATION');
+        successful.push(past); break;
+      }
     }
   }
   requireThat(successful.every(r => r.run_number < current.run_number), 'NEWER_RELEASE_ALREADY_COMPLETED');
   const latest = successful.sort((a, b) => b.run_number - a.run_number)[0];
   for (const run of runs.filter(r => r.id !== current.id &&
-    r.run_number > (latest?.run_number ?? policy.bootstrap.releaseFloor))) {
+    r.run_number > (latest?.run_number ?? 0))) {
     // A failed prior run may have submitted a request whose history is not visible
     // yet. Only a positively unexecuted provider step is safe to supersede.
     for (let attempt = 1; attempt <= run.run_attempt; attempt++) {
-      const jobs = await api.gh(`/actions/runs/${run.id}/attempts/${attempt}/jobs?per_page=100`);
-      requireThat(jobs.total_count === jobs.jobs?.length && jobs.jobs.length === 2 &&
-        jobs.jobs.every(j => j.run_id === run.id && j.run_attempt === attempt && j.status === 'completed'),
-      'PRIOR_RELEASE_EXECUTION_UNVERIFIABLE');
-      const production = jobs.jobs.find(j => j.name === 'Unattended recovery release');
+      const production = await releaseProductionJob(api, run, attempt);
+      const deployStep = production?.name === 'Authorized recovery release' ?
+        'Revalidate authority, providers, source and recovery before deployment' :
+        'Revalidate policy, provenance, providers and recovery before automatic deployment';
       requireThat(production && (production.conclusion === 'skipped' ||
-        production.steps?.some(s => s.name === 'Revalidate policy, provenance, providers and recovery before automatic deployment' &&
-          s.conclusion === 'skipped')), 'UNVERIFIED_PRIOR_RELEASE_REQUIRES_RECONCILIATION');
+        production.steps?.some(s => s.name === deployStep && s.conclusion === 'skipped')),
+      'UNVERIFIED_PRIOR_RELEASE_REQUIRES_RECONCILIATION');
     }
   }
   requireThat(candidate.releaseRunAttempt <= 20, 'RELEASE_ATTEMPT_HISTORY_TOO_LARGE');
@@ -441,7 +453,7 @@ export function validateBaselineReceipt(rows, descriptor, candidate) {
       row.sha === descriptor.sha && row.policySha256 === candidate.policySha256,
     'BASELINE_RECEIPT_PROVENANCE_MISMATCH');
   }
-  requireThat(last.phase === 'verified' && rows.filter(r => r.phase === 'verified').length === 1 &&
+  requireThat(last.phase === 'verified' && last.renderSha === last.sha && last.vercelSha === last.sha && rows.filter(r => r.phase === 'verified').length === 1 &&
     /^dep-[a-z0-9]+$/.test(last.renderDeployId) && /^dpl_[A-Za-z0-9]+$/.test(last.vercelDeployId) &&
     ['renderReleaseRunAttempt', 'vercelReleaseRunAttempt'].every(key =>
       positiveAttempt(last[key]) && last[key] <= last.releaseRunAttempt), 'VERIFIED_BASELINE_RECEIPT_REQUIRED');
@@ -499,24 +511,13 @@ export async function deploy(api, qualified, policy, report, options = {}) {
     await validateCandidateReview(api, qualified);
   };
   await guard();
-  const bootstrap = validatePolicy(qualified, options.env ?? process.env, policy);
   const plan = options.evidencePlan;
   requireThat(plan && plan.policySha256 === qualified.policySha256, 'FROZEN_EVIDENCE_PLAN_REQUIRED');
   requireThat(!!plan.baseline === !!options.baselineRows, 'BASELINE_RECEIPT_REQUIRED');
-  const baselineProof = plan.baseline ? validateBaselineReceipt(options.baselineRows, plan.baseline, qualified) : bootstrap;
   requireThat(qualified.releaseRunAttempt === 1 ? !plan.resume && !options.receiptRows :
     plan.resume?.runId === qualified.releaseRunId && plan.resume.runAttempt === qualified.releaseRunAttempt - 1 &&
     plan.resume.sha === qualified.sha && options.receiptRows, 'RESUME_RECEIPT_REQUIRED');
   const prior = options.receiptRows ? validateResumeReceipt(options.receiptRows, qualified) : {};
-  const baselineFields = { baselineRenderDeployId: baselineProof.renderDeployId,
-    baselineVercelDeployId: baselineProof.vercelDeployId, baselineRenderSha: baselineProof.renderSha,
-    baselineVercelSha: baselineProof.vercelSha };
-  report({ phase: 'baseline-selected', ...baselineFields });
-  requireThat(baselineProof.renderSha !== qualified.sha && baselineProof.vercelSha !== qualified.sha,
-    'SOURCE_ALREADY_DEPLOYED_RETAIN_ORIGINAL_CI_PROVENANCE');
-  for (const key of Object.keys(baselineFields))
-    requireThat(!options.receiptRows || options.receiptRows.every(row => row[key] === undefined ||
-      row[key] === baselineFields[key]), 'RESUME_BASELINE_MISMATCH');
   const servicePath = `/services/${targets.render.id}`;
   const projectPath = `/v9/projects/${targets.vercel.id}`;
   const repository = await api.gh('');
@@ -533,6 +534,40 @@ export async function deploy(api, qualified, policy, report, options = {}) {
   const readVercelVariables = async () => validateVercelVariables(
     (await api.vercel(`/v10/projects/${targets.vercel.id}/env?decrypt=true`)).envs);
   await readVercelVariables();
+  // A verified predecessor remains authoritative after the first rollout. On the
+  // first rollout, select the current exact provider pair automatically. On a
+  // partial retry use the original immutable baseline, never the advanced live SHA.
+  let baselineProof;
+  if (plan.baseline) baselineProof = validateBaselineReceipt(options.baselineRows, plan.baseline, qualified);
+  else {
+    const baselineRow = options.receiptRows?.find(row => row.phase === 'baseline-selected');
+    requireThat(!prior.renderDeployId || baselineRow, 'RESUME_BASELINE_RECEIPT_REQUIRED');
+    if (baselineRow) {
+      baselineProof = { renderDeployId: baselineRow.baselineRenderDeployId, renderSha: baselineRow.baselineRenderSha,
+        vercelDeployId: baselineRow.baselineVercelDeployId, vercelSha: baselineRow.baselineVercelSha };
+    } else {
+      const live = (await deploymentHistory(api, 'render')).filter(row => row.status === 'live');
+      requireThat(live.length === 1, 'AUTOMATIC_RENDER_BASELINE_UNVERIFIABLE');
+      const webId = project.targets?.production?.id;
+      requireThat(/^dpl_[A-Za-z0-9]+$/.test(webId), 'AUTOMATIC_VERCEL_BASELINE_UNVERIFIABLE');
+      const web = await api.vercel(`/v13/deployments/${webId}`);
+      baselineProof = { renderDeployId: live[0].id, renderSha: live[0].commit?.id,
+        vercelDeployId: webId, vercelSha: web.gitSource?.sha };
+    }
+    requireThat(/^dep-[a-z0-9]+$/.test(baselineProof.renderDeployId) &&
+      /^dpl_[A-Za-z0-9]+$/.test(baselineProof.vercelDeployId) &&
+      shaPattern.test(baselineProof.renderSha ?? '') && shaPattern.test(baselineProof.vercelSha ?? ''),
+    'AUTOMATIC_BASELINE_PROVENANCE_UNVERIFIABLE');
+  }
+  const baselineFields = { baselineRenderDeployId: baselineProof.renderDeployId,
+    baselineVercelDeployId: baselineProof.vercelDeployId, baselineRenderSha: baselineProof.renderSha,
+    baselineVercelSha: baselineProof.vercelSha };
+  report({ phase: 'baseline-selected', ...baselineFields });
+  requireThat(baselineProof.renderSha !== qualified.sha && baselineProof.vercelSha !== qualified.sha,
+    'SOURCE_ALREADY_DEPLOYED_RETAIN_ORIGINAL_CI_PROVENANCE');
+  for (const key of Object.keys(baselineFields))
+    requireThat(!options.receiptRows || options.receiptRows.every(row => row[key] === undefined ||
+      row[key] === baselineFields[key]), 'RESUME_BASELINE_MISMATCH');
   const baseline = await api.render(`${servicePath}/deploys/${baselineProof.renderDeployId}`);
   requireThat(baseline.id === baselineProof.renderDeployId && baseline.commit?.id === baselineProof.renderSha &&
     ['live', 'deactivated'].includes(baseline.status), 'ROLLBACK_BASELINE_REVISION_UNAVAILABLE');
@@ -663,7 +698,8 @@ export async function deploy(api, qualified, policy, report, options = {}) {
   const finalVercel = await deploymentHistory(api, 'vercel');
   requireThat(finalVercel.every(x => !activeVercel.has(x.state ?? x.readyState) || x.uid === vercel.id),
     'CONCURRENT_VERCEL_BEFORE_VERIFICATION');
-  report({ phase: 'verified', sha: qualified.sha, renderDeployId: render.id, vercelDeployId: vercel.id });
+  report({ phase: 'verified', sha: qualified.sha, renderSha: render.commit.id, vercelSha: vercel.gitSource.sha,
+    renderDeployId: render.id, vercelDeployId: vercel.id });
 }
 
 let failureReport;
@@ -685,7 +721,10 @@ export async function main(env, options = {}) {
   requireThat(env.GITHUB_EVENT_NAME === 'workflow_run', 'COMPLETED_CI_EVENT_REQUIRED');
   const event = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH));
   requireThat(event.action === 'completed' && event.workflow_run?.event === 'push' &&
-    event.workflow_run?.head_branch === 'main', 'COMPLETED_MAIN_PUSH_REQUIRED');
+    event.workflow_run?.head_branch === 'main' && event.workflow_run?.status === 'completed' &&
+    event.workflow_run?.conclusion === 'success' &&
+    event.workflow_run?.repository?.full_name === targets.repository &&
+    event.workflow_run?.head_repository?.full_name === targets.repository, 'COMPLETED_MAIN_PUSH_REQUIRED');
   const qualified = await qualify(api, event.workflow_run.id);
   requireThat(qualified.sha === event.workflow_run.head_sha && qualified.ciRunAttempt === event.workflow_run.run_attempt,
     'CI_EVENT_PROVENANCE_MISMATCH');

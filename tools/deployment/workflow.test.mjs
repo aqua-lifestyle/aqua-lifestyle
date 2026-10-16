@@ -31,3 +31,16 @@ test('version-tag publication requires qualification and grants no deployment pe
   assert.match(workflow, /qualify-tag/);
   assert.doesNotMatch(workflow, /environment:|RENDER_API_KEY|VERCEL_TOKEN/);
 });
+
+test('every main push runs CI and successful trusted completion starts CD without activation', () => {
+  const ci = read('.github/workflows/ci.yml'), cd = read('.github/workflows/release.yml');
+  assert.match(ci, /push:\s+branches: \[main, develop, "feature\/\*\*"\]/);
+  assert.match(cd, /workflow_run:\s+workflows: \["Continuous integration"\]\s+types: \[completed\]\s+branches: \[main\]/);
+  assert.match(cd, /github.event.workflow_run.conclusion == 'success'/);
+  assert.match(cd, /github.event.workflow_run.event == 'push'/);
+  assert.match(cd, /github.event.workflow_run.head_repository.full_name == github.repository/);
+  assert.match(cd, /needs: candidate/);
+  assert.doesNotMatch(cd, /AUTO_DEPLOY_ENABLED|workflow_dispatch:|PRODUCTION_RELEASE_AUTHORIZATION|RELEASE_TOKEN/);
+  const policy = JSON.parse(read('tools/deployment/unattended-policy.json'));
+  assert.equal(policy.baseline, 'automatic'); assert.equal(Object.hasOwn(policy, 'bootstrap'), false);
+});

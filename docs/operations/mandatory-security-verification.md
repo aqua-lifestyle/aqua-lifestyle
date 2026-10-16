@@ -1,3 +1,9 @@
+> Finalization follow-up: the latest owner task requests automatic deployment code
+> with this independent-verifier gap explicitly disclosed. The gap below remains
+> real; it is not a claim that the current preparation installed external custody.
+> The current automatic baseline and initial infrastructure requirements are in
+> [the release runbook](safe-automatic-deployment.md).
+
 # Mandatory security verification and independent custody
 
 **Acceptance: BLOCKED.** This branch implements local classification and a custody
@@ -24,9 +30,11 @@ Render/Vercel secrets before executing further candidate-controlled checks. The
 release workflow comes from main after merge, so a merged ordinary PR can change
 both tests and enforcement. A main checkout is not independently controlled.
 
-`mandatory-security-tests.json` now explicitly enumerates 193 cases with stable
-`AQUA-SEC-0001` through `AQUA-SEC-0193` IDs and exact file/name pairs: the original
-171 cases and 22 classifier/workflow checks. Two pre-existing duplicated dynamic
+`mandatory-security-tests.json` at64cbb5c enumerated193 cases. The current
+finalization task preserves those IDs and appends 15 automatic-deployment checks
+through AQUA-SEC-0208. Owner-directed replacements of activation/bootstrap tests
+now exercise persistent credentials, automatic baseline provenance and history;
+other mandatory cases remain. Normal CI executes all 208 exact file/name pairs. Two pre-existing duplicated dynamic
 display names now include their distinct parameter values; assertions are unchanged.
 Names, IDs and expected cardinality are not rediscovered during normal qualification.
 The source hashes pin test assertions, verifier, reporter, release controller and
@@ -52,7 +60,8 @@ The release controller still consumes CI job status, and no independently protec
 verification job has been added to its production credential path. This is a stated
 unmet requirement, not a hidden same-repository substitute. Removing or rewriting
 the local command/manifest in an ordinary PR remains possible under current settings.
-The existing governance/bootstrap checks block current rollout, but those checks are
+The current governance/runtime checks block rollout; the old manual bootstrap was
+removed by the finalization task. These checks are
 also candidate controlled and cannot establish the requested protection.
 
 ## Required external trust boundary (PROPOSED, not provisioned)
@@ -98,9 +107,11 @@ bash tools/deployment/disposable-recovery.sh
 ```
 
 The probe retains verifier/policy/key in the parent and modifies a separate
-synthetic Git candidate under `/tmp`. It executes the original 171-case set
-(with disambiguated duplicate names), then skips, deletes and renames the Render
-case. All three mutant test processes exit 0, while qualification fails. The skip
+synthetic Git candidate under `/tmp`. It executes the first171 reviewed mandatory identities with an explicit exact-name
+filter, then skips, deletes and renames the Render case. New automatic-deployment
+cases are outside this focused mutation fixture; normal CI has no such filter and
+executes the full inventory. The unchanged starting-source reproduction is retained
+in the dated original evidence. All three mutant test processes exit 0, while qualification fails. The skip
 case has exactly 170 passes and one skip. It also removes/replaces CI/release/gate
 files, changes the candidate inventory, forges/misses report bytes/signature and
 substitutes commit/attempt. Every local negative must be rejected. The synthetic

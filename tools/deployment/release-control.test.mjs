@@ -25,13 +25,11 @@ const environment = () => ({ name: targets.environment, can_admins_bypass: false
   deployment_branch_policy: { custom_branch_policies: true, protected_branches: false },
   protection_rules: [{ type: 'branch_policy' }] });
 const branches = () => [{ name: 'main', type: 'branch' }];
-const runnerEnv = (attempt = 1) => ({ AUTO_DEPLOY_ENABLED: 'true', GITHUB_REPOSITORY: targets.repository,
+const runnerEnv = (attempt = 1) => ({ GITHUB_REPOSITORY: targets.repository,
   GITHUB_RUN_ID: '456', GITHUB_RUN_ATTEMPT: String(attempt), GITHUB_REF: 'refs/heads/main',
   GITHUB_WORKFLOW_REF: `${targets.repository}/.github/workflows/release.yml@refs/heads/main`,
   RENDER_API_KEY: 'synthetic-render-key', VERCEL_TOKEN: 'synthetic-vercel-token' });
-const policy = () => ({ ...standingPolicy, bootstrap: { renderDeployId: 'dep-baseline', renderSha: previous,
-  vercelDeployId: 'dpl_Baseline', vercelSha: previous, releaseFloor: 1,
-  evidenceReference: 'isolated/qualified-bootstrap' } });
+const policy = () => ({ ...standingPolicy });
 const governance = () => [
   { type: 'deletion' }, { type: 'non_fast_forward' },
   { type: 'pull_request', parameters: { required_approving_review_count: 1,
@@ -106,29 +104,43 @@ test('API qualification rejects truncated inventory even if the run says success
   await assert.rejects(qualify(f.api, 123), /INVENTORY_INCOMPLETE/);
   assert.equal(f.posts.length, 0);
 });
-test('standing deployment activation has no permissive default', () => {
-  for (const value of [undefined, 'false', 'TRUE'])
-    assert.throws(() => validatePolicy(qualified(), { ...runnerEnv(), AUTO_DEPLOY_ENABLED: value }, policy()), /STANDING_SWITCH/);
-  assert.throws(() => validatePolicy(freezeCandidate(ciQualified(), runnerEnv()), runnerEnv()), /BOOTSTRAP_REQUIRED/);
+test('persistent deployment configuration requires real credentials and exact release context', () => {
+  assert.doesNotThrow(() => validatePolicy(qualified(), runnerEnv(), standingPolicy));
+  assert.throws(() => validatePolicy(qualified(), { ...runnerEnv(), GITHUB_REF: 'refs/heads/other' }, policy()), /CONTEXT/);
   for (const field of ['RENDER_API_KEY', 'VERCEL_TOKEN'])
     assert.throws(() => validatePolicy(qualified(), { ...runnerEnv(), [field]: '' }, policy()), /CREDENTIALS_REQUIRED/);
 });
-for (const [field, value] of [['version', 2], ['epoch', 'different-policy'], ['epoch', undefined],
-  ['profile', 'normal'], ['bootstrap', null], ['unexpectedPermission', true]]) {
+for (const [field, value] of [['version', 1], ['epoch', 'different-policy'], ['epoch', undefined],
+  ['profile', 'normal'], ['baseline', 'manual'], ['unexpectedPermission', true]]) {
   test(`standing policy rejects ${field}=${JSON.stringify(value)} mismatch/missing evidence`, () => {
     assert.throws(() => validatePolicy(qualified(), runnerEnv(), { ...policy(), [field]: value }));
   });
 }
-for (const [field, value] of [['renderDeployId', 'unknown'], ['vercelDeployId', 'unknown'], ['renderSha', 'main'],
-  ['vercelSha', 'main'], ['releaseFloor', -1], ['releaseFloor', undefined], ['evidenceReference', 'http://unsafe/?secret']]) {
-  test(`bootstrap rejects unverifiable ${field}=${JSON.stringify(value)}`, () => {
-    const p = policy(); p.bootstrap[field] = value;
-    assert.throws(() => validatePolicy(freezeCandidate(ciQualified(), runnerEnv(), p), runnerEnv(), p), /BOOTSTRAP_REQUIRED/);
+for (const kind of ['missing Render SHA', 'missing Vercel SHA', 'wrong Vercel project',
+  'failed Vercel baseline', 'missing production target', 'invalid Render ID', 'non-SHA Vercel source']) {
+  test(`automatic baseline rejects ${kind}`, async () => {
+    const f = fixture();
+    if (kind === 'missing Render SHA') delete f.state.renderRows[0].commit.id;
+    if (kind === 'invalid Render ID') f.state.renderRows[0].id = 'unknown';
+    if (kind === 'missing production target') f.state.project.targets = {};
+    const read = f.api.vercel;
+    f.api.vercel = async (route, body) => {
+      const value = await read(route, body);
+      if (route.endsWith('/dpl_Baseline')) {
+        if (kind === 'missing Vercel SHA') delete value.gitSource.sha;
+        if (kind === 'wrong Vercel project') value.projectId = 'other';
+        if (kind === 'failed Vercel baseline') value.readyState = 'ERROR';
+        if (kind === 'non-SHA Vercel source') value.gitSource.sha = 'main';
+      }
+      return value;
+    };
+    await assert.rejects(f.execute()); assert.equal(f.posts.length, 0);
   });
 }
 test('standing policy is source-bound and needs no expiring per-release token', () => {
-  const setup = validatePolicy(qualified(), runnerEnv(), policy());
-  assert.equal(setup.renderSha, previous); assert(Object.isFrozen(setup));
+  assert.doesNotThrow(() => validatePolicy(qualified(), runnerEnv(), standingPolicy));
+  assert.equal(Object.hasOwn(standingPolicy, 'bootstrap'), false);
+  assert.equal(standingPolicy.baseline, 'automatic');
   assert.equal(qualified().policySha256, policyDigest(policy()));
 });
 test('unattended environment forbids manual gates and admin bypass and requires main-only branch policy', () => {
@@ -277,7 +289,7 @@ test('isolated rollout uses exact source, Render readiness before Vercel, and re
   assert.deepEqual(f.reports.map(x => x.phase), ['baseline-selected', 'admitted', 'render-requesting',
     'render-requested', 'render-ready', 'vercel-requesting', 'vercel-requested', 'verified']);
   const { ciUrl, ...identity } = qualified();
-  assert.deepEqual(f.reports.at(-1), { phase: 'verified', ...identity,
+  assert.deepEqual(f.reports.at(-1), { phase: 'verified', ...identity, renderSha: source, vercelSha: source,
     renderDeployId: 'dep-new', vercelDeployId: 'dpl_New',
     baselineRenderDeployId: 'dep-baseline', baselineVercelDeployId: 'dpl_Baseline',
     baselineRenderSha: previous, baselineVercelSha: previous,
@@ -403,6 +415,8 @@ function resumeFixture({ includeVercel = true } = {}) {
     resume: { artifactId: '789', runId: '456', runAttempt: 1, sha: source } };
   const receiptRows = [];
   const record = createAuditWriter(qualified(), row => receiptRows.push(row));
+  record({ phase: 'baseline-selected', baselineRenderDeployId: 'dep-baseline', baselineRenderSha: previous,
+    baselineVercelDeployId: 'dpl_Baseline', baselineVercelSha: previous });
   record({ phase: 'render-requested', renderDeployId: 'dep-new', renderReleaseRunAttempt: 1 });
   f.state.renderRows[0].status = 'deactivated';
   f.state.renderRows.unshift({ id: 'dep-new', status: 'live', commit: { id: source } });
@@ -621,7 +635,7 @@ test('resume requires a unique, unexpired artifact from the exact earlier attemp
     producing, 1), /INVENTORY_INCOMPLETE/);
 });
 
-const releaseRun = (overrides = {}) => ({ id: 456, run_attempt: 1, run_number: 2,
+const releaseRun = (overrides = {}) => ({ id: 456, run_attempt: 1, run_number: 1,
   head_sha: source, event: 'workflow_run', head_branch: 'main',
   repository: { full_name: targets.repository }, head_repository: { full_name: targets.repository },
   path: '.github/workflows/release.yml', name: 'Qualified production release',
@@ -633,6 +647,11 @@ function planFixture(candidate = qualified()) {
     if (route === '/actions/runs/456') return structuredClone(state.current);
     if (route.includes('/workflows/release.yml/runs?'))
       return { total_count: state.runs.length, workflow_runs: structuredClone(state.runs) };
+    const match = route.match(/^\/actions\/runs\/(\d+)\/attempts\/(\d+)\/jobs\?/);
+    if (match) return { total_count: 2, jobs: [
+      { name: 'Qualify immutable source candidate', run_id: Number(match[1]), run_attempt: Number(match[2]), status: 'completed', conclusion: 'success' },
+      { name: 'Unattended recovery release', run_id: Number(match[1]), run_attempt: Number(match[2]), status: 'completed', conclusion: 'success' }
+    ] };
     if (route.includes('/artifacts?'))
       return { total_count: state.artifacts.length, artifacts: structuredClone(state.artifacts) };
     throw new Error('unexpected evidence route');
@@ -643,13 +662,13 @@ const artifactFor = (run, attempt = run.run_attempt) => ({ id: 789,
   name: `production-release-audit-${run.id}-${attempt}`, expired: false,
   workflow_run: { id: run.id, head_sha: run.head_sha } });
 
-test('standing policy selects bootstrap once, then the immutable verified predecessor automatically', async () => {
+test('automatic policy selects the first provider baseline, then the immutable verified predecessor', async () => {
   const f = planFixture();
   assert.deepEqual(await evidencePlan(f.api, qualified(), policy()),
     { policySha256: qualified().policySha256, baseline: null, resume: null, resumeChain: [] });
-  const previousRun = releaseRun({ id: 455, run_number: 2, head_sha: previous,
+  const previousRun = releaseRun({ id: 455, run_number: 1, head_sha: previous,
     status: 'completed', conclusion: 'success' });
-  f.state.current.run_number = 3; f.state.runs = [f.state.current, previousRun];
+  f.state.current.run_number = 2; f.state.runs = [f.state.current, previousRun];
   f.state.artifacts = [artifactFor(previousRun)];
   const selected = await evidencePlan(f.api, qualified(), policy());
   assert.deepEqual(selected.baseline, { artifactId: '789', runId: '455', runAttempt: 1, sha: previous });
@@ -663,10 +682,10 @@ test('own previous-attempt receipt is selected automatically without a resume to
 });
 for (const kind of ['deleted receipt', 'expired receipt', 'truncated history', 'deleted run',
   'foreign workflow', 'fork', 'duplicate run', 'changed release attempt', 'newer completed release']) {
-  test(`evidence discovery rejects ${kind} without resetting to bootstrap`, async () => {
+  test(`evidence discovery rejects ${kind} without silently replacing missing historical evidence`, async () => {
     const f = planFixture();
-    const old = releaseRun({ id: 455, run_number: 2, head_sha: previous, status: 'completed', conclusion: 'success' });
-    f.state.current.run_number = 3; f.state.runs = [f.state.current, old];
+    const old = releaseRun({ id: 455, run_number: 1, head_sha: previous, status: 'completed', conclusion: 'success' });
+    f.state.current.run_number = 2; f.state.runs = [f.state.current, old];
     f.state.artifacts = [artifactFor(old)];
     if (kind === 'deleted receipt') f.state.artifacts = [];
     if (kind === 'expired receipt') f.state.artifacts[0].expired = true;
@@ -859,9 +878,9 @@ test('retry chain cannot cross an ambiguous request or omit an earlier attempt',
 });
 test('failed rerun preserves the earlier successful attempt as a future release baseline', async () => {
   const f = planFixture();
-  const prior = releaseRun({ id: 455, run_number: 2, head_sha: previous,
+  const prior = releaseRun({ id: 455, run_number: 1, head_sha: previous,
     run_attempt: 2, status: 'completed', conclusion: 'failure' });
-  f.state.current.run_number = 3; f.state.runs = [f.state.current, prior];
+  f.state.current.run_number = 2; f.state.runs = [f.state.current, prior];
   f.state.artifacts = [artifactFor(prior, 1)];
   const read = f.api.gh;
   f.api.gh = async route => route === '/actions/runs/455/attempts/1' ?
@@ -920,8 +939,8 @@ test('cancellation after request intent and before recorded provider ID cannot b
 test('a later main can supersede a pre-provider failure but cannot supersede an ambiguous prior release', async () => {
   for (const providerConclusion of ['skipped', 'failure', 'cancelled', 'success']) {
     const f = planFixture();
-    const old = releaseRun({ id: 455, run_number: 2, head_sha: previous, status: 'completed', conclusion: 'failure' });
-    f.state.current.run_number = 3; f.state.runs = [f.state.current, old];
+    const old = releaseRun({ id: 455, run_number: 1, head_sha: previous, status: 'completed', conclusion: 'failure' });
+    f.state.current.run_number = 2; f.state.runs = [f.state.current, old];
     const read = f.api.gh;
     f.api.gh = async route => route === '/actions/runs/455/attempts/1/jobs?per_page=100' ? {
       total_count: 2, jobs: [
@@ -933,4 +952,103 @@ test('a later main can supersede a pre-provider failure but cannot supersede an 
     if (providerConclusion === 'skipped') assert.equal((await evidencePlan(f.api, qualified(), policy())).baseline, null);
     else await assert.rejects(evidencePlan(f.api, qualified(), policy()), /UNVERIFIED_PRIOR_RELEASE_REQUIRES_RECONCILIATION/);
   }
+});
+
+test('persistent provider credentials need no activation switch at any release', () => {
+  for (const value of [undefined, 'false', 'true']) {
+    const env = { ...runnerEnv() };
+    if (value === undefined) delete env.AUTO_DEPLOY_ENABLED;
+    else env.AUTO_DEPLOY_ENABLED = value;
+    assert.doesNotThrow(() => validatePolicy(qualified(), env, policy()));
+  }
+});
+
+test('checked-in policy discovers the first live baseline without a manual bootstrap record', async () => {
+  const f = fixture(); f.state.policy = standingPolicy;
+  f.state.candidate = freezeCandidate(ciQualified(), runnerEnv(), standingPolicy);
+  await f.execute();
+  assert.deepEqual(f.posts.map(x => x.provider), ['render', 'vercel']);
+  assert.equal(f.reports.at(-1).phase, 'verified');
+  assert.equal(f.reports.at(-1).baselineRenderDeployId, 'dep-baseline');
+});
+
+for (const kind of ['failed CI', 'neutral CI', 'unfinished CI', 'PR CI', 'fork CI', 'manual CI']) {
+  test(`workflow entry rejects ${kind} without provider mutations`, async () => {
+    const temp = mkdtempSync(join(tmpdir(), 'aqua-automatic-event-'));
+    const f = fixture(), event = { action: 'completed', workflow_run: run() };
+    if (kind === 'failed CI') event.workflow_run.conclusion = 'failure';
+    if (kind === 'neutral CI') event.workflow_run.conclusion = 'neutral';
+    if (kind === 'unfinished CI') event.workflow_run.status = 'in_progress';
+    if (kind === 'PR CI') event.workflow_run.event = 'pull_request';
+    if (kind === 'fork CI') event.workflow_run.head_repository.full_name = 'untrusted/fork';
+    if (kind === 'manual CI') event.workflow_run.event = 'workflow_dispatch';
+    const path = join(temp, 'event.json'); writeFileSync(path, JSON.stringify(event));
+    try {
+      await assert.rejects(main({ ...runnerEnv(), GITHUB_EVENT_NAME: 'workflow_run', GITHUB_EVENT_PATH: path },
+        { api: f.api, policy: standingPolicy, mode: 'candidate' }), /COMPLETED_MAIN_PUSH_REQUIRED/);
+      assert.equal(f.posts.length, 0);
+    } finally { rmSync(temp, { recursive: true, force: true }); }
+  });
+}
+
+test('legacy release blocked before its provider step needs no manual history reset', async () => {
+  for (const outcome of ['skipped', 'failure', 'success']) {
+    const f = planFixture(); f.state.current.run_number = 2;
+    const legacy = releaseRun({ id: 455, run_number: 1, head_sha: previous, status: 'completed', conclusion: 'failure' });
+    f.state.runs = [f.state.current, legacy];
+    const read = f.api.gh;
+    f.api.gh = async route => route.includes('/attempts/1/jobs') ? { total_count: 2, jobs: [
+      { name: 'Qualify immutable source candidate', run_id: 455, run_attempt: 1, status: 'completed', conclusion: 'success' },
+      { name: 'Authorized recovery release', run_id: 455, run_attempt: 1, status: 'completed', conclusion: 'failure',
+        steps: [{ name: 'Revalidate authority, providers, source and recovery before deployment', conclusion: outcome }] }
+    ] } : read(route);
+    if (outcome === 'skipped') assert.equal((await evidencePlan(f.api, qualified(), standingPolicy)).baseline, null);
+    else await assert.rejects(evidencePlan(f.api, qualified(), standingPolicy), /UNVERIFIED_PRIOR_RELEASE/);
+  }
+});
+
+test('a partial retry cannot rediscover its advanced baseline after losing original baseline evidence', async () => {
+  const f = resumeFixture();
+  f.state.receiptRows = f.state.receiptRows.filter(row => row.phase !== 'baseline-selected');
+  await assert.rejects(f.execute(), /RESUME_BASELINE_RECEIPT_REQUIRED/);
+  assert.equal(f.posts.length, 0);
+});
+
+test('verified predecessor explicitly binds both provider revisions', async () => {
+  const f = fixture(); await f.execute();
+  for (const field of ['renderSha', 'vercelSha']) {
+    const rows = structuredClone(f.reports); rows.at(-1)[field] = previous;
+    assert.throws(() => validateBaselineReceipt(rows, { runId: '456', runAttempt: 1, sha: source }, qualified()), /VERIFIED_BASELINE/);
+  }
+});
+
+test('an automatically skipped release after failed CI cannot become a verified baseline', async () => {
+  const f = planFixture(); f.state.current.run_number = 2;
+  const skipped = releaseRun({ id: 455, run_number: 1, head_sha: previous, status: 'completed', conclusion: 'success' });
+  f.state.runs = [f.state.current, skipped];
+  const read = f.api.gh;
+  f.api.gh = async route => route.includes('/attempts/1/jobs') ? { total_count: 2, jobs: [
+    { name: 'Qualify immutable source candidate', run_id: 455, run_attempt: 1, status: 'completed', conclusion: 'skipped' },
+    { name: 'Unattended recovery release', run_id: 455, run_attempt: 1, status: 'completed', conclusion: 'skipped' }
+  ] } : read(route);
+  assert.equal((await evidencePlan(f.api, qualified(), standingPolicy)).baseline, null);
+});
+
+test('documented queued Render deployment is polled to readiness before Vercel', async () => {
+  const f = fixture(), read = f.api.render;
+  f.api.render = async (route, body) => {
+    const value = await read(route, body);
+    if (body) { f.state.newRender.status = 'queued'; return { ...value, status: 'queued' }; }
+    return value;
+  };
+  await f.execute();
+  assert.deepEqual(f.posts.map(row => row.provider), ['render', 'vercel']);
+  assert.equal(f.reports.at(-1).phase, 'verified');
+});
+
+test('foreign queued Render deployment blocks automatic mutation', async () => {
+  const f = fixture();
+  f.state.renderRows.push({ id: 'dep-queued', status: 'queued', commit: { id: previous } });
+  await assert.rejects(f.execute(), /CONCURRENT_RENDER_DEPLOYMENT/);
+  assert.equal(f.posts.length, 0);
 });

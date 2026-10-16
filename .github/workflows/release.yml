@@ -20,13 +20,19 @@ concurrency:
 jobs:
   candidate:
     name: Qualify immutable source candidate
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       sha: ${{ steps.candidate.outputs.sha }}
       artifact-id: ${{ steps.upload.outputs.artifact-id }}
     steps:
-      # workflow_run uses the trusted default branch, never PR code/artifacts.
+      # workflow_run uses main after merge; same-repository controls remain
+      # candidate editable. No independent verifier custody is claimed.
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
@@ -75,11 +81,10 @@ jobs:
           artifact-ids: ${{ needs.candidate.outputs.artifact-id }}
           path: ${{ runner.temp }}/candidate
           merge-multiple: true
-      - name: Validate standing policy and select immutable baseline and retry receipts
+      - name: Validate persistent configuration and select immutable retry receipts
         id: admission
         env:
           GH_TOKEN: ${{ github.token }}
-          AUTO_DEPLOY_ENABLED: ${{ vars.AUTO_DEPLOY_ENABLED }}
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           CANDIDATE_DIR: ${{ runner.temp }}/candidate
@@ -104,7 +109,6 @@ jobs:
       - name: Revalidate policy, provenance, providers and recovery before automatic deployment
         env:
           GH_TOKEN: ${{ github.token }}
-          AUTO_DEPLOY_ENABLED: ${{ vars.AUTO_DEPLOY_ENABLED }}
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           CANDIDATE_DIR: ${{ runner.temp }}/candidate

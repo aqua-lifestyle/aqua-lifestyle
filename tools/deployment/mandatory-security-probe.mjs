@@ -27,13 +27,15 @@ try {
   git(['-c', 'user.name=Synthetic fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'Synthetic candidate']);
   const context = { kind: 'ci', repository: 'aqua-lifestyle/aqua-lifestyle', sha: git(['rev-parse', 'HEAD']), runId: '123', runAttempt: 2 };
   const reporter = fileURLToPath(new URL('./security-reporter.mjs', import.meta.url));
-  // Original 171 cases retain IDs 0001..0171; the classifier cases have later IDs.
-  // Two duplicated baseline display names were disambiguated without changing assertions.
+  // Retain the first171 reviewed identities as a focused mutation fixture.
+  // Normal CI executes the entire current inventory, with no name filter.
   const baseline = { ...policy, tests: policy.tests.filter(t => Number(t.id.slice(-4)) <= 171) };
   assert.equal(baseline.tests.length, 171);
   const bytes = Buffer.from(JSON.stringify(baseline));
+  const escape = name => name.replace(/[.*+?^${}()|[\]\\]/g, char => '\\' + char);
+  const pattern = '^(?:' + baseline.tests.map(t => escape(t.name)).join('|') + ')$';
   const execute = () => {
-    const run = spawnSync(process.execPath, ['--test', `--test-reporter=${reporter}`,
+    const run = spawnSync(process.execPath, ['--test', `--test-reporter=${reporter}`, `--test-name-pattern=${pattern}`,
       ...new Set(baseline.tests.map(t => t.file))], { cwd: temp, encoding: 'utf8',
       env: { PATH: process.env.PATH, NODE_OPTIONS: '' }, timeout: 240000, maxBuffer: 16 * 1024 * 1024 });
     assert.equal(run.status, 0, run.stderr || run.stdout);
@@ -42,7 +44,7 @@ try {
   verifySourceFiles(temp, policy);
   const positive = execute();
   assert.equal(classifyReport(positive, baseline, context, bytes).cases, 171);
-  emit({ probe: 'unmodified-original-case-set', verdict: 'PASS', tests: 171 });
+  emit({ probe: 'unmodified-reviewed-case-set', verdict: 'PASS', tests: 171 });
   const file = 'tools/deployment/release-control.test.mjs';
   const original = readFileSync(join(temp, file), 'utf8');
   const needle = "test('Render failure never starts Vercel or automatic rollback'";
