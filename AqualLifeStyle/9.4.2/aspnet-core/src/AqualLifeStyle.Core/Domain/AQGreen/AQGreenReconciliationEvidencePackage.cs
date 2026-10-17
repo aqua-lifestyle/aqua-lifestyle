@@ -16,6 +16,7 @@ namespace AqualLifeStyle.Domain.AQGreen
         public static AQGreenReconciliationEvidencePackage Freeze(
             AQGreenReconciliationEvidenceManifest manifest, List<AQGreenReconciliationEvidenceRecord> records)
         {
+            VerifyObservationBoundary(manifest);
             var package = new AQGreenReconciliationEvidencePackage { Manifest = manifest, Records = records };
             foreach (var record in records) record.RecordDigest = AQGreenB6CanonicalEvidence.Digest(record, "recordDigest");
             manifest.RecordCount = records.Count;
@@ -34,10 +35,10 @@ namespace AqualLifeStyle.Domain.AQGreen
         {
             void Require(bool condition) { if (!condition) throw new InvalidOperationException("Reconciliation evidence integrity check failed."); }
             Require(Manifest != null && Records != null);
+            VerifyObservationBoundary(Manifest);
             Require((Manifest.PackageVersion == AQGreenReconciliationEvidenceManifest.Version ||
                 Manifest.PackageVersion == AQGreenReconciliationEvidenceManifest.LegacyVersion) &&
-                Manifest.TenantId > 0 && Manifest.AnalysisSnapshotCutoffUtc.Kind == DateTimeKind.Utc &&
-                Manifest.AnalysisSnapshotCutoffUtc <= Manifest.SourceBoundary.SourceObservedAtUtc &&
+                Manifest.TenantId > 0 &&
                 Manifest.SourceBoundary.TransactionMode == "REPEATABLE READ READ ONLY");
             Require(Manifest.AuthorizedAreaIds != null && Manifest.AuthorizedAreaIds.SequenceEqual(
                 Manifest.AuthorizedAreaIds.Distinct().OrderBy(id => id)));
@@ -68,6 +69,17 @@ namespace AqualLifeStyle.Domain.AQGreen
         // as UTF-8 SHA256SUMS. No filesystem or database writes in this library.
         public byte[] RecordsBytes() => AQGreenB6CanonicalEvidence.Bytes(Records);
         public byte[] ManifestBytes() => AQGreenB6CanonicalEvidence.Bytes(Manifest);
+        private static void VerifyObservationBoundary(AQGreenReconciliationEvidenceManifest manifest)
+        {
+            // DateTime comparison ignores Kind. Hash-correct bytes must not turn
+            // an unknown/default or local observation into authoritative UTC history.
+            if (manifest?.SourceBoundary == null || manifest.AnalysisSnapshotCutoffUtc == default ||
+                manifest.AnalysisSnapshotCutoffUtc.Kind != DateTimeKind.Utc ||
+                manifest.SourceBoundary.SourceObservedAtUtc == default ||
+                manifest.SourceBoundary.SourceObservedAtUtc.Kind != DateTimeKind.Utc ||
+                manifest.AnalysisSnapshotCutoffUtc > manifest.SourceBoundary.SourceObservedAtUtc)
+                throw new InvalidOperationException("Reconciliation evidence observation boundary is invalid.");
+        }
         private string Checksums() => $"{AQGreenB6CanonicalEvidence.Hash(RecordsBytes())}  records.json\n{AQGreenB6CanonicalEvidence.Hash(ManifestBytes())}  manifest.json\n";
         private static SortedDictionary<string, int> Counts(IEnumerable<AQGreenReconciliationEvidenceRecord> records) =>
             new(records.GroupBy(r => r.DiscoveryKind).ToDictionary(g => g.Key, g => g.Count()), StringComparer.Ordinal);
