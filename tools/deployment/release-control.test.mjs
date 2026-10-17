@@ -7,8 +7,8 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { auditArtifact, clients, createAuditWriter, deploy, deploymentHistory, evidencePlan, freezeCandidate,
   main, policyDigest, qualify, requalify, releaseKey, requiredJobs, run as runRelease,
-  standingPolicy, targets, validatePolicy, validateCandidateReview,
-  validateBaselineReceipt, validateInfrastructure, validateResumeReceipt,
+  standingPolicy, targets, validatePolicy, validateCandidateProvenance,
+  validateBaselineReceipt, validateMainGovernance, validateInfrastructure, validateResumeReceipt,
   validateEnvironment, validateHealth, validateRender, validateRun, validateVercel,
   validateVercelVariables, verifyCandidate, waitFor } from './release-control.mjs';
 
@@ -30,13 +30,8 @@ const runnerEnv = (attempt = 1) => ({ GITHUB_REPOSITORY: targets.repository,
   GITHUB_WORKFLOW_REF: `${targets.repository}/.github/workflows/release.yml@refs/heads/main`,
   RENDER_API_KEY: 'synthetic-render-key', VERCEL_TOKEN: 'synthetic-vercel-token' });
 const policy = () => ({ ...standingPolicy });
-const governance = () => [
-  { type: 'deletion' }, { type: 'non_fast_forward' },
-  { type: 'pull_request', parameters: { required_approving_review_count: 1,
-    dismiss_stale_reviews_on_push: true, require_last_push_approval: true, required_review_thread_resolution: true } },
-  { type: 'required_status_checks', parameters: { strict_required_status_checks_policy: true,
-    required_status_checks: requiredJobs.map(context => ({ context, integration_id: 15368 })) } }
-].map(r => ({ ...r, ruleset_source_type: 'Repository', ruleset_id: 1 }));
+const installedGovernance = JSON.parse(readFileSync(new URL('./fixtures/installed-main-governance.json', import.meta.url)));
+const governance = () => structuredClone(installedGovernance.rules);
 const service = () => ({ id: targets.render.id, name: targets.render.name,
   repo: 'https://github.com/' + targets.repository, branch: 'main', suspended: 'not_suspended',
   autoDeployTrigger: 'off', autoDeploy: 'no', rootDir: '', serviceDetails: {
@@ -203,14 +198,11 @@ function fixture() {
     main: source, jobCount: requiredJobs.length, files: [], renderRows: [
       { id: 'dep-baseline', status: 'live', commit: { id: previous } }], vercelRows: [],
     candidate: qualified(), policy: policy(), env: runnerEnv(), receiptRows: undefined, baselineRows: undefined,
-    rules: governance(), ruleset: { id: 1, enforcement: 'active', target: 'branch', bypass_actors: [] },
+    rules: governance(), ruleset: structuredClone(installedGovernance.ruleset),
     environment: environment(), branches: branches(),
     pr: { number: 1, merged: true, state: 'closed', merge_commit_sha: source,
       base: { ref: 'main', repo: { full_name: targets.repository } }, head: { sha: 'd'.repeat(40) },
       user: { login: 'author', id: 1 }, merged_at: '2026-10-16T10:00:00Z' },
-    reviews: [{ id: 1, user: { login: 'reviewer', id: 2, type: 'User' }, state: 'APPROVED',
-      commit_id: 'd'.repeat(40), submitted_at: '2026-10-16T09:00:00Z' }],
-    reviewerPermission: { permission: 'write', user: { id: 2, login: 'reviewer' } },
     publicVars: publicVars(), newRender: undefined, newVercel: undefined, renderReads: 0, vercelReads: 0 };
   const posts = [], reports = [];
   const api = {
@@ -221,14 +213,12 @@ function fixture() {
       if (route === '/git/ref/heads/main') return { object: { sha: state.main } };
       if (route.startsWith('/compare/')) return { status: 'ahead', files: state.files };
       if (route === '/rules/branches/main?per_page=100') return state.rules;
-      if (route === '/rulesets/1') return state.ruleset;
+      if (route === '/rulesets/25297647') return state.ruleset;
       if (route.endsWith('/deployment-branch-policies?per_page=100'))
         return { total_count: state.branches.length, branch_policies: state.branches };
       if (route === `/environments/${targets.environment}`) return state.environment;
       if (route.startsWith('/commits/') && route.endsWith('/pulls?per_page=100')) return [state.pr];
       if (route === '/pulls/1') return structuredClone(state.pr);
-      if (route === '/pulls/1/reviews?per_page=100') return state.reviews;
-      if (route.startsWith('/collaborators/')) return state.reviewerPermission;
       throw new Error('Unexpected GitHub fixture route');
     },
     render: async (route, body) => {
@@ -401,10 +391,10 @@ test('governance revocation during API build blocks the later Vercel POST', asyn
   const f = fixture(), read = f.api.health;
   f.api.health = async () => { const value = await read();
     if (f.state.newRender?.status === 'live')
-      f.state.rules.find(r => r.type === 'pull_request').parameters.required_approving_review_count = 0;
+      f.state.rules.find(r => r.type === 'required_status_checks').parameters.strict_required_status_checks_policy = false;
     return value;
   };
-  await assert.rejects(f.execute(), /MAIN_PR_AND_CI_GOVERNANCE_REQUIRED/);
+  await assert.rejects(f.execute(), /MAIN_CI_GOVERNANCE_REQUIRED/);
   assert.equal(f.posts.length, 1); assert.equal(f.posts[0].provider, 'render');
 });
 function resumeFixture({ includeVercel = true } = {}) {
@@ -778,37 +768,38 @@ test('completed release or later successful CI rerun cannot authorize another de
     assert.equal(first.reports.at(-1).ciRunAttempt, 1);
   }
 });
-for (const kind of ['direct push', 'stale approval', 'dismissed approval', 'request changes', 'self approval',
-  'bot approval', 'post-merge approval', 'reviewer revoked', 'unknown permission', 'incomplete reviews']) {
-  test(`candidate review rejects ${kind} before any mutation`, async () => {
-    const f = fixture();
+for (const kind of ['direct push', 'unmerged PR', 'open PR', 'wrong base', 'wrong repository',
+  'invalid head', 'missing merge time', 'missing author identity', 'ambiguous PRs', 'truncated PR inventory']) {
+  test(`candidate provenance rejects ${kind} before any mutation`, async () => {
+    const f = fixture(), read = f.api.gh;
     if (kind === 'direct push') f.state.pr.merge_commit_sha = previous;
-    if (kind === 'stale approval') f.state.reviews[0].commit_id = previous;
-    if (kind === 'dismissed approval') f.state.reviews[0].state = 'DISMISSED';
-    if (kind === 'request changes') f.state.reviews.push({ ...f.state.reviews[0], id: 2, state: 'CHANGES_REQUESTED' });
-    if (kind === 'self approval') f.state.reviews[0].user = { ...f.state.pr.user, type: 'User' };
-    if (kind === 'bot approval') f.state.reviews[0].user.type = 'Bot';
-    if (kind === 'post-merge approval') f.state.reviews[0].submitted_at = '2026-10-17T00:00:00Z';
-    if (kind === 'reviewer revoked') f.state.reviewerPermission.permission = 'read';
-    if (kind === 'unknown permission') f.state.reviewerPermission.user.id = 999;
-    if (kind === 'incomplete reviews') f.state.reviews = Array.from({ length: 100 }, () => f.state.reviews[0]);
-    await assert.rejects(f.execute()); assert.equal(f.posts.length, 0);
+    if (kind === 'unmerged PR') f.state.pr.merged = false;
+    if (kind === 'open PR') f.state.pr.state = 'open';
+    if (kind === 'wrong base') f.state.pr.base.ref = 'other';
+    if (kind === 'wrong repository') f.state.pr.base.repo.full_name = 'untrusted/fork';
+    if (kind === 'invalid head') f.state.pr.head.sha = 'main';
+    if (kind === 'missing merge time') f.state.pr.merged_at = null;
+    if (kind === 'missing author identity') delete f.state.pr.user.id;
+    if (kind === 'ambiguous PRs' || kind === 'truncated PR inventory')
+      f.api.gh = async route => route.startsWith('/commits/') ?
+        Array.from({ length: kind === 'ambiguous PRs' ? 2 : 100 }, () => f.state.pr) : read(route);
+    await assert.rejects(f.execute(), /QUALIFIED_MERGED_MAIN_PR_REQUIRED|MERGED_PR_(INVENTORY|PROVENANCE)_UNVERIFIABLE/); assert.equal(f.posts.length, 0);
   });
 }
-test('review revocation after Render completion blocks Vercel', async () => {
+test('merged PR provenance drift after Render completion blocks Vercel', async () => {
   const f = fixture(), read = f.api.health;
   f.api.health = async () => { const value = await read();
-    if (f.state.newRender?.status === 'live') f.state.reviews[0].state = 'DISMISSED'; return value; };
-  await assert.rejects(f.execute(), /PREMERGE_EXACT_HEAD_REVIEW_REQUIRED/);
+    if (f.state.newRender?.status === 'live') f.state.pr.merge_commit_sha = previous; return value; };
+  await assert.rejects(f.execute(), /QUALIFIED_MERGED_MAIN_PR_REQUIRED/);
   assert.deepEqual(f.posts.map(x => x.provider), ['render']);
 });
-for (const kind of ['missing rules', 'wrong app', 'missing job', 'no latest approval', 'manual environment gate', 'wrong branch type']) {
+for (const kind of ['missing rules', 'wrong app', 'missing job', 'bypassable checks', 'manual environment gate', 'wrong branch type']) {
   test(`infrastructure rejects ${kind} before entering provider rollout`, async () => {
     const f = fixture();
     if (kind === 'missing rules') f.state.rules = [];
-    if (kind === 'wrong app') f.state.rules.at(-1).parameters.required_status_checks[0].integration_id = 999;
-    if (kind === 'missing job') f.state.rules.at(-1).parameters.required_status_checks.pop();
-    if (kind === 'no latest approval') f.state.rules[2].parameters.require_last_push_approval = false;
+    if (kind === 'wrong app') f.state.rules.find(r => r.type === 'required_status_checks').parameters.required_status_checks[0].integration_id = 999;
+    if (kind === 'missing job') f.state.rules.find(r => r.type === 'required_status_checks').parameters.required_status_checks.pop();
+    if (kind === 'bypassable checks') f.state.ruleset.bypass_actors.push({ actor_type: 'RepositoryRole', actor_id: 5, bypass_mode: 'always' });
     if (kind === 'manual environment gate') f.state.environment.protection_rules.push({ type: 'required_reviewers' });
     if (kind === 'wrong branch type') f.state.branches[0].type = 'tag';
     await assert.rejects(f.execute()); assert.equal(f.posts.length, 0);
@@ -843,10 +834,10 @@ test('workflow entry qualifies, archives, admits and deploys automatically with 
     const rows = readFileSync(env.RELEASE_REPORT, 'utf8').trim().split('\n').map(x => JSON.parse(x));
     assert.equal(rows.at(-1).phase, 'verified'); assert.equal(rows.at(-1).ciRunAttempt, 1);
     assert.equal(rows.at(-1).policySha256, policyDigest(policy()));
-    f.state.reviews[0].state = 'DISMISSED';
+    f.state.ruleset.bypass_actors.push({ actor_type: 'RepositoryRole', actor_id: 5, bypass_mode: 'always' });
     assert.equal(await runRelease(env, { ...options, mode: 'deploy' }), 1);
     const failed = JSON.parse(readFileSync(env.RELEASE_REPORT, 'utf8').trim().split('\n').at(-1));
-    assert.equal(failed.code, 'PREMERGE_EXACT_HEAD_REVIEW_REQUIRED');
+    assert.equal(failed.code, 'MAIN_RULESET_BYPASS_FORBIDDEN');
     assert.equal(failed.policySha256, policyDigest(policy()));
   } finally { rmSync(temp, { recursive: true, force: true }); }
 });
@@ -854,7 +845,7 @@ test('workflow entry qualifies, archives, admits and deploys automatically with 
 test('retry chain retains attempt1 operations across attempt2 preflight failure and attempt3 reconciliation', async () => {
   const f = resumeFixture();
   const attempt2 = createAuditWriter(f.state.candidate, row => f.state.receiptRows.push(row));
-  attempt2({ phase: 'failed', code: 'MAIN_PR_AND_CI_GOVERNANCE_REQUIRED' });
+  attempt2({ phase: 'failed', code: 'MAIN_CI_GOVERNANCE_REQUIRED' });
   f.state.candidate = freezeCandidate(ciQualified(), runnerEnv(3), f.state.policy);
   f.state.env = runnerEnv(3); f.state.plan.resume.runAttempt = 2;
   await f.execute();
@@ -870,7 +861,7 @@ test('retry chain cannot cross an ambiguous request or omit an earlier attempt',
     f.state.candidate = freezeCandidate(ciQualified(), runnerEnv(3), f.state.policy);
     f.state.env = runnerEnv(3); f.state.plan.resume.runAttempt = 2;
     const writer = createAuditWriter(freezeCandidate(ciQualified(), runnerEnv(2), policy()), row => rows.push(row));
-    writer({ phase: 'failed', code: kind === 'ambiguous' ? 'AMBIGUOUS_PROVIDER_POST_INSPECT_BEFORE_RETRY' : 'MAIN_PR_AND_CI_GOVERNANCE_REQUIRED' });
+    writer({ phase: 'failed', code: kind === 'ambiguous' ? 'AMBIGUOUS_PROVIDER_POST_INSPECT_BEFORE_RETRY' : 'MAIN_CI_GOVERNANCE_REQUIRED' });
     if (kind === 'missing first') rows.splice(0, rows.length - 1);
     if (kind === 'gap') rows.at(-1).releaseRunAttempt = 4;
     await assert.rejects(f.execute()); assert.equal(f.posts.length, 0);
@@ -1050,5 +1041,70 @@ test('foreign queued Render deployment blocks automatic mutation', async () => {
   const f = fixture();
   f.state.renderRows.push({ id: 'dep-queued', status: 'queued', commit: { id: previous } });
   await assert.rejects(f.execute(), /CONCURRENT_RENDER_DEPLOYMENT/);
+  assert.equal(f.posts.length, 0);
+});
+
+
+test('installed owner-controlled ruleset 25297647 accepts all 17 App-bound checks without human approval', async () => {
+  const f = fixture();
+  assert.equal(f.state.ruleset.id, 25297647);
+  assert.equal(f.state.ruleset.rules.some(r => r.type === 'pull_request'), false);
+  assert.equal(f.state.ruleset.rules.find(r => r.type === 'required_status_checks').parameters.required_status_checks.length, 17);
+  validateMainGovernance(f.state.rules, f.state.ruleset);
+  await validateInfrastructure(f.api);
+  // The fixture rejects any review/collaborator route, proving neither is needed.
+  await validateCandidateProvenance(f.api, qualified());
+  await f.execute();
+  assert.deepEqual(f.posts.map(x => x.provider), ['render', 'vercel']);
+});
+for (const kind of ['hidden bypass actors', 'bypass actors', 'inactive ruleset', 'wrong ruleset identity',
+  'wrong ruleset source', 'wrong target', 'missing ruleset rules', 'missing deletion protection',
+  'missing force-push protection', 'non-strict checks', 'creation exemption', 'duplicate check',
+  'renamed check', 'unbound app', 'missing detail check', 'weakened detail check', 'missing effective check',
+  'wrong branch scope', 'excluded main', 'missing branch scope']) {
+  test(`owner governance rejects ${kind} before any provider mutation`, async () => {
+    const f = fixture();
+    const checks = f.state.rules.find(r => r.type === 'required_status_checks').parameters;
+    const detailChecks = f.state.ruleset.rules.find(r => r.type === 'required_status_checks').parameters;
+    if (kind === 'hidden bypass actors') delete f.state.ruleset.bypass_actors;
+    if (kind === 'bypass actors') f.state.ruleset.bypass_actors = [{ actor_type: 'Integration', actor_id: 15368, bypass_mode: 'pull_request' }];
+    if (kind === 'inactive ruleset') f.state.ruleset.enforcement = 'evaluate';
+    if (kind === 'wrong ruleset identity') f.state.ruleset.id = 999;
+    if (kind === 'wrong ruleset source') f.state.ruleset.source = 'untrusted/fork';
+    if (kind === 'wrong target') f.state.ruleset.target = 'tag';
+    if (kind === 'missing ruleset rules') delete f.state.ruleset.rules;
+    if (kind === 'wrong branch scope') f.state.ruleset.conditions.ref_name.include = ['refs/heads/other'];
+    if (kind === 'excluded main') f.state.ruleset.conditions.ref_name.exclude = ['refs/heads/main'];
+    if (kind === 'missing branch scope') delete f.state.ruleset.conditions;
+    if (kind === 'missing deletion protection') f.state.ruleset.rules = f.state.ruleset.rules.filter(r => r.type !== 'deletion');
+    if (kind === 'missing force-push protection') f.state.rules = f.state.rules.filter(r => r.type !== 'non_fast_forward');
+    if (kind === 'non-strict checks') checks.strict_required_status_checks_policy = false;
+    if (kind === 'creation exemption') checks.do_not_enforce_on_create = true;
+    if (kind === 'duplicate check') checks.required_status_checks.push(checks.required_status_checks[0]);
+    if (kind === 'renamed check') checks.required_status_checks[0].context += ' renamed';
+    if (kind === 'unbound app') checks.required_status_checks[0].integration_id = null;
+    if (kind === 'missing detail check') detailChecks.required_status_checks.pop();
+    if (kind === 'weakened detail check') detailChecks.strict_required_status_checks_policy = false;
+    if (kind === 'missing effective check') f.state.rules = f.state.rules.filter(r => r.type !== 'required_status_checks');
+    await assert.rejects(f.execute(), /MAIN_(CI_GOVERNANCE_REQUIRED|RULESET_CUSTODY_UNVERIFIABLE|RULESET_BYPASS_FORBIDDEN)/); assert.equal(f.posts.length, 0);
+  });
+}
+test('merged PR provenance re-read detects a concurrent head change without requesting a review', async () => {
+  const f = fixture(), read = f.api.gh;
+  let count = 0;
+  f.api.gh = async route => {
+    const value = await read(route);
+    if (route === '/pulls/1' && ++count === 2) value.head.sha = previous;
+    return value;
+  };
+  await assert.rejects(validateCandidateProvenance(f.api, qualified()), /MERGED_PR_EVIDENCE_CHANGED/);
+  assert.equal(f.posts.length, 0);
+});
+test('actual main-only environment remains blocked solely by the outstanding administrator bypass setting', async () => {
+  const f = fixture(); f.state.environment.can_admins_bypass = true;
+  await assert.rejects(validateInfrastructure(f.api), /UNATTENDED_MAIN_ONLY_ENVIRONMENT_REQUIRED/);
+  f.state.environment.can_admins_bypass = false;
+  await validateInfrastructure(f.api);
+  assert.deepEqual(f.state.environment.protection_rules, [{ type: 'branch_policy' }]);
   assert.equal(f.posts.length, 0);
 });

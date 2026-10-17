@@ -50,9 +50,12 @@ remain distinguishable. See the [runtime capability qualification](runtime-autho
 
 Required outcome: **qualified merge → completed CI → automatic deployment →
 production verification**, without recurring human release approval or a release
-token. Normal independent review of changes remains merge governance. Changes to
-the control plane require separately accountable security review before merge,
-not a new approval for every deployment.
+token. The owner explicitly selected 17-check, owner-controlled main governance
+without mandatory human PR approval or last-push approval. The current controller
+requires exact merged-PR provenance and explicit non-bypassable check evidence.
+Independent control-plane review/custody remains an unmet stronger boundary, not
+a human approval requirement imposed on every merge or deployment. See the
+[current GitHub procedure and limitations](safe-automatic-deployment.md#owner-controlled-github-governance-and-outstanding-setting).
 
 The existing single release orchestrator retains exact source, CI run/attempt,
 release run/attempt, target, policy digest and source-byte checks. Render must

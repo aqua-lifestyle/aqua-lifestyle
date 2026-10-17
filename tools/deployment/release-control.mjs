@@ -118,28 +118,51 @@ export function validateEnvironment(environment, branches) {
     branches[0].name === 'main' && branches[0].type === 'branch', 'UNATTENDED_MAIN_ONLY_ENVIRONMENT_REQUIRED');
 }
 
-export async function validateInfrastructure(api) {
-  const rules = await api.gh('/rules/branches/main?per_page=100');
-  requireThat(rules.length > 0 && rules.length < 100 &&
+// Owner-controlled merge governance, not an independently protected verifier.
+// One non-bypassable ruleset must enforce all mandatory checks and history safety.
+export function validateMainGovernance(rules, ruleset) {
+  requireThat(Array.isArray(rules) && rules.length > 0 && rules.length < 100 &&
     rules.every(r => ['Repository', 'Organization'].includes(r.ruleset_source_type) && positiveAttempt(r.ruleset_id)),
   'MAIN_GOVERNANCE_UNVERIFIABLE');
-  // Bypass actors are hidden from read-only tokens. Do not infer an empty list:
-  // concrete candidate review is checked separately; settings custody is qualified once.
-  requireThat(['deletion', 'non_fast_forward'].every(type => rules.some(r => r.type === type)) &&
-    rules.some(r => r.type === 'pull_request' && r.parameters?.required_approving_review_count >= 1 &&
-      r.parameters.dismiss_stale_reviews_on_push === true && r.parameters.require_last_push_approval === true &&
-      r.parameters.required_review_thread_resolution === true) &&
-    rules.some(r => r.type === 'required_status_checks' &&
-      r.parameters?.strict_required_status_checks_policy === true &&
-      requiredJobs.every(name => r.parameters.required_status_checks?.some(c =>
-        c.context === name && c.integration_id === 15368))), 'MAIN_PR_AND_CI_GOVERNANCE_REQUIRED');
+  const checksRequired = r => r.type === 'required_status_checks' &&
+    r.parameters?.strict_required_status_checks_policy === true &&
+    r.parameters.do_not_enforce_on_create === false &&
+    Array.isArray(r.parameters.required_status_checks) && requiredJobs.every(name => {
+      const matches = r.parameters.required_status_checks.filter(c => c.context === name);
+      return matches.length === 1 && matches[0].integration_id === 15368;
+    });
+  requireThat(ruleset?.source_type === 'Repository' && ruleset.source === targets.repository &&
+    positiveAttempt(ruleset.id) && ruleset.enforcement === 'active' && ruleset.target === 'branch' &&
+    Array.isArray(ruleset.conditions?.ref_name?.include) && ruleset.conditions.ref_name.include.length === 1 &&
+    ruleset.conditions.ref_name.include[0] === 'refs/heads/main' &&
+    Array.isArray(ruleset.conditions.ref_name.exclude) && ruleset.conditions.ref_name.exclude.length === 0 &&
+    Array.isArray(ruleset.bypass_actors), 'MAIN_RULESET_CUSTODY_UNVERIFIABLE');
+  requireThat(ruleset.bypass_actors.length === 0, 'MAIN_RULESET_BYPASS_FORBIDDEN');
+  const effective = rules.filter(r => r.ruleset_id === ruleset.id &&
+    r.ruleset_source_type === ruleset.source_type && r.ruleset_source === ruleset.source);
+  requireThat(Array.isArray(ruleset.rules) && [effective, ruleset.rules].every(rows =>
+    ['deletion', 'non_fast_forward'].every(type => rows.some(r => r.type === type)) &&
+    rows.some(checksRequired)), 'MAIN_CI_GOVERNANCE_REQUIRED');
+}
+
+export async function validateInfrastructure(api) {
+  const rules = await api.gh('/rules/branches/main?per_page=100');
+  requireThat(Array.isArray(rules) && rules.length > 0 && rules.length < 100,
+    'MAIN_GOVERNANCE_UNVERIFIABLE');
+  const checkRules = rules.filter(r => r.type === 'required_status_checks' &&
+    r.ruleset_source_type === 'Repository' && r.ruleset_source === targets.repository && positiveAttempt(r.ruleset_id));
+  requireThat(checkRules.length === 1, 'MAIN_CI_GOVERNANCE_REQUIRED');
+  // GitHub hides bypass_actors without ruleset write access. Missing evidence
+  // fails closed; never grant the release runner administration to evade this.
+  const ruleset = await api.gh(`/rulesets/${checkRules[0].ruleset_id}`);
+  validateMainGovernance(rules, ruleset);
   const environment = await api.gh(`/environments/${targets.environment}`);
   const page = await api.gh(`/environments/${targets.environment}/deployment-branch-policies?per_page=100`);
   requireThat(page.total_count === page.branch_policies?.length, 'ENVIRONMENT_BRANCH_INVENTORY_INCOMPLETE');
   validateEnvironment(environment, page.branch_policies);
 }
 
-export async function validateCandidateReview(api, candidate) {
+export async function validateCandidateProvenance(api, candidate) {
   const list = await api.gh(`/commits/${candidate.sha}/pulls?per_page=100`);
   requireThat(Array.isArray(list) && list.length < 100, 'MERGED_PR_INVENTORY_UNVERIFIABLE');
   const matches = list.filter(p => p.merge_commit_sha === candidate.sha && p.merged_at &&
@@ -150,29 +173,8 @@ export async function validateCandidateReview(api, candidate) {
   requireThat(pr.merged === true && pr.state === 'closed' && pr.merge_commit_sha === candidate.sha &&
     pr.base?.ref === 'main' && pr.base.repo?.full_name === targets.repository && shaPattern.test(pr.head?.sha) &&
     Number.isFinite(Date.parse(pr.merged_at)) && positiveAttempt(pr.user?.id), 'MERGED_PR_PROVENANCE_UNVERIFIABLE');
-  const reviews = await api.gh(`${path}/reviews?per_page=100`);
-  requireThat(Array.isArray(reviews) && reviews.length < 100 && reviews.every(r =>
-    positiveAttempt(r.id) && positiveAttempt(r.user?.id) &&
-    ['APPROVED', 'CHANGES_REQUESTED', 'COMMENTED', 'DISMISSED'].includes(r.state) &&
-    Number.isFinite(Date.parse(r.submitted_at))), 'MERGED_PR_REVIEW_EVIDENCE_UNVERIFIABLE');
-  const latest = new Map();
-  for (const review of [...reviews].sort((a, b) => a.id - b.id))
-    if (review.state !== 'COMMENTED') latest.set(review.user.id, review);
-  requireThat(![...latest.values()].some(r => r.state === 'CHANGES_REQUESTED'), 'UNRESOLVED_PR_CHANGES_REQUESTED');
-  let approved = false;
-  for (const r of latest.values()) {
-    if (r.state !== 'APPROVED' || r.commit_id !== pr.head.sha || r.user.type !== 'User' ||
-      r.user.id === pr.user.id || r.user.login === pr.user.login ||
-      Date.parse(r.submitted_at) > Date.parse(pr.merged_at)) continue;
-    requireThat(typeof r.user.login === 'string' && /^[a-zA-Z0-9-]{1,39}$/.test(r.user.login),
-      'REVIEWER_IDENTITY_UNVERIFIABLE');
-    const permission = await api.gh(`/collaborators/${r.user.login}/permission`);
-    if (['admin', 'write'].includes(permission.permission) && permission.user?.id === r.user.id &&
-      permission.user.login === r.user.login) approved = true;
-  }
-  requireThat(approved, 'PREMERGE_EXACT_HEAD_REVIEW_REQUIRED');
   const current = await api.gh(path);
-  requireThat(current.merged === true && current.merge_commit_sha === pr.merge_commit_sha &&
+  requireThat(current.merged === true && current.state === 'closed' && current.merge_commit_sha === pr.merge_commit_sha &&
     current.head?.sha === pr.head.sha && current.merged_at === pr.merged_at &&
     current.user?.id === pr.user.id && current.base?.ref === 'main' &&
     current.base.repo?.full_name === targets.repository, 'MERGED_PR_EVIDENCE_CHANGED');
@@ -508,7 +510,7 @@ export async function deploy(api, qualified, policy, report, options = {}) {
     validatePolicy(qualified, options.env ?? process.env, policy);
     await requalify(api, qualified);
     await validateInfrastructure(api);
-    await validateCandidateReview(api, qualified);
+    await validateCandidateProvenance(api, qualified);
   };
   await guard();
   const plan = options.evidencePlan;
@@ -734,7 +736,7 @@ export async function main(env, options = {}) {
   if (mode === 'candidate') {
     // Detect accidental reviewer/wait gates before entering the environment job.
     await validateInfrastructure(api);
-    await validateCandidateReview(api, q);
+    await validateCandidateProvenance(api, q);
     const archive = execFileSync('git', ['archive', '--format=tar', q.sha], { maxBuffer: 100 * 1024 * 1024 });
     writeFileSync(`${env.CANDIDATE_DIR}/source.tar`, archive);
     writeFileSync(`${env.CANDIDATE_DIR}/candidate.json`, JSON.stringify({ ...q,
@@ -750,7 +752,7 @@ export async function main(env, options = {}) {
   failureReport = code => report({ phase: 'failed', code });
   validatePolicy(q, env, policy);
   await validateInfrastructure(api);
-  await validateCandidateReview(api, q);
+  await validateCandidateProvenance(api, q);
   const plan = await evidencePlan(api, q, policy);
   if (mode === 'admit') {
     report({ phase: 'evidence-selected' });

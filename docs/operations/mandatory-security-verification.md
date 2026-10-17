@@ -30,12 +30,15 @@ Render/Vercel secrets before executing further candidate-controlled checks. The
 release workflow comes from main after merge, so a merged ordinary PR can change
 both tests and enforcement. A main checkout is not independently controlled.
 
-`mandatory-security-tests.json` at64cbb5c enumerated193 cases. The current
-finalization task preserves those IDs and appends 15 automatic-deployment checks
-through AQUA-SEC-0208. Owner-directed replacements of activation/bootstrap tests
-now exercise persistent credentials, automatic baseline provenance and history;
-other mandatory cases remain. Normal CI executes all 208 exact file/name pairs. Two pre-existing duplicated dynamic
-display names now include their distinct parameter values; assertions are unchanged.
+`mandatory-security-tests.json` now enumerates 232 cases (209 before this correction).
+The owner's explicit removal of human-review dependencies revises the candidate
+admission policy: AQUA-SEC-0126–0135 now cover exact merged-PR provenance instead
+of obsolete review-approval predicates; AQUA-SEC-0136 covers provenance drift and
+AQUA-SEC-0140 now rejects bypassable checks. Their file/name mappings are explicitly
+revised, not claimed unchanged. Twenty-three owner-governance cases are appended as
+AQUA-SEC-0210–0232. The [worklog](../exec-plans/completed/github-owner-governance-alignment.md)
+records this policy revision; it is still candidate-controlled, not an externally
+approved mandatory inventory. Normal CI executes all 232 exact file/name pairs.
 Names, IDs and expected cardinality are not rediscovered during normal qualification.
 The source hashes pin test assertions, verifier, reporter, release controller and
 workflow bytes; edits require an explicit policy revision. The manifest's own digest

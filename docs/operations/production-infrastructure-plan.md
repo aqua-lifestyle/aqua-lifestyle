@@ -1,7 +1,14 @@
 # Production infrastructure integration plan
 
+2026-10-17 governance update: the owner-authorized 17-check ruleset #25297647 and
+main-only unattended environment are installed. Mandatory human PR approval and
+last-push approval are no longer part of the selected owner-controlled model.
+The historical proposals below are not current instructions to add review gates.
+See [current controller requirements and the unapplied admin-bypass change](safe-automatic-deployment.md#owner-controlled-github-governance-and-outstanding-setting).
+Independent verifier/credential custody remains unresolved.
+
 Assessment date: 2026-10-16. Starting qualified source:
-`9581655e4ba0ab22c8578a7536439eda1bbf6fbc`, PR106. **Production readiness: BLOCKED.**
+`9581655e4ba0ab22c8578a7536439eda1bbf6fbc`, PR #106. **Production readiness: BLOCKED.**
 This plan proposes persistent infrastructure; it does not authorize changes.
 See the subsequent [production privilege assessment](production-privilege-isolation.md)
 for newly authorized catalog-only inspection, its transport blocker and the current
@@ -32,7 +39,7 @@ was opened. Deployment histories sampled the first 100 entries, not complete his
 
 | Surface | Authoritative readback |
 | --- | --- |
-| GitHub | Repository ID1276688422; main `23f176db6eb13af5ee01ff69f1a9f7bbe6b880ff`; active ruleset19085283 protects deletion/non-fast-forward only; classic protection404 |
+| GitHub | Repository ID1276688422; main `23f176db6eb13af5ee01ff69f1a9f7bbe6b880ff`; active ruleset #19085283 protects deletion/non-fast-forward only; classic protection404 |
 | Render | `srv-d9f0k8e1a83c73d8n1b0`; exact repository/main; Dockerfile `./docker/api/Dockerfile`, context `.`, root empty; health `/api/health`; native auto-deploy off; not suspended; no start/predeploy override |
 | Render current deployment | `dep-db8av3dg1s2s739m6sgg`, live SHA `1251fb82979e18be53d1d0e7f5c6fab2d0c50a58`; API200 reports this SHA and Healthy DB/Redis/key-store; recovery header absent |
 | Render database | DATABASE_URL host associates with `dpg-d9f0jne1a83c73d8m780-a`; provider metadata: available, PostgreSQL18, Frankfurt, basic_1gb, HA=false. A second listed instance is not assumed to serve the app |
@@ -50,7 +57,7 @@ human and do not constitute independent review. No eligible independent custodia
 protected external verifier has been established.
 
 **Required:** retain current protections; require latest-head premerge review,
-resolved threads, stale-review dismissal and all17 exact CI job contexts from GitHub
+resolved threads, stale-review dismissal and all 17 exact CI job contexts from GitHub
 Actions app15368 with strict up-to-date enforcement. The proposed
 [ruleset payload](../verification/production-infrastructure-20261016/main-ruleset.proposed.json)
 is generated from the current controller inventory. Independently control verifier
@@ -61,12 +68,12 @@ candidate must not redefine both tests and enforcement. Source-app pinning alone
 does not prevent another candidate workflow from producing the same job name.
 
 **Evidence:** github-readonly.json and controller validateInfrastructure/
-validateCandidateReview. The earlier executable custody probe demonstrates that
+validateCandidateProvenance. The earlier executable custody probe demonstrates that
 candidate-owned policy can be replaced; it is negative evidence, not installed custody.
 
 **Security consequences:** these settings prevent ordinary unchecked merges only
 within their actual no-bypass custody. Distinct account IDs do not prove distinct
-humans. Agent2 review is technical evidence, not a GitHub human approval. Keep the
+humans. Agent 2 review is technical evidence, not a GitHub human approval. Keep the
 independent acceptance claim BLOCKED until an external boundary is exercised.
 
 **Automation/permission:** persistent ruleset creation/update can use an owner-authorized

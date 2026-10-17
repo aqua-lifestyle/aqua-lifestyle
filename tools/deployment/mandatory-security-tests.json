@@ -629,57 +629,57 @@
     {
       "id": "AQUA-SEC-0126",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "candidate review rejects direct push before any mutation"
+      "name": "candidate provenance rejects direct push before any mutation"
     },
     {
       "id": "AQUA-SEC-0127",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "candidate review rejects stale approval before any mutation"
+      "name": "candidate provenance rejects unmerged PR before any mutation"
     },
     {
       "id": "AQUA-SEC-0128",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "candidate review rejects dismissed approval before any mutation"
+      "name": "candidate provenance rejects open PR before any mutation"
     },
     {
       "id": "AQUA-SEC-0129",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "candidate review rejects request changes before any mutation"
+      "name": "candidate provenance rejects wrong base before any mutation"
     },
     {
       "id": "AQUA-SEC-0130",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "candidate review rejects self approval before any mutation"
+      "name": "candidate provenance rejects wrong repository before any mutation"
     },
     {
       "id": "AQUA-SEC-0131",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "candidate review rejects bot approval before any mutation"
+      "name": "candidate provenance rejects invalid head before any mutation"
     },
     {
       "id": "AQUA-SEC-0132",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "candidate review rejects post-merge approval before any mutation"
+      "name": "candidate provenance rejects missing merge time before any mutation"
     },
     {
       "id": "AQUA-SEC-0133",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "candidate review rejects reviewer revoked before any mutation"
+      "name": "candidate provenance rejects missing author identity before any mutation"
     },
     {
       "id": "AQUA-SEC-0134",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "candidate review rejects unknown permission before any mutation"
+      "name": "candidate provenance rejects ambiguous PRs before any mutation"
     },
     {
       "id": "AQUA-SEC-0135",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "candidate review rejects incomplete reviews before any mutation"
+      "name": "candidate provenance rejects truncated PR inventory before any mutation"
     },
     {
       "id": "AQUA-SEC-0136",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "review revocation after Render completion blocks Vercel"
+      "name": "merged PR provenance drift after Render completion blocks Vercel"
     },
     {
       "id": "AQUA-SEC-0137",
@@ -699,7 +699,7 @@
     {
       "id": "AQUA-SEC-0140",
       "file": "tools/deployment/release-control.test.mjs",
-      "name": "infrastructure rejects no latest approval before entering provider rollout"
+      "name": "infrastructure rejects bypassable checks before entering provider rollout"
     },
     {
       "id": "AQUA-SEC-0141",
@@ -1045,6 +1045,121 @@
       "id": "AQUA-SEC-0209",
       "file": "tools/deployment/workflow.test.mjs",
       "name": "required container CI executes isolated runtime restart qualification and retains evidence"
+    },
+    {
+      "id": "AQUA-SEC-0210",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "installed owner-controlled ruleset 25297647 accepts all 17 App-bound checks without human approval"
+    },
+    {
+      "id": "AQUA-SEC-0211",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects hidden bypass actors before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0212",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects bypass actors before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0213",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects inactive ruleset before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0214",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects wrong ruleset identity before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0215",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects wrong ruleset source before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0216",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects wrong target before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0217",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects missing ruleset rules before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0218",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects missing deletion protection before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0219",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects missing force-push protection before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0220",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects non-strict checks before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0221",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects creation exemption before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0222",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects duplicate check before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0223",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects renamed check before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0224",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects unbound app before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0225",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects missing detail check before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0226",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects weakened detail check before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0227",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects missing effective check before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0228",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "merged PR provenance re-read detects a concurrent head change without requesting a review"
+    },
+    {
+      "id": "AQUA-SEC-0229",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "actual main-only environment remains blocked solely by the outstanding administrator bypass setting"
+    },
+    {
+      "id": "AQUA-SEC-0230",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects wrong branch scope before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0231",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects excluded main before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0232",
+      "file": "tools/deployment/release-control.test.mjs",
+      "name": "owner governance rejects missing branch scope before any provider mutation"
     }
   ],
   "sources": [
@@ -1074,11 +1189,11 @@
     },
     {
       "path": "tools/deployment/release-control.mjs",
-      "sha256": "04e6f51f3a04f403f56aaa26a663ce599fc48b218ab28c4a37235b63650c444d"
+      "sha256": "d46341b9745947562cc2e4f737eb0cf0b5a5a4d3723eecaa9e2267b6ad98aac2"
     },
     {
       "path": "tools/deployment/release-control.test.mjs",
-      "sha256": "dfdc115759fc67c981c9690a07f24fa83bba6bce2d4bf161a14f74d2d7633bb3"
+      "sha256": "66852c046d7f4de7e8411865559eb7ca6f0943228aea0f8c02bca62a24753e45"
     },
     {
       "path": "tools/deployment/run-security-tests.mjs",
@@ -1135,6 +1250,10 @@
     {
       "path": "tools/operations/database-authority-probe.mjs",
       "sha256": "8b38c802c3fdc166ea8f7f86da4b98d1563400fb0ddba4a59c8595119fa18602"
+    },
+    {
+      "path": "tools/deployment/fixtures/installed-main-governance.json",
+      "sha256": "cc47da01e07224bfb91f390d83da55a1c371d19b5f9179fe176bf3dad4f4ea75"
     }
   ]
 }

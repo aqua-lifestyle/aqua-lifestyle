@@ -16,7 +16,8 @@ startup, worker, provider and DB capabilities and documents guarded execution pl
 isolated normal-profile restart evidence. Production role/credential isolation
 remains unverified; this controller's recovery-only admission is not relaxed.
 
-Normal PR review remains merge governance. Restricted financial, messaging, worker
+The owner-controlled merge model requires all 17 CI checks, without mandatory
+human PR review or last-push approval. Restricted financial, messaging, worker
 and migration operations retain their separate boundaries. Deploying code never
 authorizes those operations. The [safety contract](cicd-safety-contract.md) and
 [independent verifier assessment](mandatory-security-verification.md) describe known
@@ -56,7 +57,7 @@ branch version takes effect after merge. See [GitHub workflow_run documentation]
 Policy version 2 is checked in with baseline=automatic. There is no bootstrap object,
 release floor, evidence-reference token, activation variable or expiry renewal.
 
-1. Check merged-PR provenance/premerge review, required main governance and the
+1. Check exact merged-PR provenance, required main governance and the
    main-only unattended credential environment. These are persistent merge/security
    configuration, not an approval requested after merge.
 2. Read complete release history from run 1. Only a successful **production job**
@@ -96,14 +97,51 @@ replays payments/outbox work or loosens Tenant/Area authorization. This path sup
 code-only compatible changes; schema changes stop automatically rather than acquiring
 migration authority.
 
+## Owner-controlled GitHub governance and outstanding setting
+
+The [governance alignment worklog](../exec-plans/completed/github-owner-governance-alignment.md)
+records the owner-authorized source correction and exact observed ruleset fixture.
+The controller requires one effective repository ruleset to provide deletion and
+non-fast-forward protection plus all 17 strict named checks, each bound to GitHub
+Actions App 15368, with no branch-creation exemption and explicit empty bypass
+actors. Exact merged-PR/source provenance is required; review approvals and
+collaborator permissions are no longer release prerequisites.
+
+**One prepared environment change; not applied:** repository Settings → Environments
+→ `production-release` → deselect **Allow administrators to bypass configured
+protection rules** → Save protection rules. Preserve the existing main-only branch
+policy. Do not select required reviewers, a wait timer or any custom protection
+rule. Read back GET `/repos/aqua-lifestyle/aqua-lifestyle/environments/production-release`
+and GET its `/deployment-branch-policies`: expect `can_admins_bypass:false`, only a
+branch-policy protection rule, custom branch policies enabled, protected-branches
+mode disabled, and exactly branch `main`. This removes the force-start override; it
+does not add recurring approval or revoke repository administrator membership.
+See [GitHub's supported UI procedure](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
+No supported REST/GraphQL environment-update field for this toggle was found;
+do not send an invented field and assume success. Recovery for an unintended UI
+change is to restore the recorded prior environment controls through an explicitly
+authorized administrator operation; no deploy is needed to verify the setting.
+
+**Separate unresolved custody limitation:** GitHub documents that
+[`bypass_actors` requires ruleset write access](https://docs.github.com/en/rest/repos/rules#get-a-repository-ruleset).
+The administrator GET proves the installed list is empty; it does not prove the
+read-only release token can observe it. Hidden evidence fails with
+`MAIN_RULESET_CUSTODY_UNVERIFIABLE`. Do not give the deployment runner a repository
+administration credential. A separately controlled observation/enforcement route
+must be qualified outside this source correction. Thus the prepared toggle alone
+is insufficient to make CD operational. The same-repository controller, inventory
+and shared GitHub Actions App check still do not establish independent verifier
+or production-credential custody. No new observation service, approval mechanism
+or persistent credential was provisioned in this change.
+
 ## Persistent initial setup and current read-only findings
 
 Fresh GET-only inspection on 2026-10-16 at 17:33 UTC:
 
 | Surface | Observation | Persistent setup required |
 | --- | --- | --- |
-| GitHub main | Only deletion/non-fast-forward rules | Required PR review, latest-head approval and strict checks for all 17 jobs; qualify settings/bypass custody |
-| production-release | No protection rules/branch policy; admin bypass=true | Main-only branch policy, no human/wait/custom approval gate, admin bypass disabled |
+| GitHub main (2026-10-17 readback) | Active ruleset #25297647: all 17 strict GitHub Actions App 15368 checks, deletion/non-fast-forward, no bypass actors or human-review rule; old19085283 preserved | Controller accepts this owner-controlled configuration with explicit bypass evidence; standard read-only runner cannot observe that evidence |
+| production-release (2026-10-17 readback) | Main-only branch policy, no human/wait/custom approval gate; admin bypass=true | Owner-authorized UI change to admin bypass=false remains unapplied; see exact procedure below |
 | Actions credentials | Repository and production-release secret inventories empty | Establish protected exact-target credential issuance first; persistent authentication alone in candidate-owned workflows does not protect secrets. github.token supplies read-only GitHub access |
 | Render integration | Correct existing repository/main/Docker context/API health path; native auto-deploy off; hooks and command empty; not suspended | Retain single orchestrator; qualify actual deploy permission using separately authorized non-production capability tests |
 | Render runtime | Live `1251fb8`; API/DB/Redis/key store Healthy; recovery=false and recovery header absent; Bird=true; Yoco=test and Bird/Yoco keys present | Current runtime fails the unchanged recovery-only contract. A separately authorized infrastructure task must establish a compatible profile; this preparation does not change flags or remove keys |
