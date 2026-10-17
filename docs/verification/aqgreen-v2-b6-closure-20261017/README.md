@@ -4,6 +4,8 @@
 discovery-evidence defect is **IMPLEMENTED / TESTED**. This is execution evidence,
 not business authority, an independent acceptance receipt or production permission.
 
+Follow-up: [bounded original-evidence recovery and PB1 decision prerequisite](recovery.md).
+
 ## Source and scope
 
 - New branch: `feature/b6-closure-qualification-20261017`, based on exact main

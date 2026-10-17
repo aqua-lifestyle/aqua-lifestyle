@@ -1,0 +1,82 @@
+{
+  "classification": "BOUNDED_ORIGINAL_RECOVERY_NOT_ACCEPTANCE",
+  "qualifiedCodeCommit": "8e7282ad7b414260745e7644d8e6f0835dbc664b",
+  "evidenceBranch": "evidence/b6-original-recovery-20261017",
+  "artifactRoot": "/tmp/opencode/b6-original-recovery-20261017",
+  "originalSuccessorPackages": "UNAVAILABLE_WITHIN_RECORDED_SEARCH_SCOPE",
+  "recordedOriginalPins": {
+    "parentNormativeManifest": "2c147a9286ff469aa91eed6191731d8096b34b14a88d916bdbcdb6f8515bc923",
+    "parentFreezeReceipt": "94f724d19657aa7d6f036f73bc2892540e094c51033d2bb5ef085670833d9747",
+    "as1NormativeManifest": "a49938c8abf5876b984398bf41e3b902e6fe3fbfb08e9d50df40e9ccb6b8c124",
+    "as1FreezeReceipt": "5e1d1847e5edbe7fee609db422d65eb4309d9ba319ebed9cd2b75060cb37f65f",
+    "ss1NormativeManifest": "090f963433aa0c2874c5403b97e3d57718bbf78b7a9242af9ad3ccabc02ffc58",
+    "ar1NormativeManifest": "eabe57fefac023fb9fe43730e2f366edfe27f732684ae6dd014c7244e7f8570b",
+    "ar1FreezeReceipt": "80ccfe1a8036ed5a065a7a6952f22a1606a8558ed93d99dfc78e63de13ae602c",
+    "tq1NormativeManifest": "50bf5b4bf5d932060a60f46d3ded1fc470a8dd26d7f3b531eef63f726bcccda7",
+    "tq1SelectionSubject": "528b01dcdd0916c6bafebe484dee2c552566e86fff3caa3e68ae558ec3f57b63",
+    "tq1SchemasSubject": "cb9caa90b50f2d924693477c9cd3c17cead08e8c545472097fcf97e92edbf6a7"
+  },
+  "witnessRoot": "/home/wtc/AQGREEN-V2-PRODUCTION-B7-20261008.hX4kdw",
+  "witnessManifestSha256": "825dcba858e2b2cd29318d403407f6d7e6495b7b745c36afcdbcf1504eb6c068",
+  "historicalWitnesses": [
+    { "file": "PARENT-FROZEN-CHECK.log", "sha256": "69d9385974cc940b627e0a0f5f34f936a6ed061bb4c74e55313cb52dc0d15b0f", "historicalOkLines": 15 },
+    { "file": "PARENT-REF-FROZEN-CHECK.log", "sha256": "963b0d3f989962d5e7de8af78086fe78a13b38fc55f37958434f5d4d78689c21", "historicalOkLines": 18 },
+    { "file": "AS1-FROZEN-CHECK.log", "sha256": "f3bd7106d5b14b4e9c7656d11e584eb255c748d95071b1f38a84586669c4db36", "historicalOkLines": 89 },
+    { "file": "SS1-FROZEN-CHECK.log", "sha256": "f6a352b29055220a9261ebc0ca0adfe9c30601d5a4a3054bb3e7a8d03d351416", "historicalOkLines": 326 },
+    { "file": "AR1-FROZEN-CHECK.log", "sha256": "54f2c888e503216c55e3d89aa2e417c2edd654c1630566cb9cb9c1b50a90f405", "historicalOkLines": 285 },
+    { "file": "TQ1-FROZEN-CHECK.log", "sha256": "1fd3e7fa0b053670f7270e1f9b0e6eb20104bbedb34fc1fe26db84b7e9257d5d", "historicalOkLines": 305 },
+    { "file": "TQ1-NORMATIVE-CHECK.log", "sha256": "3029be1d67d6ff49a4963276a76695e1a9c75b1d4d6d90a1f248b4415da09d14", "historicalOkLines": 16 },
+    { "file": "B6-PRESERVATION.json", "sha256": "6db1dd4d9c96f9aec0d78098f7816eeb6196141e6657ed7ab92eec3b9afe4c26" }
+  ],
+  "preservedStopWorklog": {
+    "path": "/home/wtc/Downloads/newAqua/aqua-lifestyle-b6/docs/exec-plans/active/aqgreen-v2-b6-final-closure.md",
+    "sha256": "19bbcd2b671ef7d2be5315b42792543b0da150e33299d705a1cdd3a42097fee3",
+    "pb1StopLines": [671, 681],
+    "standaloneContractGapSubject": "UNAVAILABLE"
+  },
+  "checks": {
+    "historicalWitnessManifestMatches": 8,
+    "nodeLibgcryptDigestMatches": 9,
+    "preservedCandidateFiles": 43,
+    "preservedWorklogs": 2,
+    "matchedPreservationEntries": 45,
+    "existingFoundationManifestEntriesMatched": 15,
+    "recordedB6PathsAbsent": 32,
+    "sourceHandoffCustomerArchivesInspected": 11,
+    "recordedSearchBasenames": 102,
+    "historicalLogDerivedBasenames": 101,
+    "explicitStandaloneStopBasename": "CONTRACT-GAP.md",
+    "reachableReflogObjectRecords": 15913,
+    "reachableReflogBlobsHashed": 5973,
+    "reachableReflogBytesHashed": 74982458,
+    "reachableReflogOversizedBlobsExcluded": 2,
+    "unreachableBlobsHashed": 48,
+    "unreachableOversizedBlobsExcluded": 0,
+    "blobSizeLimitBytes": 2097152,
+    "exactTenPinGitMatches": 0,
+    "newProductTestsExecuted": 0,
+    "customer11OperationsRepeated": 0,
+    "ciDispatches": 0
+  },
+  "cleanupPlan": {
+    "path": "/tmp/opencode/stale-cleanup-plan.json",
+    "sha256": "df488b5adc2f16aa4ec94892988f8831ee688ae706f81f98b94d29f0cc022b84",
+    "executionAndDisappearanceCause": "UNKNOWN"
+  },
+  "localExecutionEvidence": [
+    { "file": "recovery-audit.json", "sha256": "f056126c3ccb5a08afc365015f0c591647c151d01116b5eced1a94b7a49207b8" },
+    { "file": "recovery-supplement.json", "sha256": "59b7d7812c082da7fe0b9b124f41e93baea6f9b6a1ef9bf738ae560fbb7cf204" },
+    { "file": "independent-review.md", "sha256": "cd64316f2b40fdfb4ad8558b3d905edb268e0db5d7a76294d8d33a95721a7e2e" },
+    { "file": "independent-review-supplement.md", "sha256": "0ed6755222250cfc5809d2222eca4698855523c61118428d80cb8ed266179094" }
+  ],
+  "independentReview": "SEPARATE_AGENT_TECHNICAL_REVIEW_NOT_HUMAN_OR_EXTERNALLY_ISOLATED_TQ1_ACCEPTANCE",
+  "limits": [
+    "Historical logs and local manifests establish retained consistency, not authenticated original creation/custody.",
+    "Archive search uses recorded member names; renamed/embedded content is not excluded.",
+    "Known nested source archives inspected separately; no exhaustive nested extraction.",
+    "Git pin comparison covers ten exact known subjects, not unpinned PB1 governing bytes.",
+    "No global absence, deletion causality, runtime/BIND qualification or production authority follows."
+  ],
+  "b6Acceptance": "BLOCKED",
+  "b7D10BusinessCommissioning": "BLOCKED"
+}

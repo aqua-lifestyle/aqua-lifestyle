@@ -98,3 +98,34 @@ stop record; complete representative sanitized inputs can be supplied in paralle
 - Initial worktree/index clean. PR106 branch is separate and untouched.
 - Publication identity, remote/PR state and hosted checks are recorded in the
   task/PR handoff; this worklog does not predict their outcomes.
+
+## Original-evidence recovery follow-up
+
+Current owner mission: exact retained recovery and available bounded qualification,
+not a redesign. Re-fetched PR107/main/B6 refs before work; code remains8e7282a.
+Separate evidence-only branch `evidence/b6-original-recovery-20261017` preserves
+the qualified PR107 source. No implementation defect was found in this phase.
+
+Recovered seven October8 frozen-check logs and their B6 preservation JSON;8/8
+match the existing B7 manifest, with9/9 Node/Libgcrypt cross-digest comparisons.
+All43 native candidate files+two worklogs still match recorded hash/size/mode;
+the existing15-entry foundation identity manifest verifies. These are integrity
+results, not native/runtime qualification or authenticated historical acceptance.
+
+Original parent/AS1/SS1/AR1/TQ1 normative packages, freeze receipts and standalone
+PB1 stop subject are UNAVAILABLE in the completed bounded scope. Eleven credible
+archives,102 recorded/stop basenames,15913 local Git object records,5973 bounded
+reachable/reflog blobs and48 unreachable blobs yield no missing successor package.
+Two oversized reachable blobs remain explicit exclusions. The retained cleanup plan
+lists32 now-absent B6 paths, but cleanup execution/deletion cause is UNKNOWN.
+
+Separate-agent technical review verified witnesses/preservation and challenged the
+initial search predicate; the supplemental search closes those scoped name/pin
+omissions. No independent human/externally isolated TQ1 acceptance is claimed.
+The [concise recovery result](../../verification/aqgreen-v2-b6-closure-20261017/recovery.md)
+and its JSON record exact witness paths/hashes, search limits and minimum PB1
+decision. No product tests, unchanged CI or Customer11 execution were repeated.
+
+B6 and B7/D10 commissioning remain BLOCKED. Single next action: B6 evidence
+custodian supplies/restores one original frozen bundle with exact manifests,
+receipts and PB1 governing/stop subjects from separately retained custody.
