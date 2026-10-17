@@ -16,6 +16,9 @@ using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Email;
+using AqualLifeStyle.Configuration;
+using Microsoft.Extensions.Configuration;
+using System.Collections.Generic;
 
 namespace AqualLifeStyle.Tests
 {
@@ -26,6 +29,8 @@ namespace AqualLifeStyle.Tests
         private readonly Mock<ICustomerRepository> _customerRepositoryMock;
         private readonly EnquiryAppService _service;
         private readonly Mock<ITransactionalEmailOutbox> _emailOutboxMock;
+        private readonly IConfiguration _configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string> { ["App:FinancialOperations:Enabled"] = "true" }).Build();
 
         public EnquiryAppServiceTests()
         {
@@ -36,7 +41,7 @@ namespace AqualLifeStyle.Tests
             _service = new TestableEnquiryAppService(_enquiryRepositoryMock.Object,
                 _customerRepositoryMock.Object,
                 _objectMapperMock.Object,
-                _emailOutboxMock.Object)
+                _emailOutboxMock.Object, _configuration)
             {
                 AbpSession = Mock.Of<IAbpSession>(s => s.TenantId == 1 && s.UserId == 1)
             };
@@ -219,6 +224,23 @@ namespace AqualLifeStyle.Tests
         }
 
         [Fact]
+        public async Task FinancialHold_DeniesReferralConversionBeforeStateOrDeferredAwardEventChanges()
+        {
+            var enquiry = Enquiry.Create(1, 1, 5, "Synthetic enquiry");
+            enquiry.SetReferredByFacilitator(42);
+            SetupEnquiry(enquiry);
+            _configuration["App:FinancialOperations:Enabled"] = "false";
+
+            await Should.ThrowAsync<RuntimeOperationDeniedException>(() =>
+                _service.ConvertToCustomerAsync(enquiry.Id, new ConvertEnquiryToCustomerDto()));
+
+            enquiry.IsConverted.ShouldBeFalse();
+            enquiry.ConvertedAt.ShouldBeNull();
+            enquiry.DomainEvents.OfType<EnquiryConvertedEvent>().ShouldBeEmpty();
+            _enquiryRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Enquiry>()), Times.Never);
+        }
+
+        [Fact]
         public async Task ConvertToCustomerAsync_AddsEnquiryConvertedEventToDomainEvents()
         {
             // Arrange
@@ -324,8 +346,8 @@ namespace AqualLifeStyle.Tests
                 IEnquiryRepository enquiryRepository,
                 ICustomerRepository customerRepository,
                 IObjectMapper objectMapper,
-                ITransactionalEmailOutbox emailOutbox)
-                : base(enquiryRepository, customerRepository, objectMapper, emailOutbox, new TransactionalEmailTemplateBuilder())
+                ITransactionalEmailOutbox emailOutbox, IConfiguration configuration)
+                : base(enquiryRepository, customerRepository, objectMapper, emailOutbox, new TransactionalEmailTemplateBuilder(), configuration)
             {
             }
         }

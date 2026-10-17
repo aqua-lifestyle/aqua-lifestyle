@@ -1,0 +1,24 @@
+PASS: ordinary API configuration neither includes maintenance nor requires migration credentials
+PASS: fresh PostgreSQL18/Redis run on an internal network with no provider access or production target
+PASS: separate maintenance image initializes only the disposable application schema with its own identity
+PASS: ordinary API uses a distinct authenticated, non-owner database identity
+PASS: API role cannot create schema objects
+PASS: API role cannot perform migration DDL
+PASS: API role cannot create database identities
+PASS: API role cannot assume migration/owner identity
+PASS: API role cannot rewrite migration history
+PASS: API role cannot mutate payment records
+PASS: API role cannot mutate AQGreen commission records
+PASS: API role cannot mutate administrator identities in this fixture
+PASS: enqueue-only API role cannot claim outbox delivery
+PASS: catalog-only read resists hostile search_path and distinguishes owner/API authority without row leakage
+PASS: readiness-only API grants reject even profile SQL and are not a normal API role
+PASS: temporary column grant permits required profile SQL; this is not an HTTP workflow proof
+PASS: UNSAFE PROPOSAL REJECTED: password column grant also permits host administrator credential mutation
+PASS: UNSAFE PROPOSAL REJECTED: unrestricted outbox INSERT can fabricate Sent evidence without provider delivery
+PASS: counterexample writes rolled back and temporary profile/password grants removed before runtime qualification
+PASS: normal Production API starts without recovery and preserves held outbox/business state beyond the dispatch interval
+PASS: actual container restart grants no financial, seeding, repair or delivery authority
+PASS: fresh container from the same API image preserves the same restricted runtime authority
+PASS: missing required delivery configuration stops startup without business writes
+PASS: 23 isolated runtime checks; production privilege isolation=UNVERIFIED; no live deployment

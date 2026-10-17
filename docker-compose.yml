@@ -32,15 +32,13 @@ services:
       - aqualifestyle-network
     restart: unless-stopped
 
-  migrate:
+  api:
     build:
       context: .
       dockerfile: docker/api/Dockerfile
-    command: ["dotnet", "migrator/AqualLifeStyle.Migrator.dll", "-q"]
-    entrypoint: []
-    environment: &api-environment
+    environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Default: Host=postgres;Port=5432;Database=${POSTGRES_DB:-aqualifestyle};Username=${POSTGRES_USER:-aqualifestyle};Password=${POSTGRES_PASSWORD};
+      ConnectionStrings__Default: ${API_DATABASE_CONNECTION_STRING:?Supply the qualified restricted API connection}
       Redis__Configuration: redis:6379
       Redis__DatabaseId: 0
       App__ServerRootAddress: http://localhost:21021/
@@ -49,6 +47,9 @@ services:
       App__DefaultTenantName: ${DEFAULT_AREA_NAME:-Default}
       App__WeeklyCommissions__Enabled: ${WEEKLY_COMMISSIONS_ENABLED:-false}
       App__WeeklyCommissions__IntervalMinutes: 1440
+      App__FinancialOperations__Enabled: ${FINANCIAL_OPERATIONS_ENABLED:-false}
+      App__BackgroundJobs__Enabled: ${BACKGROUND_JOBS_ENABLED:-false}
+      App__EntryMonthlyObligations__Enabled: ${MONTHLY_OBLIGATIONS_ENABLED:-false}
       Authentication__JwtBearer__IsEnabled: "true"
       Authentication__JwtBearer__SecurityKey: ${JWT_SECURITY_KEY:?Set JWT_SECURITY_KEY in .env}
       Authentication__JwtBearer__Issuer: ${JWT_ISSUER:-AqualLifeStyle}
@@ -58,7 +59,7 @@ services:
       DataProtection__PreviousCertificateBase64: ${DATA_PROTECTION_PREVIOUS_CERTIFICATE_BASE64:-}
       DataProtection__PreviousCertificatePassword: ${DATA_PROTECTION_PREVIOUS_CERTIFICATE_PASSWORD:-}
       Yoco__SecretKey: ${YOCO_SECRET_KEY:?Set YOCO_SECRET_KEY in .env}
-      # Test mode may omit this; webhook requests then fail closed with 503.
+      # Configured test/live mode requires a valid signing secret at startup.
       Yoco__WebhookSecret: ${YOCO_WEBHOOK_SECRET:-}
       Yoco__Mode: ${YOCO_MODE:-test}
       Deployment__BuildId: ${DEPLOYMENT_BUILD_ID:-local-compose}
@@ -69,25 +70,12 @@ services:
       Bird__FromEmail: ${BIRD_FROM_EMAIL:-}
       Bird__FromName: ${BIRD_FROM_NAME:-Aqua Lifestyle Club}
       Bird__ReplyToEmail: ${BIRD_REPLY_TO_EMAIL:-}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - aqualifestyle-network
-    restart: "no"
-
-  api:
-    build:
-      context: .
-      dockerfile: docker/api/Dockerfile
-    environment: *api-environment
+      Bird__DeliveryNotBeforeUtc: ${BIRD_DELIVERY_NOT_BEFORE_UTC:-}
     ports:
       - "21021:8080"
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     networks:

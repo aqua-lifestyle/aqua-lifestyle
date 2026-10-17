@@ -1,0 +1,20 @@
+# Explicit maintenance overlay. Ordinary Compose/API releases do not load this
+# file or require the migration identity. Use only under separate schema authority.
+services:
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+      target: migrator
+    command: ["-q"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: ${MIGRATOR_DATABASE_CONNECTION_STRING:?Supply a separately controlled migration connection}
+      AQUA_INITIAL_ADMIN_PASSWORD: ${AQUA_INITIAL_ADMIN_PASSWORD:-}
+      SEED_DEMO_DATA: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - aqualifestyle-network
+    restart: "no"

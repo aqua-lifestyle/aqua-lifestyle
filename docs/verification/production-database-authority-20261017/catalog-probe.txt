@@ -1,0 +1,14 @@
+PASS: catalog transaction is read-only on PostgreSQL18
+PASS: current_user and session_user distinguish SET ROLE
+PASS: non-owner API has no schema or owner-role authority
+PASS: roles and membership inventory retain owner and SET distinctions
+PASS: column-only profile privilege differs from full table UPDATE
+PASS: RLS enabled FORCE and effective status are reported
+PASS: sequence USAGE differs from SELECT and UPDATE
+PASS: reserved SECURITY DEFINER execution denied to API and allowed to worker
+PASS: financial and migration-history writes denied to API
+PASS: maintenance DDL succeeds only through its distinct login and owner role
+PASS: API password cannot authenticate maintenance or worker login
+PASS: catalog excludes fixture secret settings and function bodies
+PASS: fixture uses an unpublished network-none PostgreSQL container
+PASS: 13 isolated catalog checks; production privileges=UNVERIFIED; no production connection

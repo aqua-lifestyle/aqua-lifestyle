@@ -22,6 +22,10 @@ namespace AqualLifeStyle.Tests.Application
 
         public TransactionalEmailOutboxProcessorTests()
         {
+            // Explicit execution grant for this controlled-provider fixture only.
+            // The test ABP job manager remains disabled; production flags stay held.
+            Resolve<IConfiguration>()["App:BackgroundJobs:Enabled"] = "true";
+            Resolve<IConfiguration>()["Bird:Enabled"] = "true";
             _deliveryGateway = Resolve<ITransactionalEmailDeliveryGateway>();
             _deliveryGateway.ClearReceivedCalls();
             _processor = Resolve<TransactionalEmailOutboxProcessor>();

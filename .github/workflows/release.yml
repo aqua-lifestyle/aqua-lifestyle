@@ -9,8 +9,9 @@ on:
 permissions:
   contents: read
   actions: read
+  pull-requests: read
 
-# One rollout at a time, including approvals. Never cancel an in-flight provider
+# One rollout at a time. Never cancel an in-flight provider
 # operation when another main update arrives. Stale waiting commits fail admission.
 concurrency:
   group: production-release
@@ -19,13 +20,19 @@ concurrency:
 jobs:
   candidate:
     name: Qualify immutable source candidate
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       sha: ${{ steps.candidate.outputs.sha }}
       artifact-id: ${{ steps.upload.outputs.artifact-id }}
     steps:
-      # workflow_run uses the trusted default branch, never PR code/artifacts.
+      # workflow_run uses main after merge; same-repository controls remain
+      # candidate editable. No independent verifier custody is claimed.
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
@@ -53,10 +60,10 @@ jobs:
           SOURCE_SHA: ${{ steps.candidate.outputs.sha }}
           ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
         run: |
-          printf 'Qualified source: `%s`\n\nImmutable artifact digest: `%s`\n\nDeployment requires separate protected authorization.\n' "$SOURCE_SHA" "$ARTIFACT_DIGEST" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Qualified source: `%s`\n\nImmutable artifact digest: `%s`\n\nStanding deployment policy and runtime safety govern automatic admission.\n' "$SOURCE_SHA" "$ARTIFACT_DIGEST" >> "$GITHUB_STEP_SUMMARY"
 
   production:
-    name: Authorized recovery release
+    name: Unattended recovery release
     needs: candidate
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -74,33 +81,40 @@ jobs:
           artifact-ids: ${{ needs.candidate.outputs.artifact-id }}
           path: ${{ runner.temp }}/candidate
           merge-multiple: true
-      - name: Admit exact release and identify trusted prior audit for an authorized retry
+      - name: Validate persistent configuration and select immutable retry receipts
         id: admission
         env:
           GH_TOKEN: ${{ github.token }}
-          AUTO_DEPLOY_ENABLED: ${{ vars.AUTO_DEPLOY_ENABLED }}
-          PRODUCTION_RELEASE_AUTHORIZATION: ${{ secrets.PRODUCTION_RELEASE_AUTHORIZATION }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           CANDIDATE_DIR: ${{ runner.temp }}/candidate
           RELEASE_REPORT: ${{ runner.temp }}/release-report.jsonl
         run: node tools/deployment/release-control.mjs admit
-      - name: Read immutable audit from the authorized earlier attempt of this release run
+      - name: Read verified predecessor audit from its exact producing release run
+        if: steps.admission.outputs.baseline-artifact-id != ''
+        uses: actions/download-artifact@v7
+        with:
+          artifact-ids: ${{ steps.admission.outputs.baseline-artifact-id }}
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.admission.outputs.baseline-run-id }}
+          path: ${{ runner.temp }}/baseline-release
+          merge-multiple: true
+      - name: Read immutable audit chain from every earlier attempt of this release run
         if: steps.admission.outputs.receipt-artifact-id != ''
         uses: actions/download-artifact@v7
         with:
           artifact-ids: ${{ steps.admission.outputs.receipt-artifact-id }}
           path: ${{ runner.temp }}/prior-release
-          merge-multiple: true
-      - name: Revalidate authority, providers, source and recovery before deployment
+          merge-multiple: false
+      - name: Revalidate policy, provenance, providers and recovery before automatic deployment
         env:
           GH_TOKEN: ${{ github.token }}
-          AUTO_DEPLOY_ENABLED: ${{ vars.AUTO_DEPLOY_ENABLED }}
-          PRODUCTION_RELEASE_AUTHORIZATION: ${{ secrets.PRODUCTION_RELEASE_AUTHORIZATION }}
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           CANDIDATE_DIR: ${{ runner.temp }}/candidate
           RELEASE_REPORT: ${{ runner.temp }}/release-report.jsonl
-          RESUME_ARTIFACT_ID: ${{ steps.admission.outputs.receipt-artifact-id }}
-          RESUME_RECEIPT_FILE: ${{ runner.temp }}/prior-release/release-report.jsonl
+          BASELINE_RECEIPT_FILE: ${{ runner.temp }}/baseline-release/release-report.jsonl
+          RESUME_RECEIPT_DIR: ${{ runner.temp }}/prior-release
         run: node tools/deployment/release-control.mjs deploy
       - name: Retain redacted release audit
         if: always()

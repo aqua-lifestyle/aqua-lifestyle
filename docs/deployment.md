@@ -15,7 +15,10 @@ Render and Vercel provide the public reverse-proxy and TLS layers. Do not expose
 
 The [safe automatic deployment runbook](operations/safe-automatic-deployment.md)
 defines the single qualified main release path, immutable source evidence,
-protected exact-release approval, sequential Render/Vercel readiness and rollback.
+standing unattended policy, sequential Render/Vercel readiness and rollback.
+Qualified main merges require no additional human release approval or per-release
+token; normal PR review remains merge governance. A qualified bootstrap, main-only
+credential environment and one-time standing activation setup remain prerequisites.
 It is not enabled by this change. Current live provider settings do not meet its
 recovery-only admission profile. Keep Render auto-deploy and Blueprint sync off;
 do not reconnect Vercel Git or deploy the current merge as part of implementation.

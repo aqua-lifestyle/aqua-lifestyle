@@ -26,7 +26,8 @@ namespace AqualLifeStyle.Web.Host.Startup
             if (recovery)
             {
                 foreach (var key in new[] { "Bird:Enabled", "App:WeeklyCommissions:Enabled",
-                    "App:EntryMonthlyObligations:Enabled", "AQGreenV2Demo:Enabled", "AQGreenV2Pilot:Enabled", "SEED_DEMO_DATA" })
+                    "App:EntryMonthlyObligations:Enabled", "App:FinancialOperations:Enabled", "App:BackgroundJobs:Enabled",
+                    "AQGreenV2Demo:Enabled", "AQGreenV2Pilot:Enabled", "SEED_DEMO_DATA" })
                     if (configuration.GetValue<bool>(key))
                         throw new InvalidOperationException("API recovery requires " + key.Replace(":", "__") + "=false.");
                 foreach (var key in new[] { "Yoco:Mode", "Yoco:SecretKey", "Yoco:WebhookSecret", "Bird:ApiKey" })

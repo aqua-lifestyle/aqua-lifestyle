@@ -19,6 +19,7 @@ namespace AqualLifeStyle.Web.Host.Payments.Yoco
 
         private readonly StaleYocoCheckoutDetector _detector;
         private readonly ILogger<YocoPaymentOperationsMonitor> _logger;
+        private readonly IConfiguration _configuration;
         private readonly int _staleCheckoutThresholdMinutes;
 
         public YocoPaymentOperationsMonitor(
@@ -29,6 +30,7 @@ namespace AqualLifeStyle.Web.Host.Payments.Yoco
             : base(timer)
         {
             _detector = detector;
+            _configuration = configuration;
             _logger = logger;
             _staleCheckoutThresholdMinutes = PositiveMinutes(
                 configuration["Yoco:Monitoring:StaleCheckoutThresholdMinutes"],
@@ -40,7 +42,9 @@ namespace AqualLifeStyle.Web.Host.Payments.Yoco
 
         protected override async Task DoWorkAsync()
         {
+            if (AqualLifeStyle.Configuration.ApplicationRecoveryMode.IsEnabled(_configuration)) return;
             PilotMode.DenyOutsidePilot("External payment monitor");
+            if (!AqualLifeStyle.Configuration.RuntimeOperationGuards.CanRunBackgroundWork(_configuration)) return;
             var checkedAtUtc = DateTime.UtcNow;
             var cutoffUtc = checkedAtUtc.AddMinutes(-_staleCheckoutThresholdMinutes);
             StaleYocoCheckoutSnapshot snapshot;

@@ -6,6 +6,8 @@ using Abp.Domain.Uow;
 using Abp.Events.Bus;
 using Abp.Events.Bus.Handlers;
 using Castle.Core.Logging;
+using Microsoft.Extensions.Configuration;
+using AqualLifeStyle.Configuration;
 using AqualLifeStyle.Application.Exceptions;
 using AqualLifeStyle.Application.Memberships;
 using AqualLifeStyle.Domain.AreaNetwork;
@@ -31,6 +33,7 @@ namespace AqualLifeStyle.Application.Enquiries
         private readonly ICustomerRepository _customerRepository;
         private readonly IActiveMembershipCache _activeMembershipCache;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        private readonly IConfiguration _configuration;
 
         public ILogger Logger { get; set; }
 
@@ -40,7 +43,8 @@ namespace AqualLifeStyle.Application.Enquiries
             IReferralRepository referralRepository,
             ICustomerRepository customerRepository,
             IActiveMembershipCache activeMembershipCache,
-            IUnitOfWorkManager unitOfWorkManager)
+            IUnitOfWorkManager unitOfWorkManager,
+            IConfiguration configuration)
         {
             _facilitatorRepository = facilitatorRepository;
             _areaLeaderRepository = areaLeaderRepository;
@@ -48,6 +52,7 @@ namespace AqualLifeStyle.Application.Enquiries
             _customerRepository = customerRepository;
             _activeMembershipCache = activeMembershipCache;
             _unitOfWorkManager = unitOfWorkManager;
+            _configuration = configuration;
             Logger = NullLogger.Instance;
         }
 
@@ -59,6 +64,8 @@ namespace AqualLifeStyle.Application.Enquiries
             }
 
             var tenantId = GetValidatedTenantId(evt);
+            if (evt.ReferredByFacilitatorId.HasValue)
+                RuntimeOperationGuards.RequireFinancialOperations(_configuration);
             Logger.Info(
                 $"Received enquiry conversion event: enquiryId={evt.EnquiryId}, customerId={evt.CustomerId}, tenantId={tenantId}, referredByFacilitatorId={evt.ReferredByFacilitatorId}.");
 

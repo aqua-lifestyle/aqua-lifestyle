@@ -19,6 +19,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Shouldly;
 using Xunit;
+using Microsoft.Extensions.Configuration;
 
 namespace AqualLifeStyle.Web.Tests.Integration
 {
@@ -48,6 +49,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             }
 
             WriteProvenanceMarker();
+            IocManager.Resolve<IConfiguration>()["App:FinancialOperations:Enabled"] = "true";
             var suffix = Guid.NewGuid().ToString("N")[..8];
             await CleanupTargetPeriodAsync();
             await SeedLevelOneNetworkAsync(suffix);

@@ -1,0 +1,35 @@
+{
+  "observedAt": "2026-10-16T18:08:32.173Z",
+  "method": "authenticated GET only; export URLs discarded without access; no database session",
+  "backup": [
+    {
+      "databaseId": "dpg-d9f0jne1a83c73d8m780-a",
+      "status": 200,
+      "exports": []
+    },
+    {
+      "databaseId": "dpg-davoaabncjis73f56rj0-a",
+      "status": 200,
+      "exports": []
+    }
+  ],
+  "publicVariableRead": {
+    "status": 200,
+    "variables": [
+      {
+        "key": "NEXT_PUBLIC_ABP_API_URL",
+        "type": "sensitive",
+        "emptyReturned": true,
+        "readableFlag": false,
+        "matchesExpected": false
+      },
+      {
+        "key": "NEXT_PUBLIC_DEFAULT_TENANT_NAME",
+        "type": "sensitive",
+        "emptyReturned": true,
+        "readableFlag": false,
+        "matchesExpected": false
+      }
+    ]
+  }
+}

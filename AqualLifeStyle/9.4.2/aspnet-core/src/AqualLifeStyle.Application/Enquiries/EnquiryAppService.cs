@@ -13,6 +13,8 @@ using AqualLifeStyle.Domain.Customers;
 using AqualLifeStyle.Domain.Enquiries;
 using AqualLifeStyle.Domain.Enums;
 using AqualLifeStyle.Email;
+using AqualLifeStyle.Configuration;
+using Microsoft.Extensions.Configuration;
 
 namespace AqualLifeStyle.Application.Enquiries
 {
@@ -23,19 +25,22 @@ namespace AqualLifeStyle.Application.Enquiries
         private readonly IObjectMapper _objectMapper;
         private readonly ITransactionalEmailOutbox _emailOutbox;
         private readonly TransactionalEmailTemplateBuilder _emailTemplates;
+        private readonly IConfiguration _configuration;
 
         public EnquiryAppService(
             IEnquiryRepository enquiryRepository,
             ICustomerRepository customerRepository,
             IObjectMapper objectMapper,
             ITransactionalEmailOutbox emailOutbox,
-            TransactionalEmailTemplateBuilder emailTemplates)
+            TransactionalEmailTemplateBuilder emailTemplates,
+            IConfiguration configuration)
         {
             _enquiryRepository = enquiryRepository;
             _customerRepository = customerRepository;
             _objectMapper = objectMapper;
             _emailOutbox = emailOutbox;
             _emailTemplates = emailTemplates;
+            _configuration = configuration;
         }
 
         [AbpAuthorize(AquaPermissions.Enquiries.View)]
@@ -176,6 +181,11 @@ namespace AqualLifeStyle.Application.Enquiries
             AqualLifeStyleValidator.ValidId(id);
 
             var enquiry = await GetEnquiryForCurrentTenantAsync(id);
+
+            // Conversion publishes an after-commit event that can award referral
+            // balances. Deny before changing the conversion, not after its commit.
+            if (enquiry.ReferredByFacilitatorId.HasValue)
+                RuntimeOperationGuards.RequireFinancialOperations(_configuration);
 
             try
             {

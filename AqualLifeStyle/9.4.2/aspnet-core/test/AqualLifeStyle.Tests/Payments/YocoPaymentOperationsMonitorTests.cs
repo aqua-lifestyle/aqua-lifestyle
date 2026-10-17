@@ -43,6 +43,7 @@ namespace AqualLifeStyle.Tests.Payments
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string>
                 {
+                    ["App:BackgroundJobs:Enabled"] = "true",
                     ["Yoco:Monitoring:ScanIntervalMinutes"] = "10",
                     ["Yoco:Monitoring:StaleCheckoutThresholdMinutes"] = "60"
                 })
@@ -74,12 +75,13 @@ namespace AqualLifeStyle.Tests.Payments
             var monitor = new TestableYocoPaymentOperationsMonitor(
                 new AbpAsyncTimer(),
                 detector.Object,
-                new ConfigurationBuilder().Build(),
+                EnabledConfiguration(),
                 logger);
 
             await monitor.RunOnceAsync();
 
             logger.Entries.ShouldBeEmpty();
+            detector.Verify(service => service.DetectAsync(It.IsAny<DateTime>()), Times.Once);
         }
 
         [Fact]
@@ -93,7 +95,7 @@ namespace AqualLifeStyle.Tests.Payments
             var monitor = new TestableYocoPaymentOperationsMonitor(
                 new AbpAsyncTimer(),
                 detector.Object,
-                new ConfigurationBuilder().Build(),
+                EnabledConfiguration(),
                 logger);
 
             await Should.ThrowAsync<InvalidOperationException>(() => monitor.RunOnceAsync());
@@ -102,5 +104,8 @@ namespace AqualLifeStyle.Tests.Payments
                 entry.Level == LogLevel.Error &&
                 entry.Message.Contains("yoco_payment_monitor_failed"));
         }
+
+        private static IConfiguration EnabledConfiguration() => new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string> { ["App:BackgroundJobs:Enabled"] = "true" }).Build();
     }
 }

@@ -49,8 +49,7 @@ namespace AqualLifeStyle.Web.Host.Startup
         public override void PreInitialize()
         {
             Configuration.BackgroundJobs.IsJobExecutionEnabled =
-                !ApplicationRecoveryMode.IsEnabled(_appConfiguration) &&
-                _appConfiguration.GetValue<bool>("App:BackgroundJobs:Enabled");
+                RuntimeOperationGuards.CanRunBackgroundWork(_appConfiguration);
             var pilot = AQGreenV2PilotConfiguration.Validate(_env, _appConfiguration);
             var demo = AQGreenV2DemoConfiguration.Validate(_env, _appConfiguration);
             if (!pilot && !demo)
@@ -74,6 +73,8 @@ namespace AqualLifeStyle.Web.Host.Startup
             }
             if (AQGreenV2DemoConfiguration.Validate(_env, _appConfiguration))
             {
+                Configuration.ReplaceService<IAQGreenDemoCalculationMode,
+                    AQGreenV2DemoCalculationMode>(DependencyLifeStyle.Singleton);
                 Configuration.ReplaceService<
                     IAQGreenPlacementV2JoiningGate,
                     AQGreenV2DemoJoiningGate>(DependencyLifeStyle.Singleton);
@@ -142,14 +143,21 @@ namespace AqualLifeStyle.Web.Host.Startup
                 AQGreenV2PilotConfiguration.Validate(_env, _appConfiguration))
                 return; // Recovery and pilot never register provider or financial workers.
 
-            IocManager.Resolve<IBackgroundWorkerManager>().Add(
-                IocManager.Resolve<YocoPaymentOperationsMonitor>());
-            IocManager.Resolve<IBackgroundWorkerManager>().Add(
-                IocManager.Resolve<TransactionalEmailOutboxWorker>());
-            IocManager.Resolve<IBackgroundWorkerManager>().Add(
-                IocManager.Resolve<EntryMonthlyObligationWorker>());
-            IocManager.Resolve<IBackgroundWorkerManager>().Add(
-                IocManager.Resolve<WeeklyCommissionCalculationWorker>());
+            // ABP's job-execution switch does not govern independently registered
+            // periodic workers. Check the same holds before resolving each worker;
+            // their bodies also enforce them for direct calls and later suspension.
+            if (RuntimeOperationGuards.CanRunBackgroundWork(_appConfiguration))
+                IocManager.Resolve<IBackgroundWorkerManager>().Add(
+                    IocManager.Resolve<YocoPaymentOperationsMonitor>());
+            if (RuntimeOperationGuards.CanDispatchEmail(_appConfiguration))
+                IocManager.Resolve<IBackgroundWorkerManager>().Add(
+                    IocManager.Resolve<TransactionalEmailOutboxWorker>());
+            if (RuntimeOperationGuards.CanRunFinancialWorker(_appConfiguration, "App:EntryMonthlyObligations:Enabled"))
+                IocManager.Resolve<IBackgroundWorkerManager>().Add(
+                    IocManager.Resolve<EntryMonthlyObligationWorker>());
+            if (RuntimeOperationGuards.CanRunFinancialWorker(_appConfiguration, "App:WeeklyCommissions:Enabled"))
+                IocManager.Resolve<IBackgroundWorkerManager>().Add(
+                    IocManager.Resolve<WeeklyCommissionCalculationWorker>());
 
             if (AQGreenV2DemoConfiguration.Validate(_env, _appConfiguration))
             {

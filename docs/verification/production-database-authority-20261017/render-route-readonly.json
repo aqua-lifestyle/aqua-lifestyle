@@ -1,0 +1,67 @@
+{
+  "observedAt": "2026-10-17T07:24:30.679Z",
+  "productionDatabaseConnections": 0,
+  "statuses": {
+    "service": 200,
+    "environment": 200,
+    "database": 200,
+    "connectionInfo": 200,
+    "managedCredentials": 200,
+    "deployments": 200
+  },
+  "service": {
+    "id": "srv-d9f0k8e1a83c73d8n1b0",
+    "suspended": "not_suspended",
+    "runtime": "docker",
+    "liveCommit": "1251fb82979e18be53d1d0e7f5c6fab2d0c50a58"
+  },
+  "database": {
+    "id": "dpg-d9f0jne1a83c73d8m780-a",
+    "status": "available",
+    "version": "18",
+    "plan": "basic_1gb",
+    "region": "frankfurt",
+    "availableFields": [
+      "connectionPool",
+      "createdAt",
+      "dashboardUrl",
+      "databaseName",
+      "databaseUser",
+      "diskAutoscalingEnabled",
+      "diskSizeGB",
+      "highAvailabilityEnabled",
+      "id",
+      "ipAllowList",
+      "name",
+      "owner",
+      "plan",
+      "readReplicas",
+      "region",
+      "role",
+      "status",
+      "suspended",
+      "suspenders",
+      "updatedAt",
+      "version"
+    ],
+    "managedCredentialCount": 1,
+    "externalRules": 2,
+    "unsupportedRules": 0,
+    "apiHostMatchesSelected": true,
+    "configuredUserMatchesProviderDefault": true,
+    "connectionOverridePresent": false,
+    "publicConnectionInfoPresent": true
+  },
+  "egress": {
+    "sourcesResponded": 2,
+    "sourcesAgree": true,
+    "observedHttpIpv4Allowed": false,
+    "proxyEnvironmentPresent": false,
+    "note": "HTTP egress observation is not proof of the database TCP source address"
+  },
+  "otherServiceIdentityVariableNames": [],
+  "ssh": {
+    "agentSocketPresent": true,
+    "defaultLocalPrivateKeyPresent": true
+  }
+}

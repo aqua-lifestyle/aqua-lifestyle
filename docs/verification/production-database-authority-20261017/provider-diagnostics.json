@@ -1,0 +1,59 @@
+{
+  "observedAt": "2026-10-17T07:39:46.893Z",
+  "productionDatabaseConnections": 0,
+  "databaseMetadataStatus": 200,
+  "results": [
+    {
+      "window": "prior-three-attempts",
+      "start": "2026-10-16T22:30:00Z",
+      "end": "2026-10-16T22:43:00Z",
+      "logs": {
+        "filter": "FATAL",
+        "status": 200,
+        "returnedRows": 0,
+        "hasMore": false,
+        "categories": {
+          "authentication": 0,
+          "accessRule": 0,
+          "capacity": 0,
+          "tls": 0,
+          "queryError": 0
+        },
+        "complete": true
+      },
+      "metrics": {
+        "status": 200,
+        "sampleCount": 27,
+        "minimum": 0,
+        "maximum": 2
+      },
+      "note": "No raw messages, labels, queries, identities or addresses retained; samples do not establish configured max_connections or per-role limits."
+    },
+    {
+      "window": "bounded-current-attempt",
+      "start": "2026-10-17T07:32:00Z",
+      "end": "2026-10-17T07:36:00Z",
+      "logs": {
+        "filter": "FATAL",
+        "status": 200,
+        "returnedRows": 0,
+        "hasMore": false,
+        "categories": {
+          "authentication": 0,
+          "accessRule": 0,
+          "capacity": 0,
+          "tls": 0,
+          "queryError": 0
+        },
+        "complete": true
+      },
+      "metrics": {
+        "status": 200,
+        "sampleCount": 9,
+        "minimum": 2,
+        "maximum": 3
+      },
+      "note": "No raw messages, labels, queries, identities or addresses retained; samples do not establish configured max_connections or per-role limits."
+    }
+  ]
+}

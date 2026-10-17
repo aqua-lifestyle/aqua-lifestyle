@@ -87,6 +87,8 @@ persistence in EntityFrameworkCore, and HTTP/authentication at Web boundaries.
 
 ## Work ownership and authorization
 
+- Use the existing .NET, Node.js, SQL and Bash tooling. Do not add Python source or
+  execute Python commands for repository work.
 - Before editing, inspect applicable instructions, branch, worktree, `HEAD`, status,
   relevant untracked files, implementation, tests, and authority. Preserve unrelated
   and user-authored work. In multi-agent work, unexpected files or commits belong to
