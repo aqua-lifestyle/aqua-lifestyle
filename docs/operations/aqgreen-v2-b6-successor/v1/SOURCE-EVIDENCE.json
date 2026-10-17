@@ -1,0 +1,53 @@
+{
+  "candidateVersion": "B6S/1.0.0-candidate.1",
+  "status": "PROPOSED_ADOPTION_PENDING_OWNER_APPROVAL",
+  "role": "SOURCE_AND_EVIDENCE_INDEX_NOT_RUNTIME_SELECTION_OR_ACCEPTANCE",
+  "historicalTq1Compatibility": "UNKNOWN",
+  "sourceReferences": {
+    "main": "23f176db6eb13af5ee01ff69f1a9f7bbe6b880ff",
+    "historicalRecovery": "810ac0979caa0ebe9d07273a6ccfd76ae408e148",
+    "pr107Correction": "8e7282ad7b414260745e7644d8e6f0835dbc664b",
+    "publishedB6": "438852eca9f91ef973802156ebbd31c3fa3940ed",
+    "nativeAccountFoundation": "8ca0dc3d78496c0a5673b5ce8df7643fbf19196a",
+    "customer11Adapter": "c4aedb19b71dd6fd57835e469908b4bfa4df7434",
+    "customer11Writer": "3148482f2c51878cc8937531340cdf90da51b0f9",
+    "d10Commissioning": "21af7fd10abf73108c415a7da747080c866a601f",
+    "d10AreaEnvelope": "38a5d4f4f53e7d1d1b5dd5dfba6da237aa839d29"
+  },
+  "retainedCandidates": {
+    "count": 43,
+    "state": "PARTIAL_UNTRACKED_NOT_INTEGRATED_NOT_ACTUAL_SELECTED_SUPPLY",
+    "sourceRoot": "docs/operations/aqgreen-v2-b6/snapshot-package",
+    "preservationInventorySha256": "6db1dd4d9c96f9aec0d78098f7816eeb6196141e6657ed7ab92eec3b9afe4c26",
+    "inventoryScope": "43candidateFilesAndTwoSeparateWorklogs",
+    "integrityEvidence": "CarriedForwardFrom810ac09_NoPreservationRecheckOrBuildInThisPreparation"
+  },
+  "customer11AcceptedArtifacts": {
+    "scope": "EXACT_ACCEPTED_BOUNDED_COMPONENT_NOT_WHOLE_POPULATION",
+    "input": "74a8e8bedd14d151c119173e44671c7ec8fd8c03ebb75cbd0763974c6dd3e416",
+    "output": "a1bcf510b41fa97e449e0dcb938d2b492ad08f215f6d4e5d75ff117f8b6af11d",
+    "capture": "b84119e66c886ac0086b9f531186d7345a007359df465ac945afe033787e2494",
+    "writerArchive": "8cf553cb8fde152754aa874cfc17ebb9160f6a9c0467c11b6b33cfa663ddfd4d",
+    "applyReceipt": "491f520890509c04165ed8a0d02bfd8e72563a3e05e838d619bcfd7f65a1653d",
+    "retryReceipt": "142ec9f7cd4f3211bf61b7738ba3dbc413c28ba1314c42dcf582f31fb3e1f6e4",
+    "idempotencyManifest": "dda4526861406527f55c0813d06cca68857704a87d13596cc43ccfc5ee32fdfd",
+    "unknownDispositionsPreserved": true,
+    "reexecutedForThisProposal": false
+  },
+  "carriedForwardEvidence": [
+    {"subject":"nativeAccountFoundation","cases":7691,"assertions":102724,"scope":"NATIVE_COMPONENT_FIXTURES_NOT_AUTHENTICATED_PRODUCER_OR_BIND"},
+    {"subject":"customer11Adapter","passed":63,"scope":"ACCEPTED_BOUNDED_COMPONENT"},
+    {"subject":"customer11Writer","passed":114,"scope":"ACCEPTED_DISPOSABLE_POSTGRESQL_18_6_COMPONENT"},
+    {"subject":"pr107Focused","passed":40,"scope":"18newChronologyPlus22existingD10BindingCases"},
+    {"subject":"pr107Postgresql","passed":3,"scope":"DISPOSABLE_POSTGRESQL_16_15_MODEL_CREATED_SCHEMA"},
+    {"subject":"pr107Hosted","runs":[39019154840,39019186930],"jobsPassedPerRun":17,"attempt":1,"scope":"EXACT_8e7282a_AND_SAME_TREE_PR_MERGE_NOT_BUSINESS_ACCEPTANCE"},
+    {"subject":"d10AreaAndCutover","passed":14,"scope":"BOUNDED_SYNTHETIC_POSTGRESQL_NOT_PRODUCTION_COMMISSIONING"},
+    {"subject":"partialTqSoftware","recordedDevelopmentCasesPerMode":69179,"scope":"PARTIAL_SYNTHETIC_DEVELOPMENT_NOT_TQ1_QUALIFICATION_OR_COMPLETE_SUBJECTS"}
+  ],
+  "unavailableOriginalFamilies": ["Parent","AS1","SS1","AR1","TQ1","PB1governingAndStandaloneStop"],
+  "historicalLossConclusion": "UNAVAILABLE_WITHIN_EXAMINED_SURFACES_NOT_PERMANENT_DESTRUCTION",
+  "newRuntimeSelection": "NONE",
+  "newQualificationExecution": "NONE",
+  "independentBusinessAcceptance": "NOT_ESTABLISHED_BY_THIS_INDEX",
+  "productionCommissioning": "NOT_AUTHORIZED"
+}
