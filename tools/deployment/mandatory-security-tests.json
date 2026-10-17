@@ -1050,7 +1050,7 @@
   "sources": [
     {
       "path": ".github/workflows/ci.yml",
-      "sha256": "2ad67d28c287ef5b9e279a7544a9d11782444246e1007be9f220c33e06500022"
+      "sha256": "f92b781ced7c155174d0c33c5013036e3cd647a0fcf4371dd29760878b3ed9e9"
     },
     {
       "path": ".github/workflows/publish-images.yml",
@@ -1106,7 +1106,7 @@
     },
     {
       "path": "tools/deployment/workflow.test.mjs",
-      "sha256": "df4cfb6d5b74b9bf954a2b67c96565b170296c2379f971eb82a1df103b786982"
+      "sha256": "a631f779ead27dc46f256a7ec0cc40f8dbb0e1a816f003edecdf1ed322f6a562"
     },
     {
       "path": "tools/deployment/mandatory-security-probe.mjs",
@@ -1130,7 +1130,11 @@
     },
     {
       "path": "tools/operations/database-authority-readonly.sql",
-      "sha256": "143d4f91e2db7a638655cdb624604648b47346d858036048c2fc8bfd1c465d90"
+      "sha256": "551c55a2be8b444a4d60bbb57ef98912aa05c64387b8eec5d01abe5a038e2e06"
+    },
+    {
+      "path": "tools/operations/database-authority-probe.mjs",
+      "sha256": "8b38c802c3fdc166ea8f7f86da4b98d1563400fb0ddba4a59c8595119fa18602"
     }
   ]
 }

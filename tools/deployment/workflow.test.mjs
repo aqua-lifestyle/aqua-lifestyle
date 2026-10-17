@@ -53,6 +53,7 @@ test('required container CI executes isolated runtime restart qualification and 
   assert.match(containers, /tags: aqualifestyle-runtime-api:qualification/);
   assert.match(containers, /tags: aqualifestyle-runtime-migrator:qualification/);
   assert.match(containers, /set -euo pipefail/);
+  assert.match(containers, /node tools\/operations\/database-authority-probe\.mjs \| tee/);
   assert.match(containers, /bash tools\/deployment\/runtime-restart-probe\.sh \| tee/);
   assert.match(containers, /name: runtime-authority-\$\{\{ github.sha \}\}-/);
   assert.doesNotMatch(containers, /continue-on-error:|secrets\./);

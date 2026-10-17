@@ -5,6 +5,9 @@ Starting source:72e09f6ed992c5608e6106d4368801cd292d2785, PR106. Assessment2026-
 configuration, credentials, grants, data, deployment or restricted operation changed.
 The prior [runtime matrix](runtime-authority-qualification.md) remains the automatic
 execution inventory. This assessment adds real access evidence and the write contract.
+The subsequent [database authority qualification](production-database-authority.md)
+re-fetches the PR head, separates TLS from authentication/catalog evidence, expands
+the read-only query and records the still-BLOCKED access dependency.
 
 ## Christian foundation and evidence
 
@@ -91,8 +94,9 @@ release authorization. None is installed or activated in production by this task
 The PostgreSQL custodian must first inspect actual role flags/membership/ownership,
 PUBLIC and default ACLs, table **and column** rights, sequence/function rights and
 executable security-definer paths. The supplied [catalog query](../../tools/operations/database-authority-readonly.sql)
-reads no application rows/function bodies/passwords. It covers known public application
-objects and aggregates other user schemas/definers; it is not a full proof of every
+reads no application rows/function bodies/passwords. The subsequent expanded version
+inventories user schemas/relations/sequences/routines, roles/memberships and RLS, with
+exact column privileges on selected sensitive objects; it is not a full proof of every
 extension, provider IAM, network, parameter ACL or external-secret escalation path.
 The transaction sets `search_path=pg_catalog,pg_temp` locally before any inspection:
 read-only alone does not prevent a shadowed built-in from reading application rows

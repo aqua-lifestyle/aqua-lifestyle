@@ -1,0 +1,42 @@
+{
+  "observedAt": "2026-10-17T07:26:59.151Z",
+  "target": "dpg-d9f0jne1a83c73d8m780-a",
+  "connectionBudget": 1,
+  "connectionsAttempted": 1,
+  "deadlineMs": 10000,
+  "transport": "external IPv4; SNI from authoritative hostname; system CA; TLS1.2 minimum; certificate/hostname verification required",
+  "events": [
+    {
+      "phase": "DNS_RESOLVED",
+      "elapsedMs": 45
+    },
+    {
+      "phase": "TCP_CONNECTED",
+      "elapsedMs": 226
+    },
+    {
+      "phase": "POSTGRES_SSL_REQUEST_SENT",
+      "elapsedMs": 228
+    },
+    {
+      "phase": "POSTGRES_SSL_ACCEPTED",
+      "elapsedMs": 408
+    },
+    {
+      "phase": "TLS_HANDSHAKE_STARTED",
+      "elapsedMs": 408
+    },
+    {
+      "phase": "TLS_VERIFIED",
+      "elapsedMs": 611
+    }
+  ],
+  "startupPacketSent": false,
+  "credentialsSent": false,
+  "sqlSent": false,
+  "tlsVersion": "TLSv1.3",
+  "authorized": true,
+  "status": "TLS_VERIFIED_NO_AUTH_ATTEMPT",
+  "errorCode": null,
+  "elapsedMs": 611
+}

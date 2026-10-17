@@ -25,6 +25,13 @@ The explicit inventory requires each case to execute once and pass; raw
 `node --test` exit status permits skips and is not qualification. Inventory changes
 are control changes. See [independent custody requirements](../operations/mandatory-security-verification.md);
 this candidate-controlled command does not supply independent enforcement.
+Run `docker pull postgres:18-alpine` then
+`node tools/operations/database-authority-probe.mjs` on a local Unix Docker socket
+for13 disposable catalog/role/sequence/routine/authentication checks. No target
+arguments, production credential or network are accepted. CI runs it in the required
+container job and retains the summary with the actual-image runtime probe. These are
+permission primitives, not production catalog evidence or full API workflow proof;
+see [database authority qualification](../operations/production-database-authority.md).
 These isolated tests cover release qualification, authority/provenance, recovery
 holds, provider sequencing, negative/partial failure, concurrency and retry
 reconciliation. They never call production. CI runs them as `Release safety tests`;

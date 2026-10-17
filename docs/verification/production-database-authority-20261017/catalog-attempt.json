@@ -1,0 +1,46 @@
+{
+  "observedAt": "2026-10-17T07:33:53.961Z",
+  "target": {
+    "service": "srv-d9f0k8e1a83c73d8n1b0",
+    "database": "dpg-d9f0jne1a83c73d8m780-a"
+  },
+  "budget": {
+    "authenticatedSessionsAttempted": 1,
+    "retries": 0,
+    "deadlineMs": 30000
+  },
+  "querySha256": "3f979c69adfd497c029b09296ad18a2c5458d2f679089cca92420f9281c599d8",
+  "client": "psql16.14",
+  "clientControls": {
+    "tls": "verify-full",
+    "sni": true,
+    "systemCa": true,
+    "gssEncryption": "disabled; verified TLS remains required",
+    "connectTimeoutSeconds": 8,
+    "readOnlyDefault": true,
+    "statementTimeoutMs": 8000,
+    "lockTimeoutMs": 1000,
+    "idleTransactionTimeoutMs": 15000,
+    "connectionCredential": "existing configured API credential; values held only in memory"
+  },
+  "binding": "observer session using configured API credential; not a query executed inside the API process",
+  "elapsedMs": 1537,
+  "exitCode": 2,
+  "processErrorCode": null,
+  "status": "CATALOG_READ_BLOCKED",
+  "failureSignals": {
+    "timeout": false,
+    "dns": false,
+    "refused": false,
+    "certificate": false,
+    "authentication": false,
+    "accessRule": false,
+    "capacity": false,
+    "permission": false,
+    "query": false,
+    "sslClosure": true
+  },
+  "stderrBytes": 173,
+  "sqlstateCodes": [],
+  "currentAndSessionIdentityObserved": false
+}
