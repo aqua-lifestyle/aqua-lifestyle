@@ -5,6 +5,8 @@ complete: original successor packages and receipts are **UNAVAILABLE within the
 searched scope**. Historical verification witnesses and preserved source identities
 were recovered and checked; they do not replace the originals.
 
+Follow-up: [historical PR refs, publication boundaries and Actions retention](historical-surfaces.md).
+
 Code baseline stays PR107 `8e7282ad7b414260745e7644d8e6f0835dbc664b`, OPEN at
 readback. PR98 remains superseded; PR99 merged the MVP; Customer11 remains a closed
 bounded component. This evidence-only branch is

@@ -1,0 +1,119 @@
+{
+  "classification": "HISTORICAL_STORAGE_INSPECTION_NOT_QUALIFICATION_OR_ACCEPTANCE",
+  "priorRecoveryCommit": "f9751ff57d841ca9e7f15360093d8da447a71199",
+  "qualifiedCodeCommit": "8e7282ad7b414260745e7644d8e6f0835dbc664b",
+  "previousChecksReusedNotRepeated": ["32paths", "workspaceAndArchiveSearch", "8witnessComparisons", "9digestComparisons", "45preservedEntries", "15foundationIdentities", "Customer11", "priorGitBlobPinSearch"],
+  "git": {
+    "pr98CommitsExamined": [
+      "e4a25bc773cacc3a03e86a0ec4fda6b8fbcfcfe1", "cab20bb03a28b00de656311d61f7387c0fec1bfd",
+      "75a5d3258aed5e33516b3473cecd079beba0a156", "9fa742705d40fecbecbcc9791acdf887d184bc6f",
+      "62bc661a2fff6378d453f61e1e552e2d0113968f", "88eec54d89bded85605ff28596839029fe20c9d5",
+      "e164c08039e828c91c93cb039301435cf9e0a748", "8ca0dc3d78496c0a5673b5ce8df7643fbf19196a",
+      "952f4835949e791586307845e36aa06672d3cc5e", "417bbcc38b68ecf9fd0b1f83eb52bf5d72d47abd",
+      "c4aedb19b71dd6fd57835e469908b4bfa4df7434", "3148482f2c51878cc8937531340cdf90da51b0f9",
+      "d818df80d8382250fb4f0cb5c8b710ba52184c0d", "5a99e204ace2e94f04cc0ac34ea3032c81b75255",
+      "7a5b027f0823508772a95aea6f3c12aff870f2e1", "6675125d173a461d3eaf562ad1bbfa41c0c2839f",
+      "23b16d84b2aaeaa621a75e16cd4723534d136fbc", "438852eca9f91ef973802156ebbd31c3fa3940ed"
+    ],
+    "pr99CommitsExamined": ["cbed24c1245eecd04b401c3ef3d243dd27f068a9", "a5ae9507ba357e2d3cfdf894aa3252fad8f693bd", "691d565c9fdd2bd6dc081a265003759527041d09"],
+    "additionalTrees": ["85cb43c3f8333cc85eecd8cc69054702e8bb46bc", "21a41694163ef09628fd84a9f4e12cb0efe1bb85", "e601e8e1c9fc8d7022b2eb1db35f055c8de59d12"],
+    "treeScope": ["docs/operations/aqgreen-v2-b6", "docs/exec-plans"],
+    "exactTreesExamined": 24,
+    "missingContractPathMatches": 0,
+    "remotePullRefsExamined": ["refs/pull/98/head", "refs/pull/98/merge", "refs/pull/99/head"],
+    "pr98RecordedForcePushDeletionEvents": [],
+    "pr98TimelineHasNextPage": false,
+    "tags": [],
+    "targetedFullHistoryPathMatches": 0,
+    "b6DirectoryDeleteRenameMatches": 0,
+    "historicalSyntheticMerges": [
+      {"sha":"fd5585a6349c58c6169eb8f80195f5918fdef632","parents":["26803037d9923842db12de621ab6f87c3cd045cc","438852eca9f91ef973802156ebbd31c3fa3940ed"],"tree":"c2c09afa50ef760eec4b584ffaf415c48235d9d5"},
+      {"sha":"41b5c76f7c18cc226f950b71b91608d88a1deddd","parents":["26803037d9923842db12de621ab6f87c3cd045cc","691d565c9fdd2bd6dc081a265003759527041d09"],"tree":"ede604548b37689e0cab3080113771368519c766"}
+    ],
+    "previousOversizeExclusionsMetadata": [
+      {"gitObjectId":"8dc0ace88d56111068b5963fb661b057875072ce","sizeBytes":2962141,"path":"docs/BusinessDocs/National Club Aqgreen.pdf","payloadRead":false},
+      {"gitObjectId":"e8a46d1983a225bdbfa86f83fdc54e2ab9a0ba6a","sizeBytes":3852030,"path":"docs/BusinessDocs/Membership.pdf","payloadRead":false}
+    ]
+  },
+  "publicationEvidence": {
+    "commit": "8ca0dc3d78496c0a5673b5ce8df7643fbf19196a",
+    "path": "docs/exec-plans/completed/b6-nonprivileged-attempt-account-source-publication.md",
+    "gitBlob": "af58f36fbaeeb1e813078dbfae9976d4488d29c6",
+    "sha256": "67391e4a54890eb282f5305827794cf49c57867dad8df4a99d9cd12e9918f0b9",
+    "externalEvidenceExclusionLines": [23,84,85,93],
+    "workflowTriggerBoundaryLines": [111,112,113],
+    "laterExplicitExclusionCommits": ["d818df80d8382250fb4f0cb5c8b710ba52184c0d", "cbed24c1245eecd04b401c3ef3d243dd27f068a9"]
+  },
+  "actions": {
+    "headCommitQueries": "First12 PR98commits plus detached85cb43c; all13 return zero retained indexed runs",
+    "branchIndexes": ["b6/nonprivileged-attempt-account-foundation", "feat/aqgreen-v2-b6-legacy-canonicalisation-analysis", "feature/aqgreen-v2-isolated-mvp-clean", "feat/aqgreen-tomorrow-operational-readiness", "test/aqgreen-v2-continuous-fresh-data-e2e"],
+    "runIdsExamined": [33710200616,33711768247,33731917137,37456317746,37491875475,37518505903,37524860226,37537235601,37542272779,37589010365,37589031102,37617621643,37617628334,37643829649,37643838547,37647430932],
+    "freshArtifactInventories": 15,
+    "freshArtifactRecords": 14,
+    "carriedForwardArtifactInventory": {"runId":37542272779,"source":"f9751ff prior recovery","artifactIds":[11450851382,11450796301],"names":["aqua-lifestyle~aqua-lifestyle~EJG8HB.dockerbuild","aqua-lifestyle~aqua-lifestyle~KASP98.dockerbuild"]},
+    "testResultRetentionDaysInInspectedWorkflows": 7,
+    "freshArtifacts": [
+      {"runId":33711768247,"id":9877565512,"name":"aqua-lifestyle~aqua-lifestyle~Z73HO7.dockerbuild","createdAt":"2026-09-03T03:54:53Z","expiresAt":"2026-12-02T03:33:06Z","expired":false,"reportedDigest":"sha256:66be14ef1db33ebbbe31507f2f45b370a326d675e2fa1b104013a86d273021cd"},
+      {"runId":33711768247,"id":9877564861,"name":"aqua-lifestyle~aqua-lifestyle~5CTJDI.dockerbuild","createdAt":"2026-09-03T03:54:51Z","expiresAt":"2026-12-02T03:33:06Z","expired":false,"reportedDigest":"sha256:25a61d73de533b2c9ec4db2f72ef72d3be51ef9e6fec20e0174cc9385f02eeb8"},
+      {"runId":33731917137,"id":9884997732,"name":"aqua-lifestyle~aqua-lifestyle~FQE6XS.dockerbuild","createdAt":"2026-09-03T08:34:05Z","expiresAt":"2026-12-02T08:10:18Z","expired":false,"reportedDigest":"sha256:3ff765cc7751cc240dbfaad545bd86f31ef76438663ce251079d9d46ed75b428"},
+      {"runId":33731917137,"id":9884996834,"name":"aqua-lifestyle~aqua-lifestyle~IITR7F.dockerbuild","createdAt":"2026-09-03T08:34:04Z","expiresAt":"2026-12-02T08:10:18Z","expired":false,"reportedDigest":"sha256:07c5b0c0ca450c3bd9805161cae295fd35225aa4eb8dd242087c35fce151c43f"},
+      {"runId":37589010365,"id":11468976687,"name":"aqua-lifestyle~aqua-lifestyle~4AXDL9.dockerbuild","createdAt":"2026-10-07T08:05:53Z","expiresAt":"2027-01-05T07:42:39Z","expired":false,"reportedDigest":"sha256:4fcfac3909c58da2c5f5b06694ce9e11f5654f70c951be1763710d4015d74fb0"},
+      {"runId":37589010365,"id":11468847378,"name":"aqua-lifestyle~aqua-lifestyle~QO9VZA.dockerbuild","createdAt":"2026-10-07T08:05:52Z","expiresAt":"2027-01-05T07:42:39Z","expired":false,"reportedDigest":"sha256:ca24ecb42bb6ecb9105e2a24a77475ded1b305a2881e5538369bf3bb24f63bf7"},
+      {"runId":37617621643,"id":11480854570,"name":"aqua-lifestyle~aqua-lifestyle~87SUPW.dockerbuild","createdAt":"2026-10-07T12:13:19Z","expiresAt":"2027-01-05T11:57:32Z","expired":false,"reportedDigest":"sha256:8115332eaa071c8e6f0bc3368b1b9469593fdff09a65969dc431b83327fa8325"},
+      {"runId":37617621643,"id":11480239728,"name":"aqua-lifestyle~aqua-lifestyle~Q6VOJL.dockerbuild","createdAt":"2026-10-07T12:13:18Z","expiresAt":"2027-01-05T11:57:32Z","expired":false,"reportedDigest":"sha256:fa614260439ed577a69f5c5d602d7069b16104b24de434c8e2cd435da67c1bd4"},
+      {"runId":37643829649,"id":11495180075,"name":"aqua-lifestyle~aqua-lifestyle~Y45SBP.dockerbuild","createdAt":"2026-10-07T15:50:51Z","expiresAt":"2027-01-05T15:25:42Z","expired":false,"reportedDigest":"sha256:af95d6f26982d3761fd4c09a3c35a6ca46173ac06190975f0bc6178a587b6cca"},
+      {"runId":37643829649,"id":11495025381,"name":"aqua-lifestyle~aqua-lifestyle~FNF7QN.dockerbuild","createdAt":"2026-10-07T15:50:53Z","expiresAt":"2027-01-05T15:25:42Z","expired":false,"reportedDigest":"sha256:fdc04b0f61fdfc00537b080c0d3937949fe211e1daa447249f95603981624499"},
+      {"runId":37643838547,"id":11493704565,"name":"aqua-lifestyle~aqua-lifestyle~9OWSW3.dockerbuild","createdAt":"2026-10-07T15:48:16Z","expiresAt":"2027-01-05T15:25:46Z","expired":false,"reportedDigest":"sha256:8cec01f8fdc10587f082e3e85b36c8a453b89d31a4a389adad93ea50edc5cc6a"},
+      {"runId":37643838547,"id":11493424688,"name":"aqua-lifestyle~aqua-lifestyle~NB3Z4L.dockerbuild","createdAt":"2026-10-07T15:48:18Z","expiresAt":"2027-01-05T15:25:46Z","expired":false,"reportedDigest":"sha256:777414fa565bcd08a96a15ecd28391a634bc7b3b50a1cabaff429b25e61c1c5c"},
+      {"runId":37647430932,"id":11496087950,"name":"aqua-lifestyle~aqua-lifestyle~P4XOZC.dockerbuild","createdAt":"2026-10-07T16:14:34Z","expiresAt":"2027-01-05T15:52:00Z","expired":false,"reportedDigest":"sha256:a99873a8e776cacdbf697fd59735f1ba151020461abdb80eff91ff59c931362c"},
+      {"runId":37647430932,"id":11495249513,"name":"aqua-lifestyle~aqua-lifestyle~7Y3M6B.dockerbuild","createdAt":"2026-10-07T16:14:35Z","expiresAt":"2027-01-05T15:52:00Z","expired":false,"reportedDigest":"sha256:e45285c9f2fc8beafb3286bad4cfbf0466e2fe56755f77fae73eec66023255d9"}
+    ],
+    "plausibleOriginalBundleArtifacts": 0,
+    "downloads": 0,
+    "artifactContentDigestVerificationClaimed": false,
+    "missingArtifactHistory": "UNKNOWN_WHETHER_EACH_ABSENT_ARTIFACT_WAS_EVER_UPLOADED"
+  },
+  "specificLaterDeliveryLead": {
+    "pr":100,
+    "head":"ddb136336997aec6b122aa333eb7d64a7088e6c7",
+    "merge":"d7947fe6074cbc7e7fa08cdc010a6e13c1aeb16f",
+    "citedRun":38460474656,
+    "runCreatedAt":"2026-10-13T20:08:42Z",
+    "artifactCount":16,
+    "originalFrozenPackageLocatorFound":false,
+    "artifacts":[
+      {"id":11847290571,"name":"backend-application-entity-framework-migrations-results","createdAt":"2026-10-13T20:18:45Z","expiresAt":"2026-10-20T20:18:44Z","expired":false,"reportedDigest":"sha256:5bf1dcb8d73b6f3bc218bee8070aedd43e22d68f5312438867e0b63a135f54b0"},
+      {"id":11847205509,"name":"aqua-lifestyle~aqua-lifestyle~YUBM4J.dockerbuild","createdAt":"2026-10-13T20:22:27Z","expiresAt":"2027-01-11T20:08:42Z","expired":false,"reportedDigest":"sha256:4272001eeace1b048306842ba0748e15c45f8f5184d1f285b2e49ed421e83531"},
+      {"id":11846720852,"name":"aqua-lifestyle~aqua-lifestyle~XCGCR5.dockerbuild","createdAt":"2026-10-13T20:22:26Z","expiresAt":"2027-01-11T20:08:42Z","expired":false,"reportedDigest":"sha256:b9c188904c02ec1ca5634f41e371ebe81689fd69a485f6250398a3b9f6c77665"},
+      {"id":11845991867,"name":"backend-application-application-administration-results","createdAt":"2026-10-13T20:15:53Z","expiresAt":"2026-10-20T20:15:52Z","expired":false,"reportedDigest":"sha256:5b67fc62c49e21270d5028eb0101045c37c869a9537f939fa5e8598f7f95994e"},
+      {"id":11845576494,"name":"backend-application-coverage-partition","createdAt":"2026-10-13T20:11:06Z","expiresAt":"2026-10-20T20:11:05Z","expired":false,"reportedDigest":"sha256:3120b517233bbfcac3db5a16080dd9d6054ac4d538b9142c3392c1bf3ce40b8f"},
+      {"id":11845547212,"name":"backend-application-application-authentication-results","createdAt":"2026-10-13T20:15:11Z","expiresAt":"2026-10-20T20:15:11Z","expired":false,"reportedDigest":"sha256:5a7584ae9516d39eecbd5cdc31cf254c8128eef63358a540b5bcd461ea2863ef"},
+      {"id":11845522378,"name":"backend-application-entity-framework-placement-results","createdAt":"2026-10-13T20:15:14Z","expiresAt":"2026-10-20T20:15:13Z","expired":false,"reportedDigest":"sha256:27e4fd19738610ef51fefc14ff3bc5f32c0c0d2cd79ca3eb4fc2d4f6beb2138d"},
+      {"id":11845399514,"name":"backend-application-entity-framework-remainder-results","createdAt":"2026-10-13T20:15:25Z","expiresAt":"2026-10-20T20:15:24Z","expired":false,"reportedDigest":"sha256:041a80d216d6d63825d9f5115b02cc9ada29c1e901c200e00070ab04083c0351"},
+      {"id":11845364256,"name":"backend-web-placement-results","createdAt":"2026-10-13T20:13:26Z","expiresAt":"2026-10-20T20:13:26Z","expired":false,"reportedDigest":"sha256:f245e2dc7b8bb421af5bfc7e57f02a19fddc540d9ee21e1955679453a9e81c2c"},
+      {"id":11845344384,"name":"backend-web-remainder-results","createdAt":"2026-10-13T20:14:53Z","expiresAt":"2026-10-20T20:14:52Z","expired":false,"reportedDigest":"sha256:59bff5123c036520bae47826271da4dc93a3d6425c8551832787dec3cb69f5be"},
+      {"id":11845274989,"name":"backend-application-application-membership-results","createdAt":"2026-10-13T20:18:12Z","expiresAt":"2026-10-20T20:18:11Z","expired":false,"reportedDigest":"sha256:afa283e381e42776db0c2f37cc9cf45f7735bfeda09eaf1b8c16656c318f6f6c"},
+      {"id":11845259441,"name":"backend-application-remainder-results","createdAt":"2026-10-13T20:15:13Z","expiresAt":"2026-10-20T20:15:12Z","expired":false,"reportedDigest":"sha256:915f8b18448a931f0f0d67172340b38850d20e03b6b31be36255c11d57c16d54"},
+      {"id":11845028926,"name":"backend-web-coverage-partition","createdAt":"2026-10-13T20:10:45Z","expiresAt":"2026-10-20T20:10:44Z","expired":false,"reportedDigest":"sha256:32e43f2dfb44b7db7971a6b1063d8917b93ca3849004e1dd3ce0163df8de3b54"},
+      {"id":11844994662,"name":"backend-application-application-remainder-results","createdAt":"2026-10-13T20:14:59Z","expiresAt":"2026-10-20T20:14:59Z","expired":false,"reportedDigest":"sha256:e87f60615e5abf962ec6e151cc15d3e905d86e092cbb42672be9fd4da6d70f7b"},
+      {"id":11844684664,"name":"backend-web-controllers-results","createdAt":"2026-10-13T20:14:13Z","expiresAt":"2026-10-20T20:14:12Z","expired":false,"reportedDigest":"sha256:c64a6378b050b120fee08a942d2219901f087301fec2388d090376235f7a105c"},
+      {"id":11844534517,"name":"pg-regression-test-results","createdAt":"2026-10-13T20:13:26Z","expiresAt":"2026-10-20T20:13:25Z","expired":false,"reportedDigest":"sha256:9509e905747bd09b2a1fb8a76c612137f42f3e228aabf2e9f94d6cc6d7ada5a6"}
+    ],
+    "contentVerified":false,
+    "downloads":0
+  },
+  "localEvidenceRoot": "/tmp/opencode/b6-history-surfaces-20261017",
+  "executionEvidence": [
+    {"file":"actions-metadata.json","sha256":"ea883734c77a9fd61d77fd7fb399754289b11aa7386f2945e804f4b8960cec07"},
+    {"file":"git-and-delivery-metadata.json","sha256":"181152681c884268531bd5e22ae68c6f13a0c772cc2feeadfeab870b97fb51f9"},
+    {"file":"oversize-git-leads.json","sha256":"65e86db7ee68bbeae3ec94bb916dccb99f917227051732143b3585c33f625584"},
+    {"file":"pr100-delivery-triage.json","sha256":"f6e5c228e9a46960559c5bd471128289206cd6a4b7c351adc2fdca4bfdf6356f"}
+  ],
+  "newFrozenFilesRecovered": 0,
+  "newConcreteCustodyLocator": null,
+  "scopeExhausted": true,
+  "status": "UNAVAILABLE_IN_EXAMINED_SURFACES_NOT_PERMANENT_LOSS",
+  "nextRequiredInput": "Specific original custodian-held frozen bundle or its recorded delivery locator",
+  "productBuildsTestsCiDispatchesCustomer11Operations": 0,
+  "prospectiveRequalificationStarted": false
+}

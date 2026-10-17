@@ -129,3 +129,32 @@ decision. No product tests, unchanged CI or Customer11 execution were repeated.
 B6 and B7/D10 commissioning remain BLOCKED. Single next action: B6 evidence
 custodian supplies/restores one original frozen bundle with exact manifests,
 receipts and PB1 governing/stop subjects from separately retained custody.
+
+## Historical Git/Actions/custody continuation
+
+Current instruction narrows work to previously unexhausted historical storage;
+no prior32-path/archive/witness/digest/preservation/foundation checks or accepted
+Customer11/test execution were repeated.24 exact historical trees, PR98 revision
+timeline/refs, PR99 merge lineage, target delete/rename history and tag metadata
+were examined.13 exact pre-pilot/predecessor commit Actions indexes have no retained
+runs; five branch indexes identify16 relevant runs.15 artifact inventories were
+freshly read and run228's prior inventory reused.14 fresh retained records are
+Docker build metadata, not plausible original B6 packages; no download was justified.
+PR100's specific cited run38460474656 was additionally triaged as a delivery lead:
+its16 ordinary test/build artifacts and prerequisite language identify no original
+frozen-package delivery. No branch-wide expansion or artifact download followed.
+
+The committed8ca0dc3 publication record explicitly retains its receipts/transient
+evidence outside Git. Laterd818df8/cbed24c commit messages explicitly exclude the
+successor candidates/B6 history from their publication scopes. This is scoped
+primary publication evidence, not a global never-committed claim. The two prior
+size-excluded blobs were identified through metadata as historical business PDFs;
+no payload/digest scan was repeated. No new concrete custody locator emerged.
+
+The [historical result](../../verification/aqgreen-v2-b6-closure-20261017/historical-surfaces.md)
+and JSON appendix preserve exact sources, artifact names/dates/reported digests,
+reuse inventory and exclusions. All specific new leads are exhausted. Original
+frozen packages remain UNAVAILABLE in those surfaces; B6 acceptance remains
+BLOCKED. Stop until a specific custodian copy/delivery locator is supplied.
+No rebuild, prospective requalification, source correction, merge or production
+action occurred. PR107 code8e7282a and PR106 remain untouched.
