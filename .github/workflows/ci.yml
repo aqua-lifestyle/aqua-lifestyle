@@ -30,6 +30,10 @@ jobs:
           node-version: 24
       - name: Test qualification, admission, provider failures and retry boundaries
         run: node tools/deployment/run-security-tests.mjs
+      - name: Validate agent tooling with the existing Node runtime
+        run: |
+          node tools/agent-evals/validate.mjs
+          node --test tools/agent-evals/validate.test.mjs
       - name: Retain exact mandatory case evidence
         uses: actions/upload-artifact@v6
         with:

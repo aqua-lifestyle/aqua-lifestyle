@@ -65,14 +65,17 @@ worktree remained outside this workstream's edits.
 
 ### RUN ON THIS WORKTREE
 
-- `python3 tools/agent-evals/validate.py`: passed six skill structures, sixteen
+- The original validator passed six skill structures, sixteen
   routing definitions, strict result-schema/coherence self-tests, authority fields,
   root safeguards, frontend bootstrap, and local links.
-- Skill Creator `quick_validate.py` was run once for each of the six skill
+- Skill Creator frontmatter validation was run once for each of the six skill
   directories: all passed.
-- `python3 -m json.tool` parsed the case and schema files; `py_compile` compiled the
-  validator with its cache outside the repository. The optional `jsonschema`
+- JSON syntax checks parsed the case and schema files; the original validator's
+  syntax check passed with its cache outside the repository. The optional `jsonschema`
   package was unavailable, so no claim depends on it.
+
+These are historical checks of the original implementation. The current validator
+uses the existing Node.js runtime: `node tools/agent-evals/validate.mjs`.
 - `rg` scans found no retired standalone semantic-integrity skill reference or
   trailing whitespace. `git diff --check` passed.
 - `git status --short --untracked-files=all`, `git diff --name-only`, and worktree
