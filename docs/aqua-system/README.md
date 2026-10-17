@@ -13,6 +13,7 @@ The pack explains Aqua at several levels without making one document carry every
 | Touching historical data, migrations, or legacy members | [05 — Data, history, migrations, and legacy members](05-data-history-migrations-and-legacy-members.md) |
 | Deploying or enabling automation | [06 — Operations and enablement runbook](06-operations-and-enablement-runbook.md) |
 | Checking evidence, decisions, risks, or readiness | [07 — Verification, decision, and risk register](07-verification-decision-and-risk-register.md) |
+| Reviewing the proposed B6 prospective successor | [B6S candidate and obligation mapping](../operations/aqgreen-v2-b6-successor/v1/README.md) — adoption pending owner approval |
 | Understanding Tenant versus business Area | [08 — Tenant and Area boundaries](08-area-and-tenant-boundaries.md) |
 | Reviewing resolved AQGreen Placement V2 design semantics | [AQGreen Network Placement V2 specification](aqgreen-network-placement-specification.md) |
 | Reviewing the isolated AQGreen V2 working slice and learning boundary | [Lean MVP working-slice report](aqgreen-v2-lean-mvp-report.md) and [discovery/task scripts](aqgreen-v2-lean-mvp-discovery.md) |
