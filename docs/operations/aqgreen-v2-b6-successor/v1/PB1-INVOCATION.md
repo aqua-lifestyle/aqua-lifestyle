@@ -188,10 +188,20 @@ expected predicate while the parser operation itself remains unsupported.
 
 ## P06. Replay, recovery and independent examination
 
-Equal descriptor/input/dependency bytes must yield byte-identical semantic child
-results; no PID, wall clock or host path enters that result. Original platform,
-process, monotonic/civil time, FD/view and syscall/exit observations are separate
-per-attempt evidence, not normalized into that semantic result.
+Deterministic equality applies to completed content/representation decisions for
+equal descriptor/input/dependency bytes and identically satisfied admitted-profile,
+custody, observation, I/O and resource preconditions. Those completed decisions
+must yield byte-identical child results; no PID, wall clock or host path enters
+them. Different completed representation decisions under those same conditions
+are a qualification failure requiring investigation, not an allowed variation.
+
+Operational failures, including UNDETERMINED RESOURCE/IO/TIMEOUT/CANCELLED/CONTEXT,
+signals, incomplete output or unsatisfied launch/observation conditions, are
+per-attempt non-success evidence outside that equality claim. They may differ
+between attempts on unchanged content. They must remain recorded and cannot be
+normalized into a successful or fabricated deterministic result. Original platform,
+process, monotonic/civil time, FD/view and syscall/exit observations remain separate
+per-attempt evidence.
 
 Read-only repetitions retain the same scoped invocation intent and use a fresh
 attempt UUID, output file and original observation ledger. A crashed attempt

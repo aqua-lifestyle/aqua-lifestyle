@@ -2,6 +2,8 @@
 
 **Version:** `B6S/1.0.0-candidate.1`
 
+**Package SHA-256:** `0711c7d483f16bddf8bb83ecacb7b4dedda978adc85295c4704516514e81fd7b`
+
 **Status:** PROPOSED — adoption PENDING owner approval.
 
 **Historical TQ1 compatibility:** UNKNOWN.
@@ -21,6 +23,10 @@ two spaces, basename, LF. It excludes itself, this index, review records and the
 worklog; no self-hash cycle exists. Any normative change produces a new digest and
 requires review of that exact successor. Published candidate bytes remain traceable
 in Git. The final manifest digest is reported in the PR/task handoff.
+
+[Independent technical review and correction record](../../../verification/aqgreen-v2-b6-successor-v1/README.md)
+binds this exact digest. Its design-review verdict grants no adoption or runtime
+acceptance.
 
 | Normative subject | Purpose |
 | --- | --- |
