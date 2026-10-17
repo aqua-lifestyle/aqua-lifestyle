@@ -114,7 +114,10 @@ JSON, SHA-256 and `B6TUPLE1` population-digest conventions. The result supplies
 `Manifest`, `Records` and `Sha256Sums`; `ManifestBytes()` and `RecordsBytes()` give
 the exact bytes for `manifest.json` / `records.json`, with UTF-8 `SHA256SUMS`.
 `Verify()` rejects altered hashes, scope, duplicates, ordering or counts. The
-manifest records source tables, exported source/category counts, schema and
+offline verifier and package freezer also require non-default UTC cutoff and
+source-observation instants, with cutoff no later than observation. They reject a
+missing source boundary; checksums cannot qualify default or non-UTC chronology.
+The manifest records source tables, exported source/category counts, schema and
 implementation digests, PostgreSQL version, observation time and hashed MVCC/
 database identity. Stable content/population hashes repeat for unchanged source
 content, scope, cutoff and implementation. The full manifest hash additionally

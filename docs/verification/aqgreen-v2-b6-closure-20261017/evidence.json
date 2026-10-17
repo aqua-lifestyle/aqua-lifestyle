@@ -1,0 +1,68 @@
+{
+  "classification": "LOCAL_QUALIFICATION_NOT_INDEPENDENT_ACCEPTANCE",
+  "baseCommit": "23f176db6eb13af5ee01ff69f1a9f7bbe6b880ff",
+  "branch": "feature/b6-closure-qualification-20261017",
+  "tests": [
+    {
+      "artifact": "b6-temporal-before.trx",
+      "sha256": "fa0fd4426fbaf49fd81a5c816674a652c8e8891ce9abf0c7cd5f67abd5e95ff1",
+      "classification": "INITIAL_REGRESSION_VARIANT_EXPECTED_FAILURE",
+      "total": 18, "executed": 18, "passed": 8, "failed": 10, "notExecuted": 0
+    },
+    {
+      "artifact": "b6-temporal-after.trx",
+      "sha256": "fedc7a1a14dfe56231de7a55bedc04133cbc420b21147a2461f1347dfe4e4b34",
+      "classification": "UNIT_COMPONENT",
+      "total": 40, "executed": 40, "passed": 40, "failed": 0, "notExecuted": 0
+    },
+    {
+      "artifact": "b6-export-review-postgresql.trx",
+      "sha256": "4bba8c78e3d40d21c00bd840979ca9525e5f0be6c9a0359881066fe4b83a9200",
+      "classification": "DISPOSABLE_POSTGRESQL_16_15_MODEL_CREATED_SCHEMA",
+      "total": 3, "executed": 3, "passed": 3, "failed": 0, "notExecuted": 0
+    }
+  ],
+  "sources": [
+    {
+      "path": "AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.Core/Domain/AQGreen/AQGreenReconciliationEvidencePackage.cs",
+      "sha256": "c4a155f60fe1e4bae2626fb8a4b8b6500371be48cf47e488320e45c463a84925"
+    },
+    {
+      "path": "AqualLifeStyle/9.4.2/aspnet-core/test/AqualLifeStyle.Tests/Domain/AQGreenReconciliationEvidencePackageTests.cs",
+      "sha256": "13d3c7f68ec33999c5e3bcd2b8a9171176d30f4530e523752969e332dbd1c14f"
+    },
+    {
+      "path": "AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.Core/Domain/AQGreen/AQGreenD10Commissioning.cs",
+      "sha256": "cced93fc858da2d9f83d08b99597c2e0be7cd07cf163f459197db804cf692fa7"
+    },
+    {
+      "path": "AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.Application/ProgrammeParticipations/AQGreenD10ProductionSelectors.cs",
+      "sha256": "8e4c33790dfb2b1df5fc9d741a6094d484ff7b25bd15e485e6e5d86273223df1"
+    },
+    {
+      "path": "AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.Web.Host/Startup/AQGreenD10OperatorEvidenceSource.cs",
+      "sha256": "f6098ca1926ddd7d9a13841b5210f371e0129ab153b8c9e624bcc92f0dc8fe08"
+    }
+  ],
+  "customer11": {
+    "classification": "REUSED_ACCEPTED_BOUNDED_EVIDENCE_WITH_FRESH_INTEGRITY_CHECKS",
+    "acceptedInput": "74a8e8bedd14d151c119173e44671c7ec8fd8c03ebb75cbd0763974c6dd3e416",
+    "acceptedOutput": "a1bcf510b41fa97e449e0dcb938d2b492ad08f215f6d4e5d75ff117f8b6af11d",
+    "acceptedCapture": "b84119e66c886ac0086b9f531186d7345a007359df465ac945afe033787e2494",
+    "writerArchive": "8cf553cb8fde152754aa874cfc17ebb9160f6a9c0467c11b6b33cfa663ddfd4d",
+    "applyReceipt": "491f520890509c04165ed8a0d02bfd8e72563a3e05e838d619bcfd7f65a1653d",
+    "idempotencyReceipt": "142ec9f7cd4f3211bf61b7738ba3dbc413c28ba1314c42dcf582f31fb3e1f6e4",
+    "idempotencyEvidenceManifest": "dda4526861406527f55c0813d06cca68857704a87d13596cc43ccfc5ee32fdfd",
+    "applyAndIdempotencyManifestChecks": "PASS_ALL_LISTED_FILES",
+    "reexecuted": false
+  },
+  "acceptance": {
+    "publicationRoot": "BLOCKED",
+    "bind": "BLOCKED",
+    "representativePopulation": "BLOCKED",
+    "finalAnalysis": "BLOCKED",
+    "b6IndependentAcceptance": "BLOCKED",
+    "b7D10OfflineImplementation": "PASS_BOUNDED_SCOPE",
+    "productionCommissioning": "BLOCKED"
+  }
+}
