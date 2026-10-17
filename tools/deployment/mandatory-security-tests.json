@@ -1114,7 +1114,7 @@
     },
     {
       "path": "tools/deployment/runtime-restart-probe.sh",
-      "sha256": "b91998b033396d8e501fa607201ef602898fc7e361ec78b75da152dcc7772611"
+      "sha256": "c8628caff8fce379e0f4919d24d89bfd03643d35a22ec66ba51490eab63ba29e"
     },
     {
       "path": "docker/api/Dockerfile",
@@ -1130,7 +1130,7 @@
     },
     {
       "path": "tools/operations/database-authority-readonly.sql",
-      "sha256": "565d6c35f7c1666e6ba39affd469fd6183c6635c6014dd3052faf8fb5fb0eb94"
+      "sha256": "143d4f91e2db7a638655cdb624604648b47346d858036048c2fc8bfd1c465d90"
     }
   ]
 }

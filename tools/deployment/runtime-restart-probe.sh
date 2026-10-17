@@ -121,6 +121,20 @@ fingerprint >"$probe_dir/before"
 # Audit the same real schema under both identities. This is bounded database
 # authority evidence; no result claims production custody or full API permission.
 probe_phase=catalog_authority
+admin_sql >/dev/null <<'SQL'
+CREATE TABLE public.aqua_catalog_shadow(marker text NOT NULL);
+INSERT INTO public.aqua_catalog_shadow VALUES ('SYNTHETIC_APP_ROW');
+GRANT SELECT ON public.aqua_catalog_shadow TO aqua_runtime_api;
+CREATE FUNCTION public.current_setting(text) RETURNS text LANGUAGE sql STABLE AS $$
+  SELECT CASE WHEN $1='transaction_read_only'
+    THEN (SELECT marker FROM public.aqua_catalog_shadow)
+    ELSE pg_catalog.current_setting($1) END
+$$;
+ALTER ROLE aqua_runtime_api IN DATABASE aqua_runtime SET search_path=public,pg_catalog;
+SQL
+# Prove the inherited lookup really selects a function reading an application row.
+# The audit must ignore it and report the real transaction state instead.
+[[ $(printf "SELECT current_setting('transaction_read_only');\n" | api_sql) == SYNTHETIC_APP_ROW ]]
 admin_sql <"$probe_root/tools/operations/database-authority-readonly.sql" >"$probe_dir/owner-catalog.json"
 api_sql <"$probe_root/tools/operations/database-authority-readonly.sql" >"$probe_dir/api-catalog.json"
 node --input-type=module - "$probe_dir/owner-catalog.json" "$probe_dir/api-catalog.json" <<'JS'
@@ -136,7 +150,12 @@ for (const flag of ['currentRoleOwns','inheritsOwner','canSetOwnerRole','create'
 for (const count of ['ownedByCurrentRole','ownerPrivilegeInherited','ownerRoleSettable']) assert.equal(api.publicTables[count],0);
 assert.deepEqual(api.reachableDangerousRoles,[]); assert.equal(api.roleAdministrationMemberships,0);
 JS
-passed 'catalog-only read distinguishes the actual fixture owner from a non-owner API without role escalation'
+admin_sql >/dev/null <<'SQL'
+ALTER ROLE aqua_runtime_api IN DATABASE aqua_runtime RESET search_path;
+DROP FUNCTION public.current_setting(text);
+DROP TABLE public.aqua_catalog_shadow;
+SQL
+passed 'catalog-only read resists hostile search_path and distinguishes owner/API authority without row leakage'
 
 # Deliberately reject two inadequate grants proposals. Never deploy these temporary
 # grants. Normal password/profile operations and administrative takeover share the

@@ -33,6 +33,14 @@ command does not provision access. The query reports metadata, not an independen
 attestation, and cannot establish external IAM/egress, secret custody or every
 privileged-function/extension route by itself.
 
+Agent2 reproduced a branch-introduced audit defect at80cdc591: inherited
+`search_path=public,pg_catalog` selected a synthetic row-reading
+`public.current_setting(text)` function, leaking its marker and spoofing the audit.
+The correction sets `search_path=pg_catalog,pg_temp` locally before inspection.
+The existing owner/API catalog check now proves raw lookup is vulnerable in the
+hostile fixture and that the actual corrected audit ignores it. Role configuration,
+function and synthetic table are removed before the remaining runtime checks.
+
 The extended internal-network runtime probe must execute23 checks, including six
 new catalog/unsafe-policy rejection checks. Profile compatibility is direct SQL,
 not an HTTP customer journey. Invalid synthetic Host password mutation is not proof

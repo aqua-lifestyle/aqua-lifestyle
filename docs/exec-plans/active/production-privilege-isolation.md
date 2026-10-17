@@ -66,8 +66,8 @@ Extended existing disposable actual-schema probe: owner/non-owner read-only audi
 profile-SQL denial under the readiness role, temporary column-grant compatibility,
 Host-admin credential mutation and outbox receipt forgery rejecting naive policies,
 then rollback/revoke/fingerprint and original runtime checks. Six added checks,
-23 total expected. First run was incomplete: editing its script while Bash was
-streaming it produced a later syntax error; current syntax check passes, rerun only
+23 total expected. First run was incomplete: a later Bash syntax error occurred
+while its script was being edited; current syntax check passes, rerun only
 after edits stop. That failed/incomplete run is not 23-pass evidence. Agent2 prompted
 column-only and other-user-schema audit coverage; added both and an explicit column
 grant counterexample check. This proves no production or complete API isolation.
@@ -82,3 +82,35 @@ findings; all209 identities unchanged and21 source pins match. Exact committed-h
 review and complete hosted CI remain pending. No application behavior or provider
 settings were changed. Production owner/grants/custody and complete normal workflows
 under a new role remain UNKNOWN/BLOCKED.
+
+## Review correction after80cdc591
+
+Both80cdc591 hosted runs passed17/17 on attempt1; Agent2 independently reconciled
+209 security,1395 application,95 web/84 opt-in skips,78 dedicated PostgreSQL and23
+runtime checks plus16 non-Docker artifact digests per run. This is historical source
+evidence, not proof of the correction below.
+
+OBSERVATION / EXPERIMENT RESULT: Agent2's network-none PostgreSQL18 reproduction
+set inherited search_path=public,pg_catalog and supplied a public.current_setting
+function reading a synthetic application row. The exact audit emitted that marker
+instead of actual transactionReadOnly. ROOT CAUSE / BRANCH-INTRODUCED: unqualified
+built-in lookup trusted the session path; READ ONLY prevents writes, not reads or
+spoofed output. An otherwise identical query with local pg_catalog,pg_temp returned
+actual 'on'. No production observation was attempted.
+
+Correction: pin local lookup before inspection. Fold the hostile function/role/table
+fixture into the existing catalog runtime check, positively prove raw substitution,
+require actual 'on'/18 and existing role facts from the corrected audit, then reset/
+drop all hostile state before later checks. Preserve23 checks and all209 identities;
+update only the changed source pins. Next: frozen-source probe/security/mutations,
+commit/push, complete final CI and fresh exact-head Agent2 review. Acceptance remains
+BLOCKED on actual production authority/custody and full normal-role workflows.
+
+Corrected frozen-source probe passed23/23, including the positive hostile-lookup
+precondition and actual audit rejection; safe log replaced. Mandatory209/no skips
+and mutation fixtures passed under local dirty-worktree80cdc591 context with new
+policy digest3f42bbf9a63ddee1e4458dcb6e22c7ee78f256d3b0573c1a0ad19750bf2f4149.
+Syntax/actionlint/diff checks passed. Application/runtime images remain unchanged
+from the explicitly carried-forward local runtime source; final hosted CI must
+rebuild exact committed images and bind new results. Agent2 review/reconciliation
+of80cdc591 is historical; fresh corrected-commit review remains required.

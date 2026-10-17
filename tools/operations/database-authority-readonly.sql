@@ -3,6 +3,9 @@
 -- Use PGOPTIONS for timeouts/default_transaction_read_only and TLS verify-full.
 \set QUIET on
 BEGIN READ ONLY;
+-- Never inherit candidate-controlled function/operator/type lookup. Keep temporary
+-- types after pg_catalog as well; read-only alone does not prohibit row reads.
+SET LOCAL search_path = pg_catalog, pg_temp;
 SELECT jsonb_build_object(
  'transactionReadOnly',current_setting('transaction_read_only'),
  'defaultTransactionReadOnly',current_setting('default_transaction_read_only'),

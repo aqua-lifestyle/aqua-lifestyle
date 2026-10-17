@@ -94,6 +94,11 @@ executable security-definer paths. The supplied [catalog query](../../tools/oper
 reads no application rows/function bodies/passwords. It covers known public application
 objects and aggregates other user schemas/definers; it is not a full proof of every
 extension, provider IAM, network, parameter ACL or external-secret escalation path.
+The transaction sets `search_path=pg_catalog,pg_temp` locally before any inspection:
+read-only alone does not prevent a shadowed built-in from reading application rows
+or spoofing metadata. A disposable hostile-search-path regression proves that raw
+lookup selects the synthetic row-reading function while the audit returns actual
+catalog settings. The temporary role setting, function and table are then removed.
 
 Provision separate credentials only after authorization. Move ownership only for an
 explicit reviewed application-object inventory; never blanket REASSIGN provider-owned

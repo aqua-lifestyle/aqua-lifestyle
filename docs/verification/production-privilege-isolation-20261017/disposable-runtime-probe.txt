@@ -11,7 +11,7 @@ PASS: API role cannot mutate payment records
 PASS: API role cannot mutate AQGreen commission records
 PASS: API role cannot mutate administrator identities in this fixture
 PASS: enqueue-only API role cannot claim outbox delivery
-PASS: catalog-only read distinguishes the actual fixture owner from a non-owner API without role escalation
+PASS: catalog-only read resists hostile search_path and distinguishes owner/API authority without row leakage
 PASS: readiness-only API grants reject even profile SQL and are not a normal API role
 PASS: temporary column grant permits required profile SQL; this is not an HTTP workflow proof
 PASS: UNSAFE PROPOSAL REJECTED: password column grant also permits host administrator credential mutation
