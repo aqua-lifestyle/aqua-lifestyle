@@ -16,7 +16,7 @@ test('main releases follow completed CI with protected, serialized deployment', 
   assert.doesNotMatch(workflow, /environment:|RENDER_API_KEY|VERCEL_TOKEN|release-control.mjs deploy/);
   assert.match(workflow, /permission-actions: write/);
   assert.match(read('tools/deployment/trigger-executor.mjs'), /aqua-deployment\/actions\/workflows\/deploy.yml\/dispatches/);
-  assert.match(read('tools/deployment/release-control.mjs'), /await validateInfrastructure\(api\);/);
+  assert.match(read('tools/deployment/release-control.mjs'), /await validateInfrastructure\(api, /);
 });
 
 test('native Vercel production trigger cannot race the qualified orchestrator', () => {

@@ -1229,7 +1229,7 @@
     },
     {
       "path": "tools/deployment/release-control.mjs",
-      "sha256": "5d18fd0294dfb838854bfd42c052e69d2cd1151f0848b2b76f0f435cbd78d45b"
+      "sha256": "830a6995cde10d3922ef2c4c3a8a49421b45f54ec64853ab8281a44613c37c96"
     },
     {
       "path": "tools/deployment/release-control.test.mjs",
@@ -1261,7 +1261,7 @@
     },
     {
       "path": "tools/deployment/workflow.test.mjs",
-      "sha256": "a8f398b6964e241c0a98c08a9c400698c134f53a0f5b3f99d78efc8d3644a4d9"
+      "sha256": "981ac820039df4dcea2596fb3bb820c8342c71427df13a0386b36286e43cbf22"
     },
     {
       "path": "tools/deployment/mandatory-security-probe.mjs",

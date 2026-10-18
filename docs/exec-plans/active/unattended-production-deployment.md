@@ -32,6 +32,17 @@ docs/operations/deployment-executor.md. Next: complete focused checks, pin copie
 controller provenance to the final application commit, publish both review branches
 and record actual PR/CI evidence without claiming production operation.
 
+Focused implementation validation:240 mandatory application cases and27 executor
+cases pass with zero skips, plus actionlint and existing classifier tampering probes
+(including170pass/one-skip denial). Fresh review found a legacy100-run cutoff and
+missing history-gap detection. Pagination, stable counts/deduplication, continuity
+and the observed first legacy run38912818702 now fence takeover. A bounded GET
+confirmed that actual legacy main history currently contains exactly that run,
+number1, completed/failure; no provider or broad infrastructure investigation was
+repeated. Current executor main and current release attempt are re-fetched before
+mutation, blocking obsolete workflow reruns. Final review and hosted evidence are
+recorded on the corresponding PRs; no production readiness is inferred.
+
 ## Goal and authority
 
 Latest explicit owner task authorizes investigation, implementation, isolated
