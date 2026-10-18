@@ -9,12 +9,13 @@ test('main releases follow completed CI with protected, serialized deployment', 
   assert.match(workflow, /workflow_run:/);
   assert.match(workflow, /workflows: \["Continuous integration"\]/);
   assert.match(workflow, /types: \[completed\]/);
-  assert.match(workflow, /environment: production-release/);
-  assert.match(workflow, /cancel-in-progress: false/);
+  assert.match(workflow, /name: Automatic deployment trigger/);
+  assert.match(workflow, /repositories: aqua-deployment/);
   assert.doesNotMatch(workflow, /workflow_dispatch:|pull_request_target:|deploy-hook/);
   assert.doesNotMatch(workflow, /PRODUCTION_RELEASE_AUTHORIZATION|AUTHORITY_REQUIRED/);
-  assert.match(workflow, /pull-requests: read/);
-  assert.match(workflow, /RESUME_RECEIPT_DIR:/);
+  assert.doesNotMatch(workflow, /environment:|RENDER_API_KEY|VERCEL_TOKEN|release-control.mjs deploy/);
+  assert.match(workflow, /permission-actions: write/);
+  assert.match(read('tools/deployment/trigger-executor.mjs'), /aqua-deployment\/actions\/workflows\/deploy.yml\/dispatches/);
   assert.match(read('tools/deployment/release-control.mjs'), /await validateInfrastructure\(api\);/);
 });
 
@@ -39,7 +40,7 @@ test('every main push runs CI and successful trusted completion starts CD withou
   assert.match(cd, /github.event.workflow_run.conclusion == 'success'/);
   assert.match(cd, /github.event.workflow_run.event == 'push'/);
   assert.match(cd, /github.event.workflow_run.head_repository.full_name == github.repository/);
-  assert.match(cd, /needs: candidate/);
+  assert.match(cd, /run: node tools\/deployment\/trigger-executor.mjs/);
   assert.doesNotMatch(cd, /AUTO_DEPLOY_ENABLED|workflow_dispatch:|PRODUCTION_RELEASE_AUTHORIZATION|RELEASE_TOKEN/);
   const policy = JSON.parse(read('tools/deployment/unattended-policy.json'));
   assert.equal(policy.baseline, 'automatic'); assert.equal(Object.hasOwn(policy, 'bootstrap'), false);

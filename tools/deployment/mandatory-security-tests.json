@@ -1160,6 +1160,46 @@
       "id": "AQUA-SEC-0232",
       "file": "tools/deployment/release-control.test.mjs",
       "name": "owner governance rejects missing branch scope before any provider mutation"
+    },
+    {
+      "id": "AQUA-SEC-0233",
+      "file": "tools/deployment/trigger-executor.test.mjs",
+      "name": "successful main CI automatically dispatches only fixed executor and exact SHA/run/attempt hints"
+    },
+    {
+      "id": "AQUA-SEC-0234",
+      "file": "tools/deployment/trigger-executor.test.mjs",
+      "name": "failed CI cannot dispatch the executor"
+    },
+    {
+      "id": "AQUA-SEC-0235",
+      "file": "tools/deployment/trigger-executor.test.mjs",
+      "name": "PR CI cannot dispatch the executor"
+    },
+    {
+      "id": "AQUA-SEC-0236",
+      "file": "tools/deployment/trigger-executor.test.mjs",
+      "name": "fork CI cannot dispatch the executor"
+    },
+    {
+      "id": "AQUA-SEC-0237",
+      "file": "tools/deployment/trigger-executor.test.mjs",
+      "name": "wrong branch cannot dispatch the executor"
+    },
+    {
+      "id": "AQUA-SEC-0238",
+      "file": "tools/deployment/trigger-executor.test.mjs",
+      "name": "missing trigger identity cannot dispatch the executor"
+    },
+    {
+      "id": "AQUA-SEC-0239",
+      "file": "tools/deployment/trigger-executor.test.mjs",
+      "name": "wrong CI attempt cannot dispatch the executor"
+    },
+    {
+      "id": "AQUA-SEC-0240",
+      "file": "tools/deployment/trigger-executor.test.mjs",
+      "name": "an ambiguous automatic dispatch is never blindly retried"
     }
   ],
   "sources": [
@@ -1173,7 +1213,7 @@
     },
     {
       "path": ".github/workflows/release.yml",
-      "sha256": "8b1233399ad0e87ed2ecc81f5e0af6380482bcf3216dbbfc428bb391c6ceecc8"
+      "sha256": "871c0f55223ae330ead30ea4cb73d2f5d1de9e3aaa1f1779ee6da32b913896c3"
     },
     {
       "path": "tools/deployment/disposable-recovery.sh",
@@ -1189,7 +1229,7 @@
     },
     {
       "path": "tools/deployment/release-control.mjs",
-      "sha256": "d46341b9745947562cc2e4f737eb0cf0b5a5a4d3723eecaa9e2267b6ad98aac2"
+      "sha256": "5d18fd0294dfb838854bfd42c052e69d2cd1151f0848b2b76f0f435cbd78d45b"
     },
     {
       "path": "tools/deployment/release-control.test.mjs",
@@ -1221,7 +1261,7 @@
     },
     {
       "path": "tools/deployment/workflow.test.mjs",
-      "sha256": "a631f779ead27dc46f256a7ec0cc40f8dbb0e1a816f003edecdf1ed322f6a562"
+      "sha256": "a8f398b6964e241c0a98c08a9c400698c134f53a0f5b3f99d78efc8d3644a4d9"
     },
     {
       "path": "tools/deployment/mandatory-security-probe.mjs",
@@ -1254,6 +1294,14 @@
     {
       "path": "tools/deployment/fixtures/installed-main-governance.json",
       "sha256": "cc47da01e07224bfb91f390d83da55a1c371d19b5f9179fe176bf3dad4f4ea75"
+    },
+    {
+      "path": "tools/deployment/trigger-executor.mjs",
+      "sha256": "5c5ea167995ca88beaebff320ab9a743d5e86879408eac39002cc75ad966ca44"
+    },
+    {
+      "path": "tools/deployment/trigger-executor.test.mjs",
+      "sha256": "129fe2ca67410e1299d52cde30a9b53c3c1f19de26a5b5479d6d3c99a15532fd"
     }
   ]
 }

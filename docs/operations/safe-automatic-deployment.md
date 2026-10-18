@@ -1,5 +1,12 @@
 # Automatic qualified production deployment
 
+**2026-10-18 executor transition:** the current application `release.yml` is now a
+credential-free automatic trigger for the separately held executor. Read the
+[current implementation and setup guide](deployment-executor.md) first. The
+same-repository provider workflow described below is retained as historical
+controller context; provider execution now belongs only in `aqua-deployment`.
+Credential custody and independent verifier protection remain BLOCKED.
+
 Current owner instruction: **merge → CI PASS → Render → API verification → Vercel
 → production verification**, without a release activation switch, human environment
 approval, hand-authored bootstrap, per-release secret/token, manual dispatch or

@@ -3,6 +3,35 @@
 > **NOT BUSINESS AUTHORITY.** This worklog records execution state and evidence. It
 > cannot confirm or supersede a business-policy decision.
 
+## Current execution — external executor, 2026-10-18
+
+Latest owner decision authorizes credential-free implementation with the existing
+account, on isolated branches, without removing Xolani-M administration, secrets,
+provider settings, merge or production deployment. Source baseline PR106 at
+92eabe0; executor initially empty. Earlier provider/governance investigations are
+carried forward, not rerun. Application branch remains
+feature/unattended-production-deployment; executor branch is
+feature/automatic-qualified-executor. Documentation-only initial executor main
+exists solely to support a reviewable PR and contains no workflow.
+
+Reuse the controller with explicit source/executor API routing and version4 identity;
+replace application deployment with automatic Actions-only dispatch; keep executor
+code/targets/policy independently held, and application Git objects inert. Preserve
+provider sequencing, restricted runtime, provenance, immutable receipts and retries.
+Focused tests cover actual candidate/admit/deploy entries with real disposable Git
+and substituted providers, credential destinations, untrusted input, CI App/attempt,
+legacy ambiguity and automatic trigger negatives. No full application CI dispatch
+is required for the credential-free local checks; final publication may trigger
+the repository's existing CI automatically.
+
+Custody remains BLOCKED: current application administrator also controls executor;
+base/App automation access is unqualified. No protected mandatory-test authority
+has been installed. Production provisioning must await actual isolation and API
+observation permissions. Current setup is in
+docs/operations/deployment-executor.md. Next: complete focused checks, pin copied
+controller provenance to the final application commit, publish both review branches
+and record actual PR/CI evidence without claiming production operation.
+
 ## Goal and authority
 
 Latest explicit owner task authorizes investigation, implementation, isolated

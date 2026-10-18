@@ -4,6 +4,12 @@ import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 export const targets = JSON.parse(readFileSync(new URL('./targets.json', import.meta.url)));
+// Only the executor's reviewed targets.json selects this mode. Candidate input
+// cannot supply an execution repository, workflow, provider URL or target.
+export const execution = targets.executor ?? { repository: targets.repository,
+  workflow: 'release.yml', name: 'Qualified production release', event: 'workflow_run' };
+const external = execution.repository !== targets.repository;
+const releaseApi = api => external ? api.executor : api.gh;
 export const standingPolicy = JSON.parse(readFileSync(new URL('./unattended-policy.json', import.meta.url)));
 export const requiredJobs = [
   'Backend application coverage partition', 'Backend web coverage partition',
@@ -24,7 +30,7 @@ const sourceIdentityFields = ['repository', 'sha', 'ciRunId', 'ciRunAttempt'];
 const targetIdentity = Object.freeze({ environment: targets.environment, profile: targets.profile,
   renderServiceId: targets.render.id, vercelProjectId: targets.vercel.id, vercelTeamId: targets.vercel.teamId });
 const releaseIdentityFields = ['version', ...sourceIdentityFields, 'releaseRunId', 'releaseRunAttempt', 'policySha256',
-  ...Object.keys(targetIdentity)];
+  ...Object.keys(targetIdentity), ...(external ? ['executorRepository', 'executorSha'] : [])];
 const positiveId = value => typeof value === 'string' && /^[1-9]\d*$/.test(value);
 const positiveAttempt = value => Number.isSafeInteger(value) && value > 0;
 
@@ -62,19 +68,22 @@ export function policyDigest(policy) {
 }
 
 export function freezeCandidate(qualified, env, policy = standingPolicy) {
-  requireThat(env.GITHUB_REPOSITORY === targets.repository && positiveId(env.GITHUB_RUN_ID) &&
+  requireThat(env.GITHUB_REPOSITORY === execution.repository && positiveId(env.GITHUB_RUN_ID) &&
     positiveId(env.GITHUB_RUN_ATTEMPT) && positiveAttempt(Number(env.GITHUB_RUN_ATTEMPT)) &&
     env.GITHUB_REF === 'refs/heads/main' &&
-    env.GITHUB_WORKFLOW_REF === `${targets.repository}/.github/workflows/release.yml@refs/heads/main`,
+    env.GITHUB_WORKFLOW_REF === `${execution.repository}/.github/workflows/${execution.workflow}@refs/heads/main` &&
+    (!external || (shaPattern.test(env.GITHUB_SHA) && env.GITHUB_WORKFLOW_SHA === env.GITHUB_SHA)),
   'RELEASE_CONTEXT_UNVERIFIABLE');
-  const candidate = { ...qualified, version: 3, releaseRunId: env.GITHUB_RUN_ID,
+  const candidate = { ...qualified, version: external ? 4 : 3,
+    ...(external ? { executorRepository: execution.repository, executorSha: env.GITHUB_SHA } : {}), releaseRunId: env.GITHUB_RUN_ID,
     releaseRunAttempt: Number(env.GITHUB_RUN_ATTEMPT), policySha256: policyDigest(policy), ...targetIdentity };
   validateReleaseIdentity(candidate);
   return Object.freeze(candidate);
 }
 
 function validateReleaseIdentity(identity) {
-  requireThat(identity?.version === 3 && identity.repository === targets.repository &&
+  requireThat(identity?.version === (external ? 4 : 3) &&
+    (!external || (identity.executorRepository === execution.repository && shaPattern.test(identity.executorSha))) && identity.repository === targets.repository &&
     shaPattern.test(identity.sha) && positiveId(identity.ciRunId) && positiveAttempt(identity.ciRunAttempt) &&
     positiveId(identity.releaseRunId) && positiveAttempt(identity.releaseRunAttempt) &&
     /^[a-f0-9]{64}$/.test(identity.policySha256) &&
@@ -100,10 +109,11 @@ export function verifyCandidate(candidate, qualified, archive, trustedArchive) {
 
 export function validatePolicy(qualified, env, policy = standingPolicy) {
   validateReleaseIdentity(qualified);
-  requireThat(env.GITHUB_REPOSITORY === qualified.repository && env.GITHUB_RUN_ID === qualified.releaseRunId &&
+  requireThat(env.GITHUB_REPOSITORY === execution.repository && env.GITHUB_RUN_ID === qualified.releaseRunId &&
     env.GITHUB_RUN_ATTEMPT === String(qualified.releaseRunAttempt) &&
     env.GITHUB_REF === 'refs/heads/main' &&
-    env.GITHUB_WORKFLOW_REF === `${targets.repository}/.github/workflows/release.yml@refs/heads/main`,
+    env.GITHUB_WORKFLOW_REF === `${execution.repository}/.github/workflows/${execution.workflow}@refs/heads/main` &&
+    (!external || (env.GITHUB_SHA === qualified.executorSha && env.GITHUB_WORKFLOW_SHA === qualified.executorSha)),
   'TRUSTED_RELEASE_CONTEXT_REQUIRED');
   requireThat(qualified.policySha256 === policyDigest(policy), 'STANDING_POLICY_CHANGED');
   requireThat(env.RENDER_API_KEY?.trim() && env.VERCEL_TOKEN?.trim(), 'DEPLOYMENT_CREDENTIALS_REQUIRED');
@@ -160,6 +170,58 @@ export async function validateInfrastructure(api) {
   const page = await api.gh(`/environments/${targets.environment}/deployment-branch-policies?per_page=100`);
   requireThat(page.total_count === page.branch_policies?.length, 'ENVIRONMENT_BRANCH_INVENTORY_INCOMPLETE');
   validateEnvironment(environment, page.branch_policies);
+  if (external) {
+    const environment = await api.executor(`/environments/${targets.environment}`);
+    const page = await api.executor(`/environments/${targets.environment}/deployment-branch-policies?per_page=100`);
+    requireThat(page.total_count === page.branch_policies?.length, 'ENVIRONMENT_BRANCH_INVENTORY_INCOMPLETE');
+    validateEnvironment(environment, page.branch_policies);
+    const rules = await api.executor('/rules/branches/main?per_page=100');
+    requireThat(Array.isArray(rules) && rules.length > 0 && rules.length < 100, 'EXECUTOR_HISTORY_PROTECTION_REQUIRED');
+    const ids = [...new Set(rules.map(r => r.ruleset_id))];
+    let protectedHistory = false;
+    for (const id of ids) {
+      requireThat(positiveAttempt(id), 'EXECUTOR_HISTORY_PROTECTION_REQUIRED');
+      const rule = await api.executor(`/rulesets/${id}`);
+      if (rule.enforcement === 'active' && rule.source === execution.repository &&
+        rule.source_type === 'Repository' && rule.target === 'branch' &&
+        Array.isArray(rule.bypass_actors) && rule.bypass_actors.length === 0 &&
+        ['deletion', 'non_fast_forward'].every(type => rule.rules?.some(r => r.type === type) &&
+          rules.some(r => r.type === type && r.ruleset_id === id))) protectedHistory = true;
+    }
+    requireThat(protectedHistory, 'EXECUTOR_HISTORY_PROTECTION_REQUIRED');
+    await validateLegacyHistory(api);
+  }
+}
+
+
+export async function validateLegacyHistory(api) {
+  if (!external) return;
+  const result = await api.gh('/actions/workflows/release.yml/runs?branch=main&per_page=100');
+  requireThat(result.total_count === result.workflow_runs?.length && result.total_count < 100,
+    'LEGACY_RELEASE_HISTORY_REQUIRES_RECONCILIATION');
+  for (const run of result.workflow_runs) {
+    requireThat(run.repository?.full_name === targets.repository && run.head_repository?.full_name === targets.repository &&
+      run.path === '.github/workflows/release.yml' && run.head_branch === 'main' && run.event === 'workflow_run' &&
+      (run.status === 'completed' || run.name === 'Automatic deployment trigger') &&
+      positiveAttempt(run.run_attempt) && run.run_attempt <= 20,
+      'LEGACY_RELEASE_HISTORY_REQUIRES_RECONCILIATION');
+    for (let attempt = 1; attempt <= run.run_attempt; attempt++) {
+      const page = await api.gh(`/actions/runs/${run.id}/attempts/${attempt}/jobs?per_page=100`);
+      requireThat(page.total_count === page.jobs?.length, 'LEGACY_RELEASE_HISTORY_REQUIRES_RECONCILIATION');
+      if (run.name === 'Automatic deployment trigger') {
+        requireThat(page.jobs.length === 1 && page.jobs[0].name === 'Dispatch qualified executor',
+          'LEGACY_RELEASE_HISTORY_REQUIRES_RECONCILIATION');
+        continue;
+      }
+      requireThat(run.name === 'Qualified production release' && page.jobs.length === 2,
+        'LEGACY_RELEASE_HISTORY_REQUIRES_RECONCILIATION');
+      const production = page.jobs.find(j => ['Unattended recovery release', 'Authorized recovery release'].includes(j.name));
+      requireThat(production && (production.conclusion === 'skipped' || production.steps?.some(s =>
+        ['Revalidate authority, providers, source and recovery before deployment',
+         'Revalidate policy, provenance, providers and recovery before automatic deployment'].includes(s.name) &&
+        s.conclusion === 'skipped')), 'LEGACY_RELEASE_HISTORY_REQUIRES_RECONCILIATION');
+    }
+  }
 }
 
 export async function validateCandidateProvenance(api, candidate) {
@@ -247,6 +309,7 @@ export function clients(env, fetcher = fetch) {
   }
   return {
     gh: (route, body) => request(`https://api.github.com/repos/${targets.repository}`, env.GH_TOKEN, route, body),
+    executor: (route, body) => request(`https://api.github.com/repos/${execution.repository}`, env.GH_TOKEN, route, body),
     render: (route, body) => request('https://api.render.com/v1', env.RENDER_API_KEY, route, body),
     vercel: (route, body) => request('https://api.vercel.com', env.VERCEL_TOKEN,
       route + (route.includes('?') ? '&' : '?') + `teamId=${targets.vercel.teamId}`, body),
@@ -272,6 +335,15 @@ export async function qualify(api, runId) {
   requireThat(String(run.id) === String(runId) && positiveAttempt(run.run_attempt), 'CI_IDENTITY_UNVERIFIABLE');
   const page = await api.gh(`/actions/runs/${runId}/attempts/${run.run_attempt}/jobs?per_page=100`);
   requireThat(page.total_count === page.jobs?.length, 'CI_INVENTORY_INCOMPLETE');
+  if (external) for (const job of page.jobs ?? []) {
+    const prefix = `https://api.github.com/repos/${targets.repository}/check-runs/`;
+    const id = job.check_run_url?.startsWith(prefix) ? job.check_run_url.slice(prefix.length) : '';
+    requireThat(positiveId(id) && Number.isSafeInteger(Number(id)), 'CI_CHECK_IDENTITY_UNVERIFIABLE');
+    const check = await api.gh(`/check-runs/${id}`);
+    requireThat(String(check.id) === id && check.app?.id === 15368 && check.head_sha === run.head_sha &&
+      check.name === job.name && check.status === 'completed' && check.conclusion === 'success',
+      'CI_TRUSTED_APP_REQUIRED');
+  }
   const main = await api.gh('/git/ref/heads/main');
   const qualified = validateRun(run, page.jobs, main.object.sha);
   // The latest run can change while its attempt-specific jobs are being read.
@@ -345,7 +417,7 @@ export function validateResumeReceipt(rows, frozen) {
 }
 
 export async function auditArtifact(api, run, attempt) {
-  const inventory = await api.gh(`/actions/runs/${run.id}/artifacts?per_page=100`);
+  const inventory = await releaseApi(api)(`/actions/runs/${run.id}/artifacts?per_page=100`);
   requireThat(inventory.total_count === inventory.artifacts?.length, 'AUDIT_ARTIFACT_INVENTORY_INCOMPLETE');
   const name = `production-release-audit-${run.id}-${attempt}`;
   const selected = inventory.artifacts.filter(a => a.name === name);
@@ -358,14 +430,14 @@ export async function auditArtifact(api, run, attempt) {
 function validateReleaseRun(run) {
   requireThat(Number.isSafeInteger(run.id) && positiveId(String(run.id)) && positiveAttempt(run.run_attempt) &&
     positiveAttempt(run.run_number) && shaPattern.test(run.head_sha) &&
-    run.repository?.full_name === targets.repository && run.head_repository?.full_name === targets.repository &&
-    run.event === 'workflow_run' && run.head_branch === 'main' &&
-    run.path === '.github/workflows/release.yml' && run.name === 'Qualified production release',
+    run.repository?.full_name === execution.repository && run.head_repository?.full_name === execution.repository &&
+    run.event === execution.event && run.head_branch === 'main' &&
+    run.path === `.github/workflows/${execution.workflow}` && run.name === execution.name,
   'RELEASE_WORKFLOW_PROVENANCE_REQUIRED');
 }
 
 async function releaseProductionJob(api, run, attempt) {
-  const page = await api.gh(`/actions/runs/${run.id}/attempts/${attempt}/jobs?per_page=100`);
+  const page = await releaseApi(api)(`/actions/runs/${run.id}/attempts/${attempt}/jobs?per_page=100`);
   const jobs = page.jobs;
   requireThat(page.total_count === jobs?.length && jobs.length === 2 &&
     new Set(jobs.map(j => j.name)).size === 2 &&
@@ -379,14 +451,14 @@ async function releaseProductionJob(api, run, attempt) {
 }
 
 export async function evidencePlan(api, candidate, policy) {
-  const current = await api.gh(`/actions/runs/${candidate.releaseRunId}`);
+  const current = await releaseApi(api)(`/actions/runs/${candidate.releaseRunId}`);
   validateReleaseRun(current);
-  requireThat(current.head_sha === candidate.sha && current.run_attempt === candidate.releaseRunAttempt &&
+  requireThat(current.head_sha === (external ? candidate.executorSha : candidate.sha) && current.run_attempt === candidate.releaseRunAttempt &&
     candidate.policySha256 === policyDigest(policy), 'RELEASE_CONTEXT_OR_POLICY_EPOCH_MISMATCH');
   const runs = [];
   let count;
   for (let page = 1; page <= 20; page++) {
-    const result = await api.gh(`/actions/workflows/release.yml/runs?branch=main&event=workflow_run&per_page=100&page=${page}`);
+    const result = await releaseApi(api)(`/actions/workflows/${execution.workflow}/runs?branch=main&event=${execution.event}&per_page=100&page=${page}`);
     requireThat(Number.isSafeInteger(result.total_count) && Array.isArray(result.workflow_runs) &&
       (count === undefined || count === result.total_count), 'RELEASE_HISTORY_UNVERIFIABLE');
     count = result.total_count;
@@ -406,7 +478,7 @@ export async function evidencePlan(api, candidate, policy) {
     requireThat(run.status === 'completed', 'CONCURRENT_RELEASE_RUN');
     requireThat(run.run_attempt <= 20, 'RELEASE_ATTEMPT_HISTORY_TOO_LARGE');
     for (let attempt = run.run_attempt; attempt >= 1; attempt--) {
-      const past = attempt === run.run_attempt ? run : await api.gh(`/actions/runs/${run.id}/attempts/${attempt}`);
+      const past = attempt === run.run_attempt ? run : await releaseApi(api)(`/actions/runs/${run.id}/attempts/${attempt}`);
       validateReleaseRun(past);
       requireThat(past.id === run.id && past.run_attempt === attempt && past.head_sha === run.head_sha &&
         past.run_number === run.run_number && past.status === 'completed', 'RELEASE_ATTEMPT_HISTORY_UNVERIFIABLE');
@@ -452,7 +524,7 @@ export function validateBaselineReceipt(rows, descriptor, candidate) {
     validateReleaseIdentity(row);
     requireThat(releaseIdentityFields.every(key => row[key] === first[key]) &&
       row.releaseRunId === descriptor.runId && row.releaseRunAttempt === descriptor.runAttempt &&
-      row.sha === descriptor.sha && row.policySha256 === candidate.policySha256,
+      (external ? row.executorSha === descriptor.sha : row.sha === descriptor.sha) && row.policySha256 === candidate.policySha256,
     'BASELINE_RECEIPT_PROVENANCE_MISMATCH');
   }
   requireThat(last.phase === 'verified' && last.renderSha === last.sha && last.vercelSha === last.sha && rows.filter(r => r.phase === 'verified').length === 1 &&
@@ -518,7 +590,7 @@ export async function deploy(api, qualified, policy, report, options = {}) {
   requireThat(!!plan.baseline === !!options.baselineRows, 'BASELINE_RECEIPT_REQUIRED');
   requireThat(qualified.releaseRunAttempt === 1 ? !plan.resume && !options.receiptRows :
     plan.resume?.runId === qualified.releaseRunId && plan.resume.runAttempt === qualified.releaseRunAttempt - 1 &&
-    plan.resume.sha === qualified.sha && options.receiptRows, 'RESUME_RECEIPT_REQUIRED');
+    plan.resume.sha === (external ? qualified.executorSha : qualified.sha) && options.receiptRows, 'RESUME_RECEIPT_REQUIRED');
   const prior = options.receiptRows ? validateResumeReceipt(options.receiptRows, qualified) : {};
   const servicePath = `/services/${targets.render.id}`;
   const projectPath = `/v9/projects/${targets.vercel.id}`;
@@ -720,6 +792,23 @@ export async function main(env, options = {}) {
     appendFileSync(env.GITHUB_OUTPUT, `sha=${q.sha}\n`);
     return;
   }
+  let q;
+  const sourceArchive = sha => execFileSync('git', ['-C', external ? env.SOURCE_DIR : '.',
+    'archive', '--format=tar', sha], { maxBuffer: 100 * 1024 * 1024 });
+  if (external) {
+    requireThat(env.GITHUB_EVENT_NAME === 'workflow_dispatch', 'EXECUTOR_DISPATCH_REQUIRED');
+    const event = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH));
+    const inputs = event.inputs;
+    requireThat(inputs && Object.keys(inputs).sort().join(',') === 'ci_run_attempt,ci_run_id,sha' &&
+      positiveId(inputs.ci_run_id) && positiveId(inputs.ci_run_attempt) && shaPattern.test(inputs.sha),
+      'EXECUTOR_INPUT_INVALID');
+    const qualified = await qualify(api, inputs.ci_run_id);
+    requireThat(qualified.sha === inputs.sha && String(qualified.ciRunAttempt) === inputs.ci_run_attempt,
+      'CI_EVENT_PROVENANCE_MISMATCH');
+    q = freezeCandidate(qualified, env, policy);
+    requireThat(execFileSync('git', ['rev-parse', 'HEAD'], {encoding:'utf8'}).trim() === q.executorSha,
+      'EXECUTOR_CHECKOUT_MISMATCH');
+  } else {
   requireThat(env.GITHUB_EVENT_NAME === 'workflow_run', 'COMPLETED_CI_EVENT_REQUIRED');
   const event = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH));
   requireThat(event.action === 'completed' && event.workflow_run?.event === 'push' &&
@@ -730,14 +819,15 @@ export async function main(env, options = {}) {
   const qualified = await qualify(api, event.workflow_run.id);
   requireThat(qualified.sha === event.workflow_run.head_sha && qualified.ciRunAttempt === event.workflow_run.run_attempt,
     'CI_EVENT_PROVENANCE_MISMATCH');
-  const q = freezeCandidate(qualified, env, policy);
+  q = freezeCandidate(qualified, env, policy);
   requireThat(execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() === q.sha,
     'CHECKOUT_SOURCE_MISMATCH');
+  }
   if (mode === 'candidate') {
     // Detect accidental reviewer/wait gates before entering the environment job.
     await validateInfrastructure(api);
     await validateCandidateProvenance(api, q);
-    const archive = execFileSync('git', ['archive', '--format=tar', q.sha], { maxBuffer: 100 * 1024 * 1024 });
+    const archive = sourceArchive(q.sha);
     writeFileSync(`${env.CANDIDATE_DIR}/source.tar`, archive);
     writeFileSync(`${env.CANDIDATE_DIR}/candidate.json`, JSON.stringify({ ...q,
       sourceSha256: createHash('sha256').update(archive).digest('hex') }, null, 2) + '\n');
@@ -747,7 +837,7 @@ export async function main(env, options = {}) {
   requireThat(mode === 'deploy' || mode === 'admit', 'RELEASE_MODE_INVALID');
   verifyCandidate(JSON.parse(readFileSync(`${env.CANDIDATE_DIR}/candidate.json`)), q,
     readFileSync(`${env.CANDIDATE_DIR}/source.tar`),
-    execFileSync('git', ['archive', '--format=tar', q.sha], { maxBuffer: 100 * 1024 * 1024 }));
+    sourceArchive(q.sha));
   const report = createAuditWriter(q, row => appendFileSync(env.RELEASE_REPORT, JSON.stringify(row) + '\n'));
   failureReport = code => report({ phase: 'failed', code });
   validatePolicy(q, env, policy);
