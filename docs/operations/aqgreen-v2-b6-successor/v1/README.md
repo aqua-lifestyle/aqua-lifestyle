@@ -6,6 +6,10 @@
 
 **Status:** PROPOSED — adoption PENDING owner approval.
 
+Later scope note: the owner has conditionally adopted **only read-only PB1** and
+authorized its isolated implementation; see [LIMITED-ADOPTION.md](LIMITED-ADOPTION.md).
+The exact five normative subjects remain unchanged; broader adoption is pending.
+
 **Historical TQ1 compatibility:** UNKNOWN.
 **Permitted preparation:** the owner's “B6 SUCCESSOR QUALIFICATION: PRESERVE AND
 COMPLETE” instruction selects Route B for preparation only. It accepts no contract,

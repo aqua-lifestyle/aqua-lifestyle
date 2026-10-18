@@ -1,0 +1,69 @@
+{
+  "classification": "LOCAL_COMPONENT_AND_NEGATIVE_ENTRYPOINT_FIXTURE_NOT_RUNTIME_QUALIFICATION",
+  "branch": "b6/pb1-readonly-v1",
+  "baseCommit": "ed07fbe9a1ecfb885a3d727ba2fe1aff3745be36",
+  "approvedManifestSha256": "0711c7d483f16bddf8bb83ecacb7b4dedda978adc85295c4704516514e81fd7b",
+  "approvedInvocationSpecSha256": "e9fe2bc58b1c38d0e4f1dd39d26d81f1243970072b21f016c2ca966022ed215a",
+  "normativeBytesChanged": false,
+  "finalExecutionRoot": "/tmp/opencode/b6s-pb1-implementation-20261018-8",
+  "sourceStateAtExecution": "UNCOMMITTED_NEW_SOURCE_HASHED_BEFORE_BUILD_MATCHED_TO_FINAL_GIT_BYTES",
+  "sources": [
+    {"path":"tools/b6-pb1/record.h","sha256":"7bdb5201c8751f901dfcecb556c00d86218f5764cebfb6af73a0729a81a75fc6"},
+    {"path":"tools/b6-pb1/record.c","sha256":"aee2d995febeab33e1b2a8b9159e71002a9340c835a12cc630b0198df14f280d"},
+    {"path":"tools/b6-pb1/pb1.h","sha256":"0d15034b1ad2b7fa4c2f504a4924a2a3fd1fd208193e5a587dd585ba661b9089"},
+    {"path":"tools/b6-pb1/pb1.c","sha256":"81c8b71305e66e9460edc74fe229f691d40ad279815aef2b9a554ece279994de"},
+    {"path":"tools/b6-pb1/fixture.c","sha256":"7287b66f0c087b26486f36791410968137ddee10ea52b87607643450c8a68e3f"},
+    {"path":"tools/b6-pb1/tests/unit.c","sha256":"30d39e72ba4e4de1f934f4403b03979b7b96be3cee325da9483d8696bfa223cb"},
+    {"path":"tools/b6-pb1/tests/launch.c","sha256":"1c9fe9a702104e7104ec41f2eaa7d65e104d435a5490142a7b27907230e2702c"},
+    {"path":"tools/b6-pb1/tests/faults.c","sha256":"07136c71e22ca67146a4f366c2574334685b240ee234bbaaba4a01efecd69640"},
+    {"path":"tools/b6-pb1/tests/process.test.mjs","sha256":"794e5ce955ada0118e521e81f735c3b531889d2725e280694eb31503a8fdbf5e"},
+    {"path":"tools/b6-pb1/test.mjs","sha256":"8427580618747ae3790e1179755744b2cbf844d2235992d84543b8d6c4da1f96"}
+  ],
+  "executablesAndLibrary": [
+    {"path":"fixture","bytes":77544,"sha256":"de4a14a5a10398a45676f866dbc1280a55172bcc4c6b210081b87945b560b9b9"},
+    {"path":"fixture-input-io","bytes":83200,"sha256":"9bbd25c614604fe9c4ce6a430c68739e20551159d90e79b056345fa268c1921a"},
+    {"path":"fixture-partial-write","bytes":78824,"sha256":"1f3fd031550c48e5bab66747a2344f8d91c9aa029621a1821dd99fdbfa745e7d"},
+    {"path":"launch","bytes":19856,"sha256":"ba3210361517696d698f9051eb1103c08af903b0fd6b965345b639a8bc08179b"},
+    {"path":"libb6s-pb1.a","bytes":76018,"sha256":"00119272c6207b00a81e350997f3a3fa7828d7bb5dfe1798b4044119bc2baa5a"},
+    {"path":"unit-normal","bytes":114400,"sha256":"68c50418ac744afe92856055c67f29db9ed7a34ff44f37469cce479d1e96bd83"},
+    {"path":"unit-sanitizer","bytes":278248,"sha256":"39c7657d2527882ea8a557c64a0e399f55c11dfe4cd82e963d26e0208c9dc818"}
+  ],
+  "tests": {
+    "normal":{"groups":8,"assertions":4599,"failed":0},
+    "asanUbsan":{"sameLogicalGroups":8,"assertions":4599,"failed":0,"diagnostics":0},
+    "process":{"tests":37,"passed":37,"failed":0,"skipped":0,"cancelled":0,"physicalAttempts":38,"exitZeroAttempts":0},
+    "interpretation":"Systematic mutation assertions are not independent attack classes; sanitizer mode does not double unique groups"
+  },
+  "evidenceArtifacts": [
+    {"file":"ARTIFACTS.sha256","sha256":"b20a2a31386ee532f88a7a782d3487fc4b487c5338f6e5bc089539fe6d50217b","listedFiles":239},
+    {"file":"summary.json","sha256":"0a5c66f0386014b9587bda42ed6b2c68cbebbde81b3abc96626cc31bde36d3ec"},
+    {"file":"source-evidence.json","sha256":"e417f8d3c2a442409639365a636a0e52c23faad662d1e1cfc80126db33466122"},
+    {"file":"unit-normal.stdout","sha256":"d9d0d2cb529c428158d9dddaae49fd92d69d3eff7a5a5d115a3ed1e000567b8f"},
+    {"file":"unit-sanitizer.stdout","sha256":"d9d0d2cb529c428158d9dddaae49fd92d69d3eff7a5a5d115a3ed1e000567b8f"},
+    {"file":"process-tests.stdout","sha256":"80221c2efccd069e820fe4ee1d74254cc766a6d967cc55bfaec169a950b8c391"},
+    {"file":"process-observations.json","sha256":"d3d77d0aa3c8c52c25f307f74fda8248864cf1332aa31fd16f0d7e34a165ead7"}
+  ],
+  "independentReview": {
+    "initialReport":"/tmp/opencode/b6s-pb1-implementation-independent-review.md",
+    "initialReportSha256":"67b56823161c7cac1c07ca1a670e78731975b5e87f498b6b84e9647a08d6895d",
+    "finalReport":"/tmp/opencode/b6s-pb1-implementation-final-review.md",
+    "finalReportSha256":"a8873f01417578525c1170e6a34a901cc99f000bb98b70213fc4f1107df98d9c",
+    "findings":{"R1":"CLOSED_READONLY_PREFLIGHT_REJECTION","R2":"CLOSED_NESTED_RESOURCE_FAILURE_REMAINS_UNDETERMINED"},
+    "newMaterialCorrectionDeltaFindings":0,
+    "scope":"SEPARATE_TECHNICAL_REVIEW_NOT_EXTERNAL_HUMAN_RUNTIME_OR_BUSINESS_ACCEPTANCE"
+  },
+  "beforeFixEvidence": {
+    "diagnosticAliasTap":"/tmp/opencode/b6s-pb1-fd2-before-peer-fix/process-before.tap",
+    "diagnosticAliasTapSha256":"91f3c2b0aefb521095a2251df628721bb7bce9f612b5206e2fe45b9f3b83d963",
+    "selectedAliasTests":{"executed":4,"failed":4,"passed":0,"skipped":0},
+    "nestedAllocationFailure":"/tmp/opencode/b6s-pb1-implementation-20261018-7-before-peer-fixes/unit-normal.stderr",
+    "nestedAllocationFailureSha256":"75b25a32ddec958d2b70912db0242113fd9ca201619f5a6e20b239e4cc1db9f1",
+    "otherRetainedFailedRunRoots":["/tmp/opencode/b6s-pb1-implementation-20261018-1","/tmp/opencode/b6s-pb1-implementation-20261018-2","/tmp/opencode/b6s-pb1-implementation-20261018-4-before-review-fixes","/tmp/opencode/b6s-pb1-implementation-20261018-5-before-alias-fix"]
+  },
+  "compilerExecutableSha256":"1b99826121ae6682a634e5efe09bd3e3df58ce58e0b28f849114ab5b89139c26",
+  "node":"v26.6.0",
+  "runtimeAdmission":"BLOCKED_NO_SUCCESS_PATH",
+  "unimplementedOrUnqualified":["ExternalControllerCurrentAuthorityAndTypedManifestSupplyValidators","QualifiedImmutableRuntimeLoaderNamespaceConfinementAndFullPrincipalProfile","ProtectedHandleCustodyAndAbsenceOfWriters","ControllerTenSecondDeadline","IndependentOriginalObservationAssessmentAndIntentRecoveryLedger","FullB6Tq1BindRepresentativeFinalAppliedAndD10FinancialAcceptance"],
+  "acceptedCustomer11OrUnchangedSuitesRepeated":false,
+  "productionOrFinancialOperation":false
+}
