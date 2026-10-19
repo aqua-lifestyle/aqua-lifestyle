@@ -86,6 +86,8 @@ namespace AqualLifeStyle.Web.Host.Startup
                 }
             }
             AuthConfigurer.Configure(services, _appConfiguration);
+            services.AddSingleton(new AqualLifeStyle.Web.Host.Health.DeploymentReadinessEvidence(
+                _environment, _appConfiguration));
 
             services.AddSignalR();
             services.Configure<ForwardedHeadersOptions>(options =>

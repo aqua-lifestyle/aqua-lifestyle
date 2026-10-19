@@ -15,6 +15,7 @@ namespace AqualLifeStyle.Web.Host.Startup
     {
         public static void Configure(IServiceCollection services, IConfiguration configuration)
         {
+            AqualLifeStyle.Web.Host.Health.DeploymentReadinessAuthentication.Configure(services);
             if (bool.Parse(configuration["Authentication:JwtBearer:IsEnabled"]))
             {
                 services.AddAuthentication(options => {
