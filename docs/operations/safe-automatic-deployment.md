@@ -1,283 +1,207 @@
-# Qualified automatic deployment
+# Automatic qualified production deployment
 
-This mechanism is **IMPLEMENTED preparation, not ENABLED**. The owner authorized
-investigation, code, tests and a PR, not a deployment or service resumption.
-`ac7dfe968ec13fd8c743504e4b531ab5afd2e5e7` is explicitly excluded. Do not rerun its
-CI as a deployment shortcut. No production action is required to test this change.
+**2026-10-18 executor transition:** the current application `release.yml` is now a
+credential-free automatic trigger for the separately held executor. Read the
+[current implementation and setup guide](deployment-executor.md) first. The
+same-repository provider workflow described below is retained as historical
+controller context; provider execution now belongs only in `aqua-deployment`.
+Credential custody and independent verifier protection remain BLOCKED.
 
-The [PR #105 production-readiness follow-up](pr105-production-readiness.md)
-preserves the reproduced CI-attempt binding gap at historical commit `8185fb5`
-and outstanding governance/provider prerequisites. The correction uses the version
-2 contract below. Final-commit CI and fresh independent review are recorded in
-PR #105; earlier preparation PASS is superseded. No activation is authorized.
+Current owner instruction: **merge → CI PASS → Render → API verification → Vercel
+→ production verification**, without a release activation switch, human environment
+approval, hand-authored bootstrap, per-release secret/token, manual dispatch or
+additional approval after merging. Repository implementation supports this sequence.
+Initial persistent infrastructure configuration is currently incomplete; no production
+deployment or settings change was performed during preparation.
 
-## Verified investigation, 16 October 2026
+The fresh authenticated [infrastructure configuration plan](production-infrastructure-plan.md)
+records exact live findings, unapplied governance payloads, runtime/transport choices,
+credential custody and recovery actions. It supersedes any interpretation of the
+setup table below as permission to provision broad credentials or change live flags.
+The [runtime authority qualification](runtime-authority-qualification.md) traces
+startup, worker, provider and DB capabilities and documents guarded execution plus
+isolated normal-profile restart evidence. Production role/credential isolation
+remains unverified; this controller's recovery-only admission is not relaxed.
 
-| Surface | Read-only evidence | Meaning |
+The owner-controlled merge model requires all 17 CI checks, without mandatory
+human PR review or last-push approval. Restricted financial, messaging, worker
+and migration operations retain their separate boundaries. Deploying code never
+authorizes those operations. The [safety contract](cicd-safety-contract.md) and
+[independent verifier assessment](mandatory-security-verification.md) describe known
+security limits. Candidate-controlled CI is not independent security enforcement.
+
+## Automatic trigger and exact source
+
+`ci.yml` runs on every push to main. `release.yml` consumes completed Continuous
+integration runs on main through `workflow_run`, with no workflow-dispatch entry.
+Its candidate job admits only a successful same-repository main push. Failed,
+neutral, cancelled, unfinished, fork, PR and manually dispatched CI cannot deploy.
+The controller independently fetches the exact CI run and attempt-specific jobs,
+requires all 17 named jobs to succeed, checks current main, and binds the result to
+immutable source bytes. Missing, skipped, duplicate or mixed-attempt jobs fail.
+
+Global production-release concurrency has cancel-in-progress=false. A queued source
+that becomes stale stops; its newer qualified main commit has its own automatic
+release event. No provider POST is blindly retried. A candidate/receipt freezes
+repository, source SHA, CI run/attempt, release run/attempt, policy digest, profile
+and exact provider targets. Persistent Render/Vercel authentication is necessary,
+but no credential grants per-release authorization.
+
+GitHub's trigger is observable in existing history: main-push CI
+[38911525858](https://github.com/aqua-lifestyle/aqua-lifestyle/actions/runs/38911525858)
+completed successfully for `23f176d` at 14:04:22 UTC on 2026-10-16; release
+[38912818702](https://github.com/aqua-lifestyle/aqua-lifestyle/actions/runs/38912818702)
+started automatically at 14:04:24 UTC with event=workflow_run and the same source.
+That historical controller stopped before provider deployment on its old authorization
+requirement. This proves the platform trigger, not a deployment with this branch's
+new code. Updated trigger/controller behavior is exercised with real Git and
+synthetic provider clients; a new live main event cannot be induced without the
+forbidden merge/main mutation. GitHub requires the consumer workflow on main; the
+branch version takes effect after merge. See [GitHub workflow_run documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run).
+
+## Baseline, deployment and final verification
+
+Policy version 2 is checked in with baseline=automatic. There is no bootstrap object,
+release floor, evidence-reference token, activation variable or expiry renewal.
+
+1. Check exact merged-PR provenance, required main governance and the
+   main-only unattended credential environment. These are persistent merge/security
+   configuration, not an approval requested after merge.
+2. Read complete release history from run 1. Only a successful **production job**
+   with an immutable verified audit can be a predecessor; an all-skipped workflow
+   that GitHub concludes successfully is not a deployed baseline. Known legacy
+   failures are superseded only when their exact provider step was positively skipped.
+   Unknown, deleted, truncated or ambiguous execution remains a technical failure.
+3. When no verified predecessor exists, automatically select the single live Render
+   deployment and the current Vercel production target. Validate exact IDs, source
+   SHAs, Git repository/project, READY/live state, current configuration and API
+   recovery/dependency health. Missing provenance blocks; current SHA is not fabricated.
+   The selected baseline is recorded before any provider mutation.
+4. Preserve that original baseline and exact accepted provider IDs across partial
+   retries. Do not rediscover an advanced Render SHA after a partial rollout. A
+   verified predecessor remains authoritative; missing/expired receipts do not
+   permit resetting to a newly discovered baseline.
+5. Reject active foreign deployments, existing unreceipted candidate operations,
+   migration changes/renames, incomplete source comparisons, source not descended
+   from the API baseline, or drift. Recheck immediately before mutation.
+6. POST Render with commitId equal to the qualified SHA. Poll the returned deployment
+   ID; treat the documented queued state as pending and reject foreign queued work.
+   Require live status, exact Git revision, recovery-only configuration, API
+   health 200 and exact buildId, Healthy database/Redis/data-protection key store.
+   Only then may Vercel be requested. [Render documents commitId and deployment states](https://api-docs.render.com/reference/create-deploy).
+7. POST Vercel for the same repository/SHA and production target, with exact CI/release
+   provenance metadata. Poll the returned ID; require READY, exact Git source,
+   project identity, production alias assignment, verified public API/Tenant build
+   values and HTTP 200 at the production URL. Recheck both providers and API readiness.
+8. Record a verified audit containing renderSha, vercelSha, both deployment IDs,
+   source/CI/release identities and originating attempts. Preserve partial IDs and
+   request intent even on failure. Providers rebuild Git source; this is source and
+   provider-state verification, not cryptographic attestation of running binaries.
+
+Backend startup does not migrate/repair/seed Production. The release path never runs
+EF Down, restores data, resumes services, enables workers, changes provider settings,
+replays payments/outbox work or loosens Tenant/Area authorization. This path supports
+code-only compatible changes; schema changes stop automatically rather than acquiring
+migration authority.
+
+## Owner-controlled GitHub governance and outstanding setting
+
+The [governance alignment worklog](../exec-plans/completed/github-owner-governance-alignment.md)
+records the owner-authorized source correction and exact observed ruleset fixture.
+The controller requires one effective repository ruleset to provide deletion and
+non-fast-forward protection plus all 17 strict named checks, each bound to GitHub
+Actions App 15368, with no branch-creation exemption and explicit empty bypass
+actors. Exact merged-PR/source provenance is required; review approvals and
+collaborator permissions are no longer release prerequisites.
+
+**One prepared environment change; not applied:** repository Settings → Environments
+→ `production-release` → deselect **Allow administrators to bypass configured
+protection rules** → Save protection rules. Preserve the existing main-only branch
+policy. Do not select required reviewers, a wait timer or any custom protection
+rule. Read back GET `/repos/aqua-lifestyle/aqua-lifestyle/environments/production-release`
+and GET its `/deployment-branch-policies`: expect `can_admins_bypass:false`, only a
+branch-policy protection rule, custom branch policies enabled, protected-branches
+mode disabled, and exactly branch `main`. This removes the force-start override; it
+does not add recurring approval or revoke repository administrator membership.
+See [GitHub's supported UI procedure](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
+No supported REST/GraphQL environment-update field for this toggle was found;
+do not send an invented field and assume success. Recovery for an unintended UI
+change is to restore the recorded prior environment controls through an explicitly
+authorized administrator operation; no deploy is needed to verify the setting.
+
+**Separate unresolved custody limitation:** GitHub documents that
+[`bypass_actors` requires ruleset write access](https://docs.github.com/en/rest/repos/rules#get-a-repository-ruleset).
+The administrator GET proves the installed list is empty; it does not prove the
+read-only release token can observe it. Hidden evidence fails with
+`MAIN_RULESET_CUSTODY_UNVERIFIABLE`. Do not give the deployment runner a repository
+administration credential. A separately controlled observation/enforcement route
+must be qualified outside this source correction. Thus the prepared toggle alone
+is insufficient to make CD operational. The same-repository controller, inventory
+and shared GitHub Actions App check still do not establish independent verifier
+or production-credential custody. No new observation service, approval mechanism
+or persistent credential was provisioned in this change.
+
+## Persistent initial setup and current read-only findings
+
+Fresh GET-only inspection on 2026-10-16 at 17:33 UTC:
+
+| Surface | Observation | Persistent setup required |
 | --- | --- | --- |
-| GitHub | Main CI [38889852541](https://github.com/aqua-lifestyle/aqua-lifestyle/actions/runs/38889852541) succeeded at `ac7dfe9`; previously only CI and version-tag image publication existed | A successful merge had no qualified repository release consumer |
-| Render | Correct main repository/branch; root Docker context, existing API Dockerfile, empty pre-deploy/start override, auto-deploy off, not suspended; live deployment `dep-db8av3dg1s2s739m6sgg` at `1251fb82979e18be53d1d0e7f5c6fab2d0c50a58` | Live auto-deploy setting agrees with the Blueprint; changing YAML is not an applied provider change |
-| Render runtime evidence | Health 200, Healthy database/Redis/Data Protection, Production, exact build `1251fb8`, no recovery header | The older API is actually running outside recovery; health does not expose every effective safety flag |
-| Render configuration | Recovery false, Bird true, Yoco test; financial/weekly/monthly/background/demo/pilot/commissioning/seed flags false; no linked environment groups returned | Provider-declared holds, not comprehensive effective-process proof; older recovery-only worklogs are stale for this observation |
-| Vercel | Project Git link null, correct frontend root, Node 24; recent production deployments created by CLI | Disconnection prevents a native main Git release. No production Git branch can be verified while disconnected |
-| Vercel current target | `dpl_EwGB3apX3P5JnU5KfG3rLzn21Kgf`, READY; custom metadata declares frontend source `6c81fb91afbac0cedb63092cc736e857eb544d82`, without authoritative `gitSource` | Operator metadata is not independent provider Git provenance |
-| Vercel build inputs | Both public API/Tenant production variables exist as sensitive/redacted values, even on authorized environment reads | Their actual production values cannot be verified with this credential. They are not assumed correct or absent |
-| GitHub protection | Existing environments have no rules/branch policy. Main ruleset prevents deletion/non-fast-forward only | No existing production approval or PR/CI protection can be presumed. A new protected environment must be configured separately |
+| GitHub main (2026-10-17 readback) | Active ruleset #25297647: all 17 strict GitHub Actions App 15368 checks, deletion/non-fast-forward, no bypass actors or human-review rule; old19085283 preserved | Controller accepts this owner-controlled configuration with explicit bypass evidence; standard read-only runner cannot observe that evidence |
+| production-release (2026-10-17 readback) | Main-only branch policy, no human/wait/custom approval gate; admin bypass=true | Owner-authorized UI change to admin bypass=false remains unapplied; see exact procedure below |
+| Actions credentials | Repository and production-release secret inventories empty | Establish protected exact-target credential issuance first; persistent authentication alone in candidate-owned workflows does not protect secrets. github.token supplies read-only GitHub access |
+| Render integration | Correct existing repository/main/Docker context/API health path; native auto-deploy off; hooks and command empty; not suspended | Retain single orchestrator; qualify actual deploy permission using separately authorized non-production capability tests |
+| Render runtime | Live `1251fb8`; API/DB/Redis/key store Healthy; recovery=false and recovery header absent; Bird=true; Yoco=test and Bird/Yoco keys present | Current runtime fails the unchanged recovery-only contract. A separately authorized infrastructure task must establish a compatible profile; this preparation does not change flags or remove keys |
+| Other restrictions | Financial/weekly/monthly/jobs/demo/pilot/commissioning/seed flags false | Keep held; deployment never enables them |
+| Vercel integration | Expected existing project/team/root/Node24; no build overrides; Git link absent | Qualify the implemented linked-Git path with native deployment disabled, or explicitly implement/test an exact-source alternative; see infrastructure plan |
+| Vercel baseline | Current target READY without authoritative Git SHA | Establish an actual Git-provenance baseline; do not invent a source SHA for the existing deployment |
+| Public frontend inputs | API/Tenant values sensitive/redacted and unverifiable | Make expected non-secret build inputs verifiable to the deployment identity; unknown values fail admission |
 
-**ROOT CAUSE established:** repository release gap, Render explicitly off and Vercel
-Git disconnected. Why those settings were originally changed, historical integration
-permissions and any historical skipped-build behavior remain **UNKNOWN**. No evidence
-shows a GitHub CI failure, Render build failure or Vercel ignored-build failure at
-the current merge. An ignored-build setting cannot be fully verified while the Git
-link is absent. No live setting, credential, service or database was changed.
+These blockers are disclosed initial configuration. There is no additional deploy
+activation variable to turn on after setup, no release-specific bootstrap to author,
+and no recurring release authorization. Current merge behavior is therefore explicit:
+main CI runs and a successful trusted event starts CD automatically; **the candidate
+currently stops at missing main PR/CI governance**, before production credentials or
+provider mutation. After that is configured, environment/credential/runtime/Git-source
+blockers still stop automatically until their checks genuinely succeed.
 
-## One production path
+Recovery-only settings checked by the controller are Production, recovery=true,
+and all of App__WeeklyCommissions__Enabled, App__EntryMonthlyObligations__Enabled,
+App__FinancialOperations__Enabled, App__BackgroundJobs__Enabled,
+AQGreenV2Demo__Enabled, AQGreenV2Pilot__Enabled,
+App__AQGreenV2__Commissioning__Enabled, SEED_DEMO_DATA and Bird__Enabled=false.
+Yoco mode/secrets/webhook secret and Bird key must be absent. This list is a read-only
+contract, not an instruction or authorization to reconfigure the live service.
 
-```mermaid
-flowchart LR
-  Main[main push] --> CI[Complete CI, including release safety tests]
-  CI --> Candidate[Exact current SHA and immutable source candidate]
-  Candidate --> Gate[Protected exact-release authorization]
-  Gate --> API[Render exact Git commit]
-  API --> Ready[Live revision and recovery readiness]
-  Ready --> Web[Vercel exact Git commit]
-  Web --> Verify[READY, Git source, production target and HTTP readiness]
+## Failure, retry and security limits
+
+Failures emit redacted codes and GitHub job summaries. The production audit artifact
+is named production-release-audit-RUN-ATTEMPT and retained 90 days; partial failures
+retain accepted IDs, request intent and original attempts. API failure prevents
+Vercel; later failures never report a verified pair. An ambiguous POST, lost receipt,
+expired evidence or unknown history blocks further mutation. Cancellation does not
+prove an accepted provider request stopped. Reconciliation/rollback uses separate
+operational authority; it is exceptional failure recovery, not normal release approval.
+Disable the Actions workflow or revoke persistent deploy capability through the
+separate custodian if containment is needed; no application activation flag is used.
+
+Independent security-test custody, immutable external audit retention, no-bypass
+credential issuance, production database/provider IAM separation and authenticated
+production backup/restore/rollback evidence remain unestablished. Static source
+hashes and 208 mandatory case checks improve candidate CI but can be edited by that
+candidate. The external verifier/broker design remains documented, not installed.
+This task does not claim full security acceptance or production privilege isolation.
+
+## Validation
+
+```bash
+node tools/deployment/run-security-tests.mjs --local
+node tools/deployment/mandatory-security-probe.mjs
+bash tools/deployment/disposable-recovery.sh
 ```
 
-CI validates the full configured inventory. `release.yml` consumes only completed
-successful **push** runs of `ci.yml` from this repository's main branch. It verifies
-all 17 required job identities/conclusions from the same explicit CI attempt,
-latest run attempt, current main HEAD,
-checked-out source, and the explicit exclusion before publishing anything.
-Failure, cancellation, skipped/missing/duplicate jobs, PR/manual CI, fork inputs or
-stale main fail closed. Latest-run reads bracket the attempt-specific job inventory;
-a rerun during inspection fails closed. Partial CI reruns cannot borrow successful
-jobs from an older attempt: rerun all CI jobs to establish a complete new attempt.
-No PR artifact or script is used by `workflow_run`.
-
-The candidate is a deterministic `git archive --format=tar` plus a manifest binding
-repository, exact SHA, CI run/attempt, producing release run/attempt, authorized
-environment/profile/provider targets and SHA-256. Version 1 manifests are rejected.
-Actions stores the immutable
-artifact with its own digest for 90 days. Deployment downloads the candidate by
-the trusted producing job's artifact ID and compares its bytes with a fresh archive
-of the qualified Git commit. The archive is **source/qualification evidence**.
-Render and Vercel build that Git revision themselves; they do not run this archive
-or the optional GHCR images. No claim of bit-identical provider rebuilds is made:
-base images/build infrastructure remain provider inputs. Record provider deployment
-IDs and resolved Git source independently. Candidate retention is not permanent
-release storage; export required audit evidence to approved custody before expiry.
-
-Version tags retain the separate **publication-only** GHCR convention. Publication
-now requires successful full CI on the exact current main revision first; package
-write permission exists only after qualification. Tags neither authorize nor
-trigger production deployment. Record OCI digests/provenance from that workflow;
-do not pass a mutable image tag off as a deployed production digest.
-
-Native Render after-CI deploys cannot perform the coupled recovery authorization
-and API-before-frontend checks. Native Vercel main builds would race CI/Render.
-Therefore one Actions orchestrator uses each platform's existing native Git build
-at an exact SHA. Render auto-deploy and Blueprint auto-sync remain off. Repository
-Vercel configuration disables **main** native deployment; other preview conventions
-remain unchanged. No deploy hooks, service creation, resume, environment PATCH,
-provider enablement, migrations, financial or message operations exist in this path.
-
-## Activation remains BLOCKED: exact owner prerequisites
-
-Do not change today's service merely to make these gates pass. Current recovery
-false/Bird/Yoco configuration is incompatible with the **recovery-only** automated
-profile. Continuing normal operation under automation requires a separate profile
-qualification; this implementation does not grant it.
-
-Before a future separately authorized release, the owner/custodian must:
-
-1. Authorize the exact source/release and establish an **already running** recovery
-   baseline through the existing separately governed recovery procedure. A suspended
-   service is rejected; this pipeline never resumes it. Verify effective runtime
-   flags, provider isolation, startup seeding/repair absence, exact schema compatibility
-   and tested rollback/backup evidence. Startup in Production skips the host seeder;
-   recovery skips all provider/financial worker registration. Existing startup
-   preflight requires exact migration history and never applies or repairs schema.
-   History matching alone does not prove absence of manual schema drift.
-2. Keep all nine checked holds explicitly false (weekly, monthly, financial,
-   background jobs, demo, pilot, D10 commissioning, demo seed and Bird), recovery
-   explicitly true, and Yoco mode/secret/webhook and Bird key absent. This is a future
-   prerequisite, **not an instruction to remove today's working provider settings**.
-   No Yoco Test Mode, Bird cutoff, D10 or financial policy is changed by this PR.
-3. Merge the reviewed mechanism only under separate merge authorization. Before any
-   Git reconnection, confirm the main-trigger exclusion is effective on main and
-   inventory other provider hooks/automations. Keep Render native auto-deploy off and
-   Blueprint synchronization off. Limit manual/provider deployments to the custodian
-   during an admitted release; Actions concurrency cannot lock out provider admins.
-4. Restore Vercel's existing Git access to **this** repository, production branch
-   main, existing project/team and root in `tools/deployment/targets.json`. Retain
-   `git.deploymentEnabled.main=false`. Remove any ignored-build override through a
-   separately approved owner action and verify the effective settings. Production
-   `NEXT_PUBLIC_ABP_API_URL` must be exactly `https://aqualifestyle-api.onrender.com`
-   and `NEXT_PUBLIC_DEFAULT_TENANT_NAME` exactly `Default`. Make these two **public**
-   values verifiable by the deployment identity; redacted/sensitive responses block
-   admission. Never make server credentials public or copy them to frontend variables.
-5. Create GitHub environment **production-release**: independent eligible required
-   reviewer(s), prevent self-review, disable administrator bypass; custom deployment
-   branch policy with exactly one **branch**, main. The script verifies these actual
-   protection rules. Store least-privilege `RENDER_API_KEY`, `VERCEL_TOKEN` and
-   `PRODUCTION_RELEASE_AUTHORIZATION` only in that environment. Do not put provider
-   secrets at repository scope. Protect main with reviewed PRs and all current CI
-   requirements, with no bypass for deployment control changes; designate reviewers
-   for workflows, deployment scripts, targets and runtime safety code. Existing
-   deletion/force-push rules do not provide these controls.
-6. Enable environment variable `AUTO_DEPLOY_ENABLED=true` **only after** that
-   authorization. Missing/false fails visibly. Supply the following per-release
-   authorization through secure environment custody, then approve the pending
-   exact workflow run. Booleans record the custodian's referenced verification;
-   the pipeline does not manufacture or independently establish human authority.
-
-```json
-{
-  "version": 2,
-  "repository": "aqua-lifestyle/aqua-lifestyle",
-  "profile": "recovery-only",
-  "environment": "production-release",
-  "renderServiceId": "srv-d9f0k8e1a83c73d8n1b0",
-  "vercelProjectId": "prj_6qL1e43KhsWrRshY5GxdmGl3HGMz",
-  "vercelTeamId": "team_Hc3BWfhTLfwLzwbgbtaasBUY",
-  "commit": "EXACT_40_CHARACTER_COMMIT",
-  "ciRunId": "EXACT_SUCCESSFUL_PUSH_CI_RUN_ID",
-  "ciRunAttempt": 1,
-  "releaseRunId": "EXACT_QUALIFIED_RELEASE_WORKFLOW_RUN_ID",
-  "releaseRunAttempt": 1,
-  "expiresAt": "OWNER_APPROVED_UTC_EXPIRY_WITHIN_24_HOURS",
-  "authorityReference": "opaque-owner-evidence-reference",
-  "baselineRenderDeployId": "dep-APPROVED_BASELINE_ID",
-  "baselineVercelDeployId": "dpl_APPROVED_BASELINE_ID",
-  "schemaCompatibilityVerified": true,
-  "rollbackVerified": true,
-  "effectiveRuntimeVerified": true,
-  "singleTriggerVerified": true,
-  "configurationFreezeVerified": true
-}
-```
-
-Freeze provider configuration/other deployment mechanisms for the authorized window.
-These fields are required evidence references, not example approval to deploy.
-Authority binds every manifest identity field, including **both CI and release run
-attempts** and exact production targets. It expires within 24 hours and is rechecked
-before each new provider POST. Every later qualification must equal the frozen
-repository/SHA/CI run/attempt; a newer successful CI attempt is not interchangeable.
-Missing, failed, contradictory or unavailable evidence blocks progression.
-An unchanged retry requires renewed attempt-specific authority/approval and
-**rerun all release jobs** to produce a candidate for that release attempt. A
-failed-job-only retry reuses an old candidate and is rejected. The current merge
-cannot be authorized through this template because its SHA is independently excluded.
-
-For an authorized partial-release retry only, add numeric `resumeFromReleaseAttempt`
-referencing an earlier attempt of the **same release run**. Admission resolves the
-unique, unexpired `production-release-audit-{runId}-{attempt}` artifact from that
-run, verifies its source metadata and downloads its immutable artifact ID. Every
-receipt row must match the source, CI run **and attempt**, targets and prior release
-attempt. Provider IDs and their original requesting attempts are retained. No
-cross-run, legacy, contradictory, missing or already-verified receipt can authorize
-adoption. An unavailable receipt or lost provider response ID requires custodian
-reconciliation; matching SHA alone is insufficient. CI-attempt drift cannot be
-repaired by reusing the old receipt or approval.
-
-## Readiness, concurrency and failure handling
-
-- Global Actions concurrency serializes the release workflow without cancelling a
-  running provider rollout. GitHub may replace an older **pending** concurrency run;
-  inspect cancelled/superseded runs. The newest candidate must still pass current-main
-  qualification; this is not a promise to release every intermediate main commit.
-- After approval, qualification is repeated and compared with the frozen candidate.
-  The same comparison gates Render admission, Vercel admission and final verification.
-  Provider preflight rejects suspension,
-  wrong targets/build/start/pre-deploy settings, changed baseline, operational flags,
-  secrets, wrong frontend build target or foreign in-flight deploys. Unknown states,
-  incomplete inventories or repeated pagination cursors fail closed. History inspection
-  is bounded at 2,000 entries and fails visibly rather than inferring absence.
-- A Git comparison against the approved Render baseline blocks changed/renamed
-  migration files, non-descendant code and truncated comparisons. Schema-changing
-  releases require a separate authorized procedure, not an automatic migrator hook.
-- Render receives `commitId` (never branch latest). Poll for `live`, verify resolved
-  commit, re-read safety configuration and health build ID, Production/dependency
-  readiness and the effective latched recovery header. Failure stops Vercel.
-- Recheck the exact frozen CI identity, current main and authority before Vercel.
-  Its production request has
-  exact `gitSource.sha/ref`, project and repository ID. Poll READY, require provider
-  Git source/project, CI run/attempt metadata and canonical release-identity digest,
-  no alias error, actual production target ID and production
-  HTTP 200. These checks prove infrastructure identity/readiness, not a business
-  workflow, authentication acceptance or provider delivery.
-- Polling is bounded (20 minutes per provider; overall 45-minute job). A timeout,
-  lost POST response or workflow cancellation **does not mean the provider stopped**.
-  Do not automatically retry POST, roll back, resume, or repair settings. A renewed
-  authorized retry inspects provider history and adopts only an operation recorded
-  by its validated immutable audit receipt. Render has no native CI-attempt metadata;
-  the receipt supplies that binding. Ambiguous duplicates, unrecorded same-source
-  operations and terminal failed candidates require operator action.
-  Provider eventual consistency still requires custodian inspection after an
-  ambiguous POST; do not use rapid reruns as an exactly-once mechanism.
-- GitHub environment/deployment records, candidate digest, workflow step summaries
-  and redacted `production-release-audit-*` artifacts record the result and provider
-  IDs, including partial completion. Each audit row carries the full release identity;
-  failure rows retain known provider IDs and original requesting attempts. Failures
-  before identity verification are explicitly marked unverified. Each retry writes
-  a separate artifact, preserving earlier records. Enable owner Actions failure notifications;
-  verify their delivery separately. Render currently declares notify-on-fail.
-  Vercel alert delivery and GitHub notification receipt have not been verified.
-  Provider bodies, configuration, keys, identity information and business data are
-  never logged by the orchestrator. A blocked admission is a failed check/summary,
-  not a silent successful skip. Agent review is not formal GitHub approval.
-
-## Rollback and recovery (separate operator authorization)
-
-1. Stop admission: clear/disable `AUTO_DEPLOY_ENABLED` and revoke the pending exact
-   authority; keep native main auto-deploy and Blueprint sync off. This prevents
-   future admission, not an already accepted provider action. Inspect provider
-   deploy state before doing anything else.
-2. Use the audit's approved previous Render/Vercel deployment IDs. Verify backup,
-   source/schema compatibility and unchanged safe runtime configuration. No EF Down,
-   migration-history editing, database replacement, seeding or provider replay.
-3. If only API completed, leave the previous frontend in place and reconcile its
-   compatibility; do not promote a frontend whose API readiness failed. If a new API
-   is unsafe, use the existing authorized emergency suspension procedure. Suspension
-   or resumption is a human operation outside this workflow.
-4. Under separate authorization, use Render's **rollback of the approved deploy ID**
-   and Vercel's **instant rollback to the approved production deployment ID**, not a
-   branch hook or mutable latest tag. Reverify provider IDs, Git revisions, recovery,
-   dependency readiness and the production alias. Old binaries must retain safe
-   guards/schema compatibility. No automatic database rollback is implied.
-5. Preserve failed/partial evidence and configuration custody. After reconciliation,
-   issue fresh exact-attempt authority, rerun all release jobs and approve the
-   appropriate qualified run. Partial retries require the matching prior audit
-   receipt described above; changed CI attempts cannot adopt the old attempt's work.
-   A failed earlier Render candidate must be explicitly resolved by the custodian;
-   the pipeline will not silently create another one. If source has advanced, the
-   old candidate is stale: qualify the new current main revision instead.
-
-## Executable evidence and limits
-
-From repository root: `node --test tools/deployment/*.test.mjs` (Node 24+).
-The tests use synthetic API clients/HTTP responses, no credentials, members,
-payments, provider calls or production mutations. They cover failed CI, exact source
-and archive provenance, protected authority, runtime holds, target/build inputs,
-sequential success, stale heads, provider failure, rollback holds, pagination,
-concurrency, retry adoption and lost-response redaction. Workflow checks also failed
-before adding the missing release path/main exclusion/tag qualification.
-The attempt-binding correction first reproduced two failing regressions (successful
-CI attempt 2 replacing attempt 1 before Render or after Render/before Vercel).
-The expanded 116-case suite passes, including failed/missing/changed CI evidence,
-stale authority, partial receipts, concurrent releases and ambiguous responses.
-These provider simulations assert that mismatches cause no further mutation.
-
-CI additionally runs the full existing backend/frontend/PostgreSQL inventory and
-both container builds. Final commit/run results and independent Agent 2 review are
-recorded in the task PR. Simulated provider success/rollback boundaries do not prove
-actual deployment, rollback, external notification delivery or production business
-operation. No production deployment/activation test has been run for this change.
-
-Primary provider contracts: [GitHub workflow_run security](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run),
-[Render exact-commit deploys](https://render.com/docs/deploys),
-[Vercel deployment API](https://vercel.com/docs/rest-api/deployments/create-a-new-deployment),
-[Vercel Git trigger controls](https://vercel.com/docs/project-configuration/git-configuration),
-[Render rollback](https://render.com/docs/rollbacks),
-[Vercel instant rollback](https://vercel.com/docs/instant-rollback).
+Run actionlint for workflow changes and complete hosted CI on the exact final commit,
+including application PostgreSQL regressions and both container builds. Preserve
+failed/cancelled attempts honestly. Local/synthetic execution does not prove actual
+provider deploy permission or end-to-end production success. Record exact final
+commit, CI run/attempt, fresh Agent 2 verdict and evidence limits in the final report.

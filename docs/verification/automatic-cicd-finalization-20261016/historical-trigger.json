@@ -1,0 +1,26 @@
+{
+  "evidence": "historical GitHub API readback; not a deployment of this branch",
+  "observedAt": "2026-10-16T17:45:50.246Z",
+  "ci": {
+    "id": 38911525858,
+    "event": "push",
+    "branch": "main",
+    "sha": "23f176db6eb13af5ee01ff69f1a9f7bbe6b880ff",
+    "status": "completed",
+    "conclusion": "success",
+    "createdAt": "2026-10-16T13:54:40Z",
+    "updatedAt": "2026-10-16T14:04:22Z",
+    "url": "https://github.com/aqua-lifestyle/aqua-lifestyle/actions/runs/38911525858"
+  },
+  "release": {
+    "id": 38912818702,
+    "event": "workflow_run",
+    "branch": "main",
+    "sha": "23f176db6eb13af5ee01ff69f1a9f7bbe6b880ff",
+    "status": "completed",
+    "conclusion": "failure",
+    "createdAt": "2026-10-16T14:04:24Z",
+    "updatedAt": "2026-10-16T14:04:51Z",
+    "url": "https://github.com/aqua-lifestyle/aqua-lifestyle/actions/runs/38912818702"
+  }
+}

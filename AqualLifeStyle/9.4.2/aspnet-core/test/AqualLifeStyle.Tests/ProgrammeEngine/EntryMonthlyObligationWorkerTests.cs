@@ -131,6 +131,8 @@ namespace AqualLifeStyle.Tests.ProgrammeEngine
             return new ConfigurationBuilder()
                 .AddInMemoryCollection(new[]
                 {
+                    new KeyValuePair<string, string>("App:BackgroundJobs:Enabled", "true"),
+                    new KeyValuePair<string, string>("App:FinancialOperations:Enabled", "true"),
                     new KeyValuePair<string, string>(
                         "App:EntryMonthlyObligations:Enabled",
                         "true"),

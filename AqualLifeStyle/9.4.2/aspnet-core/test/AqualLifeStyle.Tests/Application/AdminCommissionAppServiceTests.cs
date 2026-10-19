@@ -22,6 +22,11 @@ using Shouldly;
 using Xunit;
 using RolePermissionSetting = Abp.Authorization.Roles.RolePermissionSetting;
 using UserRole = Abp.Authorization.Users.UserRole;
+using AqualLifeStyle.Domain.AQGreen;
+using AqualLifeStyle.Web.Host.AQGreenV2Demo;
+using Microsoft.AspNetCore.Hosting;
+using Abp.Domain.Uow;
+using Castle.MicroKernel.Registration;
 
 namespace AqualLifeStyle.Tests.Application
 {
@@ -82,6 +87,37 @@ namespace AqualLifeStyle.Tests.Application
                 context.SaveChanges();
             });
             _service = Resolve<IAdminCommissionAppService>();
+        }
+
+        [Fact]
+        public async Task ValidatedDisposableDemo_CalculatorKeepsItsExistingSimulationPathWithoutGlobalFinancialAuthority()
+        {
+            await CreateQualifiedLevelOneEntryNetworkAsync();
+            LoginAsHostAdmin();
+            Resolve<IConfiguration>()["App:FinancialOperations:Enabled"] = "false";
+            var demoConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string>
+            {
+                ["AQGreenV2Demo:Enabled"] = "true",
+                ["ConnectionStrings:Default"] = "Host=localhost;Database=aqua_aqgreen_v2_demo;Username=synthetic",
+                ["App:ClientRootAddress"] = "http://localhost:3000"
+            }).Build();
+            var environment = new Mock<IWebHostEnvironment>();
+            environment.SetupGet(e => e.EnvironmentName).Returns("AQGreenV2Demo");
+            LocalIocManager.IocContainer.Register(Component.For<IAQGreenDemoCalculationMode>()
+                .Instance(new AQGreenV2DemoCalculationMode(environment.Object, demoConfiguration))
+                .Named("validated-synthetic-demo-calculation").IsDefault());
+            var calculator = Resolve<WeeklyCommissionCalculator>();
+            calculator.DemoCalculationMode.IsEnabled.ShouldBeTrue();
+            var manager = Resolve<IUnitOfWorkManager>();
+            using var uow = manager.Begin();
+            using (manager.Current.SetTenantId(1))
+            {
+                var result = await calculator.CalculateEntryAsync(1,
+                    Resolve<LatestClosedCommissionWeekResolver>().Resolve(DateTime.UtcNow), DateTime.UtcNow);
+                result.RecordsCreated.ShouldBe(6);
+            }
+            await uow.CompleteAsync();
+            Resolve<IConfiguration>()["App:FinancialOperations:Enabled"].ShouldBe("false");
         }
 
         [Fact]

@@ -1,0 +1,176 @@
+{
+  "observedAt": "2026-10-16T18:05:04.913Z",
+  "method": "authenticated GET only; no database session or provider mutation",
+  "endpointStatus": {
+    "service": 200,
+    "vars": 200,
+    "history": 200,
+    "envGroups": 200,
+    "secretFiles": 200,
+    "databases": 200,
+    "project": 200,
+    "publicVars": 200,
+    "domains": 200,
+    "webHistory": 200
+  },
+  "render": {
+    "id": "srv-d9f0k8e1a83c73d8n1b0",
+    "repo": "https://github.com/aqua-lifestyle/aqua-lifestyle",
+    "branch": "main",
+    "suspended": "not_suspended",
+    "autoDeployTrigger": "off",
+    "autoDeploy": "no",
+    "rootDir": "",
+    "dockerContext": ".",
+    "dockerfile": "./docker/api/Dockerfile",
+    "preDeployCommandEmpty": true,
+    "startCommandEmpty": true,
+    "runtime": "docker",
+    "healthCheckPath": "/api/health",
+    "envCount": 37,
+    "flags": {
+      "ASPNETCORE_ENVIRONMENT": "Production",
+      "App__Recovery__Enabled": "false",
+      "App__WeeklyCommissions__Enabled": "false",
+      "App__EntryMonthlyObligations__Enabled": "false",
+      "App__FinancialOperations__Enabled": "false",
+      "App__BackgroundJobs__Enabled": "false",
+      "AQGreenV2Demo__Enabled": "false",
+      "AQGreenV2Pilot__Enabled": "false",
+      "App__AQGreenV2__Commissioning__Enabled": "false",
+      "SEED_DEMO_DATA": "false",
+      "Bird__Enabled": "true",
+      "Yoco__Mode": "test"
+    },
+    "credentialPresence": {
+      "Yoco__SecretKey": true,
+      "Yoco__WebhookSecret": true,
+      "Bird__ApiKey": true,
+      "DATABASE_URL": true,
+      "ConnectionStrings__Default": false,
+      "DataProtection__CertificateBase64": true,
+      "DataProtection__CertificatePassword": true
+    },
+    "birdCutoffConfigured": true,
+    "environmentGroupCount": 0,
+    "secretFileCount": 0,
+    "databaseProviderMetadata": [
+      {
+        "id": "dpg-d9f0jne1a83c73d8m780-a",
+        "status": "available",
+        "version": "18",
+        "plan": "basic_1gb",
+        "region": "frankfurt",
+        "highAvailability": false,
+        "readReplicas": 0
+      },
+      {
+        "id": "dpg-davoaabncjis73f56rj0-a",
+        "status": "available",
+        "version": "18",
+        "plan": "basic_1gb",
+        "region": "frankfurt",
+        "highAvailability": false,
+        "readReplicas": 0
+      }
+    ],
+    "databasePrivileges": "UNKNOWN — no database catalog session performed",
+    "historySummary": {
+      "returned": 97,
+      "scope": "first page only; not a complete historical inventory",
+      "current": [
+        {
+          "id": "dep-db8av3dg1s2s739m6sgg",
+          "status": "live",
+          "sha": "1251fb82979e18be53d1d0e7f5c6fab2d0c50a58",
+          "createdAt": "2026-10-15T10:48:45.714682Z"
+        }
+      ]
+    }
+  },
+  "vercel": {
+    "id": "prj_6qL1e43KhsWrRshY5GxdmGl3HGMz",
+    "name": "aqua-lifestyle",
+    "accountId": "team_Hc3BWfhTLfwLzwbgbtaasBUY",
+    "rootDirectory": "AqualLifeStyle/9.4.2/aqua-frontend",
+    "nodeVersion": "24.x",
+    "framework": null,
+    "autoAssignCustomDomains": true,
+    "gitLinked": false,
+    "gitLink": null,
+    "customBuild": false,
+    "commandForIgnoringBuildStepConfigured": false,
+    "exposeSystemEnvs": true,
+    "production": {
+      "id": "dpl_EwGB3apX3P5JnU5KfG3rLzn21Kgf",
+      "state": "READY",
+      "target": "production",
+      "gitSource": null,
+      "metadataSource": null,
+      "createdAt": 1792014917716,
+      "readStatus": 200,
+      "aliasAssigned": true,
+      "aliasError": false,
+      "metadataKeys": [
+        "aqgreenSourceCommit",
+        "aqgreenSourceTree"
+      ]
+    },
+    "publicInputs": [
+      {
+        "key": "NEXT_PUBLIC_ABP_API_URL",
+        "type": "sensitive",
+        "target": [
+          "preview",
+          "production"
+        ],
+        "branchSpecific": false,
+        "actualValue": "UNKNOWN: sensitive value is not decrypted"
+      },
+      {
+        "key": "NEXT_PUBLIC_DEFAULT_TENANT_NAME",
+        "type": "sensitive",
+        "target": [
+          "preview",
+          "production"
+        ],
+        "branchSpecific": false,
+        "actualValue": "UNKNOWN: sensitive value is not decrypted"
+      }
+    ],
+    "domains": [
+      {
+        "name": "www.aqualifestyleclub.co.za",
+        "verified": true,
+        "redirect": null,
+        "gitBranch": null
+      },
+      {
+        "name": "aqua-lifestyle.vercel.app",
+        "verified": true,
+        "redirect": null,
+        "gitBranch": null
+      }
+    ],
+    "historySummary": {
+      "returned": 100,
+      "scope": "first page only; not a complete historical inventory"
+    }
+  },
+  "apiHealth": {
+    "http": 200,
+    "status": "Healthy",
+    "sha": "1251fb82979e18be53d1d0e7f5c6fab2d0c50a58",
+    "recovery": null,
+    "environment": "Production",
+    "database": "Healthy",
+    "redis": "Healthy",
+    "keyStore": "Healthy",
+    "paymentContractVersion": "aqua-payments-2026-08-09-flexible-payment-approval"
+  },
+  "frontendHttp": {
+    "status": 200,
+    "revisionHeader": null,
+    "servedRevision": "UNKNOWN — HTTP200 is not source identity"
+  }
+}

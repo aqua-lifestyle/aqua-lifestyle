@@ -518,6 +518,10 @@ namespace AqualLifeStyle.Tests.Application
                     AQGreenSinglePaymentEffectiveFrom.AddMinutes(1)));
 
             var deliveryGateway = Resolve<ITransactionalEmailDeliveryGateway>();
+            // This failure-path fixture explicitly exercises dispatch through a
+            // substituted provider; it does not grant authority to the real host.
+            Resolve<IConfiguration>()["App:BackgroundJobs:Enabled"] = "true";
+            Resolve<IConfiguration>()["Bird:Enabled"] = "true";
             deliveryGateway.ClearReceivedCalls();
             deliveryGateway
                 .SendAsync(

@@ -38,6 +38,8 @@ namespace AqualLifeStyle.Tests.WebHost
         [InlineData("Bird:Enabled", "true")]
         [InlineData("App:WeeklyCommissions:Enabled", "true")]
         [InlineData("App:EntryMonthlyObligations:Enabled", "true")]
+        [InlineData("App:FinancialOperations:Enabled", "true")]
+        [InlineData("App:BackgroundJobs:Enabled", "true")]
         [InlineData("AQGreenV2Demo:Enabled", "true")]
         [InlineData("AQGreenV2Pilot:Enabled", "true")]
         [InlineData("SEED_DEMO_DATA", "true")]

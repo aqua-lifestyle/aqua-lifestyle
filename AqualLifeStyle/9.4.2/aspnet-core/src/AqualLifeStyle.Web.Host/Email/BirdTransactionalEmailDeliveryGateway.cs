@@ -7,6 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using AqualLifeStyle.Email;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
+using AqualLifeStyle.Configuration;
 
 namespace AqualLifeStyle.Web.Host.Email
 {
@@ -18,16 +20,20 @@ namespace AqualLifeStyle.Web.Host.Email
     {
         private readonly HttpClient _httpClient;
         private readonly BirdOptions _options;
+        private readonly IConfiguration _configuration;
 
-        public BirdTransactionalEmailDeliveryGateway(HttpClient httpClient, IOptions<BirdOptions> options)
+        public BirdTransactionalEmailDeliveryGateway(HttpClient httpClient, IOptions<BirdOptions> options,
+            IConfiguration configuration)
         {
             _httpClient = httpClient;
             _options = options.Value;
+            _configuration = configuration;
         }
 
         public async Task<string> SendAsync(TransactionalEmail email, CancellationToken cancellationToken = default)
         {
             if (!_options.Enabled) throw new InvalidOperationException("Transactional email delivery is disabled.");
+            RuntimeOperationGuards.RequireEmailDispatch(_configuration);
             var endpoint = ResolveEndpoint(_options.ApiKey);
             using (var request = new HttpRequestMessage(HttpMethod.Post, endpoint))
             {

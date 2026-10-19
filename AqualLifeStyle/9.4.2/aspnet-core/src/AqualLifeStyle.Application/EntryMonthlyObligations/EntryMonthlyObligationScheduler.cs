@@ -25,13 +25,16 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
         private readonly IRepository<EntryMonthlyObligation, Guid> _obligationRepository;
         private readonly IRepository<EntryParticipation, Guid> _participationRepository;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
 
         public EntryMonthlyObligationScheduler(
             IRepository<EntryMonthlyObligation, Guid> obligationRepository,
             IRepository<EntryParticipation, Guid> participationRepository,
-            IUnitOfWorkManager unitOfWorkManager)
+            IUnitOfWorkManager unitOfWorkManager,
+            Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
             _obligationRepository = obligationRepository;
+            _configuration = configuration;
             _participationRepository = participationRepository;
             _unitOfWorkManager = unitOfWorkManager;
         }
@@ -43,8 +46,9 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
             DateTime dueAt,
             string duePolicyVersion)
         {
-            ValidatePeriod(periodYear, periodMonth);
             PilotMode.DenyOutsidePilot("Monthly obligation scheduling");
+            AqualLifeStyle.Configuration.RuntimeOperationGuards.RequireFinancialOperations(_configuration);
+            ValidatePeriod(periodYear, periodMonth);
             ValidateUtc(dueAt, nameof(dueAt));
             ValidateDuePolicyVersion(duePolicyVersion);
 
@@ -103,6 +107,7 @@ namespace AqualLifeStyle.Application.EntryMonthlyObligations
         public virtual async Task<int> AssessObligationsAsync(DateTime asOf)
         {
             PilotMode.DenyOutsidePilot("Monthly obligation assessment");
+            AqualLifeStyle.Configuration.RuntimeOperationGuards.RequireFinancialOperations(_configuration);
             ValidateUtc(asOf, nameof(asOf));
 
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MustHaveTenant))

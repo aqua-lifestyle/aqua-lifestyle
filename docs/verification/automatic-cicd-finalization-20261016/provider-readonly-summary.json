@@ -1,0 +1,137 @@
+{
+  "observedAt": "2026-10-16T17:33:06.494Z",
+  "method": "GET only",
+  "render": {
+    "read": "success",
+    "id": "srv-d9f0k8e1a83c73d8n1b0",
+    "repo": "https://github.com/aqua-lifestyle/aqua-lifestyle",
+    "branch": "main",
+    "suspended": "not_suspended",
+    "autoDeployTrigger": "off",
+    "autoDeploy": "no",
+    "rootDir": "",
+    "runtime": "docker",
+    "healthCheckPath": "/api/health",
+    "dockerfile": "./docker/api/Dockerfile",
+    "preDeployEmpty": true,
+    "commandEmpty": true,
+    "envPageSize": 37,
+    "flags": {
+      "ASPNETCORE_ENVIRONMENT": "Production",
+      "App__Recovery__Enabled": "false",
+      "App__WeeklyCommissions__Enabled": "false",
+      "App__EntryMonthlyObligations__Enabled": "false",
+      "App__FinancialOperations__Enabled": "false",
+      "App__BackgroundJobs__Enabled": "false",
+      "AQGreenV2Demo__Enabled": "false",
+      "AQGreenV2Pilot__Enabled": "false",
+      "App__AQGreenV2__Commissioning__Enabled": "false",
+      "SEED_DEMO_DATA": "false",
+      "Bird__Enabled": "true",
+      "Yoco__Mode": "test"
+    },
+    "providerKeyPresent": {
+      "Yoco__SecretKey": true,
+      "Yoco__WebhookSecret": true,
+      "Bird__ApiKey": true
+    },
+    "history": [
+      {
+        "id": "dep-db8av3dg1s2s739m6sgg",
+        "status": "live",
+        "sha": "1251fb82979e18be53d1d0e7f5c6fab2d0c50a58"
+      },
+      {
+        "id": "dep-db87ao2vcj2c738g9ffg",
+        "status": "deactivated",
+        "sha": "1251fb82979e18be53d1d0e7f5c6fab2d0c50a58"
+      },
+      {
+        "id": "dep-db7oboek1f9s738f9ag0",
+        "status": "deactivated",
+        "sha": "d7947fe6074cbc7e7fa08cdc010a6e13c1aeb16f"
+      },
+      {
+        "id": "dep-db40o0flot8c73ca10p0",
+        "status": "deactivated",
+        "sha": "21a41694163ef09628fd84a9f4e12cb0efe1bb85"
+      },
+      {
+        "id": "dep-db3is95g1s2s73al947g",
+        "status": "deactivated",
+        "sha": "21a41694163ef09628fd84a9f4e12cb0efe1bb85"
+      },
+      {
+        "id": "dep-dacje4uq1p3s73eo1860",
+        "status": "deactivated",
+        "sha": "26803037d9923842db12de621ab6f87c3cd045cc"
+      },
+      {
+        "id": "dep-dacfab1t0dsc73det9jg",
+        "status": "deactivated",
+        "sha": "659edd12f118844a5ca8e0ca5ac7aea68ff294cd"
+      },
+      {
+        "id": "dep-dabiahon74is73f0lijg",
+        "status": "deactivated",
+        "sha": "4d3892f630c5025c0bf2244a7f8d387c5bf2a1d3"
+      },
+      {
+        "id": "dep-dabaf7bncjis73f0arg0",
+        "status": "deactivated",
+        "sha": "ea2c77041ae0ecf56af523f5fc4bb7a89d7053e9"
+      },
+      {
+        "id": "dep-daa7a449v7es73e59090",
+        "status": "deactivated",
+        "sha": "657145bb97b938f513d804f21303355301536336"
+      }
+    ]
+  },
+  "vercel": {
+    "read": "success",
+    "id": "prj_6qL1e43KhsWrRshY5GxdmGl3HGMz",
+    "accountId": "team_Hc3BWfhTLfwLzwbgbtaasBUY",
+    "root": "AqualLifeStyle/9.4.2/aqua-frontend",
+    "node": "24.x",
+    "gitLinked": false,
+    "gitRepo": null,
+    "production": {
+      "id": "dpl_EwGB3apX3P5JnU5KfG3rLzn21Kgf",
+      "readyState": "READY",
+      "sha": null
+    },
+    "customBuild": false,
+    "publicBuildInputs": [
+      {
+        "key": "NEXT_PUBLIC_ABP_API_URL",
+        "type": "sensitive",
+        "target": [
+          "preview",
+          "production"
+        ],
+        "branchSpecific": false,
+        "matchesExpected": false
+      },
+      {
+        "key": "NEXT_PUBLIC_DEFAULT_TENANT_NAME",
+        "type": "sensitive",
+        "target": [
+          "preview",
+          "production"
+        ],
+        "branchSpecific": false,
+        "matchesExpected": false
+      }
+    ]
+  },
+  "health": {
+    "http": 200,
+    "status": "Healthy",
+    "sha": "1251fb82979e18be53d1d0e7f5c6fab2d0c50a58",
+    "recovery": null,
+    "database": "Healthy",
+    "redis": "Healthy",
+    "keyStore": "Healthy"
+  }
+}

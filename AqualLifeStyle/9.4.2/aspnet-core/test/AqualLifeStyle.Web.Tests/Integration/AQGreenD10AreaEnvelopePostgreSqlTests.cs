@@ -24,6 +24,7 @@ using AqualLifeStyle.Payments;
 using AqualLifeStyle.Tests.WebHost;
 using Castle.MicroKernel.Registration;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Npgsql;
 using Shouldly;
 using Xunit;
@@ -38,7 +39,11 @@ namespace AqualLifeStyle.Web.Tests.Integration
         {
             IsPostgreSqlRegressionMode().ShouldBeTrue(); LoginAsDefaultTenantAdmin();
             var fixture = await SeedSponsoredAwaitingApprovalAsync(recordedAt: AQGreenD10SyntheticEvidence.EffectiveAt.AddDays(-3));
-            var (_, runtime, _, evidence) = await ConfigureD10Async();
+            var (_, runtime, configuration, evidence) = await ConfigureD10Async();
+            // ConfigureD10Async replaces the default configuration. Grant only
+            // this synthetic case on that exact instance before resolving services.
+            configuration["App:FinancialOperations:Enabled"] = "true";
+            Resolve<IConfiguration>().ShouldBeSameAs(configuration);
             var gateway = ConfigureAreaJoiningGate(runtime);
             var member = await CreateD10InviteeAsync(fixture.AreaId);
             var code = await AQGreenInvitationCodeAsync(fixture.SponsorParticipantId);

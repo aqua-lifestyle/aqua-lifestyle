@@ -10,21 +10,30 @@ comparison.
 Run from the repository root:
 
 ```bash
-python3 tools/agent-evals/validate.py
+node tools/agent-evals/validate.mjs
 ```
 
 The validator checks format-portable frontmatter, skill/directory names, duplicate
 IDs, positive/negative boundary coverage, composition cases, root routing and
 no-skill safeguards, decision-state fields, frontend bootstrap, and local Markdown
 references. Its built-in negative self-tests exercise result-schema and case/result
-coherence enforcement. It uses only the Python standard library and makes no
+coherence enforcement. It uses only Node.js built-ins (Node24+, already used by
+repository tooling), needs no package installation, and makes no
 network or model calls.
+
+Run its CLI and regression checks with:
+
+```bash
+node --test tools/agent-evals/validate.test.mjs
+```
+
+Both commands also run in the existing CI release-safety job using Node24.
 
 Case definitions are in [cases/skill-routing.json](cases/skill-routing.json). A
 result may be checked with:
 
 ```bash
-python3 tools/agent-evals/validate.py path/to/result.json
+node tools/agent-evals/validate.mjs path/to/result.json
 ```
 
 Results follow [result.schema.json](result.schema.json). Each result copies its case

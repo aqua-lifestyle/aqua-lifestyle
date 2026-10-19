@@ -1,3 +1,5 @@
 .env
 # Ignore local user secrets file if present
 secrets.json
+# Local CI qualification output; hosted artifacts retain immutable run evidence.
+/TestResults/

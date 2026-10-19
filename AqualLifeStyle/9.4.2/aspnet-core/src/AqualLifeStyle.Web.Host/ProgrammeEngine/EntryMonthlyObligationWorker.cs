@@ -59,10 +59,8 @@ namespace AqualLifeStyle.Web.Host.ProgrammeEngine
         {
             if (AqualLifeStyle.Configuration.ApplicationRecoveryMode.IsEnabled(_configuration)) return;
             PilotMode.DenyOutsidePilot("Monthly obligation worker");
-            if (!_configuration.GetValue<bool>("App:EntryMonthlyObligations:Enabled"))
-            {
-                return;
-            }
+            if (!AqualLifeStyle.Configuration.RuntimeOperationGuards.CanRunFinancialWorker(
+                _configuration, "App:EntryMonthlyObligations:Enabled")) return;
 
             var nowUtc = GetUtcNow();
             var currentJohannesburgMonth = EntryMonthlyObligationDuePolicy

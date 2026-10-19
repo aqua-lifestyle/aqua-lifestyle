@@ -18,19 +18,46 @@ CI currently runs the full backend, frontend, production dependency audit, and b
 
 ## Deployment control
 
-From repository root on Node 24+: `node --test tools/deployment/*.test.mjs`.
+From repository root on Node 24+: `node tools/deployment/run-security-tests.mjs --local`.
+Run `node tools/deployment/mandatory-security-probe.mjs` for disposable candidate
+tampering probes. CI runs the same classifier with exact SHA/run/attempt metadata.
+The explicit inventory requires each case to execute once and pass; raw
+`node --test` exit status permits skips and is not qualification. Inventory changes
+are control changes. See [independent custody requirements](../operations/mandatory-security-verification.md);
+this candidate-controlled command does not supply independent enforcement.
+Run `docker pull postgres:18-alpine` then
+`node tools/operations/database-authority-probe.mjs` on a local Unix Docker socket
+for13 disposable catalog/role/sequence/routine/authentication checks. No target
+arguments, production credential or network are accepted. CI runs it in the required
+container job and retains the summary with the actual-image runtime probe. These are
+permission primitives, not production catalog evidence or full API workflow proof;
+see [database authority qualification](../operations/production-database-authority.md).
 These isolated tests cover release qualification, authority/provenance, recovery
 holds, provider sequencing, negative/partial failure, concurrency and retry
 reconciliation. They never call production. CI runs them as `Release safety tests`;
 the qualified-release consumer requires that job and the complete existing CI job
 inventory. Validate workflow syntax with actionlint when changing workflows.
-The version 2 candidate/authority contract freezes source, CI run and attempt,
-release run and attempt, environment and provider targets. Negative cases must
+The version 3 candidate/standing-policy contract freezes source, CI run and attempt,
+release run and attempt, policy digest, environment and provider targets. Negative cases must
 assert no further provider POST after qualification drift, including after partial
-Render completion. Retry adoption requires an immutable same-run audit receipt;
+Render completion. Retry adoption requires the immutable same-run audit chain;
 matching source SHA alone is insufficient. These remain simulated provider tests.
+Include no-token/no-human-gate/no-activation-switch positives, automatic first
+provider baseline, all-skipped workflow exclusion, successive verified-baseline rollout,
+failed-rerun preservation, preflight failure between partial retries, and foreign
+provider work starting during Render. Full workflow entry tests use real Git archive
+provenance with synthetic clients; no production deployment is required.
 See the [release runbook](../operations/safe-automatic-deployment.md) for the
 activation blockers and the distinction between mocks and actual provider evidence.
+
+The [safety contract](../operations/cicd-safety-contract.md) distinguishes Scripture,
+interpretation, engineering requirements and evidence. Its immutable-base change
+classifier is assessment only; it is not an independently enforced GitHub gate.
+Run `docker pull postgres:16-alpine` then
+`bash tools/deployment/disposable-recovery.sh` from repository root for synthetic
+restore/privilege positives and denials. It accepts no production target or backup.
+CI also runs it in the existing PostgreSQL job and retains its summary; the actual
+application-schema restore remains covered by AQGreenRecoveryReleasePostgreSqlTests.
 
 ## Backend
 
@@ -187,6 +214,7 @@ Run from the repository root. CI builds these images with Buildx:
 
 ```bash
 docker build --file docker/api/Dockerfile .
+docker build --file docker/api/Dockerfile --target migrator .
 docker build \
   --file docker/web/Dockerfile \
   --build-arg NEXT_PUBLIC_ABP_API_URL=https://api.example.test \
@@ -200,7 +228,24 @@ For Compose validation, copy `.env.example` to an ignored `.env`, replace every 
 docker compose config --quiet
 ```
 
-`docker compose up --build` is an optional local integration environment that starts PostgreSQL, Redis, the migrator, API, and frontend. It requires valid local configuration and provider test credentials; it is not a safe generic validation command for documentation-only changes.
+`docker compose up --build` starts PostgreSQL, Redis, API and frontend with a
+separately provisioned restricted API connection. It does not migrate or seed.
+Only explicitly authorized maintenance loads `docker-compose.maintenance.yml` in
+addition to the base file and supplies a different migration connection; the default
+API image contains no migrator. Compose does not provision safe database grants.
+Neither command is generic validation against a production target.
+
+For actual-image isolated startup/restart and role denials, use the commands in
+[runtime authority qualification](../operations/runtime-authority-qualification.md).
+The fixture requires PostgreSQL18, Redis7 and both newly built local images; it
+accepts no live target, creates an internal Docker network, migrates a fresh schema
+with a separate maintenance identity, and exercises normal Production API restart
+with a restricted non-owner role. It does not prove production grants or complete
+member/admin write functionality. CI requires this probe in Validate container images.
+The extended probe also executes the catalog-only audit and temporary SQL grant
+counterexamples described in [production privilege isolation](../operations/production-privilege-isolation.md).
+Its23 checks include rejection of unsafe grant proposals; they do not establish
+successful HTTP workflows under a complete production least-privilege role.
 
 ## Formatting and final review
 

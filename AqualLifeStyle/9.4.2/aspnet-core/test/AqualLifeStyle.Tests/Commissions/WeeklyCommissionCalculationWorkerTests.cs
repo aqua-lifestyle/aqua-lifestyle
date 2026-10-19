@@ -54,6 +54,8 @@ namespace AqualLifeStyle.Tests.Commissions
             return new ConfigurationBuilder()
                 .AddInMemoryCollection(new[]
                 {
+                    new KeyValuePair<string, string>("App:BackgroundJobs:Enabled", "true"),
+                    new KeyValuePair<string, string>("App:FinancialOperations:Enabled", "true"),
                     new KeyValuePair<string, string>(
                         "App:WeeklyCommissions:Enabled",
                         enabled ? "true" : "false"),

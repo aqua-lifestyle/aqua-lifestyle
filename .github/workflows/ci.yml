@@ -29,7 +29,18 @@ jobs:
         with:
           node-version: 24
       - name: Test qualification, admission, provider failures and retry boundaries
-        run: node --test tools/deployment/*.test.mjs
+        run: node tools/deployment/run-security-tests.mjs
+      - name: Validate agent tooling with the existing Node runtime
+        run: |
+          node tools/agent-evals/validate.mjs
+          node --test tools/agent-evals/validate.test.mjs
+      - name: Retain exact mandatory case evidence
+        uses: actions/upload-artifact@v6
+        with:
+          name: mandatory-security-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: TestResults/mandatory-security/report.json
+          if-no-files-found: error
+          retention-days: 90
 
   backend-application-discovery:
     name: Backend application coverage partition
@@ -433,14 +444,45 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: docker/setup-buildx-action@v3
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
       - name: Build API image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/api/Dockerfile
           push: false
+          load: true
+          tags: aqualifestyle-runtime-api:qualification
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
+      - name: Build separate maintenance image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/api/Dockerfile
+          target: migrator
+          push: false
+          load: true
+          tags: aqualifestyle-runtime-migrator:qualification
+          cache-from: type=gha,scope=api
+      - name: Qualify actual runtime restart and database authority in isolation
+        run: |
+          set -euo pipefail
+          docker pull postgres:18-alpine
+          docker pull redis:7-alpine
+          mkdir -p TestResults/runtime-authority
+          node tools/operations/database-authority-probe.mjs | tee TestResults/runtime-authority/catalog-probe.log
+          bash tools/deployment/runtime-restart-probe.sh | tee TestResults/runtime-authority/restart-probe.log
+      - name: Retain runtime authority qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: runtime-authority-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: TestResults/runtime-authority
+          if-no-files-found: error
+          retention-days: 90
       - name: Build web image
         uses: docker/build-push-action@v6
         with:
@@ -496,6 +538,14 @@ jobs:
           test "$REPRO_TRANSACTIONAL" = "true"
           test -n "$REPRO_PG_CONNECTION"
           echo "Reproduction mode active: REPRO_PG=$REPRO_PG REPRO_TRANSACTIONAL=$REPRO_TRANSACTIONAL"
+      - name: Verify disposable backup restoration and runtime privilege denials
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull postgres:16-alpine
+          mkdir -p AqualLifeStyle/9.4.2/aspnet-core/TestResults
+          bash tools/deployment/disposable-recovery.sh | tee AqualLifeStyle/9.4.2/aspnet-core/TestResults/disposable-recovery.log
       - name: Restore web tests
         run: dotnet restore test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj
       - name: Build web tests

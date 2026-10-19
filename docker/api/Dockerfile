@@ -22,17 +22,23 @@ RUN dotnet publish src/AqualLifeStyle.Web.Host/AqualLifeStyle.Web.Host.csproj \
     && dotnet publish src/AqualLifeStyle.Migrator/AqualLifeStyle.Migrator.csproj \
       --configuration Release --no-restore --output /out/migrator
 
-FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION}-bookworm-slim AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION}-bookworm-slim AS runtime-base
 WORKDIR /app
 
 ENV ASPNETCORE_HTTP_PORTS=8080 \
     DOTNET_EnableDiagnostics=0 \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
-COPY --from=publish --chown=$APP_UID:$APP_UID /out/api/ ./
-COPY --from=publish --chown=$APP_UID:$APP_UID /out/migrator/ ./migrator/
-
 USER $APP_UID
+
+# Maintenance uses its own image and separately supplied database identity.
+# The default API image contains no migrator executable.
+FROM runtime-base AS migrator
+COPY --from=publish --chown=$APP_UID:$APP_UID /out/migrator/ ./
+ENTRYPOINT ["dotnet", "AqualLifeStyle.Migrator.dll"]
+
+FROM runtime-base AS runtime
+COPY --from=publish --chown=$APP_UID:$APP_UID /out/api/ ./
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=8s --start-period=30s --retries=3 \

@@ -130,6 +130,12 @@ namespace AqualLifeStyle.Web.Host.Controllers
                 }
                 return Ok();
             }
+            catch (AqualLifeStyle.Configuration.RuntimeOperationDeniedException)
+            {
+                _logger.LogWarning("PaymentOperationsAlert {AlertType}: runtime financial processing is held; TraceId={TraceId}",
+                    "yoco_runtime_authority_held", HttpContext.TraceIdentifier);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
             catch (AqualLifeStyle.Payments.Yoco.YocoWebhookTransientException exception)
             {
                 _logger.LogError(

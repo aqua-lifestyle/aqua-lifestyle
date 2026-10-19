@@ -91,6 +91,8 @@ namespace AqualLifeStyle.Payments.Yoco
         public virtual async Task ProcessAsync(VerifiedYocoPaymentNotification notification)
         {
             AqualLifeStyle.Configuration.ApplicationRecoveryMode.DenyBusinessOperation(_configuration);
+            if (string.Equals(_configuration["Yoco:Mode"]?.Trim(), "live", StringComparison.OrdinalIgnoreCase))
+                AqualLifeStyle.Configuration.RuntimeOperationGuards.RequireFinancialOperations(_configuration);
             PilotMode.DenyOutsidePilot("External provider notification");
             if (notification == null) throw new ArgumentNullException(nameof(notification));
             var isSucceeded = string.Equals(

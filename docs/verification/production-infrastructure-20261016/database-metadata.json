@@ -1,0 +1,46 @@
+{
+  "observedAt": "2026-10-16T18:13:09.543Z",
+  "databaseUrlAssociatedInstance": "dpg-d9f0jne1a83c73d8m780-a",
+  "metadata": [
+    {
+      "id": "dpg-d9f0jne1a83c73d8m780-a",
+      "status": 200,
+      "backupFields": {
+        "diskSizeGB": 1,
+        "highAvailabilityEnabled": false,
+        "plan": "basic_1gb",
+        "region": "frankfurt",
+        "status": "available",
+        "version": "18"
+      },
+      "availableBackupFieldNames": []
+    },
+    {
+      "id": "dpg-davoaabncjis73f56rj0-a",
+      "status": 200,
+      "backupFields": {
+        "diskSizeGB": 1,
+        "highAvailabilityEnabled": false,
+        "plan": "basic_1gb",
+        "region": "frankfurt",
+        "status": "available",
+        "version": "18"
+      },
+      "availableBackupFieldNames": []
+    }
+  ],
+  "recovery": [
+    {
+      "id": "dpg-d9f0jne1a83c73d8m780-a",
+      "http": 200,
+      "recoveryStatus": "AVAILABLE",
+      "startsAt": "2026-10-13T02:44:00Z"
+    },
+    {
+      "id": "dpg-davoaabncjis73f56rj0-a",
+      "http": 200,
+      "recoveryStatus": "AVAILABLE",
+      "startsAt": "2026-10-13T01:19:57Z"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-name: Qualified production release
+name: Automatic deployment trigger
 
 on:
   workflow_run:
@@ -10,103 +10,35 @@ permissions:
   contents: read
   actions: read
 
-# One rollout at a time, including approvals. Never cancel an in-flight provider
-# operation when another main update arrives. Stale waiting commits fail admission.
-concurrency:
-  group: production-release
-  cancel-in-progress: false
-
 jobs:
-  candidate:
-    name: Qualify immutable source candidate
+  trigger:
+    name: Dispatch qualified executor
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    outputs:
-      sha: ${{ steps.candidate.outputs.sha }}
-      artifact-id: ${{ steps.upload.outputs.artifact-id }}
     steps:
-      # workflow_run uses the trusted default branch, never PR code/artifacts.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
-      - name: Qualify completed main push and publish source evidence
-        id: candidate
+      # Installed ONLY on aqua-deployment: Actions:write and Metadata:read.
+      # No Contents/Workflows/Admin/Secrets write and no provider authority.
+      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        id: trigger-token
+        with:
+          app-id: ${{ vars.DEPLOYMENT_TRIGGER_APP_ID }}
+          private-key: ${{ secrets.DEPLOYMENT_TRIGGER_APP_PRIVATE_KEY }}
+          owner: aqua-lifestyle
+          repositories: aqua-deployment
+          permission-actions: write
+      - name: Automatically dispatch qualified source hints
         env:
           GH_TOKEN: ${{ github.token }}
-          CANDIDATE_DIR: ${{ runner.temp }}/candidate
-        run: |
-          mkdir -p "$CANDIDATE_DIR"
-          node tools/deployment/release-control.mjs candidate
-      - name: Retain immutable candidate and source digest
-        id: upload
-        uses: actions/upload-artifact@v6
-        with:
-          name: source-candidate-${{ steps.candidate.outputs.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/candidate
-          if-no-files-found: error
-          retention-days: 90
-      - name: Candidate evidence
-        env:
-          SOURCE_SHA: ${{ steps.candidate.outputs.sha }}
-          ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
-        run: |
-          printf 'Qualified source: `%s`\n\nImmutable artifact digest: `%s`\n\nDeployment requires separate protected authorization.\n' "$SOURCE_SHA" "$ARTIFACT_DIGEST" >> "$GITHUB_STEP_SUMMARY"
-
-  production:
-    name: Authorized recovery release
-    needs: candidate
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    environment: production-release
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.candidate.outputs.sha }}
-          persist-credentials: false
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-      - uses: actions/download-artifact@v7
-        with:
-          artifact-ids: ${{ needs.candidate.outputs.artifact-id }}
-          path: ${{ runner.temp }}/candidate
-          merge-multiple: true
-      - name: Admit exact release and identify trusted prior audit for an authorized retry
-        id: admission
-        env:
-          GH_TOKEN: ${{ github.token }}
-          AUTO_DEPLOY_ENABLED: ${{ vars.AUTO_DEPLOY_ENABLED }}
-          PRODUCTION_RELEASE_AUTHORIZATION: ${{ secrets.PRODUCTION_RELEASE_AUTHORIZATION }}
-          CANDIDATE_DIR: ${{ runner.temp }}/candidate
-          RELEASE_REPORT: ${{ runner.temp }}/release-report.jsonl
-        run: node tools/deployment/release-control.mjs admit
-      - name: Read immutable audit from the authorized earlier attempt of this release run
-        if: steps.admission.outputs.receipt-artifact-id != ''
-        uses: actions/download-artifact@v7
-        with:
-          artifact-ids: ${{ steps.admission.outputs.receipt-artifact-id }}
-          path: ${{ runner.temp }}/prior-release
-          merge-multiple: true
-      - name: Revalidate authority, providers, source and recovery before deployment
-        env:
-          GH_TOKEN: ${{ github.token }}
-          AUTO_DEPLOY_ENABLED: ${{ vars.AUTO_DEPLOY_ENABLED }}
-          PRODUCTION_RELEASE_AUTHORIZATION: ${{ secrets.PRODUCTION_RELEASE_AUTHORIZATION }}
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          CANDIDATE_DIR: ${{ runner.temp }}/candidate
-          RELEASE_REPORT: ${{ runner.temp }}/release-report.jsonl
-          RESUME_ARTIFACT_ID: ${{ steps.admission.outputs.receipt-artifact-id }}
-          RESUME_RECEIPT_FILE: ${{ runner.temp }}/prior-release/release-report.jsonl
-        run: node tools/deployment/release-control.mjs deploy
-      - name: Retain redacted release audit
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: production-release-audit-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/release-report.jsonl
-          if-no-files-found: warn
-          retention-days: 90
+          EXECUTOR_TRIGGER_TOKEN: ${{ steps.trigger-token.outputs.token }}
+        run: node tools/deployment/trigger-executor.mjs

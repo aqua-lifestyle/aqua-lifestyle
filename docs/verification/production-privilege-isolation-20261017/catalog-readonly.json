@@ -1,0 +1,23 @@
+{
+  "observedAt": "2026-10-16T22:35:58.726Z",
+  "method": "bounded catalog-only PostgreSQL BEGIN READ ONLY; ROLLBACK; no application rows read or mutation attempted",
+  "connection": {
+    "selectedService": "srv-d9f0k8e1a83c73d8n1b0",
+    "selectedDatabase": "dpg-d9f0jne1a83c73d8m780-a",
+    "sameApplicationCredential": true,
+    "externalEndpointFromAuthoritativeProvider": true,
+    "managedCredentialCount": 1,
+    "tls": "verify-full"
+  },
+  "status": "CATALOG_READ_BLOCKED",
+  "exitCode": 2,
+  "categories": [
+    "SSL connection",
+    "connection",
+    "SSL",
+    "error",
+    "closed unexpectedly"
+  ],
+  "transportErrorCode": null,
+  "diagnosticLength": 173
+}

@@ -30,13 +30,16 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         private readonly OnyxTravelBenefitEligibilityProcessor
             _eligibilityProcessor;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
+        private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
 
         public OnyxTravelBenefitSynchronizer(
             IRepository<OnyxParticipation, Guid> participationRepository,
             OnyxTravelBenefitEligibilityProcessor eligibilityProcessor,
-            IUnitOfWorkManager unitOfWorkManager)
+            IUnitOfWorkManager unitOfWorkManager,
+            Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
             _participationRepository = participationRepository;
+            _configuration = configuration;
             _eligibilityProcessor = eligibilityProcessor;
             _unitOfWorkManager = unitOfWorkManager;
         }
@@ -46,6 +49,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             ClosedCommissionWeek closedWeek,
             DateTime processedAt)
         {
+            AqualLifeStyle.Configuration.RuntimeOperationGuards.RequireFinancialOperations(_configuration);
             if (closedWeek == null)
             {
                 throw new ArgumentNullException(nameof(closedWeek));

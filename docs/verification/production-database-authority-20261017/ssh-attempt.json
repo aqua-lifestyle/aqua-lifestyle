@@ -1,0 +1,20 @@
+{
+  "observedAt": "2026-10-17T07:35:29.999Z",
+  "route": "existing Render Frankfurt SSH gateway/key; strict verified known host; no forwarding or ephemeral instance",
+  "attempts": 1,
+  "remoteCommand": "catalog-client presence only",
+  "productionDatabaseConnections": 0,
+  "elapsedMs": 4445,
+  "exitCode": 255,
+  "processErrorCode": null,
+  "authenticatedCommandCompleted": false,
+  "catalogClientPresent": null,
+  "failureSignals": {
+    "timeout": true,
+    "authentication": false,
+    "hostKey": false,
+    "closed": false,
+    "containerConfiguration": false
+  },
+  "rawDiagnosticsSuppressed": true
+}

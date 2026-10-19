@@ -14,6 +14,8 @@ using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.Payments.Yoco;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using AqualLifeStyle.Configuration;
 
 namespace AqualLifeStyle.Payments
 {
@@ -78,6 +80,7 @@ namespace AqualLifeStyle.Payments
         private readonly IUnitOfWorkManager _unitOfWorkManager;
         private readonly IHostedPaymentCheckoutLock _hostedPaymentCheckoutLock;
         private readonly ProgrammeApprovalNotificationScheduler _approvalNotificationScheduler;
+        private readonly IConfiguration _configuration;
         public AqualLifeStyle.Domain.AQGreen.IAQGreenPilotMode PilotMode { get; set; }
             = AqualLifeStyle.Domain.AQGreen.DisabledAQGreenPilotMode.Instance;
 
@@ -97,9 +100,11 @@ namespace AqualLifeStyle.Payments
             IHostedPaymentCheckoutLock hostedPaymentCheckoutLock,
             IUnitOfWorkManager unitOfWorkManager,
             ProgrammeApprovalNotificationScheduler approvalNotificationScheduler,
-            AQGreenFuneralCoverInclusionProcessor funeralCoverInclusionProcessor)
+            AQGreenFuneralCoverInclusionProcessor funeralCoverInclusionProcessor,
+            IConfiguration configuration)
         {
             _paymentRepository = paymentRepository;
+            _configuration = configuration;
             _entryParticipationRepository = entryParticipationRepository;
             _onyxParticipationRepository = onyxParticipationRepository;
             _directOnyxCheckoutIntentRepository = directOnyxCheckoutIntentRepository;
@@ -133,6 +138,7 @@ namespace AqualLifeStyle.Payments
                 DateTime confirmedAt)
         {
             PilotMode.DenyOutsidePilot("Direct Onyx payment confirmation");
+            RuntimeOperationGuards.RequireFinancialOperations(_configuration);
             if (checkoutIntentId == Guid.Empty)
                 throw new ArgumentException("A checkout intent is required.", nameof(checkoutIntentId));
 
@@ -431,6 +437,8 @@ namespace AqualLifeStyle.Payments
                 providerCheckoutId != "PILOT-TEST-" + checkoutId.ToString("N") ||
                 externalPaymentReference != "PILOT-TEST-PAYMENT-" + checkoutId.ToString("N")))
                 throw new InvalidOperationException("Only explicitly represented test money can enter the pilot.");
+            ApplicationRecoveryMode.DenyBusinessOperation(_configuration);
+            if (!PilotMode.IsEnabled) RuntimeOperationGuards.RequireFinancialOperations(_configuration);
             if (checkoutId == Guid.Empty)
                 throw new ArgumentException("An AQGreen checkout is required.", nameof(checkoutId));
 
@@ -577,6 +585,7 @@ namespace AqualLifeStyle.Payments
                 DateTime confirmedAt)
         {
             PilotMode.DenyOutsidePilot("Monthly obligation payment");
+            RuntimeOperationGuards.RequireFinancialOperations(_configuration);
             if (checkoutId == Guid.Empty)
                 throw new ArgumentException(
                     "An AQGreen monthly checkout is required.",
@@ -730,6 +739,7 @@ namespace AqualLifeStyle.Payments
             ConfirmedProgrammePayment confirmation)
         {
             PilotMode.DenyOutsidePilot("External programme payment confirmation");
+            RuntimeOperationGuards.RequireFinancialOperations(_configuration);
             if (confirmation == null)
             {
                 throw new ArgumentNullException(nameof(confirmation));
