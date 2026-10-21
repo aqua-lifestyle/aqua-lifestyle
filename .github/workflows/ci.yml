@@ -1,50 +1,38 @@
-name: B6 harmless public approval probe
-run-name: B6 harmless approval probe ${{ inputs.case }} ${{ inputs.permit_sha256 }}
+name: B6 metadata-only public approval
+run-name: B6 approval ${{ inputs.permit_sha256 }}
 
-# Disposable test branch only. This registered filename permits a manual test
-# without installing or merging a workflow on main. Not a qualification workflow.
+# The existing registered ci.yml on the isolated approval branch carries these
+# exact reviewed bytes. Main application CI is not replaced or merged by this PR.
 on:
   workflow_dispatch:
     inputs:
-      case:
-        description: Harmless environment-control experiment only
-        required: true
-        type: choice
-        options:
-          - self-review
-          - administrator-bypass
-          - independent-positive
       permit_sha256:
-        description: Synthetic test commitment, never a real qualification permit
+        description: Commitment to the exact private run permit; no private payload
         required: true
         type: string
 
 permissions: {}
 
 jobs:
-  harmless:
+  approve:
+    name: B6 public approval
     if: github.repository == 'aqua-lifestyle/aqua-lifestyle'
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     environment: b6-public-approval-probe
     steps:
-      - name: Print harmless test metadata after native approval
+      - name: Complete metadata-only gate after native independent review
         env:
-          TEST_CASE: ${{ inputs.case }}
-          TEST_PERMIT: ${{ inputs.permit_sha256 }}
+          PERMIT_SHA256: ${{ inputs.permit_sha256 }}
         run: |
           python3 - <<'PY'
           import json, os, re
-          permit = os.environ['TEST_PERMIT']
-          if not re.fullmatch('[0-9a-f]{64}', permit):
-              raise RuntimeError('synthetic SHA256 required')
-          print(json.dumps({
-              'schema': 'B6HarmlessPublicApprovalProbeV1',
-              'scope': 'HARMLESS_TEST_NOT_BASELINE_ACCEPTANCE_NOT_QUALIFICATION',
-              'case': os.environ['TEST_CASE'], 'synthetic_permit_sha256': permit,
-              'public_run_id': os.environ['GITHUB_RUN_ID'],
-              'public_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
-              'public_workflow_commit': os.environ['GITHUB_SHA'],
-              'public_workflow_ref': os.environ['GITHUB_WORKFLOW_REF'],
-          }, sort_keys=True))
+          commitment = os.environ['PERMIT_SHA256']
+          if not re.fullmatch('[0-9a-f]{64}', commitment):
+              raise RuntimeError('exact SHA256 commitment required')
+          print(json.dumps({'schema': 'B6PublicApprovalCarrierV1',
+                            'permit_sha256': commitment,
+                            'public_run_id': os.environ['GITHUB_RUN_ID'],
+                            'public_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+                            'scope': 'APPROVAL_METADATA_ONLY_NOT_QUALIFICATION'}, sort_keys=True))
           PY
