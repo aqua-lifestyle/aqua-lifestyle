@@ -37,20 +37,27 @@ silently incorporating changed domain/migration/dependency semantics.
 - Three host-tool archives were verified against signed InRelease/index/archive
   identities without installation: Ubuntu mawk/BusyBox and Flatpak stable PPA
   Bubblewrap0.12.0. New PPA policy/binary identity needs independent review.
-- Candidate archive SHA256
-  `db193861ef5d607d390564d3543d71c486283fd1c6e5b7c889f500da7ea85619`,
-  size852588720 bytes. Toolchain manifest
+- Final allowlisted candidate archive SHA256
+  `9a370cf737b541fe624bcac5754b970bb3c3dcc7f89699fccb4b2ebbbffd0229`,
+  size570465384 bytes, nine private transport parts. Toolchain manifest
   `3fb331fd78afd15ba94aa2ac11c1cfaace2a654d32258ce1acfa128dbcc7590a`.
 - Rehydration first correctly rejected Python's default data-filter mode changes.
   The custody extractor now retains authenticated archive modes after path/link/type
   safety checks. Full source-bound archive/215 files/toolchain/locks/host archives
   verification then passed. This does not approve the candidate.
-- Private GitHub candidate readback passed:13 transport parts reconstruct the exact
+- The initial unpublished whole-directory draft was withdrawn and deleted after
+  custody inspection found unnecessary generated development-certificate state in
+  its CLI home. No production credential was involved. The replacement exporter
+  explicitly excludes CLI homes/certificate stores, installed caches and scratch;
+  input verification independently rejects non-allowlisted members. Original
+  native logs and source/archive identities remain retained; no qualification or
+  accepted historical record was deleted or relabeled.
+- Final private GitHub candidate readback passed: nine allowlisted parts reconstruct the exact
   archive hash, then complete frozen-tree/feed/locks/host-archive verification
   passed after fresh extraction. The original bootstrap package-validation
   functions also passed against all215 actual native-restored packages, without
   executing the bootstrap or any privileged isolation lane.
-- Workflow/custody development checks passed:5 unittest groups, including22
+- Workflow/custody development checks passed: six unittest groups, including22
   first-boundary authority rejection cases and safe read-only-mode transfer checks;
   all embedded shell blocks pass `bash -n`. These API responses are mocked test
   cases, distinct from the actual GitHub configuration readback and422 above.
@@ -79,7 +86,27 @@ execution blocker; no plan purchase/upgrade is authorized by this task.
 
 ## Remaining boundary
 
-Finish source/workflow/custody development validation and exact review publication.
+At code commit `72ec84806ca3ebf912be5cfa330a5410abd384b1`, ordinary non-privileged
+validation using the actual replacement Microsoft SDK8.0.130/runtime8.0.30 passed:
+**61 primitive tests**, **41 PG18 artifact/compatibility tests**, zero failures or
+skips, plus the existing one-case synthetic root-disposition writer. Two complete
+synthetic PG18 inventory/analysis/impact/final-manifest runs remained identical and
+final reverification/TRX verification passed. Existing three Core warnings remain;
+the first SDK use also reported a workload-verification notice. No assertion or
+operational warning closure was relaxed. Test TRX hashes:
+
+- primitive61: `0e948370d189e71bc55a73ff5d900f79e59226ff1004c1ade2aecb89186fe348`
+- PG18/package41: `05548c4487b102446bcd6a6a95077190be29a6e76626855d1656f2ea51633401`
+
+Subsequent export hardening changes only Python custody/verification, workflow
+candidate locator, manifest and documentation; the tested .NET code and bootstrap
+bytes are unchanged. Six Python security/custody test groups and full allowlisted
+candidate verification/readback passed after that hardening. Private workflow
+copy is source-byte-identical; no workflow dispatch/run occurred. No owned PG18
+fixture containers remained after development validation.
+
+Preparation is IMPLEMENTED and TESTED within those development evidence scopes.
+This is not privileged qualification, independent acceptance or production evidence.
 Independent reviewer appointment, exact baseline/source approval, supported required
 environment protection, and a separate run/attempt-bound owner authorization are
 required before privileged execution. Independent resulting-evidence acceptance

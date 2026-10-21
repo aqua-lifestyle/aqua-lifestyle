@@ -135,7 +135,7 @@ jobs:
           test "$(git -C "$B6_ROOT/source" rev-parse HEAD)" = "$SOURCE_COMMIT"
           package="$B6_ROOT/source/docs/operations/aqgreen-v2-b6/snapshot-package"
           cmp "$B6_ROOT/candidate-baseline.json" "$package/replacement-supply/candidate-baseline.json"
-          gh release download candidate-20261021-1 --repo "$GITHUB_REPOSITORY" --pattern 'replacement-inputs.tar.gz.part-*' --dir "$B6_ROOT" > "$B6_ROOT/input-download.log" 2>&1
+          gh release download candidate-20261021-2 --repo "$GITHUB_REPOSITORY" --pattern 'replacement-inputs.tar.gz.part-*' --dir "$B6_ROOT" > "$B6_ROOT/input-download.log" 2>&1
           python3 - <<'PY'
           import json, os, pathlib, shutil
           root = pathlib.Path(os.environ['B6_ROOT'])

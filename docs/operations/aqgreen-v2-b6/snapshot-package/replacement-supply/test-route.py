@@ -160,6 +160,20 @@ class WorkflowGuardTests(unittest.TestCase):
 
 
 class CustodyModeTests(unittest.TestCase):
+    def test_cli_homes_keys_scratch_and_unselected_installed_caches_are_not_exports(self):
+        spec = importlib.util.spec_from_file_location("verification", HERE / "verify-inputs.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        for path in ("supply/native-home/.dotnet/corefx/cryptography/x509stores/my/dev.pfx",
+                     "supply/native-home", "supply/native-packages/abp/9.4.1/abp.nuspec",
+                     "supply/restore-artifacts/project.assets.json", "host-tools/bubblewrap/extracted/usr/bin/bwrap",
+                     "supply/frozen-dotnet-evil/payload"):
+            self.assertFalse(module.allowed_member(path), path)
+        for path in ("supply/frozen-dotnet/dotnet", "supply/feed/abp.9.4.1.nupkg",
+                     "supply/native-logs/abp.9.4.1.verify.log", "supply/native-packages-tree.tsv",
+                     "host-tools/bubblewrap.deb", "host-tools/mawk/signature.log"):
+            self.assertTrue(module.allowed_member(path), path)
+
     def test_authenticated_readonly_modes_survive_safe_extraction(self):
         spec = importlib.util.spec_from_file_location("verification", HERE / "verify-inputs.py")
         module = importlib.util.module_from_spec(spec)

@@ -20,10 +20,11 @@
   "classification": "NON_PRIVILEGED_CANDIDATE_SUPPLY_VERIFICATION_NOT_GATE_Q_A",
   "baseline_id": "B6_V4_PG18_REPLACEMENT_SUPPLY_20261021_1",
   "custody_repository": "aqua-lifestyle/b6-qualification-evidence",
-  "custody_release": "candidate-20261021-1",
+  "custody_release": "candidate-20261021-2",
   "archive_name": "replacement-inputs.tar.gz",
-  "archive_parts": 13,
-  "archive_sha256": "db193861ef5d607d390564d3543d71c486283fd1c6e5b7c889f500da7ea85619",
+  "archive_parts": 9,
+  "archive_sha256": "9a370cf737b541fe624bcac5754b970bb3c3dcc7f89699fccb4b2ebbbffd0229",
+  "native_packages_tree_sha256": "3319a232099315a123a5852fedd31656db3e9ec7db147576f1eb949b3db412f3",
   "host_tools_manifest_sha256": "24afe9216d84275c9f9de226de47a3056555d790260a7b70807f8529745b7cce",
   "host_tools": [
     {

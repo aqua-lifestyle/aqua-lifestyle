@@ -27,9 +27,17 @@ complete frozen toolchain inventory, native NuGet version, dotnet host, exact fe
 host packages and bootstrap. These hashes are integrity candidates, **not approval**.
 Full manifests, archives, download records, native logs and signed repository
 metadata are restricted private release assets, not public Git content/artifacts.
-The852588720-byte input archive is transported as13 numbered private release
+The 570465384-byte allowlisted input archive is transported as nine numbered private release
 assets. Concatenation must reproduce the pinned complete archive SHA256 before
 any extraction; transport parts do not establish separate approval authority.
+`package-candidate.py` selects only publisher archives, frozen toolchain, feed,
+manifests, provenance and native verification logs. CLI homes/certificate stores,
+installed caches and scratch are excluded; installed materialization is retained
+as a complete hashed tree inventory. The input verifier independently rejects
+non-allowlisted members. The initial unpublished draft export was withdrawn after
+custody inspection identified generated development-certificate state in its CLI
+home; the replacement export is independently hash-checked/read back before any
+publication. No production credential or qualification run was involved.
 
 - SDK8.0.130/runtime8.0.30: exact Microsoft Linux-x64 release archive, independently
   pinned publisher SHA512 from the official release metadata. The verified Microsoft

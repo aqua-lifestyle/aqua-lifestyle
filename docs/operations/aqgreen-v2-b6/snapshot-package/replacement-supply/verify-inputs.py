@@ -34,10 +34,25 @@ def custody_filter(member, destination):
     return filtered.replace(mode=member.mode) if filtered is not None else None
 
 
+def allowed_member(name):
+    # Deliberately no CLI HOME, certificate store, installed cache or scratch tree.
+    # Third-party public SDK/package contents remain byte-exact inside these roots.
+    supply = ("dotnet-sdk-8.0.130-linux-x64.tar.gz", "frozen-dotnet", "feed",
+              "toolchain-manifest.tsv", "feed-manifest.tsv", "candidate.json",
+              "provenance", "native-logs", "native-packages-tree.tsv")
+    host = ("host-tools.json", "mawk.deb", "busybox-static.deb", "bubblewrap.deb",
+            "flatpak-ppa.json", "flatpak-ppa-key.asc", "flatpak-ppa-key.gpg",
+            *(f"{package}/{path}" for package in ("mawk", "busybox-static", "bubblewrap")
+              for path in ("InRelease", "Packages.xz", "signature.log")))
+    return (any(name == "supply/" + path or name.startswith("supply/" + path + "/") for path in supply)
+            or any(name == "host-tools/" + path for path in host))
+
+
 def verify(baseline, root, repository):
     supply = root / "supply"
     require(sha(supply / "toolchain-manifest.tsv") == baseline["toolchain_manifest_sha256"], "toolchain manifest mismatch")
     require(sha(supply / "feed-manifest.tsv") == baseline["feed_manifest_sha256"], "feed manifest mismatch")
+    require(sha(supply / "native-packages-tree.tsv") == baseline["native_packages_tree_sha256"], "native materialization evidence mismatch")
     require(sha(supply / "dotnet-sdk-8.0.130-linux-x64.tar.gz", "sha512") == baseline["sdk_publisher_sha512"], "publisher SDK archive mismatch")
     module_spec = importlib.util.spec_from_file_location("prepare", Path(__file__).with_name("prepare-candidate.py"))
     helper = importlib.util.module_from_spec(module_spec)
@@ -81,6 +96,7 @@ def main():
     with tarfile.open(args.archive) as archive:
         members = archive.getmembers()
         require(len({m.name for m in members}) == len(members), "duplicate archive entries")
+        require(all(allowed_member(m.name) for m in members), "non-allowlisted candidate export")
         archive.extractall(args.output, members=members, filter=custody_filter)
     verify(baseline, args.output, args.repository)
     print("Replacement candidate archive, complete toolchain, 215 feed archives, locks and host packages verified; not approval.")

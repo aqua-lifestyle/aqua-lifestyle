@@ -171,6 +171,7 @@ def main():
         "DOTNET_ROOT": str(frozen), "DOTNET_ROOT_X64": str(frozen), "DOTNET_CLI_HOME": str(home),
         "DOTNET_CLI_TELEMETRY_OPTOUT": "1", "DOTNET_SKIP_FIRST_TIME_EXPERIENCE": "1",
         "DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE": "true", "DOTNET_NOLOGO": "1",
+        "DOTNET_GENERATE_ASPNET_CERTIFICATE": "false",
         "DOTNET_NUGET_SIGNATURE_VERIFICATION": "true", "NUGET_CERT_REVOCATION_MODE": "online",
         "NUGET_PACKAGES": str(packages), "NUGET_HTTP_CACHE_PATH": str(home / "http"),
         "LC_ALL": "C", "MSBUILDDISABLENODEREUSE": "1",
