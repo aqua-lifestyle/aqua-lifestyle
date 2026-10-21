@@ -140,7 +140,7 @@ public sealed partial class B6SnapshotPackage
         DateTimeOffset? generatedAt, string? forbiddenValues)
     {
         if (approvedDestination != B6Contract.ApprovedDestination)
-            throw new B6PackageException("Handoff destination is not the package-owned isolated PostgreSQL 16 destination.");
+            throw new B6PackageException("Handoff destination is not the package-owned isolated PostgreSQL 18 destination.");
         var final = await VerifyFinalAsync(snapshot, manifest, rootDispositions, inventory,
             runtimeState, schema, inventorySql, forbiddenValues);
         if (final["manifestStage"]?.GetValue<string>() != "FINAL_ANALYSIS")

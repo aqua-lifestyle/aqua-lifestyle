@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:aqua:aqgreen:b6:snapshot-handoff:v3",
+  "$id": "urn:aqua:aqgreen:b6:snapshot-handoff:v4",
   "type": "object",
   "additionalProperties": false,
   "required": ["snapshotId", "finalManifestDigest", "analysisSnapshotCutoff", "packageVersion", "sanitisationVersion", "toolchainIdentity", "repositoryCommit", "approvedDestination", "verificationResult", "operatorGeneratedAt", "receiptDigest"],
@@ -8,11 +8,11 @@
     "snapshotId": {"type": "string", "pattern": "^[A-Za-z0-9._-]{8,128}$"},
     "finalManifestDigest": {"$ref": "#/$defs/digest"},
     "analysisSnapshotCutoff": {"type": "string", "format": "date-time"},
-    "packageVersion": {"const": "AQGreenB6SnapshotPackageV3"},
+    "packageVersion": {"const": "AQGreenB6SnapshotPackageV4"},
     "sanitisationVersion": {"const": "AQGreenB6SanitisationV3"},
     "toolchainIdentity": {"$ref": "#/$defs/toolchainIdentity"},
     "repositoryCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
-    "approvedDestination": {"const": "PACKAGE_OWNED_ISOLATED_POSTGRESQL_16"},
+    "approvedDestination": {"const": "PACKAGE_OWNED_ISOLATED_POSTGRESQL_18"},
     "verificationResult": {"const": "PASSED"},
     "operatorGeneratedAt": {"type": "string", "format": "date-time"},
     "receiptDigest": {"$ref": "#/$defs/digest"}

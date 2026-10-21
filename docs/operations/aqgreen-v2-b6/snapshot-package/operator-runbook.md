@@ -1,20 +1,38 @@
 # Operator runbook — AQGreen B6 representative snapshot
 
+**V4 compatibility candidate:** PostgreSQL18.4/180004 and the custodian-observed
+54-migration schema ending at `20261005194901_AddIsolatedAQGreenPilotEvidence`.
+Use only a separately reviewed/qualified release of these exact source changes;
+V3/PG16 qualification does not transfer. The narrowly authorized replacement-supply
+preparation is governed by [amendment1](replacement-supply/AMENDMENT.md) and its
+candidate manifest. It is not independently approved or privileged qualification.
+Existing operator authority, protected Zone2/Zone3 custody, substantive frozen
+build/supply and privileged-bootstrap gates remain.
+
+The implemented [public/private approval handoff candidate](replacement-supply/PUBLIC-HANDOFF-AMENDMENT.md)
+is explicitly pending independent acceptance. GitHub defaults to its separate
+read-only `handoff-test` job; that job has no acquisition, sudo or qualification
+step. Qualification remains behind the private branch hold, owner enablement,
+exact-source independent baseline/amendment acceptance, native public review and
+run/attempt/nonce-bound owner permit. A test result is not operational authority.
+
 > **DO NOT RUN WITHOUT PRODUCTION/DATA AUTHORIZATION.** This is a template for an
 > authorised DBA/platform operator. D03B/D09, repository content, and disposable
 > test success do not grant access.
 
 ## Pre-extraction checkpoint
 
-### New-lineage native candidate boundary
+### Historical new-lineage native candidate boundary (not the replacement route)
 
 The fresh native process-group candidate is PRECOMMIT_SYNTHETIC_VALIDATION only.
 Its source/build/ELF identities come from its new manifest, not lost historical
-artifacts. Application and real qualification remain unauthorized. Preserve the
-base `authoritative-runner.sh` bytes (SHA-256
-`5ed57d64c74014002708dc679d5d26e9d7b53e888d1124dce3a74432e16a6244`).
-Do not modify Gate-Q/Gate-A policy or mistake ordinary-user native fixture success
-for operational gate execution.
+artifacts. Application and real qualification remain unauthorized. Its historical
+base `authoritative-runner.sh` bytes had SHA-256
+`5ed57d64c74014002708dc679d5d26e9d7b53e888d1124dce3a74432e16a6244`.
+Those historical bytes remain in Git. The replacement amendment separately reviews
+its scoped bootstrap changes; it does not adopt this native candidate. Do not
+weaken Gate-Q/Gate-A policy or mistake ordinary-user native fixture success for
+operational gate execution.
 
 For a separately authorized future installation, the native binary has frozen
 package/output-parent locations recorded in its build manifest. These must be
@@ -390,7 +408,7 @@ The disposition document must also copy the verified base manifest's `SnapshotId
 rejects the component; it is never silently rebound.
 
 Run `run-analysis.sh` for Zone 3. It verifies the base manifest, creates and owns a
-unique loopback-only PostgreSQL 16 container with generated credentials, restores
+unique loopback-only digest-pinned PostgreSQL 18.4 container with generated credentials, restores
 the bounded snapshot, and runs `verify-db`. It accepts no destination DSN,
 verifies its container labels/nonce and database identity, rejects source/destination
 identity equality, and cleans up only that verified package-owned resource. The
@@ -399,11 +417,10 @@ Aqua application worker attached by the package. The tool does not attest arbitr
 external worker state. Npgsql reads generated credentials only from the verified
 owner-only runtime state; credentials are never command arguments.
 
-The current default Docker bridge permits outbound connectivity. That blocks use
+The default Docker bridge permits outbound connectivity. That blocks use
 with representative controlled data until the approved Zone 3 environment enforces
-and verifies no outbound connectivity. The mutable `postgres:16-alpine` tag is a
-separate operational-environment reproducibility residual; it is not classified as
-a source-commit blocker in this correction.
+and verifies no outbound connectivity. V4 pins its PostgreSQL18.4 image digest;
+that pin is not proof of network isolation or approval of a custodian environment.
 
 Verification rejects missing/extra tables or fields, prohibited field names,
 unknown versions, absent cutoff, bad keys/ordinals, broken or cross-Tenant

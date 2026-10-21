@@ -15,7 +15,7 @@ readonly expected_u1_sha256='9598c6dd7cab8f0dc62a31be8c73a3c030c5d92d26d120689f0
 readonly expected_u2_count='2'
 readonly expected_u2_sha256='84ba6476727924aecc6b94207f6de1fdc1135804edbea4d32b7984ede77a6b35'
 readonly expected_feed_manifest_sha256='1a56a8bad2fed7875f3326f620ce40af7c0f805d7f16696efa7f1eceaf816df7'
-readonly expected_toolchain_manifest_sha256='1c609222deecbbc9ef65d311528ad1eb19ff26adf70227752ee95cca73a5910c'
+readonly expected_toolchain_manifest_sha256='3fb331fd78afd15ba94aa2ac11c1cfaace2a654d32258ce1acfa128dbcc7590a'
 readonly expected_core_lock_sha256='9f467700282dc48f8bdc172eb8f1830a3167cbc4efaa223a328b1ff00c4acddc'
 readonly expected_ef_lock_sha256='2b1925d618a39d10fa57e3e8455f06c3565de75ccdc3ae4a9021e357c9d07356'
 readonly expected_runner_lock_sha256='401fafbcfa35347666a4de3fcfa92be9c66399663d8f8410eca420879c3d7b7b'
@@ -24,8 +24,9 @@ readonly expected_signer_policy_sha256='0d131692c7d4035f4ed890d6b32fb127bd6fe423
 readonly expected_simulate_input_sha256='5ab46a2fe268ad525c42ae06a47fb5a105802b37d0733c48fcdc093a14398a5c'
 readonly expected_sdk_version='8.0.130'
 readonly expected_runtime_version='8.0.30'
-readonly expected_nuget_version='6.8.2.32767'
-readonly expected_dotnet_host_sha256='045a8891a4e84d5acec53b3650e2ea4210bc6d3fc4ddc2d6c8de63662afa56aa'
+readonly expected_nuget_version='6.8.2.3'
+readonly expected_dotnet_host_sha256='c61ff7f8665688b95ad0f34e780daaa67b978d26115b82797c07ea6044c566ed'
+readonly expected_bwrap_sha256='8d4629686bf51c0a062a1f8a5753d7b29e95c5c81e20499dd2310f7921023140'
 readonly expected_mawk_sha256='3850bf893d3f4f8ec462c8b59d6d66fdbbe8ddc0715b3d404d9cc574526b781c'
 readonly expected_mawk_version='mawk 1.3.4 20240123'
 readonly expected_mawk_package_version='1.3.4.20240123-1build1'
@@ -508,6 +509,20 @@ if ! env -i PATH="${frozen_dotnet_root}:/usr/bin:/bin" HOME="${a_l_home}" TMPDIR
 fi
 cp -- "${a_l_restore_log}" "${evidence_dir}/a-l-locked-acquisition.log"
 
+decode_package_path() {
+  local remaining="$1" decoded='' prefix byte hex
+  while [[ "${remaining}" == *%* ]]; do
+    prefix="${remaining%%\%*}"; decoded+="${prefix}"; remaining="${remaining#*%}"
+    [[ "${remaining}" =~ ^([[:xdigit:]]{2})(.*)$ ]] || fail 'invalid encoded package path'
+    hex="${BASH_REMATCH[1]}"; remaining="${BASH_REMATCH[2]}"
+    [[ "${hex}" != 00 ]] || fail 'NUL encoded package path'
+    printf -v byte '%b' "\\x${hex}"; decoded+="${byte}"
+  done
+  decoded+="${remaining}"
+  [[ -n "${decoded}" && "${decoded}" != /* && "${decoded}" != *\\* && "${decoded}" != .. && "${decoded}" != ../* && "${decoded}" != */../* && "${decoded}" != */.. && "${decoded}" != *$'\t'* && "${decoded}" != *$'\r'* && "${decoded}" != *$'\n'* ]] || fail 'unsafe decoded package path'
+  printf '%s' "${decoded}"
+}
+
 validate_package_root() {
   local source="$1" expected_manifest="$2" raw_output="$3" label="$4" installed_source="$5" id version directory archive expected_row archive_name raw_sha raw_sha512 content_hash archive_nuspec installed_nuspec package_source archive_nuspec_entry actual_archive_nuspec actual_raw_sha512 expected_files actual_files entry installed_path count=0
   [[ -z "$(find -P "${source}" -mindepth 1 -type l -print -quit)" && -z "$(find -P "${source}" -mindepth 1 ! -type d ! -type f -print -quit)" ]] || fail "${label} contains unsafe entries"
@@ -520,7 +535,9 @@ validate_package_root() {
     [[ "$(sha256_file "${archive}")" == "${raw_sha}" ]] || fail "${label} archive mismatch ${id}/${version}"
     actual_raw_sha512="$(/usr/bin/openssl dgst -sha512 -binary "${archive}" | /usr/bin/base64 -w0)"
     [[ "${actual_raw_sha512}" == "${raw_sha512}" ]] || fail "${label} raw SHA-512 mismatch ${id}/${version}"
-    [[ "$(tr -d '\r\n' < "${archive}.sha512")" == "${content_hash}" ]] || fail "${label} content hash mismatch ${id}/${version}"
+    # Microsoft's SDK writes the raw signed-archive SHA512 here. Canonical NuGet
+    # identity is independently checked in .nupkg.metadata and locked assets.
+    [[ "$(tr -d '\r\n' < "${archive}.sha512")" == "${raw_sha512}" ]] || fail "${label} raw hash sidecar mismatch ${id}/${version}"
     [[ "$(sha256_file "${directory}/${id}.nuspec")" == "${installed_nuspec}" ]] || fail "${label} nuspec mismatch ${id}/${version}"
     archive_nuspec_entry="$(/usr/bin/unzip -Z1 "${archive}" | ${qualified_mawk} -v expected="${id}.nuspec" 'tolower($0)==expected {print; found++} END {if(found!=1) exit 1}')" || fail "${label} archive nuspec missing ${id}/${version}"
     actual_archive_nuspec="$(/usr/bin/unzip -p "${archive}" "${archive_nuspec_entry}" | sha256sum | { read -r digest _; printf '%s' "${digest}"; })"
@@ -531,7 +548,9 @@ validate_package_root() {
       [[ -n "${entry}" && "${entry}" != */ ]] || continue
       [[ "${entry}" != /* && "${entry}" != *\\* && "${entry}" != .. && "${entry}" != ../* && "${entry}" != */../* && "${entry}" != */.. && "${entry}" != *$'\t'* && "${entry}" != *$'\r'* ]] || fail "${label} unsafe archive path ${id}/${version}"
       case "${entry}" in _rels/*|'[Content_Types].xml'|package/services/metadata/core-properties/*) continue ;; esac
-      if [[ "${entry,,}" == "${id}.nuspec" ]]; then installed_path="${id}.nuspec"; else installed_path="${entry}"; fi
+      installed_path="$(decode_package_path "${entry}")" || fail "${label} unsafe installed package path ${id}/${version}"
+      if [[ "${installed_path,,}" == "${id}.nuspec" ]]; then installed_path="${id}.nuspec"; fi
+      ! grep -Fqx -- "${installed_path}" "${expected_files}" || fail "${label} normalized package path collision ${id}/${version}"
       printf '%s\n' "${installed_path}" >> "${expected_files}"
       [[ -f "${directory}/${installed_path}" && ! -L "${directory}/${installed_path}" ]] || fail "${label} extracted file missing ${id}/${version}/${installed_path}"
       if [[ "${entry,,}" != "${id}.nuspec" ]]; then
@@ -692,6 +711,7 @@ LOCKS
 verify_locks "${source_q}"; verify_locks "${source_a}"; verify_locks "${source_b}"
 
 [[ -x "${bwrap}" && -f "${bwrap}" && ! -L "${bwrap}" ]] || fail 'Bubblewrap unavailable'
+[[ "$(sha256_file "${bwrap}")" == "${expected_bwrap_sha256}" ]] || fail 'Bubblewrap identity mismatch'
 bootstrap_uid="$(id -u)"; bootstrap_gid="$(id -g)"
 [[ "${bootstrap_uid}" == 0 && "${bootstrap_gid}" == 0 ]] || fail 'trusted bootstrap must have effective UID/GID 0 for exact namespace maps'
 network_witness_script="${private_root}/network-witness.sh"

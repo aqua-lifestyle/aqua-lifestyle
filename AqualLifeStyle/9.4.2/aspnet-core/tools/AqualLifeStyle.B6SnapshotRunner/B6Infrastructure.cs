@@ -13,7 +13,7 @@ namespace AqualLifeStyle.B6SnapshotRunner;
 
 public static class B6Contract
 {
-    public const string PackageVersion = "AQGreenB6SnapshotPackageV3";
+    public const string PackageVersion = "AQGreenB6SnapshotPackageV4";
     public const string PseudonymVersion = "HmacSha256NamespacedFatalCollisionV3";
     public const string SanitisationVersion = "AQGreenB6SanitisationV3";
     public const string OrderingVersion = "DotNetGuidCompareToOrdinalV3";
@@ -25,13 +25,16 @@ public static class B6Contract
     public const string AnalysisVersion = "AQGreenB6RepresentativeAnalysisV3";
     public const string RootReviewVersion = "AQGreenB6RootReviewDispositionV1";
     public const string ImpactVersion = "AQGreenB6ImpactAnalysisV3";
-    public const string RuntimeVersion = "AQGreenB6OwnedPostgreSqlRuntimeV2";
-    public const string ExpectedMigrationHead = "20260831230903_AddAQGreenV2CommissionConsumption";
+    public const string RuntimeVersion = "AQGreenB6OwnedPostgreSqlRuntimeV3";
+    public const int PostgreSqlMajorVersion = 18;
+    public const int PostgreSqlVersionNumber = 180004;
+    public const string PostgreSqlImage = "postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15";
+    public const string ExpectedMigrationHead = "20261005194901_AddIsolatedAQGreenPilotEvidence";
     public const string PopulationScope = "ALL_TENANT_AQGREEN_PARTICIPATIONS";
     public const string Classification = "PSEUDONYMISED_AND_DATA_MINIMISED";
-    public const string ApprovedDestination = "PACKAGE_OWNED_ISOLATED_POSTGRESQL_16";
+    public const string ApprovedDestination = "PACKAGE_OWNED_ISOLATED_POSTGRESQL_18";
     public const string WorkerBoundary = "POSTGRES_ONLY_CONTAINER_NO_AQUA_APPLICATION_ATTACHED_BY_PACKAGE";
-    public const string ExpectedAllowlistDigest = "cd3361f174bb5b9ab20736c79328110fd4246ce965e51acc59e195f2bc9e514a";
+    public const string ExpectedAllowlistDigest = "794f55b268ab92d23708e2aa72a08c41d835f01afc9a17b3bda578bad705d6d3";
     public const string Null = @"\N";
     public const string EvidenceClassificationEnvironment = "B6_EXECUTION_EVIDENCE_CLASSIFICATION";
     public const string PrecommitEvidence = "PRECOMMIT_SYNTHETIC_VALIDATION";

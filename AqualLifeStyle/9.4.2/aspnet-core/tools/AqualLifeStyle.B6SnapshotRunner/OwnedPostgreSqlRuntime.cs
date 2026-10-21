@@ -30,12 +30,12 @@ public sealed class OwnedPostgreSqlRuntime
         };
         var containerId = ToolchainIdentity.Run("docker",
         [
-            "run", "--rm", "-d", "--name", name,
+            "run", "--pull=never", "--rm", "-d", "--name", name,
             "--label", $"aqua.b6.runtime-version={B6Contract.RuntimeVersion}",
             "--label", $"aqua.b6.ownership-nonce={nonce}",
             "--label", $"aqua.b6.runtime-role={role}",
             "--env", "POSTGRES_USER", "--env", "POSTGRES_DB", "--env", "POSTGRES_PASSWORD",
-            "-p", "127.0.0.1::5432", "postgres:16-alpine"
+            "-p", "127.0.0.1::5432", B6Contract.PostgreSqlImage
         ], environment).Trim();
         try
         {
@@ -59,7 +59,7 @@ public sealed class OwnedPostgreSqlRuntime
                 }
             }
             if (connection == null || connection.State != System.Data.ConnectionState.Open)
-                throw new B6PackageException("Owned PostgreSQL 16 runtime did not become ready.");
+                throw new B6PackageException("Owned PostgreSQL 18.4 runtime did not become ready.");
             await using (connection)
             {
                 await using (var marker = new NpgsqlCommand(
@@ -72,7 +72,7 @@ public sealed class OwnedPostgreSqlRuntime
                     await marker.ExecuteNonQueryAsync();
                 }
                 var evidence = await ReadIdentityAsync(connection);
-                if (evidence.Major != 16) throw new B6PackageException("Owned runtime is not PostgreSQL major version 16.");
+                B6SourceSchema.RequireVersion(evidence.VersionNumber);
                 var state = new RuntimeState
                 {
                     RuntimeVersion = B6Contract.RuntimeVersion, RuntimeRole = role,
@@ -140,10 +140,11 @@ public sealed class OwnedPostgreSqlRuntime
     {
         var state = CanonicalJson.Read<RuntimeState>(statePath);
         if (state.RuntimeVersion != B6Contract.RuntimeVersion || state.Host != "127.0.0.1" ||
-            state.WorkerBoundary != B6Contract.WorkerBoundary || state.PostgreSqlMajorVersion != 16 ||
+            state.WorkerBoundary != B6Contract.WorkerBoundary || state.PostgreSqlMajorVersion != B6Contract.PostgreSqlMajorVersion ||
+            !B6SourceSchema.VersionTextMatches(state.PostgreSqlVersion) ||
             state.RuntimeRole is not ("SOURCE" or "ANALYSIS") ||
             requiredRole != null && state.RuntimeRole != requiredRole)
-            throw new B6PackageException("Runtime state is not the required package-owned PostgreSQL 16 identity.");
+            throw new B6PackageException("Runtime state is not the required package-owned PostgreSQL 18.4 identity.");
         state.ToolchainIdentity.RequireEqual(_toolchainIdentity);
 
         var inspect = JsonNode.Parse(ToolchainIdentity.Run("docker", ["inspect", state.ContainerId]))?.AsArray();
@@ -152,7 +153,7 @@ public sealed class OwnedPostgreSqlRuntime
         var labels = detail["Config"]?["Labels"]?.AsObject();
         var bindings = detail["HostConfig"]?["PortBindings"]?["5432/tcp"]?.AsArray();
         if (detail["Name"]?.GetValue<string>() != "/" + state.ContainerName ||
-            detail["Config"]?["Image"]?.GetValue<string>() != "postgres:16-alpine" ||
+            detail["Config"]?["Image"]?.GetValue<string>() != B6Contract.PostgreSqlImage ||
             labels?["aqua.b6.runtime-version"]?.GetValue<string>() != B6Contract.RuntimeVersion ||
             labels?["aqua.b6.ownership-nonce"]?.GetValue<string>() != state.OwnershipNonce ||
             labels?["aqua.b6.runtime-role"]?.GetValue<string>() != state.RuntimeRole ||
@@ -166,8 +167,9 @@ public sealed class OwnedPostgreSqlRuntime
         try
         {
             var evidence = await ReadIdentityAsync(connection);
-            if (evidence.Digest != state.DatabaseIdentityEvidence || evidence.Major != 16)
+            if (evidence.Digest != state.DatabaseIdentityEvidence || evidence.Major != B6Contract.PostgreSqlMajorVersion)
                 throw new B6PackageException("Owned runtime database identity/version changed.");
+            B6SourceSchema.RequireVersion(evidence.VersionNumber);
             await using var marker = new NpgsqlCommand(
                 "SELECT COUNT(*) FROM public.\"__AquaB6RuntimeOwnership\" WHERE \"Nonce\"=@nonce AND \"RuntimeVersion\"=@version AND \"RuntimeRole\"=@role", connection);
             marker.Parameters.AddWithValue("nonce", state.OwnershipNonce);
@@ -190,16 +192,17 @@ public sealed class OwnedPostgreSqlRuntime
         IncludeErrorDetail = false, Pooling = false, Timeout = 10, CommandTimeout = 600
     };
 
-    private static async Task<(string Digest, string Database, string Version, int Major)> ReadIdentityAsync(NpgsqlConnection connection)
+    private static async Task<(string Digest, string Database, string Version, int Major, int VersionNumber)> ReadIdentityAsync(NpgsqlConnection connection)
     {
         await using var command = new NpgsqlCommand(
             "SELECT (SELECT system_identifier::text FROM pg_control_system()), current_database(), " +
             "(SELECT oid::text FROM pg_database WHERE datname=current_database()), current_setting('server_version'), " +
-            "current_setting('server_version_num')::int / 10000", connection);
+            "current_setting('server_version_num')::int", connection);
         await using var reader = await command.ExecuteReaderAsync();
         if (!await reader.ReadAsync()) throw new B6PackageException("Unable to read runtime identity.");
         var system = reader.GetString(0); var database = reader.GetString(1); var oid = reader.GetString(2);
-        return (B6Values.Sha256Hex($"{system}|{database}|{oid}"), database, reader.GetString(3), reader.GetInt32(4));
+        var number = reader.GetInt32(4);
+        return (B6Values.Sha256Hex($"{system}|{database}|{oid}"), database, reader.GetString(3), number / 10000, number);
     }
 }
 

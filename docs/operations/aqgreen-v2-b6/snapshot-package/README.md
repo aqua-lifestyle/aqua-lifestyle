@@ -1,5 +1,33 @@
 # AQGreen B6 representative snapshot acquisition package
 
+## Current compatibility candidate: V4 / PostgreSQL 18.4
+
+The custodian's schema-only readback established server `180004`, 54 migration
+rows (ProductVersion8.0.8) through
+`20261005194901_AddIsolatedAQGreenPilotEvidence`, and 241 columns across the
+17 extraction tables. Package V4 selects that existing schema and a digest-pinned
+PostgreSQL18.4 SOURCE/ANALYSIS runtime. It rejects other server versions, missing/
+extra migration history and incompatible required-column types/nullability before
+reading application rows. Extra unselected columns are not exported. No migration
+semantics, business rules or allowlisted fields/transforms are changed.
+
+V3/PG16 results below remain historical scoped evidence, not qualification of V4.
+V4 source must still complete existing operational release/Gate-Q/A, custody and
+independent review before a real handoff. Local development builds are not that
+release. The PG18 compatibility task left the bootstrap and supply/lock/signer pins
+unchanged. Subsequent, separately authorized [replacement-supply preparation](replacement-supply/AMENDMENT.md)
+introduces a candidate Microsoft SDK baseline and narrowly scoped bootstrap
+compatibility corrections. Neither task runs privileged qualification. Existing
+lock/graph/signer, Gate-Q/A and independent acceptance requirements remain. See the
+bounded [compatibility worklog](../../../exec-plans/active/aqgreen-b6-pg18-compatibility.md).
+
+The current [public/private handoff candidate](replacement-supply/PUBLIC-HANDOFF-AMENDMENT.md)
+adds a metadata-only public native approval gate and a private read-only verifier.
+Its contract amendment, supply baseline and privileged execution remain unaccepted
+until the proper independent human/owner records exist. No public-to-private
+approval is inferred from a green workflow. `handoff-test` cannot acquire supply
+or invoke qualification.
+
 This package creates and verifies a **pseudonymised and data-minimised
 representative snapshot**. Stable pseudonymous keys remain linkable inside the
 dataset; the package does not claim anonymisation or determine legal compliance.
@@ -21,8 +49,9 @@ admission. None of that production surface is changed by this package.
 `native-supervisor.c`, `native-supervisor-amd64`, the deterministic build script
 and manifest, and `non-root-bwrap-proof-harness.sh` form a separate ordinary-user
 candidate. They do not replace or modify the authoritative two-gate Runner below.
-That Runner retains its exact base SHA-256
+That candidate's historical Runner base had exact SHA-256
 `5ed57d64c74014002708dc679d5d26e9d7b53e888d1124dce3a74432e16a6244`.
+The replacement-supply amendment does not adopt this separate native candidate.
 Historical lost patches/trees/ELFs and validation results establish no byte
 continuity or current PASS. The current manifest identifies newly built bytes.
 
@@ -126,7 +155,7 @@ Gate-Q/Gate-A, Attempt 21, application, production or migration is authorized.
   PostgreSQL runtime, finalizer, and verified receipt generator.
 - `manifest-schema.json`, `root-disposition-schema.json`, and
   `handoff-receipt-schema.json`: machine-readable contracts.
-- `run-analysis.sh`: package-owned PostgreSQL 16 lifecycle, repeated Zone 3
+- `run-analysis.sh`: package-owned PostgreSQL 18.4 lifecycle, repeated Zone 3
   inventory, D09 population, D03B component, simulator, structural/impact, final
   manifest, verification, and receipt pipeline.
 - `authoritative-runner.sh`: the reviewed-Git-object two-gate bootstrap. It binds
@@ -471,11 +500,13 @@ a focused set. Evidence-sensitive focused runs may additionally set a positive
 hard-coding identities for every future test while allowing review gates to bind a
 known focused suite.
 
-The test migrates a disposable PostgreSQL 16 source with the current EF migrations,
+The current test migrates a digest-pinned disposable PostgreSQL 18.4 source with the evidenced EF migrations,
 inserts only production-schema-valid synthetic cases, and exercises the full
 scoped package twice. Conditions prevented by production constraints are tested as
 explicit malformed delivered-snapshot negatives. Its source update is intentional
 drift-test setup, not a production operation.
+Set `B6_TEST_RESULTS_DIR` to a new absolute external directory to retain the TRX;
+the disposable synthetic snapshots/keys/runtime state are still cleaned up.
 
 ## Architecture decision
 
