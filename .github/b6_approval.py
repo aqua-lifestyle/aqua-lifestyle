@@ -253,12 +253,14 @@ def main():
         stream.write("B6_ROOT=" + str(root) + "\n")
     deadline = time.monotonic() + 1200
     while True:
+        require(time.monotonic() <= deadline, "handoff approval timed out without authorization")
         try:
             evidence = verify_authorization(env, checked, expected, api)
             # Revalidate mutable PR review/protection/visibility immediately before release.
             fresh = context(env, api)
             require(canonical(permit(env, fresh, expected["nonce"])) == canonical(expected), "authority changed while awaiting approval")
             evidence = verify_authorization(env, fresh, expected, api)
+            require(time.monotonic() <= deadline, "handoff approval timed out without authorization")
             evidence["source_review"], evidence["environment"] = fresh["source_review"], fresh["protection"]
             (root / "authorization.json").write_text(json.dumps(evidence, indent=2) + "\n")
             (root / "candidate-baseline.json").write_bytes(fresh["baseline_bytes"])

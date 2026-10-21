@@ -199,12 +199,23 @@ class HandoffBindingTests(HandoffFixture):
             env = {**self.env, "RUNNER_TEMP": directory, "GITHUB_ENV": str(Path(directory) / "env")}
             with mock.patch.dict(os.environ, env, clear=True), mock.patch.object(GATE, "GitHub", return_value=self.api), \
                     mock.patch.object(GATE.secrets, "token_hex", return_value="c" * 64), \
-                    mock.patch.object(GATE.time, "monotonic", side_effect=[0, 1201]), mock.patch("builtins.print"):
+                    mock.patch.object(GATE.time, "monotonic", side_effect=[0, 0, 1201]), mock.patch("builtins.print"):
                 with self.assertRaisesRegex(RuntimeError, "handoff approval timed out without authorization"):
                     GATE.main()
             root = next(Path(directory).glob("b6-qualification-*"))
             self.assertFalse((root / "authorization.json").exists())
             self.assertFalse((root / "candidate-baseline.json").exists())
+
+    def test_late_successful_api_responses_cannot_release_after_deadline(self):
+        with tempfile.TemporaryDirectory(prefix="b6-handoff-late-") as directory:
+            env = {**self.env, "RUNNER_TEMP": directory, "GITHUB_ENV": str(Path(directory) / "env")}
+            with mock.patch.dict(os.environ, env, clear=True), mock.patch.object(GATE, "GitHub", return_value=self.api), \
+                    mock.patch.object(GATE.secrets, "token_hex", return_value="c" * 64), \
+                    mock.patch.object(GATE.time, "monotonic", side_effect=[0, 0, 1201]), mock.patch("builtins.print"):
+                with self.assertRaisesRegex(RuntimeError, "handoff approval timed out without authorization"):
+                    GATE.main()
+            root = next(Path(directory).glob("b6-qualification-*"))
+            self.assertFalse((root / "authorization.json").exists())
 
     def test_every_private_permit_binding_rejects_substitution(self):
         original = self.responses[self.private + "/issues/1"]["body"]

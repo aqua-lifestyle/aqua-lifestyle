@@ -140,7 +140,7 @@ human reviewer is configured by this implementation. A second author-controlled
 account is not an independent reviewer. The amendment stays PROPOSED pending real
 independent acceptance.
 
-Focused changed-code validation passed: **16 Python handoff/guard tests**, including
+Focused changed-code validation passed: **17 Python handoff/guard tests**, including
 the retained source/visibility/review/owner rejection matrix, exact-permit and
 workflow/run/attempt/nonce tampering, missing human attestation, native rejection,
 timeout without authorization, immutable-ID independence and a full **mock**
@@ -153,3 +153,12 @@ Provider harmless demonstration and PR113 CI evidence are recorded on the existi
 PR after publication. Any actual positive native handoff remains blocked until the
 owner designates a genuinely independent human and that person actually reviews.
 No privileged qualification, production extraction, merge or deployment is authorized.
+
+Native private read-only test run `39656087150` was refused before any runner or
+step started by a GitHub account-level runner restriction. Original provider
+diagnostics remain on that private run/private issue1, not in public logs. The
+qualification job was skipped. This is not an executed handoff-verifier result or
+positive human approval, and it is not a replacement-supply failure. No privileged
+execution enablement or reviewer appointment was configured. The source frontend
+checks passed after the approved lockfile fix; current exact-head CI is tracked on
+PR113 rather than promoted from an earlier commit.
