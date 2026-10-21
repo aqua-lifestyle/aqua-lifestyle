@@ -9,6 +9,13 @@ candidate manifest. It is not independently approved or privileged qualification
 Existing operator authority, protected Zone2/Zone3 custody, substantive frozen
 build/supply and privileged-bootstrap gates remain.
 
+The implemented [public/private approval handoff candidate](replacement-supply/PUBLIC-HANDOFF-AMENDMENT.md)
+is explicitly pending independent acceptance. GitHub defaults to its separate
+read-only `handoff-test` job; that job has no acquisition, sudo or qualification
+step. Qualification remains behind the private branch hold, owner enablement,
+exact-source independent baseline/amendment acceptance, native public review and
+run/attempt/nonce-bound owner permit. A test result is not operational authority.
+
 > **DO NOT RUN WITHOUT PRODUCTION/DATA AUTHORIZATION.** This is a template for an
 > authorised DBA/platform operator. D03B/D09, repository content, and disposable
 > test success do not grant access.

@@ -3,6 +3,18 @@ name: B6 replacement-supply qualification (private custody only)
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: Harmless handoff verification is the default; qualification needs separate authority
+        required: true
+        default: handoff-test
+        type: choice
+        options:
+          - handoff-test
+          - qualification
+      public_workflow_commit:
+        description: Exact reviewed commit of the metadata-only public approval carrier
+        required: true
+        type: string
       source_commit:
         description: Independently reviewed full source commit
         required: true
@@ -26,100 +38,44 @@ concurrency:
 jobs:
   qualify:
     # The public copy is reviewable source only. No public job receives evidence.
-    if: github.repository == 'aqua-lifestyle/b6-qualification-evidence'
+    if: github.repository == 'aqua-lifestyle/b6-qualification-evidence' && inputs.mode == 'qualification'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     environment: b6-qualification
     permissions:
       contents: write
+      actions: read
       issues: read
       pull-requests: read
-    env:
+    env: &handoff-context
       GH_TOKEN: ${{ github.token }}
+      HANDOFF_MODE: ${{ inputs.mode }}
+      PUBLIC_WORKFLOW_COMMIT: ${{ inputs.public_workflow_commit }}
+      PRIVILEGED_EXECUTION_ENABLED: ${{ vars.B6_PRIVILEGED_QUALIFICATION_ENABLED }}
       SOURCE_COMMIT: ${{ inputs.source_commit }}
       SOURCE_PR: ${{ inputs.source_pr }}
       AUTHORIZATION_ISSUE: ${{ inputs.authorization_issue }}
       INDEPENDENT_REVIEWER: ${{ vars.B6_INDEPENDENT_REVIEWER }}
     steps:
-      - name: Require independent baseline approval and exact owner run authorization
+      - &handoff-preflight
+        name: Verify independent public approval and exact private run permit
         shell: bash
         run: |
           set -euo pipefail
           umask 0077
           python3 - <<'PY'
-          import base64, hashlib, json, os, pathlib, re, subprocess, tempfile
-
-          def require(value, reason):
-              if not value:
-                  raise RuntimeError(reason)
-
-          def api(path):
-              return json.loads(subprocess.check_output(['gh', 'api', path]))
-
-          def contents(repo, path, ref):
-              return base64.b64decode(api(f'repos/{repo}/contents/{path}?ref={ref}')['content'], validate=False)
-
-          custody = 'aqua-lifestyle/b6-qualification-evidence'
-          source_repo = 'aqua-lifestyle/aqua-lifestyle'
-          workflow = '.github/workflows/b6-qualification.yml'
-          baseline_path = 'docs/operations/aqgreen-v2-b6/snapshot-package/replacement-supply/candidate-baseline.json'
-          source, pr_number, issue_number = (os.environ[k] for k in ('SOURCE_COMMIT', 'SOURCE_PR', 'AUTHORIZATION_ISSUE'))
-          reviewer = os.environ.get('INDEPENDENT_REVIEWER', '')
-          require(os.environ['GITHUB_REPOSITORY'] == custody, 'private custody repository required')
-          require(os.environ['GITHUB_EVENT_NAME'] == 'workflow_dispatch' and os.environ['GITHUB_REF'] == 'refs/heads/main', 'manual default-branch execution required')
-          require(re.fullmatch('[0-9a-f]{40}', source), 'full source commit required')
-          require(re.fullmatch('[1-9][0-9]*', pr_number) and re.fullmatch('[1-9][0-9]*', issue_number), 'numeric authority locators required')
-          require(re.fullmatch('[A-Za-z0-9][A-Za-z0-9-]{0,38}', reviewer), 'owner-designated independent reviewer required')
-          require(reviewer.lower() != os.environ['GITHUB_ACTOR'].lower(), 'reviewer cannot execute the qualification')
-          require(api(f'repos/{custody}')['visibility'] == 'private', 'custody must remain private')
-          protection = api(f'repos/{custody}/environments/b6-qualification')
-          require(protection.get('can_admins_bypass') is False, 'environment bypass must be disabled')
-          rules = [r for r in protection['protection_rules'] if r['type'] == 'required_reviewers']
-          require(len(rules) == 1 and rules[0].get('prevent_self_review') is True, 'independent environment protection required')
-          require(any(r['type'] == 'User' and r['reviewer']['login'].lower() == reviewer.lower() for r in rules[0]['reviewers']), 'designated reviewer must protect execution')
-          pr = api(f'repos/{source_repo}/pulls/{pr_number}')
-          require(pr['head']['repo']['full_name'] == source_repo and pr['head']['sha'] == source and not pr['draft'], 'reviewed source PR identity mismatch')
-          require(pr['user']['login'].lower() != reviewer.lower(), 'reviewer cannot author the source PR')
-          baseline_bytes = contents(source_repo, baseline_path, source)
-          baseline_hash = hashlib.sha256(baseline_bytes).hexdigest()
-          baseline = json.loads(baseline_bytes)
-          require(baseline['custody_repository'] == custody and baseline['status'] == 'CANDIDATE_NOT_APPROVED', 'replacement baseline identity mismatch')
-          # No generated status field grants authority: a current, independent,
-          # exact-commit review must explicitly approve this manifest's identity.
-          reviews = []
-          page = 1
-          while True:
-              batch = api(f'repos/{source_repo}/pulls/{pr_number}/reviews?per_page=100&page={page}')
-              reviews.extend(batch)
-              if len(batch) < 100:
-                  break
-              page += 1
-          reviews = [r for r in reviews if r['user']['login'].lower() == reviewer.lower() and r['state'] != 'COMMENTED']
-          require(reviews, 'independent supply review missing')
-          review = max(reviews, key=lambda r: r['id'])
-          marker = 'B6_SUPPLY_BASELINE_APPROVED sha256:' + baseline_hash
-          require(review['state'] == 'APPROVED' and review['commit_id'] == source and marker in (review['body'] or '').splitlines(), 'current exact-commit supply approval missing')
-          source_workflow = contents(source_repo, workflow, source)
-          require(source_workflow == contents(custody, workflow, os.environ['GITHUB_SHA']), 'executing workflow differs from independently reviewed source')
-          issue = api(f'repos/{custody}/issues/{issue_number}')
-          require(issue['user']['login'] == 'Xolani-M' and issue['state'] == 'open' and 'pull_request' not in issue, 'owner authorization issue required')
-          authority = json.loads(issue['body'])
-          expected = {
-              'schema': 'B6PrivilegedQualificationAuthorizationV1',
-              'source_commit': source, 'source_pr': int(pr_number),
-              'baseline_sha256': baseline_hash,
-              'workflow_sha256': hashlib.sha256(source_workflow).hexdigest(),
-              'run_id': os.environ['GITHUB_RUN_ID'], 'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
-              'reviewer': reviewer, 'runner': 'ubuntu-24.04',
-              'evidence_repository': custody, 'scope': 'QUALIFICATION_ONLY_NO_PRODUCTION',
-          }
-          require(authority == expected, 'owner authorization must bind this exact run, source and supply')
-          root = pathlib.Path(tempfile.mkdtemp(prefix='b6-qualification-', dir=os.environ['RUNNER_TEMP']))
+          import base64, json, os, pathlib, subprocess, tempfile
+          # Execute this private workflow commit's verifier, never unchecked code
+          # supplied by a caller-selected public checkout.
+          root = pathlib.Path(tempfile.mkdtemp(prefix='b6-authority-code-', dir=os.environ['RUNNER_TEMP']))
           root.chmod(0o700)
-          (root / 'authorization.json').write_text(json.dumps({'owner_issue': issue, 'supply_review': review, 'environment': protection, 'run_authority': authority}, indent=2) + '\n')
-          (root / 'candidate-baseline.json').write_bytes(baseline_bytes)
-          with open(os.environ['GITHUB_ENV'], 'a') as stream:
-              stream.write('B6_ROOT=' + str(root) + '\n')
+          path = f"repos/aqua-lifestyle/b6-qualification-evidence/contents/.github/b6_approval.py?ref={os.environ['GITHUB_SHA']}"
+          blob = json.loads(subprocess.check_output(['gh', 'api', path]))
+          if blob['encoding'] != 'base64':
+              raise RuntimeError('private verifier encoding mismatch')
+          verifier = root / 'b6_approval.py'
+          verifier.write_bytes(base64.b64decode(''.join(blob['content'].splitlines()), validate=True))
+          subprocess.run(['python3', str(verifier)], check=True)
           PY
 
       - name: Materialize exact source and verify retained replacement inputs
@@ -235,3 +191,25 @@ jobs:
           # Publication with immutable releases enabled preserves retained bytes;
           # independent assessment remains a separate human decision.
           gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq '.immutable' | /usr/bin/grep -Fx true
+
+  handoff-test:
+    if: github.repository == 'aqua-lifestyle/b6-qualification-evidence' && inputs.mode == 'handoff-test'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+      issues: read
+      pull-requests: read
+    env: *handoff-context
+    steps:
+      - *handoff-preflight
+      - name: Record harmless handoff result only
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          record = json.loads((pathlib.Path(os.environ['B6_ROOT']) / 'authorization.json').read_text())
+          if record['permit']['mode'] != 'handoff-test':
+              raise RuntimeError('harmless scope mismatch')
+          print('B6_HANDOFF_TEST_VERIFIED_NOT_QUALIFICATION ' + record['permit_sha256'])
+          PY

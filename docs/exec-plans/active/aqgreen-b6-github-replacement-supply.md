@@ -1,7 +1,7 @@
 > **NOT BUSINESS AUTHORITY.** This worklog records execution state and evidence. It
 > cannot confirm or supersede a business-policy decision.
 
-# B6 V4/PG18 GitHub replacement supply — worklog version 1
+# B6 V4/PG18 GitHub replacement supply — worklog version 2
 
 ## Scope and actual authority
 
@@ -111,3 +111,45 @@ Independent reviewer appointment, exact baseline/source approval, supported requ
 environment protection, and a separate run/attempt-bound owner authorization are
 required before privileged execution. Independent resulting-evidence acceptance
 remains separate from all GitHub workflow/environment success.
+
+## Existing-workstream approval closure implementation — 2026-10-21
+
+Owner instruction: **“AGENT 2 — CLOSE THE REMAINING B6 APPROVAL-GATE BLOCKERS.”**
+The owner reports Agent1's technical review as BLOCKED for qualification authority,
+not a failure of supply verification. PR113 has no actual independent GitHub review
+or designated human reviewer in the inspected provider state; no acceptance is
+inferred from that technical report.
+
+Applied the exact already-approved follow-redirects1.16.1 lockfile-only correction
+from `924263e26d9ef98a40bbde0f7e7633c439059690`. Its complete lockfile blob matches
+the approved commit. No other frontend/application changes are included.
+
+Implemented proposed amendment2 and the minimum public/private verifier, binding
+source, unchanged baseline, both workflow versions, verifier, public environment,
+actual private/public run and attempt identities, owner record, immutable reviewer
+identity and fresh nonce. Native public review is read over unauthenticated HTTPS;
+the private token never goes to the public repository. Native rejection/ambiguous/
+cancelled/stale/substituted evidence fails closed. The public comment explicitly
+binds the exact public attempt and private permit commitment. No automatic
+cross-repository approval transfer is assumed.
+
+The private workflow defaults to a separate read-only harmless test job; the
+operational job preserves the branch hold and adds explicit owner enablement plus
+independent exact-source baseline/amendment acceptance. No execution enablement or
+human reviewer is configured by this implementation. A second author-controlled
+account is not an independent reviewer. The amendment stays PROPOSED pending real
+independent acceptance.
+
+Focused changed-code validation passed: **16 Python handoff/guard tests**, including
+the retained source/visibility/review/owner rejection matrix, exact-permit and
+workflow/run/attempt/nonce tampering, missing human attestation, native rejection,
+timeout without authorization, immutable-ID independence and a full **mock**
+positive preflight. Public/harmless workflow syntax and read-only job isolation
+passed inspection. This is component/mock evidence, not an actual positive human
+approval. The verified supply, PG18 compatibility and unchanged passing suites
+are carried forward without reacquisition or repeat execution.
+
+Provider harmless demonstration and PR113 CI evidence are recorded on the existing
+PR after publication. Any actual positive native handoff remains blocked until the
+owner designates a genuinely independent human and that person actually reviews.
+No privileged qualification, production extraction, merge or deployment is authorized.

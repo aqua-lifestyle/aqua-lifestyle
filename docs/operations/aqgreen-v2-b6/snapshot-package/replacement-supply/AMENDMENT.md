@@ -91,6 +91,14 @@ tool identity, graph, signer, warning closure or semantic result fails closed.
 
 ## GitHub execution and custody
 
+**Approval-location implementation update:** the scoped
+[public/private handoff amendment2](PUBLIC-HANDOFF-AMENDMENT.md) is implemented as
+a proposal and remains pending independent acceptance. The section below preserves
+the original private-environment proposal and V1 authorization template; that
+template is not accepted by the V2 verifier. The current candidate requires the
+V2 exact permit/native public approval checks, explicit independent acceptance and
+separate owner enablement before qualification. No historical approval transfers.
+
 The one workflow is reviewed in the public source PR but runs **only** in private
 `aqua-lifestyle/b6-qualification-evidence`. Its private copy must byte-match the
 independently reviewed source commit. It uses that private repository's own scoped
@@ -156,8 +164,9 @@ production snapshots, raw data, pseudonym keys or credentials.
 
 ## Independent acceptance boundary
 
-First: the owner designates an independent reviewer, grants restricted custody
-access and configures the protected environment. That person reviews the source
+First: the owner designates a genuinely independent human reviewer, grants restricted
+custody access and configures the public protected environment under amendment2.
+That person reviews the source
 diff, publisher/source policy (including the PPA), raw versus canonical identities,
 all manifests/archives, exact locks/graphs and preparation evidence, then records
 the exact-commit/hash approval. Review cannot be Agent2's own confirmation.

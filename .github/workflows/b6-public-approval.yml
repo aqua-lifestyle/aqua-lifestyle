@@ -1,0 +1,38 @@
+name: B6 metadata-only public approval
+run-name: B6 approval ${{ inputs.permit_sha256 }}
+
+# The existing registered ci.yml on the isolated approval branch carries these
+# exact reviewed bytes. Main application CI is not replaced or merged by this PR.
+on:
+  workflow_dispatch:
+    inputs:
+      permit_sha256:
+        description: Commitment to the exact private run permit; no private payload
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  approve:
+    name: B6 public approval
+    if: github.repository == 'aqua-lifestyle/aqua-lifestyle'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    environment: b6-public-approval-probe
+    steps:
+      - name: Complete metadata-only gate after native independent review
+        env:
+          PERMIT_SHA256: ${{ inputs.permit_sha256 }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          commitment = os.environ['PERMIT_SHA256']
+          if not re.fullmatch('[0-9a-f]{64}', commitment):
+              raise RuntimeError('exact SHA256 commitment required')
+          print(json.dumps({'schema': 'B6PublicApprovalCarrierV1',
+                            'permit_sha256': commitment,
+                            'public_run_id': os.environ['GITHUB_RUN_ID'],
+                            'public_run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+                            'scope': 'APPROVAL_METADATA_ONLY_NOT_QUALIFICATION'}, sort_keys=True))
+          PY

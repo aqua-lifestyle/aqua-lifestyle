@@ -21,6 +21,13 @@ compatibility corrections. Neither task runs privileged qualification. Existing
 lock/graph/signer, Gate-Q/A and independent acceptance requirements remain. See the
 bounded [compatibility worklog](../../../exec-plans/active/aqgreen-b6-pg18-compatibility.md).
 
+The current [public/private handoff candidate](replacement-supply/PUBLIC-HANDOFF-AMENDMENT.md)
+adds a metadata-only public native approval gate and a private read-only verifier.
+Its contract amendment, supply baseline and privileged execution remain unaccepted
+until the proper independent human/owner records exist. No public-to-private
+approval is inferred from a green workflow. `handoff-test` cannot acquire supply
+or invoke qualification.
+
 This package creates and verifies a **pseudonymised and data-minimised
 representative snapshot**. Stable pseudonymous keys remain linkable inside the
 dataset; the package does not claim anonymisation or determine legal compliance.
