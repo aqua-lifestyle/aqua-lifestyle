@@ -19,6 +19,9 @@ namespace AqualLifeStyle.Tests.Migrator
         [InlineData(false)]
         public void MigrationFailure_ReturnsFailureAndStopsLaterDatabases(bool hostFails)
         {
+            // Match application startup before encrypting fixtures. Parallel ABP modules
+            // configure this process-wide default; encryption must not use its bootstrap value.
+            SimpleStringCipher.DefaultPassPhrase = AqualLifeStyleConsts.DefaultPassPhrase;
             var resolver = Substitute.For<IDbPerTenantConnectionStringResolver>();
             resolver.GetNameOrConnectionString(Arg.Any<ConnectionStringResolveArgs>())
                 .Returns("Host=localhost;Database=synthetic;Username=synthetic;Password=synthetic");
@@ -39,7 +42,13 @@ namespace AqualLifeStyle.Tests.Migrator
             public FailingRunner(IRepository<Tenant> tenants, IDbPerTenantConnectionStringResolver resolver, bool hostFails)
                 : base(null, tenants, new Log(), resolver) => _hostFails = hostFails;
             protected override void MigrateHost()
-            { HostCalls++; if (_hostFails) throw new InvalidOperationException("Synthetic migration failure"); }
+            {
+                HostCalls++;
+                // Reproduce a parallel ABP fixture reapplying application startup configuration
+                // between tenant-fixture encryption and the migrator's real decryption.
+                SimpleStringCipher.DefaultPassPhrase = AqualLifeStyleConsts.DefaultPassPhrase;
+                if (_hostFails) throw new InvalidOperationException("Synthetic migration failure");
+            }
             protected override void MigrateTenant(Tenant tenant)
             { TenantCalls++; throw new InvalidOperationException("Synthetic migration failure"); }
         }
