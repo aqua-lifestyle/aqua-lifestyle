@@ -56,6 +56,10 @@ namespace AqualLifeStyle.EntityFrameworkCore
                     "No finalized AQGreen weekly-sales eligibility decision is available.");
             }
 
+            if (await _dbContextProvider.GetDbContext().AQGreenSalesEvidenceInvalidations.AsNoTracking()
+                .AnyAsync(item => item.TenantId == tenantId && item.DecisionId == decision.Id, cancellationToken))
+                throw new AQGreenWeeklySalesEligibilityUnavailableException(
+                    "Sales evidence requires authorized reconciliation before further calculation.");
             ValidateFinalDecision(decision);
             return new AQGreenWeeklySalesEligibilitySnapshot(
                 decision.Id,

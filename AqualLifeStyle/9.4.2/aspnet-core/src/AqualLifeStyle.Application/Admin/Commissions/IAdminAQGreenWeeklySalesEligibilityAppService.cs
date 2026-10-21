@@ -8,6 +8,10 @@ namespace AqualLifeStyle.Application.Admin.Commissions
     public interface IAdminAQGreenWeeklySalesEligibilityAppService
         : IApplicationService
     {
+        Task<AQGreenSalesEvidenceInvalidationDto> InvalidateEvidenceAsync(InvalidateAQGreenSalesEvidenceInput input);
+
+        Task<System.Collections.Generic.IReadOnlyList<AQGreenSalesEvidenceInvalidationDto>> GetInvalidationsAsync(EntityDto<System.Guid> input);
+
         Task<PagedResultDto<AdminAQGreenWeeklySalesReviewDto>> GetAllAsync(
             AQGreenWeeklySalesReviewListInput input);
 

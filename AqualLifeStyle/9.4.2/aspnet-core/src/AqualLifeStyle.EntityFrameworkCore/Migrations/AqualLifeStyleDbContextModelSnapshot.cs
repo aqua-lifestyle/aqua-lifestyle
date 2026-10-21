@@ -1824,6 +1824,49 @@ namespace AqualLifeStyle.Migrations
                         });
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenSalesEvidenceInvalidation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DecisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EvidenceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("RecordedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("RecordedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "DecisionId");
+
+                    b.HasIndex("TenantId", "EvidenceId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "DecisionId", "EvidenceId");
+
+                    b.ToTable("AQGreenSalesEvidenceInvalidations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AQGSalesInvalidation_Authority", "\"TenantId\" > 0 AND \"RecordedByUserId\" > 0");
+
+                            t.HasCheckConstraint("CK_AQGSalesInvalidation_Reason", "length(trim(\"Reason\")) > 0 AND \"Reason\" = trim(\"Reason\")");
+                        });
+                });
+
             modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenWeeklySalesEligibilityDecision", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5738,6 +5781,16 @@ namespace AqualLifeStyle.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("FK_AQGRecruitConfirm_Attribution");
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenSalesEvidenceInvalidation", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.AQGreen.AQGreenWeeklySalesEvidenceReference", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DecisionId", "EvidenceId")
+                        .HasPrincipalKey("TenantId", "DecisionId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenWeeklySalesEligibilityDecision", b =>

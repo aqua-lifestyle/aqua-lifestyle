@@ -81,6 +81,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions.Dto
 
     public class AdminWeeklyCommissionDto
     {
+        // Pending reconciliation is separate from the immutable historical payout facts.
+        public bool RequiresSalesEvidenceReconciliation { get; set; }
         public bool IsTestMoney { get; set; }
         public Guid Id { get; set; }
         public int TenantId { get; set; }

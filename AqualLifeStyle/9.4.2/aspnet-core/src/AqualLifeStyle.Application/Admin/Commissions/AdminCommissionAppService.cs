@@ -13,6 +13,7 @@ using Abp.Timing;
 using AqualLifeStyle.Application.Admin.Commissions.Dto;
 using AqualLifeStyle.Authorization;
 using AqualLifeStyle.Domain.Customers;
+using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
@@ -36,6 +37,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         private readonly IRepository<Tenant, int> _tenantRepository;
         private readonly IUnitOfWorkManager _unitOfWorkManager;
         private readonly IConfiguration _configuration;
+        private readonly IAQGreenSalesEvidencePayoutGuard _salesEvidencePayoutGuard;
 
         public AdminCommissionAppService(
             ICustomerRepository customerRepository,
@@ -49,7 +51,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             IWeeklyCommissionPayoutMutationLock payoutMutationLock,
             IRepository<Tenant, int> tenantRepository,
             IUnitOfWorkManager unitOfWorkManager,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IAQGreenSalesEvidencePayoutGuard salesEvidencePayoutGuard)
         {
             _customerRepository = customerRepository;
             _entryPeriodRepository = entryPeriodRepository;
@@ -63,6 +66,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             _tenantRepository = tenantRepository;
             _unitOfWorkManager = unitOfWorkManager;
             _configuration = configuration;
+            _salesEvidencePayoutGuard = salesEvidencePayoutGuard;
         }
 
         [AbpAuthorize(AquaPermissions.Admin.Commissions.View)]
@@ -237,6 +241,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     var commission = await GetEntryCommissionAsync(
                         input.Id,
                         "Weekly earnings release");
+                    await _salesEvidencePayoutGuard.EnsureAllowedAsync(commission);
                     if (commission.PayoutStatus !=
                         WeeklyCommissionPayoutStatus.Released &&
                         commission.PayoutStatus !=
@@ -315,6 +320,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                     var commission = await GetEntryCommissionAsync(
                         input.Id,
                         "Weekly earnings payment");
+                    await _salesEvidencePayoutGuard.EnsureAllowedAsync(commission);
                     RecordPayment(
                         commission.PayoutStatus,
                         commission.PaymentReference,
@@ -374,12 +380,11 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             var customers = await LoadCustomersAsync(
                 commissions.Select(commission => commission.CustomerId));
 
-            return new PagedResultDto<AdminWeeklyCommissionDto>(
-                total,
-                commissions.Select(commission => Map(
-                    commission,
-                    periods[commission.CommissionPeriodId],
-                    customers[commission.CustomerId])).ToList());
+            var held = await _salesEvidencePayoutGuard.GetHeldCommissionIdsAsync(commissions.Select(item => item.Id).ToArray());
+            var items = commissions.Select(commission => Map(commission,
+                periods[commission.CommissionPeriodId], customers[commission.CustomerId])).ToList();
+            foreach (var item in items) item.RequiresSalesEvidenceReconciliation = held.Contains(item.Id);
+            return new PagedResultDto<AdminWeeklyCommissionDto>(total, items);
         }
 
         private async Task<PagedResultDto<AdminWeeklyCommissionDto>>

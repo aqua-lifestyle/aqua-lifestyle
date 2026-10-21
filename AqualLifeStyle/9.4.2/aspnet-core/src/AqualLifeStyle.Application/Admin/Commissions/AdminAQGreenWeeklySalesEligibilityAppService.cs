@@ -31,6 +31,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
         public AqualLifeStyle.Application.ProgrammeParticipations.AQGreenD10Runtime D10Runtime { get; set; }
         private readonly IRepository<AQGreenWeeklySalesEligibilityDecision, Guid>
             _decisionRepository;
+        private readonly IRepository<AQGreenSalesEvidenceInvalidation, Guid> _invalidationRepository;
         private readonly IRepository<EntryParticipation, Guid> _participationRepository;
         private readonly ICustomerRepository _customerRepository;
         private readonly IRepository<Area, Guid> _areaRepository;
@@ -45,6 +46,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
 
         public AdminAQGreenWeeklySalesEligibilityAppService(
             IRepository<AQGreenWeeklySalesEligibilityDecision, Guid> decisionRepository,
+            IRepository<AQGreenSalesEvidenceInvalidation, Guid> invalidationRepository,
             IRepository<EntryParticipation, Guid> participationRepository,
             ICustomerRepository customerRepository,
             IRepository<Area, Guid> areaRepository,
@@ -58,6 +60,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             LatestClosedCommissionWeekResolver closedWeekResolver)
         {
             _decisionRepository = decisionRepository;
+            _invalidationRepository = invalidationRepository;
             _participationRepository = participationRepository;
             _customerRepository = customerRepository;
             _areaRepository = areaRepository;
@@ -238,6 +241,80 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 null,
                 input?.EvidenceReferences,
                 input?.RejectionReason);
+
+        [UnitOfWork(IsDisabled = true)]
+        public async Task<AQGreenSalesEvidenceInvalidationDto> InvalidateEvidenceAsync(InvalidateAQGreenSalesEvidenceInput input)
+        {
+            await EnsureReviewAccessAsync();
+            if (input == null || input.TenantId <= 0 || input.ParticipantId == Guid.Empty || input.EvidenceId == Guid.Empty ||
+                string.IsNullOrWhiteSpace(input.Reason) || input.Reason.Trim().Length > AQGreenSalesEvidenceInvalidation.MaximumReasonLength)
+                throw Failed("Sales-evidence invalidation", "Explicit scope, evidence and a bounded reason are required.");
+            ValidateRequestedTenant(input.TenantId, "Sales-evidence invalidation");
+            AQGreenCommissionWeek week;
+            try { week = AQGreenCommissionWeek.FromStartUtc(input.CommissionWeekStartUtc); }
+            catch (ArgumentException exception) { throw Failed("Sales-evidence invalidation", exception.Message); }
+            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+            {
+                Scope = TransactionScopeOption.RequiresNew, IsTransactional = true,
+                IsolationLevel = IsolationLevel.ReadCommitted
+            }))
+            using (DisableAllTenantDataFiltersForHost())
+            {
+                await EnsureParticipantScopeAsync(input.TenantId, input.ParticipantId);
+                await _mutationLock.AcquireAsync(input.TenantId, input.ParticipantId, week.StartUtc,
+                    AQGreenWeeklySalesEligibilityRules.CurrentVersion);
+                if (AbpSession.TenantId.HasValue)
+                {
+                    var participant = await _participationRepository.GetAll().AsNoTracking()
+                        .SingleAsync(item => item.TenantId == input.TenantId && item.Id == input.ParticipantId);
+                    await _areaAuthorityStabilizer.StabilizeAsync(input.TenantId, participant.CustomerId, AbpSession.GetUserId());
+                }
+                await EnsureParticipantScopeAsync(input.TenantId, input.ParticipantId);
+                var decision = await FindAsync(input.TenantId, input.ParticipantId, week.StartUtc);
+                if (decision == null || decision.ReviewStatus != AQGreenWeeklySalesReviewStatus.Confirmed ||
+                    !decision.EvidenceReferences.Any(item => item.Id == input.EvidenceId))
+                    throw Failed("Sales-evidence invalidation", "Confirmed evidence was not found in the authorized review.");
+                var existing = await _invalidationRepository.GetAll().SingleOrDefaultAsync(item =>
+                    item.TenantId == input.TenantId && item.EvidenceId == input.EvidenceId);
+                if (existing != null)
+                {
+                    if (existing.DecisionId != decision.Id || !string.Equals(existing.Reason, input.Reason.Trim(), StringComparison.Ordinal))
+                        throw Failed("Sales-evidence invalidation", "Conflicting invalidation already exists.");
+                    await uow.CompleteAsync();
+                    return MapInvalidation(existing);
+                }
+                var record = AQGreenSalesEvidenceInvalidation.Record(decision, input.EvidenceId,
+                    input.Reason, AbpSession.GetUserId(), await _clock.GetUtcNowAsync());
+                await _invalidationRepository.InsertAsync(record);
+                await CurrentUnitOfWork.SaveChangesAsync();
+                await uow.CompleteAsync();
+                // Sensitive reason/evidence contents stay in the scoped audit record, never in logs.
+                Logger.Info($"Sales-evidence reconciliation recorded id={record.Id} actor={record.RecordedByUserId} tenant={record.TenantId}");
+                return MapInvalidation(record);
+            }
+        }
+
+        public async Task<IReadOnlyList<AQGreenSalesEvidenceInvalidationDto>> GetInvalidationsAsync(EntityDto<Guid> input)
+        {
+            await EnsureReviewAccessAsync();
+            if (input == null || input.Id == Guid.Empty) throw Failed("Sales-evidence invalidation", "A review is required.");
+            using (DisableAllTenantDataFiltersForHost())
+            {
+                var decision = await _decisionRepository.FirstOrDefaultAsync(input.Id);
+                if (decision == null) throw Failed("Sales-evidence invalidation", "Review not found.");
+                await EnsureParticipantScopeAsync(decision.TenantId, decision.ParticipantId);
+                var records = await _invalidationRepository.GetAll().AsNoTracking()
+                    .Where(item => item.TenantId == decision.TenantId && item.DecisionId == decision.Id)
+                    .OrderBy(item => item.RecordedAtUtc).ThenBy(item => item.Id).ToListAsync();
+                return records.Select(MapInvalidation).ToArray();
+            }
+        }
+
+        private static AQGreenSalesEvidenceInvalidationDto MapInvalidation(AQGreenSalesEvidenceInvalidation item) => new()
+        {
+            Id = item.Id, TenantId = item.TenantId, DecisionId = item.DecisionId, EvidenceId = item.EvidenceId,
+            Reason = item.Reason, RecordedByUserId = item.RecordedByUserId, RecordedAtUtc = item.RecordedAtUtc
+        };
 
         private async Task<AQGreenWeeklySalesEligibilityDecisionDto> ExecuteAsync(
             BeginAQGreenWeeklySalesReviewInput input,
@@ -620,6 +697,8 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                 ReviewedAt = decision.ReviewedAt,
                 ReviewedByUserId = decision.ReviewedByUserId,
                 RejectionReason = decision.RejectionReason,
+                Evidence = decision.EvidenceReferences.OrderBy(item => item.TechnicalReference, StringComparer.Ordinal)
+                    .Select(item => new AQGreenSalesEvidenceReferenceDto { Id = item.Id, TechnicalReference = item.TechnicalReference }).ToArray(),
                 EvidenceReferences = decision.EvidenceReferences
                     .OrderBy(item => item.RecordedAt)
                     .ThenBy(item => item.TechnicalReference, StringComparer.Ordinal)
@@ -645,6 +724,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             TimeZoneId = AQGreenCommissionWeek.TimeZoneId,
             SalesEligibilityRulesVersion =
                 AQGreenWeeklySalesEligibilityRules.CurrentVersion,
+            Evidence = Array.Empty<AQGreenSalesEvidenceReferenceDto>(),
             EvidenceReferences = Array.Empty<string>()
         };
 
