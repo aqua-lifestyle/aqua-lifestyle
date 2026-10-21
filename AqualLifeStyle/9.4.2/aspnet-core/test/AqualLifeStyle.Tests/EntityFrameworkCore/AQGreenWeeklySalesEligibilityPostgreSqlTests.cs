@@ -474,7 +474,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 (connection, transaction) => ExecuteAsync(
                     connection,
                     transaction,
-                    "TRUNCATE public.\"AQGreenWeeklySalesEvidenceReferences\";"));
+                    // Include dependent invalidation rows so FK preflight does not mask the ALWAYS trigger.
+                    "TRUNCATE public.\"AQGreenWeeklySalesEvidenceReferences\" CASCADE;"));
 
             (await ScalarAsync<int>(
                     database,

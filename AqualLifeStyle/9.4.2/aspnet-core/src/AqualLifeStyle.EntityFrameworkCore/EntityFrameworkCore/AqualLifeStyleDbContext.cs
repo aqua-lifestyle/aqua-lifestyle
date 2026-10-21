@@ -60,6 +60,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<AQGreenRecruitmentAttribution> AQGreenRecruitmentAttributions { get; set; }
         public virtual DbSet<AQGreenProspectiveRootAdmission> AQGreenProspectiveRootAdmissions { get; set; }
         public virtual DbSet<AQGreenRecruitmentAttributionConfirmation> AQGreenRecruitmentAttributionConfirmations { get; set; }
+        public virtual DbSet<AQGreenSalesEvidenceInvalidation> AQGreenSalesEvidenceInvalidations { get; set; }
         public virtual DbSet<AQGreenWeeklySalesEligibilityDecision> AQGreenWeeklySalesEligibilityDecisions { get; set; }
         public virtual DbSet<AQGreenWeeklySalesEvidenceReference> AQGreenWeeklySalesEvidenceReferences { get; set; }
         public virtual DbSet<EntryRecruiterCorrection> EntryRecruiterCorrections { get; set; }
@@ -105,6 +106,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureAQGreenRecruitmentAttributionIsAppendOnly();
             EnsureAQGreenV2GraduationEvidenceIsAppendOnly();
             EnsureAQGreenV2WeeklyCommissionEvidenceIsAppendOnly();
+            EnsureSalesInvalidationsAreAppendOnly();
             EnsureAQGreenWeeklySalesEligibilityIsImmutable();
             return base.SaveChanges();
         }
@@ -118,6 +120,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureAQGreenRecruitmentAttributionIsAppendOnly();
             EnsureAQGreenV2GraduationEvidenceIsAppendOnly();
             EnsureAQGreenV2WeeklyCommissionEvidenceIsAppendOnly();
+            EnsureSalesInvalidationsAreAppendOnly();
             EnsureAQGreenWeeklySalesEligibilityIsImmutable();
             return base.SaveChanges(acceptAllChangesOnSuccess);
         }
@@ -132,6 +135,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureAQGreenRecruitmentAttributionIsAppendOnly();
             EnsureAQGreenV2GraduationEvidenceIsAppendOnly();
             EnsureAQGreenV2WeeklyCommissionEvidenceIsAppendOnly();
+            EnsureSalesInvalidationsAreAppendOnly();
             EnsureAQGreenWeeklySalesEligibilityIsImmutable();
             return base.SaveChangesAsync(cancellationToken);
         }
@@ -147,6 +151,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             EnsureAQGreenRecruitmentAttributionIsAppendOnly();
             EnsureAQGreenV2GraduationEvidenceIsAppendOnly();
             EnsureAQGreenV2WeeklyCommissionEvidenceIsAppendOnly();
+            EnsureSalesInvalidationsAreAppendOnly();
             EnsureAQGreenWeeklySalesEligibilityIsImmutable();
             return base.SaveChangesAsync(
                 acceptAllChangesOnSuccess,
@@ -422,6 +427,13 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 throw new InvalidOperationException(
                     "Finalized AQGreen weekly-sales decisions are immutable.");
             }
+        }
+
+        private void EnsureSalesInvalidationsAreAppendOnly()
+        {
+            if (ChangeTracker.Entries<AQGreenSalesEvidenceInvalidation>().Any(entry =>
+                    entry.State == EntityState.Modified || entry.State == EntityState.Deleted))
+                throw new InvalidOperationException("Sales-evidence invalidations are append-only reconciliation facts.");
         }
 
         private void EnsureAQGreenV2WeeklyCommissionEvidenceIsAppendOnly()

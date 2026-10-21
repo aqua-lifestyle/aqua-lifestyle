@@ -48,6 +48,25 @@ namespace AqualLifeStyle.Application.Admin.Commissions.Dto
         public List<string> EvidenceReferences { get; set; } = new();
     }
 
+    public class InvalidateAQGreenSalesEvidenceInput : BeginAQGreenWeeklySalesReviewInput
+    {
+        public Guid EvidenceId { get; set; }
+        [Required, StringLength(AQGreenSalesEvidenceInvalidation.MaximumReasonLength)]
+        [DisableAuditing]
+        public string Reason { get; set; }
+    }
+
+    public class AQGreenSalesEvidenceInvalidationDto
+    {
+        public Guid Id { get; set; }
+        public int TenantId { get; set; }
+        public Guid DecisionId { get; set; }
+        public Guid EvidenceId { get; set; }
+        public string Reason { get; set; }
+        public long RecordedByUserId { get; set; }
+        public DateTime RecordedAtUtc { get; set; }
+    }
+
     public class AQGreenWeeklySalesEligibilityDecisionDto
     {
         public Guid Id { get; set; }
@@ -63,6 +82,12 @@ namespace AqualLifeStyle.Application.Admin.Commissions.Dto
         public DateTime? ReviewedAt { get; set; }
         public long? ReviewedByUserId { get; set; }
         public string RejectionReason { get; set; }
+    }
+
+    public class AQGreenSalesEvidenceReferenceDto
+    {
+        public Guid Id { get; set; }
+        public string TechnicalReference { get; set; }
     }
 
     public class AdminAQGreenWeeklySalesReviewDto
@@ -88,5 +113,6 @@ namespace AqualLifeStyle.Application.Admin.Commissions.Dto
         public long? ReviewedByUserId { get; set; }
         public string RejectionReason { get; set; }
         public IReadOnlyList<string> EvidenceReferences { get; set; }
+        public IReadOnlyList<AQGreenSalesEvidenceReferenceDto> Evidence { get; set; }
     }
 }

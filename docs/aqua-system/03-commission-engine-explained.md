@@ -216,3 +216,11 @@ The engine therefore prefers:
 - append-only evidence over silent row rewriting;
 - a unique ledger over duplicate “retry” rows;
 - an authorised reconciliation decision over direct SQL correction.
+
+### Later-invalidated AQGreen sales evidence
+
+A reviewer with the existing weekly-sales review permission and current Tenant/Area scope may call `AdminAQGreenWeeklySalesEligibility.InvalidateEvidence` with the participant/week, original evidence ID and a reason. Host reviewers also require `AllTenants`. The server records the actor and authoritative database UTC time in an append-only record; exact retries return the first record and conflicting reasons are rejected. `GetInvalidations` exposes those records only within the same review scope. This protective operation does not commission calculation or payout.
+
+The existing immutable V2 commission snapshot links the affected review to every dependent commission. Any invalidated evidence places those commissions under a pending reconciliation hold: both release and payment-recording APIs check it under the same transaction lock as invalidation. The administrator commission response reports `RequiresSalesEvidenceReconciliation` separately from the historical payout status. Original reviews, calculation evidence, amounts, release facts and settled payment history remain unchanged. Known-invalid evidence cannot support a new calculation. There is no automatic reversal, adjustment, reconciliation completion or hold override; any financial correction remains subject to the separate D11 authority.
+
+The additive migration must precede execution of this application version. PostgreSQL prevents updating, deleting or truncating invalidation records and rejects migration rollback once such evidence exists. Roll back application code only to a version that also enforces this hold; an older binary would not understand the new authority. No production migration or deployment is authorized by these implementation notes.
