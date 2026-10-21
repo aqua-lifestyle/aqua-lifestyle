@@ -37,7 +37,7 @@ public sealed class B6Allowlist
         var actualTop = node.AsObject().Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
         if (!actualTop.SetEquals(expectedTop)) throw new B6PackageException("Allowlist top-level contract is unexpected.");
         if (Value.PackageSchemaVersion != B6Contract.PackageVersion)
-            throw new B6PackageException("Allowlist package version is not .NET-native package V3.");
+            throw new B6PackageException("Allowlist package version is not the selected .NET-native package profile.");
         if (Value.Tables.Count == 0 || Value.Tables.Select(table => table.SourceTable).Distinct(StringComparer.Ordinal).Count() != Value.Tables.Count)
             throw new B6PackageException("Allowlist contains no tables or duplicate tables.");
         var tablePatterns = Value.ProhibitedTablePatterns.Select(pattern => new Regex(pattern, RegexOptions.IgnoreCase)).ToList();

@@ -38,18 +38,18 @@ public sealed partial class B6SnapshotPackage
         if (request.TenantId <= 0 || request.PopulationScope != B6Contract.PopulationScope)
             throw new B6PackageException("Explicit positive Tenant and full Tenant AQGreen population scope are required.");
 
-        SecureFiles.CreatePrivateDirectory(request.Output);
         await using var connection = new NpgsqlConnection(request.Dsn);
         await connection.OpenAsync();
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.RepeatableRead);
         await ExecuteAsync(connection, transaction, "SET TRANSACTION READ ONLY");
         await ExecuteAsync(connection, transaction, "SET LOCAL statement_timeout = '10min'");
         await ExecuteAsync(connection, transaction, "SET LOCAL lock_timeout = '5s'");
+        await ExecuteAsync(connection, transaction, "SET LOCAL search_path = pg_catalog, public");
 
         SourceObservation observation;
         await using (var command = new NpgsqlCommand(
             "SELECT current_setting('transaction_read_only'), transaction_timestamp(), " +
-            "current_setting('server_version'), current_setting('server_version_num')::int / 10000, " +
+            "current_setting('server_version'), current_setting('server_version_num')::int, " +
             "current_setting('server_encoding'), (SELECT datcollate FROM pg_database WHERE datname=current_database()), " +
             "txid_current_snapshot()::text, (SELECT system_identifier::text FROM pg_control_system()), " +
             "current_database(), (SELECT oid::text FROM pg_database WHERE datname=current_database())", connection, transaction))
@@ -62,9 +62,21 @@ public sealed partial class B6SnapshotPackage
                 reader.GetString(8), reader.GetString(9));
         }
         if (observation.ReadOnly != "on") throw new B6PackageException("Source transaction is not read-only.");
+        B6SourceSchema.RequireVersion(observation.VersionNumber);
         if (request.AnalysisCutoff > new DateTimeOffset(DateTime.SpecifyKind(observation.ObservedAt, DateTimeKind.Utc)))
             throw new B6PackageException("AnalysisSnapshotCutoff cannot be later than source observation.");
 
+        await B6SourceSchema.RequireColumnsAsync(connection, transaction, _allowlist);
+        var migrations = new List<(string Id, string ProductVersion)>();
+        await using (var command = new NpgsqlCommand(
+            "SELECT \"MigrationId\", \"ProductVersion\" FROM public.\"__EFMigrationsHistory\" ORDER BY \"MigrationId\"", connection, transaction))
+        await using (var reader = await command.ExecuteReaderAsync())
+            while (await reader.ReadAsync()) migrations.Add((reader.GetString(0), reader.GetString(1)));
+        B6SourceSchema.RequireHistory(migrations);
+
+        // No application rows or raw files before version/history/required-column
+        // compatibility has been established inside this same read-only snapshot.
+        SecureFiles.CreatePrivateDirectory(request.Output);
         foreach (var table in _allowlist.Value.Tables)
         {
             var projections = table.SourceFields.Select(field =>
@@ -90,11 +102,6 @@ public sealed partial class B6SnapshotPackage
                 table.SourceFields.Select(field => field.Output).ToList(), rows);
         }
 
-        var migrations = new List<(string Id, string ProductVersion)>();
-        await using (var command = new NpgsqlCommand(
-            "SELECT \"MigrationId\", \"ProductVersion\" FROM \"__EFMigrationsHistory\" ORDER BY \"MigrationId\"", connection, transaction))
-        await using (var reader = await command.ExecuteReaderAsync())
-            while (await reader.ReadAsync()) migrations.Add((reader.GetString(0), reader.GetString(1)));
         var extensions = new List<string>();
         await using (var command = new NpgsqlCommand(
             "SELECT extname || ':' || extversion FROM pg_extension ORDER BY extname", connection, transaction))
@@ -110,7 +117,7 @@ public sealed partial class B6SnapshotPackage
             AllowlistDigest = _allowlist.Digest,
             AnalysisSnapshotCutoff = B6Values.Timestamp(request.AnalysisCutoff),
             SourceObservedAt = B6Values.Timestamp(observation.ObservedAt),
-            SourcePostgreSqlMajorVersion = observation.Major,
+            SourcePostgreSqlMajorVersion = observation.VersionNumber / 10000,
             SourcePostgreSqlVersion = observation.Version,
             SourceServerEncoding = observation.Encoding,
             SourceDatabaseCollation = observation.Collation,
@@ -214,10 +221,11 @@ public sealed partial class B6SnapshotPackage
     {
         if (metadata.PackageSchemaVersion != B6Contract.PackageVersion || metadata.ExportToolVersion != B6Contract.PackageVersion ||
             metadata.AllowlistDigest != _allowlist.Digest || metadata.TransactionMode != "REPEATABLE READ READ ONLY" ||
-            metadata.PopulationScope != B6Contract.PopulationScope || metadata.SourcePostgreSqlMajorVersion != 16 ||
+            metadata.PopulationScope != B6Contract.PopulationScope || metadata.SourcePostgreSqlMajorVersion != B6Contract.PostgreSqlMajorVersion ||
+            !B6SourceSchema.VersionTextMatches(metadata.SourcePostgreSqlVersion) ||
             metadata.SourceServerEncoding != "UTF8" || !B6Contract.ControlledCode.IsMatch(metadata.SourceSystemIdentifier) ||
             !B6Contract.GitSha.IsMatch(metadata.RepositoryCommit) || metadata.RepositoryCommit != _toolchainIdentity.RepositoryCommit ||
-            metadata.EfMigrationHead != B6Contract.ExpectedMigrationHead || !B6Contract.Sha256.IsMatch(metadata.SourceSchemaVersion) ||
+            metadata.EfMigrationHead != B6Contract.ExpectedMigrationHead || metadata.SourceSchemaVersion != B6SourceSchema.ExpectedHistoryDigest ||
             !B6Contract.Sha256.IsMatch(metadata.SourceDatabaseIdentityEvidence) || metadata.SourceExtensions.Count == 0)
             throw new B6PackageException("Raw source metadata lacks the sealed PostgreSQL/schema/tool/scope evidence contract.");
         B6Values.RequireCutoffNotAfterObservation(metadata.AnalysisSnapshotCutoff, metadata.SourceObservedAt);
@@ -307,6 +315,6 @@ public sealed partial class B6SnapshotPackage
         return $"WITH {ctes} SELECT {string.Join(", ", projections)} FROM {B6Values.QuoteIdentifier(table)} t WHERE {condition} ORDER BY {order}";
     }
 
-    private sealed record SourceObservation(string ReadOnly, DateTime ObservedAt, string Version, int Major,
+    private sealed record SourceObservation(string ReadOnly, DateTime ObservedAt, string Version, int VersionNumber,
         string Encoding, string Collation, string Mvcc, string SystemId, string Database, string DatabaseOid);
 }

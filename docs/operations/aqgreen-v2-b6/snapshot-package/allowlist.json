@@ -1,6 +1,6 @@
 {
   "allowlistVersion": "AQGreenB6SnapshotAllowlistV2",
-  "packageSchemaVersion": "AQGreenB6SnapshotPackageV3",
+  "packageSchemaVersion": "AQGreenB6SnapshotPackageV4",
   "fieldContract": "Each purpose is the necessity statement; classification defines handling; transform is resolved by transformSemantics.",
   "transformSemantics": {
     "pseudonym-*": {"pseudonymised": true, "transformed": true, "retainedVerbatim": false},

@@ -89,6 +89,6 @@ b6 handoff-receipt --snapshot "${B6_SNAPSHOT_DIR}" --manifest "${work_dir}/final
   --root-dispositions "${B6_ROOT_DISPOSITIONS}" \
   --inventory "${work_dir}/inventory-1.json" \
   --runtime-state "${runtime_state}" --schema b6_snapshot --sql-file "${inventory_sql}" \
-  --approved-destination PACKAGE_OWNED_ISOLATED_POSTGRESQL_16 \
+  --approved-destination PACKAGE_OWNED_ISOLATED_POSTGRESQL_18 \
   --output "${work_dir}/handoff-receipt.json"
 printf 'B6 .NET representative analysis repeatability and final verification: PASS\nOutputs: %s\n' "${work_dir}"

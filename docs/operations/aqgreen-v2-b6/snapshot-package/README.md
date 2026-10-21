@@ -1,5 +1,23 @@
 # AQGreen B6 representative snapshot acquisition package
 
+## Current compatibility candidate: V4 / PostgreSQL 18.4
+
+The custodian's schema-only readback established server `180004`, 54 migration
+rows (ProductVersion8.0.8) through
+`20261005194901_AddIsolatedAQGreenPilotEvidence`, and 241 columns across the
+17 extraction tables. Package V4 selects that existing schema and a digest-pinned
+PostgreSQL18.4 SOURCE/ANALYSIS runtime. It rejects other server versions, missing/
+extra migration history and incompatible required-column types/nullability before
+reading application rows. Extra unselected columns are not exported. No migration
+semantics, business rules or allowlisted fields/transforms are changed.
+
+V3/PG16 results below remain historical scoped evidence, not qualification of V4.
+V4 source must still complete existing operational release/Gate-Q/A, custody and
+independent review before a real handoff. Local development builds are not that
+release. `authoritative-runner.sh`, frozen SDK/feed/lock/signer pins and its
+privileged execution gate are unchanged; no privileged bootstrap is run by this
+compatibility task. See the bounded [compatibility worklog](../../../exec-plans/active/aqgreen-b6-pg18-compatibility.md).
+
 This package creates and verifies a **pseudonymised and data-minimised
 representative snapshot**. Stable pseudonymous keys remain linkable inside the
 dataset; the package does not claim anonymisation or determine legal compliance.
@@ -471,11 +489,13 @@ a focused set. Evidence-sensitive focused runs may additionally set a positive
 hard-coding identities for every future test while allowing review gates to bind a
 known focused suite.
 
-The test migrates a disposable PostgreSQL 16 source with the current EF migrations,
+The current test migrates a digest-pinned disposable PostgreSQL 18.4 source with the evidenced EF migrations,
 inserts only production-schema-valid synthetic cases, and exercises the full
 scoped package twice. Conditions prevented by production constraints are tested as
 explicit malformed delivered-snapshot negatives. Its source update is intentional
 drift-test setup, not a production operation.
+Set `B6_TEST_RESULTS_DIR` to a new absolute external directory to retain the TRX;
+the disposable synthetic snapshots/keys/runtime state are still cleaned up.
 
 ## Architecture decision
 

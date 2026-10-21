@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>AqualLifeStyle.B6SnapshotRunner</AssemblyName>
-    <AssemblyInformationalVersion>AQGreenB6SnapshotPackageV3</AssemblyInformationalVersion>
+    <AssemblyInformationalVersion>AQGreenB6SnapshotPackageV4</AssemblyInformationalVersion>
     <RootNamespace>AqualLifeStyle.B6SnapshotRunner</RootNamespace>
   </PropertyGroup>
   <ItemGroup>

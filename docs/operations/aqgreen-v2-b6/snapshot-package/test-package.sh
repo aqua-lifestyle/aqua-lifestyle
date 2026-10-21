@@ -95,7 +95,7 @@ b6 handoff-receipt --snapshot "${test_root}/snapshot-1" \
   --root-dispositions "${test_root}/root-dispositions.json" \
   --inventory "${test_root}/inventory-1.json" \
   --runtime-state "${analysis_state}" --schema b6_snapshot --sql-file "${inventory_sql}" \
-  --approved-destination PACKAGE_OWNED_ISOLATED_POSTGRESQL_16 \
+  --approved-destination PACKAGE_OWNED_ISOLATED_POSTGRESQL_18 \
   --generated-at 2026-09-03T02:00:00Z --output "${test_root}/receipt.json"
 
 b6 fixture-load --runtime-state "${source_state}" --sql-file "${package_dir}/fixture/drift-data.sql"
@@ -130,11 +130,12 @@ export B6_TEST_SECRET="${test_root}/operator-secret"
 export B6_TEST_RUNNER="${runner_dll}"
 export B6_TEST_DRIFT_SNAPSHOT="${test_root}/snapshot-drift"
 export B6_TEST_DRIFT_MANIFEST="${test_root}/base-manifest-drift.json"
-test_results_dir="${test_root}/test-results"
+test_results_dir="${B6_TEST_RESULTS_DIR:-${test_root}/test-results}"
+[[ "${test_results_dir}" == /* && ! -e "${test_results_dir}" && ! -L "${test_results_dir}" ]]
 mkdir -m 0700 "${test_results_dir}"
 test_trx="${test_results_dir}/b6-package-tests.trx"
 dotnet test "${tests_project}" --configuration Release --no-build \
-  --filter "${B6_TEST_FILTER:-FullyQualifiedName~B6PrimitiveContractTests|FullyQualifiedName~B6ArtifactContractTests}" \
+  --filter "${B6_TEST_FILTER:-FullyQualifiedName~B6PrimitiveContractTests|FullyQualifiedName~B6ArtifactContractTests|FullyQualifiedName~B6Pg18CompatibilityTests}" \
   --logger "trx;LogFileName=$(basename "${test_trx}")" --results-directory "${test_results_dir}"
 test_result_arguments=(verify-test-run --trx "${test_trx}")
 if [[ -n "${B6_EXPECTED_TEST_COUNT:-}" ]]; then

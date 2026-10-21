@@ -138,11 +138,11 @@ public sealed partial class B6SnapshotPackage
             metadata.CanonicalEncodingVersion == B6Contract.EncodingVersion;
         if (!expectedVersions || metadata.Classification != B6Contract.Classification ||
             metadata.TransactionMode != "REPEATABLE READ READ ONLY" || metadata.PopulationScope != B6Contract.PopulationScope ||
-            metadata.SourcePostgreSqlMajorVersion != 16 || metadata.SourceServerEncoding != "UTF8" ||
+            metadata.SourcePostgreSqlMajorVersion != B6Contract.PostgreSqlMajorVersion || !B6SourceSchema.VersionTextMatches(metadata.SourcePostgreSqlVersion) || metadata.SourceServerEncoding != "UTF8" ||
             string.IsNullOrWhiteSpace(metadata.SourceDatabaseCollation) || metadata.SourceExtensions.Count == 0 ||
             !B6Contract.SnapshotId.IsMatch(metadata.SnapshotId) || !B6Contract.ControlledCode.IsMatch(metadata.SourceSystemIdentifier) ||
             !B6Contract.GitSha.IsMatch(metadata.RepositoryCommit) || metadata.RepositoryCommit != _toolchainIdentity.RepositoryCommit ||
-            !B6Contract.Sha256.IsMatch(metadata.SourceSchemaVersion) || !B6Contract.Sha256.IsMatch(metadata.SourceMvccSnapshotEvidence) ||
+            metadata.SourceSchemaVersion != B6SourceSchema.ExpectedHistoryDigest || !B6Contract.Sha256.IsMatch(metadata.SourceMvccSnapshotEvidence) ||
             !B6Contract.Sha256.IsMatch(metadata.SourceDatabaseIdentityEvidence) || metadata.EfMigrationHead != B6Contract.ExpectedMigrationHead)
             throw new B6PackageException("Snapshot metadata fails its sealed PostgreSQL/schema/scope/version contract.");
         B6Values.RequireCutoffNotAfterObservation(metadata.AnalysisSnapshotCutoff, metadata.SourceObservedAt);
@@ -151,6 +151,7 @@ public sealed partial class B6SnapshotPackage
             throw new B6PackageException("AnalysisSnapshotCutoff is confused with V2EffectiveAt.");
         metadata.ToolchainIdentity.RequireEqual(_toolchainIdentity);
         var migrations = rows["__EFMigrationsHistory"].OrderBy(row => row["MigrationId"], StringComparer.Ordinal).ToList();
+        B6SourceSchema.RequireHistory(migrations.Select(row => (row["MigrationId"], row["ProductVersion"])));
         var migrationDigest = B6Values.Sha256Hex(string.Join('\n', migrations.Select(row => $"{row["MigrationId"]}|{row["ProductVersion"]}")));
         if (migrations.LastOrDefault()?["MigrationId"] != B6Contract.ExpectedMigrationHead || migrationDigest != metadata.SourceSchemaVersion)
             throw new B6PackageException("Snapshot does not match the authoritative EF migration history.");
