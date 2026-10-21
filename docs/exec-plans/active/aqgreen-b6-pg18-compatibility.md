@@ -73,3 +73,22 @@ inventory/analysis/impact/final verification runs. It does not authorize real-da
 handoff or constitute independent acceptance. Actual output, not this planned
 invocation, must establish the final result. Future operational release still needs
 new-source Gate-Q/A/build/custody/independent acceptance and specific data authority.
+
+## Final executed compatibility evidence
+
+The invocation above passed at clean source commit
+`dfed7fb0fe06f8072e2d538a521d0f4d4fb3b2de`: **41 passed / 0 failed / 0 skipped**, plus
+the existing one-case synthetic root-disposition writer. Two complete inventory,
+analysis, simulation, impact and FINAL_ANALYSIS outputs compare byte-for-byte; final
+verification and the existing TRX verifier passed. This is synthetic PG18.4 package
+E2E, not an actual population/final acceptance receipt. TRX SHA256:
+`6bb147fb003d6ecf7544b8a706c0fb04a29cf76df3b99c6cef7b65ea24c1faf4`.
+
+Executed development assembly SHA256s (not an operational release): Runner
+`98a461fc9218559554a764b0dd8df9b95a715fb2d3412e517776f23cb43870c9`, Core
+`5e5ad20043e28042645f9519cef8a652d5157b6d58a73d4ab0041eb3d3cd31cc`, EF
+`f1fbdf835aa51f4c0df95fc553665589e72a403f36f1a0ffd17f6ab8b2a1acc8`.
+There are no Core/domain/migration source changes. All owned PG18 runtime containers
+were removed. Original bootstrap5ed57d64… and all four dependency-lock pins match.
+No production access/extraction, privileged bootstrap, Customer11 execution,
+financial mutation, PB1/C04 work, push or merge occurred.
