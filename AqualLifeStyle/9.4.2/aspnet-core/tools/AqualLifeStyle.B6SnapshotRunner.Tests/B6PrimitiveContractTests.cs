@@ -124,7 +124,7 @@ public sealed class B6PrimitiveContractTests
         bootstrap.ShouldContain("mechanical-network-witness=PASS");
         bootstrap.ShouldContain("--unshare-net");
         bootstrap.ShouldContain("8.0.130");
-        bootstrap.ShouldContain("6.8.2.32767");
+        bootstrap.ShouldContain("6.8.2.3");
         bootstrap.ShouldContain("NUGET_CERT_REVOCATION_MODE=offline");
         bootstrap.ShouldContain("FullyQualifiedName~B6PrimitiveContractTests");
         bootstrap.ShouldContain("verify-test-run");
@@ -149,7 +149,8 @@ public sealed class B6PrimitiveContractTests
         bootstrap.ShouldContain("--json-status-fd");
         bootstrap.ShouldContain("--ro-bind-data");
         bootstrap.ShouldContain("Bubblewrap wait interrupted before process exit");
-        bootstrap.ShouldContain("045a8891a4e84d5acec53b3650e2ea4210bc6d3fc4ddc2d6c8de63662afa56aa");
+        bootstrap.ShouldContain("c61ff7f8665688b95ad0f34e780daaa67b978d26115b82797c07ea6044c566ed");
+        bootstrap.ShouldContain("8d4629686bf51c0a062a1f8a5753d7b29e95c5c81e20499dd2310f7921023140");
         bootstrap.ShouldContain("747ec92ca0d9f50eccf82079bc8f878a97a3b59a270c6e10b7b1cd3b54ce728a");
         bootstrap.ShouldNotContain("7f3ee778e07ef8cf720531f9e164870369a065f3223515483d68e4030227dc19");
         bootstrap.ShouldNotContain("--ro-bind / /");
@@ -745,7 +746,8 @@ public sealed class B6PrimitiveContractTests
         $"<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net8.0</TargetFramework>" +
         $"<AssemblyName>{assemblyName}</AssemblyName></PropertyGroup></Project>\n";
 
-    private static void WriteSyntheticNuGetPackage(string root, string packageId, string version)
+    private static void WriteSyntheticNuGetPackage(string root, string packageId, string version,
+        bool distinctContentIdentity = false)
     {
         var packageDirectory = Path.Combine(root, packageId, version);
         var payloadDirectory = Path.Combine(packageDirectory, "lib", "net8.0");
@@ -759,12 +761,20 @@ public sealed class B6PrimitiveContractTests
         {
             WriteZipEntry(archive, $"{packageId}.nuspec", nuspec);
             WriteZipEntry(archive, "lib/net8.0/_._", string.Empty);
+            if (distinctContentIdentity)
+                WriteZipEntry(archive, "lib/net8.0/encoded%2Bname.txt", "encoded payload");
         }
 
         var archiveBytes = File.ReadAllBytes(archivePath);
         var contentHash = Convert.ToBase64String(SHA512.HashData(archiveBytes));
         File.WriteAllText(Path.Combine(packageDirectory, $"{packageId}.nuspec"), nuspec);
         File.WriteAllText(archivePath + ".sha512", contentHash);
+        if (distinctContentIdentity)
+        {
+            // Model signed archives: canonical package identity is not raw SHA512.
+            contentHash = Convert.ToBase64String(SHA512.HashData(Encoding.UTF8.GetBytes("canonical:" + packageId)));
+            File.WriteAllText(Path.Combine(payloadDirectory, "encoded+name.txt"), "encoded payload");
+        }
         File.WriteAllText(Path.Combine(packageDirectory, ".nupkg.metadata"),
             $"{{\"version\":2,\"contentHash\":\"{contentHash}\",\"source\":\"https://api.nuget.org/v3/index.json\"}}");
         File.WriteAllBytes(Path.Combine(payloadDirectory, "_._"), []);
@@ -1068,7 +1078,7 @@ public sealed class B6PrimitiveContractTests
                      "witness-wrong-uid-range", "witness-wrong-gid-range", "witness-map-whitespace",
                      "witness-pid", "witness-starttime", "witness-groups",
                      "witness-capabilities", "witness-no-new-privileges", "qualification-evidence-tamper",
-                     "simulation-output-mismatch"
+                     "simulation-output-mismatch", "raw-sidecar-tamper", "canonical-content-tamper", "bwrap-identity"
                  })
         {
             var fixture = CreateCurrentRunnerFixture(scenario == "freshness-over" ? 3601 : 3599, scenario);
@@ -1260,7 +1270,7 @@ public sealed class B6PrimitiveContractTests
         var tqPackages = uPackages.Skip(1).Take(1).ToArray();
         foreach (var package in uPackages)
         {
-            WriteSyntheticNuGetPackage(acquired, package.Id, package.Version);
+            WriteSyntheticNuGetPackage(acquired, package.Id, package.Version, distinctContentIdentity: true);
             var archive = Path.Combine(acquired, package.Id, package.Version,
                 $"{package.Id}.{package.Version}.nupkg");
             File.Copy(archive, Path.Combine(feed, Path.GetFileName(archive)));
@@ -1292,7 +1302,8 @@ public sealed class B6PrimitiveContractTests
             feedManifest.Append(package.Id).Append('\t').Append(package.Version).Append('\t')
                 .Append(Path.GetFileName(archive)).Append('\t').Append(B6Values.Sha256Hex(archiveBytes)).Append('\t')
                 .Append(Convert.ToBase64String(SHA512.HashData(archiveBytes))).Append('\t')
-                .Append(File.ReadAllText(archive + ".sha512")).Append('\t').Append(nuspecHash).Append('\t')
+                .Append(System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(directory,
+                    ".nupkg.metadata"))).RootElement.GetProperty("contentHash").GetString()).Append('\t').Append(nuspecHash).Append('\t')
                 .Append(nuspecHash).Append('\t').Append("https://api.nuget.org/v3/index.json\n");
         }
         var feedManifestPath = Path.Combine(root, "feed-manifest.tsv");
@@ -1344,7 +1355,7 @@ public sealed class B6PrimitiveContractTests
               [[ "$mutation" != runtime-extra ]] || printf 'Microsoft.NETCore.App 8.0.31 [%s/shared/Microsoft.NETCore.App]\n' "$root"
               exit 0
             fi
-            if [[ "${1:-}" == nuget && "${2:-}" == --version ]]; then printf 'NuGet Command Line\n6.8.2.32767\n'; exit 0; fi
+            if [[ "${1:-}" == nuget && "${2:-}" == --version ]]; then printf 'NuGet Command Line\n6.8.2.3\n'; exit 0; fi
             if [[ "${1:-}" == nuget && "${2:-}" == verify ]]; then
               package="${!#}"; name="$(basename "$package" .nupkg)"
               [[ "$mutation" != native-verify-failure ]] || exit 41
@@ -1373,6 +1384,12 @@ public sealed class B6PrimitiveContractTests
                 [[ -f "$metadata" ]] || continue
                 sed -i 's|"source":"[^"]*"|"source":"'"$source"'"|' "$metadata"
               done
+              if [[ "$flat_source" == yes ]]; then
+                if [[ "$mutation" == raw-sidecar-tamper ]]; then printf 'tamper' > "$packages/synthetic.b/2.0.0/synthetic.b.2.0.0.nupkg.sha512"; fi
+                if [[ "$mutation" == canonical-content-tamper ]]; then
+                  sed -i 's/"contentHash":"[^"]*"/"contentHash":"tamper"/' "$packages/synthetic.b/2.0.0/.nupkg.metadata"
+                fi
+              fi
               for name in one two three; do mkdir -p "$artifact/obj/$name"; printf 'assets-%s\n' "$name" > "$artifact/obj/$name/project.assets.json"; done
               if [[ "$flat_source" == no && "${2:-}" == *B6SnapshotRunner.Tests* && ! -e "$mutation_marker" ]]; then
                 : > "$mutation_marker"
@@ -1510,7 +1527,7 @@ public sealed class B6PrimitiveContractTests
         runner = ReplaceExactlyOnce(runner, "9598c6dd7cab8f0dc62a31be8c73a3c030c5d92d26d120689f06bf1b60b0980a", B6Values.Sha256Hex(u1Manifest));
         runner = ReplaceExactlyOnce(runner, "84ba6476727924aecc6b94207f6de1fdc1135804edbea4d32b7984ede77a6b35", B6Values.Sha256Hex(u2Manifest));
         runner = ReplaceExactlyOnce(runner, "1a56a8bad2fed7875f3326f620ce40af7c0f805d7f16696efa7f1eceaf816df7", B6Values.Sha256Hex(feedManifest.ToString()));
-        runner = ReplaceExactlyOnce(runner, "1c609222deecbbc9ef65d311528ad1eb19ff26adf70227752ee95cca73a5910c", B6Values.Sha256Hex(File.ReadAllBytes(toolchainManifest)));
+        runner = ReplaceExactlyOnce(runner, "3fb331fd78afd15ba94aa2ac11c1cfaace2a654d32258ce1acfa128dbcc7590a", B6Values.Sha256Hex(File.ReadAllBytes(toolchainManifest)));
         for (var index = 0; index < lockPaths.Length; index++)
         {
             var oldHash = new[]
@@ -1525,7 +1542,9 @@ public sealed class B6PrimitiveContractTests
         }
         runner = ReplaceExactlyOnce(runner, "0d131692c7d4035f4ed890d6b32fb127bd6fe423db700b2a0812c2438ff66f79", B6Values.Sha256Hex(policy));
         runner = ReplaceExactlyOnce(runner, "5ab46a2fe268ad525c42ae06a47fb5a105802b37d0733c48fcdc093a14398a5c", B6Values.Sha256Hex(File.ReadAllBytes(simulateInput)));
-        runner = ReplaceExactlyOnce(runner, "045a8891a4e84d5acec53b3650e2ea4210bc6d3fc4ddc2d6c8de63662afa56aa", B6Values.Sha256Hex(dotnetBytes));
+        runner = ReplaceExactlyOnce(runner, "c61ff7f8665688b95ad0f34e780daaa67b978d26115b82797c07ea6044c566ed", B6Values.Sha256Hex(dotnetBytes));
+        runner = ReplaceExactlyOnce(runner, "8d4629686bf51c0a062a1f8a5753d7b29e95c5c81e20499dd2310f7921023140",
+            scenario == "bwrap-identity" ? new string('0', 64) : B6Values.Sha256Hex(File.ReadAllBytes(fakeBwrap)));
         runner = ReplaceExactlyOnce(runner, "readonly bwrap='/usr/bin/bwrap'", $"readonly bwrap='{fakeBwrap}'");
         if (scenario != "bootstrap-nonroot")
             runner = ReplaceExactlyOnce(runner,
@@ -2656,7 +2675,7 @@ public sealed class B6PrimitiveContractTests
     {
         if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException("Native B6 fixtures are mandatory Linux execution.");
         FreshTerminalKeys.Length.ShouldBe(36);
-        FreshHash(CanonicalB6EntrypointFromTestSource()).ShouldBe("5ed57d64c74014002708dc679d5d26e9d7b53e888d1124dce3a74432e16a6244");
+        FreshHash(CanonicalB6EntrypointFromTestSource()).ShouldBe("f4ed523b8dbee47345664c516236adc5637db3f4f44db24f27afe6a716791026");
         FreshHash("/bin/busybox").ShouldBe("dbac288c29ba568459550a2da9e7ae0ded6b1fc728ee9fad3044c44e62d6ac14");
         var fixture = FreshCreate(FreshProofBody);
         try
@@ -2689,7 +2708,7 @@ public sealed class B6PrimitiveContractTests
             Console.WriteLine($"FRESH_SECTION=PASS name=SESSION_CLEANUP cases={sessionCount}");
             FreshAuthentic(fixture, result);
             Console.WriteLine("FRESH_SECTION=PASS name=FINDING6 cases=1 reconciliation=CHILD_TERMINAL_ACTUAL_WAIT");
-            FreshHash(CanonicalB6EntrypointFromTestSource()).ShouldBe("5ed57d64c74014002708dc679d5d26e9d7b53e888d1124dce3a74432e16a6244");
+            FreshHash(CanonicalB6EntrypointFromTestSource()).ShouldBe("f4ed523b8dbee47345664c516236adc5637db3f4f44db24f27afe6a716791026");
             Console.WriteLine("FRESH_SECTION=PASS name=GATE_Q_GATE_A_PRESERVATION cases=1 scope=SEMANTIC_ONLY");
             Console.WriteLine($"FRESH_FIXTURE=COMPLETE sections=8 cases={failureCount + authenticityCount + lifecycleCount + boundaryCount + loaderCount + sessionCount + 2}");
         }

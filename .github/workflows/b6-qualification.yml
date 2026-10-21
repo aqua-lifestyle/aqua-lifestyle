@@ -1,0 +1,237 @@
+name: B6 replacement-supply qualification (private custody only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: Independently reviewed full source commit
+        required: true
+        type: string
+      source_pr:
+        description: Public B6 source/supply review PR number
+        required: true
+        type: string
+      authorization_issue:
+        description: Private owner authorization issue, bound to this run and attempt
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: b6-privileged-qualification
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    # The public copy is reviewable source only. No public job receives evidence.
+    if: github.repository == 'aqua-lifestyle/b6-qualification-evidence'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment: b6-qualification
+    permissions:
+      contents: write
+      issues: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_COMMIT: ${{ inputs.source_commit }}
+      SOURCE_PR: ${{ inputs.source_pr }}
+      AUTHORIZATION_ISSUE: ${{ inputs.authorization_issue }}
+      INDEPENDENT_REVIEWER: ${{ vars.B6_INDEPENDENT_REVIEWER }}
+    steps:
+      - name: Require independent baseline approval and exact owner run authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 0077
+          python3 - <<'PY'
+          import base64, hashlib, json, os, pathlib, re, subprocess, tempfile
+
+          def require(value, reason):
+              if not value:
+                  raise RuntimeError(reason)
+
+          def api(path):
+              return json.loads(subprocess.check_output(['gh', 'api', path]))
+
+          def contents(repo, path, ref):
+              return base64.b64decode(api(f'repos/{repo}/contents/{path}?ref={ref}')['content'], validate=False)
+
+          custody = 'aqua-lifestyle/b6-qualification-evidence'
+          source_repo = 'aqua-lifestyle/aqua-lifestyle'
+          workflow = '.github/workflows/b6-qualification.yml'
+          baseline_path = 'docs/operations/aqgreen-v2-b6/snapshot-package/replacement-supply/candidate-baseline.json'
+          source, pr_number, issue_number = (os.environ[k] for k in ('SOURCE_COMMIT', 'SOURCE_PR', 'AUTHORIZATION_ISSUE'))
+          reviewer = os.environ.get('INDEPENDENT_REVIEWER', '')
+          require(os.environ['GITHUB_REPOSITORY'] == custody, 'private custody repository required')
+          require(os.environ['GITHUB_EVENT_NAME'] == 'workflow_dispatch' and os.environ['GITHUB_REF'] == 'refs/heads/main', 'manual default-branch execution required')
+          require(re.fullmatch('[0-9a-f]{40}', source), 'full source commit required')
+          require(re.fullmatch('[1-9][0-9]*', pr_number) and re.fullmatch('[1-9][0-9]*', issue_number), 'numeric authority locators required')
+          require(re.fullmatch('[A-Za-z0-9][A-Za-z0-9-]{0,38}', reviewer), 'owner-designated independent reviewer required')
+          require(reviewer.lower() != os.environ['GITHUB_ACTOR'].lower(), 'reviewer cannot execute the qualification')
+          require(api(f'repos/{custody}')['visibility'] == 'private', 'custody must remain private')
+          protection = api(f'repos/{custody}/environments/b6-qualification')
+          require(protection.get('can_admins_bypass') is False, 'environment bypass must be disabled')
+          rules = [r for r in protection['protection_rules'] if r['type'] == 'required_reviewers']
+          require(len(rules) == 1 and rules[0].get('prevent_self_review') is True, 'independent environment protection required')
+          require(any(r['type'] == 'User' and r['reviewer']['login'].lower() == reviewer.lower() for r in rules[0]['reviewers']), 'designated reviewer must protect execution')
+          pr = api(f'repos/{source_repo}/pulls/{pr_number}')
+          require(pr['head']['repo']['full_name'] == source_repo and pr['head']['sha'] == source and not pr['draft'], 'reviewed source PR identity mismatch')
+          require(pr['user']['login'].lower() != reviewer.lower(), 'reviewer cannot author the source PR')
+          baseline_bytes = contents(source_repo, baseline_path, source)
+          baseline_hash = hashlib.sha256(baseline_bytes).hexdigest()
+          baseline = json.loads(baseline_bytes)
+          require(baseline['custody_repository'] == custody and baseline['status'] == 'CANDIDATE_NOT_APPROVED', 'replacement baseline identity mismatch')
+          # No generated status field grants authority: a current, independent,
+          # exact-commit review must explicitly approve this manifest's identity.
+          reviews = []
+          page = 1
+          while True:
+              batch = api(f'repos/{source_repo}/pulls/{pr_number}/reviews?per_page=100&page={page}')
+              reviews.extend(batch)
+              if len(batch) < 100:
+                  break
+              page += 1
+          reviews = [r for r in reviews if r['user']['login'].lower() == reviewer.lower() and r['state'] != 'COMMENTED']
+          require(reviews, 'independent supply review missing')
+          review = max(reviews, key=lambda r: r['id'])
+          marker = 'B6_SUPPLY_BASELINE_APPROVED sha256:' + baseline_hash
+          require(review['state'] == 'APPROVED' and review['commit_id'] == source and marker in (review['body'] or '').splitlines(), 'current exact-commit supply approval missing')
+          source_workflow = contents(source_repo, workflow, source)
+          require(source_workflow == contents(custody, workflow, os.environ['GITHUB_SHA']), 'executing workflow differs from independently reviewed source')
+          issue = api(f'repos/{custody}/issues/{issue_number}')
+          require(issue['user']['login'] == 'Xolani-M' and issue['state'] == 'open' and 'pull_request' not in issue, 'owner authorization issue required')
+          authority = json.loads(issue['body'])
+          expected = {
+              'schema': 'B6PrivilegedQualificationAuthorizationV1',
+              'source_commit': source, 'source_pr': int(pr_number),
+              'baseline_sha256': baseline_hash,
+              'workflow_sha256': hashlib.sha256(source_workflow).hexdigest(),
+              'run_id': os.environ['GITHUB_RUN_ID'], 'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'reviewer': reviewer, 'runner': 'ubuntu-24.04',
+              'evidence_repository': custody, 'scope': 'QUALIFICATION_ONLY_NO_PRODUCTION',
+          }
+          require(authority == expected, 'owner authorization must bind this exact run, source and supply')
+          root = pathlib.Path(tempfile.mkdtemp(prefix='b6-qualification-', dir=os.environ['RUNNER_TEMP']))
+          root.chmod(0o700)
+          (root / 'authorization.json').write_text(json.dumps({'owner_issue': issue, 'supply_review': review, 'environment': protection, 'run_authority': authority}, indent=2) + '\n')
+          (root / 'candidate-baseline.json').write_bytes(baseline_bytes)
+          with open(os.environ['GITHUB_ENV'], 'a') as stream:
+              stream.write('B6_ROOT=' + str(root) + '\n')
+          PY
+
+      - name: Materialize exact source and verify retained replacement inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 0077
+          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1
+          git -c core.hooksPath=/dev/null init "$B6_ROOT/source" > "$B6_ROOT/source-materialization.log" 2>&1
+          git -C "$B6_ROOT/source" remote add origin https://github.com/aqua-lifestyle/aqua-lifestyle.git
+          git -C "$B6_ROOT/source" fetch --no-tags origin "$SOURCE_COMMIT" >> "$B6_ROOT/source-materialization.log" 2>&1
+          git -C "$B6_ROOT/source" -c core.hooksPath=/dev/null -c core.fsmonitor=false checkout --detach "$SOURCE_COMMIT" >> "$B6_ROOT/source-materialization.log" 2>&1
+          test "$(git -C "$B6_ROOT/source" rev-parse HEAD)" = "$SOURCE_COMMIT"
+          package="$B6_ROOT/source/docs/operations/aqgreen-v2-b6/snapshot-package"
+          cmp "$B6_ROOT/candidate-baseline.json" "$package/replacement-supply/candidate-baseline.json"
+          gh release download candidate-20261021-1 --repo "$GITHUB_REPOSITORY" --pattern 'replacement-inputs.tar.gz.part-*' --dir "$B6_ROOT" > "$B6_ROOT/input-download.log" 2>&1
+          python3 - <<'PY'
+          import json, os, pathlib, shutil
+          root = pathlib.Path(os.environ['B6_ROOT'])
+          baseline = json.loads((root / 'candidate-baseline.json').read_text())
+          with (root / 'replacement-inputs.tar.gz').open('xb') as output:
+              for index in range(baseline['archive_parts']):
+                  with (root / f'replacement-inputs.tar.gz.part-{index:03d}').open('rb') as source:
+                      shutil.copyfileobj(source, output)
+          PY
+          python3 "$package/replacement-supply/verify-inputs.py" --archive "$B6_ROOT/replacement-inputs.tar.gz" --output "$B6_ROOT/inputs" --repository "$B6_ROOT/source" > "$B6_ROOT/input-verification.log" 2>&1
+          git -C "$B6_ROOT/source" bundle create "$B6_ROOT/reviewed-source.bundle" HEAD
+
+      - name: Install only approved host tools and run existing privileged Gate-Q/A
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 0077
+          # This is the first privileged step. All input/source/review/owner guards
+          # above must have passed. No DSN, provider input or representative data.
+          sudo dpkg --install "$B6_ROOT/inputs/host-tools/mawk.deb" "$B6_ROOT/inputs/host-tools/busybox-static.deb" "$B6_ROOT/inputs/host-tools/bubblewrap.deb" > "$B6_ROOT/host-install.log" 2>&1
+          # Root's Git invocation must operate on its own reviewed source custody;
+          # do not weaken Git's safe.directory check for a runner-owned checkout.
+          sudo chown -R 0:0 "$B6_ROOT/source"
+          sudo mkdir -m 700 "$B6_ROOT/operator-zone"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          root = pathlib.Path(os.environ['B6_ROOT'])
+          baseline = json.loads((root / 'candidate-baseline.json').read_text())
+          for tool in baseline['host_tools']:
+              binary = pathlib.Path(tool['executable'])
+              if binary.is_symlink():
+                  raise RuntimeError('host executable must not be a symlink')
+              with binary.open('rb') as stream:
+                  if hashlib.file_digest(stream, 'sha256').hexdigest() != tool['executable_sha256']:
+                      raise RuntimeError('installed host executable mismatch')
+              version = subprocess.check_output(['dpkg-query', '-W', '-f=${Version}', tool['package']]).decode()
+              if version != tool['version']:
+                  raise RuntimeError('installed host package mismatch')
+          (root / 'host-observation.json').write_text(json.dumps({k: os.environ.get(k) for k in ('ImageOS', 'ImageVersion', 'RUNNER_ARCH', 'RUNNER_OS')}, indent=2) + '\n')
+          (root / 'kernel.txt').write_bytes(subprocess.check_output(['uname', '-a']))
+          PY
+          set +e
+          sudo /usr/bin/env -i PATH=/usr/bin:/bin GIT_NO_REPLACE_OBJECTS=1 git -C "$B6_ROOT/source" show "$SOURCE_COMMIT:docs/operations/aqgreen-v2-b6/snapshot-package/authoritative-runner.sh" |
+            sudo /usr/bin/env -i PATH=/usr/bin:/bin HOME=/root LC_ALL=C /bin/bash -s -- \
+              --repository "$B6_ROOT/source" --reviewed-commit "$SOURCE_COMMIT" \
+              --frozen-dotnet-root "$B6_ROOT/inputs/supply/frozen-dotnet" \
+              --toolchain-manifest "$B6_ROOT/inputs/supply/toolchain-manifest.tsv" \
+              --acquisition-feed "$B6_ROOT/inputs/supply/feed" \
+              --feed-manifest "$B6_ROOT/inputs/supply/feed-manifest.tsv" \
+              --evidence-dir "$B6_ROOT/gate-evidence" runner generate-key --output "$B6_ROOT/operator-zone/disposable-qualification-key" \
+              > "$B6_ROOT/bootstrap-console.log" 2>&1
+          statuses=("${PIPESTATUS[@]}")
+          set -e
+          printf 'git_exit_code\t%s\nbootstrap_exit_code\t%s\n' "${statuses[0]}" "${statuses[1]}" > "$B6_ROOT/outer-exit.tsv"
+          # Capture originals as root, without changing their owner-only modes.
+          sudo tar -czf "$B6_ROOT/gate-evidence.tar.gz" -C "$B6_ROOT" gate-evidence
+          sudo chown "$(id -u):$(id -g)" "$B6_ROOT/gate-evidence.tar.gz"
+          test "${statuses[0]}" = 0 && test "${statuses[1]}" = 0
+          sudo /usr/bin/env -i PATH=/usr/bin:/bin /bin/bash -c '
+            set -euo pipefail
+            cd -- "$1"
+            sha256sum -c qualification-SHA256SUMS
+            sha256sum -c SHA256SUMS
+            grep -Fx $'"'"'qualification_result\tPASS'"'"' final-verdict.tsv
+            grep -Fx $'"'"'final_transaction_result\tPASS'"'"' final-verdict.tsv
+            grep -Fx $'"'"'process_exit_code\t0'"'"' final-verdict.tsv
+          ' bash "$B6_ROOT/gate-evidence" > "$B6_ROOT/terminal-readback.log" 2>&1
+
+      - name: Retain originals privately and verify release-asset readback
+        if: always() && env.B6_ROOT != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 0077
+          # No upload-artifact, public release, cache, key, inputs or raw dataset.
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, tarfile
+          root = pathlib.Path(os.environ['B6_ROOT'])
+          excluded = {'source', 'inputs', 'replacement-inputs.tar.gz', 'gate-evidence', 'operator-zone'}
+          files = [p for p in root.iterdir() if p.name not in excluded and not p.name.startswith('replacement-inputs.tar.gz.part-')]
+          with tarfile.open(root / 'qualification-evidence.tar.gz', 'x:gz') as archive:
+              for path in files:
+                  if not path.is_file() or path.is_symlink():
+                      raise RuntimeError('unexpected evidence entry')
+                  archive.add(path, arcname=path.name)
+          with (root / 'qualification-evidence.tar.gz').open('rb') as stream:
+              digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+          (root / 'qualification-evidence.sha256').write_text(digest + '  qualification-evidence.tar.gz\n')
+          PY
+          tag="qualification-$GITHUB_RUN_ID-attempt-$GITHUB_RUN_ATTEMPT"
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --title "$tag — NOT INDEPENDENTLY ACCEPTED" --notes "Original qualification/failed/partial evidence. No independent acceptance or production authority."
+          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" "$B6_ROOT/qualification-evidence.tar.gz" "$B6_ROOT/qualification-evidence.sha256"
+          mkdir -m 700 "$B6_ROOT/readback"
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern qualification-evidence.tar.gz --dir "$B6_ROOT/readback"
+          (cd "$B6_ROOT/readback" && sha256sum -c ../qualification-evidence.sha256)
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease
+          # Publication with immutable releases enabled preserves retained bytes;
+          # independent assessment remains a separate human decision.
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq '.immutable' | /usr/bin/grep -Fx true

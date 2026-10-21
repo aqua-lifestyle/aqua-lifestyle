@@ -1,0 +1,65 @@
+{
+  "schema": "B6ReplacementSupplyCandidateV1",
+  "status": "CANDIDATE_NOT_APPROVED",
+  "sdk_version": "8.0.130",
+  "runtime_version": "8.0.30",
+  "nuget_version": "6.8.2.3",
+  "sdk_url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.130/dotnet-sdk-8.0.130-linux-x64.tar.gz",
+  "sdk_publisher_sha512": "4f3ed7011a924fbe9d093cab087deff5ed9b19fc0de0222117fda7c1334605c31818b01ffbd445b69e59f294fb4d3383fd00fd19701e7142acb7bc88b9b4ecab",
+  "dotnet_host_sha256": "c61ff7f8665688b95ad0f34e780daaa67b978d26115b82797c07ea6044c566ed",
+  "toolchain_manifest_sha256": "3fb331fd78afd15ba94aa2ac11c1cfaace2a654d32258ce1acfa128dbcc7590a",
+  "feed_manifest_sha256": "1a56a8bad2fed7875f3326f620ce40af7c0f805d7f16696efa7f1eceaf816df7",
+  "package_count": 215,
+  "lock_sha256": {
+    "src/AqualLifeStyle.Core/packages.lock.json": "9f467700282dc48f8bdc172eb8f1830a3167cbc4efaa223a328b1ff00c4acddc",
+    "src/AqualLifeStyle.EntityFrameworkCore/packages.lock.json": "2b1925d618a39d10fa57e3e8455f06c3565de75ccdc3ae4a9021e357c9d07356",
+    "tools/AqualLifeStyle.B6SnapshotRunner/packages.lock.json": "401fafbcfa35347666a4de3fcfa92be9c66399663d8f8410eca420879c3d7b7b",
+    "tools/AqualLifeStyle.B6SnapshotRunner.Tests/packages.lock.json": "e575bab05aa361751f35ce31340880c0286e6133c7f36b7e3e1fb2ff8bbf0a47"
+  },
+  "native_trust_verified_count": 215,
+  "classification": "NON_PRIVILEGED_CANDIDATE_SUPPLY_VERIFICATION_NOT_GATE_Q_A",
+  "baseline_id": "B6_V4_PG18_REPLACEMENT_SUPPLY_20261021_1",
+  "custody_repository": "aqua-lifestyle/b6-qualification-evidence",
+  "custody_release": "candidate-20261021-1",
+  "archive_name": "replacement-inputs.tar.gz",
+  "archive_parts": 13,
+  "archive_sha256": "db193861ef5d607d390564d3543d71c486283fd1c6e5b7c889f500da7ea85619",
+  "host_tools_manifest_sha256": "24afe9216d84275c9f9de226de47a3056555d790260a7b70807f8529745b7cce",
+  "host_tools": [
+    {
+      "package": "mawk",
+      "version": "1.3.4.20240123-1build1",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/m/mawk/mawk_1.3.4.20240123-1build1_amd64.deb",
+      "archive_sha256": "dc7f7f4dad4b48f6012ea65de3198d8376604afef39f06d65ec6167740e203c9",
+      "executable": "/usr/bin/mawk",
+      "executable_sha256": "3850bf893d3f4f8ec462c8b59d6d66fdbbe8ddc0715b3d404d9cc574526b781c",
+      "signed_index_sha256": "2a6a199e1031a5c279cb346646d594993f35b1c03dd4a82aaa0323980dd92451",
+      "publisher": "Ubuntu archive",
+      "publisher_key": "F6ECB3762474EDA9D21B7022871920D1991BC93C"
+    },
+    {
+      "package": "busybox-static",
+      "version": "1:1.36.1-6ubuntu3.1",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/b/busybox/busybox-static_1.36.1-6ubuntu3.1_amd64.deb",
+      "archive_sha256": "944b2728f53ceb3916cec2c962873c9951e612408099601751db2a0a5d81e0ed",
+      "executable": "/usr/bin/busybox",
+      "executable_sha256": "dbac288c29ba568459550a2da9e7ae0ded6b1fc728ee9fad3044c44e62d6ac14",
+      "signed_index_sha256": "20fd25f53fa5f24b51f4abca2db9a5c1073391f169cdbfc97e4d7b2f601f1c72",
+      "publisher": "Ubuntu archive",
+      "publisher_key": "F6ECB3762474EDA9D21B7022871920D1991BC93C"
+    },
+    {
+      "package": "bubblewrap",
+      "version": "0.12.0-1~flatpak1~24.04.1",
+      "url": "https://ppa.launchpadcontent.net/flatpak/stable/ubuntu/pool/main/b/bubblewrap/bubblewrap_0.12.0-1~flatpak1~24.04.1_amd64.deb",
+      "archive_sha256": "4e46914f82dc1c496efc87309444a5ca2cd219ed96f0053a97bf2a9fb2593e55",
+      "executable": "/usr/bin/bwrap",
+      "executable_sha256": "8d4629686bf51c0a062a1f8a5753d7b29e95c5c81e20499dd2310f7921023140",
+      "signed_index_sha256": "14eb64194cad85c5c5183ca346f0ac3744810ab1afd3b7fd134aae089ac3fdf9",
+      "publisher": "flatpak/stable Launchpad PPA",
+      "publisher_key": "5C6D153A17C02C337EF6C663B8B9D41229DFA5F5"
+    }
+  ],
+  "bootstrap_sha256": "f4ed523b8dbee47345664c516236adc5637db3f4f44db24f27afe6a716791026",
+  "independent_approval": "REQUIRED_NOT_SUPPLIED"
+}

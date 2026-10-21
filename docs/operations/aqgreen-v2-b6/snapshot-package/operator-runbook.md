@@ -3,8 +3,11 @@
 **V4 compatibility candidate:** PostgreSQL18.4/180004 and the custodian-observed
 54-migration schema ending at `20261005194901_AddIsolatedAQGreenPilotEvidence`.
 Use only a separately reviewed/qualified release of these exact source changes;
-V3/PG16 qualification does not transfer. Existing operator authority, protected
-Zone2/Zone3 custody, frozen build/supply and privileged-bootstrap gates remain.
+V3/PG16 qualification does not transfer. The narrowly authorized replacement-supply
+preparation is governed by [amendment1](replacement-supply/AMENDMENT.md) and its
+candidate manifest. It is not independently approved or privileged qualification.
+Existing operator authority, protected Zone2/Zone3 custody, substantive frozen
+build/supply and privileged-bootstrap gates remain.
 
 > **DO NOT RUN WITHOUT PRODUCTION/DATA AUTHORIZATION.** This is a template for an
 > authorised DBA/platform operator. D03B/D09, repository content, and disposable
@@ -12,15 +15,17 @@ Zone2/Zone3 custody, frozen build/supply and privileged-bootstrap gates remain.
 
 ## Pre-extraction checkpoint
 
-### New-lineage native candidate boundary
+### Historical new-lineage native candidate boundary (not the replacement route)
 
 The fresh native process-group candidate is PRECOMMIT_SYNTHETIC_VALIDATION only.
 Its source/build/ELF identities come from its new manifest, not lost historical
-artifacts. Application and real qualification remain unauthorized. Preserve the
-base `authoritative-runner.sh` bytes (SHA-256
-`5ed57d64c74014002708dc679d5d26e9d7b53e888d1124dce3a74432e16a6244`).
-Do not modify Gate-Q/Gate-A policy or mistake ordinary-user native fixture success
-for operational gate execution.
+artifacts. Application and real qualification remain unauthorized. Its historical
+base `authoritative-runner.sh` bytes had SHA-256
+`5ed57d64c74014002708dc679d5d26e9d7b53e888d1124dce3a74432e16a6244`.
+Those historical bytes remain in Git. The replacement amendment separately reviews
+its scoped bootstrap changes; it does not adopt this native candidate. Do not
+weaken Gate-Q/Gate-A policy or mistake ordinary-user native fixture success for
+operational gate execution.
 
 For a separately authorized future installation, the native binary has frozen
 package/output-parent locations recorded in its build manifest. These must be

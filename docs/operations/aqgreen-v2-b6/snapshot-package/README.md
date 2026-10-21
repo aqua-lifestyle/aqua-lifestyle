@@ -14,9 +14,12 @@ semantics, business rules or allowlisted fields/transforms are changed.
 V3/PG16 results below remain historical scoped evidence, not qualification of V4.
 V4 source must still complete existing operational release/Gate-Q/A, custody and
 independent review before a real handoff. Local development builds are not that
-release. `authoritative-runner.sh`, frozen SDK/feed/lock/signer pins and its
-privileged execution gate are unchanged; no privileged bootstrap is run by this
-compatibility task. See the bounded [compatibility worklog](../../../exec-plans/active/aqgreen-b6-pg18-compatibility.md).
+release. The PG18 compatibility task left the bootstrap and supply/lock/signer pins
+unchanged. Subsequent, separately authorized [replacement-supply preparation](replacement-supply/AMENDMENT.md)
+introduces a candidate Microsoft SDK baseline and narrowly scoped bootstrap
+compatibility corrections. Neither task runs privileged qualification. Existing
+lock/graph/signer, Gate-Q/A and independent acceptance requirements remain. See the
+bounded [compatibility worklog](../../../exec-plans/active/aqgreen-b6-pg18-compatibility.md).
 
 This package creates and verifies a **pseudonymised and data-minimised
 representative snapshot**. Stable pseudonymous keys remain linkable inside the
@@ -39,8 +42,9 @@ admission. None of that production surface is changed by this package.
 `native-supervisor.c`, `native-supervisor-amd64`, the deterministic build script
 and manifest, and `non-root-bwrap-proof-harness.sh` form a separate ordinary-user
 candidate. They do not replace or modify the authoritative two-gate Runner below.
-That Runner retains its exact base SHA-256
+That candidate's historical Runner base had exact SHA-256
 `5ed57d64c74014002708dc679d5d26e9d7b53e888d1124dce3a74432e16a6244`.
+The replacement-supply amendment does not adopt this separate native candidate.
 Historical lost patches/trees/ELFs and validation results establish no byte
 continuity or current PASS. The current manifest identifies newly built bytes.
 
@@ -144,7 +148,7 @@ Gate-Q/Gate-A, Attempt 21, application, production or migration is authorized.
   PostgreSQL runtime, finalizer, and verified receipt generator.
 - `manifest-schema.json`, `root-disposition-schema.json`, and
   `handoff-receipt-schema.json`: machine-readable contracts.
-- `run-analysis.sh`: package-owned PostgreSQL 16 lifecycle, repeated Zone 3
+- `run-analysis.sh`: package-owned PostgreSQL 18.4 lifecycle, repeated Zone 3
   inventory, D09 population, D03B component, simulator, structural/impact, final
   manifest, verification, and receipt pipeline.
 - `authoritative-runner.sh`: the reviewed-Git-object two-gate bootstrap. It binds
