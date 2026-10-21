@@ -1,4 +1,7 @@
-# Bounded public environment approval experiment
+> **NOT BUSINESS AUTHORITY.** This worklog records execution state and evidence. It
+> cannot confirm or supersede a business-policy decision.
+
+# Bounded public environment approval experiment — record version 2
 
 **TEST ONLY. NOT BASELINE ACCEPTANCE OR QUALIFICATION AUTHORITY.**
 
@@ -56,4 +59,74 @@ external approval authority needs an explicitly and independently accepted,
 versioned contract amendment. Gate-Q/A, isolation, trust, custody, owner run
 authorization and subsequent independent evidence acceptance remain mandatory.
 
-Actual experiment results and public run links will be recorded after execution.
+## Actual experiment results
+
+Public repository visibility was read back as public; evidence repository
+visibility remained private. The original private qualification workflow and its
+contract were not edited. Its actual workflow-run count remained zero.
+
+GitHub accepted public environment creation with HTTP200 and returned:
+
+- environment ID `24924994010`, name `b6-public-approval-probe`;
+- required-reviewer protection, `prevent_self_review=true`;
+- `can_admins_bypass=false`;
+- an exact test-branch policy and zero environment secrets.
+
+Both dispatched harmless tests used workflow commit
+`f7af1b7549925c1a4a70d262d46c39c83eb22a0d`, workflow SHA256
+`accc58952785efea158059f1cd79adf1bfea2507a3ec004d10d2caa93cd88272`
+and synthetic commitment
+`72b98455f74ad441f8997636542920096aa3d087798224c77de0c79afa351980`.
+The synthetic commitment is not a real source/supply/private-run permit.
+
+1. [Self-review test, run39623600292 attempt1](https://github.com/aqua-lifestyle/aqua-lifestyle/actions/runs/39623600292):
+   Xolani-M was both initiator and the configured negative-control reviewer.
+   GitHub returned `current_user_can_approve=false`, job `waiting`, no job steps.
+   The attempted approval POST was rejected with HTTP422, “No pending deployment
+   requests to approve or reject”. The run remained waiting and approval history
+   stayed empty. It was then cancelled, not approved or completed successfully.
+2. [Non-reviewer admin release test, run39623907871 attempt1](https://github.com/aqua-lifestyle/aqua-lifestyle/actions/runs/39623907871):
+   the second existing admin account was the test-only reviewer; the initiating
+   Xolani-M account's repository-admin permission was independently read back true.
+   GitHub again returned `current_user_can_approve=false`, job `waiting`, no steps;
+   the administrator's approval/release POST was rejected with the same HTTP422.
+   Approval history stayed empty. It too was cancelled. This tests the documented
+   approval API with admin bypass disabled; no browser/UI bypass was exercised.
+
+These are native provider configuration/blocking/rejection results, not a positive
+independent approval result. No genuinely independent person has been designated;
+no account was impersonated or appointed as the baseline acceptor. Neither run
+executed its harmless print step, operational qualification or any private command.
+
+An unauthenticated HTTPS read test returned HTTP200 for the public run record,
+approval history and environment record. Thus public approval metadata is readable
+without sending a private repository credential to the public repository. The
+approval-history endpoint currently returns an honestly empty array for these
+rejected tests; reading a real positive approval remains untested.
+
+GitHub's documented approval-history object has reviewer, state, comment and
+environment but no explicit attempt field. The operational amendment must therefore
+bind attempts in the approval comment/permit, verify the exact run-attempt and job
+records, and reject prior-attempt approval reuse. A bare run ID is insufficient.
+The public approval repository must still be publicly readable and retain its
+required protection when the private verifier consumes the approval; changed
+visibility or missing API/protection evidence must fail closed.
+
+After testing, both runs were confirmed cancelled. The second test-only reviewer
+assignment was removed, the original self-negative-control assignment restored,
+and the test environment's branch policy changed to
+`b6-public-probe-closed-not-authorized`. The initial branch-policy update including
+an unsupported `type` field was rejected with422; the supported name-only update
+succeeded and was read back. No incomplete protection update was credited as a pass.
+
+**Result: PUBLIC GATE WORKS for the tested native protection capabilities.**
+Positive independent approval and an actual cross-repository/private-run handoff
+are not established. A genuinely independent reviewer and independently accepted
+handoff amendment remain necessary before changing or executing qualification.
+
+## Single owner action
+
+Name a genuinely independent human reviewer and their GitHub login, distinct from
+the PR113 author and implementation/execution actors. Another account controlled
+by the same author is not independence. That person can perform the positive
+harmless review and independently assess the proposed handoff and PR113 baseline.
