@@ -26,6 +26,9 @@ namespace AqualLifeStyle.Domain.AQGreen
     /// <summary>Explicit D10 scope; neither a B6 application command nor a new reconciliation format.</summary>
     public sealed class AQGreenD10Decision
     {
+        public string AdmissionMode { get; set; } = "HISTORICAL_B6";
+        public string CleanStartResetId { get; set; }
+        public int? CleanStartRootCustomerId { get; set; }
         [JsonRequired] public string ContractVersion { get; set; } = "AQGreenD10CutoverV1";
         public string DecisionId { get; set; }
         public string DecisionReference { get; set; }
@@ -80,6 +83,8 @@ namespace AqualLifeStyle.Domain.AQGreen
     // existing frozen-review trusted authority input. Hashes alone authenticate no person.
     public sealed class AQGreenD10VerifiedAuthority
     {
+        public string AdmissionMode { get; set; } = "HISTORICAL_B6";
+        public string CleanStartEvidenceDigest { get; set; }
         [JsonRequired] public string ContractVersion { get; set; } = "AQGreenD10VerifiedAuthorityV1";
         public string AuthorityReference { get; set; }
         public string DecisionReference { get; set; }
@@ -109,6 +114,9 @@ namespace AqualLifeStyle.Domain.AQGreen
         private readonly byte[] _decision;
         private readonly DateTime _expiresAt;
         public bool FinancialWorkersCommissioned { get; }
+        public AQGreenCleanStartEvidence CleanStartEvidence => _cleanStart == null ? null :
+            JsonSerializer.Deserialize<AQGreenCleanStartEvidence>(_cleanStart, AQGreenB6CanonicalEvidence.Options);
+        private byte[] _cleanStart;
         public AQGreenD10Decision Decision => JsonSerializer.Deserialize<AQGreenD10Decision>(_decision, AQGreenB6CanonicalEvidence.Options);
         private AQGreenD10Commissioning(AQGreenD10Decision decision, DateTime expiresAt, bool workersCommissioned)
         { _decision = AQGreenB6CanonicalEvidence.Bytes(decision); _expiresAt = expiresAt; FinancialWorkersCommissioned = workersCommissioned; }
@@ -117,6 +125,8 @@ namespace AqualLifeStyle.Domain.AQGreen
             AQGreenD10VerifiedAuthority a, JsonObject independentlyVerifiedB6FinalManifest)
         {
             Require(d != null && a != null && independentlyVerifiedB6FinalManifest != null, "D10_REQUIRED_AUTHORITY_MISSING");
+            Require(d.AdmissionMode == "HISTORICAL_B6" && a.AdmissionMode == "HISTORICAL_B6" &&
+                d.CleanStartResetId == null && d.CleanStartRootCustomerId == null && a.CleanStartEvidenceDigest == null, "D10_ADMISSION_MODE_MISMATCH");
             Require(d.ContractVersion == "AQGreenD10CutoverV1" && a.ContractVersion == "AQGreenD10VerifiedAuthorityV1" &&
                 d.DecisionId == "AQG-V2-D10" && d.Outcome == "AUTHORIZED" && Code(d.DecisionReference) && Code(a.AuthorityReference), "D10_DECISION_UNAUTHORIZED");
             Require(d.TenantId > 0 && Code(d.TenantSnapshotKey) && d.PopulationScope == "ALL_TENANT_AQGREEN_PARTICIPATIONS" &&
@@ -188,9 +198,65 @@ namespace AqualLifeStyle.Domain.AQGreen
             return new AQGreenD10Commissioning(d, a.ExpiresAtUtc, a.FinancialWorkersCommissioningEvidenceDigest != null);
         }
 
+        public static AQGreenD10Commissioning BindCleanStartVerified(AQGreenD10Decision d,
+            AQGreenD10VerifiedAuthority a, AQGreenCleanStartEvidence e)
+        {
+            Require(d != null && a != null && e != null, "D10_REQUIRED_AUTHORITY_MISSING");
+            Require(d.AdmissionMode == "CLEAN_START" && a.AdmissionMode == "CLEAN_START" &&
+                d.ContractVersion == "AQGreenD10CutoverV1" && a.ContractVersion == "AQGreenD10VerifiedAuthorityV1" &&
+                e.ContractVersion == "AQGreenCleanStartV1" && e.EvidenceClassification == "OPERATIONAL_EVIDENCE" &&
+                d.DecisionId == "AQG-V2-D10" && d.Outcome == "AUTHORIZED" && Code(d.DecisionReference) &&
+                Code(a.AuthorityReference) && Code(e.ResetId) && d.CleanStartResetId == e.ResetId && d.CleanStartRootCustomerId > 0,
+                "D10_CLEAN_START_AUTHORITY_INVALID");
+            Require(d.TenantId == 1 && e.TenantId == d.TenantId && Code(d.TenantSnapshotKey) &&
+                d.PopulationScope == "ALL_TENANT_AQGREEN_PARTICIPATIONS" && d.AuthorizedAreaIds?.Length > 0 &&
+                d.AuthorizedAreaIds.All(id => id != Guid.Empty) &&
+                d.AuthorizedAreaIds.Distinct().Count() == d.AuthorizedAreaIds.Length,
+                "D10_SCOPE_UNSUPPORTED_OR_INCOMPLETE");
+            Require(Utc(e.ResetAtUtc) && Utc(d.AuthorizedAtUtc) && Utc(d.V2EffectiveAtUtc) &&
+                e.ResetAtUtc <= d.AuthorizedAtUtc && d.AuthorizedAtUtc <= d.V2EffectiveAtUtc,
+                "D10_EFFECTIVE_BOUNDARY_INVALID");
+            AQGreenCommissionWeek.FromStartUtc(d.V2EffectiveAtUtc);
+            Require(d.HistoricalMembers?.Count == 0 && d.ReconciledPlacements?.Count == 0 &&
+                d.AllowProspectiveAdmissions == true && d.EnableGraduation == false &&
+                d.PopulationDigests == null && d.PopulationParticipantKeys == null && d.AcceptedComponentDigest == null &&
+                d.SourceSnapshotDigest == null && d.BaseManifestDigest == null && d.FinalManifestDigest == null &&
+                a.B6FinalVerificationEvidenceDigest == null && a.B6ReconciliationAuthorityEvidenceDigest == null &&
+                a.B6AppliedReconciliationEvidenceDigest == null && a.FinalManifestDigest == null,
+                "D10_CLEAN_START_MUST_NOT_CLAIM_B6_HISTORY");
+            Require(e.NoGenuineMembershipsInResetScope == true && e.AutomaticPayoutsDisabled == true &&
+                e.State != null && e.State.HasNoProtectedExposure() && e.State.PopulationCount >= 0 &&
+                e.State.ArchivedCount == e.State.PopulationCount && e.State.PlacementCount == 0 &&
+                e.State.LegacyMembershipCount == 0, "D10_CLEAN_START_PROTECTED_EXPOSURE");
+            Require(e.State.ResetAtUtc?.UtcDateTime == e.ResetAtUtc &&
+                e.State.BoundaryUtc?.UtcDateTime == d.V2EffectiveAtUtc, "D10_CLEAN_START_RECORDED_BOUNDARY_MISMATCH");
+            Require(d.MembershipDigest == MembershipDigest(d.HistoricalMembers) &&
+                d.ReconciledPlacementDigest == PlacementDigest(d.ReconciledPlacements) &&
+                a.DecisionDigest == AQGreenB6CanonicalEvidence.Digest(d) && a.DecisionReference == d.DecisionReference &&
+                a.CleanStartEvidenceDigest == AQGreenB6CanonicalEvidence.Digest(e) &&
+                a.TenantId == d.TenantId && a.TenantSnapshotKey == d.TenantSnapshotKey &&
+                a.PopulationScope == d.PopulationScope && a.MembershipDigest == d.MembershipDigest &&
+                a.ReconciledPlacementDigest == d.ReconciledPlacementDigest && a.V2EffectiveAtUtc == d.V2EffectiveAtUtc &&
+                e.DatabaseIdentityDigest == d.RequiredDatabaseIdentityDigest && e.SchemaDigest == d.RequiredSchemaDigest &&
+                Utc(a.AuthorizedAtUtc) && Utc(a.ExpiresAtUtc) && a.AuthorizedAtUtc <= d.AuthorizedAtUtc &&
+                a.ExpiresAtUtc > d.V2EffectiveAtUtc, "D10_INDEPENDENT_AUTHORITY_BINDING_MISMATCH");
+            Require(new[] { e.ClassificationDigest, e.IndependentAcceptanceDigest, e.OwnerResetAuthorizationDigest,
+                e.ResetSqlDigest, e.BeforeStateDigest, e.State.SourceDigest, e.State.ArchiveDigest, e.State.ResetReceiptDigest,
+                a.OwnerAuthorizationEvidenceDigest, a.BackupRestoreEvidenceDigest, a.ReleasePrerequisiteEvidenceDigest,
+                a.FinancialBoundaryEvidenceDigest, a.WriteFenceEvidenceDigest, d.RequiredConfigurationDigest,
+                d.RequiredDatabaseIdentityDigest, d.RequiredSchemaDigest, d.RequiredAssemblyDigest,
+                d.RequiredRuntimeAssemblyDigest }.All(Digest), "D10_PREREQUISITE_EVIDENCE_MISSING");
+            Require(a.FinancialWorkersCommissioningEvidenceDigest == null || Digest(a.FinancialWorkersCommissioningEvidenceDigest),
+                "D10_WORKER_AUTHORITY_INVALID");
+            return new AQGreenD10Commissioning(d, a.ExpiresAtUtc, a.FinancialWorkersCommissioningEvidenceDigest != null)
+                { _cleanStart = AQGreenB6CanonicalEvidence.Bytes(e) };
+        }
+
         public void EnsureCurrent(DateTime nowUtc) => Require(Utc(nowUtc) && nowUtc <= _expiresAt, "D10_AUTHORITY_EXPIRED");
         public void EnsureConfiguration(IConfiguration configuration)
         {
+            if (CleanStartEvidence != null)
+                Require(!configuration.GetValue<bool>("App:AutomaticPayouts:Enabled"), "D10_CLEAN_START_AUTOMATIC_PAYOUTS_HELD");
             Require(Decision.RequiredConfigurationDigest == ConfigurationDigest(configuration), "D10_CONFIGURATION_MISMATCH");
             Require(Code(configuration["Deployment:EnvironmentId"]) && Code(configuration["Deployment:BuildId"]), "D10_DEPLOYMENT_IDENTITY_MISSING");
             Require(!configuration.GetValue<bool>("App:EntryMonthlyObligations:Enabled"), "D10_MONTHLY_AUTOMATION_NOT_COMMISSIONED");
@@ -200,7 +266,8 @@ namespace AqualLifeStyle.Domain.AQGreen
             new SortedDictionary<string, string>(new[] { "App:Recovery:Enabled", "App:WeeklyCommissions:Enabled",
                 "App:EntryMonthlyObligations:Enabled", "Bird:Enabled", "Yoco:Mode", "AQGreenV2Demo:Enabled",
                 "AQGreenV2Pilot:Enabled", "App:ServerRootAddress", "App:ClientRootAddress", "App:CorsOrigins",
-                "Deployment:EnvironmentId", "Deployment:BuildId" }
+                "Deployment:EnvironmentId", "Deployment:BuildId", "App:AutomaticPayouts:Enabled",
+                "App:FinancialOperations:Enabled", "App:BackgroundJobs:Enabled" }
                 .ToDictionary(key => key, key => configuration[key]), StringComparer.Ordinal));
         public static string MembershipDigest(IEnumerable<AQGreenD10MemberIdentity> members) => AQGreenB6CanonicalEvidence.Tuples(
             members.Select(m => new[] { m.CustomerId.ToString(CultureInfo.InvariantCulture), m.ParticipantId.ToString("D"),

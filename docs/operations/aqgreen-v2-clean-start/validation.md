@@ -1,0 +1,100 @@
+# Clean-start non-production evidence — 27 October 2026
+
+These are local implementation tests on synthetic data. They do not establish
+production classification, protected custody, human acceptance, live Yoco behavior
+or release authorization. Final revisions remain unpublished in the two clean-start
+worktrees; base revisions are recorded in README.md.
+
+This is the local validation record made before owner-authorized CI publication.
+Published candidate identities and actual CI results are attached to the commits'
+GitHub check runs; a CI pass cannot supply production-data or human acceptance.
+
+## Executable SQL identity
+
+Paths are relative to
+`AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.EntityFrameworkCore/Operations/CleanStart/`.
+
+| File | SHA-256 |
+|---|---|
+| preflight.sql | `12f2e7cee40682e6bf1d031211842143d0d0a8de5dcf79d5333a06555a1152d6` |
+| state.sql | `db3d36ac23172c2005aa6edd202ea6f9cb6b4635c75c1bdbd2889f47571fd100` |
+| reset.sql | `29535d77b81021e5d2ca76369818c35b0d9cd74e0fe6ef7a618b63e335ea5f52` |
+| restore.sql | `1f9e1e8493037151e3d96d8c3a76b8f09e622854e703b838171fcef0a7bd33e1` |
+| migration-55.reviewed.sql | `1f45ef7b67fa6eae747ca70edfed05679ef63cf4cfe2f2cf308b9d31b8c1faea` |
+
+The first preflight invocation includes both preflight.sql and state.sql; approve
+their exact pair, native source identity, boundary and aggregate reporting rules.
+No preflight or reset was executed against production.
+
+## Results and artifacts
+
+| Validation | Actual result | Local artifact |
+|---|---|---|
+| Release solution build | passed; 18 warnings, zero errors | `/tmp/aqgreen-clean-start-build-current.log` |
+| Focused backend/PostgreSQL | 126 passed, zero failed/skipped | `/tmp/aqgreen-clean-start-tests/clean-start-current.trx` |
+| PG 18.4 clean-start application flow | one passed, zero skipped; execution marker present | `/tmp/aqgreen-clean-start-web-tests/clean-start-e2e-current.trx` |
+| Executor including real Git-reader regression | 137 passed, zero failed; one existing skipped | `/tmp/aqgreen-clean-start-executor-final-with-git-reader.log` |
+| Application deployment workflow | five passed | `/tmp/aqgreen-clean-start-workflow-tests.log` |
+
+Backend result SHA-256:
+`ad98af3bffe47b7aed252c1d431643051a5c48b40842c72103e5c620f55514ef`.
+Application-flow result SHA-256:
+`9b14eda4fc055ae6d581aebc2af29f63600b646bfa86889432f7a39d0bab96cd`.
+Its `clean-start-commissioning.ran` marker SHA-256:
+`3828db6f763dabb35b5c4261659dd6769ea2e1a422434a9c933fa1b40d920f1e`.
+Executor log SHA-256:
+`b97133c2e2fb74a55d3d94d94359e9eb21dfc7ebbe1b8f9edf57ba810b4466a6`.
+
+The 126 cases comprise 8 clean-start SQL, 23 clean-start admission, 22 historical
+D10, 27 PostgreSQL placement allocator, 16 PostgreSQL structural completion,
+12 domain structural completion, 8 weekly commission evidence and 10 PostgreSQL
+sales-invalidation cases. Clean-start SQL uses the existing cached PostgreSQL 18.4
+fixture; existing allocator/structural regressions retain their PostgreSQL 16
+fixture. Migration 55 is executed from retained SQL, rejects duplicate application,
+and subsequent EF Migrate is a no-op with exactly one history entry. The pinned
+EF 8 model comparison reports no pending model changes.
+
+The full application flow uses a fresh synthetic PostgreSQL 18.4 database, actual
+D10 admission and application services, synthetic independently bound inputs and
+a fake checkout gateway. It proves the owner-selected unpaid root, ordinary
+payment/approval separation, six genuine-path synthetic invitations, five-wide
+spillover and retry protection. It does not prove actual human independence or
+provider payment delivery. CI verifies both the exact test result and its marker.
+A local launch that omitted CI's transactional/development flags failed during
+Default-Tenant setup; the final run uses those existing CI flags and passed.
+
+The skipped executor test is `disposable PostgreSQL admits at most one concurrent
+use of a signed authorization` because AQUA_TEST_DATABASE_URL was not configured.
+Its concurrent database execution is not claimed. Full backend/frontend/provider
+qualification and fresh remote exact-source CI remain required for release.
+NuGet advisory enumeration was unavailable after a bounded timeout; no dependency
+changes were introduced. Accepted B6 tests are carried forward, not rerun here.
+
+## Reproduction using existing test tooling
+
+From `AqualLifeStyle/9.4.2/aspnet-core`, after the existing Release build:
+
+```bash
+dotnet test test/AqualLifeStyle.Tests/AqualLifeStyle.Tests.csproj --configuration Release --no-build --filter 'FullyQualifiedName~AQGreenCleanStartPostgreSqlTests|FullyQualifiedName~AQGreenCleanStartCommissioningTests|FullyQualifiedName~AQGreenD10CommissioningTests|FullyQualifiedName~AQGreenPlacementAllocatorPostgreSqlTests|FullyQualifiedName~AQGreenStructuralCompletionEvaluatorPostgreSqlTests|FullyQualifiedName~AQGreenStructuralCompletionCalculatorTests|FullyQualifiedName~AQGreenV2WeeklyCommissionEvidenceTests|FullyQualifiedName~AQGreenSalesInvalidationPostgreSqlTests'
+```
+
+For the existing fresh isolated test database, set ASPNETCORE_ENVIRONMENT=Development,
+REPRO_PG=true, REPRO_TRANSACTIONAL=true, REPRO_PG_CONNECTION,
+ConnectionStrings__Default and REPRO_MARKER_DIR using its synthetic fixture values,
+then run (never substitute a production connection):
+
+```bash
+dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --no-build --filter 'FullyQualifiedName~CleanStart_EmptyTenant'
+```
+
+From the executor worktree:
+
+```bash
+node --test --test-reporter=spec tools/deployment/*.test.mjs
+```
+
+From the application root:
+
+```bash
+node --test --test-reporter=spec tools/deployment/workflow.test.mjs
+```

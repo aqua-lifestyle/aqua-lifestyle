@@ -19,13 +19,20 @@ namespace AqualLifeStyle.Web.Host.Startup
         private readonly bool _requested;
         private readonly string[] _paths;
         private readonly string[] _digests;
+        private readonly string _mode;
         public AQGreenD10OperatorEvidenceSource(IConfiguration configuration)
         {
             _requested = configuration.GetValue<bool>(Prefix + "Enabled");
+            _mode = configuration[Prefix + "AdmissionMode"] ?? "HISTORICAL_B6";
+            AQGreenD10Commissioning.Require(_mode == "HISTORICAL_B6" || _mode == "CLEAN_START", "D10_ADMISSION_MODE_MISMATCH");
+            var evidenceKey = _mode == "CLEAN_START" ? "CleanStartEvidence" : "B6FinalManifest";
+            var excludedKey = _mode == "CLEAN_START" ? "B6FinalManifest" : "CleanStartEvidence";
+            AQGreenD10Commissioning.Require(string.IsNullOrWhiteSpace(configuration[Prefix + excludedKey + "Path"]) &&
+                string.IsNullOrWhiteSpace(configuration[Prefix + excludedKey + "Sha256"]), "D10_MIXED_ADMISSION_EVIDENCE");
             _paths = new[] { configuration[Prefix + "DecisionPath"], configuration[Prefix + "VerifiedAuthorityPath"],
-                configuration[Prefix + "B6FinalManifestPath"] };
+                configuration[Prefix + evidenceKey + "Path"] };
             _digests = new[] { configuration[Prefix + "DecisionSha256"], configuration[Prefix + "VerifiedAuthoritySha256"],
-                configuration[Prefix + "B6FinalManifestSha256"] };
+                configuration[Prefix + evidenceKey + "Sha256"] };
             AQGreenD10Commissioning.Require(_requested || Array.TrueForAll(_paths, string.IsNullOrWhiteSpace) &&
                 Array.TrueForAll(_digests, string.IsNullOrWhiteSpace), "D10_EVIDENCE_CONFIGURED_WITHOUT_EXPLICIT_SELECTION");
         }
@@ -36,6 +43,10 @@ namespace AqualLifeStyle.Web.Host.Startup
             try
             {
                 var decision = ReadPinned(0); var authority = ReadPinned(1); var final = ReadPinned(2);
+                if (_mode == "CLEAN_START") return AQGreenD10Commissioning.BindCleanStartVerified(
+                    JsonSerializer.Deserialize<AQGreenD10Decision>(decision, AQGreenB6CanonicalEvidence.Options),
+                    JsonSerializer.Deserialize<AQGreenD10VerifiedAuthority>(authority, AQGreenB6CanonicalEvidence.Options),
+                    JsonSerializer.Deserialize<AQGreenCleanStartEvidence>(final, AQGreenB6CanonicalEvidence.Options));
                 return AQGreenD10Commissioning.BindVerified(
                     JsonSerializer.Deserialize<AQGreenD10Decision>(decision, AQGreenB6CanonicalEvidence.Options),
                     JsonSerializer.Deserialize<AQGreenD10VerifiedAuthority>(authority, AQGreenB6CanonicalEvidence.Options),

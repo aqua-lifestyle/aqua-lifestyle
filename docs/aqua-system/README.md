@@ -26,6 +26,12 @@ The pack explains Aqua at several levels without making one document carry every
 
 ## Authority and status
 
+The owner's 27 October 2026 clean-start direction authorizes focused implementation
+for disposable AQGreen test activity, subject to proof that genuine membership and
+financial obligations remain protected. The [clean-start execution package](../operations/aqgreen-v2-clean-start/README.md)
+defines its separate reset/D10/release admission and outstanding production gates.
+It does not assert historical B6 acceptance or authorize production operations.
+
 The documents have different jobs:
 
 1. Confirmed business-owner decisions are authoritative for business intent.

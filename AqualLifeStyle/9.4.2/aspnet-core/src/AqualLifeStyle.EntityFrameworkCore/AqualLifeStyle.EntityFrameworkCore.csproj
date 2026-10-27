@@ -29,4 +29,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AqualLifeStyle.Core\AqualLifeStyle.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Operations/CleanStart/state.sql" LogicalName="AQGreen.CleanStart.State.sql" />
+  </ItemGroup>
 </Project>

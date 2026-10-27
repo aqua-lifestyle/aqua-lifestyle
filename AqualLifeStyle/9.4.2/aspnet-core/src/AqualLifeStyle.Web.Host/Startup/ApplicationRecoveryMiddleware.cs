@@ -12,6 +12,7 @@ namespace AqualLifeStyle.Web.Host.Startup
     {
         private readonly RequestDelegate _next;
         private readonly IConfiguration _configuration;
+        private readonly bool _cleanStartPending;
         private static readonly HashSet<string> Allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "GET /api/health",
@@ -25,10 +26,30 @@ namespace AqualLifeStyle.Web.Host.Startup
         };
 
         public ApplicationRecoveryMiddleware(RequestDelegate next, IConfiguration configuration)
-        { _next = next; _configuration = configuration; ApplicationRecoveryMode.IsEnabled(configuration); }
+        {
+            _next = next; _configuration = configuration; ApplicationRecoveryMode.IsEnabled(configuration);
+            _cleanStartPending = configuration[AQGreenD10OperatorEvidenceSource.Prefix + "AdmissionMode"] == "CLEAN_START" &&
+                !configuration.GetValue<bool>(AQGreenD10OperatorEvidenceSource.Prefix + "Enabled");
+        }
 
         public async Task InvokeAsync(HttpContext context)
         {
+            // Captured at startup: config reload cannot drop the pre-D10 fence.
+            // Normal provider startup validation still runs (this is not recovery).
+            if (_cleanStartPending)
+            {
+                var route = context.Request.Method + " " + context.Request.Path.Value?.TrimEnd('/');
+                var allowed = route == "GET /api/health" || route == "GET /api/deployment-readiness" ||
+                    route == "POST /api/TokenAuth/Authenticate" || route == "GET /AntiForgery/GetToken" ||
+                    route == "GET /AntiForgery/SetCookie" || route == "GET /api/services/app/Session/GetCurrentLoginInformations";
+                if (!allowed)
+                {
+                    context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                    context.Response.ContentType = "application/json";
+                    await context.Response.WriteAsync("{\"error\":\"CLEAN_START_COMMISSIONING_HELD\"}");
+                    return;
+                }
+            }
             if (ApplicationRecoveryMode.IsEnabled(_configuration))
             {
                 context.Response.Headers["X-Aqua-Recovery-Suspended"] = "true";

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using System.Text.Json;
 using Abp.Dependency;
 using Abp.EntityFrameworkCore;
 using AqualLifeStyle.Domain.AQGreen;
@@ -15,6 +16,28 @@ namespace AqualLifeStyle.EntityFrameworkCore
     {
         private readonly IDbContextProvider<AqualLifeStyleDbContext> _provider;
         public AQGreenReconciliationEvidenceSnapshot(IDbContextProvider<AqualLifeStyleDbContext> provider) => _provider = provider;
+
+        public async Task<AQGreenCleanStartState> CaptureCleanStartAsync(int tenantId, DateTime boundaryUtc, string resetId)
+        {
+            var context = await _provider.GetDbContextAsync();
+            if (!context.Database.IsNpgsql() || context.Database.CurrentTransaction == null ||
+                tenantId != 1 || boundaryUtc.Kind != DateTimeKind.Utc)
+                throw new InvalidOperationException("D10_CLEAN_START_PROVIDER_VERIFICATION_UNAVAILABLE");
+            using var command = context.Database.GetDbConnection().CreateCommand();
+            command.Transaction = context.Database.CurrentTransaction.GetDbTransaction();
+            command.CommandText = "SET LOCAL statement_timeout='30s'; SET LOCAL lock_timeout='3s'; " +
+                "SELECT set_config('aqua.clean_start.tenant', @tenant, true), " +
+                "set_config('aqua.clean_start.boundary', @boundary, true), set_config('aqua.clean_start.reset_id', @reset, true)";
+            foreach (var pair in new[] { ("tenant", tenantId.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                ("boundary", boundaryUtc.ToString("O")), ("reset", resetId) })
+            { var parameter = command.CreateParameter(); parameter.ParameterName = pair.Item1; parameter.Value = pair.Item2;
+                command.Parameters.Add(parameter); }
+            await command.ExecuteNonQueryAsync(); command.Parameters.Clear();
+            using var stream = GetType().Assembly.GetManifestResourceStream("AQGreen.CleanStart.State.sql");
+            using var reader = new StreamReader(stream ?? throw new InvalidOperationException("D10_CLEAN_START_QUERY_MISSING"));
+            command.CommandText = await reader.ReadToEndAsync();
+            return JsonSerializer.Deserialize<AQGreenCleanStartState>((string)await command.ExecuteScalarAsync(), AQGreenB6CanonicalEvidence.Options);
+        }
 
         public async Task<AQGreenReconciliationSourceBoundary> CaptureAsync()
         {

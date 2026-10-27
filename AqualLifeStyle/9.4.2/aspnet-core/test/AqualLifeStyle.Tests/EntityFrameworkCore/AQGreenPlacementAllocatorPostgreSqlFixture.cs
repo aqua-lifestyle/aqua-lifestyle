@@ -29,9 +29,14 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         private readonly string _templateDatabase =
             $"aqgreen_allocator_template_{Guid.NewGuid():N}";
         private readonly int _hostPort;
+        private readonly string _postgresImage;
 
-        public AQGreenPlacementAllocatorPostgreSqlFixture()
+        public AQGreenPlacementAllocatorPostgreSqlFixture() : this("postgres:16-alpine") { }
+        internal AQGreenPlacementAllocatorPostgreSqlFixture(string postgresImage)
         {
+            if (postgresImage != "postgres:16-alpine" && postgresImage != "postgres:18.4-alpine")
+                throw new ArgumentException("Unsupported test-only PostgreSQL image.", nameof(postgresImage));
+            _postgresImage = postgresImage;
             var listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
             _hostPort = ((IPEndPoint)listener.LocalEndpoint).Port;
@@ -44,7 +49,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await RunDockerAsync(
                 $"run -d --name {_containerName} -e POSTGRES_DB=postgres " +
                 "-e POSTGRES_USER=aqualifestyle -e POSTGRES_PASSWORD=aqualifestyle " +
-                $"-p {_hostPort}:5432 postgres:16-alpine");
+                $"-p 127.0.0.1:{_hostPort}:5432 {_postgresImage}");
 
             for (var attempt = 0; attempt < 30; attempt++)
             {

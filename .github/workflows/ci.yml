@@ -641,6 +641,28 @@ jobs:
             throw 'D10 PostgreSQL population tests were missing, duplicated, skipped or failed'
           }
           Write-Output 'PASS: all 14 isolated D10 PostgreSQL cases executed and passed.'
+      - name: Prepare clean-start synthetic population on the existing PostgreSQL service
+        run: docker exec '${{ job.services.postgres.id }}' createdb -U aqual_ci aqual_clean_start
+      - name: Verify empty-Tenant clean-start commissioning and ordinary joining
+        env:
+          REPRO_PG_CONNECTION: "Host=localhost;Port=5432;Database=aqual_clean_start;Username=aqual_ci;Password=aqual_ci_tests_only"
+          ConnectionStrings__Default: "Host=localhost;Port=5432;Database=aqual_clean_start;Username=aqual_ci;Password=aqual_ci_tests_only"
+        run: dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~CleanStart_EmptyTenant" --logger "trx;LogFileName=clean-start-e2e.trx" --results-directory TestResults
+      - name: Verify clean-start PostgreSQL proof executed
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $settings = [System.Xml.XmlReaderSettings]::new()
+          $settings.DtdProcessing = [System.Xml.DtdProcessing]::Prohibit
+          $reader = [System.Xml.XmlReader]::Create('TestResults/clean-start-e2e.trx', $settings)
+          $trx = [System.Xml.XmlDocument]::new()
+          try { $trx.Load($reader) } finally { $reader.Dispose() }
+          $results = @($trx.SelectNodes("/*[local-name()='TestRun']/*[local-name()='Results']/*[local-name()='UnitTestResult']"))
+          if ($results.Count -ne 1 -or $results[0].GetAttribute('outcome') -ne 'Passed' -or
+              $results[0].GetAttribute('testName') -notlike '*CleanStart_EmptyTenant*' -or
+              -not (Test-Path 'TestResults/clean-start-commissioning.ran')) {
+            throw 'Clean-start PostgreSQL commissioning/joining proof was missing, skipped or failed'
+          }
       - name: Upload PostgreSQL regression results
         if: always()
         uses: actions/upload-artifact@v6

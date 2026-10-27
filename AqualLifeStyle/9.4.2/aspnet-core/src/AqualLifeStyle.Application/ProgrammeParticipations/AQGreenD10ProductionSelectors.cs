@@ -59,7 +59,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 await uow.CompleteAsync(); return;
             }
             Check(authority);
-            await VerifyPopulationAsync(authority.Decision);
+            await VerifyPopulationAsync(authority.Decision, cleanStart: authority.CleanStartEvidence);
             using var check = _uows.Begin();
             using (_uows.Current.DisableFilter(AbpDataFilters.MustHaveTenant, AbpDataFilters.MayHaveTenant))
                 AQGreenD10Commissioning.Require(!await _placements.GetAll().AnyAsync(p => p.TenantId != authority.Decision.TenantId),
@@ -114,7 +114,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             }
             if (financialCutoff.HasValue && financialCutoff >= d.V2EffectiveAtUtc)
                 AQGreenD10Commissioning.Require(DateTime.UtcNow >= d.V2EffectiveAtUtc, "D10_CUTOVER_NOT_EFFECTIVE");
-            await VerifyPopulationAsync(d, stabilizeAreas: financialCutoff.HasValue); return true;
+            await VerifyPopulationAsync(d, stabilizeAreas: financialCutoff.HasValue, cleanStart: a.CleanStartEvidence); return true;
         }
 
         public async Task<bool> ForParticipantAsync(int? tenantId, Guid participantId, bool write, bool graduation = false)
@@ -182,7 +182,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             await uow.CompleteAsync();
         }
 
-        private async Task VerifyPopulationAsync(AQGreenD10Decision d, bool stabilizeAreas = false)
+        private async Task VerifyPopulationAsync(AQGreenD10Decision d, bool stabilizeAreas = false,
+            AQGreenCleanStartEvidence cleanStart = null)
         {
             // Reuse the existing PostgreSQL source-boundary reader in its own read-only snapshot;
             // never mark an approval/calculation transaction read-only or observe its uncommitted writes.
@@ -194,6 +195,16 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                     boundary.SourceSchemaVersion == d.RequiredSchemaDigest && boundary.SourceAssemblyDigest == d.RequiredAssemblyDigest &&
                     RuntimeAssemblyDigest(boundary.SourceAssemblyDigest) == d.RequiredRuntimeAssemblyDigest,
                     "D10_DATABASE_SCHEMA_OR_RELEASE_MISMATCH");
+                if (d.AdmissionMode == "CLEAN_START")
+                {
+                    AQGreenD10Commissioning.Require(cleanStart != null, "D10_CLEAN_START_AUTHORITY_INVALID");
+                    var state = await _snapshot.CaptureCleanStartAsync(d.TenantId, d.V2EffectiveAtUtc, d.CleanStartResetId);
+                    AQGreenD10Commissioning.Require(state != null && state.HasNoProtectedExposure() &&
+                        state.PopulationCount == cleanStart.State.PopulationCount && state.ArchivedCount == state.PopulationCount &&
+                        state.ArchiveDigest == cleanStart.State.ArchiveDigest && state.PlacementCount == 0 &&
+                        state.LegacyMembershipCount == 0 && state.ResetReceiptDigest == cleanStart.State.ResetReceiptDigest,
+                        "D10_CLEAN_START_BASELINE_CHANGED");
+                }
                 await sourceUow.CompleteAsync();
             }
             using var uow = _uows.Begin();
@@ -201,7 +212,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             {
                 var ids = d.HistoricalMembers.Select(m => m.ParticipantId).ToArray();
                 var live = _participations.GetAll().IgnoreQueryFilters().AsNoTracking().Where(p =>
-                    p.TenantId == d.TenantId && (!p.IsDeleted || p.Status == EntryParticipationStatus.Active));
+                    p.TenantId == d.TenantId && (!p.IsDeleted || p.Status == EntryParticipationStatus.Active) &&
+                    (cleanStart == null || !p.IsDeleted));
                 if (stabilizeAreas)
                 {
                     await RequireCurrentReadTransactionAsync("D10_FINANCIAL_REQUIRES_CURRENT_READ_TRANSACTION");
@@ -245,7 +257,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 AQGreenD10Commissioning.Require(!observed.Any(p => p.PlacedAtUtc < d.V2EffectiveAtUtc &&
                     !d.ReconciledPlacements.Any(e => e.ParticipantId == p.ParticipantId)), "D10_OMITTED_HISTORICAL_PLACEMENT");
                 var unknownHistorical = await _participations.GetAll().IgnoreQueryFilters().AsNoTracking().AnyAsync(p =>
-                    p.TenantId == d.TenantId && p.StartedAt < d.V2EffectiveAtUtc && !ids.Contains(p.Id));
+                    p.TenantId == d.TenantId && p.StartedAt < d.V2EffectiveAtUtc && !ids.Contains(p.Id) &&
+                    (cleanStart == null || !p.IsDeleted));
                 AQGreenD10Commissioning.Require(!unknownHistorical, "D10_OMITTED_HISTORICAL_PARTICIPATION");
                 var customerIds = d.HistoricalMembers.Select(m => m.CustomerId).ToArray();
                 var unresolvedLegacy = await (from c in _customers.GetAll().IgnoreQueryFilters().AsNoTracking()
