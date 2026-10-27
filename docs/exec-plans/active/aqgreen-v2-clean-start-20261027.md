@@ -122,3 +122,43 @@ window are still required before explicit owner preflight execution approval.
 No Yoco/business source review, backup, reset, migration or deployment is implied
 by CI publication or a successful CI result. Exact production admission also
 requires independently reviewed main-source evidence and separate human gates.
+
+### First hosted CI findings and mandatory dependency correction
+
+Application `84bf271a18e4cc3f60c46b2a6d64a6bfed0c0bea`, run `40450407066`,
+executed all 240 mandatory release-safety cases: passed, zero failed/skipped.
+Executor `136d467f9e27bc64441315f8efadadeeb178ccc8`, draft PR 9, run
+`40450464399`: **138 passed, zero failed/skipped**, including actual PostgreSQL
+concurrent signed-authorization use. The PR merge tree equals the source tree;
+this is existing CI execution, not production or independent-human acceptance.
+
+The application production dependency audit failed on unchanged baseline Next.js
+16.3.8 (critical) and Zod 4.4.3 (high). Branch ownership: PRE-EXISTING, exposed by
+the mandatory current audit. No clean-start application code caused this failure.
+The smallest correction updates existing Next.js/matching ESLint configuration to
+16.4.3 and raises the existing Zod floor to 4.6.6 (lock resolves 4.6.7). No business
+logic, SQL, CI gate, automatic payout flag or new dependency family changes.
+The Next.js registry peer range remains compatible with retained React 19.2.4.
+No broad/forced audit fix or codemod is used. Full exact-source CI must run again.
+
+Primary advisory evidence:
+[Next.js image optimization](https://github.com/advisories/GHSA-2464-fhr4-w9xw),
+[Next.js cached typed arrays](https://github.com/advisories/GHSA-673q-mjm6-r5xr),
+[Zod constrained collections](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5).
+SQL and production-read/human gates remain unchanged and unexecuted.
+
+The same first CI run exposed one D10 fixture that enabled financial operations
+after binding configuration authority. ROOT CAUSE: the new configuration digest
+correctly rejects that post-binding mutation. Correct only the synthetic fixture
+to select the capability before creating/binding evidence; retain every original
+Area/financial/side-effect assertion and all production configuration checks.
+This is BRANCH-EXPOSED fixture incompatibility, not permission to relax D10.
+
+Validation of these bounded CI corrections: production `npm audit --omit=dev`
+reports **zero vulnerabilities** against the updated lock; Release web-test build
+passes (2847 warnings, zero errors); all **14 D10 PostgreSQL cases** and the **one
+empty-Tenant clean-start joining/spillover case** pass on the existing PostgreSQL
+15 test fixture with zero skipped. Artifacts are in
+`/tmp/aqgreen-clean-start-ci-correction-tests`; existing PG18.4 evidence is carried
+forward. No application business-logic, SQL or CI assertion was changed. The next
+hosted run must qualify the exact corrected commit; none is presumed successful.

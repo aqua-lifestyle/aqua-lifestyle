@@ -122,9 +122,10 @@ namespace AqualLifeStyle.Web.Tests.Integration
             await UsingDbContextAsync(async context => (await context.Customers.SingleAsync(c => c.Id == legacyCustomerId)).ChangeMembership(null));
         }
 
-        private async Task<(D10SyntheticSource Source, AQGreenD10Runtime Runtime, IConfigurationRoot Configuration, AQGreenD10SyntheticEvidence Evidence)> ConfigureD10Async()
+        private async Task<(D10SyntheticSource Source, AQGreenD10Runtime Runtime, IConfigurationRoot Configuration, AQGreenD10SyntheticEvidence Evidence)> ConfigureD10Async(bool financialOperationsEnabled = false)
         {
             var configuration = AQGreenD10SyntheticEvidence.Configuration(); AQGreenReconciliationSourceBoundary boundary;
+            if (financialOperationsEnabled) configuration["App:FinancialOperations:Enabled"] = "true";
             var uows = IocManager.Resolve<IUnitOfWorkManager>();
             using (var uow = uows.Begin(new UnitOfWorkOptions { Scope = TransactionScopeOption.RequiresNew, IsTransactional = true,
                 IsolationLevel = IsolationLevel.RepeatableRead }))

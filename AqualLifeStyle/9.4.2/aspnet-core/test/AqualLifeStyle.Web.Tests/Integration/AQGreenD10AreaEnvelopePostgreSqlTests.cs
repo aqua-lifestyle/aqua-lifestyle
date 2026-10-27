@@ -39,10 +39,9 @@ namespace AqualLifeStyle.Web.Tests.Integration
         {
             IsPostgreSqlRegressionMode().ShouldBeTrue(); LoginAsDefaultTenantAdmin();
             var fixture = await SeedSponsoredAwaitingApprovalAsync(recordedAt: AQGreenD10SyntheticEvidence.EffectiveAt.AddDays(-3));
-            var (_, runtime, configuration, evidence) = await ConfigureD10Async();
-            // ConfigureD10Async replaces the default configuration. Grant only
-            // this synthetic case on that exact instance before resolving services.
-            configuration["App:FinancialOperations:Enabled"] = "true";
+            // Select this synthetic capability before the D10 authority pins its
+            // configuration; do not mutate the commissioned configuration later.
+            var (_, runtime, configuration, evidence) = await ConfigureD10Async(financialOperationsEnabled: true);
             Resolve<IConfiguration>().ShouldBeSameAs(configuration);
             var gateway = ConfigureAreaJoiningGate(runtime);
             var member = await CreateD10InviteeAsync(fixture.AreaId);
