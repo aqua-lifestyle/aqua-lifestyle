@@ -23,7 +23,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
     }
 
     [Collection("AQGreen clean-start PostgreSQL")]
-    public sealed class AQGreenCleanStartPostgreSqlTests
+    public sealed partial class AQGreenCleanStartPostgreSqlTests
     {
         private readonly AQGreenPlacementAllocatorPostgreSqlFixture _fixture;
         private static readonly DateTime Boundary = AqualLifeStyle.Tests.WebHost.AQGreenD10SyntheticEvidence.EffectiveAt.AddDays(14);

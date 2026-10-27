@@ -1,3 +1,27 @@
+# Status-only preflight amendment validation
+
+PROPOSED amendment to the operational preflight only. No production execution or human acceptance is asserted. Existing B6, reset/restore, migration 55 and D10 runtime sources are unchanged.
+
+| Artifact | SHA-256 |
+|---|---|
+| preflight.sql | `b0b495e30d0f3b910980f6d212b75b57de725c35f56c253ff973f681382264dd` |
+| preflight-checks.sql | `1d8845c76fa87843f48fc2e648a57333c94d2417fc018c4b499ff28d25e91651` |
+| aqgreen-clean-start-preflight.mjs | `02cfc986a3435234308be8595a4775ad7d490b5c67e8380d87c983e93231c525` |
+| state.sql | `db3d36ac23172c2005aa6edd202ea6f9cb6b4635c75c1bdbd2889f47571fd100` |
+
+Targeted validation: 21 focused xUnit cases passed, zero failed/skipped, on the existing PostgreSQL 18.4 fixture. This includes the eight existing reset/recovery cases and 13 added status-screen/supporting cases. The supporting Node case executes 11 launcher/privacy checks; those 11 also passed standalone. These are separate evidence categories, not 32 independent database executions.
+
+Artifacts: `/tmp/aqgreen-status-preflight-tests/status-preflight-reviewed.trx`, `/tmp/aqgreen-status-preflight-reviewed.log`, `/tmp/aqgreen-status-preflight-node-tests-final.log`. The Release build passed with warnings; no warning-free build or dependency changes are claimed. One development fixture initially omitted its monthly due-policy FK; that fixture was corrected, without changing guard logic or assertions.
+
+The SQL tests prove predicate parity with state.sql, exact EF migration identity, unchanged source fingerprint, protected-record conservation, actual payment/loan/monthly exposure rejection, deleted and small/large payment populations, invalid scope/history, RLS-filtered UNKNOWN and read-only enforcement. A SELECT-only test role without pg_control_system EXECUTE still runs the database screen. Launcher tests cover endpoint substitution, SQL changes/races, inherited connection options, strict certificate settings, expired windows, partial/error redaction and rejection of raw counts or fabricated business acceptance.
+
+Technical self-review followed the repository benchmark: source and Tenant boundaries, unknown-versus-zero semantics, client/server TLS roles, rollback-before-output, immutable SQL snapshots, deadlines and strict output shape. Review found and corrected per-check false PASS under RLS filtering and a file-change race between hash verification and execution. No unresolved branch-owned defect was identified in that review. This is not independent human amendment acceptance.
+
+Actual provider TLS delivery is not newly production-verified. The 26 October logical target/TLS evidence is carried forward; the subsequent metadata-only connection attempt returned no verified result. The amended launcher reports UNKNOWN on connection/certificate/access failure and never retries or downgrades TLS. Mocked launcher tests do not prove a current Render handshake.
+
+The new logical identity mode needs explicit owner/reviewer acceptance for this read-only screen. It does not prove physical cluster continuity or waive native binding/private audit custody in the unchanged reset/D10 procedure. Fresh source-bound CI and human authorization remain release gates; earlier application adff7d9 CI and executor 136d467 CI are carried-forward evidence for those revisions only.
+
+## Earlier clean-start implementation evidence (before this amendment)
 # Clean-start non-production evidence — 27 October 2026
 
 These are local implementation tests on synthetic data. They do not establish

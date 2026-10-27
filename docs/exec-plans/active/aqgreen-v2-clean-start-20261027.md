@@ -162,3 +162,34 @@ empty-Tenant clean-start joining/spillover case** pass on the existing PostgreSQ
 `/tmp/aqgreen-clean-start-ci-correction-tests`; existing PG18.4 evidence is carried
 forward. No application business-logic, SQL or CI assertion was changed. The next
 hosted run must qualify the exact corrected commit; none is presumed successful.
+
+## Proposed status-only preflight amendment
+
+The owner subsequently authorized the smallest status-only preflight change,
+subject to review/testing and new production execution authorization. The prior
+raw-count SQL hash and its UTC window do not authorize the amendment.
+
+Changes are confined to the operational preflight/launcher, targeted tests and
+current operator documentation. Shared state.sql, reset/restore, migration 55,
+AQGreen/D10 business logic and accepted B6 are unchanged. Canonical population and
+financial CTEs remain byte-equivalent and are regression-checked. All counters
+stay inside PostgreSQL; the client receives only PASS/FAIL/UNKNOWN and whitelisted
+non-identifying hashes/time/source metadata. No new raw-results storage is needed
+for that receipt. External business classification remains UNKNOWN, not zero.
+
+Proposed logical identity mode RENDER_RESOURCE_TLS_DATABASE_SESSION_V1 combines
+authenticated provider-resource lookup, its exact external hostname/database/login,
+system-CA verify-full/SNI and server session/TLS/read-only checks. This is scoped
+to a current logical-source observation; physical-cluster continuity is not proven
+and the unchanged reset/D10 native binding is not waived. Approval of that narrower
+identity amendment remains a human decision.
+
+Targeted tests: 21 focused xUnit cases (including the original eight reset cases)
+and 11 launcher checks passed with zero skips. SQL uses existing PostgreSQL18.4
+fixtures. Technical self-review corrected per-check PASS under incomplete RLS
+visibility and froze verified SQL bytes to prevent a later file replacement.
+Deadline checks, strict output keys and error redaction fail closed. No new tool,
+dependency, paid resource, privileged host change or production query was used.
+Full details and exact executable hashes are in the existing preflight authorization
+and validation documents. Independent human amendment acceptance and new owner
+execution authorization are not fabricated by these tests or self-review.

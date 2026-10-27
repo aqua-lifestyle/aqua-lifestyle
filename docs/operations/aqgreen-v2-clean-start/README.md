@@ -6,8 +6,8 @@ classifies existing AQGreen records as test data, subject to preserving genuine
 membership and financial obligations. It authorizes implementation and synthetic
 validation only. This package does not assert that production eligibility passed.
 
-The exact read-only SQL, 16-table access scope, permissions, protected output
-channel requirements and separate Yoco/business cross-check are prepared in
+The status-only read-only SQL, 16-table access scope, logical Render/TLS identity
+amendment and separate Yoco/business cross-check are prepared in
 [preflight-authorization.md](preflight-authorization.md). No production assessment
 has been performed or authorized by preparing that request.
 
@@ -68,13 +68,14 @@ The protected operator record must contain all of:
    recovery SQL digests and successful tests/CI. Migration 55 source is unchanged.
 2. Actual verified PostgreSQL source identity and TLS session, schema/history
    identity, 54 applied migrations, transaction snapshot/time, full-population
-   source fingerprint and guard counts from `preflight.sql`. The 26 October
+   source fingerprint and guard statuses from the status-only launcher. The 26 October
    metadata verification is carried forward, not a fresh eligibility assessment.
 3. Classification and independent acceptance bound to that exact population;
    no genuine membership in the archived scope. Missing values do not mean zero.
-4. Existing protected execution channel, operator/data/security/platform authority,
-   restricted audit custody/retention and actual application/financial write fence.
-   Do not use the unverified workstation for production evidence.
+4. Operator/data/security/platform authority, restricted custody/retention for
+   sensitive reset/audit/business evidence and an actual financial write fence.
+   The reduced status-only preflight receipt needs no raw-results storage route;
+   it does not authorize workstation storage of sensitive production evidence.
 5. Recovery evidence and explicit confirmation of zero incremental charges for
    any backup action. **No backup/export/recovery API has been invoked here.**
 6. UTC reset/deployment window, maximum 30-second SQL statements, 3-second lock
@@ -98,16 +99,18 @@ and immutable audit references are not recycled into genuine membership. Choose
 the first genuine root and subsequent member identities outside that archived
 cohort; no uniqueness or audit constraint is relaxed to reuse a test participation.
 
-`preflight.sql` is a new production-data assessment and requires its own bounded
-read authorization. The earlier authorization pinned a different aggregate SQL;
-it does not authorize this file or establish clean-start eligibility. No production
-preflight was executed while preparing this package.
+The status-only preflight is a proposed amendment requiring review and owner
+reauthorization of its new artifact hashes, logical-source identity mode and UTC
+window. Prior raw-count query approval is not authority for this changed contract.
+No production preflight was executed while preparing the amendment.
 
 Use `classification.template.json` only as a preparation template. Complete its
 real protected counterpart outside Git; unfilled/null fields cannot authorize a
-reset. The SQL variables are `source_database`, `expected_database_identity_digest`
-(native system/database/OID digest), `boundary_utc` and `reset_id` for preflight;
-the reset additionally requires `expected_source_digest`, `classification_digest`,
+reset. The status-only launcher's boundary, reset ID and approved UTC window are
+defined in preflight-authorization.md; its output contains no counts. The unchanged
+reset still requires `source_database`, `expected_database_identity_digest`
+(native system/database/OID digest), `boundary_utc`, `reset_id`,
+`expected_source_digest`, `classification_digest`,
 `independent_acceptance_digest`, `owner_reset_authorization_digest`,
 `recovery_evidence_digest`, `reset_sql_digest`, `no_genuine_memberships=true`,
 `write_fence_evidence_digest`, `valid_from_utc` and `valid_until_utc`. The permitted
@@ -115,13 +118,14 @@ authorization window is at most 30 minutes; each SQL statement remains limited t
 30 seconds. None of these variables carries credentials or member identities.
 Supply credentials solely via the existing protected client environment.
 
-From the reviewed SQL directory, use existing `psql -X --no-password
---set=ON_ERROR_STOP=1 --set=VERBOSITY=sqlstate` with the protected variables and exactly `--file=preflight.sql`
-or separately authorized `--file=reset.sql`. Disable shell tracing/history and
-result spooling. Do not change client TLS policy to recover a failed connection.
-The preflight checks actual server TLS and approved native source identity before
-reading the historical population. Verify successful COMMIT/receipt with another
-authorized preflight, not merely process output or a pre-commit digest.
+Use only the reviewed status-only launcher for the amended preflight; it enforces
+the provider endpoint, authenticated TLS and output whitelist. The unchanged
+reset uses existing `psql -X --no-password --set=ON_ERROR_STOP=1
+--set=VERBOSITY=sqlstate --file=reset.sql` with separately approved protected inputs.
+Disable shell tracing/history and result spooling. Never weaken TLS to recover a
+connection. Verify reset COMMIT through the unchanged protected state/journal
+procedure; the new pre-reset screen rejects a reused reset identity and is not
+post-reset receipt acceptance. Native reset/D10 binding remains mandatory.
 
 ## Recovery safeguard and limits
 
@@ -147,9 +151,10 @@ successful restore is claimed. See [Render recovery documentation](https://rende
    until actual operations below have completed. No synthetic record qualifies.
 2. Establish the existing write fence; hold onboarding, financial processing,
    automatic payouts and V2 commissioning. Verify operator cancellation and the
-   recovery/cost/custody records. Run authorized `preflight.sql` using existing TLS,
-   no result spooling or shell tracing/history; review counts privately and bind
-   its source fingerprint to the disposable-test classification.
+   recovery/cost/custody records. Run the separately reauthorized status-only
+   preflight launcher using existing TLS; retain only its reduced receipt and bind
+   its source fingerprint to authoritative disposable-test classification. UNKNOWN
+   external obligations/classification require actual independent business review.
 3. Obtain **separate exact reset authorization** for `reset.sql`, source identity,
    approved fingerprint, classification, recovery, write fence and UTC window.
    Execute once using the corresponding protected psql variables. It requires the

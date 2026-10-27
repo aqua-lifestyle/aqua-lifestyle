@@ -1,188 +1,105 @@
-# Exact production preflight authorization request — 27 October 2026
+# Status-only clean-start preflight amendment
 
-**PREPARED; NOT AUTHORIZED OR EXECUTED.** No real-data finding is asserted.
-This requests one read-only assessment, not reset, DDL, deployment, financial
-release or live-payment changes. Accepted B6 work remains intact.
+**PROPOSED — technical review and reauthorization required before production use.**
+The owner authorized preparing a smaller preflight. That instruction and the
+previous raw-count preflight authorization do not authorize this changed contract.
+No production assessment was executed while preparing it. Existing AQGreen/B6,
+reset, migration, D10, payout and deployment controls remain intact.
 
-CI status below records pre-publication evidence. The owner subsequently
-authorized committing the candidate and existing CI execution; use the published
-commit's GitHub check runs for actual results. That instruction explicitly does
-not authorize this production-data preflight.
+## Executable scope and output
 
-## Frozen SQL and source
+`tools/operations/aqgreen-clean-start-preflight.mjs` runs the reviewed
+`preflight.sql` and `preflight-checks.sql`. It verifies all three SQL hashes,
+including the unchanged `state.sql` baseline, then executes a frozen in-memory
+copy. It creates no result files and never emits provider/client diagnostics.
 
-Directory:
-`AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.EntityFrameworkCore/Operations/CleanStart/`.
+Every check result is **PASS, FAIL or UNKNOWN**. Counts and source rows are
+processed only inside PostgreSQL. The reduced receipt contains status tokens,
+known resource/database/Tenant identifiers, UTC observation time, script hashes,
+and non-identifying database/schema/source/snapshot fingerprints. It contains no
+names, customer identifiers, transaction references, amounts or sensitive counts.
+Only this reduced receipt may be retained in the existing owner decision/audit
+record or reported through the approved non-identifying conversation channel.
+There is no separate raw-results destination requirement for this screen.
 
-| Executed file | SHA-256 |
-|---|---|
-| preflight.sql | `12f2e7cee40682e6bf1d031211842143d0d0a8de5dcf79d5333a06555a1152d6` |
-| state.sql, included by preflight.sql | `db3d36ac23172c2005aa6edd202ea6f9cb6b4635c75c1bdbd2889f47571fd100` |
+A `databaseScreen: PASS` proves only the database predicates in that snapshot.
+`testDataClassification` and `externalBusinessObligations` remain **UNKNOWN**;
+database zeros cannot certify genuine membership rights, off-system receipts,
+Yoco settlements/refunds/disputes, unpaid commissions or other external claims.
+Consequently `overall` remains UNKNOWN until separate authoritative business
+review and independent acceptance. Known database exposure yields FAIL. Neither
+PASS on the database screen nor exit status can authorize a reset or release.
+Exit codes are 1 for UNKNOWN and 2 for FAIL; overall PASS/exit 0 is reserved and
+cannot be granted by this database-only screen.
 
-Both files are unchanged. Approval must name both; the entry script alone is not
-the complete query. Source: existing Render `dpg-d9f0jne1a83c73d8m780-a`, database
-`aqualifestyle`, Tenant 1. Operator: Xolani-M. No production connection was made.
+## Preserved checks and bounded execution
 
-The 16 public tables read are:
+The canonical population/exposure CTEs are identical to `state.sql`; a regression
+check enforces that equality. Scope remains whole Tenant 1 before the canonical
+boundary, including deleted/inactive lifecycle exceptions. Existing payment,
+checkout, real commission, loan, graduation-funding, monthly-obligation, payout,
+orphan, invalid lifecycle, membership and immutable-placement checks remain.
+The screen additionally requires the exact reviewed 54-ID migration prefix,
+no migration-55 table, no future-boundary participation or reused reset identity,
+and complete visibility of the 16 relevant relations. Active row-security filters
+make coverage/scope/negative-exposure results UNKNOWN, not valid-looking zeros.
 
-- AQGreenJoiningCheckouts
-- AQGreenMonthlyObligationCheckouts
-- AQGreenNetworkPlacements
-- AQGreenRecruitmentAttributions
-- AbpAuditLogs (clean-start operator journal only)
-- Customers
-- EntryCommissionPeriods
-- EntryMonthlyObligations
-- EntryParticipations
-- EntryWeeklyCommissions
-- MemberPayments
-- Memberships
-- OnyxGraduationDecisions
-- OnyxLoanAgreements
-- YocoWebhookReceipts
-- __EFMigrationsHistory
+The session starts with default read-only enforcement and executes one
+REPEATABLE READ READ ONLY transaction: 30-second statements, 3-second lock waits,
+45-second idle timeout, pg_catalog search path and final ROLLBACK. No receipt is
+emitted until rollback succeeds. Missing permissions, malformed/stale output,
+connection/certificate failure, altered SQL or an expired window produce UNKNOWN.
+There is one provider lookup and at most one PostgreSQL invocation, with no retry,
+connection fallback or TLS downgrade. A maximum 15-minute explicitly approved UTC
+window bounds child timeouts; the SQL client has a maximum 120-second lifetime.
+Xolani-M remains the operator and cancellation owner.
 
-Metadata uses `pg_catalog.pg_database`, this session's `pg_stat_ssl` row,
-`information_schema.columns` for the public schema, and `pg_catalog.pg_control_system()`.
-Historical participation includes every status and deleted row before the approved
-boundary. Guards also cover scoped customers and orphan/pre-boundary financial
-activity. This is not an account-wide Yoco reconciliation. Future-boundary
-participations are separately prohibited by the reset's fresh guard; this
-preflight alone is not authority to reset.
+## Logical source identity amendment and exact limitation
 
-## Permissions and read-only enforcement
+The launcher uses the existing authenticated Render CLI to retrieve connection
+information for `dpg-d9f0jne1a83c73d8m780-a`. It requires that resource ID and one
+unambiguous external connection for the exact Frankfurt hostname, port 5432 and
+`aqualifestyle`. It ignores URI-supplied TLS options, clears inherited libpq
+routing/options, and enforces system-CA `verify-full` plus SNI. Credentials remain
+in memory/environment, never command arguments or output. SQL then checks actual
+server TLS, database, authenticated session user, absence of role substitution,
+and read-only repeatable-read execution. Tenant 1 is fixed in the SQL.
 
-The existing login needs CONNECT to the database, USAGE on public, SELECT on the
-16 tables (including deleted rows and all columns used for source fingerprints),
-visibility of the referenced metadata and EXECUTE on pg_control_system() and the
-built-in observation/hash functions. It must see the complete Tenant population;
-an RLS-filtered or partially authorized view cannot establish an empty population.
-No INSERT, UPDATE, DELETE, TRUNCATE, CREATE, role creation or privilege change is
-needed. If existing permissions are insufficient, stop; do not grant anything.
-Existing write privileges are not authorized for use by this assessment.
+Proposed identity mode: **RENDER_RESOURCE_TLS_DATABASE_SESSION_V1**. Together these
+controls establish the logical provider resource/database for this bounded
+read-only observation. They are not an assertion of native-fingerprint equality:
+they cannot establish physical-cluster continuity across a restore/replacement
+under the same logical endpoint. Owner/reviewer acceptance must explicitly cover
+this narrower preflight equivalence. Native binding and protected before-images
+in the unchanged reset/restore/D10 contracts are not waived by this amendment.
 
-Inspection confirms `REPEATABLE READ READ ONLY`, 30-second statement, 3-second
-lock and 45-second idle-in-transaction limits, actual server-side TLS and expected
-native database identity checks before population reads, and final ROLLBACK.
-set_config changes are transaction local. The SQL only reads and hashes rows;
-there is no persistent mutation, export, COPY, sequence advance or DDL. PostgreSQL
-enforces read-only mode. Full-row hashing remains inside the server. Stop on any
-timeout/error and disconnect; no retry or weaker TLS. One execution only.
+Primary authority: [PostgreSQL TLS verification](https://www.postgresql.org/docs/18/libpq-ssl.html)
+and [Render connection information](https://render.com/docs/postgresql-creating-connecting).
+The 26 October successful target/TLS evidence is carried forward; no new live
+connection success is claimed. A failing actual TLS route remains UNKNOWN.
 
-## Output and channel authorization
+## Exact reauthorization
 
-Source rows processed inside PostgreSQL are RESTRICTED production data. Output is
-CONFIDENTIAL aggregate/evidence metadata: population/archive/placement/legacy and
-guard counts, fingerprints, receipt/boundary timestamps, migration count/latest
-ID, schema/native identity, TLS/read-only indicators and snapshot/time evidence.
-No names, member identifiers, payment references, individual amounts, raw
-financial records or audit before-images are returned. Database/resource/reset
-identifiers are operational metadata, not member identities.
+Review and approve the new entry SQL, check SQL, launcher hashes and this contract;
+`state.sql` remains the unchanged canonical baseline. Exact artifact hashes and
+validation are recorded in [validation.md](validation.md). The prior entry SQL
+hash `12f2e7cee40682e6bf1d031211842143d0d0a8de5dcf79d5333a06555a1152d6`
+and the prior 05:45–06:00 window are not authorization for this changed invocation.
+An expired window must be replaced by a new explicit UTC window.
 
-**The unchanged SQL does not suppress small cells.** Exact counts and fingerprints
-must stay in the named existing protected operator/reviewer channel. Do not paste
-raw psql output into this conversation, GitHub, application logs, CI artifacts,
-shell history or local result files. The conversation may receive only status,
-validated non-identifying zero/nonzero guard indicators and safe aggregate counts;
-suppress positive counts whenever disclosure could identify individuals. Zero
-alone never proves test-data classification or absent obligations. No raw result
-stream may pass through a tool whose output appears in chat. Stop if an existing
-protected execution/output channel cannot be identified.
-
-The protected authorization must fix: execution/output channel reference and its
-custodian/access/retention; expected native identity digest from the existing
-verified source record; reset_id; boundary_utc; UTC assessment window; operator
-authority and Xolani-M's cancellation responsibility. These values are not filled
-in the current classification template. Previously proposed boundary
-`2026-10-29T22:00:00Z` remains unapproved and creates no activation authority.
-
-From the reviewed directory, after approval and protected variable binding:
+From the repository root, only after review/acceptance and owner reauthorization:
 
 ```bash
-psql -X --no-password --set=ON_ERROR_STOP=1 --set=VERBOSITY=sqlstate \
-  --set=source_database=aqualifestyle \
-  --set=expected_database_identity_digest="$B6_APPROVED_DATABASE_IDENTITY_DIGEST" \
-  --set=boundary_utc="$B6_APPROVED_BOUNDARY_UTC" \
-  --set=reset_id="$B6_APPROVED_RESET_ID" \
-  --file=preflight.sql
+node tools/operations/aqgreen-clean-start-preflight.mjs \
+  --boundary-utc '2026-10-29T22:00:00Z' \
+  --reset-id 'AQGREEN-CLEANSTART-20261027' \
+  --window-start-utc 'OWNER_APPROVED_UTC_START' \
+  --window-end-utc 'OWNER_APPROVED_UTC_END'
 ```
 
-This is an operator invocation template, not an approved executable operation.
-Use the existing protected credential/TLS environment with tracing/history and
-spooling disabled. No credentials in arguments, no stdout-to-file redirection,
-no production configuration changes. Raw output belongs only in the approved
-protected session; permitted redacted results may be reported separately.
-
-## Required authoritative cross-check — not performed
-
-The owner's classification is intent, not proof of zero financial exposure.
-No authoritative merchant-history or outstanding-obligation record/reference was
-provided or accessed. Do not certify clean start from database zeros, IsTestMoney
-flags, current Yoco mode, missing webhooks or prior synthetic payment tests.
-
-The existing authorized Yoco account custodian must review complete relevant
-live merchant history through the assessment cutoff: all pages/accounts used by
-the business, successful/pending/unmatched transactions, settlements, refunds,
-disputes and chargebacks. Privately reconcile identifiers/references/purpose,
-amount/currency and status with Aqua records where authorized. An empty search
-or missing metadata does not prove completeness. Any real/unmatched/uncertain
-item touching the disposable population is a STOP. Refund/cancellation alone
-does not establish absence of continuing obligations.
-
-The business/finance custodian must check genuine membership/benefit rights,
-cash/manual/off-system receipts, unpaid/held commissions, loans, graduation
-funding, monthly obligations, payouts and unresolved customer/provider claims.
-Cover the entire classified population and unlinked historical AQGreen activity,
-including deleted/inactive records. Under the existing write fence, record
-provider/business cutoff and observation times, completeness, source references
-and exceptions; bind acceptance to the actual SQL fingerprint/snapshot. Resolve
-cutoff/in-flight-payment gaps before acceptance. No identities, transaction
-details or raw financial records belong here.
-
-This SQL request does not authorize agent access to provider transactions or
-off-system financial records. Obtain a protected signed custodian review reference,
-or separately authorize precise read-only provider/business-record access and
-channel. Aqua must accept the actual classification/cross-check and new clean-start
-contract independently; existing B6 implementation acceptance is retained.
-
-## Release gate and recovery status
-
-Local carried-forward evidence: 126 backend/PostgreSQL cases, one PostgreSQL
-joining flow, 137 executor cases and five workflow cases passed. The executor's
-real PostgreSQL concurrent authorization-use test remains SKIPPED locally because
-AQUA_TEST_DATABASE_URL was unset. Existing CI supplies that variable and a
-disposable PostgreSQL service; configuration is not executed evidence.
-
-Both candidates remain uncommitted worktrees, at application base
-`73890aa1b7c843238bbca1b450000d43d8ef8b5b` and executor base
-`caf8b4bb34572feecccad30fdd8eb5b19b8116a9`. There is no published exact-source
-commit/run for these changes. **The mandatory release gates are not all satisfied.**
-Authorized publication/review and fresh application/executor CI must establish
-all required checks, the unchanged 240-case mandatory inventory, explicit
-PostgreSQL execution/markers and the concurrent authorization-use result. Schema
-readback remains UNVERIFIED. No local skip is waived or reported as passed.
-
-Existing Render TLS/PITR availability is carried forward; operation-specific
-protected backup identity/cutoff/recovery readiness, custody, retention, zero
-incremental charges and effective write fence remain UNVERIFIED. No backup,
-export or restore was requested. Do not charge, provision or export to resolve
-this silently. Tested in-database before-images can reverse only this reset before
-prospective admissions and while integrity checks pass; they share the source
-database's failure domain and are not an independent backup. No automatic
-migration Down or rollback to legacy financial processing.
-
-## Separate production authorization after actual evidence acceptance
-
-Protected backup (existing facility only; zero additional charge and protected
-custody confirmed) → controlled classified-test archival reset → committed reset
-readback/Aqua acceptance → separate migration-55 authorization and retained SQL →
-database verification (55 exact history entries and append-only/hold checks) →
-Render in held CLEAN_START mode and authenticated readiness → matching Vercel →
-separately authorized D10/root commissioning → controlled live Yoco validation.
-Automatic payouts stay off; financial worker commissioning/release stays separately
-gated. Any mismatch, real exposure, unresolved exception, failed check, unknown
-recovery/cost/custody or broken fence stops before the next mutation.
-
-Exact reset/exclusions, migration SQL hash, configuration and stop/recovery
-details remain in [README.md](README.md). Approving this read-only preflight does
-not authorize any part of the production mutation sequence.
+The boundary and reset identity are proposals for assessment scope, not D10 or
+reset authority. Retain only the reduced receipt. Do not run the SQL directly
+without the launcher: server TLS alone cannot prove client certificate/hostname
+verification. Financial classification and Aqua's separate clean-start acceptance
+remain required. This screen does not replace post-reset state/receipt verification
+or authorize backup, reset, migration 55, deployment, D10 or live Yoco activity.
