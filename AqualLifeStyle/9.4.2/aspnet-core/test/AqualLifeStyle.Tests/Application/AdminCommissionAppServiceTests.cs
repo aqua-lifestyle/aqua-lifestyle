@@ -138,6 +138,34 @@ namespace AqualLifeStyle.Tests.Application
             });
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task OnlyOwnerAcceptedRetiredCohortIsExcludedFromNewCommissionInputs(bool acceptedRetirement)
+        {
+            await CreateQualifiedLevelOneEntryNetworkAsync();LoginAsHostAdmin();
+            await UsingDbContextAsync(1,async context=>
+            {foreach(var p in await context.EntryParticipations.Where(p=>p.TenantId==1).ToListAsync()){p.IsDeleted=true;p.DeletionTime=DateTime.UtcNow;}await context.SaveChangesAsync();});
+            var calculator=Resolve<WeeklyCommissionCalculator>();
+            if(acceptedRetirement)
+            {
+                var (x,e)=AqualLifeStyle.Tests.WebHost.AQGreenCleanStartCommissioningTests.Create();
+                AqualLifeStyle.Tests.WebHost.AQGreenCleanStartCommissioningTests.OwnerAttest(e);
+                AqualLifeStyle.Tests.WebHost.AQGreenCleanStartCommissioningTests.Sign(x,e);
+                var source=new Mock<IAQGreenD10CommissioningSource>();source.Setup(s=>s.Read()).Returns(AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,e));
+                calculator.D10Source=source.Object;
+            }
+            var manager=Resolve<IUnitOfWorkManager>();using var uow=manager.Begin();using(manager.Current.SetTenantId(1))
+            {
+                var week=Resolve<LatestClosedCommissionWeekResolver>().Resolve(DateTime.UtcNow);
+                if(acceptedRetirement){var result=await calculator.CalculateEntryAsync(1,week,DateTime.UtcNow);result.RecordsCreated.ShouldBe(0);}
+                else await Should.ThrowAsync<InvalidOperationException>(()=>calculator.CalculateEntryAsync(1,week,DateTime.UtcNow));
+            }
+            await uow.CompleteAsync();
+            await UsingDbContextAsync(1,async context=>
+            {(await context.EntryWeeklyCommissions.CountAsync()).ShouldBe(0);(await context.EntryParticipations.IgnoreQueryFilters().CountAsync(p=>p.TenantId==1 && p.IsDeleted)).ShouldBe(6);});
+        }
+
         [Fact]
         public async Task HostAdministrator_CanCalculateAndReviewEntryEarningsIdempotently()
         {

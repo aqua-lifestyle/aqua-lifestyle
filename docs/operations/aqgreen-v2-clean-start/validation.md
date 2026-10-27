@@ -1,3 +1,59 @@
+# Current owner-attested test-only candidate
+
+Status: IMPLEMENTED; focused non-production validation is recorded below. No
+production reset, migration, deployment or new independent acceptance is asserted.
+The business-owner classification is CONFIRMED in
+[the decision record](owner-attested-test-only-decision.md), explicitly owner-attested
+and not independently provider-verified. Earlier evidence below applies only to
+its historical revisions; it does not override this current candidate.
+
+| Artifact | SHA-256 |
+|---|---|
+| preflight.sql | `b0b495e30d0f3b910980f6d212b75b57de725c35f56c253ff973f681382264dd` |
+| preflight-checks.sql | `1d8845c76fa87843f48fc2e648a57333c94d2417fc018c4b499ff28d25e91651` |
+| state.sql | `f3cd2d6b9248bbb1bf098cc721b98b5a025f0c9f015c97316b1886f80e27f138` |
+| reset.sql | `51d93f6b07165bb0ed547cf1d2985b3ec83b61cf1dd278a0abecb577c8d34bf1` |
+| restore.sql | `e8eb11cdb8f1242e1c7fdb3560c603950810ea37c3525fc5d74d84e39df5f3f3` |
+| migration-55.reviewed.sql | `1f45ef7b67fa6eae747ca70edfed05679ef63cf4cfe2f2cf308b9d31b8c1faea` |
+| aqgreen-clean-start-preflight.mjs | `3429dafeb5b9c09b253a0db86889feae0942b1046ad2dd4a0482e58928fd2e59` |
+
+The original status-only payment predicate is unchanged and can still report FAIL
+on preserved records. Only explicitly attested reset/D10/executor admission admits
+that positive evidence, with conservation checks. The canonical ten exposure
+predicates remain identical; all nine non-payment guards remain mandatory.
+
+Current evidence: the first targeted backend run passed 196 cases, zero failed or
+skipped. After the final participation-fact conservation and RLS checks, the
+reviewed backend rerun is required before claiming TESTED for that revision.
+The reviewed PostgreSQL 18.4 application flow passed one case with zero skips;
+its execution marker confirms retained historical payment relationships, an empty
+active cohort, explicit first root, six invited members, payment/approval separation,
+five-wide spillover and replay protection. The gateway is synthetic.
+
+Artifacts: /tmp/aqgreen-owner-attested-reviewed-web-tests/owner-attested-reviewed-e2e.trx
+and its clean-start-commissioning.ran marker. The Release build passed with
+2,851 warnings and zero errors; no warning-free build is claimed. The existing
+launcher suite passed all 17 cases with zero failures/skips. Its SQL predicates
+are untouched; only its state.sql integrity pin changed. Final source-bound CI
+results are attached to the published commits.
+
+Executor preparation initially passed 140 of 141 cases; the PostgreSQL replay
+case failed because this checkout lacked the lockfile's pg dependency. Restoring
+the existing lockfile dependencies introduced no dependency changes. The focused
+real PostgreSQL concurrency suite then passed all three cases with zero skips.
+The final full executor suite is required after source-pin publication.
+
+Technical self-review inspected the complete scoped diff, original predicate
+parity, Tenant bounds, retained references, independent authority versus owner
+attestation, receipt replay, locked conservation, rollback, late callback holds,
+commission exclusion and fail-closed recovery. No independent human acceptance
+or production control is inferred from these tests.
+The retained reviewed migration SQL and all EF migration sources are unchanged.
+B6 is retained unchanged. A fake payment gateway proves application behavior only;
+no live Yoco transaction, settlement classification or production release is claimed.
+
+## Historical validation records
+
 # Status-only preflight amendment validation
 
 The SQL baseline is the accepted status-only amendment. The subsequent launcher-only diagnostic correction is PROPOSED pending Aqua's acceptance and a fresh owner execution window. No diagnostic-candidate production execution or acceptance is asserted. Existing B6, SQL, reset/restore, migration 55 and D10 runtime sources are unchanged.

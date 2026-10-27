@@ -42,6 +42,64 @@ namespace AqualLifeStyle.Tests.WebHost
         { x.Authority.CleanStartEvidenceDigest = AQGreenB6CanonicalEvidence.Digest(c);
             x.Authority.DecisionDigest = AQGreenB6CanonicalEvidence.Digest(x.Decision); }
 
+        public static void OwnerAttest(AQGreenCleanStartEvidence c)
+        {
+            var hash=AQGreenD10SyntheticEvidence.Hash("owner-attested-test-only-not-provider-verification");
+            c.PaymentAdmissionMode=c.State.PaymentAdmissionMode=AQGreenCleanStartEvidence.OwnerAttestedTestOnly;
+            c.OwnerTestOnlyAttestationDigest=c.State.OwnerTestOnlyAttestationDigest=hash;
+            c.ProviderModeVerification="NOT_INDEPENDENTLY_VERIFIED";
+            c.ProtectedFinancialRecordsPreserved=true;
+            c.HistoricalFinancialRecordsDigest=c.State.ResetTenantFinancialRecordsDigest=hash;
+            c.State.PaymentEvidenceDigest=c.State.ResetPaymentEvidenceDigest=hash;
+            c.State.ProtectedPaymentCount=c.State.ResetProtectedPaymentCount=4;
+        }
+
+        [Fact]
+        public void OwnerAttestationAdmitsRetainedPaymentsWithoutClaimingProviderVerification()
+        {
+            var (x,c)=Create();OwnerAttest(c);Sign(x,c);
+            var bound=AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,c);
+            bound.CleanStartEvidence.ProviderModeVerification.ShouldBe("NOT_INDEPENDENTLY_VERIFIED");
+            bound.CleanStartEvidence.State.ProtectedPaymentCount.ShouldBe(4);
+            bound.CleanStartEvidence.State.HasNoProtectedExposure().ShouldBeFalse();
+            bound.CleanStartEvidence.AdmitsPreservedState(c.State).ShouldBeTrue();
+            bound.EnsureConfiguration(AQGreenD10SyntheticEvidence.Configuration());
+        }
+
+        [Theory]
+        [InlineData("mode")][InlineData("attestation")][InlineData("provider-claim")][InlineData("preservation")]
+        [InlineData("current-payment-drift")][InlineData("reset-payment-drift")][InlineData("count-drift")]
+        [InlineData("receipt-mode")][InlineData("receipt-attestation")][InlineData("financial-digest")]
+        [InlineData("placements")][InlineData("unclassified")][InlineData("commission")][InlineData("loan")]
+        [InlineData("graduation")][InlineData("obligation")][InlineData("payout")][InlineData("orphan")][InlineData("invalid")]
+        public void OwnerAttestationCannotBypassPreservationUnknownEvidenceOrAnyOtherGuard(string failure)
+        {
+            var (x,c)=Create();OwnerAttest(c);
+            switch(failure)
+            {
+                case "mode": c.PaymentAdmissionMode="INFERRED_TEST";break;
+                case "attestation": c.OwnerTestOnlyAttestationDigest=null;break;
+                case "provider-claim": c.ProviderModeVerification="INDEPENDENTLY_VERIFIED";break;
+                case "preservation": c.ProtectedFinancialRecordsPreserved=false;break;
+                case "current-payment-drift": c.State.PaymentEvidenceDigest=AQGreenD10SyntheticEvidence.Hash("changed-payment");break;
+                case "reset-payment-drift": c.State.ResetPaymentEvidenceDigest=null;break;
+                case "count-drift": c.State.ProtectedPaymentCount=5;break;
+                case "receipt-mode": c.State.PaymentAdmissionMode=null;break;
+                case "receipt-attestation": c.State.OwnerTestOnlyAttestationDigest=null;break;
+                case "financial-digest": c.HistoricalFinancialRecordsDigest=AQGreenD10SyntheticEvidence.Hash("changed-financial-records");break;
+                case "placements": c.State.PlacementCount=1;break;
+                case "unclassified": c.State.UnclassifiedMembershipCount=1;break;
+                case "commission": c.State.RealCommissionCount=1;break;
+                case "loan": c.State.LoanCount=1;break;
+                case "graduation": c.State.GraduationCount=1;break;
+                case "obligation": c.State.MonthlyObligationCount=1;break;
+                case "payout": c.State.PayoutCount=1;break;
+                case "orphan": c.State.OrphanTopologyCount=1;break;
+                case "invalid": c.State.InvalidParticipationCount=1;break;
+            }
+            Sign(x,c);Should.Throw<InvalidOperationException>(()=>AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,c));
+        }
+
         [Fact]
         public void EmptyApprovedTenantBindsWithNoFabricatedB6HistoryAndWorkersHeld()
         {

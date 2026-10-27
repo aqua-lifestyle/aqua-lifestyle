@@ -106,7 +106,11 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             {
                 AQGreenD10Commissioning.Require(financialCutoff != default(DateTime) && financialCutoff.Value.Kind == DateTimeKind.Utc,
                     "D10_FINANCIAL_CUTOFF_INVALID");
-                if (financialCutoff < d.V2EffectiveAtUtc) return false; // Explicit V1 historical boundary, never failure fallback.
+                if (financialCutoff < d.V2EffectiveAtUtc)
+                {
+                    AQGreenD10Commissioning.Require(a.CleanStartEvidence == null, "D10_CLEAN_START_HISTORICAL_FINANCIAL_REPLAY_HELD");
+                    return false; // Explicit historical B6/V1 boundary, never failure fallback.
+                }
             }
             else if (DateTime.UtcNow < d.V2EffectiveAtUtc)
             {
@@ -199,7 +203,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 {
                     AQGreenD10Commissioning.Require(cleanStart != null, "D10_CLEAN_START_AUTHORITY_INVALID");
                     var state = await _snapshot.CaptureCleanStartAsync(d.TenantId, d.V2EffectiveAtUtc, d.CleanStartResetId);
-                    AQGreenD10Commissioning.Require(state != null && state.HasNoProtectedExposure() &&
+                    AQGreenD10Commissioning.Require(state != null && cleanStart.AdmitsPreservedState(state) &&
                         state.PopulationCount == cleanStart.State.PopulationCount && state.ArchivedCount == state.PopulationCount &&
                         state.ArchiveDigest == cleanStart.State.ArchiveDigest && state.PlacementCount == 0 &&
                         state.LegacyMembershipCount == 0 && state.ResetReceiptDigest == cleanStart.State.ResetReceiptDigest,

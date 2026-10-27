@@ -11,7 +11,7 @@ const directory = new URL('../../AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeS
 export const pins = Object.freeze({
   'preflight.sql': 'b0b495e30d0f3b910980f6d212b75b57de725c35f56c253ff973f681382264dd',
   'preflight-checks.sql': '1d8845c76fa87843f48fc2e648a57333c94d2417fc018c4b499ff28d25e91651',
-  'state.sql': 'db3d36ac23172c2005aa6edd202ea6f9cb6b4635c75c1bdbd2889f47571fd100'
+  'state.sql': 'f3cd2d6b9248bbb1bf098cc721b98b5a025f0c9f015c97316b1886f80e27f138'
 });
 const hash = b => createHash('sha256').update(b).digest('hex');
 const digest = s => typeof s === 'string' && /^[a-f0-9]{64}$/.test(s);

@@ -1,3 +1,14 @@
+# Current scope note
+
+The following is the historical status-only preflight contract. Its accepted
+production executions and the payment-only FAIL are retained as evidence. The
+current owner-attested retirement branch is defined in
+[the release package](README.md) and [owner decision](owner-attested-test-only-decision.md).
+It does not weaken this screen or falsely turn preserved payment presence into
+verified zero exposure. The launcher changes only its included state.sql hash;
+current artifact identities are in [validation.md](validation.md). Prior windows
+and approvals do not authorize executing the new reset or migration.
+
 # Status-only clean-start preflight amendment
 
 **PROPOSED — technical review and reauthorization required before production use.**

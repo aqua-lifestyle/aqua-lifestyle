@@ -18,6 +18,9 @@ using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.Email;
 using AqualLifeStyle.Payments;
 using AqualLifeStyle.Payments.Yoco;
+using AqualLifeStyle.Domain.AQGreen;
+using AqualLifeStyle.Tests.WebHost;
+using Castle.MicroKernel.Registration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NSubstitute;
@@ -40,8 +43,10 @@ namespace AqualLifeStyle.Tests.Application
         private static readonly DateTime AQGreenSinglePaymentEffectiveFrom =
             new(2026, 7, 26, 0, 0, 0, DateTimeKind.Utc);
 
-        [Fact]
-        public async Task AQGreenJoiningCheckout_AwaitsApprovalAfterOneVerifiedTwelveHundredRandPayment()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task AQGreenJoiningCheckout_AwaitsApprovalAfterOneVerifiedTwelveHundredRandPayment(bool retired)
         {
             var suffix = Guid.NewGuid().ToString("N");
             var userId = await CreateTestUserAsync(
@@ -94,6 +99,15 @@ namespace AqualLifeStyle.Tests.Application
 
             var processor = LocalIocManager.Resolve<ProgrammePaymentConfirmationProcessor>();
             Assert.False(typeof(IApplicationService).IsAssignableFrom(processor.GetType()));
+            if (retired)
+            {
+                await UsingDbContextAsync(1,async context=>
+                { var p=await context.EntryParticipations.SingleAsync(p=>p.Id==persisted.ParticipationId);p.IsDeleted=true;p.DeletionTime=DateTime.UtcNow;await context.SaveChangesAsync(); });
+                var (x,e)=AQGreenCleanStartCommissioningTests.Create();AQGreenCleanStartCommissioningTests.OwnerAttest(e);
+                AQGreenCleanStartCommissioningTests.Sign(x,e);
+                var source=Substitute.For<IAQGreenD10CommissioningSource>();
+                source.Read().Returns(AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,e));processor.D10Source=source;
+            }
 
             var checkout = await UsingDbContextAsync(1, async context =>
                 await context.AQGreenJoiningCheckouts.SingleAsync(
@@ -136,6 +150,8 @@ namespace AqualLifeStyle.Tests.Application
             Assert.Equal(first.PaymentId, repeated.PaymentId);
             Assert.Equal(persisted.ParticipationId, repeated.ParticipationId);
             Assert.Equal(ProgrammeParticipationKind.Entry, first.ParticipationKind);
+            first.HistoricalPaymentHeld.ShouldBe(retired);repeated.HistoricalPaymentHeld.ShouldBe(retired);
+            if(retired){first.AwaitingAdministrativeApproval.ShouldBeFalse();repeated.AwaitingAdministrativeApproval.ShouldBeFalse();}
 
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 processor.ProcessAQGreenJoiningCheckoutAsync(
@@ -158,10 +174,10 @@ namespace AqualLifeStyle.Tests.Application
 
             await UsingDbContextAsync(1, async context =>
             {
-                var participation = await context.EntryParticipations
+                var participation = await context.EntryParticipations.IgnoreQueryFilters()
                     .SingleAsync(item => item.Id == persisted.ParticipationId);
-                participation.Status.ShouldBe(EntryParticipationStatus.PaymentConfirmedAwaitingApproval);
-                participation.JoiningPaymentId.ShouldBe(first.PaymentId);
+                if(retired){participation.IsDeleted.ShouldBeTrue();participation.Status.ShouldBe(EntryParticipationStatus.AwaitingJoiningPayment);participation.JoiningPaymentId.ShouldBeNull();}
+                else {participation.Status.ShouldBe(EntryParticipationStatus.PaymentConfirmedAwaitingApproval);participation.JoiningPaymentId.ShouldBe(first.PaymentId);}
                 var persistedCheckout = await context.AQGreenJoiningCheckouts
                     .SingleAsync(item => item.Id == persisted.CheckoutId);
                 persistedCheckout.Status.ShouldBe(HostedPaymentCheckoutStatus.Completed);
@@ -176,6 +192,12 @@ namespace AqualLifeStyle.Tests.Application
                 var funeralCover = await context.AQGreenFuneralCoverEntitlements
                     .Where(item => item.EntryParticipationId == persisted.ParticipationId)
                     .ToListAsync();
+                if(retired)
+                {
+                    funeralCover.ShouldBeEmpty();
+                    (await context.EntryWeeklyCommissions.CountAsync()).ShouldBe(0);
+                    return;
+                }
                 funeralCover.Count.ShouldBe(1);
                 funeralCover.Single().Status.ShouldBe(AQGreenFuneralCoverStatus.Included);
                 funeralCover.Single().FuneralCoverAmount.ShouldBe(30000m);
@@ -799,10 +821,11 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Theory]
-        [InlineData("live", "payment.succeeded")]
-        [InlineData("test", "payment.succeeded")]
-        [InlineData("test", "payment.failed")]
-        public async Task YocoNotification_LiveConfirmsOnce_TestVerifiesWithoutBusinessWrites(string mode, string eventType)
+        [InlineData("live", "payment.succeeded", false)]
+        [InlineData("test", "payment.succeeded", false)]
+        [InlineData("test", "payment.failed", false)]
+        [InlineData("live", "payment.succeeded", true)]
+        public async Task YocoNotification_LiveConfirmsOnce_TestVerifiesWithoutBusinessWrites(string mode, string eventType, bool retired)
         {
             Resolve<IConfiguration>()["Yoco:Mode"] = mode;
             var suffix = Guid.NewGuid().ToString("N");
@@ -884,6 +907,14 @@ namespace AqualLifeStyle.Tests.Application
                     JsonSerializer.SerializeToElement(YocoCheckoutMetadata.AQGreenJoiningPurpose)
             };
             notification.Mode = mode; notification.EventType = eventType;
+            if(retired)
+            {
+                await UsingDbContextAsync(1,async context=>
+                {var p=await context.EntryParticipations.SingleAsync(p=>p.Id==persisted.ParticipationId);p.IsDeleted=true;p.DeletionTime=DateTime.UtcNow;await context.SaveChangesAsync();});
+                var (x,e)=AQGreenCleanStartCommissioningTests.Create();AQGreenCleanStartCommissioningTests.OwnerAttest(e);AQGreenCleanStartCommissioningTests.Sign(x,e);
+                var source=Substitute.For<IAQGreenD10CommissioningSource>();source.Read().Returns(AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,e));
+                LocalIocManager.IocContainer.Register(Component.For<IAQGreenD10CommissioningSource>().Instance(source).Named("retired-payment-"+suffix).IsDefault());
+            }
             var processor = Resolve<YocoPaymentNotificationProcessor>();
 
             var mismatchedMerchantReference = CreateNotification(
@@ -945,9 +976,9 @@ namespace AqualLifeStyle.Tests.Application
 
             await UsingDbContextAsync(1, async context =>
             {
-                var participation = await context.EntryParticipations.SingleAsync(
+                var participation = await context.EntryParticipations.IgnoreQueryFilters().SingleAsync(
                     item => item.Id == persisted.ParticipationId);
-                participation.Status.ShouldBe(EntryParticipationStatus.PaymentConfirmedAwaitingApproval);
+                participation.Status.ShouldBe(retired?persisted.OriginalParticipationStatus:EntryParticipationStatus.PaymentConfirmedAwaitingApproval);
                 (await context.MemberPayments.CountAsync(payment =>
                     payment.ExternalReference == notification.PaymentId)).ShouldBe(1);
                 var receipt = await context.YocoWebhookReceipts.SingleAsync();
@@ -957,6 +988,15 @@ namespace AqualLifeStyle.Tests.Application
                 receipt.CheckoutReferenceId.ShouldBe(persisted.CheckoutId);
                 var payment = await context.MemberPayments.SingleAsync(item =>
                     item.ExternalReference == notification.PaymentId);
+                if(retired)
+                {
+                    participation.IsDeleted.ShouldBeTrue();participation.JoiningPaymentId.ShouldBeNull();
+                    (await context.AQGreenJoiningCheckouts.SingleAsync(c=>c.Id==persisted.CheckoutId)).PaymentId.ShouldBe(payment.Id);
+                    (await context.TransactionalEmailOutboxMessages.CountAsync()).ShouldBe(0);
+                    (await context.EntryWeeklyCommissions.CountAsync()).ShouldBe(0);
+                    (await context.AQGreenNetworkPlacements.CountAsync()).ShouldBe(0);
+                    return;
+                }
                 (await context.TransactionalEmailOutboxMessages.CountAsync(message =>
                     message.IdempotencyKey == $"payment-confirmed:{payment.Id}" &&
                     message.NotificationType == "PaymentConfirmation")).ShouldBe(1);

@@ -40,11 +40,11 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             var state = await File.ReadAllTextAsync(Path.Combine(Operations, "state.sql"));
             var checks = await File.ReadAllTextAsync(Path.Combine(Operations, "preflight-checks.sql"));
             var start = state.IndexOf("WITH settings AS (", StringComparison.Ordinal);
-            var end = state.IndexOf("SELECT set_config('aqua.clean_start.observed_state'", StringComparison.Ordinal);
+            var end = state.IndexOf("\n, payment_evidence AS (", StringComparison.Ordinal);
             var checkStart = checks.IndexOf("WITH settings AS (", StringComparison.Ordinal);
             var checkEnd = checks.IndexOf(", verdict AS (", StringComparison.Ordinal);
             checks.Substring(checkStart, checkEnd - checkStart).Trim().ShouldBe(state.Substring(start, end - start).Trim());
-            AQGreenB6CanonicalEvidence.Hash(Encoding.UTF8.GetBytes(state)).ShouldBe("db3d36ac23172c2005aa6edd202ea6f9cb6b4635c75c1bdbd2889f47571fd100");
+            AQGreenB6CanonicalEvidence.Hash(Encoding.UTF8.GetBytes(state)).ShouldBe("f3cd2d6b9248bbb1bf098cc721b98b5a025f0c9f015c97316b1886f80e27f138");
             await using var lease = await _fixture.CreateDatabaseAsync();
             await using var c = new NpgsqlConnection(lease.ConnectionString()); await c.OpenAsync();
             await using var context = _fixture.CreateDbContext(c);

@@ -62,9 +62,40 @@ WITH settings AS (
     (c."EntryParticipationId" IN (SELECT "Id" FROM p) OR c."CreationTime"<s.boundary) AND
     (r."Id" IS NULL OR r."TenantId"<>s.tenant OR r."PeriodEnd">=s.boundary)) AS invalid
 )
+
+, payment_evidence AS (
+ SELECT encode(sha256(convert_to(jsonb_build_object(
+  'payments',(SELECT coalesce(jsonb_agg(to_jsonb(m) ORDER BY m."Id"),'[]') FROM public."MemberPayments" m, settings s WHERE m."TenantId"=s.tenant AND
+    (m."CustomerId" IN (SELECT "CustomerId" FROM p) OR m."Purpose" IN (0,1,3,4,7) AND m."InitiatedAt"<s.boundary)),
+  'receipts',(SELECT coalesce(jsonb_agg(to_jsonb(y) ORDER BY y."Id"),'[]') FROM public."YocoWebhookReceipts" y, settings s WHERE y."TenantId"=s.tenant AND y."Programme"=0 AND y."ProcessedAt"<s.boundary),
+  'joining',(SELECT coalesce(jsonb_agg(to_jsonb(c) ORDER BY c."Id"),'[]') FROM public."AQGreenJoiningCheckouts" c, settings s WHERE c."TenantId"=s.tenant AND (c."CustomerId" IN (SELECT "CustomerId" FROM p) OR c."CreatedAt"<s.boundary)),
+  'monthly',(SELECT coalesce(jsonb_agg(to_jsonb(c) ORDER BY c."Id"),'[]') FROM public."AQGreenMonthlyObligationCheckouts" c, settings s WHERE c."TenantId"=s.tenant AND (c."CustomerId" IN (SELECT "CustomerId" FROM p) OR c."CreatedAt"<s.boundary)),
+  'participationReferences',(SELECT coalesce(jsonb_agg(jsonb_build_object('id',"Id",'joining',"JoiningPaymentId",'registration',"RegistrationPaymentId",'activation',"ActivationPaymentId") ORDER BY "Id"),'[]') FROM p)
+ )::text,'UTF8')),'hex') AS historical_digest,
+ encode(sha256(convert_to(jsonb_build_object(
+  'payments',(SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY "Id"),'[]') FROM public."MemberPayments" t, settings s WHERE t."TenantId"=s.tenant),
+  'receipts',(SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY "Id"),'[]') FROM public."YocoWebhookReceipts" t, settings s WHERE t."TenantId"=s.tenant),
+  'joining',(SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY "Id"),'[]') FROM public."AQGreenJoiningCheckouts" t, settings s WHERE t."TenantId"=s.tenant),
+  'monthlyCheckouts',(SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY "Id"),'[]') FROM public."AQGreenMonthlyObligationCheckouts" t, settings s WHERE t."TenantId"=s.tenant),
+  'commissions',(SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY "Id"),'[]') FROM public."EntryWeeklyCommissions" t, settings s WHERE t."TenantId"=s.tenant),
+  'loans',(SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY "Id"),'[]') FROM public."OnyxLoanAgreements" t, settings s WHERE t."TenantId"=s.tenant),
+  'graduations',(SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY "Id"),'[]') FROM public."OnyxGraduationDecisions" t, settings s WHERE t."TenantId"=s.tenant),
+  'obligations',(SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY "Id"),'[]') FROM public."EntryMonthlyObligations" t, settings s WHERE t."TenantId"=s.tenant)
+ )::text,'UTF8')),'hex') AS tenant_financial_digest,
+ encode(sha256(convert_to((SELECT coalesce(string_agg(encode(sha256(convert_to(to_jsonb(a)::text,'UTF8')),'hex'),'' ORDER BY a."Id"),'') FROM public."AbpAuditLogs" a, settings s WHERE a."TenantId"=s.tenant),'UTF8')),'hex') AS audit_digest
+)
 SELECT set_config('aqua.clean_start.observed_state',jsonb_build_object(
+ 'participationFactsDigest',encode(sha256(convert_to((SELECT coalesce(jsonb_agg(to_jsonb(p)-'IsDeleted'-'DeletionTime' ORDER BY "Id"),'[]') FROM p)::text,'UTF8')),'hex'),
  'populationCount',population,'archivedCount',archived,'placementCount',placements,
  'legacyMembershipCount',memberships,'unclassifiedMembershipCount',unclassified,
+ 'paymentEvidenceDigest',(SELECT historical_digest FROM payment_evidence),
+ 'tenantFinancialRecordsDigest',(SELECT tenant_financial_digest FROM payment_evidence),
+ 'auditHistoryDigest',(SELECT audit_digest FROM payment_evidence),
+ 'paymentAdmissionMode',(SELECT a."ReturnValue"::jsonb->'receipt'->>'paymentAdmissionMode' FROM reset_log a ORDER BY a."Id" DESC LIMIT 1),
+ 'ownerTestOnlyAttestationDigest',(SELECT a."ReturnValue"::jsonb->'receipt'->>'ownerTestOnlyAttestationDigest' FROM reset_log a ORDER BY a."Id" DESC LIMIT 1),
+ 'resetPaymentEvidenceDigest',(SELECT a."ReturnValue"::jsonb->'receipt'->>'paymentEvidenceDigest' FROM reset_log a ORDER BY a."Id" DESC LIMIT 1),
+ 'resetTenantFinancialRecordsDigest',(SELECT a."ReturnValue"::jsonb->'receipt'->>'tenantFinancialRecordsDigest' FROM reset_log a ORDER BY a."Id" DESC LIMIT 1),
+ 'resetProtectedPaymentCount',(SELECT a."ReturnValue"::jsonb->'receipt'->'protectedPaymentCount' FROM reset_log a ORDER BY a."Id" DESC LIMIT 1),
  'protectedPaymentCount',payments,'realCommissionCount',real_commissions,'loanCount',loans,
  'graduationCount',graduations,'monthlyObligationCount',obligations,'payoutCount',payouts,
  'orphanTopologyCount',orphans,'invalidParticipationCount',invalid,

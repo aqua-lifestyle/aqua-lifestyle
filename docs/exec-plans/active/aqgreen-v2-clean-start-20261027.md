@@ -214,3 +214,37 @@ Focused launcher validation: 17 passed, zero failed/skipped. The existing .NET C
 wrapper now requires all 17 instead of 11; its exact zero-failure/skip assertions
 remain. Independent acceptance and fresh production authorization are pending;
 there has been no production retry, reset, migration, deployment or new resource.
+
+## Current owner directive: owner-attested test-only retirement
+
+The latest explicit owner instruction supersedes the requirement to independently
+classify the four payment groups before implementing the clean start. The owner
+formally classifies the old AQGreen cohort as TEST DATA. Record that declaration
+as OWNER_ATTESTED_TEST_ONLY_V1, with provider test/live classification explicitly
+unverified. Do not invent independent financial verification or repeat that request.
+
+Production evidence already obtained: the 13:05 UTC read-only diagnostic completed;
+payments alone failed, through MemberPayments, Yoco receipts, joining checkouts and
+participation payment references. All nine other original exposure guards passed.
+No production reset, DDL or deployment is authorized by the new direction.
+
+Implementation scope: source-bound owner attestation; unchanged nine guards;
+before/after financial and audit conservation; soft-retire old participations and
+AQGreen membership assignments while retaining all source relationships; no old
+cohort commissions/payouts; preserve late verified payment evidence in a held
+historical path without activation; keep new-payment/approval integrity; bind the
+same evidence through reset, D10 and the existing executor. Migration 55 SQL stays
+unchanged. Validate using existing PostgreSQL/application/executor tests and prepare
+one coordinated, human-authorized cutover proposal. The unexecuted protected
+payment-review draft and earlier diagnostic artifacts remain preserved, not reused
+as invented provider clearance. No additional infrastructure or Python.
+
+Targeted validation: initial backend run 196 passed, zero failed/skipped; final
+PostgreSQL 18.4 application flow passed with its execution marker and no skips.
+The last preservation expansion exposed a whitespace error in the synthetic
+trigger fixture (BEGIN concatenated with UPDATE/NEW); only the test fixture was
+corrected, without weakening assertions or changing release SQL. The corrected
+rollback cases and final source-bound CI must pass before release qualification.
+The executor's missing existing pg dependency was restored from its unchanged
+lockfile; real PostgreSQL replay/concurrency then passed all three focused cases.
+No new dependency, production query, mutation, resource or human approval resulted.

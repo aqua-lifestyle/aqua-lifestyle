@@ -225,7 +225,7 @@ namespace AqualLifeStyle.Domain.AQGreen
                 a.B6AppliedReconciliationEvidenceDigest == null && a.FinalManifestDigest == null,
                 "D10_CLEAN_START_MUST_NOT_CLAIM_B6_HISTORY");
             Require(e.NoGenuineMembershipsInResetScope == true && e.AutomaticPayoutsDisabled == true &&
-                e.State != null && e.State.HasNoProtectedExposure() && e.State.PopulationCount >= 0 &&
+                e.State != null && e.AdmitsPreservedState(e.State) && e.State.PopulationCount >= 0 &&
                 e.State.ArchivedCount == e.State.PopulationCount && e.State.PlacementCount == 0 &&
                 e.State.LegacyMembershipCount == 0, "D10_CLEAN_START_PROTECTED_EXPOSURE");
             Require(e.State.ResetAtUtc?.UtcDateTime == e.ResetAtUtc &&
@@ -253,6 +253,12 @@ namespace AqualLifeStyle.Domain.AQGreen
         }
 
         public void EnsureCurrent(DateTime nowUtc) => Require(Utc(nowUtc) && nowUtc <= _expiresAt, "D10_AUTHORITY_EXPIRED");
+        public bool IsRetiredCleanStartParticipation(AqualLifeStyle.Domain.Onyx.EntryParticipation participant)
+        {
+            if (_cleanStart == null || participant == null || !participant.IsDeleted) return false;
+            var decision = Decision;
+            return participant.TenantId == decision.TenantId && participant.StartedAt < decision.V2EffectiveAtUtc;
+        }
         public void EnsureConfiguration(IConfiguration configuration)
         {
             if (CleanStartEvidence != null)

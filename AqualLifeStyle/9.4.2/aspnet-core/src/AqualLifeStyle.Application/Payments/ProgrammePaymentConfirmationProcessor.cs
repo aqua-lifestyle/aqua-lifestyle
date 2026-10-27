@@ -16,6 +16,7 @@ using AqualLifeStyle.Payments.Yoco;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using AqualLifeStyle.Configuration;
+using AqualLifeStyle.Domain.AQGreen;
 
 namespace AqualLifeStyle.Payments
 {
@@ -33,6 +34,7 @@ namespace AqualLifeStyle.Payments
         public bool WasAlreadyProcessed { get; }
         public bool AwaitingAdministrativeApproval { get; }
         public bool AllocationReconciliationRequired { get; }
+        public bool HistoricalPaymentHeld { get; }
 
         public ProgrammePaymentConfirmationResult(
             Guid paymentId,
@@ -40,7 +42,8 @@ namespace AqualLifeStyle.Payments
             ProgrammeParticipationKind participationKind,
             bool wasAlreadyProcessed,
             bool awaitingAdministrativeApproval = false,
-            bool allocationReconciliationRequired = false)
+            bool allocationReconciliationRequired = false,
+            bool historicalPaymentHeld = false)
         {
             PaymentId = paymentId;
             ParticipationId = participationId;
@@ -48,6 +51,7 @@ namespace AqualLifeStyle.Payments
             WasAlreadyProcessed = wasAlreadyProcessed;
             AwaitingAdministrativeApproval = awaitingAdministrativeApproval;
             AllocationReconciliationRequired = allocationReconciliationRequired;
+            HistoricalPaymentHeld = historicalPaymentHeld;
         }
     }
 
@@ -62,6 +66,7 @@ namespace AqualLifeStyle.Payments
     /// </remarks>
     public class ProgrammePaymentConfirmationProcessor : ITransientDependency
     {
+        public IAQGreenD10CommissioningSource D10Source { get; set; } = UncommissionedAQGreenD10Source.Instance;
         private readonly IRepository<MemberPayment, Guid> _paymentRepository;
         private readonly IRepository<EntryParticipation, Guid> _entryParticipationRepository;
         private readonly IRepository<OnyxParticipation, Guid> _onyxParticipationRepository;
@@ -468,6 +473,13 @@ namespace AqualLifeStyle.Payments
                 // both locks have been acquired.
                 checkout = await _aqGreenJoiningCheckoutRepository.GetAsync(checkout.Id);
 
+                // Resolve the retained source row with an explicit Tenant bound.
+                // A retired cohort may retain new verified provider facts, but
+                // can never be reactivated or fed into prospective commissions.
+                var participation = await _entryParticipationRepository.GetAll().IgnoreQueryFilters()
+                    .SingleOrDefaultAsync(p => p.Id == checkout.ParticipationId && p.TenantId == checkout.TenantId);
+                var historicalHeld = D10Source.Read()?.IsRetiredCleanStartParticipation(participation) == true;
+
                 if (checkout.Status == HostedPaymentCheckoutStatus.Completed)
                 {
                     if (!checkout.PaymentId.HasValue)
@@ -488,7 +500,7 @@ namespace AqualLifeStyle.Payments
                         existing.Id,
                         checkout.ParticipationId,
                         ProgrammeParticipationKind.Entry,
-                        true);
+                        true, historicalPaymentHeld: historicalHeld);
                 }
 
                 EnsureCheckoutPaymentFacts(
@@ -497,10 +509,9 @@ namespace AqualLifeStyle.Payments
                     amount,
                     currency,
                     "AQGreen");
-                var participation = await _entryParticipationRepository.GetAsync(
-                    checkout.ParticipationId);
-                if (participation.CustomerId != checkout.CustomerId ||
-                    participation.Status == EntryParticipationStatus.Active)
+                if (participation == null || participation.CustomerId != checkout.CustomerId ||
+                    participation.IsDeleted && !historicalHeld ||
+                    !historicalHeld && participation.Status == EntryParticipationStatus.Active)
                     throw new InvalidOperationException(
                         "The AQGreen checkout no longer matches an awaiting participation.");
 
@@ -538,6 +549,14 @@ namespace AqualLifeStyle.Payments
                 {
                     EnsureMatchingPaymentFacts(existingPayment, candidate);
                     existingPayment.Confirm(confirmedAt);
+                }
+
+                if (historicalHeld)
+                {
+                    checkout.Complete(payment.Id, confirmedAt);
+                    await _unitOfWorkManager.Current.SaveChangesAsync();
+                    return new ProgrammePaymentConfirmationResult(payment.Id, participation.Id,
+                        ProgrammeParticipationKind.Entry, wasAlreadyProcessed, historicalPaymentHeld: true);
                 }
 
                 if (!participation.JoiningPaymentSchedule.HasValue &&
@@ -784,6 +803,17 @@ namespace AqualLifeStyle.Payments
                     await _paymentRepository.InsertAsync(candidate);
                 }
 
+                if (confirmation.Purpose != MemberPaymentPurpose.OnyxDirectEntry)
+                {
+                    var historical = await _entryParticipationRepository.GetAll().IgnoreQueryFilters().SingleOrDefaultAsync(p =>
+                        p.Id == participationId && p.TenantId == confirmation.TenantId);
+                    if (D10Source.Read()?.IsRetiredCleanStartParticipation(historical) == true)
+                    {
+                        await _unitOfWorkManager.Current.SaveChangesAsync();
+                        return new ProgrammePaymentConfirmationResult(payment.Id, historical.Id,
+                            ProgrammeParticipationKind.Entry, wasAlreadyProcessed, historicalPaymentHeld: true);
+                    }
+                }
                 var participation = await ApplyToParticipationAsync(payment);
                 if (participation.IsAwaitingApproval)
                 {
@@ -822,12 +852,12 @@ namespace AqualLifeStyle.Payments
                 return onyx.Id;
             }
 
-            var entry = await _entryParticipationRepository.GetAll()
+            var entry = await _entryParticipationRepository.GetAll().IgnoreQueryFilters()
                 .AsNoTracking()
                 .SingleOrDefaultAsync(participation =>
                     participation.TenantId == tenantId &&
                     participation.CustomerId == customerId);
-            if (entry == null)
+            if (entry == null || entry.IsDeleted && D10Source.Read()?.IsRetiredCleanStartParticipation(entry) != true)
                 throw new UserFriendlyException(
                     "No AQGreen participation was found for this customer.");
             return entry.Id;

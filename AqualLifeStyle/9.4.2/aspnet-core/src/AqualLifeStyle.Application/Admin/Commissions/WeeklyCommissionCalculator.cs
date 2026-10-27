@@ -66,6 +66,7 @@ namespace AqualLifeStyle.Application.Admin.Commissions
             = AqualLifeStyle.Domain.AQGreen.DisabledAQGreenPilotMode.Instance;
         public IAQGreenDemoCalculationMode DemoCalculationMode { get; set; }
             = DisabledAQGreenDemoCalculationMode.Instance;
+        public IAQGreenD10CommissioningSource D10Source { get; set; } = UncommissionedAQGreenD10Source.Instance;
         private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
 
         public WeeklyCommissionCalculator(
@@ -171,6 +172,12 @@ namespace AqualLifeStyle.Application.Admin.Commissions
                          participation.ActivatedAt <= closedWeek.PeriodEndUtc))
                     .ToListAsync();
             }
+            // The verified CLEAN_START baseline retires its exact pre-boundary
+            // cohort. Keep all other deleted/effective-history failures intact.
+            var cleanStart = D10Source.Read();
+            if (cleanStart?.CleanStartEvidence != null)
+                networkParticipations = networkParticipations
+                    .Where(p => !cleanStart.IsRetiredCleanStartParticipation(p)).ToList();
             EnsureNoDeletedParticipationEvidence(networkParticipations, "AQGreen");
             var targetParticipations = networkParticipations;
             var targetParticipationIds = targetParticipations

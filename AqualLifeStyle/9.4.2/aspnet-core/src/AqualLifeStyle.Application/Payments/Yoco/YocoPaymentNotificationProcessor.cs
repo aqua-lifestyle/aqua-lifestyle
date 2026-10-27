@@ -259,6 +259,14 @@ namespace AqualLifeStyle.Payments.Yoco
             ProgrammePaymentConfirmationResult confirmation,
             YocoCheckoutProgramme programme)
         {
+            if (confirmation.HistoricalPaymentHeld)
+            {
+                // The immutable provider receipt and retained checkout/payment
+                // relationships are the durable evidence. Never invite approval
+                // or emit private transaction identifiers into ordinary logs.
+                _logger.LogWarning("Retired AQGreen payment evidence retained; operational reconciliation required; activation and payouts remain held.");
+                return;
+            }
             if (confirmation.AllocationReconciliationRequired)
             {
                 _logger.LogError(

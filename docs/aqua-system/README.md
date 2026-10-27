@@ -31,6 +31,10 @@ for disposable AQGreen test activity, subject to proof that genuine membership a
 financial obligations remain protected. The [clean-start execution package](../operations/aqgreen-v2-clean-start/README.md)
 defines its separate reset/D10/release admission and outstanding production gates.
 It does not assert historical B6 acceptance or authorize production operations.
+The later [owner-attested test-only decision](../operations/aqgreen-v2-clean-start/owner-attested-test-only-decision.md)
+permits retained payment evidence under an explicit retirement admission branch.
+Provider mode remains unverified; all nine other guards and final operational
+authorizations remain mandatory.
 
 The documents have different jobs:
 

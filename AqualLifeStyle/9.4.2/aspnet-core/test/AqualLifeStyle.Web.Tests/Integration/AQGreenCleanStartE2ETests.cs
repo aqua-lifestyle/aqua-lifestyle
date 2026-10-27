@@ -8,6 +8,8 @@ using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Application.ProgrammeParticipations.Dto;
 using AqualLifeStyle.Application.Recruitment;
 using AqualLifeStyle.Domain.AQGreen;
+using AqualLifeStyle.Domain.Onyx;
+using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Tests.WebHost;
 using Castle.MicroKernel.Registration;
@@ -30,28 +32,55 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 on a.AreaId equals r.Id where a.TenantId==1 && a.UserId==AbpSession.UserId && !a.RevokedAt.HasValue && r.IsActive select r.Id).FirstAsync());
             var root=await SeedLeanMemberIdentityAsync(area,"clean-start-root");
             var (x,clean)=AQGreenCleanStartCommissioningTests.Create();var config=AQGreenD10SyntheticEvidence.Configuration();
+            AQGreenCleanStartCommissioningTests.OwnerAttest(clean);
             config["App:FinancialOperations:Enabled"]="true";
             config["App:BackgroundJobs:Enabled"]="false";
             x.Decision.RequiredConfigurationDigest=AQGreenD10Commissioning.ConfigurationDigest(config);
             x.Decision.CleanStartRootCustomerId=root.CustomerId;x.Decision.AuthorizedAreaIds=new[]{area};
+            var historical=await SeedLeanMemberIdentityAsync(area,"owner-attested-retired");
+            var oldPaymentId=await UsingDbContextAsync(async c=>
+            {
+                var started=x.Decision.V2EffectiveAtUtc.AddDays(-3);
+                var terms=EntryProgrammeTerms.CreateSingleJoiningPayment("synthetic-owner-retirement",started.AddDays(-1),1200,600,7);
+                var p=EntryParticipation.StartIndependently(1,historical.CustomerId,terms,started);
+                var payment=MemberPayment.CreatePending(1,historical.CustomerId,MemberPaymentPurpose.AQGreenJoining,1200,"YOCO","SYNTHETIC-RETIRED-PAYMENT",started);
+                payment.Confirm(started.AddMinutes(1));p.ApplyConfirmedJoiningPayment(payment);p.ApproveByAdministrator(AbpSession.UserId.Value,started.AddMinutes(2));
+                p.IsDeleted=true;p.DeletionTime=clean.ResetAtUtc;
+                var checkout=AQGreenJoiningCheckout.Create(1,p.Id,historical.CustomerId,AQGreenJoiningPaymentSchedule.Full,AQGreenJoiningPaymentStage.Full,1200,"ZAR",started);
+                checkout.RecordCheckout("SYNTHETIC-RETIRED-CHECKOUT","https://payments.example.test/retired",started);checkout.Complete(payment.Id,started.AddMinutes(1));
+                c.EntryParticipations.Add(p);c.MemberPayments.Add(payment);c.AQGreenJoiningCheckouts.Add(checkout);
+                c.YocoWebhookReceipts.Add(YocoWebhookReceipt.Record(1,"SYNTHETIC-RETIRED-EVENT",payment.ExternalReference,checkout.ProviderCheckoutId,
+                    AQGreenD10SyntheticEvidence.Hash("synthetic-payload"),YocoCheckoutProgramme.AQGreen,checkout.Id,started.AddMinutes(1)));
+                await c.SaveChangesAsync();return payment.Id;
+            });
+            AQGreenCleanStartState retained;
+            using(var uow=Resolve<IUnitOfWorkManager>().Begin(new UnitOfWorkOptions{Scope=TransactionScopeOption.RequiresNew,IsTransactional=true,IsolationLevel=IsolationLevel.RepeatableRead}))
+            {var reader=Resolve<IAQGreenReconciliationEvidenceSnapshot>();await reader.CaptureAsync();retained=await reader.CaptureCleanStartAsync(1,x.Decision.V2EffectiveAtUtc,clean.ResetId);await uow.CompleteAsync();}
+            retained.ProtectedPaymentCount.ShouldBe(4);
             // A test-only durable marker models the committed operator receipt.
+            // The actual reset SQL and conservation checks execute separately on PG18.4.
             await UsingDbContextAsync(async c=>await c.Database.ExecuteSqlRawAsync("""
                 WITH undo AS (SELECT jsonb_build_object() AS value), receipt AS
                 (SELECT jsonb_build_object('resetId','SYNTHETIC-CLEAN-START','undoDigest',encode(sha256(convert_to(value::text,'UTF8')),'hex'),
                   'resetAt',{0}::timestamptz,'boundary',{1}::timestamptz,
+                  'paymentAdmissionMode','OWNER_ATTESTED_TEST_ONLY_V1','ownerTestOnlyAttestationDigest',{2}::text,
+                  'providerModeVerification','NOT_INDEPENDENTLY_VERIFIED','paymentEvidenceDigest',{3}::text,
+                  'tenantFinancialRecordsDigest',{4}::text,'protectedPaymentCount',{5}::bigint,
                   'databaseIdentity',(SELECT encode(sha256(convert_to(system_identifier::text||'|'||current_database()||'|'||
                     (SELECT oid::text FROM pg_database WHERE datname=current_database()),'UTF8')),'hex') FROM pg_control_system())) AS value FROM undo)
                 INSERT INTO "AbpAuditLogs"("TenantId","ServiceName","MethodName","Parameters","ReturnValue","ExecutionTime","ExecutionDuration")
                 SELECT 1,'AQGreen.CleanStart','ArchiveDisposableTests',jsonb_build_object('resetId','SYNTHETIC-CLEAN-START',
                   'receiptDigest',encode(sha256(convert_to(receipt.value::text,'UTF8')),'hex'))::text,
                   jsonb_build_object('receipt',receipt.value,'undo',undo.value)::text,{0},0 FROM undo,receipt
-                """,clean.ResetAtUtc,x.Decision.V2EffectiveAtUtc));
+                """,clean.ResetAtUtc,x.Decision.V2EffectiveAtUtc,clean.OwnerTestOnlyAttestationDigest,retained.PaymentEvidenceDigest,retained.TenantFinancialRecordsDigest,retained.ProtectedPaymentCount.Value));
             using(var uow=Resolve<IUnitOfWorkManager>().Begin(new UnitOfWorkOptions{Scope=TransactionScopeOption.RequiresNew,
                 IsTransactional=true,IsolationLevel=IsolationLevel.RepeatableRead}))
             {
                 var reader=Resolve<IAQGreenReconciliationEvidenceSnapshot>();var boundary=await reader.CaptureAsync();
                 clean.State=await reader.CaptureCleanStartAsync(1,x.Decision.V2EffectiveAtUtc,clean.ResetId);
-                clean.State.PopulationCount.ShouldBe(0);clean.State.HasNoProtectedExposure().ShouldBeTrue();
+                clean.State.PopulationCount.ShouldBe(1);clean.State.ArchivedCount.ShouldBe(1);clean.State.ProtectedPaymentCount.ShouldBe(4);
+                clean.HistoricalFinancialRecordsDigest=clean.State.ResetTenantFinancialRecordsDigest;
+                clean.AdmitsPreservedState(clean.State).ShouldBeTrue();
                 clean.DatabaseIdentityDigest=x.Decision.RequiredDatabaseIdentityDigest=boundary.SourceDatabaseIdentityEvidence;
                 clean.SchemaDigest=x.Decision.RequiredSchemaDigest=boundary.SourceSchemaVersion;
                 x.Decision.RequiredAssemblyDigest=boundary.SourceAssemblyDigest;
@@ -103,13 +132,23 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 (await c.EntryWeeklyCommissions.CountAsync()).ShouldBe(0);
             });
             await runtime.VerifyStartupAsync();source.Current.FinancialWorkersCommissioned.ShouldBeFalse();
+            (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.ForTenantAsync(1,false,x.Decision.V2EffectiveAtUtc.AddTicks(-1))))
+                .Message.ShouldBe("D10_CLEAN_START_HISTORICAL_FINANCIAL_REPLAY_HELD");
+            await UsingDbContextAsync(async c=>
+            {
+                var old=await c.EntryParticipations.IgnoreQueryFilters().SingleAsync(p=>p.CustomerId==historical.CustomerId && p.TenantId==1);
+                old.IsDeleted.ShouldBeTrue();old.JoiningPaymentId.ShouldBe(oldPaymentId);
+                (await c.MemberPayments.SingleAsync(p=>p.Id==oldPaymentId)).ExternalReference.ShouldBe("SYNTHETIC-RETIRED-PAYMENT");
+                (await c.YocoWebhookReceipts.CountAsync(r=>r.EventId=="SYNTHETIC-RETIRED-EVENT")).ShouldBe(1);
+                (await c.AQGreenJoiningCheckouts.SingleAsync(p=>p.ProviderCheckoutId=="SYNTHETIC-RETIRED-CHECKOUT")).PaymentId.ShouldBe(oldPaymentId);
+            });
             File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("REPRO_MARKER_DIR"),"clean-start-commissioning.ran"),
-                "PostgreSQL: empty CLEAN_START, protected root authority, ordinary payment/approval, six invitations, spillover, retries; no real provider or automatic payouts.");
+                "PostgreSQL: owner-attested historical payment retention, empty active CLEAN_START, protected root authority, ordinary payment/approval, six invitations, spillover, retries; no real provider or automatic payouts.");
         }
 
         private async Task AssertAwaitingApprovalOrPaymentAsync(Guid id) => await UsingDbContextAsync(async c=>
         { var p=await c.EntryParticipations.SingleAsync(p=>p.Id==id);p.Status.ShouldNotBe(AqualLifeStyle.Domain.Onyx.EntryParticipationStatus.Active);
-            (await c.AQGreenNetworkPlacements.CountAsync()).ShouldBe(0);(await c.MemberPayments.CountAsync()).ShouldBe(0); });
+            (await c.AQGreenNetworkPlacements.CountAsync()).ShouldBe(0);(await c.MemberPayments.CountAsync(m=>m.CustomerId==p.CustomerId)).ShouldBe(0); });
         private sealed class CleanStartTestSource : IAQGreenD10CommissioningSource
         { public AQGreenD10Commissioning Current;public AQGreenD10Commissioning Read()=>Current; }
     }

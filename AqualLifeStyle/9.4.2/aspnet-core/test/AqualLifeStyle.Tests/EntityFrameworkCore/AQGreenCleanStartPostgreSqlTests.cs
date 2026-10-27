@@ -60,7 +60,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await tx.RollbackAsync();return state;
         }
         private static async Task<(int Code,string Output)> ResetAsync(NpgsqlConnection c,AQGreenCleanStartState state,string owner=null,
-            string operation="reset.sql")
+            string operation="reset.sql",bool ownerAttested=false,string attestation=null)
         {
             var identity=(string)await SqlAsync(c,"SELECT encode(sha256(convert_to(system_identifier::text||'|'||current_database()||'|'||"+
                 "(SELECT oid::text FROM pg_database WHERE datname=current_database()),'UTF8')),'hex') FROM pg_control_system()");
@@ -81,6 +81,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 ("classification_digest",Hash),("independent_acceptance_digest",Hash),("owner_reset_authorization_digest",owner??Hash),
                 ("recovery_evidence_digest",Hash),("reset_sql_digest",Hash),("no_genuine_memberships","true"),("write_fence_evidence_digest",Hash),
                 ("owner_undo_authorization_digest",Hash),("expected_archive_digest",state.ArchiveDigest),
+                ("payment_admission_mode",ownerAttested?AQGreenCleanStartEvidence.OwnerAttestedTestOnly:AQGreenCleanStartEvidence.ZeroPaymentExposure),
+                ("owner_test_only_attestation_digest",ownerAttested?attestation??Hash:""),
                 ("valid_from_utc",DateTime.UtcNow.AddMinutes(-5).ToString("O")),("valid_until_utc",DateTime.UtcNow.AddMinutes(5).ToString("O"))})
                 start.ArgumentList.Add("--set="+pair.Item1+"="+pair.Item2);
             using var process=Process.Start(start);var stdout=process.StandardOutput.ReadToEndAsync();var stderr=process.StandardError.ReadToEndAsync();
@@ -93,6 +95,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
               'otherCustomerMemberships',(SELECT jsonb_agg(to_jsonb(t) ORDER BY "Id") FROM "Customers" t WHERE "TenantId"<>1),
               'payments',(SELECT jsonb_agg(to_jsonb(t) ORDER BY "Id") FROM "MemberPayments" t),
               'receipts',(SELECT jsonb_agg(to_jsonb(t) ORDER BY "Id") FROM "YocoWebhookReceipts" t),
+              'joining',(SELECT jsonb_agg(to_jsonb(t) ORDER BY "Id") FROM "AQGreenJoiningCheckouts" t),
+              'monthly',(SELECT jsonb_agg(to_jsonb(t) ORDER BY "Id") FROM "AQGreenMonthlyObligationCheckouts" t),
               'otherTenant',(SELECT jsonb_agg(to_jsonb(t) ORDER BY "Id") FROM "EntryParticipations" t WHERE "TenantId"=2)
             )::text)
             """);
@@ -151,6 +155,73 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             var before=await ProtectedDigestAsync(c);var state=await StateAsync(c);state.ProtectedPaymentCount.ShouldBe(1);
             var result=await ResetAsync(c,state);result.Code.ShouldNotBe(0);result.Output.ShouldContain("CLEAN_START_PROTECTED_OR_UNCLASSIFIED_EXPOSURE");
             (await StateAsync(c)).ArchivedCount.ShouldBe(0);(await ProtectedDigestAsync(c)).ShouldBe(before);
+        }
+
+        private static async Task SeedRetainedPaymentGraphAsync(NpgsqlConnection c)
+        {
+            await SqlAsync(c,"""
+              INSERT INTO "MemberPayments"("Id","TenantId","CustomerId","Purpose","Amount","Currency","Provider","ExternalReference",
+                "Status","InitiatedAt","CreationTime","IsDeleted") VALUES
+                ('f0000000-0000-0000-0000-000000000002',1,1,7,1200,'ZAR','YOCO','SYNTHETIC-OWNER-ATTESTED-PAYMENT',1,now()-interval '1 hour',now(),false);
+              UPDATE "EntryParticipations" SET "JoiningPaymentId"='f0000000-0000-0000-0000-000000000002' WHERE "TenantId"=1 AND "CustomerId"=1;
+              """);
+            await using var context=new AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext(
+                new DbContextOptionsBuilder<AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>().UseNpgsql(c).Options);
+            var p=await context.EntryParticipations.SingleAsync(p=>p.TenantId==1 && p.CustomerId==1);
+            var checkout=AqualLifeStyle.Domain.Payments.AQGreenJoiningCheckout.Create(1,p.Id,1,
+                AqualLifeStyle.Domain.Onyx.AQGreenJoiningPaymentSchedule.Full,AqualLifeStyle.Domain.Onyx.AQGreenJoiningPaymentStage.Full,1200,"ZAR",DateTime.UtcNow.AddHours(-2));
+            checkout.RecordCheckout("SYNTHETIC-OWNER-CHECKOUT","https://payments.example.test/owner-checkout",DateTime.UtcNow.AddHours(-1));
+            checkout.Complete(Guid.Parse("f0000000-0000-0000-0000-000000000002"),DateTime.UtcNow);
+            context.AQGreenJoiningCheckouts.Add(checkout);
+            context.YocoWebhookReceipts.Add(AqualLifeStyle.Domain.Payments.YocoWebhookReceipt.Record(1,"SYNTHETIC-OWNER-EVENT",
+                "SYNTHETIC-OWNER-ATTESTED-PAYMENT",checkout.ProviderCheckoutId,Hash,AqualLifeStyle.Domain.Payments.YocoCheckoutProgramme.AQGreen,checkout.Id,DateTime.UtcNow));
+            await context.SaveChangesAsync();
+        }
+
+        [Fact]
+        public async Task OwnerAttestedRetirementPreservesAllPaymentRelationshipsAndBindsActualReceipt()
+        {
+            await using var lease=await _fixture.CreateDatabaseAsync();await using var c=new NpgsqlConnection(lease.ConnectionString());await c.OpenAsync();
+            await PrepareAsync(c);await SeedMembershipAssignmentsAsync(c);await SeedRetainedPaymentGraphAsync(c);
+            var before=await StateAsync(c);before.ProtectedPaymentCount.ShouldBe(4);var protectedBefore=await ProtectedDigestAsync(c);
+            var result=await ResetAsync(c,before,ownerAttested:true);result.Code.ShouldBe(0,result.Output);
+            var after=await StateAsync(c);after.ProtectedPaymentCount.ShouldBe(4);after.ArchivedCount.ShouldBe(after.PopulationCount);
+            after.PaymentEvidenceDigest.ShouldBe(before.PaymentEvidenceDigest);after.TenantFinancialRecordsDigest.ShouldBe(before.TenantFinancialRecordsDigest);
+            (await ProtectedDigestAsync(c)).ShouldBe(protectedBefore);after.OwnerTestOnlyAttestationDigest.ShouldBe(Hash);
+            var (x,e)=AqualLifeStyle.Tests.WebHost.AQGreenCleanStartCommissioningTests.Create();
+            x.Decision.V2EffectiveAtUtc=x.Authority.V2EffectiveAtUtc=Boundary;
+            x.Decision.AuthorizedAtUtc=x.Authority.AuthorizedAtUtc=DateTime.UtcNow;x.Authority.ExpiresAtUtc=Boundary.AddDays(1);
+            AqualLifeStyle.Tests.WebHost.AQGreenCleanStartCommissioningTests.OwnerAttest(e);
+            e.State=after;e.ResetAtUtc=after.ResetAtUtc.Value.UtcDateTime;e.OwnerTestOnlyAttestationDigest=Hash;
+            e.HistoricalFinancialRecordsDigest=after.ResetTenantFinancialRecordsDigest;
+            AqualLifeStyle.Tests.WebHost.AQGreenCleanStartCommissioningTests.Sign(x,e);
+            AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,e).CleanStartEvidence.State.ProtectedPaymentCount.ShouldBe(4);
+            ((bool)await SqlAsync(c,"SELECT EXISTS(SELECT 1 FROM \"EntryParticipations\" p JOIN \"MemberPayments\" m ON m.\"Id\"=p.\"JoiningPaymentId\" WHERE p.\"TenantId\"=1 AND p.\"IsDeleted\" AND m.\"TenantId\"=1)")).ShouldBeTrue();
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task OwnerAttestedRetirementRejectsMissingAuthorityAndFinancialMutationAndRecoveryDrift(bool participationMutation)
+        {
+            await using var lease=await _fixture.CreateDatabaseAsync();await using var c=new NpgsqlConnection(lease.ConnectionString());await c.OpenAsync();
+            await PrepareAsync(c);await SeedRetainedPaymentGraphAsync(c);var before=await StateAsync(c);var protectedBefore=await ProtectedDigestAsync(c);
+            var missing=await ResetAsync(c,before,ownerAttested:true,attestation:"");missing.Code.ShouldNotBe(0);missing.Output.ShouldContain("CLEAN_START_EXPLICIT_PAYMENT_CLASSIFICATION_REQUIRED");
+            await SqlAsync(c,"""
+              CREATE FUNCTION synthetic_financial_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
+              BEGIN
+              """+"\n"+(participationMutation?"NEW.\"GracePeriodDays\":=8;":"UPDATE \"MemberPayments\" SET \"ExternalReference\"='SYNTHETIC-UNAUTHORIZED-MUTATION' WHERE \"TenantId\"=1;")+"\n"+"""
+               RETURN NEW; END $$;
+              CREATE TRIGGER synthetic_financial_mutation BEFORE UPDATE ON "EntryParticipations" FOR EACH ROW EXECUTE FUNCTION synthetic_financial_mutation();
+              """);
+            var failed=await ResetAsync(c,before,ownerAttested:true);failed.Code.ShouldNotBe(0);failed.Output.ShouldContain("CLEAN_START_PROTECTED_FINANCIAL_OR_AUDIT_RECORD_CHANGED");
+            (await ProtectedDigestAsync(c)).ShouldBe(protectedBefore);(await StateAsync(c)).ArchivedCount.ShouldBe(0);
+            (await StateAsync(c)).SourceDigest.ShouldBe(before.SourceDigest);
+            await SqlAsync(c,"DROP TRIGGER synthetic_financial_mutation ON \"EntryParticipations\";");
+            var reset=await ResetAsync(c,before,ownerAttested:true);reset.Code.ShouldBe(0,reset.Output);var archived=await StateAsync(c);
+            await SqlAsync(c,"UPDATE \"MemberPayments\" SET \"ExternalReference\"='SYNTHETIC-LATE-FINANCIAL-FACT' WHERE \"TenantId\"=1");
+            var recovery=await ResetAsync(c,archived,operation:"restore.sql");recovery.Code.ShouldNotBe(0);recovery.Output.ShouldContain("CLEAN_START_RECOVERY_FINANCIAL_STATE_CHANGED");
+            (await StateAsync(c)).ArchivedCount.ShouldBe(archived.ArchivedCount);
         }
 
         [Fact]

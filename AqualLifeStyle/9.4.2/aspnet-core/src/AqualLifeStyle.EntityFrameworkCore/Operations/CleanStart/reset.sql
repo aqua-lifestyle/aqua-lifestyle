@@ -2,6 +2,14 @@
 -- All psql variables below come from the protected, independently accepted package.
 -- No credentials, identities or approval records belong in command arguments.
 \set ON_ERROR_STOP on
+\if :{?payment_admission_mode}
+\else
+\set payment_admission_mode ZERO_PAYMENT_EXPOSURE_V1
+\endif
+\if :{?owner_test_only_attestation_digest}
+\else
+\set owner_test_only_attestation_digest ''
+\endif
 \o /dev/null
 BEGIN ISOLATION LEVEL SERIALIZABLE READ WRITE;
 SET LOCAL statement_timeout='30s';
@@ -29,10 +37,19 @@ SELECT set_config('aqua.clean_start.tenant','1',true),
  set_config('aqua.clean_start.no_genuine_memberships',:'no_genuine_memberships',true),
  set_config('aqua.clean_start.valid_from',:'valid_from_utc',true),
  set_config('aqua.clean_start.valid_until',:'valid_until_utc',true),
- set_config('aqua.clean_start.fence',:'write_fence_evidence_digest',true);
+ set_config('aqua.clean_start.fence',:'write_fence_evidence_digest',true),
+ set_config('aqua.clean_start.payment_mode',:'payment_admission_mode',true),
+ set_config('aqua.clean_start.owner_test_attestation',:'owner_test_only_attestation_digest',true);
 DO $identity$
 DECLARE key text; actual_identity text;
 BEGIN
+ IF current_setting('aqua.clean_start.payment_mode') NOT IN ('ZERO_PAYMENT_EXPOSURE_V1','OWNER_ATTESTED_TEST_ONLY_V1') OR
+    (current_setting('aqua.clean_start.payment_mode')='OWNER_ATTESTED_TEST_ONLY_V1' AND
+     (current_setting('aqua.clean_start.owner_test_attestation') !~ '^[0-9a-f]{64}$' OR
+      current_setting('aqua.clean_start.owner_test_attestation')=repeat('0',64))) OR
+    (current_setting('aqua.clean_start.payment_mode')='ZERO_PAYMENT_EXPOSURE_V1' AND
+     current_setting('aqua.clean_start.owner_test_attestation')<>'') THEN
+  RAISE EXCEPTION 'CLEAN_START_EXPLICIT_PAYMENT_CLASSIFICATION_REQUIRED'; END IF;
  IF current_setting('aqua.clean_start.reset_id') !~ '^[A-Za-z0-9.-]{1,80}$' OR
     current_setting('aqua.clean_start.no_genuine_memberships') <> 'true' THEN
   RAISE EXCEPTION 'CLEAN_START_CLASSIFICATION_REQUIRED'; END IF;
@@ -52,6 +69,13 @@ BEGIN
  IF current_database()<>current_setting('aqua.clean_start.database') OR
     actual_identity<>current_setting('aqua.clean_start.expected_identity') THEN
   RAISE EXCEPTION 'CLEAN_START_SOURCE_IDENTITY_CHANGED'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+   WHERE n.nspname='public' AND c.relname=ANY(ARRAY['EntryParticipations','Customers','Memberships',
+    'AQGreenNetworkPlacements','AQGreenRecruitmentAttributions','MemberPayments','YocoWebhookReceipts',
+    'AQGreenJoiningCheckouts','AQGreenMonthlyObligationCheckouts','EntryWeeklyCommissions','OnyxLoanAgreements',
+    'OnyxGraduationDecisions','EntryMonthlyObligations','EntryCommissionPeriods','AbpAuditLogs','__EFMigrationsHistory'])
+    AND pg_catalog.row_security_active(c.oid)) THEN
+  RAISE EXCEPTION 'CLEAN_START_FULL_VISIBILITY_REQUIRED'; END IF;
  IF (SELECT count(*) FROM public."__EFMigrationsHistory")<>54 OR
     (SELECT max("MigrationId") FROM public."__EFMigrationsHistory")<>'20261005194901_AddIsolatedAQGreenPilotEvidence' OR
     to_regclass('public."AQGreenSalesEvidenceInvalidations"') IS NOT NULL THEN
@@ -77,11 +101,19 @@ BEGIN
   RAISE EXCEPTION 'CLEAN_START_RESET_REPLAY'; END IF;
  IF (s->>'placementCount')::bigint<>0 THEN
   RAISE EXCEPTION 'CLEAN_START_IMMUTABLE_V2_PLACEMENT_EXISTS'; END IF;
- FOREACH key IN ARRAY ARRAY['unclassifiedMembershipCount','protectedPaymentCount','realCommissionCount',
+ FOREACH key IN ARRAY ARRAY['paymentEvidenceDigest','tenantFinancialRecordsDigest','auditHistoryDigest','participationFactsDigest'] LOOP
+  IF s->>key IS NULL OR s->>key !~ '^[0-9a-f]{64}$' THEN
+   RAISE EXCEPTION 'CLEAN_START_PRESERVATION_EVIDENCE_REQUIRED'; END IF;
+ END LOOP;
+ FOREACH key IN ARRAY ARRAY['unclassifiedMembershipCount','realCommissionCount',
   'loanCount','graduationCount','monthlyObligationCount','payoutCount','orphanTopologyCount','invalidParticipationCount'] LOOP
   IF NOT s ? key OR s->key='null'::jsonb OR (s->>key)::bigint<>0 THEN
    RAISE EXCEPTION 'CLEAN_START_PROTECTED_OR_UNCLASSIFIED_EXPOSURE'; END IF;
  END LOOP;
+ IF NOT s ? 'protectedPaymentCount' OR s->'protectedPaymentCount'='null'::jsonb OR
+    (s->>'protectedPaymentCount')::bigint<0 OR
+    ((s->>'protectedPaymentCount')::bigint<>0 AND current_setting('aqua.clean_start.payment_mode')<>'OWNER_ATTESTED_TEST_ONLY_V1') THEN
+  RAISE EXCEPTION 'CLEAN_START_PROTECTED_OR_UNCLASSIFIED_EXPOSURE'; END IF;
 END $guard$;
 -- Retain only the before-images of the fields/projection this reset changes.
 -- These remain in the protected database audit journal, never in stdout/files.
@@ -113,13 +145,20 @@ UPDATE public."EntryParticipations" SET "IsDeleted"=true,
  "DeletionTime"=coalesce("DeletionTime",transaction_timestamp()) WHERE "TenantId"=1 AND NOT "IsDeleted";
 \ir state.sql
 DO $receipt$
-DECLARE s jsonb := current_setting('aqua.clean_start.observed_state')::jsonb; receipt text;
+DECLARE s jsonb := current_setting('aqua.clean_start.observed_state')::jsonb;
+ before_state jsonb := current_setting('aqua.clean_start.before')::jsonb; receipt text;
 BEGIN
  IF clock_timestamp()>current_setting('aqua.clean_start.valid_until')::timestamptz THEN
   RAISE EXCEPTION 'CLEAN_START_AUTHORIZED_WINDOW_EXPIRED'; END IF;
  IF (s->>'populationCount')::bigint<>(s->>'archivedCount')::bigint OR
     (s->>'placementCount')::bigint<>0 OR (s->>'legacyMembershipCount')::bigint<>0 THEN
   RAISE EXCEPTION 'CLEAN_START_RESET_POSTCONDITION_FAILED'; END IF;
+ IF s->>'paymentEvidenceDigest' IS DISTINCT FROM before_state->>'paymentEvidenceDigest' OR
+    s->>'tenantFinancialRecordsDigest' IS DISTINCT FROM before_state->>'tenantFinancialRecordsDigest' OR
+    s->>'auditHistoryDigest' IS DISTINCT FROM before_state->>'auditHistoryDigest' OR
+    s->>'participationFactsDigest' IS DISTINCT FROM before_state->>'participationFactsDigest' OR
+    s->'protectedPaymentCount' IS DISTINCT FROM before_state->'protectedPaymentCount' THEN
+  RAISE EXCEPTION 'CLEAN_START_PROTECTED_FINANCIAL_OR_AUDIT_RECORD_CHANGED'; END IF;
  receipt := jsonb_build_object('resetId',current_setting('aqua.clean_start.reset_id'),
   'tenantId',1,'archiveDigest',s->>'archiveDigest','archiveCount',s->'archivedCount',
   'beforeDigest',current_setting('aqua.clean_start.expected_source'),
@@ -128,6 +167,13 @@ BEGIN
   'recovery',current_setting('aqua.clean_start.recovery'),'sql',current_setting('aqua.clean_start.sql'),
   'fence',current_setting('aqua.clean_start.fence'),'boundary',current_setting('aqua.clean_start.boundary'),
   'databaseIdentity',current_setting('aqua.clean_start.expected_identity'),
+  'paymentAdmissionMode',current_setting('aqua.clean_start.payment_mode'),
+  'ownerTestOnlyAttestationDigest',nullif(current_setting('aqua.clean_start.owner_test_attestation'),''),
+  'providerModeVerification','NOT_INDEPENDENTLY_VERIFIED',
+  'protectedPaymentCount',s->'protectedPaymentCount',
+  'paymentEvidenceDigest',s->>'paymentEvidenceDigest',
+  'tenantFinancialRecordsDigest',s->>'tenantFinancialRecordsDigest',
+  'auditHistoryDigest',s->>'auditHistoryDigest',
   'resetAt',transaction_timestamp(),
   'undoDigest',encode(sha256(convert_to(current_setting('aqua.clean_start.undo'),'UTF8')),'hex'))::text;
  INSERT INTO public."AbpAuditLogs"("TenantId","ServiceName","MethodName","Parameters","ReturnValue","ExecutionTime","ExecutionDuration")
