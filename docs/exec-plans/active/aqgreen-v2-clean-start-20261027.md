@@ -193,3 +193,24 @@ dependency, paid resource, privileged host change or production query was used.
 Full details and exact executable hashes are in the existing preflight authorization
 and validation documents. Independent human amendment acceptance and new owner
 execution authorization are not fabricated by these tests or self-review.
+
+## Launcher-only diagnostic correction
+
+The one authorized status-only attempt began 2026-10-27T09:29:25.975Z and
+returned execution/overall UNKNOWN with launcher exit 1. The operator's direct
+acceptance was verified at executor PR9 comment 6438280453 before execution.
+The previous launcher discarded child diagnostics and completion time, so its
+cause is UNDETERMINED; the 34.025-second remainder does not prove cancellation.
+
+Current owner direction authorizes only a minimal launcher diagnostic amendment,
+focused local validation and existing CI, Aqua acceptance and a new window request.
+All SQL, reset/restore, D10, TLS, financial predicates and business-result semantics
+remain unchanged. Safe allowlisted failure categories, observed provider/client
+exit statuses and a completion timestamp now distinguish failed execution from a
+completed database screen with unresolved business evidence. Raw diagnostics stay
+in memory; no counts, records, secrets or arbitrary diagnostic messages are emitted.
+
+Focused launcher validation: 17 passed, zero failed/skipped. The existing .NET CI
+wrapper now requires all 17 instead of 11; its exact zero-failure/skip assertions
+remain. Independent acceptance and fresh production authorization are pending;
+there has been no production retry, reset, migration, deployment or new resource.

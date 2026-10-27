@@ -103,3 +103,41 @@ without the launcher: server TLS alone cannot prove client certificate/hostname
 verification. Financial classification and Aqua's separate clean-start acceptance
 remain required. This screen does not replace post-reset state/receipt verification
 or authorize backup, reset, migration 55, deployment, D10 or live Yoco activity.
+
+## Narrow diagnostic amendment after the authorized UNKNOWN attempt
+
+The owner authorized a launcher-only diagnostic correction after the single
+27 October 09:29:25.975 UTC attempt returned UNKNOWN. Its cause remains
+undetermined; the earlier receipt did not retain the child exit status, failure
+stage or completion time. This amendment does not establish that the deadline
+caused that failure. The approved SQL hashes and every financial check remain
+unchanged. Production use of the changed launcher requires Aqua's acceptance and
+a fresh explicit owner execution window; the earlier window has expired.
+
+The receipt adds `diagnostics.failureCategory`, an allowlisted execution `stage`,
+`launcherExitStatus` and `processExitStatuses.provider/database`, plus
+`evidence.finishedAtUtc` on unsuccessful attempts. A null child exit status means
+no exit status was observed, including an unstarted or forcibly terminated child;
+it never asserts process success. Null failureCategory means execution completed
+and its receipt validated, even when the business result remains UNKNOWN.
+
+| Failure category | Evidence represented |
+|---|---|
+| CONFIGURATION_OR_PREREQUISITES | Invalid invocation/artifacts, unavailable provider lookup or missing client/credentials |
+| DATABASE_CONNECTION_OR_TLS | PostgreSQL client exit 2: connection failure or loss; no narrower TLS cause is claimed |
+| DATABASE_IDENTITY_VERIFICATION | Rejected provider logical target or the fixed SQL source/read-only-session guard marker |
+| SQL_EXECUTION | PostgreSQL ON_ERROR_STOP exit 3 without a recognized identity/timeout marker |
+| RESULT_VALIDATION | Malformed provider/client JSON or rejected status-receipt shape/content |
+| EXECUTION_TIMEOUT_OR_WINDOW_EXPIRY | Observed deadline expiry, ETIMEDOUT, or an exact known server timeout marker |
+| UNDETERMINED | An abnormal database-client termination without evidence supporting a narrower category |
+
+Client verbosity is `terse` with the C locale so fixed identity/timeout markers
+can be recognized in memory. Provider/client error text, arbitrary error codes,
+signals, counts and rows are never emitted or written to a result file. The
+category describes the observed failed safeguard, not an inferred root cause.
+There are no retries or weaker transport settings. Database-screen PASS/FAIL/
+UNKNOWN and overall UNKNOWN pending external classification remain unchanged.
+
+For the next authorized attempt, use a fresh 15-minute UTC window and begin in
+its first minute, leaving the existing provider/client budgets inside that window.
+Do not execute during this diagnostic correction or on the expired authorization.

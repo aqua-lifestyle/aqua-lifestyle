@@ -15,13 +15,15 @@ const sqlReceipt = () => ({ contract: 'AQGreenCleanStartScreenV2', databaseScree
     testDataClassification: 'UNKNOWN', externalBusinessObligations: 'UNKNOWN' },
   sourceFingerprint: 'a'.repeat(64), databaseFingerprint: 'c'.repeat(64), schemaFingerprint: 'd'.repeat(64),
   snapshotFingerprint: 'b'.repeat(64), observedAtUtc: new Date(time).toISOString() });
-function fixture({ provider = metadata(), sql = sqlReceipt(), providerCode = 0, sqlCode = 0, now = () => time, read = readFileSync } = {}) {
+function fixture({ provider = metadata(), sql = sqlReceipt(), providerCode = 0, sqlCode = 0,
+  providerProcess = {}, databaseProcess = {}, now = () => time, read = readFileSync } = {}) {
   const calls = [];
   const result = assess(options, { now, read, environment: { PGHOSTADDR: 'unsafe', PGSERVICE: 'unsafe', PGOPTIONS: '-c transaction_read_only=off', PGSSLMODE: 'disable', PSQL_ECHO: 'all' },
     execute(command, args, settings) {
       calls.push({ command, args, settings });
       return { status: command === 'render' ? providerCode : sqlCode,
-        stdout: JSON.stringify(command === 'render' ? provider : sql), stderr: secret + ' PRIVATE-FINANCIAL-DIAGNOSTIC 1' };
+        stdout: JSON.stringify(command === 'render' ? provider : sql), stderr: secret + ' PRIVATE-FINANCIAL-DIAGNOSTIC 1',
+        ...(command === 'render' ? providerProcess : databaseProcess) };
     } });
   assert.ok(!JSON.stringify(result).includes(secret));
   assert.ok(!JSON.stringify(result).includes('PRIVATE-FINANCIAL'));
@@ -147,4 +149,112 @@ test('SQL entry requires server TLS/read-only/identity and emits only after roll
 test('actual CLI with no approved parameters returns only UNKNOWN without a production connection', () => {
   const p = spawnSync(process.execPath, [fileURLToPath(new URL('./aqgreen-clean-start-preflight.mjs', import.meta.url))], { encoding: 'utf8' });
   assert.equal(p.status, 1); assert.equal(p.stderr, ''); assert.equal(JSON.parse(p.stdout).overall, 'UNKNOWN');
+  const r = JSON.parse(p.stdout);
+  assert.equal(r.diagnostics.failureCategory, 'CONFIGURATION_OR_PREREQUISITES');
+  assert.equal(r.diagnostics.launcherExitStatus, p.status);
+  assert.ok(Date.parse(r.evidence.finishedAtUtc) >= Date.parse(r.evidence.attemptedAtUtc));
+});
+
+test('configuration, provider and database process failures retain only safe categories and exit statuses', () => {
+  for (const [patch, category, stage, provider, database] of [
+    [{ providerCode: 1 }, 'CONFIGURATION_OR_PREREQUISITES', 'PROVIDER_LOOKUP', 1, null],
+    [{ providerProcess: { status: null, error: { code: 'ENOENT', message: secret } } }, 'CONFIGURATION_OR_PREREQUISITES', 'PROVIDER_LOOKUP', null, null],
+    [{ sqlCode: 1 }, 'CONFIGURATION_OR_PREREQUISITES', 'DATABASE_CLIENT', 0, 1],
+    [{ sqlCode: 2 }, 'DATABASE_CONNECTION_OR_TLS', 'DATABASE_CLIENT', 0, 2],
+    [{ sqlCode: 3 }, 'SQL_EXECUTION', 'DATABASE_CLIENT', 0, 3],
+    [{ databaseProcess: { status: null, error: { code: 'ENOENT', message: secret } } }, 'CONFIGURATION_OR_PREREQUISITES', 'DATABASE_CLIENT', 0, null],
+    [{ databaseProcess: { status: null, signal: 'SIGTERM' } }, 'UNDETERMINED', 'DATABASE_CLIENT', 0, null]
+  ]) {
+    const { result, calls } = fixture(patch);
+    assert.equal(result.overall, 'UNKNOWN');
+    assert.deepEqual(result.diagnostics, { failureCategory: category, stage, launcherExitStatus: 1,
+      processExitStatuses: { provider, database } });
+    assert.equal(result.evidence.finishedAtUtc, new Date(time).toISOString());
+    assert.equal(calls.length, stage === 'PROVIDER_LOOKUP' ? 1 : 2);
+  }
+});
+
+test('identity failures are distinct from missing credentials and SQL failures without exposing diagnostics', () => {
+  const wrongTarget = fixture({ provider: { ...metadata(), id: 'dpg-wrong' } });
+  assert.equal(wrongTarget.result.diagnostics.failureCategory, 'DATABASE_IDENTITY_VERIFICATION');
+  assert.equal(wrongTarget.result.diagnostics.stage, 'LOGICAL_TARGET_VERIFICATION');
+  assert.equal(wrongTarget.calls.length, 1);
+  const noPassword = fixture({ provider: { id: resource, externalConnectionString: `postgresql://fixture_user@${host}/aqualifestyle` } });
+  assert.equal(noPassword.result.diagnostics.failureCategory, 'CONFIGURATION_OR_PREREQUISITES');
+  for (const [stderr, expected] of [
+    ['psql:<stdin>:30: ERROR:  CLEAN_START_SOURCE_OR_READ_ONLY_SESSION_UNVERIFIED\n', 'DATABASE_IDENTITY_VERIFICATION'],
+    [`psql:<stdin>:30: ERROR:  private row mentions CLEAN_START_SOURCE_OR_READ_ONLY_SESSION_UNVERIFIED ${secret}\n`, 'SQL_EXECUTION'],
+    [`psql:<stdin>:30: ERROR:  ${secret}\n`, 'SQL_EXECUTION']
+  ]) {
+    const { result, calls } = fixture({ sqlCode: 3, databaseProcess: { stderr } });
+    assert.equal(result.diagnostics.failureCategory, expected);
+    assert.equal(result.diagnostics.processExitStatuses.database, 3);
+    assert.ok(calls[1].args.includes('--set=VERBOSITY=terse'));
+    assert.equal(calls[1].settings.env.LC_ALL, 'C');
+    assert.ok(!JSON.stringify(result).includes('CLEAN_START_SOURCE_OR_READ_ONLY_SESSION_UNVERIFIED'));
+  }
+});
+
+test('child timeouts and fixed server timeout markers identify timeout without guessing from a signal', () => {
+  for (const patch of [
+    { providerProcess: { status: null, signal: 'SIGKILL', error: { code: 'ETIMEDOUT', message: secret } } },
+    { databaseProcess: { status: null, signal: 'SIGKILL', error: { code: 'ETIMEDOUT', message: secret } } },
+    ...['statement', 'lock'].map(kind => ({ sqlCode: 3, databaseProcess: {
+      stderr: `psql:<stdin>:120: ERROR:  canceling statement due to ${kind} timeout\n` } })),
+    { sqlCode: 2, databaseProcess: { stderr: 'psql:<stdin>:120: FATAL:  terminating connection due to idle-in-transaction timeout\n' } }
+  ]) {
+    const { result } = fixture(patch);
+    assert.equal(result.diagnostics.failureCategory, 'EXECUTION_TIMEOUT_OR_WINDOW_EXPIRY');
+    assert.equal(result.overall, 'UNKNOWN');
+  }
+  const { result } = fixture({ sqlCode: 3, databaseProcess: {
+    stderr: `psql:<stdin>:120: ERROR:  ${secret} mentions canceling statement due to statement timeout\n` } });
+  assert.equal(result.diagnostics.failureCategory, 'SQL_EXECUTION');
+});
+
+test('malformed provider or database output and rejected receipt fields are result-validation failures', () => {
+  for (const patch of [{ providerProcess: { stdout: secret } }, { databaseProcess: { stdout: secret } },
+    { sql: { ...sqlReceipt(), sensitiveCount: 1 } }]) {
+    const { result } = fixture(patch);
+    assert.equal(result.diagnostics.failureCategory, 'RESULT_VALIDATION');
+    assert.equal(result.overall, 'UNKNOWN');
+  }
+});
+
+test('window cancellation records completion while a short but open window alone is not a failure', () => {
+  const end = Date.parse(options.end);
+  const expired = fixture({ now: () => end });
+  assert.equal(expired.calls.length, 0);
+  assert.equal(expired.result.diagnostics.failureCategory, 'EXECUTION_TIMEOUT_OR_WINDOW_EXPIRY');
+  assert.deepEqual(expired.result.diagnostics.processExitStatuses, { provider: null, database: null });
+  let current = time;
+  const deadline = assess(options, { now: () => current, execute(command) {
+    if (command === 'render') return { status: 0, stdout: JSON.stringify(metadata()) };
+    current = end;
+    return { status: 0, stdout: JSON.stringify(sqlReceipt()) };
+  } });
+  assert.equal(deadline.diagnostics.failureCategory, 'EXECUTION_TIMEOUT_OR_WINDOW_EXPIRY');
+  assert.equal(deadline.evidence.finishedAtUtc, new Date(end).toISOString());
+  assert.deepEqual(deadline.diagnostics.processExitStatuses, { provider: 0, database: 0 });
+  const short = fixture({ now: () => end - 34025 });
+  assert.equal(short.result.databaseScreen, 'PASS');
+  assert.equal(short.result.diagnostics.failureCategory, null);
+  assert.ok(short.calls[1].settings.timeout <= 34025);
+});
+
+test('completed database PASS, FAIL and UNKNOWN retain business semantics and accurately record process success', () => {
+  for (const screen of ['PASS', 'FAIL', 'UNKNOWN']) {
+    const sql = sqlReceipt();
+    sql.databaseScreen = screen; sql.overall = screen === 'FAIL' ? 'FAIL' : 'UNKNOWN';
+    if (screen !== 'PASS') {
+      sql.sourceFingerprint = null; sql.checks.financialAndStructuralExposure = screen;
+    }
+    const { result } = fixture({ sql });
+    assert.equal(result.databaseScreen, screen);
+    assert.equal(result.overall, sql.overall);
+    assert.deepEqual(result.diagnostics, { failureCategory: null, stage: 'COMPLETE',
+      launcherExitStatus: screen === 'FAIL' ? 2 : 1, processExitStatuses: { provider: 0, database: 0 } });
+    assert.equal(result.checks.externalBusinessObligations, 'UNKNOWN');
+    assert.equal(result.evidence.finishedAtUtc, new Date(time).toISOString());
+  }
 });

@@ -1,15 +1,37 @@
 # Status-only preflight amendment validation
 
-PROPOSED amendment to the operational preflight only. No production execution or human acceptance is asserted. Existing B6, reset/restore, migration 55 and D10 runtime sources are unchanged.
+The SQL baseline is the accepted status-only amendment. The subsequent launcher-only diagnostic correction is PROPOSED pending Aqua's acceptance and a fresh owner execution window. No diagnostic-candidate production execution or acceptance is asserted. Existing B6, SQL, reset/restore, migration 55 and D10 runtime sources are unchanged.
 
 | Artifact | SHA-256 |
 |---|---|
 | preflight.sql | `b0b495e30d0f3b910980f6d212b75b57de725c35f56c253ff973f681382264dd` |
 | preflight-checks.sql | `1d8845c76fa87843f48fc2e648a57333c94d2417fc018c4b499ff28d25e91651` |
-| aqgreen-clean-start-preflight.mjs | `02cfc986a3435234308be8595a4775ad7d490b5c67e8380d87c983e93231c525` |
+| aqgreen-clean-start-preflight.mjs (diagnostic correction) | `483f9cd595ca6eaa00849f6fce3e417665587c4a2e559d5206e20b2750670f2d` |
 | state.sql | `db3d36ac23172c2005aa6edd202ea6f9cb6b4635c75c1bdbd2889f47571fd100` |
 
-Targeted validation: 21 focused xUnit cases passed, zero failed/skipped, on the existing PostgreSQL 18.4 fixture. This includes the eight existing reset/recovery cases and 13 added status-screen/supporting cases. The supporting Node case executes 11 launcher/privacy checks; those 11 also passed standalone. These are separate evidence categories, not 32 independent database executions.
+## Diagnostic correction evidence
+
+`node --test --test-reporter=spec tools/operations/aqgreen-clean-start-preflight.test.mjs`:
+**17 passed, zero failed/skipped**. All original 11 cases remain; six focused cases
+exercise exit/status categories, fixed identity/timeout marker recognition, malformed
+provider/client output, deadline handling and unchanged PASS/FAIL/UNKNOWN semantics.
+Synthetic credentials and financial diagnostic canaries never appear in receipts.
+The existing .NET CI wrapper requires all 17 Node cases with zero failures/skips.
+No dependencies, production SQL or new environment were used. Fresh exact-source
+CI is attached to the published diagnostic commit; prior CI alone does not qualify it.
+
+The 09:29:25.975 UTC authorized execution used the old launcher
+`02cfc986a3435234308be8595a4775ad7d490b5c67e8380d87c983e93231c525`
+and returned UNKNOWN/exit 1. Its cause remains UNDETERMINED. The new categories
+are evidence about future observed failure stages, not a diagnosis of that attempt.
+Privacy/source self-review confirms only allowlisted categories, stages, bounded
+numeric child exit statuses and UTC timestamps are added. Client diagnostics are
+examined only in memory and never printed or saved. No SQL predicates, reset/D10
+guards, TLS requirements, retries or business-result rules changed.
+
+## Carried-forward status-only SQL evidence
+
+Before the diagnostic correction: 21 focused xUnit cases passed, zero failed/skipped, on the existing PostgreSQL 18.4 fixture. This includes the eight existing reset/recovery cases and 13 added status-screen/supporting cases. The supporting Node case executed the original 11 launcher/privacy checks; those 11 also passed standalone. These are separate evidence categories, not 32 independent database executions.
 
 Artifacts: `/tmp/aqgreen-status-preflight-tests/status-preflight-reviewed.trx`, `/tmp/aqgreen-status-preflight-reviewed.log`, `/tmp/aqgreen-status-preflight-node-tests-final.log`. The Release build passed with warnings; no warning-free build or dependency changes are claimed. One development fixture initially omitted its monthly due-policy FK; that fixture was corrected, without changing guard logic or assertions.
 

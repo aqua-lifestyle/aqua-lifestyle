@@ -21,6 +21,14 @@ const exact = (o, fields) => o && !Array.isArray(o) && Object.keys(o).sort().joi
 const utc = s => typeof s === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(s) &&
   Number.isFinite(Date.parse(s)) && new Date(s).toISOString().replace('.000Z', 'Z') === s;
 const worst = values => values.includes('FAIL') ? 'FAIL' : values.includes('UNKNOWN') ? 'UNKNOWN' : 'PASS';
+const exitStatus = overall => overall === 'PASS' ? 0 : overall === 'FAIL' ? 2 : 1;
+const categories = Object.freeze({ configuration: 'CONFIGURATION_OR_PREREQUISITES',
+  connection: 'DATABASE_CONNECTION_OR_TLS', identity: 'DATABASE_IDENTITY_VERIFICATION',
+  sql: 'SQL_EXECUTION', result: 'RESULT_VALIDATION', timeout: 'EXECUTION_TIMEOUT_OR_WINDOW_EXPIRY',
+  undetermined: 'UNDETERMINED' });
+class PreflightFailure extends Error {
+  constructor(category) { super('UNKNOWN'); this.category = category; }
+}
 
 export function connection(metadata) {
   const ids = new Set(), urls = new Set();
@@ -36,21 +44,31 @@ export function connection(metadata) {
     }
   };
   visit(metadata);
-  if (ids.size !== 1 || !ids.has(resource) || urls.size !== 1) throw Error('UNKNOWN');
+  if (ids.size !== 1 || !ids.has(resource) || urls.size !== 1) throw new PreflightFailure(categories.identity);
   const u = new URL([...urls][0]), user = decodeURIComponent(u.username), password = decodeURIComponent(u.password);
-  if (!/^[A-Za-z0-9_]+$/.test(user) || !password || /[\x00-\x1f\x7f]/.test(password)) throw Error('UNKNOWN');
+  if (!/^[A-Za-z0-9_]+$/.test(user) || !password || /[\x00-\x1f\x7f]/.test(password)) throw new PreflightFailure(categories.configuration);
   return { host: hostname, user, password };
 }
 
 export function assess(options, { execute = spawnSync, read = readFileSync, now = Date.now, environment = process.env } = {}) {
   const started = now();
-  const unknown = () => ({ contract: 'AQGreenCleanStartScreenV2', databaseScreen: 'UNKNOWN', overall: 'UNKNOWN',
-    checks: { execution: 'UNKNOWN' }, evidence: { resource, database, tenant: 1, attemptedAtUtc: new Date(started).toISOString() } });
+  let stage = 'CONFIGURATION', failureCategory = categories.configuration;
+  const processExitStatuses = { provider: null, database: null };
+  const diagnostics = (category, overall) => ({ failureCategory: category, stage,
+    launcherExitStatus: exitStatus(overall), processExitStatuses: { ...processExitStatuses } });
+  const unknown = (category = failureCategory) => ({ contract: 'AQGreenCleanStartScreenV2', databaseScreen: 'UNKNOWN', overall: 'UNKNOWN',
+    checks: { execution: 'UNKNOWN' }, diagnostics: diagnostics(category, 'UNKNOWN'),
+    evidence: { resource, database, tenant: 1, attemptedAtUtc: new Date(started).toISOString(), finishedAtUtc: new Date(now()).toISOString() } });
+  const record = (name, result) => {
+    processExitStatuses[name] = Number.isInteger(result.status) && result.status >= 0 && result.status <= 255 ? result.status : null;
+  };
+  const timedOut = result => result.error?.code === 'ETIMEDOUT' || now() >= Date.parse(options.end);
   try {
     if (!exact(options, ['boundary', 'resetId', 'start', 'end']) || ![options.boundary, options.start, options.end].every(utc) ||
         !/^[A-Za-z0-9.-]{1,80}$/.test(options.resetId) || Date.parse(options.end) <= Date.parse(options.start) ||
         Date.parse(options.end) - Date.parse(options.start) > 900_000 ||
-        started < Date.parse(options.start) || started >= Date.parse(options.end) || Date.parse(options.boundary) <= Date.parse(options.end)) return unknown();
+        Date.parse(options.boundary) <= Date.parse(options.end)) return unknown();
+    if (started < Date.parse(options.start) || started >= Date.parse(options.end)) return unknown(categories.timeout);
     const sqlFiles = {};
     for (const [file, pin] of Object.entries(pins)) {
       const bytes = read(new URL(file, directory));
@@ -63,25 +81,45 @@ export function assess(options, { execute = spawnSync, read = readFileSync, now 
     const approvedSql = sqlFiles['preflight.sql'].replace(include, sqlFiles['preflight-checks.sql']);
     const remaining = limit => Math.min(limit, Date.parse(options.end) - now());
     const providerBudget = remaining(15000);
-    if (providerBudget <= 0) return unknown();
+    if (providerBudget <= 0) return unknown(categories.timeout);
+    stage = 'PROVIDER_LOOKUP';
     const provider = execute('render', ['postgres', 'get', resource, '--include-sensitive-connection-info', '--output', 'json', '--confirm'],
       { encoding: 'utf8', timeout: providerBudget, killSignal: 'SIGKILL', maxBuffer: 1048576, stdio: ['ignore', 'pipe', 'pipe'] });
-    if (provider.status !== 0 || now() >= Date.parse(options.end)) return unknown();
-    const c = connection(JSON.parse(provider.stdout));
+    record('provider', provider);
+    if (timedOut(provider)) return unknown(categories.timeout);
+    if (provider.error || provider.status !== 0) return unknown();
+    failureCategory = categories.result;
+    const metadata = JSON.parse(provider.stdout);
+    stage = 'LOGICAL_TARGET_VERIFICATION'; failureCategory = categories.identity;
+    const c = connection(metadata);
     const env = { ...environment };
     for (const key of Object.keys(env)) if (key.startsWith('PG') || key.startsWith('PSQL_')) delete env[key];
     Object.assign(env, { PGHOST: c.host, PGPORT: '5432', PGDATABASE: database, PGUSER: c.user, PGPASSWORD: c.password,
       PGSSLMODE: 'verify-full', PGSSLROOTCERT: '/etc/ssl/certs/ca-certificates.crt', PGSSLSNI: '1', PGCONNECT_TIMEOUT: '8',
       PGAPPNAME: 'aqgreen-clean-start-status-screen', PSQL_HISTORY: '/dev/null',
+      LC_ALL: 'C',
       PGOPTIONS: '-c default_transaction_read_only=on -c statement_timeout=30000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=45000' });
     const sqlBudget = remaining(120000);
-    if (sqlBudget <= 0) return unknown();
-    const result = execute('psql', ['-X', '-qAt', '--no-password', '--set=ON_ERROR_STOP=1', '--set=VERBOSITY=sqlstate',
+    if (sqlBudget <= 0) return unknown(categories.timeout);
+    stage = 'DATABASE_CLIENT'; failureCategory = categories.undetermined;
+    const result = execute('psql', ['-X', '-qAt', '--no-password', '--set=ON_ERROR_STOP=1', '--set=VERBOSITY=terse',
       '--set=boundary_utc=' + options.boundary, '--set=reset_id=' + options.resetId,
       '--file=-'],
       { env, input: approvedSql, encoding: 'utf8', timeout: sqlBudget, killSignal: 'SIGKILL', maxBuffer: 65536, stdio: ['pipe', 'pipe', 'pipe'] });
-    // Never emit raw client/provider errors, SQL diagnostics, credentials or rows.
-    if (result.status !== 0 || now() >= Date.parse(options.end)) return unknown();
+    // Examine only fixed diagnostic markers in memory. Never emit raw errors or rows.
+    record('database', result);
+    if (timedOut(result)) return unknown(categories.timeout);
+    if (result.error) return unknown(['ENOENT', 'EACCES', 'ENOEXEC'].includes(result.error.code) ? categories.configuration : categories.undetermined);
+    const errorText = typeof result.stderr === 'string' ? result.stderr : '';
+    if (result.status !== 0) {
+      if (/^psql:<stdin>:\d+: (?:ERROR|FATAL):  (?:canceling statement due to (?:statement|lock) timeout|terminating connection due to idle-in-transaction timeout)\r?$/m.test(errorText))
+        return unknown(categories.timeout);
+      if (result.status === 2) return unknown(categories.connection);
+      if (result.status === 1) return unknown(categories.configuration);
+      if (result.status === 3) return unknown(/^psql:<stdin>:\d+: ERROR:  CLEAN_START_SOURCE_OR_READ_ONLY_SESSION_UNVERIFIED\r?$/m.test(errorText) ? categories.identity : categories.sql);
+      return unknown();
+    }
+    stage = 'RESULT_VALIDATION'; failureCategory = categories.result;
     const r = JSON.parse(result.stdout.trim());
     if (!exact(r, ['contract', 'databaseScreen', 'overall', 'checks', 'sourceFingerprint', 'databaseFingerprint', 'schemaFingerprint', 'snapshotFingerprint', 'observedAtUtc']) ||
         r.contract !== 'AQGreenCleanStartScreenV2' || !exact(r.checks, keys) ||
@@ -94,15 +132,17 @@ export function assess(options, { execute = spawnSync, read = readFileSync, now 
         !Number.isFinite(Date.parse(r.observedAtUtc)) || Date.parse(r.observedAtUtc) < Date.parse(options.start) ||
         Date.parse(r.observedAtUtc) >= Date.parse(options.end)) return unknown();
     const finished = now();
-    if (finished >= Date.parse(options.end)) return unknown();
+    if (finished >= Date.parse(options.end)) return unknown(categories.timeout);
+    stage = 'COMPLETE';
     return { contract: r.contract, databaseScreen: r.databaseScreen, overall: r.overall,
+      diagnostics: diagnostics(null, r.overall),
       checks: { execution: 'PASS', logicalSourceIdentity: 'PASS', rollback: 'PASS', ...r.checks },
       evidence: { resource, database, tenant: 1, identityMode: 'RENDER_RESOURCE_TLS_DATABASE_SESSION_V1',
         observedAtUtc: new Date(r.observedAtUtc).toISOString(), finishedAtUtc: new Date(finished).toISOString(),
         sqlDigests: pins, runnerDigest,
         sourceFingerprint: r.sourceFingerprint, databaseFingerprint: r.databaseFingerprint,
         schemaFingerprint: r.schemaFingerprint, snapshotFingerprint: r.snapshotFingerprint } };
-  } catch { return unknown(); }
+  } catch (error) { return unknown(error instanceof PreflightFailure ? error.category : failureCategory); }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
@@ -117,5 +157,5 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   }
   const receipt = assess(valid ? options : {});
   process.stdout.write(JSON.stringify(receipt) + '\n');
-  process.exitCode = receipt.overall === 'PASS' ? 0 : receipt.overall === 'FAIL' ? 2 : 1;
+  process.exitCode = receipt.diagnostics.launcherExitStatus;
 }

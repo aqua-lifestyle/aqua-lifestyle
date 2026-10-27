@@ -150,7 +150,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             start.ArgumentList.Add("--test");start.ArgumentList.Add("--test-reporter=tap");start.ArgumentList.Add("tools/operations/aqgreen-clean-start-preflight.test.mjs");
             using var process = Process.Start(start);var output = process.StandardOutput.ReadToEndAsync();var errors = process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync();var report = await output;process.ExitCode.ShouldBe(0,report+await errors);
-            report.ShouldContain("# tests 11");report.ShouldContain("# pass 11");report.ShouldContain("# fail 0");report.ShouldContain("# skipped 0");
+            report.ShouldContain("# tests 17");report.ShouldContain("# pass 17");report.ShouldContain("# fail 0");report.ShouldContain("# skipped 0");
         }
     }
 }
