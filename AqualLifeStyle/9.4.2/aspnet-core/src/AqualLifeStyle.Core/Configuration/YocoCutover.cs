@@ -33,7 +33,12 @@ namespace AqualLifeStyle.Configuration
                 Enabled = CompatibilityReceiver || selected == "true" || selection.Enabled;
                 if (Enabled)
                 {
-                    if (!long.TryParse(configuration[Prefix + "OperatorUserId"], out var id) || id <= 0 ||
+                    // Forced capture needs no application login. Privileged
+                    // operations remain unavailable without a pinned operator.
+                    var operatorValue = configuration[Prefix + "OperatorUserId"];
+                    long id = 0;
+                    if (operatorValue != null && (!long.TryParse(operatorValue, out id) || id <= 0) ||
+                        !CompatibilityReceiver && id <= 0 ||
                         selection.Enabled && selection.Operator != id)
                         throw new InvalidOperationException("YOCO_CUTOVER_OPERATOR_REQUIRED");
                     OperatorUserId = id; selection.Enabled = true; selection.Operator = id;
@@ -56,8 +61,15 @@ namespace AqualLifeStyle.Configuration
     {
         private static readonly AsyncLocal<bool> Authorized = new();
         private static readonly AsyncLocal<bool> Business = new();
+        private static readonly AsyncLocal<bool> ReadOnly = new();
         public static bool IsAuthorized => Authorized.Value;
         public static bool IsBusinessAuthorized => Business.Value;
+        public static bool IsReadOnlyAuthorized => ReadOnly.Value;
+        public static IDisposable EnterReadOnly()
+        {
+            var prior = ReadOnly.Value; ReadOnly.Value = true;
+            return new Scope(() => ReadOnly.Value = prior);
+        }
         public static IDisposable EnterBusiness()
         {
             var prior = Business.Value; Business.Value = true;
@@ -74,6 +86,50 @@ namespace AqualLifeStyle.Configuration
             public Scope(Action exit) => _exit = exit;
             public void Dispose() => _exit();
         }
+    }
+
+    // Explicit member reads only. HTTP GET is not itself proof of read-only
+    // behavior: GetMyInvitations, for example, creates invitation records.
+    // ABP permission, ownership and Tenant checks still run for every method.
+    public static class YocoCutoverMemberReads
+    {
+        private static readonly HashSet<string> Operations = new(StringComparer.Ordinal)
+        {
+            "AQGreenPilotAppService.GetStatusAsync",
+            "MyAccountAppService.GetProfileAsync",
+            "CustomerAppService.GetMyCustomerAsync",
+            "MembershipAppService.GetAllAsync",
+            "MembershipAppService.GetActiveTiersAsync",
+            "MembershipAppService.GetAsync",
+            "MembershipAppService.GetTierBenefitsAsync",
+            "MembershipAppService.GetSavingsWindowStatuses",
+            "ProductAppService.GetAllAsync",
+            "ProductAppService.GetAllForCustomerAsync",
+            "ProductAppService.GetAsync",
+            "OrderIntentAppService.GetMineAsync",
+            "EnquiryAppService.GetMineAsync",
+            "ClubMemberProgrammeParticipationAppService.GetMyParticipationsAsync",
+            "ClubMemberProgrammeProgressAppService.GetMyJourneyAsync",
+            "ClubMemberProgrammeProgressAppService.GetMyProgressAsync",
+            "ClubMemberSavingsAppService.GetMyAccountAsync",
+            "ClubMemberOnyxLoanAppService.GetMyAgreementsAsync",
+            "ClubMemberEntryMonthlyObligationAppService.GetMyObligationsAsync"
+        };
+        private static readonly HashSet<string> Paths = BuildPaths();
+        private static HashSet<string> BuildPaths()
+        {
+            var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var operation in Operations)
+            {
+                var parts = operation.Split('.');
+                var service = parts[0].Substring(0, parts[0].Length - "AppService".Length);
+                var method = parts[1].EndsWith("Async", StringComparison.Ordinal) ? parts[1][..^5] : parts[1];
+                paths.Add("/api/services/app/" + service + "/" + method);
+            }
+            return paths;
+        }
+        public static bool AllowsOperation(string operation) => Operations.Contains(operation);
+        public static bool AllowsRoute(string method, string path) => method == "GET" && path != null && Paths.Contains(path);
     }
 
     public sealed class YocoCutoverEvent
@@ -115,5 +171,8 @@ namespace AqualLifeStyle.Configuration
         Task<T> TransactAsync<T>(Func<YocoCutoverSnapshot, Task<T>> action);
         // Shared session lease drains HTTP writers before an exclusive phase change.
         Task<IAsyncDisposable> EnterBusinessAsync();
+        // Reviewed HTTP reads join a bounded, server-enforced read-only UOW.
+        // It is rolled back, never used as authorization for business writes.
+        Task ReadOnlyAsync(Func<Task> read);
     }
 }

@@ -109,6 +109,11 @@ namespace AqualLifeStyle.Web.Host.Controllers
                     capability == "member-programme-journey-v1");
             if (AQGreenV2DemoConfiguration.Validate(_environment, _configuration))
                 capabilities = System.Linq.Enumerable.Append(capabilities, "aqgreen-v2-demo-checkout-v1");
+            if (new YocoCutoverOptions(_configuration).Enabled)
+                capabilities = System.Linq.Enumerable.Where(capabilities, capability =>
+                    capability != "aqgreen-flexible-joining-v1" &&
+                    capability != "programme-approval-queue-v1" &&
+                    capability != "direct-onyx-checkout-v1");
             return System.Linq.Enumerable.ToArray(capabilities);
         }
 
