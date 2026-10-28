@@ -71,6 +71,10 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             var type = invocation.TargetType;
             while (type != null && type.Namespace?.StartsWith("Castle.Proxies", StringComparison.Ordinal) == true)
                 type = type.BaseType;
+            if (new YocoCutoverOptions(_configuration).Enabled && invocation.Method.IsPublic && !invocation.Method.IsSpecialName &&
+                !YocoCutoverDispatch.IsBusinessAuthorized && !YocoCutoverDispatch.IsAuthorized &&
+                type?.Name + "." + invocation.Method.Name != "SessionAppService.GetCurrentLoginInformations")
+                throw new AbpAuthorizationException("Application business operations are fenced during payment cutover.");
             if (ApplicationRecoveryMode.IsEnabled(_configuration) && invocation.Method.IsPublic &&
                 !invocation.Method.IsSpecialName &&
                 !RecoveryAllowed.Contains(type?.Name + "." + invocation.Method.Name))

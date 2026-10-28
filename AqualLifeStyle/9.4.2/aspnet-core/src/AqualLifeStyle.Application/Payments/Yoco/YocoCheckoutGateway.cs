@@ -48,6 +48,9 @@ namespace AqualLifeStyle.Payments.Yoco
 
         public async Task<YocoCheckout> CreateAsync(CreateYocoCheckout checkout)
         {
+            var cutover = new AqualLifeStyle.Configuration.YocoCutoverOptions(_configuration);
+            if (cutover.CompatibilityReceiver || cutover.Enabled && !AqualLifeStyle.Configuration.YocoCutoverDispatch.IsBusinessAuthorized)
+                throw new InvalidOperationException("YOCO_CUTOVER_CHECKOUT_CREATION_FENCED");
             AqualLifeStyle.Configuration.ApplicationRecoveryMode.DenyBusinessOperation(_configuration);
             if (string.Equals(_configuration["Yoco:Mode"]?.Trim(), "live", StringComparison.OrdinalIgnoreCase))
                 AqualLifeStyle.Configuration.RuntimeOperationGuards.RequireFinancialOperations(_configuration);

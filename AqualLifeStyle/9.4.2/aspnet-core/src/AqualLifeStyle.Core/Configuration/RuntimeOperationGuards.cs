@@ -15,6 +15,7 @@ namespace AqualLifeStyle.Configuration
 
         public static bool CanRunBackgroundWork(IConfiguration configuration)
             => !ApplicationRecoveryMode.IsEnabled(configuration) &&
+               !new YocoCutoverOptions(configuration).Enabled &&
                configuration.GetValue<bool>(BackgroundSetting);
 
         public static bool CanRunFinancialWorker(IConfiguration configuration, string workerSetting)

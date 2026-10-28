@@ -274,7 +274,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             }
         }
 
-        private sealed class RecoveryRedis : IDisposable
+        internal sealed class RecoveryRedis : IDisposable
         {
             private readonly string _name = "aqgreen-recovery-redis-" + Guid.NewGuid().ToString("N");
             public string Endpoint { get; private set; }

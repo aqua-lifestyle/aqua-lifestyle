@@ -36,7 +36,7 @@ namespace AqualLifeStyle
 
         public override void PreInitialize()
         {
-            if (_env.IsProduction() || ApplicationRecoveryMode.IsEnabled(_appConfiguration))
+            if (_env.IsProduction() || new YocoCutoverOptions(_appConfiguration).Enabled || ApplicationRecoveryMode.IsEnabled(_appConfiguration))
                 IocManager.Resolve<AqualLifeStyleEntityFrameworkModule>().SkipDbSeed = true;
 
             Configuration.DefaultNameOrConnectionString = _appConfiguration.GetConnectionString(
