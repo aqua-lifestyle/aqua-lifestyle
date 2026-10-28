@@ -40,7 +40,7 @@ while IFS= read -r cutover_file; do
 done < <(git diff --name-only "$cutover_base" "$cutover_sha")
 cutover_temp=$(mktemp -d "${TMPDIR:-/tmp}/aqua-yoco-receiver-code.XXXXXXXX")
 trap 'rm -rf -- "$cutover_temp"' EXIT
-git archive "$cutover_sha" | tar -x -C "$cutover_temp"
+git -C "$cutover_root" archive "$cutover_sha" | tar -x -C "$cutover_temp"
 cutover_project="$cutover_temp/AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.Web.Host/AqualLifeStyle.Web.Host.csproj"
 dotnet restore "$cutover_project" -p:Configuration=Release
 dotnet publish "$cutover_project" --configuration Release --no-restore --output "$cutover_out" \

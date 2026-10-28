@@ -282,3 +282,14 @@ reconciliation before Normal, and disabled payouts/workers. Main-push CI and
 provider baseline readback remain execution gates; no new operational facts,
 provider acceptance, merchant records or deployment IDs have been fabricated.
 No production access or mutation was performed for this correction.
+
+CI packaging follow-up: the first exact-source run correctly failed the unchanged
+mandatory source-integrity check because CI's newly reviewed receiver-build steps
+changed its pinned workflow bytes. Only that workflow digest is refreshed in the
+candidate inventory; no mandatory case, assertion or verifier is changed or
+waived, and human review of this control change remains pending. The receiver
+build helper also needed `git -C <repository root> archive`: CI invokes it from
+the backend subdirectory, where plain `git archive` emits a stripped subtree.
+Direct archive listings reproduced that exact missing-project cause. Runtime,
+receiver pin, reviewed SQL and previously passing tests remain unchanged.
+The additional restricted-file/pin/duplicate-JSON test passed separately (1/1).
