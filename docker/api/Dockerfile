@@ -18,7 +18,7 @@ RUN dotnet restore src/AqualLifeStyle.Web.Host/AqualLifeStyle.Web.Host.csproj \
 FROM restore AS publish
 COPY AqualLifeStyle/9.4.2/aspnet-core/ ./
 RUN dotnet publish src/AqualLifeStyle.Web.Host/AqualLifeStyle.Web.Host.csproj \
-      --configuration Release --no-restore --output /out/api \
+      --configuration Release --no-restore --output /out/api -p:DefineConstants=YOCO_CUTOVER_COMPAT \
     && dotnet publish src/AqualLifeStyle.Migrator/AqualLifeStyle.Migrator.csproj \
       --configuration Release --no-restore --output /out/migrator
 

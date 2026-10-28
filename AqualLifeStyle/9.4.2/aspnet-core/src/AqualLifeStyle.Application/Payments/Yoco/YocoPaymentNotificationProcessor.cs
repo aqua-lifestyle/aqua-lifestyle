@@ -90,6 +90,9 @@ namespace AqualLifeStyle.Payments.Yoco
         [UnitOfWork]
         public virtual async Task ProcessAsync(VerifiedYocoPaymentNotification notification)
         {
+            var cutover = new AqualLifeStyle.Configuration.YocoCutoverOptions(_configuration);
+            if (cutover.CompatibilityReceiver || cutover.Enabled && !AqualLifeStyle.Configuration.YocoCutoverDispatch.IsAuthorized)
+                throw new InvalidOperationException("YOCO_CUTOVER_BUSINESS_DISPATCH_HELD");
             AqualLifeStyle.Configuration.ApplicationRecoveryMode.DenyBusinessOperation(_configuration);
             PilotMode.DenyOutsidePilot("External provider notification");
             if (notification == null) throw new ArgumentNullException(nameof(notification));
@@ -259,6 +262,8 @@ namespace AqualLifeStyle.Payments.Yoco
         {
             if (confirmation.AllocationReconciliationRequired)
             {
+                if (AqualLifeStyle.Configuration.YocoCutoverDispatch.IsAuthorized)
+                    throw new YocoWebhookValidationException("YOCO_PAYMENT_ALLOCATION_RECONCILIATION_REQUIRED");
                 _logger.LogError(
                     "PaymentOperationsAlert {AlertType}: AQGreen participation {ParticipationId} retained payment {PaymentId} without allocating another obligation",
                     "aqgreen_monthly_payment_allocation_reconciliation_required",
@@ -293,6 +298,17 @@ namespace AqualLifeStyle.Payments.Yoco
                     payment.ConfirmedAt.Value,
                     key));
         }
+
+        public virtual async Task VerifyCutoverTenantAsync(VerifiedYocoPaymentNotification notification, int tenantId)
+        {
+            var checkout = await ResolveCheckoutAsync(GetRequiredMetadataText(notification.Metadata,
+                YocoCheckoutMetadata.ProviderCheckoutId, "The provider checkout reference is required."));
+            if (tenantId <= 0 || checkout.TenantId != tenantId)
+                throw new YocoWebhookValidationException("The cutover event belongs to a different Tenant.");
+            EnsureNotificationMatchesCheckout(notification, checkout, GetRequiredMetadataText(notification.Metadata,
+                YocoCheckoutMetadata.Purpose, "The payment purpose is required."));
+        }
+
 
         private async Task<ResolvedYocoCheckout> ResolveCheckoutAsync(
             string providerCheckoutId)

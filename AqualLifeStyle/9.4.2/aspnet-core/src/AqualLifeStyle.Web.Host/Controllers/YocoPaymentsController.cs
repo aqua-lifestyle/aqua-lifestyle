@@ -20,8 +20,10 @@ namespace AqualLifeStyle.Web.Host.Controllers
     /// </summary>
     [ApiController]
     [Route("api/payments/yoco")]
+    [Abp.Auditing.DisableAuditing]
     public sealed class YocoPaymentsController : ControllerBase, ITransientDependency
         {
+            public YocoCutoverService Cutover { get; set; }
             private readonly IYocoWebhookSignatureVerifier _signatureVerifier;
             private readonly YocoPaymentNotificationProcessor _notificationProcessor;
             private readonly JsonSerializerOptions _jsonOptions;
@@ -72,6 +74,21 @@ namespace AqualLifeStyle.Web.Host.Controllers
                     "yoco_webhook_signature_rejected",
                     HttpContext.TraceIdentifier);
                 return StatusCode(StatusCodes.Status403Forbidden);
+            }
+
+            if (Cutover?.Enabled == true)
+            {
+                try
+                {
+                    await Cutover.ReceiveAsync(rawBody, webhookId, Request.Headers["webhook-timestamp"], Request.Headers["webhook-signature"]);
+                    return Ok(new { status = "DurablyReceived" });
+                }
+                catch (UnauthorizedAccessException) { return StatusCode(StatusCodes.Status403Forbidden); }
+                catch
+                {
+                    _logger.LogError("Yoco cutover capture unavailable; successful receipt was not acknowledged.");
+                    return StatusCode(StatusCodes.Status503ServiceUnavailable);
+                }
             }
 
             YocoPaymentWebhookEvent webhookEvent;

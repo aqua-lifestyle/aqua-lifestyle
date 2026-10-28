@@ -49,7 +49,7 @@ namespace AqualLifeStyle.Web.Host.Startup
         public override void PreInitialize()
         {
             Configuration.BackgroundJobs.IsJobExecutionEnabled =
-                !ApplicationRecoveryMode.IsEnabled(_appConfiguration) &&
+                !new YocoCutoverOptions(_appConfiguration).Enabled && !ApplicationRecoveryMode.IsEnabled(_appConfiguration) &&
                 _appConfiguration.GetValue<bool>("App:BackgroundJobs:Enabled");
             var pilot = AQGreenV2PilotConfiguration.Validate(_env, _appConfiguration);
             var demo = AQGreenV2DemoConfiguration.Validate(_env, _appConfiguration);
@@ -110,7 +110,7 @@ namespace AqualLifeStyle.Web.Host.Startup
 
         public override void PostInitialize()
         {
-            if (_env.IsProduction() || ApplicationRecoveryMode.IsEnabled(_appConfiguration))
+            if (!new YocoCutoverOptions(_appConfiguration).CompatibilityReceiver && (_env.IsProduction() || ApplicationRecoveryMode.IsEnabled(_appConfiguration)))
             {
                 var manager = IocManager.Resolve<IUnitOfWorkManager>();
                 using (var uow = manager.Begin())
@@ -138,7 +138,7 @@ namespace AqualLifeStyle.Web.Host.Startup
                 // to default behavior if the ErrorInfoBuilder is not available.
             }
 
-            if (ApplicationRecoveryMode.IsEnabled(_appConfiguration) ||
+            if (new YocoCutoverOptions(_appConfiguration).Enabled || ApplicationRecoveryMode.IsEnabled(_appConfiguration) ||
                 AQGreenV2PilotConfiguration.Validate(_env, _appConfiguration))
                 return; // Recovery and pilot never register provider or financial workers.
 
