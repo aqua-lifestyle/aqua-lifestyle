@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using AqualLifeStyle.Configuration;
 using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.Web.Host.Health;
 using AqualLifeStyle.Web.Host.Models;
