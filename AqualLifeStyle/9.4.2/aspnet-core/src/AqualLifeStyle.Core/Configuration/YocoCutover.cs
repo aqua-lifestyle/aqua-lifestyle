@@ -33,7 +33,12 @@ namespace AqualLifeStyle.Configuration
                 Enabled = CompatibilityReceiver || selected == "true" || selection.Enabled;
                 if (Enabled)
                 {
-                    if (!long.TryParse(configuration[Prefix + "OperatorUserId"], out var id) || id <= 0 ||
+                    // Forced capture needs no application login. Privileged
+                    // operations remain unavailable without a pinned operator.
+                    var operatorValue = configuration[Prefix + "OperatorUserId"];
+                    long id = 0;
+                    if (operatorValue != null && (!long.TryParse(operatorValue, out id) || id <= 0) ||
+                        !CompatibilityReceiver && id <= 0 ||
                         selection.Enabled && selection.Operator != id)
                         throw new InvalidOperationException("YOCO_CUTOVER_OPERATOR_REQUIRED");
                     OperatorUserId = id; selection.Enabled = true; selection.Operator = id;
