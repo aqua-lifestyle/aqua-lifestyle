@@ -42,6 +42,21 @@ namespace AqualLifeStyle.Web.Host.Startup
                     context.Request.Method == "GET" && (path == "/api/operations/yoco-cutover/status" || path == "/api/operations/yoco-cutover/events") ||
                     context.Request.Method == "POST" && (path == "/api/operations/yoco-cutover/phase" || path == "/api/operations/yoco-cutover/replay"))
                 { await _next(context); return; }
+                if (YocoCutoverMemberReads.AllowsRoute(context.Request.Method, path))
+                {
+                    try
+                    {
+                        if (_cutoverStore == null) throw new InvalidOperationException("YOCO_CUTOVER_READ_STORE_REQUIRED");
+                        await _cutoverStore.ReadOnlyAsync(() => _next(context));
+                    }
+                    catch when (!context.Response.HasStarted)
+                    {
+                        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                        context.Response.ContentType = "application/json";
+                        await context.Response.WriteAsync("{\"error\":\"YOCO_CUTOVER_READ_UNAVAILABLE\"}");
+                    }
+                    return;
+                }
                 IAsyncDisposable lease;
                 try
                 {
