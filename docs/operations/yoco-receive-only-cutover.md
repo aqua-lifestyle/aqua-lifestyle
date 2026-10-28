@@ -45,8 +45,11 @@ unlimited provider retries or unlimited database storage.
    unchanged. Preserve Yoco signing credentials; never place them in arguments,
    source or chat. No additional service, disk, database or paid restore is used.
 2. Approve the pinned compatibility receiver deployment and bounded verification.
-   Configure `App__YocoCutover__Enabled=true` and
-   `App__YocoCutover__OperatorUserId=<authenticated authorized host user id>`.
+   Configure `App__YocoCutover__Enabled=true`. The forced receiver starts and
+   captures without `OperatorUserId` or an application login. Leave that optional
+   identity unset for receipt-only operation: every privileged operation remains
+   denied. Full V2 still requires its authenticated, pinned host operator before
+   phase changes, reconciliation/replay or normal business processing.
    Set `App__BackgroundJobs__Enabled`, `App__WeeklyCommissions__Enabled`,
    `App__EntryMonthlyObligations__Enabled`, `App__AutomaticPayouts__Enabled`,
    `AQGreenV2Demo__Enabled`, `AQGreenV2Pilot__Enabled`, `SEED_DEMO_DATA`,
@@ -61,14 +64,18 @@ unlimited provider retries or unlimited database storage.
    Until the old deployment is completely drained, the fence is not established.
    HTTP middleware alone cannot fence old binaries, direct SQL clients or another
    writer service. Stop unless all existing writers are accounted for and held.
-4. On the authenticated host-operator API, POST
+4. Forced receive-only capture requires no phase command or application login.
+   Verify health and the `X-Aqua-Yoco-Receiver: Schema54` response header, plus
+   signed durable receipt and 503 business-write responses in step 5. If the
+   optional operator is configured for protected inspection, POST
    `/api/operations/yoco-cutover/phase` with `{"phase":"ReceiveOnly"}`.
    GET `/api/operations/yoco-cutover/status` must show `ReceiveOnly`, no migration
    55, and `receiverOnlyArtifact=true`. The response header must be
    `X-Aqua-Yoco-Receiver: Schema54`. Verify joining/checkout/approval/commission
    writes return 503. Operations require the configured **host** user and the
    existing `Pages.Tenants` permission; a Tenant session or another host user is
-   denied. Use bearer authentication through the existing restricted channel.
+   denied. Without an operator pin all these privileged endpoints are denied.
+   Use bearer authentication through the existing restricted channel when used.
 5. Perform only the separately authorized bounded delivery/drain verification.
    Confirm valid signed webhook receipt is durable and duplicate receipt exact;
    invalid signature is rejected. No synthetic live payment or provider mutation

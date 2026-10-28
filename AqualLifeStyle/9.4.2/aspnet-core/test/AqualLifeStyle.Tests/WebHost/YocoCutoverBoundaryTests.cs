@@ -29,6 +29,12 @@ namespace AqualLifeStyle.Tests.WebHost
         private static IConfiguration Config() => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string>
             { [YocoCutoverOptions.Prefix+"Enabled"]="true",[YocoCutoverOptions.Prefix+"OperatorUserId"]="7" }).Build();
         [Fact]
+        public void FullBackendStillRequiresPinnedOperator()
+        {
+            var c=Config();c[YocoCutoverOptions.Prefix+"OperatorUserId"]=null;
+            Should.Throw<InvalidOperationException>(()=>new YocoCutoverOptions(c)).Message.ShouldBe("YOCO_CUTOVER_OPERATOR_REQUIRED");
+        }
+        [Fact]
         public void EnabledFenceAndOperatorCannotBeRemovedByConfigurationReload()
         {
             var c=Config();new YocoCutoverOptions(c).Enabled.ShouldBeTrue();c[YocoCutoverOptions.Prefix+"Enabled"]="false";
