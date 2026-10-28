@@ -164,7 +164,7 @@ namespace AqualLifeStyle.Payments.Yoco
         public Task<bool> SetPhaseAsync(string phase) => _store.TransactAsync(async s =>
         {
             var options = new YocoCutoverOptions(_configuration);
-            if (!options.Enabled || !new[] { "ReceiveOnly", "Replay", "Normal" }.Contains(phase) ||
+            if (!options.Enabled || options.OperatorUserId <= 0 || !new[] { "ReceiveOnly", "Replay", "Normal" }.Contains(phase) ||
                 options.CompatibilityReceiver && phase != "ReceiveOnly" || phase != "ReceiveOnly" && !s.HasMigration55)
                 throw new InvalidOperationException("YOCO_CUTOVER_PHASE_NOT_AUTHORIZED");
             if (phase == "Normal" && (s.Phase != "Replay" || s.Events.Any(Unfinished)))
