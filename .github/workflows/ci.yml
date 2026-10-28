@@ -137,6 +137,8 @@ jobs:
       RESULTS_DIR: TestResults/${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # Exact compatibility source is an ancestor of this candidate.
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
@@ -169,6 +171,12 @@ jobs:
           set -euo pipefail
           docker pull redis:7-alpine
           docker image inspect redis:7-alpine --format '{{.Id}}'
+      - name: Build pinned schema-54 receive-only compatibility artifact
+        if: matrix.shard == 'entity-framework-migrations'
+        run: |
+          set -euo pipefail
+          printf 'YOCO_RECEIVER54_ARTIFACT=%s\n' "$RUNNER_TEMP/aqua-yoco-receiver54" >> "$GITHUB_ENV"
+          bash "$GITHUB_WORKSPACE/tools/operations/build-yoco-receiver54.sh" "$RUNNER_TEMP/aqua-yoco-receiver54"
       - name: Test complete application shard
         run: |
           set -euo pipefail
@@ -443,6 +451,8 @@ jobs:
     needs: [backend-application-discovery, backend-application-tests, backend-web-discovery, backend-web-tests, frontend]
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: docker/setup-buildx-action@v3
       - uses: actions/setup-node@v6
         with:
@@ -466,6 +476,22 @@ jobs:
           push: false
           load: true
           tags: aqualifestyle-runtime-migrator:qualification
+          cache-from: type=gha,scope=api
+      - name: Prepare pinned schema-54 receiver Docker context
+        run: |
+          set -euo pipefail
+          cutover_sha=$(node -p "require('./tools/operations/yoco-receiver54.json').source")
+          [[ "$cutover_sha" =~ ^[0-9a-f]{40}$ ]]
+          mkdir "$RUNNER_TEMP/yoco-receiver-source"
+          git archive "$cutover_sha" | tar -x -C "$RUNNER_TEMP/yoco-receiver-source"
+      - name: Build the separate receive-only compatibility image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ runner.temp }}/yoco-receiver-source
+          file: ${{ runner.temp }}/yoco-receiver-source/docker/api/Dockerfile
+          push: false
+          load: true
+          tags: aqualifestyle-yoco-receiver:qualification
           cache-from: type=gha,scope=api
       - name: Qualify actual runtime restart and database authority in isolation
         run: |

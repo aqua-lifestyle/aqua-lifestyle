@@ -1,0 +1,7 @@
+{
+  "contract": "Aqua.YocoReceiver54.SourceV1",
+  "baseline": "1251fb82979e18be53d1d0e7f5c6fab2d0c50a58",
+  "source": "ba5a268e8e48da288e77d52f79f59f962604dfe6",
+  "tree": "ec44e4b69260806e529ece258eaafe54c35f34fe",
+  "databaseMigrations": 54
+}

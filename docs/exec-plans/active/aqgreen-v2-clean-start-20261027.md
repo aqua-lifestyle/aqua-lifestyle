@@ -248,3 +248,37 @@ rollback cases and final source-bound CI must pass before release qualification.
 The executor's missing existing pg dependency was restored from its unchanged
 lockfile; real PostgreSQL replay/concurrency then passed all three focused cases.
 No new dependency, production query, mutation, resource or human approval resulted.
+
+## Receive-only Yoco correction — owner-authorized implementation
+
+Implement a PostgreSQL-backed receive-only fence using the existing 54-schema
+AbpBackgroundJobs table. Capture verified envelopes independently of business
+processing and commit before acknowledgement. Retain events, serialize duplicate
+capture and replay, drain HTTP writers through shared/exclusive advisory leases,
+and hold all background/automatic payout activity. Replay requires separately
+pinned authoritative-Yoco human reconciliation; unknown events stay held.
+Build a baseline-1251fb8 receiver-only artifact and a separate full-V2 artifact;
+merge ancestry must preserve the 54-to-55 migration delta. No migration-55/reset
+rewrite, production action, new dependency, resource or charge is authorized.
+Validate relevant negative/concurrent/crash/replay/fence/54-schema cases using
+existing synthetic PostgreSQL fixtures, then existing exact-source CI. Any new
+source amendment requires independent acceptance before production authorization.
+
+Receive-only correction validation: 35/35 focused tests passed, zero skipped,
+including the real Production-mode schema-54 receiver, host/operator versus
+Tenant authorization, signed capture and duplicate receipt, abrupt process
+restart, and receipt continuity through migration 55. The earlier 101/101 focused
+payment/recovery tests passed before the final MVC-attribute-only correction;
+this is carried-forward evidence, not exact-source CI. Independent agent review
+closed its controller activation finding and reported technical ACCEPT; it is
+not Aqua's human acceptance. The amended source still needs human admission and
+separate deployment/cutover authorization.
+
+The separate receiver is pinned in `tools/operations/yoco-receiver54.json` and
+built from the actually deployed 54-migration source with no migration changes.
+[The executable receive-only cutover procedure](../../operations/yoco-receive-only-cutover.md)
+retains conservation acceptance before migration 55, authoritative Yoco
+reconciliation before Normal, and disabled payouts/workers. Main-push CI and
+provider baseline readback remain execution gates; no new operational facts,
+provider acceptance, merchant records or deployment IDs have been fabricated.
+No production access or mutation was performed for this correction.

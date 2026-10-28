@@ -175,6 +175,7 @@ namespace AqualLifeStyle.Web.Host.Startup
             }
 
             app.UseAbp(options => { options.UseAbpRequestLocalization = false; }); // Initializes ABP framework.
+            YocoCutoverStartup.ValidateAsync(app.ApplicationServices, env, _appConfiguration).GetAwaiter().GetResult();
 
             app.UseCors(_defaultCorsPolicyName); // Enable CORS!
             app.UseMiddleware<ApplicationRecoveryMiddleware>();

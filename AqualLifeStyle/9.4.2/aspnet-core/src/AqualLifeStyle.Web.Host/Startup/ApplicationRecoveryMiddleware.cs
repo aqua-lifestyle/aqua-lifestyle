@@ -13,6 +13,7 @@ namespace AqualLifeStyle.Web.Host.Startup
         private readonly RequestDelegate _next;
         private readonly IConfiguration _configuration;
         private readonly bool _cleanStartPending;
+        private readonly IYocoCutoverStore _cutoverStore;
         private static readonly HashSet<string> Allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "GET /api/health",
@@ -25,8 +26,9 @@ namespace AqualLifeStyle.Web.Host.Startup
             "POST /api/services/app/AdminProgrammeParticipation/ExportLegacyAQGreenReconciliationEvidence"
         };
 
-        public ApplicationRecoveryMiddleware(RequestDelegate next, IConfiguration configuration)
+        public ApplicationRecoveryMiddleware(RequestDelegate next, IConfiguration configuration, IYocoCutoverStore cutoverStore = null)
         {
+            _cutoverStore = cutoverStore;
             _next = next; _configuration = configuration; ApplicationRecoveryMode.IsEnabled(configuration);
             _cleanStartPending = configuration[AQGreenD10OperatorEvidenceSource.Prefix + "AdmissionMode"] == "CLEAN_START" &&
                 !configuration.GetValue<bool>(AQGreenD10OperatorEvidenceSource.Prefix + "Enabled");
@@ -34,6 +36,32 @@ namespace AqualLifeStyle.Web.Host.Startup
 
         public async Task InvokeAsync(HttpContext context)
         {
+            var cutover = new YocoCutoverOptions(_configuration);
+            if (cutover.Enabled)
+            {
+                context.Response.Headers["X-Aqua-Yoco-Receiver"] = cutover.CompatibilityReceiver ? "Schema54" : "FullV2";
+                var path = context.Request.Path.Value?.TrimEnd('/');
+                if (context.Request.Method == "POST" && path == "/api/payments/yoco/webhook" ||
+                    context.Request.Method == "GET" && path == "/api/health" ||
+                    context.Request.Method == "POST" && path == "/api/TokenAuth/Authenticate" ||
+                    context.Request.Method == "GET" && path == "/api/services/app/Session/GetCurrentLoginInformations" ||
+                    context.Request.Method == "GET" && (path == "/api/operations/yoco-cutover/status" || path == "/api/operations/yoco-cutover/events") ||
+                    context.Request.Method == "POST" && (path == "/api/operations/yoco-cutover/phase" || path == "/api/operations/yoco-cutover/replay"))
+                { await _next(context); return; }
+                IAsyncDisposable lease;
+                try
+                {
+                    if (cutover.CompatibilityReceiver || _cutoverStore == null)
+                        throw new InvalidOperationException("YOCO_CUTOVER_BUSINESS_WRITES_FENCED");
+                    lease = await _cutoverStore.EnterBusinessAsync();
+                }
+                catch
+                { context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                    await context.Response.WriteAsync("{\"error\":\"YOCO_CUTOVER_BUSINESS_WRITES_FENCED\"}"); return; }
+                try { using (YocoCutoverDispatch.EnterBusiness()) { await _next(context); } }
+                finally { await lease.DisposeAsync(); }
+                return;
+            }
             // Captured at startup: config reload cannot drop the pre-D10 fence.
             // Normal provider startup validation still runs (this is not recovery).
             if (_cleanStartPending)
