@@ -304,3 +304,42 @@ validation includes the real Production host starting on schema 54 without an
 operator, signed capture/deduplication, denied privileged calls and fenced writes.
 This is a new revision requiring exact acceptance and CI before deployment;
 existing owner authorization covers receiver-only operation after those gates.
+
+2026-10-28 member read-only restoration, authorized by the owner's whole-member
+experience directive: live capability GET and direct receiver member read routes
+return 503 under the schema-54 receiver. The frontend's shared unknown-mode
+boundary replaces all pages with Info before dashboard/catalogue/programme reads
+can run. Unauthenticated website-proxy member requests return 401 separately;
+these probes are not an authenticated production member journey.
+
+The narrow correction reuses the existing screens and read services. An explicit
+shared HTTP/application allowlist runs under a bounded PostgreSQL read-only UOW;
+business-write authorization is never granted by that read scope. The receiver
+health contract no longer advertises checkout/approval capabilities. The existing
+invitation GET remains fenced because it creates records. A separate repository
+permission mismatch is corrected at the frontend catalogue request: a member
+selects the existing self-service endpoint rather than the administrative
+inventory, without widening backend permissions or retrying a denied request.
+The local browser fixture now supplies the real anonymous capability contract
+instead of a fixture-only 401. All data in local member/browser tests is synthetic.
+
+Validation: 26/26 focused backend tests passed, zero skipped, including the
+published Production-mode schema-54 host on PostgreSQL 18.4. The member reads
+return 200 with a standard synthetic Member, unauthenticated reads return 401,
+the administrative catalogue remains 403, a wrong-Tenant token is rejected, and
+all tested business/unknown/side-effectful GET routes remain 503. Corrupt
+activation history still errors; synthetic fixture dates were supplied explicitly
+for the valid read scenario, without changing a runtime history guard. Existing
+signed capture, deduplication, crash/restart and migration-continuity assertions
+remain in the same test and pass. Forty focused frontend tests passed. Four
+desktop/mobile browser tests passed using the actual compiled frontend and the
+existing synthetic backend, including every member read section and the existing
+programme/earnings view. Production build/type checking passed; ESLint passed
+with one pre-existing invitation-navigation warning. These are not authenticated
+production member or genuine provider-delivery evidence.
+
+Exact-source CI and independent human admission are pending. No new
+production receiver deployment, retirement, migration, D10, payout or provider
+checkout attempt has occurred in this workstream. The documented provider 403
+remains with Xolani-M; genuine signed receipt/Held/deduplication evidence remains
+required before retirement, and Aqua conservation acceptance remains before 55.

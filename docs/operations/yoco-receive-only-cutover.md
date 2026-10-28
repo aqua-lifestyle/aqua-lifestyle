@@ -87,6 +87,36 @@ operator. Background execution and external checkout creation also fail closed.
 A receiver restart requires the mode to remain enabled. Old accepted payment
 relationships are never deleted or overwritten by capture.
 
+## Member reads while receive-only is held
+
+The member-read amendment allows the existing anonymous `AQGreenPilot/GetStatus`
+capability response and an explicit list of existing member read methods. This
+does not commission V2 or accept any historical/financial evidence. The same
+frontend capability guard remains fail-closed on an unknown response.
+
+`YocoCutoverMemberReads` defines the single HTTP/application-method allowlist:
+profile/current customer, membership catalogue/benefits/window status, products,
+self orders/enquiries, participation, programme journey/progress (including
+AQGreen, Onyx and recorded earnings), savings, loans and monthly obligations.
+Authentication is resolved before the read UOW starts. All existing ABP
+permissions, Tenant and ownership checks remain authoritative. Each allowed
+request joins a PostgreSQL repeatable-read, read-only transaction with the
+existing 3-second lock and 30-second statement limits, then rolls back. The
+read scope never authorizes a business write or callback replay.
+
+The health response omits checkout/approval capabilities while cutover is
+enabled, so the existing member UI disables new/continued hosted payment actions.
+Joining, profile edits, checkout, approvals, placement, commissions, payouts and
+unknown routes remain fenced. `ProgrammeInvitation/GetMyInvitations` remains
+closed because that existing GET creates invitations. Do not allow arbitrary
+GETs, grant administrative permissions to members, or use legacy financial
+fallbacks to fill unavailable V2 history. Member catalogue requests select the
+existing self-service active-tiers endpoint; administrators retain the separately
+authorized inventory. Read errors remain errors, not empty business values.
+
+Deploying this amendment still requires exact-source CI/admission and independent
+human acceptance. It does not authorize the full V2 artifact before migration 55.
+
 ## Coordinated execution and release
 
 After the owner authorizes the exact window and pins:

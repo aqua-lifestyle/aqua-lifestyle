@@ -35,6 +35,7 @@ import {
   initialMembershipsState,
 } from "./context";
 import { membershipsReducer } from "./reducer";
+import { useAuthState } from "../Auth";
 
 type MembershipsProviderProps = {
   children: ReactNode;
@@ -45,6 +46,8 @@ const getErrorMessage = (error: unknown): string => {
 };
 
 export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {
+  const { session } = useAuthState();
+  const canViewAll = session?.user?.permissions.includes("Aqua.Memberships.View") ?? false;
   const [state, dispatch] = useReducer(
     membershipsReducer,
     initialMembershipsState,
@@ -55,13 +58,15 @@ export const MembershipsProvider = ({ children }: MembershipsProviderProps) => {
 
     try {
       const memberships = await httpClient.get<Membership[]>(
-        apiEndpoints.memberships.getAll,
+        // Members use the existing self-service catalogue. The administrative
+        // inventory retains its separate permission; a denial never falls back.
+        canViewAll ? apiEndpoints.memberships.getAll : apiEndpoints.memberships.getActiveTiers,
       );
       dispatch(getMembershipsSuccess(memberships));
     } catch (error) {
       dispatch(getMembershipsError(getErrorMessage(error)));
     }
-  }, []);
+  }, [canViewAll]);
 
   const getActiveTiers = useCallback(async () => {
     dispatch(getActiveTiersPending());

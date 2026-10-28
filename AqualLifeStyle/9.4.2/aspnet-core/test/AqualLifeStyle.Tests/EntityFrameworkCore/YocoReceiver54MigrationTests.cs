@@ -36,6 +36,9 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 throw new InvalidOperationException("Build the pinned schema-54 receiver with tools/operations/build-yoco-receiver54.sh and set YOCO_RECEIVER54_ARTIFACT. This proof cannot be skipped.");
             await using var db=await _fixture.CreateDatabaseAsync();await using var c=new NpgsqlConnection(db.ConnectionString());await c.OpenAsync();await PrepareAsync(c);
             await SeedReceiverOperators(c);
+            // The allocator fixture intentionally omits lifecycle dates. Supply
+            // explicit synthetic activation facts for this member-read scenario.
+            await SqlAsync(c,"UPDATE \"EntryParticipations\" SET \"ActivatedAt\"=\"StartedAt\" WHERE \"Status\"=2");
             var before=await ProtectedDigestAsync(c);using var redis=await AQGreenMigrationRollbackPostgreSqlTests.RecoveryRedis.StartAsync();
             using var rsa=RSA.Create(2048);var request=new CertificateRequest("CN=Synthetic cutover receiver",rsa,HashAlgorithmName.SHA256,RSASignaturePadding.Pkcs1);
             using var cert=request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-2),DateTimeOffset.UtcNow.AddHours(1));
@@ -47,6 +50,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             using(var host=await ReceiverHost.Start(directory,db.ConnectionString(),redis.Endpoint,cert64,true,client,false))
             {
                 await host.Ready(client);
+                await VerifyReceiverMemberReads(client,host,c,before);
                 (await ReceiverPost(client,host.Address,body,false)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
                 (await ReceiverPost(client,host.Address,body,true)).StatusCode.ShouldBe(HttpStatusCode.OK,host.Log);
                 (await ReceiverPost(client,host.Address,body,true)).StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -115,7 +119,59 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 user.SetNormalizedNames();context.Users.Add(user);await context.SaveChangesAsync();context.UserRoles.Add(new UserRole(null,id,role.Id));
             }
             var tenantUser=await context.Users.SingleAsync(x=>x.Id==3001);tenantUser.SecurityStamp="synthetic-cutover-stamp-3001";
+            var memberRole=new Role(1,"Member","Member");context.Roles.Add(memberRole);await context.SaveChangesAsync();
+            context.UserRoles.Add(new UserRole(1,3001,memberRole.Id));
+            foreach(var permission in AqualLifeStyle.Authorization.AquaRolePermissions.GetFor(AqualLifeStyle.Domain.Enums.AquaUserRole.Member)
+                .Concat(new[]{"Pages.Products","Pages.Memberships"}))
+                context.Permissions.Add(new RolePermissionSetting {TenantId=1,RoleId=memberRole.Id,Name=permission,IsGranted=true});
             context.Permissions.Add(new RolePermissionSetting {TenantId=null,RoleId=role.Id,Name="Pages.Tenants",IsGranted=true});await context.SaveChangesAsync();
+        }
+        private static async Task VerifyReceiverMemberReads(HttpClient client,ReceiverHost host,NpgsqlConnection c,string before)
+        {
+            var status=await client.GetAsync(host.Address+"/api/services/app/AQGreenPilot/GetStatus");
+            status.StatusCode.ShouldBe(HttpStatusCode.OK,host.Log);
+            var statusBody=await status.Content.ReadAsStringAsync();statusBody.ShouldContain("\"isPilot\":false");
+            var health=await (await client.GetAsync(host.Address+"/api/health")).Content.ReadAsStringAsync();
+            health.ShouldContain("member-programme-journey-v1");health.ShouldNotContain("aqgreen-flexible-joining-v1");
+            health.ShouldNotContain("direct-onyx-checkout-v1");
+            var routes=new[]{"Customer/GetMyCustomer","ClubMemberProgrammeParticipation/GetMyParticipations",
+                "ClubMemberProgrammeProgress/GetMyJourney","ClubMemberProgrammeProgress/GetMyProgress",
+                "ClubMemberSavings/GetMyAccount","ClubMemberOnyxLoan/GetMyAgreements",
+                "ClubMemberEntryMonthlyObligation/GetMyObligations","OrderIntent/GetMine","Enquiry/GetMine",
+                "Membership/GetActiveTiers","Membership/GetSavingsWindowStatuses","Product/GetAll","MyAccount/GetProfile"};
+            foreach(var route in routes)
+                (await client.GetAsync(host.Address+"/api/services/app/"+route)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized,route);
+            client.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",ReceiverToken(3001,1));
+            (await client.GetAsync(host.Address+"/api/services/app/Membership/GetAll")).StatusCode.ShouldBe(HttpStatusCode.Forbidden,
+                "The standard Member keeps ViewSelf without gaining the administrative inventory permission.");
+            foreach(var route in routes)
+            {
+                var response=await client.GetAsync(host.Address+"/api/services/app/"+route);
+                response.StatusCode.ShouldBe(HttpStatusCode.OK,route+" "+host.Log+" "+await response.Content.ReadAsStringAsync());
+            }
+            var customer=await (await client.GetAsync(host.Address+"/api/services/app/Customer/GetMyCustomer")).Content.ReadAsStringAsync();
+            using(var document=System.Text.Json.JsonDocument.Parse(customer))
+            {
+                document.RootElement.GetProperty("result").GetProperty("id").GetInt32().ShouldBe(1);
+                document.RootElement.GetProperty("result").GetProperty("email").GetString().ShouldBe("allocator-customer-1@example.test");
+            }
+            // Corrupt historical evidence remains an error, never a fabricated
+            // zero/Incomplete progress value. This is disposable fixture data.
+            await SqlAsync(c,"UPDATE \"EntryParticipations\" SET \"ActivatedAt\"=NULL WHERE \"TenantId\"=1 AND \"CustomerId\"=1");
+            (await client.GetAsync(host.Address+"/api/services/app/ClubMemberProgrammeProgress/GetMyProgress")).StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
+            await SqlAsync(c,"UPDATE \"EntryParticipations\" SET \"ActivatedAt\"=\"StartedAt\" WHERE \"TenantId\"=1 AND \"CustomerId\"=1");
+            client.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",ReceiverToken(3001,2));
+            (await client.GetAsync(host.Address+"/api/services/app/Customer/GetMyCustomer")).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+            client.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",ReceiverToken(3001,1));
+            foreach(var route in new[]{"ProgrammeInvitation/GetMyInvitations","Customer/GetAll","AdminCommission/GetAll","Unknown/GetAnything"})
+                (await client.GetAsync(host.Address+"/api/services/app/"+route)).StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable,route);
+            foreach(var route in new[]{"Product/GetAll","ClubMemberProgrammeParticipation/GetMyParticipations","Account/Register",
+                "ClubMemberProgrammeParticipation/StartEntry","ClubMemberProgrammeParticipation/CreateAQGreenJoiningCheckout",
+                "AdminProgrammeParticipation/ApproveProgrammeParticipation","AdminCommission/Release"})
+                (await client.PostAsync(host.Address+"/api/services/app/"+route,new StringContent("{}",Encoding.UTF8,"application/json")))
+                    .StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable,route);
+            client.DefaultRequestHeaders.Authorization=null;
+            (await ProtectedDigestAsync(c)).ShouldBe(before);
         }
         private static string ReceiverToken(long user,int? tenant=null)
         {

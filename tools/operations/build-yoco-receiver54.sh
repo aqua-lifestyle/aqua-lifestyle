@@ -31,6 +31,7 @@ while IFS= read -r cutover_file; do
     AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.Web.Core/AqualLifeStyleWebCoreModule.cs|\
     AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.Web.Host/Controllers/YocoCutoverController.cs|\
     AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.Web.Host/Controllers/YocoPaymentsController.cs|\
+    AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.Web.Host/Controllers/HealthController.cs|\
     AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.Web.Host/Startup/YocoCutoverStartup.cs|\
     AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.Web.Host/Startup/Startup.cs|\
     AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.Web.Host/Startup/ApplicationRecoveryMiddleware.cs|\
