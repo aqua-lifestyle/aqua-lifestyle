@@ -41,6 +41,27 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             using var cert=request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-2),DateTimeOffset.UtcNow.AddHours(1));
             var cert64=Convert.ToBase64String(cert.Export(X509ContentType.Pfx,"synthetic"));
             using var client=new HttpClient {Timeout=TimeSpan.FromSeconds(15)};var body=CutoverBody();
+            // The forced artifact needs no application operator to receive on
+            // schema 54. No host, including the former fixture operator, gains
+            // privileged access when the optional identity is absent.
+            using(var host=await ReceiverHost.Start(directory,db.ConnectionString(),redis.Endpoint,cert64,true,client,false))
+            {
+                await host.Ready(client);
+                (await ReceiverPost(client,host.Address,body,false)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+                (await ReceiverPost(client,host.Address,body,true)).StatusCode.ShouldBe(HttpStatusCode.OK,host.Log);
+                (await ReceiverPost(client,host.Address,body,true)).StatusCode.ShouldBe(HttpStatusCode.OK);
+                client.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",ReceiverToken(7));
+                foreach(var route in new[]{"status","events"})
+                    (await client.GetAsync(host.Address+"/api/operations/yoco-cutover/"+route)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+                foreach(var route in new[]{"phase","replay"})
+                    (await client.PostAsync(host.Address+"/api/operations/yoco-cutover/"+route,new StringContent("{}",Encoding.UTF8,"application/json")))
+                        .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+                client.DefaultRequestHeaders.Authorization=null;
+                (await client.PostAsync(host.Address+"/api/services/app/Account/Register",new StringContent("{}",Encoding.UTF8,"application/json")))
+                    .StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+                Convert.ToInt64(await SqlAsync(c,"SELECT count(*) FROM \"AbpBackgroundJobs\" WHERE \"JobType\"='Aqua.YocoCutover.ManualHeldEventV1'")).ShouldBe(1);
+                (await ProtectedDigestAsync(c)).ShouldBe(before);host.Kill();
+            }
             using(var host=await ReceiverHost.Start(directory,db.ConnectionString(),redis.Endpoint,cert64,true,client))
             {
                 await host.Ready(client);
@@ -115,7 +136,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             private Process _process;private readonly ConcurrentQueue<string> _logs=new();
             public string Address;public string Log=>string.Join("\n",_logs);public int ExitCode=>_process.ExitCode;
-            public static Task<ReceiverHost> Start(string dir,string cs,string redis,string cert,bool enabled,HttpClient _)
+            public static Task<ReceiverHost> Start(string dir,string cs,string redis,string cert,bool enabled,HttpClient _,bool operatorConfigured=true)
             {
                 var listener=new TcpListener(IPAddress.Loopback,0);listener.Start();var port=((IPEndPoint)listener.LocalEndpoint).Port;listener.Stop();
                 var host=new ReceiverHost {Address="http://127.0.0.1:"+port};
@@ -134,6 +155,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     ("Bird__ApiKey","bk_eu1_safe-test-placeholder"),("Bird__FromEmail","noreply@example.test"),("Bird__ReplyToEmail","help@example.test"),
                     ("Bird__FromName","Synthetic cutover test"),("Bird__DeliveryNotBeforeUtc","2026-01-01T00:00:00Z"),
                     ("Yoco__Mode","test"),("Yoco__SecretKey","sk_test_synthetic_not_a_real_credential"),("Yoco__WebhookSecret",CutoverSecret)}) start.Environment[pair.Item1]=pair.Item2;
+                if(!operatorConfigured)start.Environment.Remove("App__YocoCutover__OperatorUserId");
                 host._process=new Process {StartInfo=start};host._process.OutputDataReceived+=(_,e)=>{if(e.Data!=null)host._logs.Enqueue(e.Data);};
                 host._process.ErrorDataReceived+=(_,e)=>{if(e.Data!=null)host._logs.Enqueue(e.Data);};host._process.Start();host._process.BeginOutputReadLine();host._process.BeginErrorReadLine();return Task.FromResult(host);
             }

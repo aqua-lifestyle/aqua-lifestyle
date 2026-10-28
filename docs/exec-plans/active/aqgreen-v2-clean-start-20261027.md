@@ -293,3 +293,14 @@ the backend subdirectory, where plain `git archive` emits a stripped subtree.
 Direct archive listings reproduced that exact missing-project cause. Runtime,
 receiver pin, reviewed SQL and previously passing tests remain unchanged.
 The additional restricted-file/pin/duplicate-JSON test passed separately (1/1).
+
+2026-10-28 owner-directed receiver startup correction: the forced schema-54
+artifact may omit the application operator ID for signature-verified durable
+capture. Missing identity denies every protected controller operation; phase
+changes also explicitly reject an absent operator. Full V2 retains its required
+operator, replay/release guards and all existing schema/payment controls.
+The receiver source pin is updated to the narrow two-file correction. Focused
+validation includes the real Production host starting on schema 54 without an
+operator, signed capture/deduplication, denied privileged calls and fenced writes.
+This is a new revision requiring exact acceptance and CI before deployment;
+existing owner authorization covers receiver-only operation after those gates.
