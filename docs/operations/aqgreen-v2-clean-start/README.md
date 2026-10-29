@@ -97,14 +97,29 @@ The protected operator record must contain all of:
    authorized Area(s), canonical UTC effective boundary and capability selection.
    Keep that identity in the protected D10 decision only.
 
-The retained programme boundary is **Friday 00:00 Africa/Johannesburg** (Thursday
-22:00 UTC), not a UTC Monday. The next boundary after 27 October is
-`2026-10-29T22:00:00Z`; this is a proposed activation time, not authorization or a
-claim that prerequisites will be ready. Reset, actual receipt acceptance, DDL,
-deployment and D10 authorization must finish beforehand. The owner must approve
-the actual reset window (at most 30 minutes), deployment window and cancellation
-responsibility; if readiness misses the boundary, stop and select another approved
-canonical boundary. The reset's SQL receipt is checked against the same domain rule.
+The original boundary policy remains **Friday 00:00 Africa/Johannesburg** (Thursday
+22:00 UTC). The old proposed `2026-10-29T22:00:00Z` boundary has expired and cannot
+be backdated. The owner's [prospective CLEAN_START amendment](owner-attested-test-only-decision.md)
+also permits an explicitly authorized future UTC launch time, without waiting for
+the next financial week. This leaves the commission-week calendar unchanged.
+
+Select the new path only with `boundary_policy=OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1`
+and `boundary_authorization_digest` bound to the real owner/independent boundary
+decision. Reset records these in its immutable journal; native `state.sql` exposes
+them to D10. Use `AQGreenCleanStartV2` evidence with matching `boundaryPolicy` and
+`boundaryAuthorizationDigest`; the latter must equal the independently verified
+authority's existing `financialBoundaryEvidenceDigest`. V1/omitted policy remains
+canonical, and cannot silently select the new timing. Unknown/mixed modes fail.
+
+Choose a future effective time that allows reset, actual conservation/Aqua
+acceptance, DDL, deployment and D10 authorization to finish first. The owner must
+authorize the actual reset window (at most 30 minutes), deployment window and
+cancellation responsibility. A missed effective time requires a new valid binding;
+neither this amendment nor an old package authorizes an expired operation.
+Financial cutoffs before the effective point remain rejected by the existing
+`D10_CLEAN_START_HISTORICAL_FINANCIAL_REPLAY_HELD` guard. A partial financial week
+does not become a completed/payable week through this amendment. Workers and
+payouts stay held pending their existing separate financial commissioning.
 
 Archived test identities retain login/administrator access. Their old participation
 and immutable audit references are not recycled into genuine membership. Choose
@@ -133,6 +148,12 @@ without the separate exact reset authorization. The permitted
 authorization window is at most 30 minutes; each SQL statement remains limited to
 30 seconds. None of these variables carries credentials or member identities.
 Supply credentials solely via the existing protected client environment.
+
+For the prospective amendment, also supply `boundary_policy` and
+`boundary_authorization_digest` as described above. These are authority references,
+not provider credentials or replacements for the owner/reset/reviewer digests.
+Canonical operations omit both new inputs or select
+`CANONICAL_FINANCIAL_WEEK_V1` with an empty boundary-authorization digest.
 
 Use only the reviewed status-only launcher for the amended preflight; it enforces
 the provider endpoint, authenticated TLS and output whitelist. Retirement uses

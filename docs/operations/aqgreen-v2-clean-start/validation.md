@@ -1,5 +1,37 @@
 # Current owner-attested test-only candidate
 
+## Prospective UTC boundary amendment — current local evidence
+
+The owner authorized a prospective CLEAN_START boundary without waiting for the
+next Friday midnight. Local implementation is TESTED, not production deployed.
+Historical B6 and commission-week logic are unchanged. No production data or
+credentials were used in these tests.
+
+- Core/D10 focused validation:88 passed, zero failed/skipped; includes explicit
+  native/independent policy binding, missing/unknown/mixed authority, temporal
+  rejection, all nine exposure guards, V1 encoding/canonical compatibility,
+  historical B6 calendar rejection and payout/worker holds.
+- PostgreSQL18.4 clean-start/preflight validation:37 of39 passed initially. The
+  two failures were the deliberately pinned old state hash and an unset local
+  receiver-artifact prerequisite. Updated the hash to the actual amended SQL and
+  reused the existing4eba379 artifact; the two focused reruns passed, zero skips.
+  No receiver rebuild was performed. The new native prospective-retirement case
+  passed, covering rejected missing/unknown authority, rejected past time,
+  retained payment relationships, actual journal/D10 binding and bounded undo.
+- Launcher privacy/diagnostic suite:17 passed, zero failed/skipped. Its state.sql
+  integrity pin follows the amended source; approved preflight predicates remain
+  unchanged.
+- Mandatory exact-source CI and Aqua acceptance of this new boundary amendment
+  remain pending until their real results are recorded. Prior member-release
+  production acceptance stays closed and is not repeated or used as new-source
+  acceptance. No actual conservation/retirement, migration55, Normal or payout
+  activation is asserted.
+
+Artifacts: `/tmp/aqgreen-prospective-core-results/prospective-core.trx`,
+`/tmp/aqgreen-prospective-postgres-results/prospective-postgres.trx` and
+`/tmp/aqgreen-prospective-postgres-corrections/prospective-postgres-corrections.trx`.
+Release builds passed with existing warnings; no warning-free build is claimed.
+
 Status: IMPLEMENTED; focused non-production validation is recorded below. No
 production reset, migration, deployment or new independent acceptance is asserted.
 The business-owner classification is CONFIRMED in
@@ -11,11 +43,11 @@ its historical revisions; it does not override this current candidate.
 |---|---|
 | preflight.sql | `b0b495e30d0f3b910980f6d212b75b57de725c35f56c253ff973f681382264dd` |
 | preflight-checks.sql | `1d8845c76fa87843f48fc2e648a57333c94d2417fc018c4b499ff28d25e91651` |
-| state.sql | `f3cd2d6b9248bbb1bf098cc721b98b5a025f0c9f015c97316b1886f80e27f138` |
-| reset.sql | `51d93f6b07165bb0ed547cf1d2985b3ec83b61cf1dd278a0abecb577c8d34bf1` |
+| state.sql | `16d580d6782096bc9be9be3a862f57bd304a18eb75578338cb2d7ad4abd630f0` |
+| reset.sql | `f7f82dc9497ac1519b7d6b69785af12682526b9e2a500a949ba273d1b446a2cd` |
 | restore.sql | `e8eb11cdb8f1242e1c7fdb3560c603950810ea37c3525fc5d74d84e39df5f3f3` |
 | migration-55.reviewed.sql | `1f45ef7b67fa6eae747ca70edfed05679ef63cf4cfe2f2cf308b9d31b8c1faea` |
-| aqgreen-clean-start-preflight.mjs | `3429dafeb5b9c09b253a0db86889feae0942b1046ad2dd4a0482e58928fd2e59` |
+| aqgreen-clean-start-preflight.mjs | `abfdf2f08b596575c625f7599050d009135f37086c7a69323a980af74c9bb45e` |
 
 The original status-only payment predicate is unchanged and can still report FAIL
 on preserved records. Only explicitly attested reset/D10/executor admission admits

@@ -44,7 +44,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             var checkStart = checks.IndexOf("WITH settings AS (", StringComparison.Ordinal);
             var checkEnd = checks.IndexOf(", verdict AS (", StringComparison.Ordinal);
             checks.Substring(checkStart, checkEnd - checkStart).Trim().ShouldBe(state.Substring(start, end - start).Trim());
-            AQGreenB6CanonicalEvidence.Hash(Encoding.UTF8.GetBytes(state)).ShouldBe("f3cd2d6b9248bbb1bf098cc721b98b5a025f0c9f015c97316b1886f80e27f138");
+            AQGreenB6CanonicalEvidence.Hash(Encoding.UTF8.GetBytes(state)).ShouldBe("16d580d6782096bc9be9be3a862f57bd304a18eb75578338cb2d7ad4abd630f0");
             await using var lease = await _fixture.CreateDatabaseAsync();
             await using var c = new NpgsqlConnection(lease.ConnectionString()); await c.OpenAsync();
             await using var context = _fixture.CreateDbContext(c);

@@ -202,9 +202,10 @@ namespace AqualLifeStyle.Domain.AQGreen
             AQGreenD10VerifiedAuthority a, AQGreenCleanStartEvidence e)
         {
             Require(d != null && a != null && e != null, "D10_REQUIRED_AUTHORITY_MISSING");
+            var prospective = e.ContractVersion == "AQGreenCleanStartV2";
             Require(d.AdmissionMode == "CLEAN_START" && a.AdmissionMode == "CLEAN_START" &&
                 d.ContractVersion == "AQGreenD10CutoverV1" && a.ContractVersion == "AQGreenD10VerifiedAuthorityV1" &&
-                e.ContractVersion == "AQGreenCleanStartV1" && e.EvidenceClassification == "OPERATIONAL_EVIDENCE" &&
+                (e.ContractVersion == "AQGreenCleanStartV1" || prospective) && e.EvidenceClassification == "OPERATIONAL_EVIDENCE" &&
                 d.DecisionId == "AQG-V2-D10" && d.Outcome == "AUTHORIZED" && Code(d.DecisionReference) &&
                 Code(a.AuthorityReference) && Code(e.ResetId) && d.CleanStartResetId == e.ResetId && d.CleanStartRootCustomerId > 0,
                 "D10_CLEAN_START_AUTHORITY_INVALID");
@@ -216,7 +217,20 @@ namespace AqualLifeStyle.Domain.AQGreen
             Require(Utc(e.ResetAtUtc) && Utc(d.AuthorizedAtUtc) && Utc(d.V2EffectiveAtUtc) &&
                 e.ResetAtUtc <= d.AuthorizedAtUtc && d.AuthorizedAtUtc <= d.V2EffectiveAtUtc,
                 "D10_EFFECTIVE_BOUNDARY_INVALID");
-            AQGreenCommissionWeek.FromStartUtc(d.V2EffectiveAtUtc);
+            if (prospective)
+                Require(e.BoundaryPolicy == AQGreenCleanStartEvidence.ProspectiveBoundary &&
+                    Digest(e.BoundaryAuthorizationDigest) &&
+                    e.BoundaryAuthorizationDigest == a.FinancialBoundaryEvidenceDigest &&
+                    e.State != null && e.State.BoundaryPolicy == e.BoundaryPolicy &&
+                    e.State.BoundaryAuthorizationDigest == e.BoundaryAuthorizationDigest,
+                    "D10_CLEAN_START_PROSPECTIVE_BOUNDARY_AUTHORITY_REQUIRED");
+            else
+            {
+                Require(e.BoundaryPolicy == null && e.BoundaryAuthorizationDigest == null &&
+                    e.State?.BoundaryPolicy == null && e.State?.BoundaryAuthorizationDigest == null,
+                    "D10_CLEAN_START_BOUNDARY_POLICY_MISMATCH");
+                AQGreenCommissionWeek.FromStartUtc(d.V2EffectiveAtUtc);
+            }
             Require(d.HistoricalMembers?.Count == 0 && d.ReconciledPlacements?.Count == 0 &&
                 d.AllowProspectiveAdmissions == true && d.EnableGraduation == false &&
                 d.PopulationDigests == null && d.PopulationParticipantKeys == null && d.AcceptedComponentDigest == null &&

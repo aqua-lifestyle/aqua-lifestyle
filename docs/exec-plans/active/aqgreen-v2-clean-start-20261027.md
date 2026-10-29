@@ -1,5 +1,35 @@
 # AQGreen V2 clean-start release — 27 October 2026
 
+## Active prospective-boundary amendment — 30 October Johannesburg time
+
+Current explicit owner instruction: "boundry can happen now". The accepted reset
+and both D10 paths still require Friday00:00 Johannesburg; the expired29 October
+22:00UTC proposal cannot be executed by changing an argument to a noncanonical
+instant. Implement only the explicitly selected CLEAN_START prospective boundary,
+preserving historical B6 admission, commission weeks, all nine exposure guards,
+native source/receipt binding, payment/audit preservation and all financial holds.
+
+Worktree `aqua-clean-start-boundary`, branch `fix/prospective-clean-start-boundary`,
+base accepted main `53341b578bf08a61c554bf36f165beb82626b9e7`.
+`AQGreenCleanStartV2` and `OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1` require the native
+receipt policy/authority to match the independent financial-boundary digest.
+Missing or unknown selection/authority fails; V1 retains its original encoding
+and canonical guard. Future effective time and actual reset/conservation/D10
+authority ordering are unchanged. No historical timestamp is backdated.
+
+Current work is implementation/non-production validation only. Exact tests/CI,
+new hashes and independent amendment acceptance will be recorded when observed.
+Source/publication acceptance is not actual conservation acceptance. No production
+SQL, retirement, migration, receiver replacement, Normal or payout activation has
+been performed for this amendment; the closed member release remains untouched.
+
+Local results:88 core/D10 and17 launcher tests passed with zero skips. PostgreSQL
+run initially passed37/39; updated the explicit state-file hash assertion and
+provided the existing4eba379 artifact path for the unchanged published-receiver
+proof. Both failed checks then passed in a focused2/2 rerun. The new native
+prospective retirement/preservation/D10/undo case passed. No existing receiver
+build, checkout retry, application UI change or production mutation was needed.
+
 Owner authority: the direct 27 October clean-start instruction supersedes mandatory
 historical migration only for an explicitly classified disposable Tenant 1 dataset.
 It authorizes implementation and non-production validation, not production reads,
