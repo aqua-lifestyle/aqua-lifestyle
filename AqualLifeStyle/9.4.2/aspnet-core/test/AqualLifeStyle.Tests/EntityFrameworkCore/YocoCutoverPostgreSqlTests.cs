@@ -60,6 +60,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 finally { Current.Value=null; }
             }
             public Task<IAsyncDisposable> EnterBusinessAsync()=>YocoCutoverStore.EnterBusinessAsync(_cs);
+            public Task ReadOnlyAsync(Func<Task> read) => throw new NotSupportedException("Receipt test double does not admit HTTP reads.");
         }
         private sealed class CutoverDispatch : IYocoCutoverDispatcher
         {

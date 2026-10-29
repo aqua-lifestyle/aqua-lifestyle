@@ -178,7 +178,6 @@ namespace AqualLifeStyle.Web.Host.Startup
             YocoCutoverStartup.ValidateAsync(app.ApplicationServices, env, _appConfiguration).GetAwaiter().GetResult();
 
             app.UseCors(_defaultCorsPolicyName); // Enable CORS!
-            app.UseMiddleware<ApplicationRecoveryMiddleware>();
 
             app.UseStaticFiles();
 
@@ -189,6 +188,8 @@ namespace AqualLifeStyle.Web.Host.Startup
                 branch => branch.UseRateLimiter());
 
             app.UseAuthentication();
+            // Resolve the authenticated Tenant before opening a member-read UOW.
+            app.UseMiddleware<ApplicationRecoveryMiddleware>();
             app.UseAuthorization();
 
             app.UseAbpRequestLocalization();

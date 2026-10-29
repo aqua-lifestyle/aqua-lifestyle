@@ -36,6 +36,18 @@ namespace AqualLifeStyle.EntityFrameworkCore
             return result;
         }
 
+        public async Task ReadOnlyAsync(Func<Task> read)
+        {
+            using var uow = _uows.Begin(new UnitOfWorkOptions { Scope = TransactionScopeOption.RequiresNew,
+                IsTransactional = true, IsolationLevel = System.Transactions.IsolationLevel.RepeatableRead });
+            var context = await _provider.GetDbContextAsync();
+            if (!context.Database.IsNpgsql() || context.Database.CurrentTransaction == null)
+                throw new InvalidOperationException("YOCO_CUTOVER_READ_REQUIRES_POSTGRES_TRANSACTION");
+            await context.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY; SET LOCAL lock_timeout='3s'; SET LOCAL statement_timeout='30s'");
+            using (YocoCutoverDispatch.EnterReadOnly()) { await read(); }
+            // Deliberately no Complete: disposal rolls back the read transaction.
+        }
+
         public static async Task<T> ExecuteAsync<T>(AqualLifeStyleDbContext context, Func<YocoCutoverSnapshot, Task<T>> action)
         {
             if (!context.Database.IsNpgsql() || context.Database.CurrentTransaction == null)

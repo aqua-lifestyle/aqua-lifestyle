@@ -64,6 +64,34 @@ namespace AqualLifeStyle.Tests.WebHost
             reached.ShouldBe(allowed);if(!allowed)ctx.Response.StatusCode.ShouldBe(503);
         }
         [Fact]
+        public void MemberReadScopeNeverAuthorizesBusinessWritesOrInvitationCreation()
+        {
+            var interceptor=new PilotApplicationBoundaryInterceptor(DisabledAQGreenPilotMode.Instance,Config());
+            var read=Substitute.For<IInvocation>();read.TargetType.Returns(typeof(AQGreenPilotAppService));
+            read.Method.Returns(typeof(AQGreenPilotAppService).GetMethod("GetStatusAsync"));
+            Should.Throw<AbpAuthorizationException>(()=>interceptor.Intercept(read));
+            using(YocoCutoverDispatch.EnterReadOnly())
+            {
+                YocoCutoverDispatch.IsBusinessAuthorized.ShouldBeFalse();YocoCutoverDispatch.IsAuthorized.ShouldBeFalse();
+                interceptor.Intercept(read);read.Received(1).Proceed();
+                var write=Substitute.For<IInvocation>();write.TargetType.Returns(typeof(AQGreenCleanStartRootAppService));
+                write.Method.Returns(typeof(AQGreenCleanStartRootAppService).GetMethod("AuthorizeRootAsync"));
+                Should.Throw<AbpAuthorizationException>(()=>interceptor.Intercept(write));write.DidNotReceive().Proceed();
+            }
+            YocoCutoverDispatch.IsReadOnlyAuthorized.ShouldBeFalse();
+            YocoCutoverMemberReads.AllowsRoute("GET","/api/services/app/ProgrammeInvitation/GetMyInvitations").ShouldBeFalse();
+            YocoCutoverMemberReads.AllowsRoute("POST","/api/services/app/Product/GetAll").ShouldBeFalse();
+            YocoCutoverMemberReads.AllowsRoute("GET","/api/services/app/AdminCommission/GetAll").ShouldBeFalse();
+        }
+        [Fact]
+        public async Task MemberReadsFailClosedWithoutReadOnlyStore()
+        {
+            var reached=false;var ctx=new DefaultHttpContext();ctx.Request.Method="GET";
+            ctx.Request.Path="/api/services/app/AQGreenPilot/GetStatus";ctx.Response.Body=new MemoryStream();
+            await new ApplicationRecoveryMiddleware(_=>{reached=true;return Task.CompletedTask;},Config()).InvokeAsync(ctx);
+            reached.ShouldBeFalse();ctx.Response.StatusCode.ShouldBe(503);
+        }
+        [Fact]
         public async Task DirectCheckoutCannotReachProviderAndDirectBusinessApplicationCallsAreDenied()
         {
             var c=Config();var network=new RejectNetwork();var gateway=new YocoCheckoutGateway(new HttpClient(network),c);

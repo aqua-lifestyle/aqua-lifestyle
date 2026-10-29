@@ -21,6 +21,14 @@ const memberAccessToken = createAccessToken({
     "Aqua.ProgrammeParticipations.Invite",
     "Aqua.ProgrammeParticipations.ViewSelf",
     "Aqua.Savings.ViewSelf",
+    "Aqua.Members.ViewSelf",
+    "Aqua.Memberships.ViewSelf",
+    "Aqua.Orders.ViewSelf",
+    "Aqua.Enquiries.ViewSelf",
+    "Aqua.Loans.ViewSelf",
+    "Aqua.EntryMonthlyObligations.ViewSelf",
+    "Pages.Products",
+    "Pages.Memberships",
   ],
   role: "Member",
   sub: "42",
@@ -310,6 +318,12 @@ const responses = new Map([
   }]],
   ["/api/services/app/Membership/GetActiveTiers", []],
   ["/api/services/app/Membership/GetSavingsWindowStatuses", []],
+  ["/api/services/app/OrderIntent/GetMine", []],
+  ["/api/services/app/Enquiry/GetMine", []],
+  ["/api/services/app/ClubMemberSavings/GetMyAccount", { account: null }],
+  ["/api/services/app/ClubMemberOnyxLoan/GetMyAgreements", { items: [] }],
+  ["/api/services/app/ClubMemberEntryMonthlyObligation/GetMyObligations", []],
+  ["/api/services/app/Product/GetAll", [{ id: 5, isActive: true, membershipId: null, name: "Water filter", price: 149 }]],
   ["/api/services/app/ClubMemberProgrammeParticipation/GetMyParticipations", participation],
   ["/api/services/app/ClubMemberProgrammeProgress/GetMyJourney", {
     programmes: [
@@ -375,6 +389,10 @@ createServer((request, response) => {
   if (url.pathname === "/api/health") {
     return sendJson(response, 200, responses.get(url.pathname));
   }
+  // Match the real anonymous capability contract instead of failing login
+  // behind a fixture-only 401 before the member's first authenticated request.
+  if (request.method === "GET" && url.pathname === "/api/services/app/AQGreenPilot/GetStatus")
+    return sendJson(response, 200, { result: { isPilot: false, testMoneyOnly: false }, __abp: true, success: true });
 
   if (request.method === "POST" && url.pathname === "/api/TokenAuth/Authenticate") {
     let body = "";
