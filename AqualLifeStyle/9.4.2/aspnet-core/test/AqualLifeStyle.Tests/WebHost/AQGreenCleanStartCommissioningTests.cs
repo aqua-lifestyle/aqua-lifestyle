@@ -54,6 +54,88 @@ namespace AqualLifeStyle.Tests.WebHost
             c.State.ProtectedPaymentCount=c.State.ResetProtectedPaymentCount=4;
         }
 
+        private static void Prospective(AQGreenD10SyntheticEvidence x, AQGreenCleanStartEvidence c)
+        {
+            c.ContractVersion="AQGreenCleanStartV2";
+            c.BoundaryPolicy=c.State.BoundaryPolicy=AQGreenCleanStartEvidence.ProspectiveBoundary;
+            c.BoundaryAuthorizationDigest=c.State.BoundaryAuthorizationDigest=x.Authority.FinancialBoundaryEvidenceDigest;
+            x.Decision.V2EffectiveAtUtc=x.Authority.V2EffectiveAtUtc=x.Decision.V2EffectiveAtUtc.AddMinutes(17);
+            c.State.BoundaryUtc=x.Decision.V2EffectiveAtUtc;
+        }
+
+        [Fact]
+        public void ExplicitProspectiveCleanStartBindsWithoutMovingCommissionWeeksOrEnablingMoney()
+        {
+            var (x,c)=Create();OwnerAttest(c);Prospective(x,c);Sign(x,c);
+            var bound=AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,c);
+            bound.CleanStartEvidence.BoundaryPolicy.ShouldBe(AQGreenCleanStartEvidence.ProspectiveBoundary);
+            bound.Decision.V2EffectiveAtUtc.ShouldBe(c.State.BoundaryUtc.Value.UtcDateTime);
+            bound.FinancialWorkersCommissioned.ShouldBeFalse();
+            Should.Throw<ArgumentException>(()=>AQGreenCommissionWeek.FromStartUtc(bound.Decision.V2EffectiveAtUtc));
+            var config=AQGreenD10SyntheticEvidence.Configuration();config["App:AutomaticPayouts:Enabled"]="true";
+            Should.Throw<InvalidOperationException>(()=>bound.EnsureConfiguration(config));
+            // Historical admission keeps its existing canonical-week requirement.
+            var historical=AQGreenD10SyntheticEvidence.Create(AQGreenD10SyntheticEvidence.Configuration());
+            historical.Decision.V2EffectiveAtUtc=historical.Authority.V2EffectiveAtUtc=bound.Decision.V2EffectiveAtUtc;
+            Should.Throw<ArgumentException>(()=>AQGreenD10Commissioning.BindVerified(historical.Decision,historical.Authority,historical.Final));
+        }
+
+        [Theory]
+        [InlineData("unselected-version")][InlineData("unknown-version")][InlineData("unknown-policy")]
+        [InlineData("missing-authority")][InlineData("zero-authority")][InlineData("authority-mismatch")]
+        [InlineData("receipt-policy")][InlineData("receipt-authority")][InlineData("backdated")]
+        [InlineData("non-utc")][InlineData("missing-owner")][InlineData("missing-independent")]
+        public void ProspectiveBoundaryRequiresExplicitNativeAndIndependentBindingWithoutBackdating(string failure)
+        {
+            var (x,c)=Create();Prospective(x,c);
+            switch(failure)
+            {
+                case "unselected-version":c.ContractVersion="AQGreenCleanStartV1";break;
+                case "unknown-version":c.ContractVersion="AQGreenCleanStartV9";break;
+                case "unknown-policy":c.BoundaryPolicy="INFERRED_IMMEDIATE";break;
+                case "missing-authority":c.BoundaryAuthorizationDigest=null;break;
+                case "zero-authority":c.BoundaryAuthorizationDigest=new string('0',64);break;
+                case "authority-mismatch":c.BoundaryAuthorizationDigest=AQGreenD10SyntheticEvidence.Hash("different-boundary-decision");break;
+                case "receipt-policy":c.State.BoundaryPolicy=null;break;
+                case "receipt-authority":c.State.BoundaryAuthorizationDigest=null;break;
+                case "backdated":x.Decision.V2EffectiveAtUtc=x.Decision.AuthorizedAtUtc.AddTicks(-1);break;
+                case "non-utc":x.Decision.V2EffectiveAtUtc=DateTime.SpecifyKind(x.Decision.V2EffectiveAtUtc,DateTimeKind.Unspecified);break;
+                case "missing-owner":c.OwnerResetAuthorizationDigest=null;break;
+                case "missing-independent":c.IndependentAcceptanceDigest=null;break;
+            }
+            Sign(x,c);Should.Throw<InvalidOperationException>(()=>AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,c));
+        }
+
+        [Theory]
+        [InlineData(nameof(AQGreenCleanStartState.PlacementCount))]
+        [InlineData(nameof(AQGreenCleanStartState.UnclassifiedMembershipCount))]
+        [InlineData(nameof(AQGreenCleanStartState.RealCommissionCount))]
+        [InlineData(nameof(AQGreenCleanStartState.LoanCount))]
+        [InlineData(nameof(AQGreenCleanStartState.GraduationCount))]
+        [InlineData(nameof(AQGreenCleanStartState.MonthlyObligationCount))]
+        [InlineData(nameof(AQGreenCleanStartState.PayoutCount))]
+        [InlineData(nameof(AQGreenCleanStartState.OrphanTopologyCount))]
+        [InlineData(nameof(AQGreenCleanStartState.InvalidParticipationCount))]
+        public void ProspectiveBoundaryPreservesEveryNonPaymentExposureGuard(string property)
+        {
+            var (x,c)=Create();OwnerAttest(c);Prospective(x,c);
+            typeof(AQGreenCleanStartState).GetProperty(property).SetValue(c.State,(long?)1);
+            Sign(x,c);Should.Throw<InvalidOperationException>(()=>AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,c));
+        }
+
+        [Fact]
+        public void LegacyCanonicalEvidenceKeepsItsEncodingAndRejectsAnImplicitImmediateBoundary()
+        {
+            var (x,c)=Create();
+            var canonical=AQGreenB6CanonicalEvidence.Bytes(c);
+            var json=System.Text.Json.Nodes.JsonNode.Parse(canonical).AsObject();
+            json.ContainsKey("boundaryPolicy").ShouldBeFalse();json.ContainsKey("boundaryAuthorizationDigest").ShouldBeFalse();
+            json["state"].AsObject().ContainsKey("boundaryPolicy").ShouldBeFalse();
+            x.Decision.V2EffectiveAtUtc=x.Authority.V2EffectiveAtUtc=x.Decision.V2EffectiveAtUtc.AddMinutes(17);
+            c.State.BoundaryUtc=x.Decision.V2EffectiveAtUtc;Sign(x,c);
+            Should.Throw<ArgumentException>(()=>AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,c));
+        }
+
         [Fact]
         public void OwnerAttestationAdmitsRetainedPaymentsWithoutClaimingProviderVerification()
         {

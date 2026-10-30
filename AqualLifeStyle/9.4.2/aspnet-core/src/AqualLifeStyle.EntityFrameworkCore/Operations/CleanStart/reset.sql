@@ -2,6 +2,14 @@
 -- All psql variables below come from the protected, independently accepted package.
 -- No credentials, identities or approval records belong in command arguments.
 \set ON_ERROR_STOP on
+\if :{?boundary_policy}
+\else
+\set boundary_policy CANONICAL_FINANCIAL_WEEK_V1
+\endif
+\if :{?boundary_authorization_digest}
+\else
+\set boundary_authorization_digest ''
+\endif
 \if :{?payment_admission_mode}
 \else
 \set payment_admission_mode ZERO_PAYMENT_EXPOSURE_V1
@@ -25,6 +33,8 @@ LOCK TABLE public."EntryParticipations",public."Customers",public."Memberships",
  public."AbpAuditLogs",public."__EFMigrationsHistory" IN SHARE ROW EXCLUSIVE MODE;
 SELECT set_config('aqua.clean_start.tenant','1',true),
  set_config('aqua.clean_start.boundary',:'boundary_utc',true),
+ set_config('aqua.clean_start.boundary_policy',:'boundary_policy',true),
+ set_config('aqua.clean_start.boundary_authority',:'boundary_authorization_digest',true),
  set_config('aqua.clean_start.reset_id',:'reset_id',true),
  set_config('aqua.clean_start.expected_source',:'expected_source_digest',true),
  set_config('aqua.clean_start.expected_identity',:'expected_database_identity_digest',true),
@@ -43,6 +53,14 @@ SELECT set_config('aqua.clean_start.tenant','1',true),
 DO $identity$
 DECLARE key text; actual_identity text;
 BEGIN
+ IF current_setting('aqua.clean_start.boundary_policy') NOT IN
+      ('CANONICAL_FINANCIAL_WEEK_V1','OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1') OR
+    (current_setting('aqua.clean_start.boundary_policy')='OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1' AND
+      (current_setting('aqua.clean_start.boundary_authority') !~ '^[0-9a-f]{64}$' OR
+       current_setting('aqua.clean_start.boundary_authority')=repeat('0',64))) OR
+    (current_setting('aqua.clean_start.boundary_policy')='CANONICAL_FINANCIAL_WEEK_V1' AND
+      current_setting('aqua.clean_start.boundary_authority')<>'') THEN
+  RAISE EXCEPTION 'CLEAN_START_EXPLICIT_BOUNDARY_AUTHORITY_REQUIRED'; END IF;
  IF current_setting('aqua.clean_start.payment_mode') NOT IN ('ZERO_PAYMENT_EXPOSURE_V1','OWNER_ATTESTED_TEST_ONLY_V1') OR
     (current_setting('aqua.clean_start.payment_mode')='OWNER_ATTESTED_TEST_ONLY_V1' AND
      (current_setting('aqua.clean_start.owner_test_attestation') !~ '^[0-9a-f]{64}$' OR
@@ -81,8 +99,9 @@ BEGIN
     to_regclass('public."AQGreenSalesEvidenceInvalidations"') IS NOT NULL THEN
   RAISE EXCEPTION 'CLEAN_START_REQUIRES_REVIEWED_PRE_DDL_SCHEMA'; END IF;
  IF current_setting('aqua.clean_start.boundary')::timestamptz < transaction_timestamp() OR
-    extract(isodow FROM current_setting('aqua.clean_start.boundary')::timestamptz AT TIME ZONE 'Africa/Johannesburg')<>5 OR
-    (current_setting('aqua.clean_start.boundary')::timestamptz AT TIME ZONE 'Africa/Johannesburg')::time<>time '00:00:00' THEN
+    (current_setting('aqua.clean_start.boundary_policy')='CANONICAL_FINANCIAL_WEEK_V1' AND
+      (extract(isodow FROM current_setting('aqua.clean_start.boundary')::timestamptz AT TIME ZONE 'Africa/Johannesburg')<>5 OR
+       (current_setting('aqua.clean_start.boundary')::timestamptz AT TIME ZONE 'Africa/Johannesburg')::time<>time '00:00:00')) THEN
   RAISE EXCEPTION 'CLEAN_START_BOUNDARY_OR_POPULATION_CHANGED'; END IF;
 END $identity$;
 \ir state.sql
@@ -166,6 +185,9 @@ BEGIN
   'reviewer',current_setting('aqua.clean_start.reviewer'),'owner',current_setting('aqua.clean_start.owner'),
   'recovery',current_setting('aqua.clean_start.recovery'),'sql',current_setting('aqua.clean_start.sql'),
   'fence',current_setting('aqua.clean_start.fence'),'boundary',current_setting('aqua.clean_start.boundary'),
+  'boundaryPolicy',CASE WHEN current_setting('aqua.clean_start.boundary_policy')='OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1'
+    THEN current_setting('aqua.clean_start.boundary_policy') END,
+  'boundaryAuthorizationDigest',nullif(current_setting('aqua.clean_start.boundary_authority'),''),
   'databaseIdentity',current_setting('aqua.clean_start.expected_identity'),
   'paymentAdmissionMode',current_setting('aqua.clean_start.payment_mode'),
   'ownerTestOnlyAttestationDigest',nullif(current_setting('aqua.clean_start.owner_test_attestation'),''),

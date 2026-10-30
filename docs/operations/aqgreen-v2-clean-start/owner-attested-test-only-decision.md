@@ -1,5 +1,34 @@
 # Owner-attested test-only retirement
 
+## Prospective CLEAN_START boundary amendment
+
+Business decision: **CONFIRMED — owner-authorized prospective CLEAN_START**.
+On 30 October 2026 Johannesburg time the owner instructed: "boundry can happen
+now". This supersedes the Friday-midnight-only timing restriction for this
+explicitly authorized CLEAN_START launch. It does not change the commission-week
+calendar, historical B6 admission or the classification/preservation decision below.
+
+The proposed implementation uses `OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1` and a
+nonzero boundary-authorization digest in the native reset receipt. D10 requires
+`AQGreenCleanStartV2`, matching native policy/authority and the same independently
+bound financial-boundary authority. The effective time must be prospective and
+late enough for reset, actual conservation acceptance, migration and deployment
+before commissioning; no instant is backdated and an expired boundary is not reused.
+V1 evidence and omitted boundary-policy inputs keep the original canonical path.
+Unknown policies, absent authority and mixed versions fail closed.
+
+The owner's authentic-receiver-test waiver is recorded separately on executor
+PR #9 (comment6509172606). It records missing provider evidence truthfully and
+does not disable signature verification, durable storage/deduplication, financial
+preservation, actual conservation/Aqua-before55, Normal or automatic payout holds.
+
+The new boundary implementation, hashes and operation bindings require their own
+source qualification and exact amendment acceptance before production use. This
+record is business authority for timing, not a claim that new source, a retirement,
+actual conservation or D10 commissioning has already been accepted/executed.
+
+## Preserved owner-attested classification
+
 Business decision: **CONFIRMED — OWNER_ATTESTED_TEST_ONLY_V1**.
 
 Authority is the owner's current, explicit instruction: “This is my formal

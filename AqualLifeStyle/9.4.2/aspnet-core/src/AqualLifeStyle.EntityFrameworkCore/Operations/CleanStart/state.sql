@@ -109,6 +109,8 @@ SELECT set_config('aqua.clean_start.observed_state',jsonb_build_object(
  'archiveDigest',encode(sha256(convert_to((SELECT coalesce(jsonb_agg(to_jsonb(p) ORDER BY "Id"),'[]') FROM p)::text,'UTF8')),'hex'),
  'resetAtUtc',(SELECT a."ExecutionTime" FROM reset_log a ORDER BY a."Id" DESC LIMIT 1),
  'boundaryUtc',(SELECT a."ReturnValue"::jsonb->'receipt'->>'boundary' FROM reset_log a ORDER BY a."Id" DESC LIMIT 1),
+ 'boundaryPolicy',(SELECT a."ReturnValue"::jsonb->'receipt'->>'boundaryPolicy' FROM reset_log a ORDER BY a."Id" DESC LIMIT 1),
+ 'boundaryAuthorizationDigest',(SELECT a."ReturnValue"::jsonb->'receipt'->>'boundaryAuthorizationDigest' FROM reset_log a ORDER BY a."Id" DESC LIMIT 1),
  'resetReceiptDigest',(SELECT CASE WHEN
    a."ReturnValue"::jsonb->'receipt'->>'resetId'=current_setting('aqua.clean_start.reset_id') AND
    (a."ReturnValue"::jsonb->'receipt'->>'resetAt')::timestamptz=a."ExecutionTime" AND

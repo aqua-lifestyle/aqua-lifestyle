@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace AqualLifeStyle.Domain.AQGreen
@@ -10,7 +11,14 @@ namespace AqualLifeStyle.Domain.AQGreen
     {
         public const string OwnerAttestedTestOnly = "OWNER_ATTESTED_TEST_ONLY_V1";
         public const string ZeroPaymentExposure = "ZERO_PAYMENT_EXPOSURE_V1";
+        public const string ProspectiveBoundary = "OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1";
         public string ContractVersion { get; set; }
+        // V2 is explicit and bound to the native retirement receipt/authority.
+        // Omitted fields preserve the original V1 canonical evidence encoding.
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string BoundaryPolicy { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string BoundaryAuthorizationDigest { get; set; }
         public string EvidenceClassification { get; set; }
         public int TenantId { get; set; }
         public string ResetId { get; set; }
@@ -84,6 +92,10 @@ namespace AqualLifeStyle.Domain.AQGreen
         public long? ResetProtectedPaymentCount { get; set; }
         public DateTimeOffset? ResetAtUtc { get; set; }
         public DateTimeOffset? BoundaryUtc { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string BoundaryPolicy { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string BoundaryAuthorizationDigest { get; set; }
 
         public bool HasNoProtectedExposure() => new[] { UnclassifiedMembershipCount,
             ProtectedPaymentCount, RealCommissionCount, LoanCount, GraduationCount,

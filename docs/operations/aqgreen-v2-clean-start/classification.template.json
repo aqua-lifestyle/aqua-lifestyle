@@ -26,6 +26,8 @@
   "validFromUtc": null,
   "validUntilUtc": null,
   "v2EffectiveBoundaryUtc": null,
+  "boundaryPolicy": null,
+  "boundaryAuthorizationDigest": null,
   "protectedFirstRootSelectionReference": null,
   "resetSqlDigest": null,
   "sourcePublicationAndCiReference": null,

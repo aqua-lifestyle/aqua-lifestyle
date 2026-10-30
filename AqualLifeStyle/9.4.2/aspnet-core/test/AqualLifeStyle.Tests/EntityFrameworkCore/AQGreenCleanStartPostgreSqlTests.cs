@@ -49,18 +49,19 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         }
         private static async Task<object> SqlAsync(NpgsqlConnection c,string sql)
         { await using var command=new NpgsqlCommand(sql,c); return await command.ExecuteScalarAsync(); }
-        private static async Task<AQGreenCleanStartState> StateAsync(NpgsqlConnection c)
+        private static async Task<AQGreenCleanStartState> StateAsync(NpgsqlConnection c,DateTime? boundaryUtc=null)
         {
             await using var tx=await c.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead);
             await using(var command=new NpgsqlCommand("SET TRANSACTION READ ONLY; SELECT set_config('aqua.clean_start.tenant','1',true),"+
                 "set_config('aqua.clean_start.boundary',@boundary,true),set_config('aqua.clean_start.reset_id',@reset,true)",c,tx))
-            { command.Parameters.AddWithValue("boundary",Boundary.ToString("O"));command.Parameters.AddWithValue("reset",ResetId);await command.ExecuteNonQueryAsync(); }
+            { command.Parameters.AddWithValue("boundary",(boundaryUtc??Boundary).ToString("O"));command.Parameters.AddWithValue("reset",ResetId);await command.ExecuteNonQueryAsync(); }
             await using var read=new NpgsqlCommand(await File.ReadAllTextAsync(Path.Combine(Operations,"state.sql")),c,tx);
             var state=JsonSerializer.Deserialize<AQGreenCleanStartState>((string)await read.ExecuteScalarAsync(),AQGreenB6CanonicalEvidence.Options);
             await tx.RollbackAsync();return state;
         }
         private static async Task<(int Code,string Output)> ResetAsync(NpgsqlConnection c,AQGreenCleanStartState state,string owner=null,
-            string operation="reset.sql",bool ownerAttested=false,string attestation=null)
+            string operation="reset.sql",bool ownerAttested=false,string attestation=null,
+            DateTime? boundaryUtc=null,string boundaryPolicy=null,string boundaryAuthorization=null)
         {
             var identity=(string)await SqlAsync(c,"SELECT encode(sha256(convert_to(system_identifier::text||'|'||current_database()||'|'||"+
                 "(SELECT oid::text FROM pg_database WHERE datname=current_database()),'UTF8')),'hex') FROM pg_control_system()");
@@ -76,7 +77,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             // is the fixed synthetic fixture password, never a production secret.
             start.Environment["PGPASSWORD"]="aqualifestyle";start.Environment["PSQL_HISTORY"]="/dev/null";
             foreach(var arg in new[]{"-X","-qAt","--no-password","--set=ON_ERROR_STOP=1","--file="+Path.Combine(Operations,operation)}) start.ArgumentList.Add(arg);
-            foreach(var pair in new[]{("boundary_utc",Boundary.ToString("O")),("reset_id",ResetId),
+            foreach(var pair in new[]{("boundary_utc",(boundaryUtc??Boundary).ToString("O")),("reset_id",ResetId),
                 ("expected_source_digest",state.SourceDigest),("expected_database_identity_digest",identity),("source_database",info.Database),
                 ("classification_digest",Hash),("independent_acceptance_digest",Hash),("owner_reset_authorization_digest",owner??Hash),
                 ("recovery_evidence_digest",Hash),("reset_sql_digest",Hash),("no_genuine_memberships","true"),("write_fence_evidence_digest",Hash),
@@ -85,6 +86,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 ("owner_test_only_attestation_digest",ownerAttested?attestation??Hash:""),
                 ("valid_from_utc",DateTime.UtcNow.AddMinutes(-5).ToString("O")),("valid_until_utc",DateTime.UtcNow.AddMinutes(5).ToString("O"))})
                 start.ArgumentList.Add("--set="+pair.Item1+"="+pair.Item2);
+            if(boundaryPolicy!=null) start.ArgumentList.Add("--set=boundary_policy="+boundaryPolicy);
+            if(boundaryAuthorization!=null) start.ArgumentList.Add("--set=boundary_authorization_digest="+boundaryAuthorization);
             using var process=Process.Start(start);var stdout=process.StandardOutput.ReadToEndAsync();var stderr=process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync();return(process.ExitCode,await stdout+await stderr);
         }
@@ -100,6 +103,49 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
               'otherTenant',(SELECT jsonb_agg(to_jsonb(t) ORDER BY "Id") FROM "EntryParticipations" t WHERE "TenantId"=2)
             )::text)
             """);
+
+        [Fact]
+        public async Task ProspectiveRetirementRequiresOwnerBoundaryAuthorityPreservesMoneyAndBindsNativeD10()
+        {
+            await using var lease=await _fixture.CreateDatabaseAsync();await using var c=new NpgsqlConnection(lease.ConnectionString());await c.OpenAsync();
+            await PrepareAsync(c);await SeedMembershipAssignmentsAsync(c);await SeedRetainedPaymentGraphAsync(c);
+            var boundary=Boundary.AddMinutes(17);var before=await StateAsync(c,boundary);var protectedBefore=await ProtectedDigestAsync(c);
+            var implicitMode=await ResetAsync(c,before,ownerAttested:true,boundaryUtc:boundary);
+            implicitMode.Code.ShouldNotBe(0);implicitMode.Output.ShouldContain("CLEAN_START_BOUNDARY_OR_POPULATION_CHANGED");
+            foreach(var authority in new[]{"",new string('0',64),"not-owner-authority"})
+            {
+                var denied=await ResetAsync(c,before,ownerAttested:true,boundaryUtc:boundary,
+                    boundaryPolicy:AQGreenCleanStartEvidence.ProspectiveBoundary,boundaryAuthorization:authority);
+                denied.Code.ShouldNotBe(0);denied.Output.ShouldContain("CLEAN_START_EXPLICIT_BOUNDARY_AUTHORITY_REQUIRED");
+                (await ProtectedDigestAsync(c)).ShouldBe(protectedBefore);(await StateAsync(c,boundary)).SourceDigest.ShouldBe(before.SourceDigest);
+            }
+            var past=await ResetAsync(c,before,ownerAttested:true,boundaryUtc:DateTime.UtcNow.AddMinutes(-1),
+                boundaryPolicy:AQGreenCleanStartEvidence.ProspectiveBoundary,boundaryAuthorization:Hash);
+            past.Code.ShouldNotBe(0);past.Output.ShouldContain("CLEAN_START_BOUNDARY_OR_POPULATION_CHANGED");
+            var unknown=await ResetAsync(c,before,ownerAttested:true,boundaryUtc:boundary,
+                boundaryPolicy:"UNKNOWN_BOUNDARY",boundaryAuthorization:Hash);
+            unknown.Code.ShouldNotBe(0);unknown.Output.ShouldContain("CLEAN_START_EXPLICIT_BOUNDARY_AUTHORITY_REQUIRED");
+            var reset=await ResetAsync(c,before,ownerAttested:true,boundaryUtc:boundary,
+                boundaryPolicy:AQGreenCleanStartEvidence.ProspectiveBoundary,boundaryAuthorization:Hash);
+            reset.Code.ShouldBe(0,reset.Output);var after=await StateAsync(c,boundary);
+            after.BoundaryPolicy.ShouldBe(AQGreenCleanStartEvidence.ProspectiveBoundary);after.BoundaryAuthorizationDigest.ShouldBe(Hash);
+            after.BoundaryUtc.Value.UtcDateTime.ShouldBe(boundary);after.ArchivedCount.ShouldBe(after.PopulationCount);
+            after.PaymentEvidenceDigest.ShouldBe(before.PaymentEvidenceDigest);after.TenantFinancialRecordsDigest.ShouldBe(before.TenantFinancialRecordsDigest);
+            (await ProtectedDigestAsync(c)).ShouldBe(protectedBefore);
+            var (x,e)=AqualLifeStyle.Tests.WebHost.AQGreenCleanStartCommissioningTests.Create();
+            AqualLifeStyle.Tests.WebHost.AQGreenCleanStartCommissioningTests.OwnerAttest(e);
+            e.ContractVersion="AQGreenCleanStartV2";e.BoundaryPolicy=after.BoundaryPolicy;e.BoundaryAuthorizationDigest=Hash;
+            e.State=after;e.ResetAtUtc=after.ResetAtUtc.Value.UtcDateTime;e.OwnerTestOnlyAttestationDigest=Hash;
+            e.HistoricalFinancialRecordsDigest=after.ResetTenantFinancialRecordsDigest;
+            x.Decision.V2EffectiveAtUtc=x.Authority.V2EffectiveAtUtc=boundary;
+            x.Decision.AuthorizedAtUtc=x.Authority.AuthorizedAtUtc=DateTime.UtcNow;
+            x.Authority.ExpiresAtUtc=boundary.AddDays(1);x.Authority.FinancialBoundaryEvidenceDigest=Hash;
+            AqualLifeStyle.Tests.WebHost.AQGreenCleanStartCommissioningTests.Sign(x,e);
+            var bound=AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,e);
+            bound.FinancialWorkersCommissioned.ShouldBeFalse();bound.CleanStartEvidence.ProviderModeVerification.ShouldBe("NOT_INDEPENDENTLY_VERIFIED");
+            var restore=await ResetAsync(c,after,operation:"restore.sql",boundaryUtc:boundary);
+            restore.Code.ShouldBe(0,restore.Output);(await ProtectedDigestAsync(c)).ShouldBe(protectedBefore);
+        }
 
         private async Task SeedMembershipAssignmentsAsync(NpgsqlConnection c)
         {
