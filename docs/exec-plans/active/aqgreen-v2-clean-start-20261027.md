@@ -1,5 +1,27 @@
 # AQGreen V2 clean-start release — 27 October 2026
 
+## PR118 published; exact mandatory audit failure and authorized correction
+
+Published existing V3 as961b9a2363711e03c8975ecc163bea6ccbf22f9e on
+`fix/aqgreen-v3-preflight-qualification`, draft application PR118; Aqua requested.
+All240 local mandatory cases passed on that commit. Hosted CI41285026278
+completed15 successful jobs, one failed frontend dependency audit and one skipped
+container job. Hosted artifacts prove all30 StatusOnly cases passed across their
+two existing shards and240 security cases passed once. PR merge/head trees match.
+
+The unchanged production follow-redirects1.16.1 is affected by high-severity
+GHSA-mrwp-f3q8-3g9p. Owner explicitly authorizes a separate minimal audit-fix commit:
+only1.16.2 version/tarball/integrity in the existing lock entry plus required
+manifest/evidence hashes; preserve original V3 commit and all other packages/code.
+Registry metadata supplies the exact integrity. Local lockfile production audit
+now reports zero vulnerabilities. Rerun existing mandatory CI on the resulting
+exact head; earlier failed workflow remains FAILED and downstream skips remain
+skips. No application behavior/family/gate/assertion change or scope expansion.
+
+Render operator access remains a separately escalated publickey denial. Current
+receipt, protected inputs and actual conservation acceptance are not invented by
+source/CI success. No merge, deploy, production SQL, retirement or migration55.
+
 ## 1 November — review publication explicitly authorized; Render operator access escalated
 
 The owner authorizes committing/publishing only the existing V3 correction and its

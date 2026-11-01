@@ -2,6 +2,38 @@
 
 ## Retirement preflight alignment — 30 October 2026
 
+### PR118 exact-source CI and authorized minimal audit correction
+
+V3 correction commit `961b9a2363711e03c8975ecc163bea6ccbf22f9e` is published in
+**draft PR118**, with Aqua `aqualifestyleclub` requested for independent review:
+https://github.com/aqua-lifestyle/aqua-lifestyle/pull/118 . No acceptance is assumed.
+Existing mandatory CI run **41285026278**, attempt1, completed **15 jobs passed,
+one failed, one skipped**. Release safety, all backend shards/coverage partitions
+and PostgreSQL workflow checks passed. The30 focused StatusOnly cases all passed
+across the migration/remainder TRX partitions (one inventory test is classified as
+migration). The hosted security report records240 cases passed exactly once.
+PR merge `5a42e9e83b555554a947deb3fe4534672d05633c` has the same source tree as head
+961b9a2: `92d93de5756d942777ad5c3020f8e8417d633ae7`. This is PR qualification,
+not main-push production admission. Hosted security artifact ID13074771736,
+report SHA-256 `62c818d99945ea15a865b46bb9e332ce735f4927958a4191aa77c588fb78474b`.
+
+The sole failed job was **Frontend quality checks / Audit production dependencies**:
+unchanged transitive `follow-redirects1.16.1`, high-severity
+[GHSA-mrwp-f3q8-3g9p](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p).
+Ownership: **PRE-EXISTING**, exposed by current mandatory audit; no V3 code caused
+the dependency defect. Frontend lint/type/test/build steps and container validation
+were skipped downstream and are not passing evidence. No gate was weakened.
+
+The owner explicitly authorized a **separate commit on the same PR** updating only
+that existing transitive package to patched1.16.2, necessary manifest/evidence
+hashes, and rerunning existing CI/security. The lockfile correction changes exactly
+three fields of that single package: version, registry tarball and registry-verified
+integrity. No other package, package.json, application source, dependency family,
+audit threshold or assertion changes. `npm audit --omit=dev --package-lock-only`
+then reports **zero vulnerabilities**. Installation/full frontend/container and
+final exact-head CI remain subject to their next actual results. Preserve961b9a2
+unchanged; no amend/merge/deploy/production SQL/reset/migration55 is authorized.
+
 ### 1 November — authorized review publication; existing Render SSH blocked
 
 The owner explicitly authorizes committing only this existing V3 correction and
