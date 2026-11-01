@@ -10,15 +10,15 @@ const options = { boundary: '2026-10-29T22:00:00Z', resetId: 'SYNTHETIC-PREFLIGH
 const secret = 'SYNTHETIC-CREDENTIAL-NEVER-EMIT';
 const host = `${resource}.frankfurt-postgres.render.com`;
 const metadata = () => ({ id: resource, externalConnectionString: `postgresql://fixture_user:${secret}@${host}/aqualifestyle?sslmode=require` });
-const sqlReceipt = () => ({ contract: 'AQGreenCleanStartScreenV2', databaseScreen: 'PASS', overall: 'UNKNOWN',
+const sqlReceipt = () => ({ contract: 'AQGreenCleanStartScreenV3', databaseScreen: 'PASS', overall: 'UNKNOWN',
   checks: { transaction: 'PASS', visibility: 'PASS', schema: 'PASS', scope: 'PASS', financialAndStructuralExposure: 'PASS',
     testDataClassification: 'UNKNOWN', externalBusinessObligations: 'UNKNOWN' },
   sourceFingerprint: 'a'.repeat(64), databaseFingerprint: 'c'.repeat(64), schemaFingerprint: 'd'.repeat(64),
   snapshotFingerprint: 'b'.repeat(64), observedAtUtc: new Date(time).toISOString() });
 function fixture({ provider = metadata(), sql = sqlReceipt(), providerCode = 0, sqlCode = 0,
-  providerProcess = {}, databaseProcess = {}, now = () => time, read = readFileSync } = {}) {
+  providerProcess = {}, databaseProcess = {}, now = () => time, read = readFileSync, invocation = options } = {}) {
   const calls = [];
-  const result = assess(options, { now, read, environment: { PGHOSTADDR: 'unsafe', PGSERVICE: 'unsafe', PGOPTIONS: '-c transaction_read_only=off', PGSSLMODE: 'disable', PSQL_ECHO: 'all' },
+  const result = assess(invocation, { now, read, environment: { PGHOSTADDR: 'unsafe', PGSERVICE: 'unsafe', PGOPTIONS: '-c transaction_read_only=off', PGSSLMODE: 'disable', PSQL_ECHO: 'all' },
     execute(command, args, settings) {
       calls.push({ command, args, settings });
       return { status: command === 'render' ? providerCode : sqlCode,
@@ -257,4 +257,54 @@ test('completed database PASS, FAIL and UNKNOWN retain business semantics and ac
     assert.equal(result.checks.externalBusinessObligations, 'UNKNOWN');
     assert.equal(result.evidence.finishedAtUtc, new Date(time).toISOString());
   }
+});
+
+test('explicit prospective policy passes its exact authority to SQL without changing financial or external results', () => {
+  const invocation = { ...options, boundary: '2026-10-30T11:00:00Z',
+    boundaryPolicy: 'OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1', boundaryAuthorizationDigest: 'e'.repeat(64) };
+  const { result, calls } = fixture({ invocation });
+  assert.equal(result.databaseScreen, 'PASS'); assert.equal(result.overall, 'UNKNOWN');
+  assert.ok(calls[1].args.includes('--set=boundary_policy=OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1'));
+  assert.ok(calls[1].args.includes('--set=boundary_authorization_digest=' + 'e'.repeat(64)));
+  const sql = sqlReceipt(); sql.sourceFingerprint = null;
+  sql.checks.financialAndStructuralExposure = sql.databaseScreen = sql.overall = 'FAIL';
+  assert.equal(fixture({ invocation, sql }).result.overall, 'FAIL');
+});
+
+test('partial, unknown, zero and mixed prospective authority fails before provider access', () => {
+  for (const patch of [
+    { boundaryPolicy: 'OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1' },
+    { boundaryAuthorizationDigest: 'e'.repeat(64) },
+    { boundaryPolicy: 'UNKNOWN', boundaryAuthorizationDigest: 'e'.repeat(64) },
+    { boundaryPolicy: 'CANONICAL_FINANCIAL_WEEK_V1', boundaryAuthorizationDigest: 'e'.repeat(64) },
+    { boundaryPolicy: 'OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1', boundaryAuthorizationDigest: '0'.repeat(64) },
+    { boundaryPolicy: 'OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1', boundaryAuthorizationDigest: 'bad;sql' }
+  ]) {
+    const { result, calls } = fixture({ invocation: { ...options, ...patch } });
+    assert.equal(result.overall, 'UNKNOWN'); assert.equal(calls.length, 0);
+  }
+});
+
+test('owner-attested admission is explicit and disclosed without inventing independent provider verification', () => {
+  const invocation = { ...options, boundary: '2026-10-30T11:00:00Z',
+    boundaryPolicy: 'OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1', boundaryAuthorizationDigest: 'e'.repeat(64),
+    paymentAdmissionMode: 'OWNER_ATTESTED_TEST_ONLY_V1', ownerTestOnlyAttestationDigest: 'f'.repeat(64) };
+  const { result, calls } = fixture({ invocation });
+  assert.equal(result.databaseScreen, 'PASS'); assert.equal(result.overall, 'UNKNOWN');
+  assert.equal(result.evidence.paymentAdmissionMode, invocation.paymentAdmissionMode);
+  assert.equal(result.evidence.ownerTestOnlyAttestationDigest, invocation.ownerTestOnlyAttestationDigest);
+  assert.equal(result.evidence.providerModeVerification, 'NOT_INDEPENDENTLY_VERIFIED');
+  assert.equal(result.evidence.boundaryUtc, invocation.boundary); assert.equal(result.evidence.resetId, options.resetId);
+  assert.equal(result.evidence.boundaryPolicy, invocation.boundaryPolicy);
+  assert.equal(result.evidence.boundaryAuthorizationDigest, invocation.boundaryAuthorizationDigest);
+  assert.ok(calls[1].args.includes('--set=payment_admission_mode=OWNER_ATTESTED_TEST_ONLY_V1'));
+  for (const patch of [{ paymentAdmissionMode: 'OWNER_ATTESTED_TEST_ONLY_V1' },
+    { ownerTestOnlyAttestationDigest: 'f'.repeat(64) },
+    { ...invocation, paymentAdmissionMode: 'UNKNOWN' },
+    { ...invocation, ownerTestOnlyAttestationDigest: '0'.repeat(64) }]) {
+    const denied = fixture({ invocation: { ...options, ...patch } });
+    assert.equal(denied.result.overall, 'UNKNOWN'); assert.equal(denied.calls.length, 0);
+  }
+  const old = sqlReceipt(); old.contract = 'AQGreenCleanStartScreenV2';
+  assert.equal(fixture({ invocation, sql: old }).result.checks.execution, 'UNKNOWN');
 });

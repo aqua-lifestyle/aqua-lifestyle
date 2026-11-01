@@ -1,7 +1,23 @@
--- AQGreenCleanStartScreenV2. Use only through the reviewed status-only launcher.
+-- AQGreenCleanStartScreenV3. Use only through the reviewed status-only launcher.
 -- This contract supersedes the raw-count/native-pin preflight only after approval.
 \set ON_ERROR_STOP on
 \set QUIET on
+\if :{?boundary_policy}
+\else
+\set boundary_policy CANONICAL_FINANCIAL_WEEK_V1
+\endif
+\if :{?boundary_authorization_digest}
+\else
+\set boundary_authorization_digest ''
+\endif
+\if :{?payment_admission_mode}
+\else
+\set payment_admission_mode ZERO_PAYMENT_EXPOSURE_V1
+\endif
+\if :{?owner_test_only_attestation_digest}
+\else
+\set owner_test_only_attestation_digest ''
+\endif
 \pset pager off
 \pset format unaligned
 \pset tuples_only on
@@ -13,7 +29,11 @@ SET LOCAL lock_timeout='3s';
 SET LOCAL idle_in_transaction_session_timeout='45s';
 SET LOCAL search_path=pg_catalog;
 SELECT set_config('aqua.clean_start.tenant','1',true),
-       set_config('aqua.clean_start.boundary',:'boundary_utc',true),
+        set_config('aqua.clean_start.boundary',:'boundary_utc',true),
+        set_config('aqua.clean_start.boundary_policy',:'boundary_policy',true),
+        set_config('aqua.clean_start.boundary_authority',:'boundary_authorization_digest',true),
+        set_config('aqua.clean_start.payment_mode',:'payment_admission_mode',true),
+        set_config('aqua.clean_start.owner_test_attestation',:'owner_test_only_attestation_digest',true),
        set_config('aqua.clean_start.reset_id',:'reset_id',true),
        set_config('aqua.clean_start.expected_user',:'expected_session_user',true);
 DO $identity$

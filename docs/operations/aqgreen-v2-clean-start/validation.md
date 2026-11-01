@@ -1,5 +1,299 @@
 # Current owner-attested test-only candidate
 
+## Retirement preflight alignment — 30 October 2026
+
+### PR118 exact-source CI and authorized minimal audit correction
+
+V3 correction commit `961b9a2363711e03c8975ecc163bea6ccbf22f9e` is published in
+**draft PR118**, with Aqua `aqualifestyleclub` requested for independent review:
+https://github.com/aqua-lifestyle/aqua-lifestyle/pull/118 . No acceptance is assumed.
+Existing mandatory CI run **41285026278**, attempt1, completed **15 jobs passed,
+one failed, one skipped**. Release safety, all backend shards/coverage partitions
+and PostgreSQL workflow checks passed. The30 focused StatusOnly cases all passed
+across the migration/remainder TRX partitions (one inventory test is classified as
+migration). The hosted security report records240 cases passed exactly once.
+PR merge `5a42e9e83b555554a947deb3fe4534672d05633c` has the same source tree as head
+961b9a2: `92d93de5756d942777ad5c3020f8e8417d633ae7`. This is PR qualification,
+not main-push production admission. Hosted security artifact ID13074771736,
+report SHA-256 `62c818d99945ea15a865b46bb9e332ce735f4927958a4191aa77c588fb78474b`.
+
+The sole failed job was **Frontend quality checks / Audit production dependencies**:
+unchanged transitive `follow-redirects1.16.1`, high-severity
+[GHSA-mrwp-f3q8-3g9p](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p).
+Ownership: **PRE-EXISTING**, exposed by current mandatory audit; no V3 code caused
+the dependency defect. Frontend lint/type/test/build steps and container validation
+were skipped downstream and are not passing evidence. No gate was weakened.
+
+The owner explicitly authorized a **separate commit on the same PR** updating only
+that existing transitive package to patched1.16.2, necessary manifest/evidence
+hashes, and rerunning existing CI/security. The lockfile correction changes exactly
+three fields of that single package: version, registry tarball and registry-verified
+integrity. No other package, package.json, application source, dependency family,
+audit threshold or assertion changes. `npm audit --omit=dev --package-lock-only`
+then reports **zero vulnerabilities**. Installation/full frontend/container and
+final exact-head CI remain subject to their next actual results. Preserve961b9a2
+unchanged; no amend/merge/deploy/production SQL/reset/migration55 is authorized.
+
+### 1 November — authorized review publication; existing Render SSH blocked
+
+The owner explicitly authorizes committing only this existing V3 correction and
+supporting evidence, publishing a scoped feature branch/draft PR, running existing
+mandatory CI/security checks and submitting the exact revision to Aqua. **No merge,
+deployment, production SQL, reset or migration55 is authorized by publication.**
+No further timing-policy or test-data-classification decision is requested.
+Earlier preparation statements below are historical observations; the draft PR
+and its exact-head CI records identify subsequent publication/qualification state.
+
+At `2026-11-01T07:02:12.815Z`–`07:02:18.141Z`, the exact existing Render service GET
+returned200 and its verified Frankfurt SSH address was used for one bounded probe
+of the **running service**, with BatchMode and strict existing-known-host checks.
+SSH exited255, **SSH_PUBLICKEY_AUTHORIZATION_DENIED** (`Permission denied (publickey)`).
+No remote command, environment read or SQL ran. No ephemeral instance, new key,
+access rule, configuration change or paid resource was created.
+Exact diagnostic SHA-256:
+`37166d4c1dc82edb7dc8a3871360510699cd786fa4bfddae01c27706d9f5f969`.
+
+The owner selected the existing Render-session route. **Xolani-M must make an
+already-authorized operator session available, or execute the prepared protected
+read-only capture there.** This preference does not establish that a session is
+accessible to the agent. Retain the complete reduced receipt and exact failure
+diagnostic in the existing protected channel; no sensitive database rows should
+be exported. The readback must establish current native identity/schema/source,
+population/financial guard statuses and preservation fingerprints. The expired
+30 October11:00 boundary is not renewed by this instruction. V3 source acceptance,
+actual current-source business bindings, recovery/cost/custody and exact operation
+authorization remain separate gates. Aqua's actual conservation acceptance must
+still precede migration55. Publication does not edit executor production pins or
+waive their current-source admission checks. Existing Yoco mode/signature/Normal/
+worker/payout holds and the prior authentic-event waiver remain unchanged.
+
+### 1 November — prior approved network identified; restoration unavailable
+
+Current owner direction authorizes restoration of the prior existing network if
+available and requires actual PostgreSQL source-IP evidence plus operator
+authorization before adding a necessary exact /32. It does not itself identify
+or authorize an unverified new source address. No DNS/certificate/credential
+investigation, security change or business assessment was repeated in this phase.
+
+NetworkManager's existing journal establishes a **successful Wi-Fi activation at
+2026-10-30T05:06:54.149Z** before the06:12 successful capture. Its saved profile UUID
+differs from the currently active profile. The last recorded pre-capture IPv4
+default-route policy also names `wlo1` and matches that successful profile.
+This supplies the previously missing
+historical network comparison; no historical public IP is inferred from a UUID.
+The former profile is still saved. One targeted scan of that network succeeded
+at06:31UTC on1 November but did not find it. Therefore the existing authorized
+route cannot presently be restored by selecting that profile. No connection
+switch, new profile, VPN, resolver, allowlist or other network setting was changed.
+
+One narrowly scoped Render log GET returned HTTP200, not truncated, for network
+connection messages on the exact database resource during the known13:30–13:34UTC
+30 October failures. It contained no matching network-source evidence. No raw log
+text, source address, personal data or SQL/business record was retained/emitted.
+That absence does not prove the source IP, absence of traffic or rejection cause.
+
+At `2026-11-01T06:47:04.961Z`, existing resource metadata plus an address-suppressed
+HTTPS egress comparison still returned allowlist **FAIL**. The endpoint/credential
+selectors remain unchanged. HTTPS egress is not substituted for actual PostgreSQL
+TCP source evidence. Actual current PostgreSQL source-IP verification remains
+**BLOCKED**; no gateway/Render flow evidence is available in the accessible record.
+
+The operator question offered restoration of the known route or protected actual
+source-IP evidence with exact /32 authorization. The response repeated the task
+direction; it supplied neither a reachable prior network nor a source-bound /32
+authorization. No network access was self-authorized. Preserve all existing entries
+and strict TLS. The next external action belongs to Xolani-M/network custodian:
+make the saved prior network available, or provide authoritative PostgreSQL/NAT
+source evidence and the corresponding exact operator-authorized /32 through the
+existing protected channel. This is an access prerequisite, not another business
+policy decision or final reset-authorization request.
+
+**Actual current results:** route comparison PASS; prior-route restoration BLOCKED
+(network unavailable); actual PostgreSQL source IP/new-entry authorization BLOCKED;
+current bounded database capture BLOCKED/not attempted in this phase. No fresh
+source fingerprint exists. The original30 October11:00UTC boundary is expired and
+cannot be reused as a prospective scope PASS. Financial exposure cannot be freshly
+classified without the receipt; all nine non-payment guards remain mandatory.
+Owner-attested test-data policy is accepted, but its current source binding is
+BLOCKED. External-obligation clearance remains unverified, with all records and
+claims preserved. Protected retirement inputs remain incomplete. No reset,
+migration55, financial operation, new resource or replacement window was executed.
+
+### Existing-route comparison — current finding supersedes DNS-only blocker
+
+The latest owner instruction authorizes reuse/comparison of existing infrastructure
+and the established read-only route. It does not authorize new access, paid
+resources, data reset, migration55 or financial cutover. No V3 production execution
+or final reset authorization is inferred from it.
+
+| Route property | Earlier successful capture | Current observation |
+|---|---|---|
+| Target | Existing `dpg-d9f0jne1a83c73d8m780-a`, database `aqualifestyle` | Same authenticated provider resource/database selection |
+| Host/endpoint | External `dpg-d9f0jne1a83c73d8m780-a.frankfurt-postgres.render.com:5432` | Exact same external FQDN/port; no internal-host substitution |
+| Credential reference | Existing authenticated Render CLI's resource `externalConnectionString`, memory only | Same reference/selection; historical secret values were not retained, so historical value equality is not claimed |
+| Operator execution | Existing local operator script/workspace route; historical machine hostname not retained in the production receipt | Local workstation `nathan`, existing packaged psql16.14 wrapper; wrapper only selects existing client libraries/executable, with no target/network override |
+| DNS context | Successful production connection; historical resolver configuration not retained | Existing systemd-resolved stub, current network uplink DNS; both `resolvectl query` and libc `getent ahosts` now resolve the exact FQDN |
+| Network access | The06:12 capture succeeded after the approved operator /32 was added, preserving earlier entries | Current observed HTTPS public egress does **not** fall within the existing database allowlist; no unrestricted CIDR present |
+
+The accepted and current `connection()` selectors are byte-identical when compared
+as function source, SHA-256:
+`9382ddbdeeee0ac0270d44565a8556eba0f7d536d7fbdee59268137c8d68da9e`.
+Both choose identical current credentials from the same current metadata, without
+emitting/storing values. This is reference/selection evidence, not evidence that
+historical credentials or the old execution host's resolver configuration are known.
+
+DNS resolution recovered without agent configuration changes. The11:14 failure
+remains an observed name-resolution failure; its upstream historical cause cannot
+be reconstructed. A reused accepted-state readback then exited2 with no receipt.
+Connection-only diagnostics at13:30/13:32/13:33UTC confirmed client exit2 without
+timeout. The initial finite classifier did not recognize libpq's alternate wording;
+an allowlisted technical-word diagnostic established **`SSL connection has been
+closed unexpectedly`**, before any validated session. The diagnostic classifier
+now recognizes that fixed wording; no further connection attempt followed. This
+is connection closure, not an independently established certificate/TLS fault.
+
+Latest closure diagnostic (13:33:03.239Z–13:33:06.267Z), stderr SHA-256:
+`120996031337843b7ade737b83cb890f0394cafa8f4acb9799c228801ab80ea8`.
+The13:32 stderr digest also matched the retained earlier closure digest
+`ed08e5e786f9e63d5f97dba7597d5a610cd6756f469a66aacc69f156a2558714`;
+digest equality does not independently establish the provider's rejection reason.
+
+At13:33:48.267UTC, read-only provider metadata and an address-suppressed HTTPS egress
+comparison returned `observedHttpsEgressInExistingDatabaseAllowlist: FAIL`.
+No public address, CIDR, credential or business record was emitted/retained.
+**Limit:** HTTPS egress does not independently attest the source IP of the database
+TCP connection; provider-side rejection causality is not invented. It nevertheless
+establishes that the current observed operator egress is outside the approved set.
+
+The previous DNS-only next action is therefore superseded: reuse the existing
+approved operator network/egress before another database read. No allowlist, TLS,
+resolver, credential, database or production service configuration was changed.
+No alternative IP/endpoint, VPN/jump host, new service or paid resource was created.
+Current-source fingerprints are still unavailable; no old/expired11:00 boundary or
+snapshot is promoted to current retirement eligibility. The V3 qualification code
+and completed20 Node/30 PostgreSQL tests are reused unchanged. Protected inputs
+remain incomplete, and retirement execution cannot proceed on these observations.
+
+### Qualification continuation and decisive connection evidence
+
+The owner's latest instruction directionally accepts V3 **for qualification only**,
+not production execution. No further timing-policy or test-data-classification
+decision is needed. Keep the executable source unchanged while sealing its local
+review identity against base `fc955e8aaa466bc836c31e341d12afa3f68ee19c` with the
+existing `candidate-files.sha256`. A manifest identifies exact local source bytes;
+it is not a commit, publication, independent acceptance or production admission.
+The eight changed file hashes are refreshed; all32 other listed files matched
+their existing hashes before refresh. The executable/test hashes below are
+unchanged from the passing20 Node/30 PostgreSQL qualification evidence. Those
+results are carried forward, not a claim that remote CI has run.
+
+Retained diagnostics cannot establish the cause of the earlier bounded failures:
+their error text was discarded. One discriminating **connection-only** observation
+was performed at `2026-10-30T11:14:43.598Z`–`11:14:59.890Z`, using the existing exact
+Render target and unchanged verify-full/SNI/read-only controls. It queried no
+business table and made no production mutation. No V3 production assessment ran.
+
+- Authenticated provider lookup exited0 and validated the exact logical endpoint.
+- PostgreSQL client exited2, without a client timeout.
+- Its in-memory libpq diagnostic matched **`could not translate host name`**:
+  **NAME_RESOLUTION_FAILED**. No database session or rollback receipt was obtained.
+- Original stderr SHA-256:
+  `fc79115b85920289135aa45a50042480a5c500b342aa1ceb9ce21d34acc13213`.
+- Connection-only SQL SHA-256:
+  `6053f026c0474d04a29323ed025426c10450c621a2c9316e60af86d1da69b148`.
+- Raw diagnostics, addresses, usernames and credentials were not emitted/retained.
+
+**Evidenced current blocker:** hostname resolution in the existing operator
+execution environment, before a database session exists. This does not establish
+the underlying resolver outage or retrospectively diagnose earlier failures.
+It is not evidence of a SQL/business-predicate failure. No TLS investigation,
+resolver/allowlist/security modification, alternate endpoint/IP, fallback or repeat
+connection attempt followed.
+
+**Minimum next action:** the operator/platform custodian must restore resolution
+of the approved database hostname in the existing authorized execution environment.
+After that is evidenced, obtain the current-source receipt through the accepted
+read-only route; the V3 production-execution restriction remains in force. Until
+then no new business assessment, final reset-authorization request, recovery/cost/
+custody completion claim or retirement window is warranted.
+
+Status: **IMPLEMENTED**, **TESTED** locally in `aqua-clean-start-boundary` against
+base `fc955e8aaa466bc836c31e341d12afa3f68ee19c`. Application accepted main
+`4414df2d02e824c14b38326a989f37a8855f015f` and executor accepted main
+`fbcafc951f4068eb6465da95ea1c576a08eb494c` are verified through operational
+comment 6515761957 and the authenticated PR117 review/merge/CI. Their acceptance
+does not qualify this subsequent preflight amendment. Nothing was committed,
+published or dispatched for this amendment; executor accepted source pins are
+intentionally not relabelled as qualifying changed preflight bytes.
+
+- Node launcher/privacy/selection checks: **20 passed, zero failed/skipped**.
+- Actual PostgreSQL **18.4** status-screen checks: **30 passed, zero failed/skipped**;
+  artifact `/tmp/opencode/retirement-preflight-tests/retirement-preflight-v3.trx`.
+  Covers prospective 11:00-equivalent versus canonical rejection, absent/unknown/
+  zero/mixed authority, future population, expired boundary, reset replay, strict
+  payment rejection versus explicit attested admission, retained payment graph and
+  unchanged source fingerprint, non-payment exposure rejection, exact migration
+  inventory/CTE parity, RLS UNKNOWN, read-only enforcement and rollback/privacy.
+- The initial test command exceeded its 120-second tool budget after building;
+  not passing evidence. The next run passed 23/24, failing only a new synthetic
+  payment reference without its required FK. Reused the existing retained payment
+  graph fixture; the boundary-only intermediate run passed 24/24, and the final
+  selected-admission run passed 30/30. No constraint/assertion was weakened.
+- Release test-project build passed with existing warnings. Full exact-source CI
+  and independent amendment acceptance: **NOT RUN / NOT OBTAINED**.
+
+Current V3 SHA-256 (supersedes historical preflight identities below):
+
+| Artifact | SHA-256 |
+|---|---|
+| preflight.sql | `3490551fda6c0c7ad08e3ef7924813879737306163230199b4a4deda049bf723` |
+| preflight-checks.sql | `9566152651d21ff934fa9e335a8483dcf4f13310509bff3050b4b24154db3c67` |
+| aqgreen-clean-start-preflight.mjs | `c3e3375c44f5de6cdadc0553ba7fa50e4be478e51fd0ebc96a817091ca4a4e09` |
+
+`state.sql`, `reset.sql`, `restore.sql`, migration55, runtime/D10 and accepted
+B6 are unchanged by this correction. The launcher digest above must be pinned
+with the final amendment review; old executor/manifest pins do not authorize it.
+
+### Actual constrained operational evidence
+
+At `2026-10-30T10:54:45.496Z`, authenticated Render GETs of the seven individually
+allowlisted settings confirmed Production, receive-only true, and background jobs,
+weekly commissions, monthly obligations, financial operations and automatic
+payouts false. The recorded receiver deployment matched `4eba379...`; live health
+returned 200/Healthy with that exact build. These are provider configuration,
+deployment and public-health observations, not a fresh protected process-level
+readiness attestation. No environment enumeration, secret output or mutation.
+Reduced receipt SHA-256:
+`41dc39497aff71afdeff5f16fa8efa1e84d908957b38a1b5b0b0d6038e16ffd9`.
+
+The same account's PITR GET returned **AVAILABLE**, `startsAt=2026-10-26T02:44:01Z`.
+Its API does not return the latest recoverable point or attest acceptable data
+loss, account-specific zero recovery cost, or approved custody/retention. Those
+requirements remain unverified. Official documentation says recovery creates a
+new instance and excludes the latest ten minutes; no clone/export/restore was
+requested. The transactional before-image journal is not an independent backup.
+
+Two bounded read-only source-observation attempts using the **unchanged accepted
+state.sql** yielded no validated receipt. The first reduced failure had no precise
+process category; the second observed PostgreSQL client exit2 and no SQLSTATE.
+This proves no successful current readback, not where SQL execution stopped or
+what caused the connection failure/loss. No TLS investigation, network change,
+fallback or further retry followed. No current source/payment/financial/audit
+fingerprint is available from these attempts; old fingerprints are not reused.
+The changed V3 preflight was **not** executed against production before acceptance.
+
+The source-bound protected authorization packet therefore cannot be completed
+truthfully yet. Its current cohort/native/preservation fingerprints, bound
+classification/independent operational acceptance, approved recovery/cost/custody
+evidence and exact reset authorization remain missing. No reset, migration55,
+full cutover, financial release or replacement retirement window was performed.
+The current execution environment reports `AQGREEN_APPROVED_RESET_INPUTS` unbound;
+no existing protected authorization file was edited or replaced with a new route.
+Both remote main references were rechecked and still match the accepted identities
+above. The source declaration and timing policies need no repeat owner approval;
+this changed preflight source and the eventual exact operation retain their
+independent acceptance/authorization gates.
+
 ## Prospective UTC boundary amendment — current local evidence
 
 The owner authorized a prospective CLEAN_START boundary without waiting for the
