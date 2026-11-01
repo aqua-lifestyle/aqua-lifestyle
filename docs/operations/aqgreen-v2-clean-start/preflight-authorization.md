@@ -1,5 +1,67 @@
 # Current scope note
 
+## Retirement-blocker correction — 30 October 2026
+
+Current owner direction accepts the existing V3 correction **for qualification
+only**, not production execution. Timing-policy and test-data-classification
+decisions need no repetition. Exact local bytes are identified by the existing
+candidate-files.sha256 plus base fc955e8; independent acceptance/source admission
+is still separate. The11:14 connection-only check documented in validation.md
+established NAME_RESOLUTION_FAILED at that observation. The later existing-route
+comparison supersedes the DNS-only blocker: the same external hostname now resolves,
+but connections close before a verified session and the currently observed HTTPS
+egress is outside the existing database allowlist. Reuse the existing approved
+operator egress; no new access/security change is authorized by that comparison.
+No V3 production assessment is authorized or claimed by those diagnostics.
+
+**PROPOSED source amendment; local TESTED evidence is not independent acceptance.**
+The accepted prospective reset/D10 path was not propagated to the historical
+status screen. At `2026-10-30T11:00:00Z`, Johannesburg time is Friday **13:00**,
+not Friday midnight. The old scope predicate necessarily fails its time-of-day
+conjunct. Future boundary, no post-boundary participation and unused reset identity
+are independent checks; the aggregate FAIL does not prove they passed.
+
+The other mismatch is admission selection: the historical screen unconditionally
+rejects `payments>0`, whereas the accepted retirement contract explicitly admits
+retained payment evidence under `OWNER_ATTESTED_TEST_ONLY_V1`. That predicate
+measures presence, not provider test/live mode, settled value or liability.
+The last successful detailed observation (29 October 21:48 UTC, operational
+comment 6509172606) passed all nine non-payment guards; it is carried-forward
+evidence, not a current readback of the 30 October aggregate FAIL. The earlier
+27 October diagnostic identified MemberPayments, Yoco receipts, joining checkouts
+and participation payment references. No current subpredicate result is invented.
+
+The minimal V3 amendment lets the launcher explicitly select the same two paths
+already accepted for reset/D10:
+
+- `--boundary-policy OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1` together with
+  `--boundary-authorization-digest` from the actual protected boundary authority;
+- `--payment-admission-mode OWNER_ATTESTED_TEST_ONLY_V1` together with
+  `--owner-test-only-attestation-digest` from the actual owner declaration.
+
+Each pair is optional but must be complete, recognized and nonzero. Omitted pairs
+retain canonical Friday and zero-payment admission. No nine non-payment guard,
+population CTE, visibility/schema/source check, timeout or rollback control is
+removed. V3 evidence names the chosen policies/authority digests, exact boundary
+and reset identity, and `providerModeVerification: NOT_INDEPENDENTLY_VERIFIED`.
+Old V2 receipts are rejected. A V3 financial/structural PASS means database
+**admissibility under the disclosed selection**, never that payment presence or
+external liabilities are zero. Actual conservation still occurs in the separately
+authorized reset and requires Aqua's acceptance before migration 55.
+
+Both business checks remain UNKNOWN in SQL by design. Classification is already
+owner-attested, but must be bound to a freshly observed source fingerprint in the
+protected record. External claims are not independently cleared by that declaration;
+their records/obligations remain preserved and processing held. A database-only
+`overall: PASS` remains impossible; final business acceptance belongs to the
+protected authorization packet, not fabricated SQL output.
+
+This amendment needs exact artifact qualification and independent acceptance before
+production use. It does not request another owner classification or timing-policy
+decision. Current artifact hashes/results are at the top of `validation.md`.
+No replacement retirement window is proposed. The historical commands/windows
+below are not current execution authority.
+
 The following is the historical status-only preflight contract. Its accepted
 production executions and the payment-only FAIL are retained as evidence. The
 current owner-attested retirement branch is defined in

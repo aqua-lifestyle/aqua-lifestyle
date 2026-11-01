@@ -9,8 +9,8 @@ const database = 'aqualifestyle';
 const hostname = `${resource}.frankfurt-postgres.render.com`;
 const directory = new URL('../../AqualLifeStyle/9.4.2/aspnet-core/src/AqualLifeStyle.EntityFrameworkCore/Operations/CleanStart/', import.meta.url);
 export const pins = Object.freeze({
-  'preflight.sql': 'b0b495e30d0f3b910980f6d212b75b57de725c35f56c253ff973f681382264dd',
-  'preflight-checks.sql': '1d8845c76fa87843f48fc2e648a57333c94d2417fc018c4b499ff28d25e91651',
+  'preflight.sql': '3490551fda6c0c7ad08e3ef7924813879737306163230199b4a4deda049bf723',
+  'preflight-checks.sql': '9566152651d21ff934fa9e335a8483dcf4f13310509bff3050b4b24154db3c67',
   'state.sql': '16d580d6782096bc9be9be3a862f57bd304a18eb75578338cb2d7ad4abd630f0'
 });
 const hash = b => createHash('sha256').update(b).digest('hex');
@@ -56,7 +56,7 @@ export function assess(options, { execute = spawnSync, read = readFileSync, now 
   const processExitStatuses = { provider: null, database: null };
   const diagnostics = (category, overall) => ({ failureCategory: category, stage,
     launcherExitStatus: exitStatus(overall), processExitStatuses: { ...processExitStatuses } });
-  const unknown = (category = failureCategory) => ({ contract: 'AQGreenCleanStartScreenV2', databaseScreen: 'UNKNOWN', overall: 'UNKNOWN',
+  const unknown = (category = failureCategory) => ({ contract: 'AQGreenCleanStartScreenV3', databaseScreen: 'UNKNOWN', overall: 'UNKNOWN',
     checks: { execution: 'UNKNOWN' }, diagnostics: diagnostics(category, 'UNKNOWN'),
     evidence: { resource, database, tenant: 1, attemptedAtUtc: new Date(started).toISOString(), finishedAtUtc: new Date(now()).toISOString() } });
   const record = (name, result) => {
@@ -64,7 +64,16 @@ export function assess(options, { execute = spawnSync, read = readFileSync, now 
   };
   const timedOut = result => result.error?.code === 'ETIMEDOUT' || now() >= Date.parse(options.end);
   try {
-    if (!exact(options, ['boundary', 'resetId', 'start', 'end']) || ![options.boundary, options.start, options.end].every(utc) ||
+    const prospective = Object.hasOwn(options, 'boundaryPolicy') || Object.hasOwn(options, 'boundaryAuthorizationDigest');
+    const attested = Object.hasOwn(options, 'paymentAdmissionMode') || Object.hasOwn(options, 'ownerTestOnlyAttestationDigest');
+    if (!exact(options, ['boundary', 'resetId', 'start', 'end',
+          ...(prospective ? ['boundaryPolicy', 'boundaryAuthorizationDigest'] : []),
+          ...(attested ? ['paymentAdmissionMode', 'ownerTestOnlyAttestationDigest'] : [])]) ||
+        (prospective && (options.boundaryPolicy !== 'OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1' ||
+          !digest(options.boundaryAuthorizationDigest) || options.boundaryAuthorizationDigest === '0'.repeat(64))) ||
+        (attested && (options.paymentAdmissionMode !== 'OWNER_ATTESTED_TEST_ONLY_V1' ||
+          !digest(options.ownerTestOnlyAttestationDigest) || options.ownerTestOnlyAttestationDigest === '0'.repeat(64))) ||
+        ![options.boundary, options.start, options.end].every(utc) ||
         !/^[A-Za-z0-9.-]{1,80}$/.test(options.resetId) || Date.parse(options.end) <= Date.parse(options.start) ||
         Date.parse(options.end) - Date.parse(options.start) > 900_000 ||
         Date.parse(options.boundary) <= Date.parse(options.end)) return unknown();
@@ -104,6 +113,10 @@ export function assess(options, { execute = spawnSync, read = readFileSync, now 
     stage = 'DATABASE_CLIENT'; failureCategory = categories.undetermined;
     const result = execute('psql', ['-X', '-qAt', '--no-password', '--set=ON_ERROR_STOP=1', '--set=VERBOSITY=terse',
       '--set=boundary_utc=' + options.boundary, '--set=reset_id=' + options.resetId,
+      ...(prospective ? ['--set=boundary_policy=' + options.boundaryPolicy,
+        '--set=boundary_authorization_digest=' + options.boundaryAuthorizationDigest] : []),
+      ...(attested ? ['--set=payment_admission_mode=' + options.paymentAdmissionMode,
+        '--set=owner_test_only_attestation_digest=' + options.ownerTestOnlyAttestationDigest] : []),
       '--file=-'],
       { env, input: approvedSql, encoding: 'utf8', timeout: sqlBudget, killSignal: 'SIGKILL', maxBuffer: 65536, stdio: ['pipe', 'pipe', 'pipe'] });
     // Examine only fixed diagnostic markers in memory. Never emit raw errors or rows.
@@ -122,7 +135,7 @@ export function assess(options, { execute = spawnSync, read = readFileSync, now 
     stage = 'RESULT_VALIDATION'; failureCategory = categories.result;
     const r = JSON.parse(result.stdout.trim());
     if (!exact(r, ['contract', 'databaseScreen', 'overall', 'checks', 'sourceFingerprint', 'databaseFingerprint', 'schemaFingerprint', 'snapshotFingerprint', 'observedAtUtc']) ||
-        r.contract !== 'AQGreenCleanStartScreenV2' || !exact(r.checks, keys) ||
+        r.contract !== 'AQGreenCleanStartScreenV3' || !exact(r.checks, keys) ||
         !Object.values(r.checks).every(v => states.includes(v)) || r.checks.transaction !== 'PASS' ||
         r.checks.testDataClassification !== 'UNKNOWN' || r.checks.externalBusinessObligations !== 'UNKNOWN' ||
         r.databaseScreen !== worst(keys.slice(0, 5).map(k => r.checks[k])) ||
@@ -138,6 +151,12 @@ export function assess(options, { execute = spawnSync, read = readFileSync, now 
       diagnostics: diagnostics(null, r.overall),
       checks: { execution: 'PASS', logicalSourceIdentity: 'PASS', rollback: 'PASS', ...r.checks },
       evidence: { resource, database, tenant: 1, identityMode: 'RENDER_RESOURCE_TLS_DATABASE_SESSION_V1',
+        boundaryUtc: options.boundary, resetId: options.resetId,
+        boundaryPolicy: prospective ? options.boundaryPolicy : 'CANONICAL_FINANCIAL_WEEK_V1',
+        boundaryAuthorizationDigest: prospective ? options.boundaryAuthorizationDigest : null,
+        paymentAdmissionMode: attested ? options.paymentAdmissionMode : 'ZERO_PAYMENT_EXPOSURE_V1',
+        ownerTestOnlyAttestationDigest: attested ? options.ownerTestOnlyAttestationDigest : null,
+        providerModeVerification: 'NOT_INDEPENDENTLY_VERIFIED',
         observedAtUtc: new Date(r.observedAtUtc).toISOString(), finishedAtUtc: new Date(finished).toISOString(),
         sqlDigests: pins, runnerDigest,
         sourceFingerprint: r.sourceFingerprint, databaseFingerprint: r.databaseFingerprint,
@@ -148,8 +167,11 @@ export function assess(options, { execute = spawnSync, read = readFileSync, now 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const flags = process.argv.slice(2);
   const options = {};
-  const names = { '--boundary-utc': 'boundary', '--reset-id': 'resetId', '--window-start-utc': 'start', '--window-end-utc': 'end' };
-  let valid = flags.length === 8;
+  const names = { '--boundary-utc': 'boundary', '--reset-id': 'resetId', '--window-start-utc': 'start', '--window-end-utc': 'end',
+    '--boundary-policy': 'boundaryPolicy', '--boundary-authorization-digest': 'boundaryAuthorizationDigest' };
+  names['--payment-admission-mode'] = 'paymentAdmissionMode';
+  names['--owner-test-only-attestation-digest'] = 'ownerTestOnlyAttestationDigest';
+  let valid = [8, 12, 16].includes(flags.length);
   for (let i = 0; i < flags.length; i += 2) {
     const name = names[flags[i]];
     if (!name || Object.hasOwn(options, name) || flags[i + 1] === undefined) valid = false;

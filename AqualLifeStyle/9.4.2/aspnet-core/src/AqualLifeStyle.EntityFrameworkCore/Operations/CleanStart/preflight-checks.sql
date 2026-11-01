@@ -81,17 +81,28 @@ WITH settings AS (
    (SELECT encode(sha256(convert_to(string_agg("MigrationId",chr(10) ORDER BY "MigrationId"),'UTF8')),'hex')
      FROM public."__EFMigrationsHistory")='64884df1307d040e0ba9cf863e3227a5b507dad364bc78624c58a877b5bf6fa9' AND
    to_regclass('public."AQGreenSalesEvidenceInvalidations"') IS NULL THEN 'PASS' ELSE 'FAIL' END AS schema_status,
- CASE WHEN extract(isodow FROM (SELECT boundary FROM settings) AT TIME ZONE 'Africa/Johannesburg')=5 AND
-   ((SELECT boundary FROM settings) AT TIME ZONE 'Africa/Johannesburg')::time=time '00:00:00' AND
+  CASE WHEN ((coalesce(nullif(current_setting('aqua.clean_start.boundary_policy',true),''),'CANONICAL_FINANCIAL_WEEK_V1')='CANONICAL_FINANCIAL_WEEK_V1' AND
+    coalesce(current_setting('aqua.clean_start.boundary_authority',true),'')='' AND
+    extract(isodow FROM (SELECT boundary FROM settings) AT TIME ZONE 'Africa/Johannesburg')=5 AND
+    ((SELECT boundary FROM settings) AT TIME ZONE 'Africa/Johannesburg')::time=time '00:00:00') OR
+    (current_setting('aqua.clean_start.boundary_policy',true)='OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1' AND
+     current_setting('aqua.clean_start.boundary_authority',true) ~ '^[0-9a-f]{64}$' AND
+     current_setting('aqua.clean_start.boundary_authority',true)<>repeat('0',64))) AND
    (SELECT boundary FROM settings)>transaction_timestamp() AND
    NOT EXISTS(SELECT 1 FROM public."EntryParticipations",settings s WHERE "TenantId"=s.tenant AND "StartedAt">=s.boundary) AND
    NOT EXISTS(SELECT 1 FROM reset_log) THEN 'PASS' ELSE 'FAIL' END AS scope_status,
- CASE WHEN placements>0 OR unclassified>0 OR payments>0 OR real_commissions>0 OR loans>0 OR
-   graduations>0 OR obligations>0 OR payouts>0 OR orphans>0 OR invalid>0 THEN 'FAIL'
+  CASE WHEN placements>0 OR unclassified>0 OR real_commissions>0 OR loans>0 OR
+    graduations>0 OR obligations>0 OR payouts>0 OR orphans>0 OR invalid>0 THEN 'FAIL'
    WHEN population IS NULL OR archived IS NULL OR placements IS NULL OR memberships IS NULL OR
    unclassified IS NULL OR payments IS NULL OR real_commissions IS NULL OR loans IS NULL OR
    graduations IS NULL OR obligations IS NULL OR payouts IS NULL OR orphans IS NULL OR invalid IS NULL
-   THEN 'UNKNOWN' ELSE 'PASS' END AS exposure_status
+    THEN 'UNKNOWN'
+    WHEN coalesce(nullif(current_setting('aqua.clean_start.payment_mode',true),''),'ZERO_PAYMENT_EXPOSURE_V1')='ZERO_PAYMENT_EXPOSURE_V1' AND
+      coalesce(current_setting('aqua.clean_start.owner_test_attestation',true),'')='' THEN CASE WHEN payments>0 THEN 'FAIL' ELSE 'PASS' END
+    WHEN current_setting('aqua.clean_start.payment_mode',true)='OWNER_ATTESTED_TEST_ONLY_V1' AND
+      current_setting('aqua.clean_start.owner_test_attestation',true) ~ '^[0-9a-f]{64}$' AND
+      current_setting('aqua.clean_start.owner_test_attestation',true)<>repeat('0',64) THEN 'PASS'
+    ELSE 'FAIL' END AS exposure_status
  FROM counts
 ), effective AS (
  SELECT transaction_status,visibility_status,
@@ -106,7 +117,7 @@ WITH settings AS (
    ELSE 'PASS' END AS database_status FROM effective
 )
 SELECT set_config('aqua.clean_start.preflight_receipt',jsonb_build_object(
- 'contract','AQGreenCleanStartScreenV2','databaseScreen',database_status,
+  'contract','AQGreenCleanStartScreenV3','databaseScreen',database_status,
  'overall',CASE WHEN database_status='FAIL' THEN 'FAIL' ELSE 'UNKNOWN' END,
  'checks',jsonb_build_object('transaction',transaction_status,'visibility',visibility_status,
    'schema',schema_status,'scope',scope_status,'financialAndStructuralExposure',exposure_status,
