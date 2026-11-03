@@ -45,10 +45,12 @@ unlimited provider retries or unlimited database storage.
    unchanged. Preserve Yoco signing credentials; never place them in arguments,
    source or chat. No additional service, disk, database or paid restore is used.
 2. Approve the pinned compatibility receiver deployment and bounded verification.
-   Configure `App__YocoCutover__Enabled=true`. The forced receiver starts and
-   captures without `OperatorUserId` or an application login. Leave that optional
-   identity unset for receipt-only operation: every privileged operation remains
-   denied. Full V2 still requires its authenticated, pinned host operator before
+   Configure `App__YocoCutover__Enabled=true`. The receiver and full V2 can start
+   and durably capture without `OperatorUserId` or an application login. Leave that
+   optional identity unset for receipt-only operation: privileged operations and
+   HTTP business leases remain denied. Callbacks require reconciliation and do
+   not dispatch business effects even if a previously stored phase says Normal.
+   Full V2 still requires its authenticated, pinned host operator before
    phase changes, reconciliation/replay or normal business processing.
    Set `App__BackgroundJobs__Enabled`, `App__WeeklyCommissions__Enabled`,
    `App__EntryMonthlyObligations__Enabled`, `App__AutomaticPayouts__Enabled`,
@@ -84,6 +86,10 @@ unlimited provider retries or unlimited database storage.
 
 A configuration reload cannot silently disable an enabled fence or change its
 operator. Background execution and external checkout creation also fail closed.
+A missing operator pin remains an explicitly unconfigured identity, not an
+authorized user zero. An invalid explicit pin still prevents startup. Adding a
+pin to an already running unpinned process requires a separately authorized
+checked restart; reload cannot silently grant privileged authority.
 A receiver restart requires the mode to remain enabled. Old accepted payment
 relationships are never deleted or overwritten by capture.
 

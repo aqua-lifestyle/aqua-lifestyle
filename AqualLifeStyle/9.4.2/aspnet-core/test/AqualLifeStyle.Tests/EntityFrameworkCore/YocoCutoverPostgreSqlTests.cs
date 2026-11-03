@@ -107,6 +107,41 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         private static async Task Apply55(NpgsqlConnection c)=>await SqlAsync(c,await File.ReadAllTextAsync(Path.Combine(Operations,"migration-55.reviewed.sql")));
 
         [Fact]
+        public async Task YocoUnpinnedReceiveOnly_CommitsVerifiedCallbacksWithoutOperatorPhaseOrBusinessEffects()
+        {
+            await using var db=await _fixture.CreateDatabaseAsync();await using var c=new NpgsqlConnection(db.ConnectionString());
+            await c.OpenAsync();await PrepareAsync(c);await Apply55(c);
+            var before=await ProtectedDigestAsync(c);var config=CutoverConfig();config[YocoCutoverOptions.Prefix+"OperatorUserId"]=null;
+            var store=new CutoverStore(_fixture,db.ConnectionString());
+            var service=CutoverService(store,out var dispatch,out _,out _,config);var body=CutoverBody("live");
+            (await CutoverController(service,body,valid:false).WebhookAsync()).ShouldBeOfType<StatusCodeResult>().StatusCode.ShouldBe(403);
+            await Task.WhenAll(Enumerable.Range(0,8).Select(_=>Capture(service,body:body)));
+            var state=await service.StatusAsync();state.Events.Count.ShouldBe(1);state.Phase.ShouldBe("Uninitialized");
+            state.PhaseEvidence.ShouldBeEmpty();state.Events.Single().RequiresReconciliation.ShouldBeTrue();
+            Convert.FromBase64String(state.Events.Single().BodyBase64).ShouldBe(body);
+            foreach(var phase in new[]{"ReceiveOnly","Replay","Normal"})
+                (await Should.ThrowAsync<InvalidOperationException>(()=>service.SetPhaseAsync(phase))).Message.ShouldBe("YOCO_CUTOVER_PHASE_NOT_AUTHORIZED");
+            foreach(var id in new[]{0L,7L})
+                (await Should.ThrowAsync<InvalidOperationException>(()=>service.ReplayAsync(state.Events.Single().Id,id))).Message.ShouldBe("YOCO_REPLAY_OPERATOR_REQUIRED");
+            dispatch.Calls.ShouldBe(0);(await ProtectedDigestAsync(c)).ShouldBe(before);
+        }
+        [Fact]
+        public async Task YocoUnpinnedReceiveOnly_CannotDispatchFromPreviouslyStoredNormalPhase()
+        {
+            await using var db=await _fixture.CreateDatabaseAsync();await using var c=new NpgsqlConnection(db.ConnectionString());
+            await c.OpenAsync();await PrepareAsync(c);await Apply55(c);
+            var before=await ProtectedDigestAsync(c);var config=CutoverConfig();config[YocoCutoverOptions.Prefix+"OperatorUserId"]=null;
+            var store=new CutoverStore(_fixture,db.ConnectionString());
+            // Model an already stored phase; missing operator configuration must
+            // never convert it into current business-dispatch authority.
+            await store.TransactAsync(s=>{s.Phase="Normal";return Task.FromResult(true);});
+            var service=CutoverService(store,out var dispatch,out _,out _,config);
+            await Capture(service,body:CutoverBody("live"));
+            var state=await service.StatusAsync();state.Phase.ShouldBe("Normal");
+            state.Events.Single().RequiresReconciliation.ShouldBeTrue();state.Events.Single().Status.ShouldBe("Pending");
+            dispatch.Calls.ShouldBe(0);(await ProtectedDigestAsync(c)).ShouldBe(before);
+        }
+        [Fact]
         public async Task YocoReceiveOnly_Schema54DurablyCapturesWithoutBusinessEffectsAndNeverRunsAsAnAutomaticJob()
         {
             await using var db=await _fixture.CreateDatabaseAsync();await using var c=new NpgsqlConnection(db.ConnectionString());await c.OpenAsync();await PrepareAsync(c);

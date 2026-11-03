@@ -29,6 +29,59 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
     public sealed partial class AQGreenCleanStartPostgreSqlTests
     {
         [Fact]
+        public async Task YocoFullV2ProductionStartup_WithoutOperatorCapturesOnlyAndPinnedHostAuthorizationRemainsRequired()
+        {
+            var root=new DirectoryInfo(AppContext.BaseDirectory);
+            while(root!=null&&!File.Exists(Path.Combine(root.FullName,"AqualLifeStyle.sln")))root=root.Parent;
+            root.ShouldNotBeNull();
+            var directory=Path.Combine(root.FullName,"src","AqualLifeStyle.Web.Host","bin","Release","net8.0");
+            await using var db=await _fixture.CreateDatabaseAsync();await using var c=new NpgsqlConnection(db.ConnectionString());
+            await c.OpenAsync();await PrepareAsync(c);await Apply55(c);await SeedReceiverOperators(c);
+            var before=await ProtectedDigestAsync(c);using var redis=await AQGreenMigrationRollbackPostgreSqlTests.RecoveryRedis.StartAsync();
+            using var rsa=RSA.Create(2048);var request=new CertificateRequest("CN=Synthetic full V2 receive-only",rsa,HashAlgorithmName.SHA256,RSASignaturePadding.Pkcs1);
+            using var cert=request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-2),DateTimeOffset.UtcNow.AddHours(1));
+            var cert64=Convert.ToBase64String(cert.Export(X509ContentType.Pfx,"synthetic"));
+            using var client=new HttpClient {Timeout=TimeSpan.FromSeconds(15)};var body=CutoverBody("live");
+            using(var host=await ReceiverHost.Start(directory,db.ConnectionString(),redis.Endpoint,cert64,true,client,
+                operatorConfigured:false,cleanStartPending:true))
+            {
+                await host.Ready(client);
+                var health=await client.GetAsync(host.Address+"/api/health");
+                health.Headers.GetValues("X-Aqua-Yoco-Receiver").Single().ShouldBe("FullV2");
+                (await ReceiverPost(client,host.Address,body,false)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+                (await ReceiverPost(client,host.Address,body,true)).StatusCode.ShouldBe(HttpStatusCode.OK,host.Log);
+                (await ReceiverPost(client,host.Address,body,true)).StatusCode.ShouldBe(HttpStatusCode.OK);
+                client.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",ReceiverToken(7));
+                foreach(var route in new[]{"status","events"})
+                    (await client.GetAsync(host.Address+"/api/operations/yoco-cutover/"+route)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+                foreach(var route in new[]{"phase","replay"})
+                    (await client.PostAsync(host.Address+"/api/operations/yoco-cutover/"+route,new StringContent("{}",Encoding.UTF8,"application/json")))
+                        .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+                (await client.PostAsync(host.Address+"/api/services/app/Account/Register",new StringContent("{}",Encoding.UTF8,"application/json")))
+                    .StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+                client.DefaultRequestHeaders.Authorization=null;
+                var service=CutoverService(new(_fixture,db.ConnectionString()),out var dispatch,out _,out _);
+                var state=await service.StatusAsync();state.Events.Count.ShouldBe(1);state.Phase.ShouldBe("Uninitialized");
+                state.Events.Single().RequiresReconciliation.ShouldBeTrue();dispatch.Calls.ShouldBe(0);
+                (await ProtectedDigestAsync(c)).ShouldBe(before);
+            }
+            using(var host=await ReceiverHost.Start(directory,db.ConnectionString(),redis.Endpoint,cert64,true,client,
+                operatorConfigured:true,cleanStartPending:true))
+            {
+                await host.Ready(client);
+                client.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",ReceiverToken(8));
+                (await client.GetAsync(host.Address+"/api/operations/yoco-cutover/status")).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+                client.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",ReceiverToken(3001,1));
+                (await client.GetAsync(host.Address+"/api/operations/yoco-cutover/status")).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+                client.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",ReceiverToken(7));
+                (await client.GetAsync(host.Address+"/api/operations/yoco-cutover/status")).StatusCode.ShouldBe(HttpStatusCode.OK,host.Log);
+                (await client.PostAsync(host.Address+"/api/operations/yoco-cutover/phase",new StringContent("{\"phase\":\"Normal\"}",Encoding.UTF8,"application/json")))
+                    .StatusCode.ShouldBe(HttpStatusCode.Conflict);
+                client.DefaultRequestHeaders.Authorization=null;
+            }
+            (await ProtectedDigestAsync(c)).ShouldBe(before);
+        }
+        [Fact]
         public async Task YocoReceiverArtifact54MigrationCompatibility_RealProductionHostCommitsReceiptsSurvivesRestartAndCannotUnfence()
         {
             var directory=Environment.GetEnvironmentVariable("YOCO_RECEIVER54_ARTIFACT");
@@ -192,7 +245,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             private Process _process;private readonly ConcurrentQueue<string> _logs=new();
             public string Address;public string Log=>string.Join("\n",_logs);public int ExitCode=>_process.ExitCode;
-            public static Task<ReceiverHost> Start(string dir,string cs,string redis,string cert,bool enabled,HttpClient _,bool operatorConfigured=true)
+            public static Task<ReceiverHost> Start(string dir,string cs,string redis,string cert,bool enabled,HttpClient _,bool operatorConfigured=true,
+                bool cleanStartPending=false)
             {
                 var listener=new TcpListener(IPAddress.Loopback,0);listener.Start();var port=((IPEndPoint)listener.LocalEndpoint).Port;listener.Stop();
                 var host=new ReceiverHost {Address="http://127.0.0.1:"+port};
@@ -212,6 +266,11 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     ("Bird__FromName","Synthetic cutover test"),("Bird__DeliveryNotBeforeUtc","2026-01-01T00:00:00Z"),
                     ("Yoco__Mode","test"),("Yoco__SecretKey","sk_test_synthetic_not_a_real_credential"),("Yoco__WebhookSecret",CutoverSecret)}) start.Environment[pair.Item1]=pair.Item2;
                 if(!operatorConfigured)start.Environment.Remove("App__YocoCutover__OperatorUserId");
+                if(cleanStartPending)
+                {
+                    start.Environment["App__AQGreenV2__Commissioning__AdmissionMode"]="CLEAN_START";
+                    start.Environment["App__AQGreenV2__Commissioning__Enabled"]="false";
+                }
                 host._process=new Process {StartInfo=start};host._process.OutputDataReceived+=(_,e)=>{if(e.Data!=null)host._logs.Enqueue(e.Data);};
                 host._process.ErrorDataReceived+=(_,e)=>{if(e.Data!=null)host._logs.Enqueue(e.Data);};host._process.Start();host._process.BeginOutputReadLine();host._process.BeginErrorReadLine();return Task.FromResult(host);
             }
