@@ -22,8 +22,12 @@ namespace AqualLifeStyle.Web.Host.Controllers
         private readonly IConfiguration _configuration;
         public YocoCutoverController(YocoCutoverService service, IConfiguration configuration)
         { _service = service; _configuration = configuration; }
-        private bool Operator() => AbpSession.UserId.HasValue && !AbpSession.TenantId.HasValue &&
-            AbpSession.UserId == new YocoCutoverOptions(_configuration).OperatorUserId;
+        private bool Operator()
+        {
+            var options = new YocoCutoverOptions(_configuration);
+            return options.HasOperator && AbpSession.UserId.HasValue && !AbpSession.TenantId.HasValue &&
+                AbpSession.UserId == options.OperatorUserId;
+        }
         [HttpGet("status")]
         public async Task<IActionResult> StatusAsync()
         {

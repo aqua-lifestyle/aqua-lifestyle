@@ -29,10 +29,55 @@ namespace AqualLifeStyle.Tests.WebHost
         private static IConfiguration Config() => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string>
             { [YocoCutoverOptions.Prefix+"Enabled"]="true",[YocoCutoverOptions.Prefix+"OperatorUserId"]="7" }).Build();
         [Fact]
-        public void FullBackendStillRequiresPinnedOperator()
+        public async Task FullBackendStartsReceiveOnlyWithoutOperatorAndKeepsBackgroundAndFinancialWorkHeld()
         {
             var c=Config();c[YocoCutoverOptions.Prefix+"OperatorUserId"]=null;
+            var options=new YocoCutoverOptions(c);
+            options.CompatibilityReceiver.ShouldBeFalse();options.Enabled.ShouldBeTrue();options.HasOperator.ShouldBeFalse();
+            RuntimeOperationGuards.CanRunBackgroundWork(c).ShouldBeFalse();
+            RuntimeOperationGuards.CanRunFinancialWorker(c,"App:WeeklyCommissions:Enabled").ShouldBeFalse();
+            RuntimeOperationGuards.CanDispatchEmail(c).ShouldBeFalse();
+            var network=new RejectNetwork();var gateway=new YocoCheckoutGateway(new HttpClient(network),c);
+            (await Should.ThrowAsync<InvalidOperationException>(()=>gateway.CreateAsync(null)))
+                .Message.ShouldBe("YOCO_CUTOVER_CHECKOUT_CREATION_FENCED");network.Attempts.ShouldBe(0);
+        }
+        [Theory]
+        [InlineData("")][InlineData("0")][InlineData("-1")][InlineData("not-an-id")][InlineData("9223372036854775808")]
+        public void InvalidExplicitOperatorStillRejectsStartup(string value)
+        {
+            var c=Config();c[YocoCutoverOptions.Prefix+"OperatorUserId"]=value;
             Should.Throw<InvalidOperationException>(()=>new YocoCutoverOptions(c)).Message.ShouldBe("YOCO_CUTOVER_OPERATOR_REQUIRED");
+        }
+        [Fact]
+        public void UnpinnedReceiveOnlyCannotGainAnOperatorOrLoseItsFenceThroughReload()
+        {
+            var c=Config();c[YocoCutoverOptions.Prefix+"OperatorUserId"]=null;
+            new YocoCutoverOptions(c).HasOperator.ShouldBeFalse();c[YocoCutoverOptions.Prefix+"Enabled"]="false";
+            new YocoCutoverOptions(c).Enabled.ShouldBeTrue();c[YocoCutoverOptions.Prefix+"OperatorUserId"]="7";
+            Should.Throw<InvalidOperationException>(()=>new YocoCutoverOptions(c)).Message.ShouldBe("YOCO_CUTOVER_OPERATOR_REQUIRED");
+        }
+        [Theory]
+        [InlineData(0L,null)][InlineData(7L,null)][InlineData(7L,1)][InlineData(null,null)]
+        public async Task UnpinnedOperatorCannotReadStatusEventsOrAdvancePhaseOrReplay(long? user,int? tenant)
+        {
+            var c=Config();c[YocoCutoverOptions.Prefix+"OperatorUserId"]=null;
+            var controller=new YocoCutoverController(null,c);var session=Substitute.For<IAbpSession>();
+            session.UserId.Returns(user);session.TenantId.Returns(tenant);controller.AbpSession=session;
+            (await controller.StatusAsync()).ShouldBeOfType<ForbidResult>();
+            (await controller.EventsAsync()).ShouldBeOfType<ForbidResult>();
+            (await controller.PhaseAsync(new(){Phase="Normal"})).ShouldBeOfType<ForbidResult>();
+            (await controller.ReplayAsync(new(){Id=1})).ShouldBeOfType<ForbidResult>();
+        }
+        [Fact]
+        public async Task UnpinnedHttpBusinessWriteNeverAcquiresEvenAnAvailableBusinessLease()
+        {
+            var c=Config();c[YocoCutoverOptions.Prefix+"OperatorUserId"]=null;
+            var store=Substitute.For<IYocoCutoverStore>();var reached=false;
+            var ctx=new DefaultHttpContext();ctx.Request.Method="POST";ctx.Request.Path="/api/services/app/Account/Register";
+            ctx.Response.Body=new MemoryStream();
+            await new ApplicationRecoveryMiddleware(_=>{reached=true;return Task.CompletedTask;},c,store).InvokeAsync(ctx);
+            reached.ShouldBeFalse();ctx.Response.StatusCode.ShouldBe(503);
+            await store.DidNotReceive().EnterBusinessAsync();
         }
         [Fact]
         public void EnabledFenceAndOperatorCannotBeRemovedByConfigurationReload()

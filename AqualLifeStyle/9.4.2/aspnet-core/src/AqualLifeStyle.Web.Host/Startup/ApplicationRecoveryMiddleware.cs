@@ -66,7 +66,7 @@ namespace AqualLifeStyle.Web.Host.Startup
                 IAsyncDisposable lease;
                 try
                 {
-                    if (cutover.CompatibilityReceiver || _cutoverStore == null)
+                    if (cutover.CompatibilityReceiver || !cutover.HasOperator || _cutoverStore == null)
                         throw new InvalidOperationException("YOCO_CUTOVER_BUSINESS_WRITES_FENCED");
                     lease = await _cutoverStore.EnterBusinessAsync();
                 }

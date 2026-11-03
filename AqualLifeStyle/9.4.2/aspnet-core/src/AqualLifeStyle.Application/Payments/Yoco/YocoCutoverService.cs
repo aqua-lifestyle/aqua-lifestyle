@@ -138,10 +138,11 @@ namespace AqualLifeStyle.Payments.Yoco
                 { if (old.PayloadHash != hash) throw new InvalidOperationException("YOCO_CAPTURE_CONFLICT"); return true; }
                 s.Events.Add(new YocoCutoverEvent { EventId = eventId, PayloadHash = hash, BodyBase64 = Convert.ToBase64String(raw),
                     Signature = signature, SignatureTimestamp = timestamp, VerifiedAtUtc = DateTimeOffset.UtcNow,
-                    RequiresReconciliation = options.CompatibilityReceiver || s.Phase != "Normal" || s.Events.Any(Unfinished) });
+                    RequiresReconciliation = options.CompatibilityReceiver || !options.HasOperator ||
+                        s.Phase != "Normal" || s.Events.Any(Unfinished) });
                 return await Task.FromResult(true);
             });
-            if (!options.CompatibilityReceiver)
+            if (!options.CompatibilityReceiver && options.HasOperator)
                 await TryNormalAsync(eventId);
         }
 
@@ -187,7 +188,7 @@ namespace AqualLifeStyle.Payments.Yoco
         public async Task<string> ReplayAsync(long id, long operatorUserId)
         {
             var options = new YocoCutoverOptions(_configuration);
-            if (!options.Enabled || options.CompatibilityReceiver || operatorUserId != options.OperatorUserId)
+            if (!options.Enabled || options.CompatibilityReceiver || !options.HasOperator || operatorUserId != options.OperatorUserId)
                 throw new InvalidOperationException("YOCO_REPLAY_OPERATOR_REQUIRED");
             string eventId = null;
             try

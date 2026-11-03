@@ -21,6 +21,7 @@ namespace AqualLifeStyle.Configuration
         public bool CompatibilityReceiver { get; }
         public bool Enabled { get; }
         public long OperatorUserId { get; }
+        public bool HasOperator => OperatorUserId > 0;
         public YocoCutoverOptions(IConfiguration configuration)
         {
             CompatibilityReceiver = Assembly.GetEntryAssembly()?.GetCustomAttribute<YocoReceiverArtifactAttribute>() != null;
@@ -33,12 +34,11 @@ namespace AqualLifeStyle.Configuration
                 Enabled = CompatibilityReceiver || selected == "true" || selection.Enabled;
                 if (Enabled)
                 {
-                    // Forced capture needs no application login. Privileged
-                    // operations remain unavailable without a pinned operator.
+                    // Durable receive-only capture needs no application login.
+                    // An absent pin grants no operator or business authority.
                     var operatorValue = configuration[Prefix + "OperatorUserId"];
                     long id = 0;
                     if (operatorValue != null && (!long.TryParse(operatorValue, out id) || id <= 0) ||
-                        !CompatibilityReceiver && id <= 0 ||
                         selection.Enabled && selection.Operator != id)
                         throw new InvalidOperationException("YOCO_CUTOVER_OPERATOR_REQUIRED");
                     OperatorUserId = id; selection.Enabled = true; selection.Operator = id;
