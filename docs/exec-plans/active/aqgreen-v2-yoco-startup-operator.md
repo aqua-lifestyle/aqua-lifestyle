@@ -74,8 +74,24 @@ Pages.Tenants remain mandatory at privileged HTTP boundaries.
 - Diff review found no blocking branch-owned issue. HTTP host/Pages.Tenants and
   positive-operator checks, invalid/reloaded pin rejection, unknown/stored phases,
   callback commit/duplication and no-provider-side-effect paths were reviewed.
-- Required hosted sharded application, frontend, image and security CI is pending
-  PR publication. It remains required before any merge/readiness claim.
+- Required hosted sharded application, frontend, image and security CI is collected
+  on the PR and remains required before any merge/readiness claim.
+- PR #119 opened at implementation commit
+  `057bd98657cd6542518a72a85467fdf4a0718ac8`; human review requested from
+  `aqualifestyleclub`.
+- First hosted run 41594680891: 15 jobs passed, one failed and image validation
+  was skipped as its dependent prerequisite failed. The sole test failure was the
+  new full-host regression running in the entity-framework-remainder shard, which
+  does not prepare the existing Redis image (`No such image: redis:7-alpine`).
+  Its fixture applies migration 55 and requires the same Redis preparation as the
+  compatibility-host test. The test name now explicitly includes `Migration55`,
+  placing it in the already-provisioned migration shard under unchanged partition
+  rules. Every assertion remains; coverage discovery must prove it executes once.
+- The follow-up changes only this test identifier and the worklog, not production
+  code or assertions. Release build passed again. Its combined local build/test
+  command hit a four-minute timeout before producing a test result; that rerun is
+  incomplete, not a pass. Earlier real-host proof applies to the identical test
+  body; final current-head execution must be established by hosted CI.
 
 ## Next action
 

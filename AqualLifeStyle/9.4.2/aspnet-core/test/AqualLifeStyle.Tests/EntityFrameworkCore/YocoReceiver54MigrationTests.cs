@@ -29,7 +29,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
     public sealed partial class AQGreenCleanStartPostgreSqlTests
     {
         [Fact]
-        public async Task YocoFullV2ProductionStartup_WithoutOperatorCapturesOnlyAndPinnedHostAuthorizationRemainsRequired()
+        public async Task YocoFullV2Migration55ProductionStartup_WithoutOperatorCapturesOnlyAndPinnedHostAuthorizationRemainsRequired()
         {
             var root=new DirectoryInfo(AppContext.BaseDirectory);
             while(root!=null&&!File.Exists(Path.Combine(root.FullName,"AqualLifeStyle.sln")))root=root.Parent;
