@@ -10,6 +10,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
+using AqualLifeStyle.Configuration;
 using AqualLifeStyle.Web.Host.Controllers;
 using AqualLifeStyle.Web.Host.Health;
 using AqualLifeStyle.Web.Host.Startup;
@@ -89,14 +90,20 @@ namespace AqualLifeStyle.Tests.WebHost
                 new SigningCredentials(key, key is SymmetricSecurityKey ? SecurityAlgorithms.HmacSha256 : SecurityAlgorithms.RsaSha256)));
         }
 
-        private static IWebHost Server(IConfigurationRoot configuration, SecurityKey key)
+        private static IWebHost Server(IConfigurationRoot configuration, SecurityKey key, bool cutover = false)
         {
+            if (cutover)
+            {
+                configuration[YocoCutoverOptions.Prefix + "Enabled"] = "true";
+                configuration[AQGreenD10OperatorEvidenceSource.Prefix + "AdmissionMode"] = "CLEAN_START";
+            }
             var evidence = new DeploymentReadinessEvidence(Environment(), configuration);
             var oidc = new OpenIdConnectConfiguration { Issuer = DeploymentReadinessAuthentication.Issuer };
             oidc.SigningKeys.Add(key);
             return new WebHostBuilder().UseKestrel().UseUrls("http://127.0.0.1:0")
                 .ConfigureServices(services =>
                 {
+                    services.AddSingleton<IConfiguration>(configuration);
                     services.AddSingleton(evidence);
                     services.AddControllers().AddApplicationPart(typeof(DeploymentReadinessController).Assembly);
                     AuthConfigurer.Configure(services, configuration);
@@ -104,7 +111,9 @@ namespace AqualLifeStyle.Tests.WebHost
                         options.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(oidc));
                 }).Configure(app =>
                 {
-                    app.UseRouting(); app.UseAuthentication(); app.UseAuthorization();
+                    app.UseRouting(); app.UseAuthentication();
+                    app.UseMiddleware<ApplicationRecoveryMiddleware>();
+                    app.UseAuthorization();
                     app.UseEndpoints(endpoints => endpoints.MapControllers());
                 }).Build();
         }
@@ -114,11 +123,13 @@ namespace AqualLifeStyle.Tests.WebHost
                 .Features.Get<IServerAddressesFeature>().Addresses.Single()) };
         }
 
-        [Fact]
-        public async Task Protected_endpoint_accepts_only_GitHub_identity_and_never_returns_secrets()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Protected_endpoint_accepts_only_GitHub_identity_and_never_returns_secrets(bool cutover)
         {
             using var rsa = RSA.Create(2048);
-            using var server = Server(Configuration(), new RsaSecurityKey(rsa) { KeyId = "fixture" });
+            using var server = Server(Configuration(), new RsaSecurityKey(rsa) { KeyId = "fixture" }, cutover);
             await server.StartAsync();
             using var client = Client(server);
             var path = "/api/deployment-readiness?expectedRevision=" + Revision;
@@ -139,12 +150,14 @@ namespace AqualLifeStyle.Tests.WebHost
             defaults.DefaultAuthenticateScheme.ShouldBe("JwtBearer"); defaults.DefaultChallengeScheme.ShouldBe("JwtBearer");
         }
 
-        [Fact]
-        public async Task Wrong_signature_issuer_audience_expiry_claims_and_application_JWT_are_unauthorized()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Wrong_signature_issuer_audience_expiry_claims_and_application_JWT_are_unauthorized(bool cutover)
         {
             using var rsa = RSA.Create(2048); using var other = RSA.Create(2048);
             var key = new RsaSecurityKey(rsa) { KeyId = "fixture" };
-            using var server = Server(Configuration(), key); await server.StartAsync(); using var client = Client(server);
+            using var server = Server(Configuration(), key, cutover); await server.StartAsync(); using var client = Client(server);
             var tokens = new List<string> { Token(new RsaSecurityKey(other) { KeyId = "fixture" }),
                 Token(key, issuer: "https://attacker.invalid"), Token(key, audience: "other"), Token(key, expirySeconds: -1),
                 Token(new SymmetricSecurityKey(Encoding.UTF8.GetBytes("application-jwt-secret-canary-32-characters")),
@@ -200,11 +213,13 @@ namespace AqualLifeStyle.Tests.WebHost
             public void RequestRefresh() { }
         }
 
-        [Fact]
-        public async Task Unavailable_signing_keys_never_authorize_readiness()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Unavailable_signing_keys_never_authorize_readiness(bool cutover)
         {
             using var rsa = RSA.Create(2048); var key = new RsaSecurityKey(rsa) { KeyId = "fixture" };
-            using var server = Server(Configuration(), key); await server.StartAsync(); using var client = Client(server);
+            using var server = Server(Configuration(), key, cutover); await server.StartAsync(); using var client = Client(server);
             server.Services.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
                 .Get(DeploymentReadinessAuthentication.Scheme).ConfigurationManager = new UnavailableKeys();
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(key));

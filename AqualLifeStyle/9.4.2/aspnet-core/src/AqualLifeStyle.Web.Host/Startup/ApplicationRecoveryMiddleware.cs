@@ -43,6 +43,7 @@ namespace AqualLifeStyle.Web.Host.Startup
                 var path = context.Request.Path.Value?.TrimEnd('/');
                 if (context.Request.Method == "POST" && path == "/api/payments/yoco/webhook" ||
                     context.Request.Method == "GET" && path == "/api/health" ||
+                    context.Request.Method == "GET" && path == "/api/deployment-readiness" ||
                     context.Request.Method == "POST" && path == "/api/TokenAuth/Authenticate" ||
                     context.Request.Method == "GET" && path == "/api/services/app/Session/GetCurrentLoginInformations" ||
                     context.Request.Method == "GET" && (path == "/api/operations/yoco-cutover/status" || path == "/api/operations/yoco-cutover/events") ||

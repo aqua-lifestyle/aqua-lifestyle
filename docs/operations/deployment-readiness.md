@@ -24,6 +24,12 @@ not public, ABP-wrapped or cacheable. No exception/configuration values are retu
 Only the runtime invokes the existing pure startup validator; no provider operation
 or database mutation is involved.
 
+While Yoco cutover is enabled, only the exact readiness **GET** passes the
+operational-route gate to this existing authorization layer, including receive-only
+startup without an operator pin. It acquires neither a business-write lease nor a
+member-read scope. Other methods and sibling paths remain fenced; passing the
+middleware is not authentication, readiness success or financial authority.
+
 ConfigurationHeld means the existing explicit background/financial/weekly/monthly,
 commissioning, demo, pilot and seed switches are false. It does not prove database
 role isolation, provider connectivity, successful delivery/payment or business

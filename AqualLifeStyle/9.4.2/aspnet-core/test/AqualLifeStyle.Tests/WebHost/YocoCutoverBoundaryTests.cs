@@ -13,6 +13,7 @@ using AqualLifeStyle.Configuration;
 using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Web.Host.Controllers;
+using AqualLifeStyle.Web.Host.Health;
 using AqualLifeStyle.Web.Host.Startup;
 using Castle.DynamicProxy;
 using Microsoft.AspNetCore.Http;
@@ -80,6 +81,28 @@ namespace AqualLifeStyle.Tests.WebHost
             await store.DidNotReceive().EnterBusinessAsync();
         }
         [Fact]
+        public async Task UnpinnedProtectedReadinessGetReachesAuthorizationWithoutAnyBusinessOrReadLease()
+        {
+            var c=Config();c[YocoCutoverOptions.Prefix+"OperatorUserId"]=null;
+            c[AQGreenD10OperatorEvidenceSource.Prefix+"AdmissionMode"]="CLEAN_START";
+            foreach(var key in DeploymentReadinessEvidence.HeldSettings)c[key]="false";
+            var store=Substitute.For<IYocoCutoverStore>();var reached=false;
+            var ctx=new DefaultHttpContext();ctx.Request.Method="GET";ctx.Request.Path="/api/deployment-readiness";
+            ctx.Response.Body=new MemoryStream();
+            await new ApplicationRecoveryMiddleware(_=>
+            {
+                reached=true;
+                YocoCutoverDispatch.IsBusinessAuthorized.ShouldBeFalse();
+                YocoCutoverDispatch.IsReadOnlyAuthorized.ShouldBeFalse();
+                YocoCutoverDispatch.IsAuthorized.ShouldBeFalse();
+                return Task.CompletedTask;
+            },c,store).InvokeAsync(ctx);
+            reached.ShouldBeTrue();ctx.Response.Headers["X-Aqua-Yoco-Receiver"].ToString().ShouldBe("FullV2");
+            foreach(var key in DeploymentReadinessEvidence.HeldSettings)c[key].ShouldBe("false");
+            await store.DidNotReceive().EnterBusinessAsync();
+            await store.DidNotReceive().ReadOnlyAsync(Arg.Any<Func<Task>>());
+        }
+        [Fact]
         public void EnabledFenceAndOperatorCannotBeRemovedByConfigurationReload()
         {
             var c=Config();new YocoCutoverOptions(c).Enabled.ShouldBeTrue();c[YocoCutoverOptions.Prefix+"Enabled"]="false";
@@ -96,6 +119,14 @@ namespace AqualLifeStyle.Tests.WebHost
         [InlineData("POST","/api/payments/yoco/webhook",true)]
         [InlineData("GET","/api/payments/yoco/webhook",false)]
         [InlineData("GET","/api/health",true)]
+        [InlineData("GET","/api/deployment-readiness",true)]
+        [InlineData("POST","/api/deployment-readiness",false)]
+        [InlineData("PUT","/api/deployment-readiness",false)]
+        [InlineData("DELETE","/api/deployment-readiness",false)]
+        [InlineData("HEAD","/api/deployment-readiness",false)]
+        [InlineData("OPTIONS","/api/deployment-readiness",false)]
+        [InlineData("GET","/api/deployment-readiness-extra",false)]
+        [InlineData("GET","/api/deployment-readiness/anything",false)]
         [InlineData("POST","/api/operations/yoco-cutover/phase",true)]
         [InlineData("GET","/api/operations/yoco-cutover/events",true)]
         [InlineData("POST","/api/services/app/ClubMemberProgrammeParticipation/CreateAQGreenJoiningCheckout",false)]
