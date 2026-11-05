@@ -156,10 +156,12 @@ enablement so startup registers the worker; a reload alone cannot add a worker.
 Keep background jobs, monthly workers, commissions and payouts disabled. This
 delivery selection grants no HTTP/application-service access or cutover business
 authority. Existing registration, verification, joining, payment, funeral inclusion,
-Area approval and activation implementations are reused. Pre-commissioning
-registration access must remain unchanged unless an existing authorized operator
-first establishes that no eligible genuine root customer exists. That private
-readback is outstanding; no absence is inferred from missing access or test data.
+Area approval and activation implementations are reused. The corrected
+[first-account gate](aqgreen-first-customer-activation.md) permits only Tenant1
+account operations during pending CLEAN_START with every financial/worker hold
+intact and the existing self-registration setting still authoritative. A genuine
+customer can register/verify before its real identity is selected for commissioning.
+No test customer, invented ID or inferred absence of financial evidence is used.
 
 ## Coordinated execution and release
 

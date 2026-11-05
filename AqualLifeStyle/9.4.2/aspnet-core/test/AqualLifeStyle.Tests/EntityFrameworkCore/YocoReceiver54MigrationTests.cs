@@ -58,7 +58,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     (await client.PostAsync(host.Address+"/api/operations/yoco-cutover/"+route,new StringContent("{}",Encoding.UTF8,"application/json")))
                         .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
                 (await client.PostAsync(host.Address+"/api/services/app/Account/Register",new StringContent("{}",Encoding.UTF8,"application/json")))
-                    .StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+                    .StatusCode.ShouldBe(HttpStatusCode.BadRequest); // Nonfinancial access reaches unchanged DTO validation; no account is fabricated.
                 client.DefaultRequestHeaders.Authorization=null;
                 var service=CutoverService(new(_fixture,db.ConnectionString()),out var dispatch,out _,out _);
                 var state=await service.StatusAsync();state.Events.Count.ShouldBe(1);state.Phase.ShouldBe("Uninitialized");
