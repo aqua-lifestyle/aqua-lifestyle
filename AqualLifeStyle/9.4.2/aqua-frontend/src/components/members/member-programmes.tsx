@@ -338,10 +338,13 @@ export const MemberProgrammes = () => {
 
         {healthState.isSuccess && !paymentApiCompatible ? (
           <StatusMessage tone="error">
-            Payments are unavailable because this frontend cannot verify a
+            {healthState.health?.paymentAvailability === "Held" ? (
+              <>Payments are temporarily held pending operational authorization.
+                New checkouts remain disabled. Contact the club team for an update.</>
+            ) : (<>Payments are unavailable because this frontend cannot verify a
             compatible payment API deployment. No payment has been taken. Ask
             an operator to deploy and verify the matching database, API, and
-            frontend versions.
+            frontend versions.</>)}
           </StatusMessage>
         ) : null}
 

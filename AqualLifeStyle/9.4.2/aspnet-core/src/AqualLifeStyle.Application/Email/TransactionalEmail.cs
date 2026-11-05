@@ -4,6 +4,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Abp.Dependency;
+using AqualLifeStyle.Domain.Email;
 
 namespace AqualLifeStyle.Email
 {
@@ -28,6 +29,8 @@ namespace AqualLifeStyle.Email
     public interface ITransactionalEmailDeliveryGateway
     {
         Task<string> SendAsync(TransactionalEmail email, CancellationToken cancellationToken = default);
+        Task<string> SendVerificationAsync(TransactionalEmailOutboxMessage message, TransactionalEmail email,
+            CancellationToken cancellationToken = default);
     }
 
     public sealed class TransactionalEmailTemplateBuilder : ITransientDependency

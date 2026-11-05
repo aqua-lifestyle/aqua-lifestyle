@@ -20,6 +20,18 @@ describe("parseSystemHealth", () => {
     expect(isPilotAQGreenJoiningApiCompatible(pilotHealth())).toBe(true);
     expect(isPaymentApiCompatible(pilotHealth())).toBe(false);
   });
+
+  it.each(["Held", "Unavailable"] as const)("keeps %s payments disabled despite matching capability strings", (paymentAvailability) => {
+    const health = { ...pilotHealth(), paymentAvailability,
+      contractCapabilities: [...pilotHealth().contractCapabilities, "direct-onyx-checkout-v1"] };
+    expect(isPaymentApiCompatible(health)).toBe(false);
+    expect(isPilotAQGreenJoiningApiCompatible(health)).toBe(false);
+    expect(isProgrammeJourneyApiCompatible(health)).toBe(true);
+  });
+
+  it("rejects an unknown payment gate rather than dropping it into the legacy contract", () => {
+    expect(() => parseSystemHealth({ ...pilotHealth(), paymentAvailability: "unknown" })).toThrow();
+  });
   it("rejects unknown or mismatched pilot contracts", () => {
     expect(isPilotAQGreenJoiningApiCompatible(null)).toBe(false);
     expect(isPilotAQGreenJoiningApiCompatible({ ...pilotHealth(), environment: "Production" })).toBe(false);

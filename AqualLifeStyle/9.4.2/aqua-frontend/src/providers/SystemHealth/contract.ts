@@ -8,6 +8,7 @@ const systemHealthSchema = z.object({
   buildId: z.string().min(1),
   imageId: z.string().min(1),
   paymentContractVersion: z.string().min(1),
+  paymentAvailability: z.enum(["NotCutoverGated", "Held", "Available", "Unavailable"]).optional(),
   contractCapabilities: z.array(z.string().min(1)),
   releaseDate: z.string().min(1),
   checkedAtUtc: z.string().min(1),
@@ -31,6 +32,7 @@ export const parseSystemHealth = (value: unknown): SystemHealth => {
 };
 
 export const isPaymentApiCompatible = (health: SystemHealth | null) =>
+  health?.paymentAvailability !== "Held" && health?.paymentAvailability !== "Unavailable" &&
   health?.paymentContractVersion === REQUIRED_PAYMENT_CONTRACT_VERSION &&
   requiredPaymentCapabilities.every((capability) =>
     health.contractCapabilities.includes(capability),
@@ -39,6 +41,7 @@ export const isPaymentApiCompatible = (health: SystemHealth | null) =>
 // The isolated pilot commissions AQGreen joining and approval only. It must
 // neither advertise nor require the deliberately closed Onyx checkout path.
 export const isPilotAQGreenJoiningApiCompatible = (health: SystemHealth | null) =>
+  health?.paymentAvailability !== "Held" && health?.paymentAvailability !== "Unavailable" &&
   health?.environment === "AQGreenV2Pilot" &&
   health.paymentContractVersion === REQUIRED_PAYMENT_CONTRACT_VERSION &&
   ["aqgreen-flexible-joining-v1", "programme-approval-queue-v1"].every(

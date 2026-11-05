@@ -66,5 +66,46 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             held.Single(x => x.Id == oldProcessing.Id).AttemptCount.ShouldBe(1);
             held.ShouldAllBe(x => x.HtmlBody == "Synthetic body" && x.ProviderMessageId == null);
         }
+
+        [Fact]
+        public async Task VerificationOnly_PostgreSql_FiltersEachClaimAndConcurrentWorkersAcquireOnce()
+        {
+            await using var context = CreateDbContext();
+            var provider = Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>();
+            provider.GetDbContext(Arg.Any<MultiTenancySides?>()).Returns(context);
+            var repository = new TransactionalEmailOutboxRepository(provider);
+            var now = DateTime.UtcNow; var cutoff = now.AddMinutes(-5);
+            var messages = new[] { (1, "EmailVerification", "allowed"), (2, "EmailVerification", "other-tenant"),
+                (1, "PasswordReset", "other-type"), (1, "EmailVerification", "historical") }
+                .Select(item => TransactionalEmailOutboxMessage.Create(item.Item1, item.Item2, item.Item3,
+                    "synthetic@example.test", "Synthetic", "body", "body", now)).ToArray();
+            context.TransactionalEmailOutboxMessages.AddRange(messages); await context.SaveChangesAsync();
+            var historical = messages.Single(x => x.IdempotencyKey == "historical");
+            await context.TransactionalEmailOutboxMessages.Where(x => x.Id == historical.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.CreationTime, cutoff.AddSeconds(-1)));
+            var allowed = messages.Single(x => x.IdempotencyKey == "allowed");
+            (await repository.GetEligibleMessageIdsAsync(now.AddSeconds(1), now.AddMinutes(-10), 50, cutoff, true))
+                .ShouldBe(new[] { allowed.Id });
+            foreach (var held in messages.Where(x => x.Id != allowed.Id))
+                (await repository.TryClaimAsync(held.Id, Guid.NewGuid(), now.AddSeconds(1), now.AddMinutes(-10), cutoff, true))
+                    .ShouldBeNull();
+
+            async Task<TransactionalEmailOutboxMessage> Claim()
+            {
+                await using var worker = CreateDbContext();
+                var workerProvider = Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>();
+                workerProvider.GetDbContext(Arg.Any<MultiTenancySides?>()).Returns(worker);
+                return await new TransactionalEmailOutboxRepository(workerProvider).TryClaimAsync(allowed.Id,
+                    Guid.NewGuid(), now.AddSeconds(1), now.AddMinutes(-10), cutoff, true);
+            }
+            var results = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Claim()));
+            results.Count(x => x != null).ShouldBe(1);
+            context.ChangeTracker.Clear();
+            (await context.TransactionalEmailOutboxMessages.SingleAsync(x => x.Id == allowed.Id)).AttemptCount.ShouldBe(1);
+            foreach (var held in await context.TransactionalEmailOutboxMessages.Where(x => x.Id != allowed.Id).ToListAsync())
+            {
+                held.Status.ShouldBe(TransactionalEmailStatus.Pending); held.AttemptCount.ShouldBe(0);
+            }
+        }
     }
 }

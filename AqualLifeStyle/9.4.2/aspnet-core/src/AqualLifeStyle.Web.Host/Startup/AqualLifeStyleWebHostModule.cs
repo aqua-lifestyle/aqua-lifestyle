@@ -140,6 +140,13 @@ namespace AqualLifeStyle.Web.Host.Startup
                 // to default behavior if the ErrorInfoBuilder is not available.
             }
 
+            // This independently selected worker can only claim Tenant1 verification
+            // messages. It does not authorize ABP jobs or any financial worker.
+            var verificationEmail = RuntimeOperationGuards.CanDispatchVerificationEmail(_appConfiguration);
+            if (verificationEmail)
+                IocManager.Resolve<IBackgroundWorkerManager>().Add(
+                    IocManager.Resolve<TransactionalEmailOutboxWorker>());
+
             if (new YocoCutoverOptions(_appConfiguration).Enabled || ApplicationRecoveryMode.IsEnabled(_appConfiguration) ||
                 AQGreenV2PilotConfiguration.Validate(_env, _appConfiguration))
                 return; // Recovery and pilot never register provider or financial workers.
@@ -150,7 +157,7 @@ namespace AqualLifeStyle.Web.Host.Startup
             if (RuntimeOperationGuards.CanRunBackgroundWork(_appConfiguration))
                 IocManager.Resolve<IBackgroundWorkerManager>().Add(
                     IocManager.Resolve<YocoPaymentOperationsMonitor>());
-            if (RuntimeOperationGuards.CanDispatchEmail(_appConfiguration))
+            if (!verificationEmail && RuntimeOperationGuards.CanDispatchEmail(_appConfiguration))
                 IocManager.Resolve<IBackgroundWorkerManager>().Add(
                     IocManager.Resolve<TransactionalEmailOutboxWorker>());
             if (RuntimeOperationGuards.CanRunFinancialWorker(_appConfiguration, "App:EntryMonthlyObligations:Enabled"))

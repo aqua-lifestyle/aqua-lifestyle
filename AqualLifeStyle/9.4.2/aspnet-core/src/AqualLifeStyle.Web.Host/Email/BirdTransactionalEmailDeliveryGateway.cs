@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AqualLifeStyle.Email;
+using AqualLifeStyle.Domain.Email;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
 using AqualLifeStyle.Configuration;
@@ -30,10 +31,26 @@ namespace AqualLifeStyle.Web.Host.Email
             _configuration = configuration;
         }
 
-        public async Task<string> SendAsync(TransactionalEmail email, CancellationToken cancellationToken = default)
+        public Task<string> SendAsync(TransactionalEmail email, CancellationToken cancellationToken = default)
         {
             if (!_options.Enabled) throw new InvalidOperationException("Transactional email delivery is disabled.");
             RuntimeOperationGuards.RequireEmailDispatch(_configuration);
+            return SendCoreAsync(email, cancellationToken);
+        }
+
+        public Task<string> SendVerificationAsync(TransactionalEmailOutboxMessage message, TransactionalEmail email,
+            CancellationToken cancellationToken = default)
+        {
+            if (!_options.Enabled) throw new InvalidOperationException("Transactional email delivery is disabled.");
+            RuntimeOperationGuards.RequireVerificationMessage(_configuration, message);
+            if (email == null || email.Reference != message.IdempotencyKey ||
+                email.Recipient != message.Recipient || email.Subject != message.Subject)
+                throw new RuntimeOperationDeniedException("Verification email does not match its outbox claim.");
+            return SendCoreAsync(email, cancellationToken);
+        }
+
+        private async Task<string> SendCoreAsync(TransactionalEmail email, CancellationToken cancellationToken)
+        {
             var endpoint = ResolveEndpoint(_options.ApiKey);
             using (var request = new HttpRequestMessage(HttpMethod.Post, endpoint))
             {

@@ -13,13 +13,14 @@ namespace AqualLifeStyle.Domain.Email
         Task<IReadOnlyList<Guid>> GetEligibleMessageIdsAsync(
             DateTime now,
             DateTime staleBefore,
-            int maximumCount, DateTime deliveryNotBeforeUtc);
+            int maximumCount, DateTime deliveryNotBeforeUtc, bool verificationOnly = false);
         Task<TransactionalEmailOutboxMessage> TryClaimAsync(
             Guid messageId,
             Guid processingToken,
             DateTime now,
-            DateTime staleBefore, DateTime deliveryNotBeforeUtc);
-        Task<IReadOnlyList<TransactionalEmailOutboxMessage>> GetPendingTerminalAlertsAsync(int maximumCount, DateTime deliveryNotBeforeUtc);
+            DateTime staleBefore, DateTime deliveryNotBeforeUtc, bool verificationOnly = false);
+        Task<IReadOnlyList<TransactionalEmailOutboxMessage>> GetPendingTerminalAlertsAsync(
+            int maximumCount, DateTime deliveryNotBeforeUtc, bool verificationOnly = false);
         Task MarkTerminalAlertEmittedAsync(Guid messageId, DateTime emittedAt);
     }
 }

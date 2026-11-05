@@ -128,6 +128,19 @@ describe("ProgrammeInvitationLanding", () => {
     );
   });
 
+  it("explains an operational hold and keeps payment disabled even if capabilities are present", async () => {
+    const current = vi.mocked(useSystemHealthState).getMockImplementation()?.();
+    vi.mocked(useSystemHealthState).mockReturnValue({
+      ...current!, health: { ...current!.health!, paymentAvailability: "Held" },
+    });
+    render(<ProgrammeInvitationLanding inviteCode="AQ7G2X9KLMNP" />);
+    expect(await screen.findByText(/temporarily held pending operational authorization/i)).toBeInTheDocument();
+    expect(screen.queryByText(/cannot verify a compatible payment API/i)).not.toBeInTheDocument();
+    const pay = screen.getByRole("button", { name: /confirm and continue/i });
+    expect(pay).toBeDisabled(); fireEvent.click(pay);
+    expect(httpClient.post).not.toHaveBeenCalled();
+  });
+
   it("routes an Onyx invitation only to the Onyx joining endpoint", async () => {
     vi.mocked(httpClient.get).mockResolvedValue({
       ...preview,

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Abp.Domain.Uow;
 using AqualLifeStyle.Domain.Email;
 using AqualLifeStyle.Email;
+using AqualLifeStyle.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NSubstitute;
@@ -454,6 +455,122 @@ namespace AqualLifeStyle.Tests.Application
                 .Where(message => message.IdempotencyKey == idempotencyKey)
                 .Select(message => message.Id)
                 .SingleAsync());
+        }
+
+        private void SelectVerificationOnly()
+        {
+            var config = Resolve<IConfiguration>();
+            config[RuntimeOperationGuards.BackgroundSetting] = "false";
+            config[YocoCutoverOptions.Prefix + "Enabled"] = "true";
+            config[RuntimeOperationGuards.VerificationEmailSetting] = "true";
+            config["App:AQGreenV2:Commissioning:AdmissionMode"] = "CLEAN_START";
+        }
+
+        [Fact]
+        public async Task VerificationOnlyDeliversNewTenantOneVerificationAndLeavesEveryOtherMessageUntouched()
+        {
+            SelectVerificationOnly();
+            var cutoff = DateTime.UtcNow.AddMinutes(-5);
+            Resolve<IConfiguration>()["Bird:DeliveryNotBeforeUtc"] = cutoff.ToString("O");
+            var outbox = Resolve<ITransactionalEmailOutbox>();
+            foreach (var item in new[] { (1, "EmailVerification", "allowed"), (1, "EmailVerification", "historical"),
+                (2, "EmailVerification", "other-tenant"), (1, "PasswordReset", "reset"),
+                (1, "PaymentConfirmation", "payment"), (1, "InternalAccountInvitation", "staff") })
+            {
+                await outbox.EnqueueAsync(item.Item1, item.Item2, item.Item3,
+                    new TransactionalEmail("synthetic@example.test", "Synthetic", "<p>Synthetic</p>", "Synthetic", item.Item3));
+            }
+            await UsingDbContextAsync(1, context => context.TransactionalEmailOutboxMessages
+                .Where(x => x.IdempotencyKey == "historical").ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.CreationTime, cutoff.AddSeconds(-1))));
+            _deliveryGateway.SendVerificationAsync(Arg.Any<TransactionalEmailOutboxMessage>(), Arg.Any<TransactionalEmail>(),
+                Arg.Any<CancellationToken>()).Returns("synthetic-verification");
+
+            await Should.ThrowAsync<RuntimeOperationDeniedException>(() => _processor.ProcessPendingAsync());
+            await _processor.ProcessVerificationPendingAsync();
+            await _processor.ProcessVerificationPendingAsync();
+
+            await _deliveryGateway.Received(1).SendVerificationAsync(
+                Arg.Is<TransactionalEmailOutboxMessage>(x => x.IdempotencyKey == "allowed" && x.TenantId == 1),
+                Arg.Is<TransactionalEmail>(x => x.Reference == "allowed"), Arg.Any<CancellationToken>());
+            await _deliveryGateway.DidNotReceive().SendAsync(Arg.Any<TransactionalEmail>(), Arg.Any<CancellationToken>());
+            var uows = Resolve<IUnitOfWorkManager>();
+            using var uow = uows.Begin();
+            using (uows.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
+            {
+                var messages = await Resolve<ITransactionalEmailOutboxRepository>().GetAllListAsync();
+                messages.Single(x => x.IdempotencyKey == "allowed").Status.ShouldBe(TransactionalEmailStatus.Sent);
+                foreach (var held in messages.Where(x => x.IdempotencyKey != "allowed"))
+                {
+                    held.Status.ShouldBe(TransactionalEmailStatus.Pending); held.AttemptCount.ShouldBe(0);
+                }
+            }
+            await uow.CompleteAsync();
+        }
+
+        [Theory]
+        [InlineData("Bird:DeliveryNotBeforeUtc", null)]
+        [InlineData("App:AQGreenV2:VerificationEmail:Enabled", "false")]
+        [InlineData("Bird:Enabled", "false")]
+        public async Task VerificationSelectionAndCutoffAreRequiredBeforeClaim(string key, string value)
+        {
+            SelectVerificationOnly();
+            var id = await InsertPendingMessageAsync("held-selection");
+            Resolve<IConfiguration>()[key] = value;
+            await Should.ThrowAsync<InvalidOperationException>(() => _processor.ProcessVerificationPendingAsync());
+            await UsingDbContextAsync(1, async context =>
+                (await context.TransactionalEmailOutboxMessages.SingleAsync(x => x.Id == id)).AttemptCount.ShouldBe(0));
+            await _deliveryGateway.DidNotReceive().SendVerificationAsync(Arg.Any<TransactionalEmailOutboxMessage>(),
+                Arg.Any<TransactionalEmail>(), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task VerificationClaimIndependentlyRejectsWrongTenantTypeAndOldRows()
+        {
+            SelectVerificationOnly();
+            var cutoff = DateTime.UtcNow.AddMinutes(-1);
+            var repository = Resolve<ITransactionalEmailOutboxRepository>();
+            var now = DateTime.UtcNow;
+            foreach (var item in new[] { (1, "PasswordReset"), (2, "EmailVerification"), (1, "EmailVerification") })
+            {
+                var message = TransactionalEmailOutboxMessage.Create(item.Item1, item.Item2, Guid.NewGuid().ToString("N"),
+                    "synthetic@example.test", "Synthetic", "body", "body", now);
+                message.CreationTime = item.Item1 == 1 && item.Item2 == "EmailVerification" ? cutoff.AddSeconds(-1) : now;
+                await UsingDbContextAsync(item.Item1, async context =>
+                {
+                    context.TransactionalEmailOutboxMessages.Add(message); await context.SaveChangesAsync();
+                });
+                var uows = Resolve<IUnitOfWorkManager>(); using var uow = uows.Begin();
+                using (uows.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
+                    (await repository.TryClaimAsync(message.Id, Guid.NewGuid(), now, now.AddMinutes(-10), cutoff,
+                        verificationOnly: true)).ShouldBeNull();
+                await uow.CompleteAsync();
+            }
+        }
+
+        [Fact]
+        public async Task VerificationReloadStopsTheBatchBeforeClaimingAnotherMessage()
+        {
+            SelectVerificationOnly();
+            var outbox = Resolve<ITransactionalEmailOutbox>();
+            foreach (var key in new[] { "first-verification", "second-verification" })
+                await outbox.EnqueueAsync(1, "EmailVerification", key,
+                    new TransactionalEmail("synthetic@example.test", "Synthetic", "body", "body", key));
+            _deliveryGateway.SendVerificationAsync(Arg.Any<TransactionalEmailOutboxMessage>(), Arg.Any<TransactionalEmail>(),
+                Arg.Any<CancellationToken>()).Returns(_ =>
+                {
+                    Resolve<IConfiguration>()[RuntimeOperationGuards.VerificationEmailSetting] = "false";
+                    return "synthetic-verification";
+                });
+            await Should.ThrowAsync<RuntimeOperationDeniedException>(() => _processor.ProcessVerificationPendingAsync());
+            await _deliveryGateway.Received(1).SendVerificationAsync(Arg.Any<TransactionalEmailOutboxMessage>(),
+                Arg.Any<TransactionalEmail>(), Arg.Any<CancellationToken>());
+            await UsingDbContextAsync(1, async context =>
+            {
+                var messages = await context.TransactionalEmailOutboxMessages.ToListAsync();
+                messages.Count(x => x.Status == TransactionalEmailStatus.Sent && x.AttemptCount == 1).ShouldBe(1);
+                messages.Count(x => x.Status == TransactionalEmailStatus.Pending && x.AttemptCount == 0).ShouldBe(1);
+            });
         }
 
         private static TransactionalEmailOutboxMessage CreateMessage(string idempotencyKey)

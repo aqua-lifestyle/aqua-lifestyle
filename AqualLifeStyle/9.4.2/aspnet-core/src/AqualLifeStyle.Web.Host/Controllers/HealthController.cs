@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Abp.Runtime.Caching.Redis;
+using AqualLifeStyle.Payments.Yoco;
 
 namespace AqualLifeStyle.Web.Host.Controllers
 {
@@ -35,6 +36,8 @@ namespace AqualLifeStyle.Web.Host.Controllers
         private readonly IConfiguration _configuration;
         private readonly IAbpRedisCacheDatabaseProvider _redisDatabaseProvider;
         private readonly IDataProtectionKeyStoreReadinessProbe _dataProtectionKeyStoreProbe;
+        private readonly IYocoCutoverStore _cutoverStore;
+        private readonly IYocoCutoverReleaseGate _cutoverReleaseGate;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="HealthController"/> class.
@@ -49,13 +52,17 @@ namespace AqualLifeStyle.Web.Host.Controllers
             IWebHostEnvironment environment,
             IConfiguration configuration,
             IAbpRedisCacheDatabaseProvider redisDatabaseProvider,
-            IDataProtectionKeyStoreReadinessProbe dataProtectionKeyStoreProbe)
+            IDataProtectionKeyStoreReadinessProbe dataProtectionKeyStoreProbe,
+            IYocoCutoverStore cutoverStore = null,
+            IYocoCutoverReleaseGate cutoverReleaseGate = null)
         {
             _dbContextProvider = dbContextProvider;
             _environment = environment;
             _configuration = configuration;
             _redisDatabaseProvider = redisDatabaseProvider;
             _dataProtectionKeyStoreProbe = dataProtectionKeyStoreProbe;
+            _cutoverStore = cutoverStore;
+            _cutoverReleaseGate = cutoverReleaseGate;
         }
 
         /// <summary>
@@ -70,9 +77,10 @@ namespace AqualLifeStyle.Web.Host.Controllers
                 await _dataProtectionKeyStoreProbe.IsReadyAsync();
             var isRedisConfigured = !string.IsNullOrWhiteSpace(_configuration["Redis:Configuration"]);
             var isRedisReachable = !isRedisConfigured || await IsRedisReachable();
+            var paymentAvailability = await GetPaymentAvailabilityAsync();
             var isHealthy = isDatabaseReachable &&
                 isDataProtectionKeyStoreReachable &&
-                isRedisReachable;
+                isRedisReachable && paymentAvailability != "Unavailable";
 
             var response = new HealthCheckResponse
             {
@@ -89,7 +97,8 @@ namespace AqualLifeStyle.Web.Host.Controllers
                 BuildId = DeploymentMetadata.ResolveBuildId(_configuration),
                 ImageId = DeploymentMetadata.ResolveImageId(_configuration),
                 PaymentContractVersion = DeploymentMetadata.PaymentContractVersion,
-                ContractCapabilities = GetContractCapabilities(),
+                ContractCapabilities = GetContractCapabilities(paymentAvailability),
+                PaymentAvailability = paymentAvailability,
                 ReleaseDate = AppVersionHelper.ReleaseDate,
                 CheckedAtUtc = DateTime.UtcNow,
                 Environment = _environment.EnvironmentName,
@@ -100,7 +109,35 @@ namespace AqualLifeStyle.Web.Host.Controllers
                 : StatusCode(503, response);
         }
 
-        private string[] GetContractCapabilities()
+        private async Task<string> GetPaymentAvailabilityAsync()
+        {
+            var cutover = new YocoCutoverOptions(_configuration);
+            if (!cutover.Enabled) return "NotCutoverGated";
+            if (cutover.CompatibilityReceiver || !cutover.HasOperator ||
+                !_configuration.GetValue<bool>(RuntimeOperationGuards.FinancialSetting)) return "Held";
+            if (_cutoverStore == null || _cutoverReleaseGate == null) return "Unavailable";
+            try
+            {
+                // The existing lease verifies durable Normal and zero unfinished
+                // events without initializing/updating control or callback records.
+                var lease = await _cutoverStore.EnterBusinessAsync();
+                try
+                {
+                    await _cutoverStore.ReadOnlyAsync(() => _cutoverReleaseGate.VerifyAsync());
+                    return "Available";
+                }
+                finally { await lease.DisposeAsync(); }
+            }
+            catch
+            {
+                // A rejected lease does not distinguish an ordinary held phase
+                // from corrupt control/event state. Do not infer a healthy hold
+                // from that failure: Normal authority could not be established.
+                return "Unavailable";
+            }
+        }
+
+        private string[] GetContractCapabilities(string paymentAvailability)
         {
             var capabilities = System.Linq.Enumerable.Where(
                 DeploymentMetadata.ContractCapabilities,
@@ -110,7 +147,7 @@ namespace AqualLifeStyle.Web.Host.Controllers
                     capability == "member-programme-journey-v1");
             if (AQGreenV2DemoConfiguration.Validate(_environment, _configuration))
                 capabilities = System.Linq.Enumerable.Append(capabilities, "aqgreen-v2-demo-checkout-v1");
-            if (new YocoCutoverOptions(_configuration).Enabled)
+            if (paymentAvailability == "Held" || paymentAvailability == "Unavailable")
                 capabilities = System.Linq.Enumerable.Where(capabilities, capability =>
                     capability != "aqgreen-flexible-joining-v1" &&
                     capability != "programme-approval-queue-v1" &&

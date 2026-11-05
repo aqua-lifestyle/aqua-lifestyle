@@ -68,6 +68,12 @@ namespace AqualLifeStyle.Web.Host.Models
         public string[] ContractCapabilities { get; set; }
 
         /// <summary>
+        /// Cutover payment gate: NotCutoverGated, Held, Available or Unavailable.
+        /// Unavailable means authority could not be determined, not an ordinary hold.
+        /// </summary>
+        public string PaymentAvailability { get; set; }
+
+        /// <summary>
         /// Gets or sets the configured release date for this application version.
         /// </summary>
         public DateTime ReleaseDate { get; set; }
