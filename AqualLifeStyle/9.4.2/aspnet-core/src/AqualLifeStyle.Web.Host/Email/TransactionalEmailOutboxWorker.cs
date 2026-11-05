@@ -30,8 +30,10 @@ namespace AqualLifeStyle.Web.Host.Email
         {
             if (AqualLifeStyle.Configuration.ApplicationRecoveryMode.IsEnabled(_configuration)) return;
             PilotMode.DenyOutsidePilot("External email delivery worker");
-            if (!AqualLifeStyle.Configuration.RuntimeOperationGuards.CanDispatchEmail(_configuration)) return;
-            await _processor.ProcessPendingAsync();
+            if (AqualLifeStyle.Configuration.RuntimeOperationGuards.CanDispatchVerificationEmail(_configuration))
+                await _processor.ProcessVerificationPendingAsync();
+            else if (AqualLifeStyle.Configuration.RuntimeOperationGuards.CanDispatchEmail(_configuration))
+                await _processor.ProcessPendingAsync();
         }
     }
 }

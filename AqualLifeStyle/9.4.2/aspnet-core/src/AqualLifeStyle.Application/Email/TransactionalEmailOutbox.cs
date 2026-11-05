@@ -80,9 +80,14 @@ namespace AqualLifeStyle.Email
         }
 
         [UnitOfWork(IsDisabled = true)]
-        public virtual async Task ProcessPendingAsync()
+        public virtual Task ProcessPendingAsync() => ProcessPendingAsync(verificationOnly: false);
+
+        [UnitOfWork(IsDisabled = true)]
+        public virtual Task ProcessVerificationPendingAsync() => ProcessPendingAsync(verificationOnly: true);
+
+        private async Task ProcessPendingAsync(bool verificationOnly)
         {
-            var deliveryNotBeforeUtc = RuntimeOperationGuards.RequireEmailDispatch(_configuration);
+            var deliveryNotBeforeUtc = RequireDispatch(verificationOnly, DateTime.MinValue);
             var now = DateTime.UtcNow;
             IReadOnlyList<Guid> candidateIds;
             using (var unitOfWork = _unitOfWorkManager.Begin(new UnitOfWorkOptions
@@ -94,14 +99,14 @@ namespace AqualLifeStyle.Email
                 candidateIds = await _repository.GetEligibleMessageIdsAsync(
                     now,
                     now.Subtract(StaleProcessingAge),
-                    CandidateScanSize, deliveryNotBeforeUtc);
+                    CandidateScanSize, deliveryNotBeforeUtc, verificationOnly);
                 await unitOfWork.CompleteAsync();
             }
 
             var claimedCount = 0;
             foreach (var messageId in candidateIds)
             {
-                RuntimeOperationGuards.RequireEmailDispatch(_configuration);
+                deliveryNotBeforeUtc = RequireDispatch(verificationOnly, deliveryNotBeforeUtc);
                 if (claimedCount >= BatchSize) break;
 
                 var processingToken = Guid.NewGuid();
@@ -118,7 +123,7 @@ namespace AqualLifeStyle.Email
                         messageId,
                         processingToken,
                         claimedAt,
-                        claimedAt.Subtract(StaleProcessingAge), deliveryNotBeforeUtc);
+                        claimedAt.Subtract(StaleProcessingAge), deliveryNotBeforeUtc, verificationOnly);
                     await unitOfWork.CompleteAsync();
                 }
 
@@ -129,13 +134,19 @@ namespace AqualLifeStyle.Email
                 Exception deliveryFailure = null;
                 try
                 {
-                    RuntimeOperationGuards.RequireEmailDispatch(_configuration);
-                    providerId = await _deliveryGateway.SendAsync(new TransactionalEmail(
+                    deliveryNotBeforeUtc = RequireDispatch(verificationOnly, deliveryNotBeforeUtc);
+                    if (claimed.CreationTime < deliveryNotBeforeUtc)
+                        throw new RuntimeOperationDeniedException("Email predates the current delivery boundary.");
+                    if (verificationOnly) RuntimeOperationGuards.RequireVerificationMessage(_configuration, claimed);
+                    var email = new TransactionalEmail(
                         claimed.Recipient,
                         claimed.Subject,
                         _bodyProtector.Unprotect(claimed.HtmlBody),
                         _bodyProtector.Unprotect(claimed.TextBody),
-                        claimed.IdempotencyKey));
+                        claimed.IdempotencyKey);
+                    providerId = verificationOnly
+                        ? await _deliveryGateway.SendVerificationAsync(claimed, email)
+                        : await _deliveryGateway.SendAsync(email);
                 }
                 catch (Exception exception)
                 {
@@ -170,21 +181,33 @@ namespace AqualLifeStyle.Email
 
             }
 
-            await EmitPendingTerminalAlertsAsync(deliveryNotBeforeUtc);
+            await EmitPendingTerminalAlertsAsync(deliveryNotBeforeUtc, verificationOnly);
         }
 
-        private async Task EmitPendingTerminalAlertsAsync(DateTime deliveryNotBeforeUtc)
+        private DateTime RequireDispatch(bool verificationOnly, DateTime priorBoundary)
         {
+            var current = verificationOnly
+                ? RuntimeOperationGuards.RequireVerificationEmailDispatch(_configuration)
+                : RuntimeOperationGuards.RequireEmailDispatch(_configuration);
+            // A reload may narrow this batch, but cannot widen an already selected batch.
+            return current > priorBoundary ? current : priorBoundary;
+        }
+
+        private async Task EmitPendingTerminalAlertsAsync(DateTime deliveryNotBeforeUtc, bool verificationOnly)
+        {
+            deliveryNotBeforeUtc = RequireDispatch(verificationOnly, deliveryNotBeforeUtc);
             IReadOnlyList<TransactionalEmailOutboxMessage> pendingAlerts;
             using (var unitOfWork = _unitOfWorkManager.Begin(new UnitOfWorkOptions { IsTransactional = false }))
             using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
             {
-                pendingAlerts = await _repository.GetPendingTerminalAlertsAsync(CandidateScanSize, deliveryNotBeforeUtc);
+                pendingAlerts = await _repository.GetPendingTerminalAlertsAsync(CandidateScanSize, deliveryNotBeforeUtc, verificationOnly);
                 await unitOfWork.CompleteAsync();
             }
 
             foreach (var failure in pendingAlerts)
             {
+                deliveryNotBeforeUtc = RequireDispatch(verificationOnly, deliveryNotBeforeUtc);
+                if (failure.CreationTime < deliveryNotBeforeUtc) continue;
                 // Alert delivery is at-least-once; monitoring deduplicates by OutboxId.
                 _logger.LogError(
                     "EmailOperationsAlert AlertType=terminal_email_delivery_failed OutboxId={OutboxId} NotificationType={NotificationType} TenantId={TenantId} AttemptCount={AttemptCount}",

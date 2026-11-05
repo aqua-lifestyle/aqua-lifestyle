@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Abp.EntityFrameworkCore;
 using Abp.Runtime.Caching.Redis;
@@ -8,6 +9,8 @@ using AqualLifeStyle.EntityFrameworkCore;
 using AqualLifeStyle.Web.Host.Controllers;
 using AqualLifeStyle.Web.Host.Health;
 using AqualLifeStyle.Web.Host.Models;
+using AqualLifeStyle.Configuration;
+using AqualLifeStyle.Payments.Yoco;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -58,7 +61,9 @@ namespace AqualLifeStyle.Tests.WebHost
             IConfiguration configuration,
             IAbpRedisCacheDatabaseProvider redisDatabaseProvider,
             IDataProtectionKeyStoreReadinessProbe dataProtectionKeyStoreProbe = null,
-            string environmentName = "Production")
+            string environmentName = "Production",
+            IYocoCutoverStore cutoverStore = null,
+            IYocoCutoverReleaseGate releaseGate = null)
         {
             var environment = Substitute.For<IWebHostEnvironment>();
             environment.EnvironmentName.Returns(environmentName);
@@ -73,7 +78,7 @@ namespace AqualLifeStyle.Tests.WebHost
                 environment,
                 configuration,
                 redisDatabaseProvider,
-                dataProtectionKeyStoreProbe);
+                dataProtectionKeyStoreProbe, cutoverStore, releaseGate);
             controller.ControllerContext = new ControllerContext
             {
                 HttpContext = new DefaultHttpContext()
@@ -265,6 +270,95 @@ namespace AqualLifeStyle.Tests.WebHost
 
             DeploymentMetadata.ResolveBuildId(configuration).ShouldBe("unavailable");
             DeploymentMetadata.ResolveImageId(configuration).ShouldBe("unavailable");
+        }
+
+        [Theory]
+        [InlineData("YOCO_CUTOVER_BUSINESS_WRITES_FENCED", "Unavailable", 503)]
+        [InlineData("YOCO_CUTOVER_RECONCILIATION_HELD", "Unavailable", 503)]
+        [InlineData("synthetic corrupt/unreadable state", "Unavailable", 503)]
+        [InlineData(null, "Available", 200)]
+        public async Task CutoverCapabilitiesRequireNormalLeaseAndCurrentReleaseAuthority(
+            string failure, string expectedAvailability, int status)
+        {
+            using var connection = new SqliteConnection("DataSource=:memory:"); connection.Open();
+            using var context = CreateOpenSqliteContext(connection);
+            var provider = Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>();
+            provider.GetDbContextAsync().Returns(context);
+            var store = Substitute.For<IYocoCutoverStore>(); var lease = Substitute.For<IAsyncDisposable>();
+            store.EnterBusinessAsync().Returns(_ => failure == null ? Task.FromResult(lease) :
+                Task.FromException<IAsyncDisposable>(new InvalidOperationException(failure)));
+            store.ReadOnlyAsync(Arg.Any<Func<Task>>()).Returns(call => call.Arg<Func<Task>>()());
+            var release = Substitute.For<IYocoCutoverReleaseGate>();
+            var configuration = BuildConfiguration(null, new Dictionary<string, string>
+            {
+                [YocoCutoverOptions.Prefix + "Enabled"] = "true",
+                [YocoCutoverOptions.Prefix + "OperatorUserId"] = "7",
+                [RuntimeOperationGuards.FinancialSetting] = "true"
+            });
+            var controller = CreateController(provider, configuration, Substitute.For<IAbpRedisCacheDatabaseProvider>(),
+                cutoverStore: store, releaseGate: release);
+            var actionResult = await controller.Get();
+            ObjectResult result = status == 200
+                ? actionResult.Result.ShouldBeOfType<OkObjectResult>()
+                : actionResult.Result.ShouldBeOfType<ObjectResult>();
+            result.StatusCode.ShouldBe(status);
+            var response = result.Value.ShouldBeOfType<HealthCheckResponse>();
+            response.PaymentAvailability.ShouldBe(expectedAvailability);
+            response.ContractCapabilities.Contains("aqgreen-flexible-joining-v1").ShouldBe(failure == null);
+            if (failure == null)
+            {
+                await release.Received(1).VerifyAsync();
+                await lease.Received(1).DisposeAsync();
+            }
+            else await release.DidNotReceive().VerifyAsync();
+            await store.DidNotReceive().TransactAsync(Arg.Any<Func<YocoCutoverSnapshot, Task<bool>>>());
+        }
+
+        [Fact]
+        public async Task InvalidReleaseAuthorityIsUnavailableAndDisposesTheLease()
+        {
+            var store = Substitute.For<IYocoCutoverStore>(); var lease = Substitute.For<IAsyncDisposable>();
+            store.EnterBusinessAsync().Returns(lease);
+            store.ReadOnlyAsync(Arg.Any<Func<Task>>()).Returns(call => call.Arg<Func<Task>>()());
+            var release = Substitute.For<IYocoCutoverReleaseGate>();
+            release.VerifyAsync().Returns(Task.FromException(new InvalidOperationException("synthetic missing D10 authority")));
+            using var connection = new SqliteConnection("DataSource=:memory:"); connection.Open();
+            using var context = CreateOpenSqliteContext(connection);
+            var provider = Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>(); provider.GetDbContextAsync().Returns(context);
+            var configuration = BuildConfiguration(null, new Dictionary<string, string>
+            {
+                [YocoCutoverOptions.Prefix + "Enabled"] = "true", [YocoCutoverOptions.Prefix + "OperatorUserId"] = "7",
+                [RuntimeOperationGuards.FinancialSetting] = "true"
+            });
+            var result = (await CreateController(provider, configuration, Substitute.For<IAbpRedisCacheDatabaseProvider>(),
+                cutoverStore: store, releaseGate: release).Get()).Result.ShouldBeOfType<ObjectResult>();
+            result.StatusCode.ShouldBe(503);
+            result.Value.ShouldBeOfType<HealthCheckResponse>().PaymentAvailability.ShouldBe("Unavailable");
+            await lease.Received(1).DisposeAsync();
+        }
+
+        [Theory]
+        [InlineData(null, "true")]
+        [InlineData("7", "false")]
+        public async Task ExplicitRuntimeHoldsOmitCapabilitiesWithoutAttemptingNormalQualification(string pinnedOperator, string financial)
+        {
+            using var connection = new SqliteConnection("DataSource=:memory:"); connection.Open();
+            using var context = CreateOpenSqliteContext(connection);
+            var provider = Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>(); provider.GetDbContextAsync().Returns(context);
+            var store = Substitute.For<IYocoCutoverStore>(); var release = Substitute.For<IYocoCutoverReleaseGate>();
+            var configuration = BuildConfiguration(null, new Dictionary<string, string>
+            {
+                [YocoCutoverOptions.Prefix + "Enabled"] = "true", [YocoCutoverOptions.Prefix + "OperatorUserId"] = pinnedOperator,
+                [RuntimeOperationGuards.FinancialSetting] = financial
+            });
+            var result = (await CreateController(provider, configuration, Substitute.For<IAbpRedisCacheDatabaseProvider>(),
+                cutoverStore: store, releaseGate: release).Get()).Result.ShouldBeOfType<OkObjectResult>();
+            var response = result.Value.ShouldBeOfType<HealthCheckResponse>();
+            response.PaymentAvailability.ShouldBe("Held");
+            response.ContractCapabilities.ShouldNotContain("aqgreen-flexible-joining-v1");
+            response.ContractCapabilities.ShouldNotContain("programme-approval-queue-v1");
+            response.ContractCapabilities.ShouldNotContain("direct-onyx-checkout-v1");
+            await store.DidNotReceive().EnterBusinessAsync(); await release.DidNotReceive().VerifyAsync();
         }
     }
 }

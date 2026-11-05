@@ -166,6 +166,41 @@ namespace AqualLifeStyle.Tests.WebHost
         }
 
         [Fact]
+        public async Task VerificationWorkerSelectsOnlyVerificationProcessorAndReloadClosesIt()
+        {
+            var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string>
+            {
+                [RuntimeOperationGuards.VerificationEmailSetting] = "true", [YocoCutoverOptions.Prefix + "Enabled"] = "true",
+                ["App:AQGreenV2:Commissioning:AdmissionMode"] = "CLEAN_START", ["Bird:Enabled"] = "true"
+            }).Build();
+            var processor = Substitute.For<TransactionalEmailOutboxProcessor>(null, null, null, null, null, config);
+            var worker = new TransactionalEmailOutboxWorker(new AbpAsyncTimer(), config, processor);
+            await InvokeWorkerAsync(typeof(TransactionalEmailOutboxWorker), worker);
+            await processor.Received(1).ProcessVerificationPendingAsync();
+            await processor.DidNotReceive().ProcessPendingAsync();
+            config[RuntimeOperationGuards.VerificationEmailSetting] = "false";
+            await InvokeWorkerAsync(typeof(TransactionalEmailOutboxWorker), worker);
+            await processor.Received(1).ProcessVerificationPendingAsync();
+            await processor.DidNotReceive().ProcessPendingAsync();
+        }
+
+        [Theory]
+        [InlineData("App:AQGreenV2:VerificationEmail:Enabled", "invalid")]
+        [InlineData("App:AQGreenV2:Commissioning:AdmissionMode", "HISTORICAL_B6")]
+        [InlineData("AQGreenV2Pilot:Enabled", "true")]
+        [InlineData("AQGreenV2Demo:Enabled", "true")]
+        public void VerificationDeliveryDoesNotTreatInvalidOrUnsupportedSelectionAsPermission(string key, string value)
+        {
+            var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string>
+            {
+                [RuntimeOperationGuards.VerificationEmailSetting] = "true",
+                ["App:AQGreenV2:Commissioning:AdmissionMode"] = "CLEAN_START", ["Bird:Enabled"] = "true"
+            }).Build();
+            config[key] = value;
+            Should.Throw<InvalidOperationException>(() => RuntimeOperationGuards.CanDispatchVerificationEmail(config));
+        }
+
+        [Fact]
         public async Task FinancialHold_RejectsLegacyReferralAwardsBeforeTheHandlerOpensATransaction()
         {
             var handler = (EnquiryConvertedEventHandler)Construct(typeof(EnquiryConvertedEventHandler),

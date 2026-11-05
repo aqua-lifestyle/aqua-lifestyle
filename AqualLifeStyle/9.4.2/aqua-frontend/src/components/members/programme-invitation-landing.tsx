@@ -213,8 +213,11 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
 
             {!healthState.isPending && !paymentApiCompatible && session ? (
               <StatusMessage tone="error">
-                Payment is unavailable because this frontend cannot verify a
-                compatible payment API deployment. No payment has been taken.
+                {healthState.health?.paymentAvailability === "Held" ? (
+                  <>Payments are temporarily held pending operational authorization.
+                    New checkouts remain disabled. Contact the club team for an update.</>
+                ) : (<>Payment is unavailable because this frontend cannot verify a
+                  compatible payment API deployment. No payment has been taken.</>)}
               </StatusMessage>
             ) : null}
 

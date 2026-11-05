@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Abp.EntityFrameworkCore;
 using AqualLifeStyle.Domain.Email;
+using AqualLifeStyle.Configuration;
 using Microsoft.EntityFrameworkCore;
 
 namespace AqualLifeStyle.EntityFrameworkCore.Repositories
@@ -48,9 +49,9 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
         public async Task<IReadOnlyList<Guid>> GetEligibleMessageIdsAsync(
             DateTime now,
             DateTime staleBefore,
-            int maximumCount, DateTime deliveryNotBeforeUtc)
+            int maximumCount, DateTime deliveryNotBeforeUtc, bool verificationOnly = false)
         {
-            return await GetAll()
+            return await DeliveryScope(verificationOnly)
                 .Where(message => message.CreationTime >= deliveryNotBeforeUtc)
                 .Where(message =>
                     (message.Status == TransactionalEmailStatus.Pending && message.NextAttemptAt <= now) ||
@@ -65,9 +66,9 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
             Guid messageId,
             Guid processingToken,
             DateTime now,
-            DateTime staleBefore, DateTime deliveryNotBeforeUtc)
+            DateTime staleBefore, DateTime deliveryNotBeforeUtc, bool verificationOnly = false)
         {
-            var affected = await GetAll()
+            var affected = await DeliveryScope(verificationOnly)
                 .Where(message => message.CreationTime >= deliveryNotBeforeUtc)
                 .Where(message =>
                     message.Id == messageId &&
@@ -85,9 +86,9 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
         }
 
         public async Task<IReadOnlyList<TransactionalEmailOutboxMessage>> GetPendingTerminalAlertsAsync(
-            int maximumCount, DateTime deliveryNotBeforeUtc)
+            int maximumCount, DateTime deliveryNotBeforeUtc, bool verificationOnly = false)
         {
-            return await GetAll().AsNoTracking()
+            return await DeliveryScope(verificationOnly).AsNoTracking()
                 .Where(message => message.CreationTime >= deliveryNotBeforeUtc)
                 .Where(message =>
                     message.Status == TransactionalEmailStatus.Failed &&
@@ -96,6 +97,12 @@ namespace AqualLifeStyle.EntityFrameworkCore.Repositories
                 .Take(maximumCount)
                 .ToListAsync();
         }
+
+        private IQueryable<TransactionalEmailOutboxMessage> DeliveryScope(bool verificationOnly)
+            => verificationOnly
+                ? GetAll().Where(message => message.TenantId == RuntimeOperationGuards.VerificationEmailTenantId &&
+                    message.NotificationType == RuntimeOperationGuards.VerificationEmailNotificationType)
+                : GetAll();
 
         public async Task MarkTerminalAlertEmittedAsync(Guid messageId, DateTime emittedAt)
         {

@@ -12,6 +12,8 @@ using Shouldly;
 using Xunit;
 using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
+using AqualLifeStyle.Configuration;
+using AqualLifeStyle.Domain.Email;
 
 namespace AqualLifeStyle.Web.Tests.Email
 {
@@ -158,6 +160,38 @@ namespace AqualLifeStyle.Web.Tests.Email
             options.ApiKey = key;
             return new BirdTransactionalEmailDeliveryGateway(
                 new HttpClient(handler), Options.Create(options), AuthorizedConfiguration());
+        }
+
+        [Theory]
+        [InlineData(1, "EmailVerification", false, true)]
+        [InlineData(2, "EmailVerification", false, false)]
+        [InlineData(1, "PasswordReset", false, false)]
+        [InlineData(1, "EmailVerification", true, false)]
+        public async Task VerificationGatewayRechecksTenantTypeCutoffAndKeepsOrdinarySendHeld(
+            int tenant, string notificationType, bool historical, bool allowed)
+        {
+            var config = AuthorizedConfiguration();
+            config[RuntimeOperationGuards.BackgroundSetting] = "false";
+            config[YocoCutoverOptions.Prefix + "Enabled"] = "true";
+            config[RuntimeOperationGuards.VerificationEmailSetting] = "true";
+            config["App:AQGreenV2:Commissioning:AdmissionMode"] = "CLEAN_START";
+            var cutoff = DateTime.UtcNow.AddMinutes(-5); config["Bird:DeliveryNotBeforeUtc"] = cutoff.ToString("O");
+            var handler = new RecordingHandler(HttpStatusCode.Accepted, "{\"id\":\"synthetic-verification\"}");
+            var gateway = new BirdTransactionalEmailDeliveryGateway(new HttpClient(handler), Options.Create(ValidOptions()), config);
+            var message = TransactionalEmailOutboxMessage.Create(tenant, notificationType, "synthetic-reference",
+                "member@example.test", "Synthetic verification", "body", "body", DateTime.UtcNow);
+            message.CreationTime = historical ? cutoff.AddSeconds(-1) : DateTime.UtcNow;
+            message.StartAttempt(Guid.NewGuid(), DateTime.UtcNow);
+            var email = new TransactionalEmail(message.Recipient, message.Subject, "body", "body", message.IdempotencyKey);
+            await Should.ThrowAsync<RuntimeOperationDeniedException>(() => gateway.SendAsync(email));
+            handler.Request.ShouldBeNull();
+            if (allowed)
+            {
+                (await gateway.SendVerificationAsync(message, email)).ShouldBe("synthetic-verification");
+                handler.IdempotencyKey.ShouldBe(message.IdempotencyKey);
+                config[RuntimeOperationGuards.VerificationEmailSetting] = "false";
+            }
+            await Should.ThrowAsync<RuntimeOperationDeniedException>(() => gateway.SendVerificationAsync(message, email));
         }
 
         private static IConfiguration AuthorizedConfiguration() => new ConfigurationBuilder()

@@ -132,6 +132,18 @@ describe("MemberProgrammes", () => {
       .toBeDisabled();
   });
 
+  it("explains an operational hold without presenting it as an outdated deployment", async () => {
+    const current = vi.mocked(useSystemHealthState).getMockImplementation()?.();
+    vi.mocked(useSystemHealthState).mockReturnValue({
+      ...current!, health: { ...current!.health!, paymentAvailability: "Held" },
+    });
+    render(<MemberProgrammes />);
+    expect(await screen.findByText(/temporarily held pending operational authorization/i)).toBeInTheDocument();
+    expect(screen.queryByText(/cannot verify a compatible payment API/i)).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Join AQGreen" })).toBeDisabled();
+    expect(httpClient.post).not.toHaveBeenCalled();
+  });
+
   it("fails closed when the API does not advertise the member journey capability", async () => {
     const current = vi.mocked(useSystemHealthState).getMockImplementation()?.();
     vi.mocked(useSystemHealthState).mockReturnValue({

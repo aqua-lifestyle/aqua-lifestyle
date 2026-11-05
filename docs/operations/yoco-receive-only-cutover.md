@@ -56,8 +56,10 @@ unlimited provider retries or unlimited database storage.
    `App__EntryMonthlyObligations__Enabled`, `App__AutomaticPayouts__Enabled`,
    `AQGreenV2Demo__Enabled`, `AQGreenV2Pilot__Enabled`, `SEED_DEMO_DATA`,
    `App__FinancialOperations__Enabled` to `false`. Preserve the existing validated
-   Bird configuration; no email worker or ABP job executes while the cutover
-   protocol is enabled. Do not weaken normal production provider validation.
+   Bird configuration; no email worker or ABP job executes by default while the
+   cutover protocol is enabled. The full-V2 verification-only selection below
+   requires separate authorization and defaults off. Do not weaken production
+   provider validation.
    Set `App__Recovery__Enabled=false`; the old recovery mode rejects webhook
    credentials and cannot serve as this receiver. Leave D10 commissioning held.
 3. Deploy the **receiver source pin**, not the full V2 main commit, with the
@@ -110,8 +112,18 @@ request joins a PostgreSQL repeatable-read, read-only transaction with the
 existing 3-second lock and 30-second statement limits, then rolls back. The
 read scope never authorizes a business write or callback replay.
 
-The health response omits checkout/approval capabilities while cutover is
-enabled, so the existing member UI disables new/continued hosted payment actions.
+The health response omits checkout/approval capabilities while cutover is held.
+`paymentAvailability=Held` is an explicit runtime gate (receiver-only, no pinned
+operator or financial operations disabled). `Unavailable` means the runtime cannot
+qualify durable Normal/current release authority and returns degraded HTTP 503.
+A rejected lease is not translated to a healthy hold: that error cannot distinguish
+a held phase from corrupt control/event state. Capabilities return only
+when the pinned operator is configured, financial operations are separately
+authorized, the existing shared business lease verifies durable `Normal` with no
+unfinished events, and the existing D10 release gate verifies current authority
+inside a read-only transaction. Health never changes phase, initializes control
+state, reconciles callbacks or enables finance. `NotCutoverGated` preserves the
+ordinary non-cutover contract; it is not a production acceptance claim.
 Joining, profile edits, checkout, approvals, placement, commissions, payouts and
 unknown routes remain fenced. `ProgrammeInvitation/GetMyInvitations` remains
 closed because that existing GET creates invitations. Do not allow arbitrary
@@ -122,6 +134,32 @@ authorized inventory. Read errors remain errors, not empty business values.
 
 Deploying this amendment still requires exact-source CI/admission and independent
 human acceptance. It does not authorize the full V2 artifact before migration 55.
+
+## Verification-only delivery (full V2 only)
+
+The backend setting `App__AQGreenV2__VerificationEmail__Enabled` defaults to
+`false`. Separate operational authorization may select `true` with
+`App__AQGreenV2__Commissioning__AdmissionMode=CLEAN_START`, outside recovery,
+pilot, demo and the compatibility receiver. With `Bird__Enabled=true` and the
+existing approved non-future UTC
+`Bird__DeliveryNotBeforeUtc`, the same outbox worker can deliver only Tenant1
+`EmailVerification` messages created on/after that boundary. Candidate selection
+and atomic claim both filter Tenant/type/time. The processor and Bird adapter
+recheck selection and cutoff before sending with the original idempotency key.
+Historical mail, other Tenants, password resets, staff invitations, payment mail
+and terminal alerts outside that scope remain untouched. The ordinary Bird/ABP
+email path still requires its general execution grant. Disabling verification delivery
+stops verification processing on the next execution-boundary check; an already
+accepted external request cannot be recalled. Restart after separately authorized
+enablement so startup registers the worker; a reload alone cannot add a worker.
+
+Keep background jobs, monthly workers, commissions and payouts disabled. This
+delivery selection grants no HTTP/application-service access or cutover business
+authority. Existing registration, verification, joining, payment, funeral inclusion,
+Area approval and activation implementations are reused. Pre-commissioning
+registration access must remain unchanged unless an existing authorized operator
+first establishes that no eligible genuine root customer exists. That private
+readback is outstanding; no absence is inferred from missing access or test data.
 
 ## Coordinated execution and release
 
