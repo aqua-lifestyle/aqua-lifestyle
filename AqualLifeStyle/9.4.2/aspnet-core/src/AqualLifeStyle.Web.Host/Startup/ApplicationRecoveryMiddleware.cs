@@ -38,8 +38,15 @@ namespace AqualLifeStyle.Web.Host.Startup
         {
             var cutover = new YocoCutoverOptions(_configuration);
             if (cutover.Enabled)
-            {
                 context.Response.Headers["X-Aqua-Yoco-Receiver"] = cutover.CompatibilityReceiver ? "Schema54" : "FullV2";
+            if (AQGreenAccountBootstrap.IsEnabled(_configuration) &&
+                AQGreenAccountBootstrap.AllowsRoute(context.Request.Method, context.Request.Path.Value))
+            {
+                using (YocoCutoverDispatch.EnterAccountBootstrap()) { await _next(context); }
+                return;
+            }
+            if (cutover.Enabled)
+            {
                 var path = context.Request.Path.Value?.TrimEnd('/');
                 if (context.Request.Method == "POST" && path == "/api/payments/yoco/webhook" ||
                     context.Request.Method == "GET" && path == "/api/health" ||

@@ -63,6 +63,8 @@ namespace AqualLifeStyle.Authorization.Accounts
                 return new IsTenantAvailableOutput(TenantAvailabilityState.NotFound);
             }
 
+            RequireBootstrapTenant(tenant.Id);
+
             if (!tenant.IsActive)
             {
                 return new IsTenantAvailableOutput(TenantAvailabilityState.InActive);
@@ -75,6 +77,7 @@ namespace AqualLifeStyle.Authorization.Accounts
             GetTenantSelfRegistrationAvailabilityInput input)
         {
             var tenant = await TenantManager.FindByTenancyNameAsync(input.TenancyName.Trim());
+            if (tenant != null) RequireBootstrapTenant(tenant.Id);
             if (tenant == null || !tenant.IsActive)
             {
                 return new GetTenantSelfRegistrationAvailabilityOutput
@@ -96,6 +99,7 @@ namespace AqualLifeStyle.Authorization.Accounts
         public async Task<RegisterOutput> Register(RegisterInput input)
         {
             int? targetTenantId = AbpSession.TenantId;
+            if (targetTenantId.HasValue) RequireBootstrapTenant(targetTenantId.Value);
             ProgrammeInvitationPlacement invitationPlacement = null;
             if (!string.IsNullOrWhiteSpace(input.InviteCode))
             {
@@ -105,6 +109,7 @@ namespace AqualLifeStyle.Authorization.Accounts
                 if (PilotMode.IsEnabled && invitationPlacement.ProgrammeKey != "AQGREEN")
                     PilotMode.DenyOutsidePilot("Uncommissioned programme registration");
                 targetTenantId = invitationPlacement.TenantId;
+                AQGreenAccountBootstrap.RequireProgramme(invitationPlacement.ProgrammeKey);
             }
             else if (!targetTenantId.HasValue)
             {
@@ -126,6 +131,7 @@ namespace AqualLifeStyle.Authorization.Accounts
                     "The registration organisation could not be confirmed. Return to the registration link and try again.");
             }
 
+            RequireBootstrapTenant(targetTenantId.Value);
             var targetTenant = await TenantManager.FindByIdAsync(targetTenantId.Value);
             if (targetTenant == null || !targetTenant.IsActive)
             {
@@ -190,6 +196,7 @@ namespace AqualLifeStyle.Authorization.Accounts
         {
             if (input == null || input.TenantId <= 0 || input.UserId <= 0 || string.IsNullOrWhiteSpace(input.Token))
                 throw InvalidAccountLink("Email verification failed.");
+            RequireBootstrapTenant(input.TenantId);
             using (CurrentUnitOfWork.SetTenantId(input.TenantId))
             {
                 await UserManager.InitializeOptionsAsync(input.TenantId);
@@ -271,6 +278,7 @@ namespace AqualLifeStyle.Authorization.Accounts
                 return (0, null, null);
             var tenant = await TenantManager.FindByTenancyNameAsync(input.AreaName.Trim());
             if (tenant == null || !tenant.IsActive) return (0, null, null);
+            RequireBootstrapTenant(tenant.Id);
             using (CurrentUnitOfWork.SetTenantId(tenant.Id))
             {
                 await UserManager.InitializeOptionsAsync(tenant.Id);
@@ -301,6 +309,12 @@ namespace AqualLifeStyle.Authorization.Accounts
             // Enqueue and throttle reservation share the surrounding database transaction.
             // Removing this newly inserted row prevents throttled requests from leaking mail.
             await _emailOutbox.DeleteAsync(idempotencyKey);
+        }
+
+        private void RequireBootstrapTenant(int targetTenantId)
+        {
+            if (AbpSession.TenantId.HasValue) AQGreenAccountBootstrap.RequireTenant(AbpSession.TenantId.Value);
+            AQGreenAccountBootstrap.RequireTenant(targetTenantId);
         }
 
         private static UserFriendlyException InvalidAccountLink(string title)

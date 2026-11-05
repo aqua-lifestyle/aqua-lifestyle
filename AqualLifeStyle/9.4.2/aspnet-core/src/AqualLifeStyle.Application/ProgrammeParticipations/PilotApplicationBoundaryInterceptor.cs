@@ -71,8 +71,15 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             var type = invocation.TargetType;
             while (type != null && type.Namespace?.StartsWith("Castle.Proxies", StringComparison.Ordinal) == true)
                 type = type.BaseType;
+            var accountBootstrap = YocoCutoverDispatch.IsAccountBootstrapAuthorized &&
+                AQGreenAccountBootstrap.IsEnabled(_configuration) &&
+                AQGreenAccountBootstrap.AllowsOperation(type?.Name + "." + invocation.Method.Name);
+            if (YocoCutoverDispatch.IsAccountBootstrapAuthorized && invocation.Method.IsPublic &&
+                !invocation.Method.IsSpecialName && !accountBootstrap)
+                throw new AbpAuthorizationException("First-account access does not authorize this application operation.");
             if (new YocoCutoverOptions(_configuration).Enabled && invocation.Method.IsPublic && !invocation.Method.IsSpecialName &&
                 !YocoCutoverDispatch.IsBusinessAuthorized && !YocoCutoverDispatch.IsAuthorized &&
+                !accountBootstrap &&
                 !(YocoCutoverDispatch.IsReadOnlyAuthorized && YocoCutoverMemberReads.AllowsOperation(type?.Name + "." + invocation.Method.Name)) &&
                 type?.Name + "." + invocation.Method.Name != "SessionAppService.GetCurrentLoginInformations")
                 throw new AbpAuthorizationException("Application business operations are fenced during payment cutover.");

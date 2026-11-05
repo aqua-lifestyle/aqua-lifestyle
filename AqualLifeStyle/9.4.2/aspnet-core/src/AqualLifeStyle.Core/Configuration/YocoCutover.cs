@@ -62,9 +62,16 @@ namespace AqualLifeStyle.Configuration
         private static readonly AsyncLocal<bool> Authorized = new();
         private static readonly AsyncLocal<bool> Business = new();
         private static readonly AsyncLocal<bool> ReadOnly = new();
+        private static readonly AsyncLocal<bool> AccountBootstrap = new();
         public static bool IsAuthorized => Authorized.Value;
         public static bool IsBusinessAuthorized => Business.Value;
         public static bool IsReadOnlyAuthorized => ReadOnly.Value;
+        public static bool IsAccountBootstrapAuthorized => AccountBootstrap.Value;
+        public static IDisposable EnterAccountBootstrap()
+        {
+            var prior = AccountBootstrap.Value; AccountBootstrap.Value = true;
+            return new Scope(() => AccountBootstrap.Value = prior);
+        }
         public static IDisposable EnterReadOnly()
         {
             var prior = ReadOnly.Value; ReadOnly.Value = true;
