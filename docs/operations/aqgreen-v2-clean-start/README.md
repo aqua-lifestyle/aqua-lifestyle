@@ -93,9 +93,11 @@ The protected operator record must contain all of:
 6. UTC reset/deployment window, maximum 30-second SQL statements, 3-second lock
    waits, 45-second idle transaction timeout, and Xolani-M's cancellation duty.
    On cancellation/error disconnect and verify rollback; never retry blindly.
-7. Exact first genuine root Customer identity, outside the archived test population,
-   authorized Area(s), canonical UTC effective boundary and capability selection.
-   Keep that identity in the protected D10 decision only.
+7. Explicit authorized Areas, actual commissioning authorization/effective times and
+   capability selection. Launch-before-first-customer uses the post-reset V2 D10
+   contracts and deferred Host root policy: no genuine Customer is preselected.
+   Preserve the original reset boundary separately. See the current
+   [activation procedure](../aqgreen-first-customer-activation.md).
 
 The original boundary policy remains **Friday 00:00 Africa/Johannesburg** (Thursday
 22:00 UTC). The old proposed `2026-10-29T22:00:00Z` boundary has expired and cannot
@@ -234,11 +236,15 @@ successful restore is claimed. See [Render recovery documentation](https://rende
    source/schema/assembly/configuration digests and canonical effective time.
    Explicitly set `AdmissionMode=CLEAN_START`; use `CleanStartEvidencePath/Sha256`,
    never a fabricated B6 manifest. Historical collections are empty. For launch
-   before the first genuine registration, the accepted Decision has
+   before the first genuine registration, the accepted post-reset Decision has
    `cleanStartRootCustomerId: null` and explicit
    `cleanStartRootSelectionPolicy: "HOST_SELECT_AFTER_REGISTRATION_V1"`.
    Empty-active-network evidence and all existing provenance/conservation checks
    remain required. Initial workers, graduation and automatic payouts stay off.
+   Use `AQGreenD10CutoverV2` / `AQGreenD10VerifiedAuthorityV2`, retaining the original
+   reset boundary and reset-only authority separately from current LIVE authority.
+   The existing historical evidence is not re-dated. Native runtime/source and
+   intended configuration bindings are captured by protected readiness version2.
 8. Obtain **separate D10/first-root/controlled live-Yoco authorization**. Commission
    at the approved boundary by controlled restart with the pinned D10 inputs and
    explicitly authorized financial operations for payment processing; background,

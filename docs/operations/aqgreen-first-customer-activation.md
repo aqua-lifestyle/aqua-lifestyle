@@ -44,9 +44,10 @@ settings. Do not populate example values as real authority.
 | 2 / owner | `Bird__Enabled` | Retain effective `true` and the existing API key, verified sender and reply-to settings. Startup validation is not proof of delivery. |
 | 2 / owner | `Bird__DeliveryNotBeforeUtc` | Existing approved mail-activation boundary, or the actual operator-approved boundary for this activation: non-future UTC ending `Z`. No default or date is invented here. Older mail stays held. |
 | 2 / owner | `App__AQGreenV2__VerificationEmail__Enabled` | Set effective `true` after the Bird sender and cutoff are ready. This selects only Tenant1 `EmailVerification` mail; it does not enable general jobs. |
-| 3 / protected operator | Prepare the root-unbound D10 Decision, authorized Areas/approver and effective boundary | Set `cleanStartRootCustomerId: null` and explicitly select `cleanStartRootSelectionPolicy: "HOST_SELECT_AFTER_REGISTRATION_V1"` in the independently accepted Decision. This is an evidence field, not a new Render flag. Use original accepted CLEAN_START facts and current source/schema/runtime/configuration bindings. Do not recreate migration/reset facts or re-date historical receipts. |
+| 3 / protected operator | Prepare the post-reset root-unbound D10 Decision, authorized Areas/approver and effective boundary | Use `AQGreenD10CutoverV2` / `AQGreenD10VerifiedAuthorityV2`. Set `cleanStartRootCustomerId: null`, `cleanStartRootSelectionPolicy: "HOST_SELECT_AFTER_REGISTRATION_V1"`, and `cleanStartResetBoundaryUtc` to the original accepted boundary. Record actual current owner/verification times and a separately authorized LIVE effective instant. Do not recreate reset facts or re-date historical receipts. |
 | 4 / protected operator | `App__YocoCutover__OperatorUserId` | Existing authorized Host user ID, confirmed through the existing Session API. No default operator is granted. Selection requires a controlled restart. |
 | 4 / owner with protected operator | `Yoco__Mode` and existing Yoco merchant/webhook configuration | Genuine joining requires effective `live`, the already-approved matching live merchant key/signing setup and existing checkout-return configuration. The completed deployment accepted either test or live and does not prove which merchant mode is currently effective. Do not invent or expose keys or re-register the integration as a shortcut. |
+| 4 / protected operator | Native runtime bindings from the protected release audit | The existing OIDC readiness response version2 exports actual EF assembly and combined Application/Core/EF digests, current configuration digest, and intended LIVE configuration digest. Use the newly deployed revision, not predecessor/local build hashes. The intended digest uses the approved `production-release` identity, actual new build revision and financial enablement in memory only. |
 | 4 / protected operator | `App__AQGreenV2__Commissioning__DecisionPath` | Actual readable runtime location of the approved D10 Decision JSON. No default filename. |
 | 4 / protected operator | `App__AQGreenV2__Commissioning__DecisionSha256` | Lowercase SHA256 of that exact file's bytes. |
 | 4 / protected operator | `App__AQGreenV2__Commissioning__VerifiedAuthorityPath` | Actual readable runtime location of its approved VerifiedAuthority JSON. |
@@ -67,6 +68,54 @@ worker registration are startup-bound; changing JSON or a Dashboard value alone
 does not complete activation. Do not reapply `render.yaml`, migrations or a reset.
 
 ## Existing file-custody mechanism
+
+### Post-reset chronology and actual authority
+
+The historical reset boundary remains in the original `CleanStartEvidence.State`.
+The V2 Decision explicitly binds that same instant as `cleanStartResetBoundaryUtc`;
+it does not edit the receipt or reuse its reset-only permission as LIVE authority.
+Required ordering is reset <= reset boundary <= actual owner authorization <=
+prospective LIVE effective instant. V2 VerifiedAuthority records actual verification
+on/after owner authorization and expires after both verification and effective time.
+Verification may be later than the planned effective instant, but no authority is
+usable before its real verification time and no writes before the effective instant.
+Renewal preserves the Decision/effective epoch and uses genuine current verification.
+
+`resetBoundaryAuthorizationEvidenceDigest` binds the original reset authority;
+`financialBoundaryEvidenceDigest` binds separate genuine current LIVE authority.
+Retirement permission is not financial permission. Historical state comparisons and
+retired participation classification retain the reset boundary. Any participation
+in the reset-to-commissioning gap, including a deleted one, is rejected.
+
+### Private-process transport on the existing Render service
+
+File transport below remains supported with all its original privacy checks.
+For the new post-reset contract, existing protected Render environment configuration
+can instead carry exact base64-encoded accepted UTF-8 JSON bytes. This needs no SSH,
+new credentials, disk, instance, or world-readable runtime file.
+
+| Existing selector | Exact value | Private payload setting |
+|---|---|---|
+| `App__AQGreenV2__Commissioning__DecisionPath` | `environment:App:AQGreenV2:Commissioning:DecisionJsonBase64` | `App__AQGreenV2__Commissioning__DecisionJsonBase64` |
+| `App__AQGreenV2__Commissioning__VerifiedAuthorityPath` | `environment:App:AQGreenV2:Commissioning:VerifiedAuthorityJsonBase64` | `App__AQGreenV2__Commissioning__VerifiedAuthorityJsonBase64` |
+| `App__AQGreenV2__Commissioning__CleanStartEvidencePath` | `environment:App:AQGreenV2:Commissioning:CleanStartEvidenceJsonBase64` | `App__AQGreenV2__Commissioning__CleanStartEvidenceJsonBase64` |
+| `App__YocoCutover__ReconciliationPath` | `environment:App:YocoCutover:ReconciliationJsonBase64` | `App__YocoCutover__ReconciliationJsonBase64` |
+
+All three D10 selectors use the same transport. Their existing `*Sha256` pins still
+hash the exact decoded bytes, including whitespace/newlines; embedded Decision /
+CleanStartEvidence digests remain the existing canonical digests, not a substituted
+file hash. Duplicate, malformed, missing, oversized or mismatched data fails closed.
+The private D10 transport accepts only the explicit new Decision/Authority versions.
+Pins alone do not select authority. Never copy payloads to frontend settings, logs,
+chat or Git; preserve original source evidence/acceptance in existing private custody.
+
+Prepare all accepted payloads/pins and the exact intended configuration first.
+Stage the complete future Render configuration without deploying intermediate
+states. Apply deployment identifiers, all accepted evidence and financial/commissioning
+selection together with one controlled existing-service deployment. An invalid
+startup stays failed/held; do not bypass source, schema, custody or acceptance checks.
+
+### Private file transport
 
 Render delivers Docker secret files at `/etc/secrets/<actual filename>`, including
 files inherited from groups. The application consumes and verifies files; it does

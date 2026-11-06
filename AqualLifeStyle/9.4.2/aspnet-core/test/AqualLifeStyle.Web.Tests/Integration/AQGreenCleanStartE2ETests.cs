@@ -37,6 +37,8 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 on a.AreaId equals r.Id where a.TenantId==1 && a.UserId==AbpSession.UserId && !a.RevokedAt.HasValue && r.IsActive select r.Id).FirstAsync());
             var (x,clean)=AQGreenCleanStartCommissioningTests.Create();var config=AQGreenD10SyntheticEvidence.Configuration();
             AQGreenCleanStartCommissioningTests.OwnerAttest(clean);
+            AQGreenCleanStartCommissioningTests.PostReset(x,clean);
+            var resetBoundary=x.Decision.CleanStartResetBoundaryUtc.Value;
             config["App:FinancialOperations:Enabled"]="true";
             config["App:BackgroundJobs:Enabled"]="false";
             config["Yoco:Mode"]="live";
@@ -47,7 +49,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             var historical=await SeedLeanMemberIdentityAsync(area,"owner-attested-retired");
             var oldPaymentId=await UsingDbContextAsync(async c=>
             {
-                var started=x.Decision.V2EffectiveAtUtc.AddDays(-3);
+                var started=resetBoundary.AddDays(-3);
                 var terms=EntryProgrammeTerms.CreateSingleJoiningPayment("synthetic-owner-retirement",started.AddDays(-1),1200,600,7);
                 var p=EntryParticipation.StartIndependently(1,historical.CustomerId,terms,started);
                 var payment=MemberPayment.CreatePending(1,historical.CustomerId,MemberPaymentPurpose.AQGreenJoining,1200,"YOCO","SYNTHETIC-RETIRED-PAYMENT",started);
@@ -62,7 +64,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             });
             AQGreenCleanStartState retained;
             using(var uow=Resolve<IUnitOfWorkManager>().Begin(new UnitOfWorkOptions{Scope=TransactionScopeOption.RequiresNew,IsTransactional=true,IsolationLevel=IsolationLevel.RepeatableRead}))
-            {var reader=Resolve<IAQGreenReconciliationEvidenceSnapshot>();await reader.CaptureAsync();retained=await reader.CaptureCleanStartAsync(1,x.Decision.V2EffectiveAtUtc,clean.ResetId);await uow.CompleteAsync();}
+            {var reader=Resolve<IAQGreenReconciliationEvidenceSnapshot>();await reader.CaptureAsync();retained=await reader.CaptureCleanStartAsync(1,resetBoundary,clean.ResetId);await uow.CompleteAsync();}
             retained.ProtectedPaymentCount.ShouldBe(4);
             // A test-only durable marker models the committed operator receipt.
             // The actual reset SQL and conservation checks execute separately on PG18.4.
@@ -70,6 +72,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 WITH undo AS (SELECT jsonb_build_object() AS value), receipt AS
                 (SELECT jsonb_build_object('resetId','SYNTHETIC-CLEAN-START','undoDigest',encode(sha256(convert_to(value::text,'UTF8')),'hex'),
                   'resetAt',{0}::timestamptz,'boundary',{1}::timestamptz,
+                  'boundaryPolicy','OWNER_AUTHORIZED_PROSPECTIVE_UTC_V1','boundaryAuthorizationDigest',{6}::text,
                   'paymentAdmissionMode','OWNER_ATTESTED_TEST_ONLY_V1','ownerTestOnlyAttestationDigest',{2}::text,
                   'providerModeVerification','NOT_INDEPENDENTLY_VERIFIED','paymentEvidenceDigest',{3}::text,
                   'tenantFinancialRecordsDigest',{4}::text,'protectedPaymentCount',{5}::bigint,
@@ -79,12 +82,12 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 SELECT 1,'AQGreen.CleanStart','ArchiveDisposableTests',jsonb_build_object('resetId','SYNTHETIC-CLEAN-START',
                   'receiptDigest',encode(sha256(convert_to(receipt.value::text,'UTF8')),'hex'))::text,
                   jsonb_build_object('receipt',receipt.value,'undo',undo.value)::text,{0},0 FROM undo,receipt
-                """,clean.ResetAtUtc,x.Decision.V2EffectiveAtUtc,clean.OwnerTestOnlyAttestationDigest,retained.PaymentEvidenceDigest,retained.TenantFinancialRecordsDigest,retained.ProtectedPaymentCount.Value));
+                """,clean.ResetAtUtc,resetBoundary,clean.OwnerTestOnlyAttestationDigest,retained.PaymentEvidenceDigest,retained.TenantFinancialRecordsDigest,retained.ProtectedPaymentCount.Value,clean.BoundaryAuthorizationDigest));
             using(var uow=Resolve<IUnitOfWorkManager>().Begin(new UnitOfWorkOptions{Scope=TransactionScopeOption.RequiresNew,
                 IsTransactional=true,IsolationLevel=IsolationLevel.RepeatableRead}))
             {
                 var reader=Resolve<IAQGreenReconciliationEvidenceSnapshot>();var boundary=await reader.CaptureAsync();
-                clean.State=await reader.CaptureCleanStartAsync(1,x.Decision.V2EffectiveAtUtc,clean.ResetId);
+                clean.State=await reader.CaptureCleanStartAsync(1,resetBoundary,clean.ResetId);
                 clean.State.PopulationCount.ShouldBe(1);clean.State.ArchivedCount.ShouldBe(1);clean.State.ProtectedPaymentCount.ShouldBe(4);
                 clean.HistoricalFinancialRecordsDigest=clean.State.ResetTenantFinancialRecordsDigest;
                 clean.AdmitsPreservedState(clean.State).ShouldBeTrue();
@@ -95,7 +98,8 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 await uow.CompleteAsync();
             }
             AQGreenCleanStartCommissioningTests.Sign(x,clean);
-            var source=new CleanStartTestSource{Current=AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,clean)};
+            PostResetOperatorTransportTests.Install(config,x.Decision,x.Authority,clean);
+            var source=new CleanStartTestSource{Current=new AqualLifeStyle.Web.Host.Startup.AQGreenD10OperatorEvidenceSource(config).Read()};
             var key=Guid.NewGuid().ToString("N");
             IocManager.IocContainer.Register(Component.For<IConfiguration>().Instance(config).Named("clean-config-"+key).IsDefault(),
                 Component.For<IAQGreenD10CommissioningSource>().Instance(source).Named("clean-source-"+key).IsDefault(),
@@ -104,6 +108,16 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 Component.For<IAQGreenPlacementV2ProgressGate>().ImplementedBy<AQGreenD10ProgressGate>().Named("clean-progress-"+key).LifestyleTransient().IsDefault(),
                 Component.For<IYocoCheckoutGateway>().Instance(new LeanMvpCheckoutGateway()).Named("clean-gateway-"+key).IsDefault());
             var runtime=Resolve<AQGreenD10Runtime>();await runtime.VerifyStartupAsync();
+            var gapCustomer=await SeedLeanMemberIdentityAsync(area,"forbidden-retirement-gap");
+            var gapId=await UsingDbContextAsync(async c=>
+            {
+                var p=EntryParticipation.StartIndependently(1,gapCustomer.CustomerId,
+                    EntryProgrammeTerms.CreateSingleJoiningPayment("synthetic-gap",clean.ResetAtUtc.AddDays(-1),1200,600,7),resetBoundary.AddMinutes(1));
+                p.IsDeleted=true;c.EntryParticipations.Add(p);await c.SaveChangesAsync();return p.Id;
+            });
+            (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.VerifyStartupAsync()))
+                .Message.ShouldBe("D10_UNAUTHORIZED_RESET_TO_COMMISSIONING_POPULATION");
+            await UsingDbContextAsync(async c=>{c.EntryParticipations.Remove(await c.EntryParticipations.IgnoreQueryFilters().SingleAsync(p=>p.Id==gapId));});
             // Root-unbound release must not adopt a populated prospective network.
             var unauthorized=await SeedLeanMemberIdentityAsync(area,"not-authorized-root");
             var unauthorizedId=await UsingDbContextAsync(async c=>
@@ -121,9 +135,35 @@ namespace AqualLifeStyle.Web.Tests.Integration
             config[YocoCutoverOptions.Prefix+"Enabled"]="true";
             config[YocoCutoverOptions.Prefix+"OperatorUserId"]=AbpSession.UserId.Value.ToString();
             var store=Resolve<IYocoCutoverStore>();
-            var cutover=new YocoCutoverService(store,null,null,new SyntheticEmptyReconciliation(AbpSession.UserId.Value),config,
+            var merchant=new SyntheticEmptyReconciliation(AbpSession.UserId.Value);
+            void InstallMerchant()
+            {
+                var bytes=System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(merchant.Read().Item1);
+                var p=YocoCutoverOptions.Prefix;
+                config[p+"ReconciliationPath"]="environment:"+p+"ReconciliationJsonBase64";
+                config[p+"ReconciliationJsonBase64"]=Convert.ToBase64String(bytes);
+                config[p+"ReconciliationSha256"]=YocoCutoverService.Hash(bytes);
+            }
+            InstallMerchant();
+            var cutover=new YocoCutoverService(store,null,null,new YocoCutoverReconciliationSource(config),config,
                 new YocoCutoverReleaseGate(runtime));
             await cutover.SetPhaseAsync("Replay");
+            var current=source.Current;var effective=x.Decision.V2EffectiveAtUtc;
+            x.Decision.V2EffectiveAtUtc=x.Authority.V2EffectiveAtUtc=DateTime.UtcNow.AddHours(1);
+            AQGreenCleanStartCommissioningTests.Sign(x,clean);
+            source.Current=AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,clean);
+            (await Should.ThrowAsync<InvalidOperationException>(()=>cutover.SetPhaseAsync("Normal"))).Message.ShouldBe("D10_CUTOVER_WRITE_FENCE");
+            (await cutover.StatusAsync()).Phase.ShouldBe("Replay");
+            source.Current=current;
+            x.Decision.V2EffectiveAtUtc=x.Authority.V2EffectiveAtUtc=effective;
+            AQGreenCleanStartCommissioningTests.Sign(x,clean);
+            merchant.Reviewed=false;InstallMerchant();
+            (await Should.ThrowAsync<InvalidOperationException>(()=>cutover.SetPhaseAsync("Normal"))).Message.ShouldBe("YOCO_RELEASE_RECONCILIATION_REQUIRED");
+            (await cutover.StatusAsync()).Phase.ShouldBe("Replay");
+            merchant.Reviewed=true;InstallMerchant();
+            var serverRoot=config["App:ServerRootAddress"];config["App:ServerRootAddress"]="https://changed.example.test";
+            (await Should.ThrowAsync<InvalidOperationException>(()=>cutover.SetPhaseAsync("Normal"))).Message.ShouldBe("D10_CONFIGURATION_MISMATCH");
+            config["App:ServerRootAddress"]=serverRoot;
             await cutover.SetPhaseAsync("Normal");
             (await cutover.StatusAsync()).Phase.ShouldBe("Normal");
             await using var businessLease=await store.EnterBusinessAsync();
@@ -196,6 +236,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 (await c.EntryWeeklyCommissions.CountAsync()).ShouldBe(0);
             });
             await runtime.VerifyStartupAsync();source.Current.FinancialWorkersCommissioned.ShouldBeFalse();
+            source.Current.CleanStartEvidence.State.BoundaryUtc.Value.UtcDateTime.ShouldBe(resetBoundary);
             (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.ForTenantAsync(1,false,x.Decision.V2EffectiveAtUtc.AddTicks(-1))))
                 .Message.ShouldBe("D10_CLEAN_START_HISTORICAL_FINANCIAL_REPLAY_HELD");
             await UsingDbContextAsync(async c=>
@@ -207,7 +248,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 (await c.AQGreenJoiningCheckouts.SingleAsync(p=>p.ProviderCheckoutId=="SYNTHETIC-RETIRED-CHECKOUT")).PaymentId.ShouldBe(oldPaymentId);
             });
             File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("REPRO_MARKER_DIR"),"clean-start-commissioning.ran"),
-                "PostgreSQL: root-unbound empty CLEAN_START, post-commissioning registration/verification, protected root authority, ordinary payment/cover/approval, six invitations, spillover, retries, retained history; no real provider or automatic payouts.");
+                "PostgreSQL: immutable historical reset, later owner/independent LIVE authority, future-effective Normal held, post-reset gap denied, root-unbound registration/verification, protected root, payment/cover/approval/placement, retries and retained history; no real provider or automatic payouts.");
         }
 
         private async Task<ParticipantFixture> RegisterCleanStartCustomerAsync(Guid area, string label)
@@ -252,6 +293,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
 
         private sealed class SyntheticEmptyReconciliation : IYocoCutoverReconciliationSource
         {
+            public bool Reviewed=true;
             private readonly YocoCutoverReconciliation _manifest;
             public SyntheticEmptyReconciliation(long userId) => _manifest=new YocoCutoverReconciliation
             {
@@ -261,8 +303,11 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 CapturedEventSetSha256=YocoCutoverService.EventSetHash(Array.Empty<YocoCutoverEvent>()),
                 OutstandingReferencesReconciled=true,UnresolvedObligationsRemain=false,Entries=new()
             };
-            public (YocoCutoverReconciliation,string) Read() =>
-                (_manifest,YocoCutoverService.Hash(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(_manifest)));
+            public (YocoCutoverReconciliation,string) Read()
+            {
+                _manifest.OutstandingReferencesReconciled=Reviewed;
+                return (_manifest,YocoCutoverService.Hash(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(_manifest)));
+            }
         }
     }
 }

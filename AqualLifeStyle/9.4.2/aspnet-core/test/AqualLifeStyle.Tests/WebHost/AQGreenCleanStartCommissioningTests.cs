@@ -63,6 +63,87 @@ namespace AqualLifeStyle.Tests.WebHost
             c.State.BoundaryUtc=x.Decision.V2EffectiveAtUtc;
         }
 
+        public static void PostReset(AQGreenD10SyntheticEvidence x, AQGreenCleanStartEvidence c)
+        {
+            var resetBoundary=DateTime.UtcNow.Date.AddDays(-4).AddHours(1);
+            var authorization=DateTime.UtcNow.AddMinutes(-2);
+            c.ContractVersion="AQGreenCleanStartV2";
+            c.BoundaryPolicy=c.State.BoundaryPolicy=AQGreenCleanStartEvidence.ProspectiveBoundary;
+            c.BoundaryAuthorizationDigest=c.State.BoundaryAuthorizationDigest=x.Authority.FinancialBoundaryEvidenceDigest;
+            c.ResetAtUtc=resetBoundary.AddMinutes(-10);c.State.ResetAtUtc=c.ResetAtUtc;c.State.BoundaryUtc=resetBoundary;
+            x.Decision.ContractVersion=AQGreenD10Decision.PostResetContract;
+            x.Decision.CleanStartRootCustomerId=null;
+            x.Decision.CleanStartRootSelectionPolicy=AQGreenD10Decision.HostSelectRootAfterRegistration;
+            x.Decision.CleanStartResetBoundaryUtc=resetBoundary;
+            x.Decision.AuthorizedAtUtc=authorization;
+            x.Decision.V2EffectiveAtUtc=x.Authority.V2EffectiveAtUtc=authorization.AddSeconds(10);
+            x.Authority.ContractVersion=AQGreenD10VerifiedAuthority.PostResetContract;
+            x.Authority.AuthorizedAtUtc=authorization.AddSeconds(30);
+            x.Authority.ResetBoundaryAuthorizationEvidenceDigest=c.BoundaryAuthorizationDigest;
+            x.Authority.FinancialBoundaryEvidenceDigest=AQGreenD10SyntheticEvidence.Hash("synthetic-distinct-current-live-financial-authority");
+        }
+
+        [Fact]
+        public void CurrentLiveAuthorizationAndLaterVerificationBindWithoutRewritingTheHistoricalReset()
+        {
+            var (x,c)=Create();OwnerAttest(c);PostReset(x,c);Sign(x,c);
+            var historicalBytes=AQGreenB6CanonicalEvidence.Bytes(c);
+            var bound=AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,c);
+            bound.EnsureCurrent(DateTime.UtcNow);
+            bound.Decision.CleanStartResetBoundaryUtc.ShouldBe(c.State.BoundaryUtc.Value.UtcDateTime);
+            bound.Decision.V2EffectiveAtUtc.ShouldBeGreaterThan(c.State.BoundaryUtc.Value.UtcDateTime);
+            AQGreenB6CanonicalEvidence.Bytes(bound.CleanStartEvidence).ShouldBe(historicalBytes);
+            bound.FinancialWorkersCommissioned.ShouldBeFalse();
+            // Verification may occur after the policy effective time; it cannot
+            // grant use before its actual timestamp or rewrite that policy epoch.
+            x.Authority.AuthorizedAtUtc=DateTime.UtcNow.AddMinutes(5);Sign(x,c);
+            var future=AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,c);
+            Should.Throw<InvalidOperationException>(()=>future.EnsureCurrent(DateTime.UtcNow))
+                .Message.ShouldBe("D10_AUTHORITY_NOT_YET_AUTHORIZED");
+        }
+
+        [Theory]
+        [InlineData("missing-reset-boundary")][InlineData("changed-reset-boundary")][InlineData("non-utc-reset-boundary")]
+        [InlineData("backdated-owner")][InlineData("effective-before-owner")][InlineData("review-before-owner")]
+        [InlineData("expired-review")][InlineData("reset-only-financial-authority")][InlineData("missing-original-boundary-authority")]
+        [InlineData("legacy-authority")][InlineData("legacy-evidence")][InlineData("unknown-version")][InlineData("preselected-root")]
+        public void PostResetCommissioningRejectsContradictoryChronologyScopeOrReusedRetirementPermission(string failure)
+        {
+            var (x,c)=Create();PostReset(x,c);
+            switch(failure)
+            {
+                case "missing-reset-boundary":x.Decision.CleanStartResetBoundaryUtc=null;break;
+                case "changed-reset-boundary":x.Decision.CleanStartResetBoundaryUtc=x.Decision.CleanStartResetBoundaryUtc.Value.AddMinutes(1);break;
+                case "non-utc-reset-boundary":x.Decision.CleanStartResetBoundaryUtc=DateTime.SpecifyKind(x.Decision.CleanStartResetBoundaryUtc.Value,DateTimeKind.Unspecified);break;
+                case "backdated-owner":x.Decision.AuthorizedAtUtc=c.State.BoundaryUtc.Value.UtcDateTime.AddSeconds(-1);break;
+                case "effective-before-owner":x.Decision.V2EffectiveAtUtc=x.Authority.V2EffectiveAtUtc=x.Decision.AuthorizedAtUtc.AddSeconds(-1);break;
+                case "review-before-owner":x.Authority.AuthorizedAtUtc=x.Decision.AuthorizedAtUtc.AddSeconds(-1);break;
+                case "expired-review":x.Authority.ExpiresAtUtc=x.Authority.AuthorizedAtUtc;break;
+                case "reset-only-financial-authority":x.Authority.FinancialBoundaryEvidenceDigest=c.BoundaryAuthorizationDigest;break;
+                case "missing-original-boundary-authority":x.Authority.ResetBoundaryAuthorizationEvidenceDigest=null;break;
+                case "legacy-authority":x.Authority.ContractVersion="AQGreenD10VerifiedAuthorityV1";break;
+                case "legacy-evidence":c.ContractVersion="AQGreenCleanStartV1";break;
+                case "unknown-version":x.Decision.ContractVersion="AQGreenD10CutoverV9";break;
+                case "preselected-root":x.Decision.CleanStartRootCustomerId=1;break;
+            }
+            Sign(x,c);Should.Throw<InvalidOperationException>(()=>AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,c));
+        }
+
+        [Fact]
+        public void PostResetHistoryClassificationDoesNotRetireTheUnapprovedIntervalOrChangeLegacyEncoding()
+        {
+            var (x,c)=Create();
+            var legacy=AQGreenB6CanonicalEvidence.Bytes(x.Decision);
+            System.Text.Json.Nodes.JsonNode.Parse(legacy).AsObject().ContainsKey("cleanStartResetBoundaryUtc").ShouldBeFalse();
+            System.Text.Json.Nodes.JsonNode.Parse(AQGreenB6CanonicalEvidence.Bytes(x.Authority)).AsObject()
+                .ContainsKey("resetBoundaryAuthorizationEvidenceDigest").ShouldBeFalse();
+            PostReset(x,c);Sign(x,c);var bound=AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,c);
+            var terms=AqualLifeStyle.Domain.Onyx.EntryProgrammeTerms.CreateSingleJoiningPayment("synthetic-history-classification",c.ResetAtUtc.AddDays(-1),1200,600,7);
+            var old=AqualLifeStyle.Domain.Onyx.EntryParticipation.StartIndependently(1,1,terms,c.ResetAtUtc.AddMinutes(-1));old.IsDeleted=true;
+            var gap=AqualLifeStyle.Domain.Onyx.EntryParticipation.StartIndependently(1,2,terms,c.State.BoundaryUtc.Value.UtcDateTime.AddMinutes(1));gap.IsDeleted=true;
+            bound.IsRetiredCleanStartParticipation(old).ShouldBeTrue();bound.IsRetiredCleanStartParticipation(gap).ShouldBeFalse();
+        }
+
         [Fact]
         public void ExplicitProspectiveCleanStartBindsWithoutMovingCommissionWeeksOrEnablingMoney()
         {

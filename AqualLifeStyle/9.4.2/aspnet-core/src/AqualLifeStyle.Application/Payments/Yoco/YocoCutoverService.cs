@@ -76,6 +76,12 @@ namespace AqualLifeStyle.Payments.Yoco
             var path = _configuration[YocoCutoverOptions.Prefix + "ReconciliationPath"];
             var hash = _configuration[YocoCutoverOptions.Prefix + "ReconciliationSha256"];
             if (string.IsNullOrWhiteSpace(path) || !YocoCutoverService.Digest(hash)) throw new InvalidOperationException("YOCO_RECONCILIATION_PIN_REQUIRED");
+            if (PrivateOperatorJson.TryRead(_configuration, path, YocoCutoverOptions.Prefix + "ReconciliationJsonBase64", 1024 * 1024, out var input))
+            {
+                if (YocoCutoverService.Hash(input) != hash) throw new InvalidOperationException("YOCO_RECONCILIATION_PIN_CHANGED");
+                using var parsed = JsonDocument.Parse(input); RejectDuplicates(parsed.RootElement);
+                return (JsonSerializer.Deserialize<YocoCutoverReconciliation>(input), hash);
+            }
             var file = new FileInfo(Path.GetFullPath(path));
             if (!file.Exists || file.Length > 1024 * 1024 || file.LinkTarget != null) throw new InvalidOperationException("YOCO_RECONCILIATION_CUSTODY_REQUIRED");
             for (var d = file.Directory; d != null; d = d.Parent)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -11,6 +12,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
 using AqualLifeStyle.Configuration;
+using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Web.Host.Controllers;
 using AqualLifeStyle.Web.Host.Health;
 using AqualLifeStyle.Web.Host.Startup;
@@ -194,6 +196,50 @@ namespace AqualLifeStyle.Tests.WebHost
             current["App:BackgroundJobs:Enabled"] = null; evidence.Read(Revision).Status.ShouldBe("Unavailable");
             current["App:BackgroundJobs:Enabled"] = "true"; evidence.Read(Revision).Status.ShouldBe("Unavailable");
             current["App:BackgroundJobs:Enabled"] = "false"; current.Reload(); evidence.Read(Revision).Status.ShouldBe("Unavailable");
+        }
+
+        [Fact]
+        public async Task Live_clean_start_exports_actual_hash_only_bindings_under_the_existing_protected_identity()
+        {
+            var configuration=Configuration();
+            configuration["Yoco:Mode"]="live";configuration["Yoco:SecretKey"]="sk_live_yoco-secret-canary";
+            configuration["App:AutomaticPayouts:Enabled"]="false";
+            configuration["Deployment:BuildId"]=null;configuration["RENDER_GIT_COMMIT"]=Revision;
+            using var rsa=RSA.Create(2048);var key=new RsaSecurityKey(rsa){KeyId="fixture"};
+            using var server=Server(configuration,key,true);await server.StartAsync();using var client=Client(server);
+            var path="/api/deployment-readiness?expectedRevision="+Revision;
+            (await client.GetAsync(path)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+            client.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",Token(key));
+            var response=await client.GetAsync(path);response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            using var doc=System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            doc.RootElement.GetProperty("version").GetInt32().ShouldBe(2);
+            var binding=doc.RootElement.GetProperty("d10Bindings");
+            var expectedEf=Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(
+                typeof(AqualLifeStyle.EntityFrameworkCore.AQGreenReconciliationEvidenceSnapshot).Assembly.Location))).ToLowerInvariant();
+            binding.GetProperty("requiredAssemblyDigest").GetString().ShouldBe(expectedEf);
+            binding.GetProperty("requiredRuntimeAssemblyDigest").GetString().ShouldBe(
+                AqualLifeStyle.Application.ProgrammeParticipations.AQGreenD10Runtime.RuntimeAssemblyDigest(expectedEf));
+            binding.GetProperty("intendedConfigurationDigest").GetString().ShouldNotBe(binding.GetProperty("currentConfigurationDigest").GetString());
+            binding.GetProperty("intendedBuildId").GetString().ShouldBe(Revision);
+            binding.GetProperty("intendedEnvironmentId").GetString().ShouldBe("production-release");
+            configuration["Deployment:BuildId"].ShouldBeNull();configuration["Deployment:EnvironmentId"].ShouldBeNull();
+            configuration["App:FinancialOperations:Enabled"].ShouldBe("false");
+            (await response.Content.ReadAsStringAsync()).ShouldNotContain("secret-canary");
+        }
+
+        [Fact]
+        public void Live_binding_export_does_not_hash_secrets_or_turn_missing_or_enabled_inputs_into_valid_metadata()
+        {
+            var current=Configuration();current["Yoco:Mode"]="live";current["Yoco:SecretKey"]="sk_live_yoco-secret-canary";
+            current["App:AQGreenV2:Commissioning:AdmissionMode"]="CLEAN_START";current["App:AutomaticPayouts:Enabled"]="false";
+            var evidence=new DeploymentReadinessEvidence(Environment(),current);var before=evidence.Read(Revision);
+            before.Status.ShouldBe("Ready");before.Version.ShouldBe(2);before.D10Bindings.ShouldNotBeNull();
+            current["Yoco:SecretKey"]="sk_live_different-secret-canary";
+            evidence.Read(Revision).D10Bindings.IntendedConfigurationDigest.ShouldBe(before.D10Bindings.IntendedConfigurationDigest);
+            current["App:AutomaticPayouts:Enabled"]=null;
+            var unknown=evidence.Read(Revision);unknown.Status.ShouldBe("Unavailable");unknown.Version.ShouldBe(2);unknown.D10Bindings.ShouldBeNull();
+            current["App:AutomaticPayouts:Enabled"]="true";
+            evidence.Read(Revision).Status.ShouldBe("Unavailable");
         }
 
         [Fact]
