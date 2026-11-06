@@ -245,12 +245,14 @@ successful restore is claimed. See [Render recovery documentation](https://rende
    reset boundary and reset-only authority separately from current LIVE authority.
    The existing historical evidence is not re-dated. Native runtime/source and
    intended configuration bindings are captured by protected readiness version2.
-8. Obtain **separate D10/first-root/controlled live-Yoco authorization**. Commission
+8. Reuse the actual owner D10/first-root/controlled LIVE authorization; do not ask
+   for another general release approval. Commission
    at the approved boundary by controlled restart with the pinned D10 inputs and
    explicitly authorized financial operations for payment processing; background,
    weekly/monthly automation and automatic payouts remain disabled. Configuration
    digests bind financial/background flags; a reload cannot clear the initial
-   HTTP fence. Complete the accepted Yoco reconciliation and Normal release before
+   HTTP fence. Complete scoped empty first-launch admission or actual required
+   Yoco reconciliation, and Normal release, before
    genuine registration. After registration and verification, Host-only
    `AQGreenCleanStartRoot.AuthorizeRoot` accepts the actual Customer ID and creates
    only the authorized prospective root's unpaid participation and immutable

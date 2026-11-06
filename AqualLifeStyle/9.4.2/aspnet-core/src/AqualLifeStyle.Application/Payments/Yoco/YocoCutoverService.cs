@@ -12,13 +12,18 @@ using Microsoft.Extensions.Configuration;
 
 namespace AqualLifeStyle.Payments.Yoco
 {
-    public interface IYocoCutoverReleaseGate { Task VerifyAsync(); }
+    public interface IYocoCutoverReleaseGate
+    {
+        Task VerifyAsync();
+        Task<string> VerifyEmptyProspectiveAsync() => Task.FromResult<string>(null);
+    }
     public sealed class YocoCutoverReleaseGate : IYocoCutoverReleaseGate, ITransientDependency
     {
         private readonly AqualLifeStyle.Application.ProgrammeParticipations.AQGreenD10Runtime _runtime;
         public YocoCutoverReleaseGate(AqualLifeStyle.Application.ProgrammeParticipations.AQGreenD10Runtime runtime) => _runtime = runtime;
         public async Task VerifyAsync()
         { if (!await _runtime.ForTenantAsync(1, true)) throw new InvalidOperationException("YOCO_CUTOVER_D10_RELEASE_REQUIRED"); }
+        public Task<string> VerifyEmptyProspectiveAsync() => _runtime.VerifyEmptyProspectiveLaunchAsync();
     }
     public interface IYocoCutoverDispatcher
     {
@@ -145,7 +150,7 @@ namespace AqualLifeStyle.Payments.Yoco
                 s.Events.Add(new YocoCutoverEvent { EventId = eventId, PayloadHash = hash, BodyBase64 = Convert.ToBase64String(raw),
                     Signature = signature, SignatureTimestamp = timestamp, VerifiedAtUtc = DateTimeOffset.UtcNow,
                     RequiresReconciliation = options.CompatibilityReceiver || !options.HasOperator ||
-                        s.Phase != "Normal" || s.Events.Any(Unfinished) });
+                        s.Phase != "Normal" || s.Events.Any(x => x.RequiresReconciliation && Unfinished(x)) });
                 return await Task.FromResult(true);
             });
             if (!options.CompatibilityReceiver && options.HasOperator)
@@ -177,17 +182,32 @@ namespace AqualLifeStyle.Payments.Yoco
             if (phase == "Normal" && (s.Phase != "Replay" || s.Events.Any(Unfinished)))
                 throw new InvalidOperationException("YOCO_CUTOVER_UNRESOLVED_EVENTS");
             string digest = null;
+            string admissionDigest = null;
             if (phase == "Normal")
             {
-                var (m, pin) = _reconciliation.Read();
-                RequireAuthority(m, options.OperatorUserId);
-                if (!Digest(pin) || m.CapturedEventSetSha256 != EventSetHash(s.Events) ||
-                    m.OutstandingReferencesReconciled != true || m.UnresolvedObligationsRemain != false)
-                    throw new InvalidOperationException("YOCO_RELEASE_RECONCILIATION_REQUIRED");
-                await _release.VerifyAsync(); digest = pin;
+                var manifestSelected = !string.IsNullOrWhiteSpace(_configuration[YocoCutoverOptions.Prefix + "ReconciliationPath"]) ||
+                    !string.IsNullOrWhiteSpace(_configuration[YocoCutoverOptions.Prefix + "ReconciliationSha256"]) ||
+                    !string.IsNullOrWhiteSpace(_configuration[YocoCutoverOptions.Prefix + "ReconciliationJsonBase64"]);
+                if (!manifestSelected)
+                {
+                    if (s.Events.Count != 0) throw new InvalidOperationException("YOCO_NONEMPTY_INBOX_REQUIRES_RECONCILIATION");
+                    admissionDigest = await _release.VerifyEmptyProspectiveAsync();
+                    if (!Digest(admissionDigest)) throw new InvalidOperationException("YOCO_EMPTY_PROSPECTIVE_ADMISSION_REQUIRED");
+                }
+                else
+                {
+                    var (m, pin) = _reconciliation.Read();
+                    RequireAuthority(m, options.OperatorUserId);
+                    if (!Digest(pin) || m.CapturedEventSetSha256 != EventSetHash(s.Events) ||
+                        m.OutstandingReferencesReconciled != true || m.UnresolvedObligationsRemain != false)
+                        throw new InvalidOperationException("YOCO_RELEASE_RECONCILIATION_REQUIRED");
+                    await _release.VerifyAsync(); digest = pin;
+                }
             }
             s.PhaseEvidence.Add(new YocoCutoverPhaseEvidence { Phase = phase, OperatorUserId = options.OperatorUserId,
-                CommittedAtUtc = DateTimeOffset.UtcNow, ReconciliationDigest = digest });
+                CommittedAtUtc = DateTimeOffset.UtcNow, ReconciliationDigest = digest,
+                AdmissionKind = admissionDigest == null ? null : YocoCutoverPhaseEvidence.EmptyProspectiveV2,
+                AdmissionEvidenceDigest = admissionDigest });
             s.Phase = phase; return true;
         });
 
@@ -201,8 +221,11 @@ namespace AqualLifeStyle.Payments.Yoco
             {
                 return await _store.TransactAsync(async s =>
                 {
-                    if (s.Phase != "Replay" || !s.HasMigration55) throw new InvalidOperationException("YOCO_REPLAY_PHASE_REQUIRED");
-                    var e = s.Events.Single(x => x.Id == id); eventId = e.EventId;
+                    if (!s.HasMigration55) throw new InvalidOperationException("YOCO_REPLAY_PHASE_REQUIRED");
+                    var e = s.Events.Single(x => x.Id == id);
+                    if (s.Phase != "Replay" && (s.Phase != "Normal" || e.RequiresReconciliation))
+                        throw new InvalidOperationException("YOCO_REPLAY_PHASE_REQUIRED");
+                    eventId = e.EventId;
                     if (!Unfinished(e)) return e.Status;
                     var n = Parse(e); var (m, digest) = _reconciliation.Read();
                     var now = DateTimeOffset.UtcNow;

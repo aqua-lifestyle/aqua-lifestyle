@@ -217,6 +217,26 @@ After the owner authorizes the exact window and pins:
 
 ## Controlled reconciliation and replay
 
+### Owner-approved scoped minimum
+
+For the first prospective root-unbound V2 launch only, an explicit post-reset D10
+contract and no selected reconciliation inputs can use server-verified empty
+admission: the inbox is completely empty and there is no post-reset prospective
+participation, including deleted rows, under the same exclusive cutover transaction.
+The durable evidence kind is `EMPTY_PROSPECTIVE_AQGREEN_V2_V1`; it is not an assertion
+that older V1 merchant references were reviewed, paid, reconciled or zero.
+Future payment matching/idempotency and separate membership approval stay unchanged.
+Selected manifest input, any captured event or prospective work disables this path.
+
+Normal-mode failures are isolated, visible and recoverable with actual matched
+operator evidence per reference, without changing Normal. True compatibility/
+cutover debt still fences business and uses the controlled global Replay path.
+Missing/unknown persisted classification is not treated as a harmless Normal error.
+
+The following merchant-reconciliation procedure applies to actual in-flight work
+or explicitly selected manifests, rather than imposing a global historical V1
+merchant attestation on an empty new V2 launch.
+
 GET `/api/operations/yoco-cutover/events` is a restricted operator response with
 inbox IDs, event IDs, hashes and statuses, not raw payment bodies. Access matching
 checkout/payment facts and merchant evidence only through the separately approved

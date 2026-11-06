@@ -72,6 +72,10 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 throw new InvalidOperationException("YOCO_CUTOVER_PHASE_INVALID");
             foreach (var row in rows.Where(x => x.JobType == EventType))
             {
+                using var eventDocument = JsonDocument.Parse(row.JobArgs);
+                if (!eventDocument.RootElement.TryGetProperty("RequiresReconciliation", out var classification) ||
+                    classification.ValueKind != JsonValueKind.True && classification.ValueKind != JsonValueKind.False)
+                    throw new InvalidOperationException("YOCO_CUTOVER_EVENT_CLASSIFICATION_UNVERIFIED");
                 var item = JsonSerializer.Deserialize<YocoCutoverEvent>(row.JobArgs);
                 if (row.NextTryTime != DateTime.MaxValue || row.IsAbandoned || row.TryCount != 0 ||
                     item?.Contract != "Aqua.YocoCutover.EventV1" || item.BodyBase64 == null ||
@@ -132,8 +136,17 @@ namespace AqualLifeStyle.EntityFrameworkCore
                     {
                         using var doc = JsonDocument.Parse(reader.GetString(1));
                         if (reader.GetString(0) == ControlType) { phase = doc.RootElement.GetProperty("Phase").GetString(); controls++; }
-                        else if (doc.RootElement.GetProperty("Status").GetString() is not ("Applied" or "RetainedTest"))
-                            throw new InvalidOperationException("YOCO_CUTOVER_RECONCILIATION_HELD");
+                        else
+                        {
+                            var status = doc.RootElement.GetProperty("Status").GetString();
+                            if (doc.RootElement.GetProperty("Contract").GetString() != "Aqua.YocoCutover.EventV1" ||
+                                !new[] { "Pending", "Held", "Applied", "RetainedTest" }.Contains(status) ||
+                                !doc.RootElement.TryGetProperty("RequiresReconciliation", out var classification) ||
+                                classification.ValueKind != JsonValueKind.True && classification.ValueKind != JsonValueKind.False)
+                                throw new InvalidOperationException("YOCO_CUTOVER_EVENT_CLASSIFICATION_UNVERIFIED");
+                            if (classification.GetBoolean() && status is not ("Applied" or "RetainedTest"))
+                                throw new InvalidOperationException("YOCO_CUTOVER_RECONCILIATION_HELD");
+                        }
                     }
                     if (controls != 1 || phase != "Normal") throw new InvalidOperationException("YOCO_CUTOVER_BUSINESS_WRITES_FENCED");
                 }

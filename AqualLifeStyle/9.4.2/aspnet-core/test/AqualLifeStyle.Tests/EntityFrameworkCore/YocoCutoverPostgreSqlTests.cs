@@ -30,8 +30,9 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
     {
         private const string CutoverSecret = "whsec_c3ludGhldGljLWN1dG92ZXItc2lnbmluZy1rZXktb25seQ==";
         private static IConfiguration CutoverConfig() => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string>
-        { [YocoCutoverOptions.Prefix+"Enabled"]="true", [YocoCutoverOptions.Prefix+"OperatorUserId"]="7",
-          ["Yoco:WebhookSecret"]=CutoverSecret }).Build();
+         { [YocoCutoverOptions.Prefix+"Enabled"]="true", [YocoCutoverOptions.Prefix+"OperatorUserId"]="7",
+           [YocoCutoverOptions.Prefix+"ReconciliationPath"]="synthetic-explicit-merchant-manifest",
+           ["Yoco:WebhookSecret"]=CutoverSecret }).Build();
         private static byte[] CutoverBody(string mode="test") => JsonSerializer.SerializeToUtf8Bytes(new
         { type="payment.succeeded", payload=new { id="pay_synthetic", type="payment",status="succeeded",amount=1200,
             currency="ZAR", mode, createdDate=DateTimeOffset.UtcNow.AddDays(-2),
@@ -266,6 +267,54 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await middleware.InvokeAsync(context);reached.ShouldBeTrue();YocoCutoverDispatch.IsBusinessAuthorized.ShouldBeFalse();
             await service.SetPhaseAsync("ReceiveOnly");await Capture(service);await service.SetPhaseAsync("Replay");
             reached=false;await middleware.InvokeAsync(context);reached.ShouldBeFalse();context.Response.StatusCode.ShouldBe(503);dispatch.Calls.ShouldBe(0);
+        }
+
+        [Fact]
+        public async Task NormalFailureIsIsolated_ValidLaterCallbacksAndBusinessContinue_ButActualCutoverDebtStillFences()
+        {
+            await using var db=await _fixture.CreateDatabaseAsync();await using var c=new NpgsqlConnection(db.ConnectionString());
+            await c.OpenAsync();await PrepareAsync(c);await Apply55(c);
+            var store=new CutoverStore(_fixture,db.ConnectionString());var service=CutoverService(store,out var dispatch,out var proof,out var release);
+            proof.Accept(null);release.Accepted=true;await service.SetPhaseAsync("Replay");await service.SetPhaseAsync("Normal");
+            dispatch.Action=(_,_)=>throw new InvalidOperationException("synthetic single-reference validation failure");
+            await Capture(service,"evt_normal_failed",CutoverBody("live"));
+            var failed=(await service.StatusAsync()).Events.Single();failed.Status.ShouldBe("Held");failed.RequiresReconciliation.ShouldBeFalse();
+            await using(var lease=await store.EnterBusinessAsync()) { }
+            var second=System.Text.Json.Nodes.JsonNode.Parse(CutoverBody("live"));
+            second["payload"]["id"]="pay_synthetic_second";
+            second["payload"]["metadata"][YocoCheckoutMetadata.ProviderCheckoutId]="checkout_synthetic_second";
+            dispatch.Action=null;await Capture(service,"evt_normal_valid",Encoding.UTF8.GetBytes(second.ToJsonString()));
+            var valid=(await service.StatusAsync()).Events.Single(e=>e.EventId=="evt_normal_valid");
+            valid.Status.ShouldBe("Applied");valid.RequiresReconciliation.ShouldBeFalse();dispatch.Calls.ShouldBe(2);
+            await using(var lease=await store.EnterBusinessAsync()) { }
+            // Actual matched operator evidence can recover just the failed
+            // Normal reference without a global phase change.
+            proof.Accept(failed,"live");
+            proof.Manifest.CapturedEventSetSha256=YocoCutoverService.EventSetHash((await service.StatusAsync()).Events);
+            (await service.ReplayAsync(failed.Id,7)).ShouldBe("Applied");
+            (await service.StatusAsync()).Phase.ShouldBe("Normal");dispatch.Calls.ShouldBe(3);
+            await using(var lease=await store.EnterBusinessAsync()) { }
+            // An actual unpinned/overlap receiver still creates cutover debt.
+            var receiverConfig=CutoverConfig();receiverConfig[YocoCutoverOptions.Prefix+"OperatorUserId"]=null;
+            var receiver=CutoverService(store,out _,out _,out _,receiverConfig);
+            await Capture(receiver,"evt_actual_cutover_debt",CutoverBody("live"));
+            await Should.ThrowAsync<InvalidOperationException>(()=>store.EnterBusinessAsync());
+            await Capture(service,"evt_after_cutover_debt",CutoverBody("live"));
+            (await service.StatusAsync()).Events.Single(e=>e.EventId=="evt_actual_cutover_debt").RequiresReconciliation.ShouldBeTrue();
+            (await service.StatusAsync()).Events.Single(e=>e.EventId=="evt_after_cutover_debt").RequiresReconciliation.ShouldBeTrue();
+        }
+
+        [Fact]
+        public async Task MissingStoredReconciliationClassificationCannotBecomeNormalFailureOrBusinessPermission()
+        {
+            await using var db=await _fixture.CreateDatabaseAsync();await using var c=new NpgsqlConnection(db.ConnectionString());
+            await c.OpenAsync();await PrepareAsync(c);await Apply55(c);
+            var store=new CutoverStore(_fixture,db.ConnectionString());var service=CutoverService(store,out _,out var proof,out var release);
+            proof.Accept(null);release.Accepted=true;await service.SetPhaseAsync("Replay");await service.SetPhaseAsync("Normal");
+            await Capture(service,"evt_classification",CutoverBody("live"));
+            await SqlAsync(c,"UPDATE \"AbpBackgroundJobs\" SET \"JobArgs\"=(\"JobArgs\"::jsonb-'RequiresReconciliation')::text WHERE \"JobType\"='Aqua.YocoCutover.ManualHeldEventV1'");
+            await Should.ThrowAsync<InvalidOperationException>(()=>store.EnterBusinessAsync());
+            await Should.ThrowAsync<InvalidOperationException>(()=>service.StatusAsync());
         }
     }
 }

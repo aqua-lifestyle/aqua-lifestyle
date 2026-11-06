@@ -166,10 +166,15 @@ namespace AqualLifeStyle.Configuration
     }
     public sealed class YocoCutoverPhaseEvidence
     {
+        public const string EmptyProspectiveV2 = "EMPTY_PROSPECTIVE_AQGREEN_V2_V1";
         public string Phase { get; set; }
         public long OperatorUserId { get; set; }
         public DateTimeOffset CommittedAtUtc { get; set; }
         public string ReconciliationDigest { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string AdmissionKind { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string AdmissionEvidenceDigest { get; set; }
     }
 
     public interface IYocoCutoverStore
