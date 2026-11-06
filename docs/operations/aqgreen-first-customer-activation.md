@@ -23,7 +23,8 @@ the whole environment or file contents. The following facts are distinct:
   financial/background execution held, and Bird startup configuration enabled.
   It did not prove a delivery cutoff, mail delivery, evidence-file mounts or valid
   D10 authority. Those private facts are not established by repository inspection.
-- No new environment flag is needed for the first-account correction. It permits
+- No new environment flag is needed for account registration. The earlier correction
+  permits
   only existing Tenant1 account operations while CLEAN_START commissioning,
   financial operations and all background/automatic financial work remain held.
   The existing Tenant self-registration setting still controls account creation.
@@ -36,16 +37,14 @@ settings. Do not populate example values as real authority.
 | Order / actor | Exact setting or operation | Required value/source and expected result |
 |---|---|---|
 | 1 / owner | `App__AQGreenV2__Commissioning__AdmissionMode` | Retain effective `CLEAN_START`. |
-| 1 / owner | `App__AQGreenV2__Commissioning__Enabled` | Retain `false` during first-account registration. Leave all six D10 pins below absent/blank until the complete verified set is installed. |
-| 1 / owner | `App__FinancialOperations__Enabled`, `App__BackgroundJobs__Enabled`, `App__WeeklyCommissions__Enabled`, `App__EntryMonthlyObligations__Enabled`, `App__AutomaticPayouts__Enabled` | Retain `false` for bootstrap. The last four stay false throughout this MVP activation. |
+| 1 / owner | `App__AQGreenV2__Commissioning__Enabled` | Retain `false` during evidence preparation. Leave all six D10 pins below absent/blank until the complete verified set is installed. No customer is registered or preselected for launch. |
+| 1 / owner | `App__FinancialOperations__Enabled`, `App__BackgroundJobs__Enabled`, `App__WeeklyCommissions__Enabled`, `App__EntryMonthlyObligations__Enabled`, `App__AutomaticPayouts__Enabled` | Retain `false` during evidence preparation. The last four stay false throughout this MVP activation. |
 | 1 / owner | `App__Recovery__Enabled`, `AQGreenV2Demo__Enabled`, `AQGreenV2Pilot__Enabled`, `SEED_DEMO_DATA` | Retain `false`; these are not onboarding workarounds. |
 | 1 / owner | `App__YocoCutover__Enabled` | Retain literal `true`; durable capture is retained after Normal. Never delete captured/control records. |
 | 2 / owner | `Bird__Enabled` | Retain effective `true` and the existing API key, verified sender and reply-to settings. Startup validation is not proof of delivery. |
 | 2 / owner | `Bird__DeliveryNotBeforeUtc` | Existing approved mail-activation boundary, or the actual operator-approved boundary for this activation: non-future UTC ending `Z`. No default or date is invented here. Older mail stays held. |
 | 2 / owner | `App__AQGreenV2__VerificationEmail__Enabled` | Set effective `true` after the Bird sender and cutoff are ready. This selects only Tenant1 `EmailVerification` mail; it does not enable general jobs. |
-| 3 / customer | `/signup` → email verification → `/login` | After the first-account correction is deployed, existing registration/confirmation/resend work with financial holds intact. Registration also requires the existing Tenant1 `Abp.Account.IsSelfRegistrationEnabled` setting, an active Tenant, valid default role and valid Area. A Render override does not establish a persisted Tenant setting's value. |
-| 3 / customer | `GET /api/services/app/Customer/GetMyCustomer` | Existing verified member access supplies the actual new Customer identity privately for root selection. No customer ID is guessed or taken from a test account. |
-| 4 / protected operator | Select the actual first root, Area/approver and effective boundary; validate the existing commissioning records | Use original accepted CLEAN_START facts, current source/schema/runtime/configuration bindings and valid authority. Do not recreate migration/reset facts or re-date historical receipts. |
+| 3 / protected operator | Prepare the root-unbound D10 Decision, authorized Areas/approver and effective boundary | Set `cleanStartRootCustomerId: null` and explicitly select `cleanStartRootSelectionPolicy: "HOST_SELECT_AFTER_REGISTRATION_V1"` in the independently accepted Decision. This is an evidence field, not a new Render flag. Use original accepted CLEAN_START facts and current source/schema/runtime/configuration bindings. Do not recreate migration/reset facts or re-date historical receipts. |
 | 4 / protected operator | `App__YocoCutover__OperatorUserId` | Existing authorized Host user ID, confirmed through the existing Session API. No default operator is granted. Selection requires a controlled restart. |
 | 4 / owner with protected operator | `Yoco__Mode` and existing Yoco merchant/webhook configuration | Genuine joining requires effective `live`, the already-approved matching live merchant key/signing setup and existing checkout-return configuration. The completed deployment accepted either test or live and does not prove which merchant mode is currently effective. Do not invent or expose keys or re-register the integration as a shortcut. |
 | 4 / protected operator | `App__AQGreenV2__Commissioning__DecisionPath` | Actual readable runtime location of the approved D10 Decision JSON. No default filename. |
@@ -54,10 +53,11 @@ settings. Do not populate example values as real authority.
 | 4 / protected operator | `App__AQGreenV2__Commissioning__VerifiedAuthoritySha256` | Lowercase SHA256 of that exact authority file's bytes. |
 | 4 / protected operator | `App__AQGreenV2__Commissioning__CleanStartEvidencePath` | Actual readable runtime location of the accepted CleanStartEvidence JSON. |
 | 4 / protected operator | `App__AQGreenV2__Commissioning__CleanStartEvidenceSha256` | Lowercase SHA256 of that exact evidence file's bytes. |
-| 5 / owner with protected operator | Install all six verified pins, select `App__AQGreenV2__Commissioning__Enabled=true`, and set `App__FinancialOperations__Enabled=true` for the authorized payment/replay procedure | Apply as one consistent configuration matching the Decision's configuration digest. Complete account verification first: the bootstrap exception closes when commissioning/payment processing is selected. HTTP business access still requires durable Normal. |
+| 5 / owner with protected operator | Install all six verified pins, select `App__AQGreenV2__Commissioning__Enabled=true`, and set `App__FinancialOperations__Enabled=true` for the authorized payment/replay procedure | Only after the complete evidence is valid, apply as one consistent configuration matching the Decision's configuration digest, including LIVE mode and financial enablement. HTTP business access still requires durable Normal. No root Customer is required at this stage. |
 | 6 / protected operator | Yoco status, manifest/replay and Normal procedure below | Stop if any captured event or outstanding reference is unresolved. |
-| 7 / protected Host administrator | `POST /api/services/app/AQGreenCleanStartRoot/AuthorizeRoot` | `tenantId: 1` and the actual admission reason. Uses the pinned real Customer. Returns an unpaid participation, not activation. |
-| 8 / customer and authorized approver | `/member/programmes`, then `/admin/programme-participations` | Existing Yoco checkout and signed confirmation complete R1,200 once or two distinct R600 instalments; funeral inclusion follows full completion; separate authorized approval creates Active membership/placement. The first root requires the existing dedicated Host bootstrap approver; subsequent sponsored members use their assigned Area Administrator. |
+| 7 / genuine customer | `/signup` → email verification → `/login`, then `GET /api/services/app/Customer/GetMyCustomer` | After Normal release, ordinary registration/confirmation/resend supplies the actual Customer identity privately. Registration requires the existing Tenant1 `Abp.Account.IsSelfRegistrationEnabled` setting, active Tenant, default role and active Area. No test customer or guessed identity is accepted. Registration creates no participation, payment, cover or placement. |
+| 8 / protected Host administrator | `POST /api/services/app/AQGreenCleanStartRoot/AuthorizeRoot` | Supply `tenantId: 1`, the actual registered `customerId`, and the real admission `reason`. The verified active customer must have registered on/after the effective boundary in an authorized Area. Both existing Host permissions remain mandatory. Returns an unpaid participation, not activation. |
+| 9 / customer and authorized approver | `/member/programmes`, then `/admin/programme-participations` | Existing Yoco checkout and signed confirmation complete R1,200 once or two distinct R600 instalments; funeral inclusion follows full completion; separate authorized approval creates Active membership/placement. The first root requires the existing dedicated Host bootstrap approver; subsequent sponsored members use their assigned Area Administrator. |
 
 **Taking effect:** use Render **Save and deploy** to apply environment changes to
 the existing build. **Save only** does not change the running process. Group and
@@ -110,6 +110,16 @@ explicit empty `__tenant` header; omission otherwise selects the default Tenant.
    `POST .../phase` with `{"phase":"Normal"}`. Expected HTTP200/`Committed`.
    A 409/`Held` is a stop, not permission to drop events. If already Normal, do not
    repeat this transition: the implementation requires Replay as its source state.
+
+The root-unbound Decision is valid only with explicit empty-active-network evidence:
+all baseline participations are archived, no placements or legacy memberships,
+and all existing conservation/exposure/provenance checks pass. An omitted policy,
+unknown count, zero/guessed root ID, or arbitrary populated network is rejected.
+After launch, the immutable post-boundary Host root admission permits ordinary
+network growth and restart; the Decision is not rewritten to insert a customer.
+Competing root selections are serialized per Tenant. Exact retries retain the same
+participation; a different customer cannot replace the root. Existing accepted
+positive root pins remain compatible but cannot be combined with the deferred policy.
 
 The existing root endpoint requires both
 `Aqua.Admin.ProgrammeParticipations.BootstrapAQGreenRoot` and

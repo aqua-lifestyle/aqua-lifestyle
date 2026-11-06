@@ -4,6 +4,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Transactions;
 using Abp.Domain.Uow;
+using Abp.Configuration;
+using AqualLifeStyle.Authorization.Accounts;
+using AqualLifeStyle.Authorization.Accounts.Dto;
+using AqualLifeStyle.Authorization.Users;
+using AqualLifeStyle.Configuration;
 using AqualLifeStyle.Application.ProgrammeParticipations;
 using AqualLifeStyle.Application.ProgrammeParticipations.Dto;
 using AqualLifeStyle.Application.Recruitment;
@@ -30,13 +35,15 @@ namespace AqualLifeStyle.Web.Tests.Integration
             await AssertFreshPostgreSqlDatabaseAsync();LoginAsDefaultTenantAdmin();
             var area=await UsingDbContextAsync(async c=>await (from a in c.AreaAdminAssignments join r in c.Areas
                 on a.AreaId equals r.Id where a.TenantId==1 && a.UserId==AbpSession.UserId && !a.RevokedAt.HasValue && r.IsActive select r.Id).FirstAsync());
-            var root=await SeedLeanMemberIdentityAsync(area,"clean-start-root");
             var (x,clean)=AQGreenCleanStartCommissioningTests.Create();var config=AQGreenD10SyntheticEvidence.Configuration();
             AQGreenCleanStartCommissioningTests.OwnerAttest(clean);
             config["App:FinancialOperations:Enabled"]="true";
             config["App:BackgroundJobs:Enabled"]="false";
+            config["Yoco:Mode"]="live";
             x.Decision.RequiredConfigurationDigest=AQGreenD10Commissioning.ConfigurationDigest(config);
-            x.Decision.CleanStartRootCustomerId=root.CustomerId;x.Decision.AuthorizedAreaIds=new[]{area};
+            x.Decision.CleanStartRootCustomerId=null;
+            x.Decision.CleanStartRootSelectionPolicy=AQGreenD10Decision.HostSelectRootAfterRegistration;
+            x.Decision.AuthorizedAreaIds=new[]{area};
             var historical=await SeedLeanMemberIdentityAsync(area,"owner-attested-retired");
             var oldPaymentId=await UsingDbContextAsync(async c=>
             {
@@ -97,15 +104,72 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 Component.For<IAQGreenPlacementV2ProgressGate>().ImplementedBy<AQGreenD10ProgressGate>().Named("clean-progress-"+key).LifestyleTransient().IsDefault(),
                 Component.For<IYocoCheckoutGateway>().Instance(new LeanMvpCheckoutGateway()).Named("clean-gateway-"+key).IsDefault());
             var runtime=Resolve<AQGreenD10Runtime>();await runtime.VerifyStartupAsync();
+            // Root-unbound release must not adopt a populated prospective network.
+            var unauthorized=await SeedLeanMemberIdentityAsync(area,"not-authorized-root");
+            var unauthorizedId=await UsingDbContextAsync(async c=>
+            {
+                var p=EntryParticipation.StartIndependently(1,unauthorized.CustomerId,
+                    EntryProgrammeTerms.CreateSingleJoiningPayment("synthetic-invalid-root",DateTime.UtcNow.AddDays(-1),1200,600,7),DateTime.UtcNow);
+                c.EntryParticipations.Add(p);await c.SaveChangesAsync();return p.Id;
+            });
+            (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.VerifyStartupAsync()))
+                .Message.ShouldBe("D10_CLEAN_START_AUTHORIZED_ROOT_REQUIRED");
+            await UsingDbContextAsync(async c=>{c.EntryParticipations.Remove(await c.EntryParticipations.SingleAsync(p=>p.Id==unauthorizedId));});
+            await runtime.VerifyStartupAsync();
             await Should.ThrowAsync<InvalidOperationException>(()=>runtime.EnsureFinancialWorkersAsync());
+            LoginAsHostAdmin();
+            config[YocoCutoverOptions.Prefix+"Enabled"]="true";
+            config[YocoCutoverOptions.Prefix+"OperatorUserId"]=AbpSession.UserId.Value.ToString();
+            var store=Resolve<IYocoCutoverStore>();
+            var cutover=new YocoCutoverService(store,null,null,new SyntheticEmptyReconciliation(AbpSession.UserId.Value),config,
+                new YocoCutoverReleaseGate(runtime));
+            await cutover.SetPhaseAsync("Replay");
+            await cutover.SetPhaseAsync("Normal");
+            (await cutover.StatusAsync()).Phase.ShouldBe("Normal");
+            await using var businessLease=await store.EnterBusinessAsync();
+            using var businessScope=YocoCutoverDispatch.EnterBusiness();
+            // This uses actual registration/verification after valid commissioning,
+            // not a pre-created root Customer. Synthetic provider/source authority
+            // remains test-only; this is not merchant acceptance or live delivery.
+            var root=await RegisterCleanStartCustomerAsync(area,"after-launch-root");
+            var other=await RegisterCleanStartCustomerAsync(area,"other-registered-customer");
             // A Tenant administrator cannot nominate or create the root.
+            LoginAsDefaultTenantAdmin();
             await Should.ThrowAsync<Abp.Authorization.AbpAuthorizationException>(()=>InUnitOfWorkAsync(()=>
-                Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(new CleanStartRootInput{TenantId=1,Reason="Synthetic owner-selected first root"})));
-            LoginAsHostAdmin();var request=new CleanStartRootInput{TenantId=1,Reason="Synthetic owner-selected first root"};
-            var rootId=await InUnitOfWorkAsync(()=>Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(request));
+                Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(new CleanStartRootInput{TenantId=1,CustomerId=root.CustomerId,Reason="Synthetic Host-selected first root"})));
+            LoginAsHostAdmin();var request=new CleanStartRootInput{TenantId=1,CustomerId=root.CustomerId,Reason="Synthetic Host-selected first root"};
+            (await Should.ThrowAsync<InvalidOperationException>(()=>InUnitOfWorkAsync(()=>
+                Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(new CleanStartRootInput{TenantId=1,Reason=request.Reason}))))
+                .Message.ShouldBe("D10_CLEAN_START_ROOT_CUSTOMER_REQUIRED_OR_MISMATCHED");
+            var attempts=await Task.WhenAll(new[]{root,other}.Select(candidate=>Task.Run(async ()=>
+            {
+                try
+                {
+                    var id=await InUnitOfWorkAsync(()=>Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(
+                        new CleanStartRootInput{TenantId=1,CustomerId=candidate.CustomerId,Reason=request.Reason}));
+                    return (Customer:candidate,Id:(Guid?)id);
+                }
+                catch(InvalidOperationException e)
+                {
+                    e.Message.ShouldBe("D10_CLEAN_START_ROOT_POPULATION_NOT_EMPTY");
+                    return (Customer:candidate,Id:(Guid?)null);
+                }
+            })));
+            var winner=attempts.Where(a=>a.Id.HasValue).ShouldHaveSingleItem();
+            root=winner.Customer;var rootId=winner.Id.Value;request.CustomerId=root.CustomerId;
             (await InUnitOfWorkAsync(()=>Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(request))).ShouldBe(rootId);
             root=root with{ParticipationId=rootId};await AssertAwaitingApprovalOrPaymentAsync(rootId);
+            (await Should.ThrowAsync<AQGreenPlacementConflictException>(()=>ApproveAsync(rootId)))
+                .Message.ShouldBe("AQGreen approval requires a fully satisfied joining obligation.");
             await ConfirmJoiningPaymentAsync(root);await AssertAwaitingApprovalAsync(rootId);
+            await UsingDbContextAsync(async c=>
+            {
+                var cover=await c.AQGreenFuneralCoverEntitlements.SingleAsync(e=>e.CustomerId==root.CustomerId);
+                cover.FuneralCoverAmount.ShouldBe(30000m);
+            });
+            (await Should.ThrowAsync<InvalidOperationException>(()=>InUnitOfWorkAsync(()=>
+                Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(new CleanStartRootInput{TenantId=1,CustomerId=unauthorized.CustomerId,Reason="Synthetic attempted replacement"}))))
+                .Message.ShouldBe("D10_CLEAN_START_ROOT_POPULATION_NOT_EMPTY");
             LoginAsHostAdmin();await ApproveAsync(rootId);await AssertActiveApprovalAsync(root,true);
             var children=new System.Collections.Generic.List<ParticipantFixture>();
             for(var i=0;i<6;i++)
@@ -143,7 +207,41 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 (await c.AQGreenJoiningCheckouts.SingleAsync(p=>p.ProviderCheckoutId=="SYNTHETIC-RETIRED-CHECKOUT")).PaymentId.ShouldBe(oldPaymentId);
             });
             File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("REPRO_MARKER_DIR"),"clean-start-commissioning.ran"),
-                "PostgreSQL: owner-attested historical payment retention, empty active CLEAN_START, protected root authority, ordinary payment/approval, six invitations, spillover, retries; no real provider or automatic payouts.");
+                "PostgreSQL: root-unbound empty CLEAN_START, post-commissioning registration/verification, protected root authority, ordinary payment/cover/approval, six invitations, spillover, retries, retained history; no real provider or automatic payouts.");
+        }
+
+        private async Task<ParticipantFixture> RegisterCleanStartCustomerAsync(Guid area, string label)
+        {
+            await Resolve<ISettingManager>().ChangeSettingForTenantAsync(1,"Abp.Account.IsSelfRegistrationEnabled","true");
+            var name="clean_register_"+Guid.NewGuid().ToString("N");
+            using(AbpSession.Use(1,null))
+                await InUnitOfWorkAsync(()=>Resolve<IAccountAppService>().Register(new RegisterInput
+                {
+                    Name="Synthetic",Surname="Post-launch",UserName=name,EmailAddress=name+"@example.test",
+                    Password="Synthetic!101",ContactNumber="+27 72 111 2233",HomeAddress="Synthetic fixture address",AreaId=area
+                }));
+            var identity=await UsingDbContextAsync(async c=>await c.Customers.SingleAsync(p=>p.User.UserName==name));
+            await UsingDbContextAsync(async c=>
+            {
+                (await c.EntryParticipations.AnyAsync(p=>p.CustomerId==identity.Id)).ShouldBeFalse();
+                (await c.AQGreenNetworkPlacements.AnyAsync()).ShouldBeFalse();
+                (await c.MemberPayments.AnyAsync(p=>p.CustomerId==identity.Id)).ShouldBeFalse();
+                (await c.AQGreenFuneralCoverEntitlements.AnyAsync(p=>p.CustomerId==identity.Id)).ShouldBeFalse();
+            });
+            using(AbpSession.Use(1,null))
+            {
+                var manager=Resolve<UserManager>();await manager.InitializeOptionsAsync(1);
+                var user=await manager.FindByIdAsync(identity.UserId.ToString());
+                user.IsEmailConfirmed.ShouldBeFalse();
+                using(AbpSession.Use(null,await UsingDbContextAsync(async c=>await c.Users.Where(u=>u.TenantId==null && u.UserName=="admin").Select(u=>u.Id).SingleAsync())))
+                    (await Should.ThrowAsync<InvalidOperationException>(()=>InUnitOfWorkAsync(()=>
+                        Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(new CleanStartRootInput
+                        {TenantId=1,CustomerId=identity.Id,Reason="Synthetic unverified selection rejected"}))))
+                        .Message.ShouldBe("D10_CLEAN_START_ROOT_VERIFIED_REGISTRATION_REQUIRED");
+                var token=await manager.GenerateEmailConfirmationTokenAsync(user);
+                await InUnitOfWorkAsync(()=>Resolve<IAccountAppService>().ConfirmEmail(new ConfirmEmailInput{TenantId=1,UserId=user.Id,Token=token}));
+            }
+            return new ParticipantFixture(identity.UserId,name,identity.Id,Guid.Empty,null,area,label);
         }
 
         private async Task AssertAwaitingApprovalOrPaymentAsync(Guid id) => await UsingDbContextAsync(async c=>
@@ -151,5 +249,20 @@ namespace AqualLifeStyle.Web.Tests.Integration
             (await c.AQGreenNetworkPlacements.CountAsync()).ShouldBe(0);(await c.MemberPayments.CountAsync(m=>m.CustomerId==p.CustomerId)).ShouldBe(0); });
         private sealed class CleanStartTestSource : IAQGreenD10CommissioningSource
         { public AQGreenD10Commissioning Current;public AQGreenD10Commissioning Read()=>Current; }
+
+        private sealed class SyntheticEmptyReconciliation : IYocoCutoverReconciliationSource
+        {
+            private readonly YocoCutoverReconciliation _manifest;
+            public SyntheticEmptyReconciliation(long userId) => _manifest=new YocoCutoverReconciliation
+            {
+                Contract="Aqua.YocoCutover.ReconciliationV1",Authority="OPERATOR_ATTESTED_AUTHORITATIVE_YOCO_RECORDS",
+                OperatorUserId=userId,AcceptedAtUtc=DateTimeOffset.UtcNow,ExpiresAtUtc=DateTimeOffset.UtcNow.AddHours(1),
+                AquaAcceptanceReference="SYNTHETIC-TEST-ONLY",OwnerAuthorizationReference="SYNTHETIC-TEST-ONLY",
+                CapturedEventSetSha256=YocoCutoverService.EventSetHash(Array.Empty<YocoCutoverEvent>()),
+                OutstandingReferencesReconciled=true,UnresolvedObligationsRemain=false,Entries=new()
+            };
+            public (YocoCutoverReconciliation,string) Read() =>
+                (_manifest,YocoCutoverService.Hash(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(_manifest)));
+        }
     }
 }

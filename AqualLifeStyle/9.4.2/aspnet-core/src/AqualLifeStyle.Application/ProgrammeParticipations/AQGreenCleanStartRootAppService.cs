@@ -21,13 +21,14 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
     public sealed class CleanStartRootInput
     {
         [Range(1,1)] public int TenantId { get; set; }
+        [Range(1,int.MaxValue)] public int? CustomerId { get; set; }
         [Required, StringLength(500)] public string Reason { get; set; }
     }
     public interface IAQGreenCleanStartRootAppService : IApplicationService
     { Task<Guid> AuthorizeRootAsync(CleanStartRootInput input); }
 
     // The existing joining API requires an active sponsor invitation. An empty
-    // Tenant therefore needs exactly one separately owner-selected prospective
+    // Tenant therefore needs exactly one separately Host-authorized prospective
     // root. This creates neither a payment nor activation nor a placement.
     [Audited]
     public class AQGreenCleanStartRootAppService : AqualLifeStyleAppServiceBase, IAQGreenCleanStartRootAppService
@@ -64,15 +65,29 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             using(CurrentUnitOfWork.SetTenantId(input.TenantId))
             {
                 AQGreenD10Commissioning.Require(await _locks.HasCurrentReadTransactionAsync(), "D10_JOINING_REQUIRES_CURRENT_READ_TRANSACTION");
+                await _locks.AcquireAQGreenRootAdmissionAsync(input.TenantId);
                 var a=_source.Read();
                 AQGreenD10Commissioning.Require(a?.CleanStartEvidence!=null && a.Decision.TenantId==input.TenantId &&
-                    a.Decision.CleanStartRootCustomerId>0, "D10_CLEAN_START_ROOT_NOT_AUTHORIZED");
+                    (a.Decision.CleanStartRootCustomerId>0 ||
+                     a.Decision.CleanStartRootSelectionPolicy==AQGreenD10Decision.HostSelectRootAfterRegistration),
+                    "D10_CLEAN_START_ROOT_NOT_AUTHORIZED");
                 AQGreenD10Commissioning.Require(await _runtime.ForTenantAsync(input.TenantId,true), "D10_CLEAN_START_ROOT_NOT_AUTHORIZED");
-                var d=a.Decision;var customerId=d.CleanStartRootCustomerId.Value;
+                var d=a.Decision;
+                AQGreenD10Commissioning.Require(d.CleanStartRootCustomerId.HasValue
+                    ? !input.CustomerId.HasValue || input.CustomerId==d.CleanStartRootCustomerId
+                    : input.CustomerId>0, "D10_CLEAN_START_ROOT_CUSTOMER_REQUIRED_OR_MISMATCHED");
+                var customerId=(d.CleanStartRootCustomerId ?? input.CustomerId).Value;
                 await _locks.AcquireCustomerAreaTransitionsAsync(new[]{customerId});
                 var c=await _customers.GetAll().SingleOrDefaultAsync(x=>x.Id==customerId && x.TenantId==input.TenantId);
                 AQGreenD10Commissioning.Require(c!=null && c.IsActive && c.AreaId.HasValue && d.AuthorizedAreaIds.Contains(c.AreaId.Value),
                     "D10_AREA_OUTSIDE_AUTHORIZED_SCOPE");
+                if (!d.CleanStartRootCustomerId.HasValue)
+                {
+                    var user=await UserManager.FindByIdAsync(c.UserId.ToString());
+                    AQGreenD10Commissioning.Require(c.CreationTime>=d.V2EffectiveAtUtc && user!=null &&
+                        user.TenantId==input.TenantId && user.IsActive && !user.IsDeleted && user.IsEmailConfirmed &&
+                        !user.RequiresPasswordReset(), "D10_CLEAN_START_ROOT_VERIFIED_REGISTRATION_REQUIRED");
+                }
                 var assignments=await _assignments.GetAll().IgnoreQueryFilters().Where(x=>x.CustomerId==customerId &&
                     !x.IsDeleted && !x.EffectiveTo.HasValue).ToListAsync();
                 AQGreenD10Commissioning.Require(assignments.Count==1 && assignments[0].TenantId==input.TenantId &&

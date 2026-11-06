@@ -198,6 +198,13 @@ After the owner authorizes the exact window and pins:
    Commission the authorized first root and perform controlled live joining,
    payment, Area approval, placement and commission validation under their
    separate operational authorization. Provider payment is not activation.
+
+   Launch-before-first-customer uses the independently accepted D10 Decision's
+   `cleanStartRootSelectionPolicy=HOST_SELECT_AFTER_REGISTRATION_V1` with no root
+   Customer pin. This grants no automatic root: only after valid Normal release,
+   genuine registration and verification may the existing Host root API select the
+   actual customer. Missing root alone never implies this authority. Existing
+   empty-baseline, runtime, provider reconciliation and financial controls remain.
 10. Deactivate receive-only with the checked `Normal` phase, retaining the durable
     capture protocol. Do not toggle the protocol off during a rolling deployment:
     an old receiver could otherwise enqueue after a new instance's startup check.

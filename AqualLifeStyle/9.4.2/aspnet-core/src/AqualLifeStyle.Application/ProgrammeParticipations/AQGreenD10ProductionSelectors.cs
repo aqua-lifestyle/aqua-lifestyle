@@ -37,16 +37,18 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         private readonly IRepository<Area, Guid> _areas;
         private readonly IRepository<CustomerAreaAssignment, Guid> _areaAssignments;
         private readonly IHostedPaymentCheckoutLock _areaLocks;
+        private readonly IRepository<AQGreenProspectiveRootAdmission, Guid> _rootAdmissions;
         public AQGreenD10Runtime(IAQGreenD10CommissioningSource source, IConfiguration configuration,
             IUnitOfWorkManager uows, IRepository<EntryParticipation, Guid> participations,
             ICustomerRepository customers, IRepository<AQGreenNetworkPlacement, Guid> placements, IAbpSession session,
             IRepository<Membership, int> memberships, IAQGreenReconciliationEvidenceSnapshot snapshot,
             IRepository<EntryCommissionPeriod, Guid> periods, IRepository<EntryWeeklyCommission, Guid> commissions,
             IRepository<Area, Guid> areas, IRepository<CustomerAreaAssignment, Guid> areaAssignments,
-            IHostedPaymentCheckoutLock areaLocks)
+            IHostedPaymentCheckoutLock areaLocks, IRepository<AQGreenProspectiveRootAdmission, Guid> rootAdmissions)
         { _source = source; _configuration = configuration; _uows = uows; _participations = participations;
             _customers = customers; _placements = placements; _session = session; _memberships = memberships; _snapshot = snapshot;
-            _periods = periods; _commissions = commissions; _areas = areas; _areaAssignments = areaAssignments; _areaLocks = areaLocks; }
+            _periods = periods; _commissions = commissions; _areas = areas; _areaAssignments = areaAssignments; _areaLocks = areaLocks;
+            _rootAdmissions = rootAdmissions; }
 
         public async Task VerifyStartupAsync()
         {
@@ -218,6 +220,27 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 var live = _participations.GetAll().IgnoreQueryFilters().AsNoTracking().Where(p =>
                     p.TenantId == d.TenantId && (!p.IsDeleted || p.Status == EntryParticipationStatus.Active) &&
                     (cleanStart == null || !p.IsDeleted));
+                if (cleanStart != null && d.CleanStartRootSelectionPolicy == AQGreenD10Decision.HostSelectRootAfterRegistration)
+                {
+                    // The signed empty baseline authorizes launch, not adoption of a
+                    // populated network. Later population needs the immutable Host
+                    // root admission created after this effective boundary.
+                    var roots = _rootAdmissions.GetAll().AsNoTracking().Where(r =>
+                        r.TenantId == d.TenantId && r.AuthorizedAt >= d.V2EffectiveAtUtc);
+                    if (!await live.AnyAsync())
+                        AQGreenD10Commissioning.Require(!await roots.AnyAsync() &&
+                            !await _placements.GetAll().AnyAsync(p => p.TenantId == d.TenantId),
+                            "D10_CLEAN_START_UNBOUND_POPULATION_NOT_EMPTY");
+                    else
+                    {
+                        AQGreenD10Commissioning.Require(await roots.CountAsync() == 1 &&
+                            await (from r in roots join p in live on r.ParticipantId equals p.Id
+                                where r.AdministratorUserId > 0 && p.StartedAt >= d.V2EffectiveAtUtc &&
+                                    r.AuthorizedAt >= p.StartedAt
+                                select r.Id).CountAsync() == 1,
+                            "D10_CLEAN_START_AUTHORIZED_ROOT_REQUIRED");
+                    }
+                }
                 if (stabilizeAreas)
                 {
                     await RequireCurrentReadTransactionAsync("D10_FINANCIAL_REQUIRES_CURRENT_READ_TRANSACTION");

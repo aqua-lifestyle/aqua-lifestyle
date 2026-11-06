@@ -26,6 +26,12 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public Task AcquireAQGreenParticipationAsync(Guid participationId) =>
             AcquireAsync($"aqgreen-checkout-creation:{participationId:N}");
 
+        public Task AcquireAQGreenRootAdmissionAsync(int tenantId)
+        {
+            if (tenantId <= 0) throw new ArgumentOutOfRangeException(nameof(tenantId));
+            return AcquireAsync($"aqgreen-clean-start-root:{tenantId}");
+        }
+
         public Task AcquireDirectOnyxCustomerAsync(int customerId)
         {
             if (customerId <= 0) throw new ArgumentOutOfRangeException(nameof(customerId));
