@@ -183,6 +183,60 @@ namespace AqualLifeStyle.Tests.WebHost
         }
 
         [Fact]
+        public void ExplicitRootUnboundLaunchBindsOnlyTheVerifiedEmptyActiveBaseline()
+        {
+            var (x,c)=Create();
+            x.Decision.CleanStartRootCustomerId=null;
+            x.Decision.CleanStartRootSelectionPolicy=AQGreenD10Decision.HostSelectRootAfterRegistration;
+            Sign(x,c);
+            var bound=AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,c);
+            bound.Decision.CleanStartRootCustomerId.ShouldBeNull();
+            bound.FinancialWorkersCommissioned.ShouldBeFalse();
+            bound.EnsureConfiguration(AQGreenD10SyntheticEvidence.Configuration());
+            // An archived disposable cohort is allowed; it is not an active network.
+            c.State.PopulationCount=c.State.ArchivedCount=3;Sign(x,c);
+            AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,c).ShouldNotBeNull();
+        }
+
+        [Theory]
+        [InlineData("implicit")][InlineData("unknown-policy")][InlineData("mixed-pin")]
+        [InlineData("zero-pin")][InlineData("negative-pin")][InlineData("live-population")]
+        [InlineData("unknown-population")][InlineData("unknown-archive")][InlineData("placement")]
+        [InlineData("legacy-membership")][InlineData("authority-not-rebound")]
+        public void RootUnboundLaunchCannotInferAuthorityOrAdoptPopulatedOrUnknownState(string failure)
+        {
+            var (x,c)=Create();
+            x.Decision.CleanStartRootCustomerId=null;
+            x.Decision.CleanStartRootSelectionPolicy=AQGreenD10Decision.HostSelectRootAfterRegistration;
+            switch(failure)
+            {
+                case "implicit":x.Decision.CleanStartRootSelectionPolicy=null;break;
+                case "unknown-policy":x.Decision.CleanStartRootSelectionPolicy="AUTOMATIC_ROOT";break;
+                case "mixed-pin":x.Decision.CleanStartRootCustomerId=1;break;
+                case "zero-pin":x.Decision.CleanStartRootCustomerId=0;break;
+                case "negative-pin":x.Decision.CleanStartRootCustomerId=-1;break;
+                case "live-population":c.State.PopulationCount=1;break;
+                case "unknown-population":c.State.PopulationCount=null;break;
+                case "unknown-archive":c.State.ArchivedCount=null;break;
+                case "placement":c.State.PlacementCount=1;break;
+                case "legacy-membership":c.State.LegacyMembershipCount=1;break;
+            }
+            if(failure!="authority-not-rebound") Sign(x,c);
+            Should.Throw<InvalidOperationException>(()=>AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,c));
+        }
+
+        [Fact]
+        public void DeferredRootSelectionDoesNotChangeLegacyEncodingOrAuthorizeHistoricalAdmission()
+        {
+            var (x,c)=Create();
+            System.Text.Json.Nodes.JsonNode.Parse(AQGreenB6CanonicalEvidence.Bytes(x.Decision))
+                .AsObject().ContainsKey("cleanStartRootSelectionPolicy").ShouldBeFalse();
+            var historical=AQGreenD10SyntheticEvidence.Create(AQGreenD10SyntheticEvidence.Configuration());
+            historical.Decision.CleanStartRootSelectionPolicy=AQGreenD10Decision.HostSelectRootAfterRegistration;
+            Should.Throw<InvalidOperationException>(()=>historical.Bind()).Message.ShouldBe("D10_ADMISSION_MODE_MISMATCH");
+        }
+
+        [Fact]
         public void EmptyApprovedTenantBindsWithNoFabricatedB6HistoryAndWorkersHeld()
         {
             var (x,c) = Create(); var bound = AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,c);

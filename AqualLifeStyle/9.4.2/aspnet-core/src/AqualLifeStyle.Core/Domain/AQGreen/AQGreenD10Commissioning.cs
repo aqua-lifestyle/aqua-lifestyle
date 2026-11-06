@@ -26,9 +26,12 @@ namespace AqualLifeStyle.Domain.AQGreen
     /// <summary>Explicit D10 scope; neither a B6 application command nor a new reconciliation format.</summary>
     public sealed class AQGreenD10Decision
     {
+        public const string HostSelectRootAfterRegistration = "HOST_SELECT_AFTER_REGISTRATION_V1";
         public string AdmissionMode { get; set; } = "HISTORICAL_B6";
         public string CleanStartResetId { get; set; }
         public int? CleanStartRootCustomerId { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string CleanStartRootSelectionPolicy { get; set; }
         [JsonRequired] public string ContractVersion { get; set; } = "AQGreenD10CutoverV1";
         public string DecisionId { get; set; }
         public string DecisionReference { get; set; }
@@ -126,7 +129,8 @@ namespace AqualLifeStyle.Domain.AQGreen
         {
             Require(d != null && a != null && independentlyVerifiedB6FinalManifest != null, "D10_REQUIRED_AUTHORITY_MISSING");
             Require(d.AdmissionMode == "HISTORICAL_B6" && a.AdmissionMode == "HISTORICAL_B6" &&
-                d.CleanStartResetId == null && d.CleanStartRootCustomerId == null && a.CleanStartEvidenceDigest == null, "D10_ADMISSION_MODE_MISMATCH");
+                d.CleanStartResetId == null && d.CleanStartRootCustomerId == null &&
+                d.CleanStartRootSelectionPolicy == null && a.CleanStartEvidenceDigest == null, "D10_ADMISSION_MODE_MISMATCH");
             Require(d.ContractVersion == "AQGreenD10CutoverV1" && a.ContractVersion == "AQGreenD10VerifiedAuthorityV1" &&
                 d.DecisionId == "AQG-V2-D10" && d.Outcome == "AUTHORIZED" && Code(d.DecisionReference) && Code(a.AuthorityReference), "D10_DECISION_UNAUTHORIZED");
             Require(d.TenantId > 0 && Code(d.TenantSnapshotKey) && d.PopulationScope == "ALL_TENANT_AQGREEN_PARTICIPATIONS" &&
@@ -207,7 +211,9 @@ namespace AqualLifeStyle.Domain.AQGreen
                 d.ContractVersion == "AQGreenD10CutoverV1" && a.ContractVersion == "AQGreenD10VerifiedAuthorityV1" &&
                 (e.ContractVersion == "AQGreenCleanStartV1" || prospective) && e.EvidenceClassification == "OPERATIONAL_EVIDENCE" &&
                 d.DecisionId == "AQG-V2-D10" && d.Outcome == "AUTHORIZED" && Code(d.DecisionReference) &&
-                Code(a.AuthorityReference) && Code(e.ResetId) && d.CleanStartResetId == e.ResetId && d.CleanStartRootCustomerId > 0,
+                Code(a.AuthorityReference) && Code(e.ResetId) && d.CleanStartResetId == e.ResetId &&
+                (d.CleanStartRootCustomerId > 0 && d.CleanStartRootSelectionPolicy == null ||
+                 d.CleanStartRootCustomerId == null && d.CleanStartRootSelectionPolicy == AQGreenD10Decision.HostSelectRootAfterRegistration),
                 "D10_CLEAN_START_AUTHORITY_INVALID");
             Require(d.TenantId == 1 && e.TenantId == d.TenantId && Code(d.TenantSnapshotKey) &&
                 d.PopulationScope == "ALL_TENANT_AQGREEN_PARTICIPATIONS" && d.AuthorizedAreaIds?.Length > 0 &&

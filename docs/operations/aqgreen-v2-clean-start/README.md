@@ -233,15 +233,21 @@ successful restore is claimed. See [Render recovery documentation](https://rende
    with actual post-reset state, receipt, classification/independent acceptance,
    source/schema/assembly/configuration digests and canonical effective time.
    Explicitly set `AdmissionMode=CLEAN_START`; use `CleanStartEvidencePath/Sha256`,
-   never a fabricated B6 manifest. Historical collections are empty; root Customer
-   identity is explicit. Initial workers, graduation and automatic payouts stay off.
+   never a fabricated B6 manifest. Historical collections are empty. For launch
+   before the first genuine registration, the accepted Decision has
+   `cleanStartRootCustomerId: null` and explicit
+   `cleanStartRootSelectionPolicy: "HOST_SELECT_AFTER_REGISTRATION_V1"`.
+   Empty-active-network evidence and all existing provenance/conservation checks
+   remain required. Initial workers, graduation and automatic payouts stay off.
 8. Obtain **separate D10/first-root/controlled live-Yoco authorization**. Commission
    at the approved boundary by controlled restart with the pinned D10 inputs and
    explicitly authorized financial operations for payment processing; background,
    weekly/monthly automation and automatic payouts remain disabled. Configuration
    digests bind financial/background flags; a reload cannot clear the initial
-   HTTP fence. Host-only `AQGreenCleanStartRoot.AuthorizeRoot` creates
-   only the owner-selected prospective root's unpaid participation and immutable
+   HTTP fence. Complete the accepted Yoco reconciliation and Normal release before
+   genuine registration. After registration and verification, Host-only
+   `AQGreenCleanStartRoot.AuthorizeRoot` accepts the actual Customer ID and creates
+   only the authorized prospective root's unpaid participation and immutable
    root attribution; ordinary payment confirmation and authorized Area approval
    still control activation/placement. Subsequent members use normal invitations,
    joining, real checkout verification and approval. Do not enable pilot/demo modes.

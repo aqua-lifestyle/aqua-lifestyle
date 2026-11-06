@@ -18,5 +18,8 @@ namespace AqualLifeStyle.Domain.Payments
         Task AcquireProgrammeApprovalUserSessionAsync(long userId);
         Task ReleaseProgrammeApprovalUserSessionAsync(long userId);
         Task AcquireProgrammeParticipationDecisionAsync(Guid participationId);
+        /// <summary>Serializes the first-root selection for one Tenant in the caller's transaction.</summary>
+        Task AcquireAQGreenRootAdmissionAsync(int tenantId) =>
+            throw new NotSupportedException("AQGreen root admission locking is unavailable.");
     }
 }
