@@ -164,10 +164,39 @@ namespace AqualLifeStyle.Web.Tests.Integration
             var serverRoot=config["App:ServerRootAddress"];config["App:ServerRootAddress"]="https://changed.example.test";
             (await Should.ThrowAsync<InvalidOperationException>(()=>cutover.SetPhaseAsync("Normal"))).Message.ShouldBe("D10_CONFIGURATION_MISMATCH");
             config["App:ServerRootAddress"]=serverRoot;
+            // An explicitly selected invalid manifest must not fall back to the
+            // empty-launch path, even though this fixture has no captured work.
+            var selectedPin=config[YocoCutoverOptions.Prefix+"ReconciliationSha256"];
+            config[YocoCutoverOptions.Prefix+"ReconciliationSha256"]=new string('a',64);
+            (await Should.ThrowAsync<InvalidOperationException>(()=>cutover.SetPhaseAsync("Normal"))).Message.ShouldBe("YOCO_RECONCILIATION_PIN_CHANGED");
+            config[YocoCutoverOptions.Prefix+"ReconciliationSha256"]=selectedPin;
+            // Owner-approved first-launch scope is explicit: no selected merchant
+            // manifest, atomically empty inbox and no prospective V2 work.
+            config[YocoCutoverOptions.Prefix+"ReconciliationPath"]=null;
+            config[YocoCutoverOptions.Prefix+"ReconciliationSha256"]=null;
+            config[YocoCutoverOptions.Prefix+"ReconciliationJsonBase64"]=null;
             await cutover.SetPhaseAsync("Normal");
-            (await cutover.StatusAsync()).Phase.ShouldBe("Normal");
+            var normal=await cutover.StatusAsync();normal.Phase.ShouldBe("Normal");
+            var admission=normal.PhaseEvidence.Last();admission.AdmissionKind.ShouldBe(YocoCutoverPhaseEvidence.EmptyProspectiveV2);
+            admission.AdmissionEvidenceDigest.Length.ShouldBe(64);admission.ReconciliationDigest.ShouldBeNull();
             await using var businessLease=await store.EnterBusinessAsync();
             using var businessScope=YocoCutoverDispatch.EnterBusiness();
+            // New V1 financial activity on an old shared Customer is not a change
+            // to the accepted historical reset facts and must not freeze V2.
+            await UsingDbContextAsync(async c=>
+            {
+                var now=DateTime.UtcNow;
+                var v1=MemberPayment.CreatePending(1,historical.CustomerId,MemberPaymentPurpose.SavingsContribution,250,"SYNTHETIC-V1","SYNTHETIC-V1-CONTINUING",now);
+                v1.Confirm(now);c.MemberPayments.Add(v1);
+            });
+            using(var uow=Resolve<IUnitOfWorkManager>().Begin(new UnitOfWorkOptions{Scope=TransactionScopeOption.RequiresNew,IsTransactional=true,IsolationLevel=IsolationLevel.RepeatableRead}))
+            {
+                var reader=Resolve<IAQGreenReconciliationEvidenceSnapshot>();await reader.CaptureAsync();
+                var afterV1=await reader.CaptureCleanStartAsync(1,resetBoundary,clean.ResetId);
+                afterV1.PaymentEvidenceDigest.ShouldNotBe(clean.State.PaymentEvidenceDigest);
+                await uow.CompleteAsync();
+            }
+            await runtime.VerifyStartupAsync();
             // This uses actual registration/verification after valid commissioning,
             // not a pre-created root Customer. Synthetic provider/source authority
             // remains test-only; this is not merchant acceptance or live delivery.
@@ -199,6 +228,8 @@ namespace AqualLifeStyle.Web.Tests.Integration
             root=winner.Customer;var rootId=winner.Id.Value;request.CustomerId=root.CustomerId;
             (await InUnitOfWorkAsync(()=>Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(request))).ShouldBe(rootId);
             root=root with{ParticipationId=rootId};await AssertAwaitingApprovalOrPaymentAsync(rootId);
+            (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.VerifyEmptyProspectiveLaunchAsync()))
+                .Message.ShouldBe("D10_PROSPECTIVE_WORK_REQUIRES_RECONCILIATION");
             (await Should.ThrowAsync<AQGreenPlacementConflictException>(()=>ApproveAsync(rootId)))
                 .Message.ShouldBe("AQGreen approval requires a fully satisfied joining obligation.");
             await ConfirmJoiningPaymentAsync(root);await AssertAwaitingApprovalAsync(rootId);

@@ -55,7 +55,7 @@ settings. Do not populate example values as real authority.
 | 4 / protected operator | `App__AQGreenV2__Commissioning__CleanStartEvidencePath` | Actual readable runtime location of the accepted CleanStartEvidence JSON. |
 | 4 / protected operator | `App__AQGreenV2__Commissioning__CleanStartEvidenceSha256` | Lowercase SHA256 of that exact evidence file's bytes. |
 | 5 / owner with protected operator | Install all six verified pins, select `App__AQGreenV2__Commissioning__Enabled=true`, and set `App__FinancialOperations__Enabled=true` for the authorized payment/replay procedure | Only after the complete evidence is valid, apply as one consistent configuration matching the Decision's configuration digest, including LIVE mode and financial enablement. HTTP business access still requires durable Normal. No root Customer is required at this stage. |
-| 6 / protected operator | Yoco status, manifest/replay and Normal procedure below | Stop if any captured event or outstanding reference is unresolved. |
+| 6 / protected operator | Scoped Yoco Normal admission below | For the explicit new root-unbound initial launch, no selected manifest + atomically empty inbox + verified no prospective V2 work permits distinct empty admission. No legacy reference is labelled reconciled. Actual cutover debt/work uses the genuine manifest/replay path. |
 | 7 / genuine customer | `/signup` → email verification → `/login`, then `GET /api/services/app/Customer/GetMyCustomer` | After Normal release, ordinary registration/confirmation/resend supplies the actual Customer identity privately. Registration requires the existing Tenant1 `Abp.Account.IsSelfRegistrationEnabled` setting, active Tenant, default role and active Area. No test customer or guessed identity is accepted. Registration creates no participation, payment, cover or placement. |
 | 8 / protected Host administrator | `POST /api/services/app/AQGreenCleanStartRoot/AuthorizeRoot` | Supply `tenantId: 1`, the actual registered `customerId`, and the real admission `reason`. The verified active customer must have registered on/after the effective boundary in an authorized Area. Both existing Host permissions remain mandatory. Returns an unpaid participation, not activation. |
 | 9 / customer and authorized approver | `/member/programmes`, then `/admin/programme-participations` | Existing Yoco checkout and signed confirmation complete R1,200 once or two distinct R600 instalments; funeral inclusion follows full completion; separate authorized approval creates Active membership/placement. The first root requires the existing dedicated Host bootstrap approver; subsequent sponsored members use their assigned Area Administrator. |
@@ -147,18 +147,43 @@ new credentials. Host authentication uses the existing TokenAuth endpoint with a
 explicit empty `__tenant` header; omission otherwise selects the default Tenant.
 
 1. `GET /api/operations/yoco-cutover/status` and private `GET .../events`.
-2. If not already validly Normal, prepare the accepted
+2. If not already validly Normal, choose the actual applicable path. For the
+   owner-approved first prospective V2 launch, leave all three reconciliation
+   selector/hash/private-payload settings absent. The server requires the new
+   post-reset D10/root-unbound contract, effective genuine authority, joining
+   financial enablement, an atomically empty inbox, and zero prospective
+   participation (including deleted) since the historical reset. It records
+   `EMPTY_PROSPECTIVE_AQGREEN_V2_V1` with an admission-evidence digest, not a
+   merchant-reconciliation digest. Older V1 references retain their existing state
+   and processing/recovery; they are not declared paid, reconciled or zero.
+
+   If there is actual captured cutover debt or prospective V2 work, prepare the accepted
    `Aqua.YocoCutover.ReconciliationV1` manifest from actual merchant records. Pin
    `App__YocoCutover__ReconciliationPath` and `App__YocoCutover__ReconciliationSha256` through
    the existing protected file mechanism. Even an empty captured-event set needs
-   actual outstanding-reference reconciliation, not an assumption of zero exposure.
+   actual scoped outstanding-reference reconciliation, not an assumption of zero exposure.
+   Any selected manifest input must validate: an invalid or partial selection never
+   falls back to empty admission.
 3. `POST .../phase` with `{"phase":"Replay"}`; `POST .../replay` with each accepted
    private inbox `id`. Existing signature, Tenant, amount, mode, purpose, lock,
    immutable receipt and duplicate safeguards remain in force.
-4. Only with no Pending/Held events and valid effective D10 authority:
+4. Only after the applicable path and valid effective D10 authority pass:
    `POST .../phase` with `{"phase":"Normal"}`. Expected HTTP200/`Committed`.
    A 409/`Held` is a stop, not permission to drop events. If already Normal, do not
    repeat this transition: the implementation requires Replay as its source state.
+
+After Normal, ordinary failed references remain visible as `HasReferenceRecovery`
+and retain their original envelope/evidence. They do not cascade into unrelated
+callback failures or block every V1/V2 business lease. The pinned Host can replay
+one such reference with actual matched, accepted provider evidence while Normal
+continues. `HasCutoverDebt` remains a real fence and requires the existing Replay
+procedure. Unknown/corrupt stored classifications fail closed.
+
+Accepted historical financial conservation is not re-proved on every new V2
+operation by hashing current shared-Customer financial rows. Legitimate new V1
+activity is not historical mutation. The original evidence, reset receipt, archived
+cohort/topology integrity, source/schema/configuration and live authorization
+checks remain; no V1 financial history is reinterpreted or granted new entitlement.
 
 The root-unbound Decision is valid only with explicit empty-active-network evidence:
 all baseline participations are archived, no placements or legacy memberships,

@@ -34,7 +34,10 @@ namespace AqualLifeStyle.Web.Host.Controllers
             if (!Operator()) return Forbid();
             var s = await _service.StatusAsync();
             return Ok(new { s.Phase, s.HasMigration55, HasPending = s.Events.Any(YocoCutoverService.Unfinished),
-                HasHeld = s.Events.Any(x => x.Status == "Held"), ReceiverOnlyArtifact = _service.CompatibilityReceiver });
+                HasHeld = s.Events.Any(x => x.Status == "Held"), ReceiverOnlyArtifact = _service.CompatibilityReceiver,
+                HasCutoverDebt = s.Events.Any(x => x.RequiresReconciliation && YocoCutoverService.Unfinished(x)),
+                HasReferenceRecovery = s.Events.Any(x => !x.RequiresReconciliation && YocoCutoverService.Unfinished(x)),
+                LastNormalAdmissionKind = s.PhaseEvidence.LastOrDefault(x => x.Phase == "Normal")?.AdmissionKind });
         }
         // Restricted operator response: never log/spool it or publish it in chat.
         [HttpGet("events")]

@@ -169,6 +169,29 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             await uow.CompleteAsync(); return true;
         }
 
+        public async Task<string> VerifyEmptyProspectiveLaunchAsync()
+        {
+            RuntimeOperationGuards.RequireFinancialOperations(_configuration);
+            var authority = _source.Read();
+            AQGreenD10Commissioning.Require(authority?.Decision.ContractVersion == AQGreenD10Decision.PostResetContract &&
+                authority.Decision.CleanStartRootSelectionPolicy == AQGreenD10Decision.HostSelectRootAfterRegistration &&
+                authority.Decision.CleanStartRootCustomerId == null, "D10_EMPTY_PROSPECTIVE_AUTHORITY_REQUIRED");
+            AQGreenD10Commissioning.Require(await ForTenantAsync(1, true), "D10_EMPTY_PROSPECTIVE_AUTHORITY_REQUIRED");
+            using var uow = _uows.Begin();
+            using (_uows.Current.DisableFilter(AbpDataFilters.MustHaveTenant, AbpDataFilters.MayHaveTenant))
+                AQGreenD10Commissioning.Require(!await _participations.GetAll().IgnoreQueryFilters().AnyAsync(p =>
+                    p.TenantId == 1 && p.StartedAt >= authority.Decision.CleanStartResetBoundaryUtc.Value),
+                    "D10_PROSPECTIVE_WORK_REQUIRES_RECONCILIATION");
+            await uow.CompleteAsync();
+            return AQGreenB6CanonicalEvidence.Digest(new {
+                AdmissionKind = YocoCutoverPhaseEvidence.EmptyProspectiveV2, TenantId = 1,
+                DecisionDigest = AQGreenB6CanonicalEvidence.Digest(authority.Decision),
+                HistoricalResetBoundary = authority.Decision.CleanStartResetBoundaryUtc,
+                V2EffectiveAt = authority.Decision.V2EffectiveAtUtc,
+                ProspectiveWorkVerifiedEmptyAtUtc = DateTime.UtcNow
+            });
+        }
+
         public async Task ValidateJoiningDestinationAsync(int tenantId, Guid destinationAreaId)
         {
             ApplicationRecoveryMode.DenyBusinessOperation(_configuration);
@@ -206,7 +229,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                     AQGreenD10Commissioning.Require(cleanStart != null, "D10_CLEAN_START_AUTHORITY_INVALID");
                     var state = await _snapshot.CaptureCleanStartAsync(d.TenantId,
                         d.CleanStartResetBoundaryUtc ?? d.V2EffectiveAtUtc, d.CleanStartResetId);
-                    AQGreenD10Commissioning.Require(state != null && cleanStart.AdmitsPreservedState(state) &&
+                    var financialSnapshotRequired = d.ContractVersion != AQGreenD10Decision.PostResetContract;
+                    AQGreenD10Commissioning.Require(state != null && (!financialSnapshotRequired || cleanStart.AdmitsPreservedState(state)) &&
+                        state.OrphanTopologyCount == 0 && state.InvalidParticipationCount == 0 &&
                         state.PopulationCount == cleanStart.State.PopulationCount && state.ArchivedCount == state.PopulationCount &&
                         state.ArchiveDigest == cleanStart.State.ArchiveDigest && state.PlacementCount == 0 &&
                         state.LegacyMembershipCount == 0 && state.ResetReceiptDigest == cleanStart.State.ResetReceiptDigest,
