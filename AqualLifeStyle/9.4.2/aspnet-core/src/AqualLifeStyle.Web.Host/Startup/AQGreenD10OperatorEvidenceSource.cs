@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using AqualLifeStyle.Domain.AQGreen;
 using Microsoft.Extensions.Configuration;
+using AqualLifeStyle.Configuration;
 
 namespace AqualLifeStyle.Web.Host.Startup
 {
@@ -20,8 +21,12 @@ namespace AqualLifeStyle.Web.Host.Startup
         private readonly string[] _paths;
         private readonly string[] _digests;
         private readonly string _mode;
+        private readonly IConfiguration _configuration;
+        private readonly bool _environmentInputs;
+        private static readonly string[] EnvironmentKeys = { Prefix + "DecisionJsonBase64", Prefix + "VerifiedAuthorityJsonBase64", Prefix + "CleanStartEvidenceJsonBase64" };
         public AQGreenD10OperatorEvidenceSource(IConfiguration configuration)
         {
+            _configuration = configuration;
             _requested = configuration.GetValue<bool>(Prefix + "Enabled");
             _mode = configuration[Prefix + "AdmissionMode"] ?? "HISTORICAL_B6";
             AQGreenD10Commissioning.Require(_mode == "HISTORICAL_B6" || _mode == "CLEAN_START", "D10_ADMISSION_MODE_MISMATCH");
@@ -35,6 +40,12 @@ namespace AqualLifeStyle.Web.Host.Startup
                 configuration[Prefix + evidenceKey + "Sha256"] };
             AQGreenD10Commissioning.Require(_requested || Array.TrueForAll(_paths, string.IsNullOrWhiteSpace) &&
                 Array.TrueForAll(_digests, string.IsNullOrWhiteSpace), "D10_EVIDENCE_CONFIGURED_WITHOUT_EXPLICIT_SELECTION");
+            _environmentInputs = Array.Exists(_paths, p => p?.StartsWith(PrivateOperatorJson.Scheme, StringComparison.Ordinal) == true);
+            if (_environmentInputs)
+                AQGreenD10Commissioning.Require(_mode == "CLEAN_START" &&
+                    _paths[0] == PrivateOperatorJson.Scheme + EnvironmentKeys[0] &&
+                    _paths[1] == PrivateOperatorJson.Scheme + EnvironmentKeys[1] &&
+                    _paths[2] == PrivateOperatorJson.Scheme + EnvironmentKeys[2], "D10_ENVIRONMENT_INPUT_SELECTION_INVALID");
         }
 
         public AQGreenD10Commissioning Read()
@@ -43,10 +54,15 @@ namespace AqualLifeStyle.Web.Host.Startup
             try
             {
                 var decision = ReadPinned(0); var authority = ReadPinned(1); var final = ReadPinned(2);
-                if (_mode == "CLEAN_START") return AQGreenD10Commissioning.BindCleanStartVerified(
-                    JsonSerializer.Deserialize<AQGreenD10Decision>(decision, AQGreenB6CanonicalEvidence.Options),
-                    JsonSerializer.Deserialize<AQGreenD10VerifiedAuthority>(authority, AQGreenB6CanonicalEvidence.Options),
-                    JsonSerializer.Deserialize<AQGreenCleanStartEvidence>(final, AQGreenB6CanonicalEvidence.Options));
+                if (_mode == "CLEAN_START")
+                {
+                    var d = JsonSerializer.Deserialize<AQGreenD10Decision>(decision, AQGreenB6CanonicalEvidence.Options);
+                    var a = JsonSerializer.Deserialize<AQGreenD10VerifiedAuthority>(authority, AQGreenB6CanonicalEvidence.Options);
+                    AQGreenD10Commissioning.Require(!_environmentInputs || d?.ContractVersion == AQGreenD10Decision.PostResetContract &&
+                        a?.ContractVersion == AQGreenD10VerifiedAuthority.PostResetContract, "D10_ENVIRONMENT_INPUT_REQUIRES_POST_RESET_CONTRACT");
+                    return AQGreenD10Commissioning.BindCleanStartVerified(d, a,
+                        JsonSerializer.Deserialize<AQGreenCleanStartEvidence>(final, AQGreenB6CanonicalEvidence.Options));
+                }
                 return AQGreenD10Commissioning.BindVerified(
                     JsonSerializer.Deserialize<AQGreenD10Decision>(decision, AQGreenB6CanonicalEvidence.Options),
                     JsonSerializer.Deserialize<AQGreenD10VerifiedAuthority>(authority, AQGreenB6CanonicalEvidence.Options),
@@ -60,6 +76,13 @@ namespace AqualLifeStyle.Web.Host.Startup
         private byte[] ReadPinned(int index)
         {
             AQGreenD10Commissioning.Require(!string.IsNullOrWhiteSpace(_paths[index]) && !string.IsNullOrWhiteSpace(_digests[index]), "D10_PINNED_INPUT_MISSING");
+            if (_environmentInputs)
+            {
+                PrivateOperatorJson.TryRead(_configuration, _paths[index], EnvironmentKeys[index], 32 * 1024 * 1024, out var input);
+                AQGreenD10Commissioning.Require(input != null && AQGreenB6CanonicalEvidence.Hash(input) == _digests[index], "D10_PINNED_INPUT_CHANGED");
+                using (var parsed = JsonDocument.Parse(input)) RejectDuplicates(parsed.RootElement);
+                return input;
+            }
             var path = Path.GetFullPath(_paths[index]); var info = new FileInfo(path);
             AQGreenD10Commissioning.Require(info.Exists && info.Length <= 32 * 1024 * 1024 &&
                 (info.Attributes & FileAttributes.ReparsePoint) == 0, "D10_INPUT_CUSTODY_INVALID");

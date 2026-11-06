@@ -204,7 +204,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 if (d.AdmissionMode == "CLEAN_START")
                 {
                     AQGreenD10Commissioning.Require(cleanStart != null, "D10_CLEAN_START_AUTHORITY_INVALID");
-                    var state = await _snapshot.CaptureCleanStartAsync(d.TenantId, d.V2EffectiveAtUtc, d.CleanStartResetId);
+                    var state = await _snapshot.CaptureCleanStartAsync(d.TenantId,
+                        d.CleanStartResetBoundaryUtc ?? d.V2EffectiveAtUtc, d.CleanStartResetId);
                     AQGreenD10Commissioning.Require(state != null && cleanStart.AdmitsPreservedState(state) &&
                         state.PopulationCount == cleanStart.State.PopulationCount && state.ArchivedCount == state.PopulationCount &&
                         state.ArchiveDigest == cleanStart.State.ArchiveDigest && state.PlacementCount == 0 &&
@@ -220,6 +221,10 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 var live = _participations.GetAll().IgnoreQueryFilters().AsNoTracking().Where(p =>
                     p.TenantId == d.TenantId && (!p.IsDeleted || p.Status == EntryParticipationStatus.Active) &&
                     (cleanStart == null || !p.IsDeleted));
+                if (d.ContractVersion == AQGreenD10Decision.PostResetContract)
+                    AQGreenD10Commissioning.Require(!await _participations.GetAll().IgnoreQueryFilters().AnyAsync(p =>
+                        p.TenantId == d.TenantId && p.StartedAt >= d.CleanStartResetBoundaryUtc.Value &&
+                        p.StartedAt < d.V2EffectiveAtUtc), "D10_UNAUTHORIZED_RESET_TO_COMMISSIONING_POPULATION");
                 if (cleanStart != null && d.CleanStartRootSelectionPolicy == AQGreenD10Decision.HostSelectRootAfterRegistration)
                 {
                     // The signed empty baseline authorizes launch, not adoption of a

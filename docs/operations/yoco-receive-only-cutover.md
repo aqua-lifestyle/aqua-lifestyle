@@ -249,6 +249,16 @@ and hash do not themselves prove review: Xolani-M verifies actual source access
 and Aqua's authenticated acceptance of the exact manifest before activation.
 
 Use the existing protected runtime secret-file mechanism, outside the checkout,
+or the explicit private-process transport documented in the
+[activation procedure](aqgreen-first-customer-activation.md#private-process-transport-on-the-existing-render-service).
+For private-process transport, set the existing reconciliation selector to
+`environment:App:YocoCutover:ReconciliationJsonBase64`, supply accepted exact UTF-8
+manifest bytes as base64 in `App__YocoCutover__ReconciliationJsonBase64`, and retain
+the existing SHA256 pin. This changes transport only: no merchant acceptance,
+outstanding-reference finding, expiry, event-set or D10 release check is waived.
+Never place that payload in frontend configuration or ordinary logs.
+
+For file transport, keep the file outside the checkout,
 without symlinks, mode 0600 file/0700 parent. Pin its absolute path and SHA-256 in
 `App__YocoCutover__ReconciliationPath` and
 `App__YocoCutover__ReconciliationSha256`. Retain the source evidence and accepted
