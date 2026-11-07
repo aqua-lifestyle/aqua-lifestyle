@@ -669,8 +669,6 @@ jobs:
           Write-Output 'PASS: all 14 isolated D10 PostgreSQL cases executed and passed.'
       - name: Prepare clean-start synthetic population on the existing PostgreSQL service
         run: docker exec '${{ job.services.postgres.id }}' createdb -U aqual_ci aqual_clean_start
-      - name: Prepare Redis image for D10 production restart proof
-        run: docker pull redis:7-alpine
       - name: Verify empty-Tenant clean-start commissioning and ordinary joining
         env:
           REPRO_PG_CONNECTION: "Host=localhost;Port=5432;Database=aqual_clean_start;Username=aqual_ci;Password=aqual_ci_tests_only"

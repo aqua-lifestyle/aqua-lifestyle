@@ -74,6 +74,8 @@ Hosted PR CI `42339358805/1` exposed a branch-owned fixture preparation omission
 the new Production restart proof uses the existing `RecoveryRedis` fixture, which
 deliberately runs Docker with no image pull; the PostgreSQL job had no cached
 `redis:7-alpine`. Exact failure was `No such image: redis:7-alpine`, before either
-restart process started. Add the same explicit image-preparation step already used
-by the migration job. No production behavior or test assertion changes. Include
-the exact changed CI workflow pin in the single necessary executor binding.
+restart process started. A first attempt placed image preparation in the workflow;
+CI `42340527674/1` correctly rejected that immutable mandatory-source change.
+Restore the original workflow bytes and prepare the existing image in the new
+restart proof using the fixture's existing Docker command helper. No trust root,
+production behavior, assertion or fixture's no-pull startup rule is weakened.
