@@ -69,3 +69,11 @@ shared runtime check, and strict creation of the first activation. Continuing
 operations/startup retain the same independent checks. No production mutation or
 new D10 acceptance has been performed. Next: full CI/review, one application PR
 and the necessary exact-source executor binding, then protected deployment.
+
+Hosted PR CI `42339358805/1` exposed a branch-owned fixture preparation omission:
+the new Production restart proof uses the existing `RecoveryRedis` fixture, which
+deliberately runs Docker with no image pull; the PostgreSQL job had no cached
+`redis:7-alpine`. Exact failure was `No such image: redis:7-alpine`, before either
+restart process started. Add the same explicit image-preparation step already used
+by the migration job. No production behavior or test assertion changes. Include
+the exact changed CI workflow pin in the single necessary executor binding.
