@@ -225,6 +225,19 @@ forward. Do not enable their workers or replace sponsor attribution with placeme
 
 ## Actual acceptance boundary
 
+The armed, verified **pre-Normal** process reports HTTP200 `Healthy` with
+`paymentAvailability: Held`. This permits the existing provider health check to
+route authenticated Host activation requests. It does not grant a business lease
+or advertise joining/approval/direct-Onyx payment capabilities. The probe reads
+verified control/inbox state without updating it and verifies selected D10
+authority/source/configuration. Unknown, corrupt, inconsistent or unverifiable
+state remains HTTP503 `Unavailable`.
+
+Only an actual committed Normal state with its valid D10 activation evidence and
+independent release checks produces `paymentAvailability: Available`. Verify both
+the protected Normal status and payment availability. A successful health check
+alone is not proof that financial operations are active.
+
 Configuration success is not customer acceptance. Retain real registration and
 verification, actual Yoco obligation/receipt completion, funeral inclusion, separate
 Area approval/Active status and subsequent invitation/placement/progress evidence

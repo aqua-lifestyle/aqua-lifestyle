@@ -99,11 +99,53 @@ namespace AqualLifeStyle.EntityFrameworkCore
             // Deliberately no Complete: disposal rolls back the read transaction.
         }
 
-        public static async Task<T> ExecuteAsync<T>(AqualLifeStyleDbContext context, Func<YocoCutoverSnapshot, Task<T>> action)
+        public async Task<YocoCutoverSnapshot> ReadVerifiedSnapshotAsync()
+        {
+            using var uow = _uows.Begin(new UnitOfWorkOptions { Scope = TransactionScopeOption.RequiresNew,
+                IsTransactional = true, IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted });
+            var context = await _provider.GetDbContextAsync();
+            return await ReadVerifiedSnapshotAsync(context);
+        }
+
+        public static async Task<YocoCutoverSnapshot> ReadVerifiedSnapshotAsync(AqualLifeStyleDbContext context)
         {
             if (!context.Database.IsNpgsql() || context.Database.CurrentTransaction == null)
                 throw new InvalidOperationException("YOCO_CUTOVER_REQUIRES_POSTGRES_TRANSACTION");
-            await context.Database.ExecuteSqlRawAsync("SET LOCAL lock_timeout='3s'; SET LOCAL statement_timeout='30s'; SELECT pg_advisory_xact_lock({0})", LockKey);
+            await context.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY");
+            var (state, _, control) = await LoadVerifiedStateAsync(context, shared: true);
+            if (control != null)
+            {
+                using var document = JsonDocument.Parse(control.JobArgs);
+                RejectDuplicateControlFields(document.RootElement);
+                if (control.IsAbandoned || control.TryCount != 0 || control.NextTryTime != DateTime.MaxValue ||
+                    !document.RootElement.TryGetProperty("Evidence", out var evidence) || evidence.ValueKind != JsonValueKind.Array)
+                    throw new InvalidOperationException("YOCO_CUTOVER_READINESS_UNVERIFIED");
+            }
+            if (state.PhaseEvidence.Count > 256 ||
+                (state.PhaseEvidence.Count == 0 ? state.Phase != "Uninitialized" : state.PhaseEvidence.Last()?.Phase != state.Phase))
+                throw new InvalidOperationException("YOCO_CUTOVER_READINESS_UNVERIFIED");
+            DateTimeOffset previous = default;
+            foreach (var e in state.PhaseEvidence)
+            {
+                if (e == null || !new[] { "ReceiveOnly", "Replay", "Normal" }.Contains(e.Phase) || e.OperatorUserId <= 0 ||
+                    e.CommittedAtUtc == default || e.CommittedAtUtc.Offset != TimeSpan.Zero || e.CommittedAtUtc < previous ||
+                    e.CommittedAtUtc > DateTimeOffset.UtcNow || e.Phase != "Normal" && e.D10Activation != null)
+                    throw new InvalidOperationException("YOCO_CUTOVER_READINESS_UNVERIFIED");
+                previous = e.CommittedAtUtc;
+            }
+            // No save/Complete: release the shared lock by rolling back this read.
+            return state;
+        }
+
+        private static async Task<(YocoCutoverSnapshot State, List<BackgroundJobInfo> Rows, BackgroundJobInfo Control)>
+            LoadVerifiedStateAsync(AqualLifeStyleDbContext context, bool shared)
+        {
+            if (!context.Database.IsNpgsql() || context.Database.CurrentTransaction == null)
+                throw new InvalidOperationException("YOCO_CUTOVER_REQUIRES_POSTGRES_TRANSACTION");
+            var lockingSql = shared
+                ? "SET LOCAL lock_timeout='3s'; SET LOCAL statement_timeout='30s'; SELECT pg_advisory_xact_lock_shared({0})"
+                : "SET LOCAL lock_timeout='3s'; SET LOCAL statement_timeout='30s'; SELECT pg_advisory_xact_lock({0})";
+            await context.Database.ExecuteSqlRawAsync(lockingSql, LockKey);
             var history = await context.Database.GetAppliedMigrationsAsync();
             const string migration55 = "20261021051549_AddAQGreenSalesEvidenceInvalidation";
             var prefix = context.Database.GetMigrations().Where(x => x != migration55).ToArray();
@@ -140,6 +182,12 @@ namespace AqualLifeStyle.EntityFrameworkCore
             }
             if (s.Events.Select(x => x.EventId).Distinct(StringComparer.Ordinal).Count() != s.Events.Count)
                 throw new InvalidOperationException("YOCO_CUTOVER_DUPLICATE_STORAGE_IDENTITY");
+            return (s, rows, control);
+        }
+
+        public static async Task<T> ExecuteAsync<T>(AqualLifeStyleDbContext context, Func<YocoCutoverSnapshot, Task<T>> action)
+        {
+            var (s, rows, control) = await LoadVerifiedStateAsync(context, shared: false);
             var hadActivation = s.PhaseEvidence.Any(e => e?.D10Activation != null);
             var result = await action(s);
             var newActivation = hadActivation ? null : s.PhaseEvidence.FirstOrDefault(e => e?.D10Activation != null)?.D10Activation;

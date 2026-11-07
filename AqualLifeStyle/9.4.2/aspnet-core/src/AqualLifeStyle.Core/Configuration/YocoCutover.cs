@@ -192,5 +192,7 @@ namespace AqualLifeStyle.Configuration
         // joining an activation transaction. Unknown storage must fail closed.
         Task<YocoCutoverSnapshot> ReadCommittedControlAsync() =>
             throw new InvalidOperationException("D10_COMMITTED_ACTIVATION_READ_UNAVAILABLE");
+        // Read-only integrity proof for a legitimate hold; never a business lease.
+        Task<YocoCutoverSnapshot> ReadVerifiedSnapshotAsync();
     }
 }

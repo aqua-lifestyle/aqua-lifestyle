@@ -62,6 +62,12 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             }
             public Task<IAsyncDisposable> EnterBusinessAsync()=>YocoCutoverStore.EnterBusinessAsync(_cs);
             public Task ReadOnlyAsync(Func<Task> read) => throw new NotSupportedException("Receipt test double does not admit HTTP reads.");
+            public async Task<YocoCutoverSnapshot> ReadVerifiedSnapshotAsync()
+            {
+                await using var connection=new NpgsqlConnection(_cs);await connection.OpenAsync();
+                await using var context=_fixture.CreateDbContext(connection);await using var tx=await context.Database.BeginTransactionAsync();
+                return await YocoCutoverStore.ReadVerifiedSnapshotAsync(context);
+            }
         }
         private sealed class CutoverDispatch : IYocoCutoverDispatcher
         {
@@ -73,6 +79,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
         {
             public bool Accepted;
             public Task VerifyAsync(){if(!Accepted)throw new InvalidOperationException("synthetic D10 hold");return Task.CompletedTask;}
+            public Task VerifyHeldReadinessAsync()=>VerifyAsync();
             public Task<AqualLifeStyle.Domain.AQGreen.AQGreenD10ActivationReceipt> PrepareActivationAsync(DateTime at)=>
                 Task.FromResult(new AqualLifeStyle.Domain.AQGreen.AQGreenD10ActivationReceipt {
                     ContractVersion=AqualLifeStyle.Domain.AQGreen.AQGreenD10ActivationReceipt.Contract,
@@ -114,6 +121,33 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             c.Request.Headers["webhook-signature"]=valid?sig:"v1,aW52YWxpZA==";return c;
         }
         private static async Task Apply55(NpgsqlConnection c)=>await SqlAsync(c,await File.ReadAllTextAsync(Path.Combine(Operations,"migration-55.reviewed.sql")));
+
+        [Fact]
+        public async Task YocoReadinessSnapshot_IsReadOnlyAndRejectsMissingControlEvidenceWithoutMutatingStorage()
+        {
+            await using var db=await _fixture.CreateDatabaseAsync();await using var connection=new NpgsqlConnection(db.ConnectionString());
+            await connection.OpenAsync();await PrepareAsync(connection);await Apply55(connection);
+            var store=new CutoverStore(_fixture,db.ConnectionString());
+            var service=CutoverService(store,out _,out _,out _);await service.SetPhaseAsync("Replay");
+            var original=await SqlAsync(connection,"SELECT \"JobArgs\" FROM \"AbpBackgroundJobs\" WHERE \"JobType\"='Aqua.YocoCutover.ControlV1'");
+            await using(var context=_fixture.CreateDbContext(connection))
+            await using(var tx=await context.Database.BeginTransactionAsync())
+            {
+                (await YocoCutoverStore.ReadVerifiedSnapshotAsync(context)).Phase.ShouldBe("Replay");
+                (await SqlAsync(connection,"SHOW transaction_read_only")).ShouldBe("on");
+                var denied=await Should.ThrowAsync<PostgresException>(()=>SqlAsync(connection,"UPDATE \"AbpBackgroundJobs\" SET \"JobArgs\"=\"JobArgs\" WHERE \"JobType\"='Aqua.YocoCutover.ControlV1'"));
+                denied.SqlState.ShouldBe("25006");await tx.RollbackAsync();
+            }
+            (await SqlAsync(connection,"SELECT \"JobArgs\" FROM \"AbpBackgroundJobs\" WHERE \"JobType\"='Aqua.YocoCutover.ControlV1'")).ShouldBe(original);
+            await SqlAsync(connection,"UPDATE \"AbpBackgroundJobs\" SET \"JobArgs\"='{\"Phase\":\"Replay\"}' WHERE \"JobType\"='Aqua.YocoCutover.ControlV1'");
+            await using(var context=_fixture.CreateDbContext(connection))
+            await using(var tx=await context.Database.BeginTransactionAsync())
+            {
+                (await Should.ThrowAsync<InvalidOperationException>(()=>YocoCutoverStore.ReadVerifiedSnapshotAsync(context)))
+                    .Message.ShouldBe("YOCO_CUTOVER_READINESS_UNVERIFIED");
+                await tx.RollbackAsync();
+            }
+        }
 
         [Fact]
         public async Task YocoUnpinnedReceiveOnly_CommitsVerifiedCallbacksWithoutOperatorPhaseOrBusinessEffects()

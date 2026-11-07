@@ -16,6 +16,7 @@ namespace AqualLifeStyle.Payments.Yoco
     public interface IYocoCutoverReleaseGate
     {
         Task VerifyAsync();
+        Task VerifyHeldReadinessAsync();
         Task<string> VerifyEmptyProspectiveAsync() => Task.FromResult<string>(null);
         Task<AQGreenD10ActivationReceipt> PrepareActivationAsync(DateTime activationUtc);
     }
@@ -25,6 +26,7 @@ namespace AqualLifeStyle.Payments.Yoco
         public YocoCutoverReleaseGate(AqualLifeStyle.Application.ProgrammeParticipations.AQGreenD10Runtime runtime) => _runtime = runtime;
         public async Task VerifyAsync()
         { if (!await _runtime.ForTenantAsync(1, true)) throw new InvalidOperationException("YOCO_CUTOVER_D10_RELEASE_REQUIRED"); }
+        public Task VerifyHeldReadinessAsync() => _runtime.VerifySelectedStartupAsync(1);
         public Task<string> VerifyEmptyProspectiveAsync() => _runtime.VerifyEmptyProspectiveLaunchAsync();
         public Task<AQGreenD10ActivationReceipt> PrepareActivationAsync(DateTime activationUtc) => _runtime.PrepareActivationAsync(activationUtc);
     }

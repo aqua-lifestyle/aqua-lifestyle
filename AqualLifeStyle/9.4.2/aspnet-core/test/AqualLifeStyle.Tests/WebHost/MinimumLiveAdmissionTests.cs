@@ -16,12 +16,14 @@ namespace AqualLifeStyle.Tests.WebHost
             public Task<T> TransactAsync<T>(Func<YocoCutoverSnapshot,Task<T>> action)=>action(State);
             public Task<IAsyncDisposable> EnterBusinessAsync()=>throw new NotSupportedException();
             public Task ReadOnlyAsync(Func<Task> read)=>throw new NotSupportedException();
+            public Task<YocoCutoverSnapshot> ReadVerifiedSnapshotAsync()=>throw new NotSupportedException();
         }
         private sealed class Gate : IYocoCutoverReleaseGate
         {
             public int EmptyCalls;
             public bool Accepted=true;
             public Task VerifyAsync()=>Task.CompletedTask;
+            public Task VerifyHeldReadinessAsync()=>Task.CompletedTask;
             public Task<AqualLifeStyle.Domain.AQGreen.AQGreenD10ActivationReceipt> PrepareActivationAsync(DateTime at)=>
                 Task.FromResult(new AqualLifeStyle.Domain.AQGreen.AQGreenD10ActivationReceipt {
                     ContractVersion=AqualLifeStyle.Domain.AQGreen.AQGreenD10ActivationReceipt.Contract,
