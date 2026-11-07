@@ -46,6 +46,7 @@ namespace AqualLifeStyle.Tests.WebHost
         [InlineData("wrong-operator")][InlineData("missing-admission")][InlineData("mixed-admission")][InlineData("no-migration")]
         [InlineData("null-history")][InlineData("bare-normal")][InlineData("duplicate-normal")][InlineData("wrong-current-phase")]
         [InlineData("receipt-on-replay")][InlineData("non-utc")][InlineData("wrong-tenant")]
+        [InlineData("zero-admission")][InlineData("zero-reconciliation")]
         public void IncompleteFabricatedOrForeignNormalNeverWaivesExpiry(string failure)
         {
             var (a,s,expires)=Fixture();var e=s.PhaseEvidence.Last();
@@ -70,6 +71,8 @@ namespace AqualLifeStyle.Tests.WebHost
                 case "receipt-on-replay":s.PhaseEvidence[0].D10Activation=e.D10Activation;break;
                 case "non-utc":e.D10Activation.ActivatedAtUtc=DateTime.SpecifyKind(e.D10Activation.ActivatedAtUtc,DateTimeKind.Unspecified);break;
                 case "wrong-tenant":e.D10Activation.TenantId=2;break;
+                case "zero-admission":e.AdmissionEvidenceDigest=new string('0',64);break;
+                case "zero-reconciliation":e.AdmissionEvidenceDigest=null;e.AdmissionKind=null;e.ReconciliationDigest=new string('0',64);break;
             }
             Should.Throw<InvalidOperationException>(()=>a.VerifyCommittedActivation(s,7,expires.AddDays(365)))
                 .Message.ShouldBe("D10_COMMITTED_ACTIVATION_INVALID");

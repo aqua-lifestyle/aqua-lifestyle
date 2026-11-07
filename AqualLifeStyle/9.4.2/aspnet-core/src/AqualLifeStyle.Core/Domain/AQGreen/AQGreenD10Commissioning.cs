@@ -352,8 +352,8 @@ namespace AqualLifeStyle.Domain.AQGreen
                 if (e.Phase == "Normal")
                 {
                     Require(state.HasMigration55 && previousPhase == "Replay" && operatorUserId > 0 && e.OperatorUserId == operatorUserId &&
-                        (Digest(e.ReconciliationDigest) && e.AdmissionKind == null && e.AdmissionEvidenceDigest == null ||
-                         e.ReconciliationDigest == null && e.AdmissionKind == YocoCutoverPhaseEvidence.EmptyProspectiveV2 && Digest(e.AdmissionEvidenceDigest)), error);
+                        (ActivationDigest(e.ReconciliationDigest) && e.AdmissionKind == null && e.AdmissionEvidenceDigest == null ||
+                         e.ReconciliationDigest == null && e.AdmissionKind == YocoCutoverPhaseEvidence.EmptyProspectiveV2 && ActivationDigest(e.AdmissionEvidenceDigest)), error);
                     var r = e.D10Activation;
                     Require(r != null && r.ContractVersion == AQGreenD10ActivationReceipt.Contract && r.TenantId == Decision.TenantId &&
                         r.DecisionDigest == AQGreenB6CanonicalEvidence.Hash(_decision) && r.VerifiedAuthorityDigest == _verifiedAuthorityDigest &&
@@ -370,6 +370,7 @@ namespace AqualLifeStyle.Domain.AQGreen
             }
             return activated;
         }
+        private static bool ActivationDigest(string value) => Digest(value) && value != new string('0', 64);
         public bool IsRetiredCleanStartParticipation(AqualLifeStyle.Domain.Onyx.EntryParticipation participant)
         {
             if (_cleanStart == null || participant == null || !participant.IsDeleted) return false;

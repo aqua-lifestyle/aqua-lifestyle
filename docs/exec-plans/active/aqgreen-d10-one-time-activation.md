@@ -50,7 +50,7 @@ separate evidence steps; missing owner/operator facts will not be invented.
 
 ## Current state / next action
 
-IMPLEMENTED / TESTED locally: Release restore/build;196 focused component cases;
+IMPLEMENTED / TESTED locally: Release restore/build;212 focused component/health cases;
 15 PostgreSQL cutover cases; complete isolated joining lifecycle after real wall-clock
 expiry, including two new Production processes and rejection of a receipt-stripped
 Normal process. Zero skips in the passing runs. Latest lifecycle also rejects
@@ -86,3 +86,12 @@ on Docker's explicit `No such image` result. Other Docker errors remain failures
 image acquisition has a bounded two-minute setup deadline while existing fixture
 commands retain thirty seconds. This is dependency preparation, not a skipped
 restart proof or an allowed business fallback.
+
+Adversarial review added two zero-hash admission/reconciliation receipt cases.
+Both initially reproduced a branch-owned acceptance gap: the generic historical
+digest-format predicate accepts64 zeroes. The new activation-receipt validator
+now explicitly rejects zero evidence, matching the existing Yoco release predicate;
+the historical authority format is unchanged. Latest local run passed all212
+component/health cases,15 PostgreSQL cutover cases, and the complete fresh-DB
+lifecycle with both real Production restarts and the rejected corrupt receipt.
+Zero failed/skipped in these final local runs; full hosted CI remains required.
