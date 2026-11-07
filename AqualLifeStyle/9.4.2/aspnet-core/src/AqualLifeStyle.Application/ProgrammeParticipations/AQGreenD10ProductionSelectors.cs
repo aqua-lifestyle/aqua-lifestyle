@@ -74,6 +74,15 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             await check.CompleteAsync();
         }
 
+        public async Task VerifySelectedStartupAsync(int tenantId)
+        {
+            AQGreenD10Commissioning.Require(_source.Read()?.Decision.TenantId == tenantId,
+                "D10_SELECTED_READINESS_AUTHORITY_REQUIRED");
+            // Startup integrity permits an intentionally future effective instant;
+            // the independent write/Normal gates still enforce that instant.
+            await VerifyStartupAsync();
+        }
+
         private async Task<AQGreenD10ActivationReceipt> CheckAsync(AQGreenD10Commissioning authority)
         {
             ApplicationRecoveryMode.DenyBusinessOperation(_configuration);

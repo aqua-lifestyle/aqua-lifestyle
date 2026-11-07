@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using AqualLifeStyle.Configuration;
 using AqualLifeStyle.EntityFrameworkCore;
@@ -114,7 +115,8 @@ namespace AqualLifeStyle.Web.Host.Controllers
             var cutover = new YocoCutoverOptions(_configuration);
             if (!cutover.Enabled) return "NotCutoverGated";
             if (cutover.CompatibilityReceiver || !cutover.HasOperator ||
-                !_configuration.GetValue<bool>(RuntimeOperationGuards.FinancialSetting)) return "Held";
+                !_configuration.GetValue<bool>(RuntimeOperationGuards.FinancialSetting))
+                return await GetVerifiedHoldAsync(requireSelectedAuthority: false);
             if (_cutoverStore == null || _cutoverReleaseGate == null) return "Unavailable";
             try
             {
@@ -130,11 +132,30 @@ namespace AqualLifeStyle.Web.Host.Controllers
             }
             catch
             {
-                // A rejected lease does not distinguish an ordinary held phase
-                // from corrupt control/event state. Do not infer a healthy hold
-                // from that failure: Normal authority could not be established.
-                return "Unavailable";
+                // A rejected lease alone proves no healthy hold. Independently
+                // establish readable, consistent pre-Normal state and authority.
+                return await GetVerifiedHoldAsync(requireSelectedAuthority: true);
             }
+        }
+
+        private async Task<string> GetVerifiedHoldAsync(bool requireSelectedAuthority)
+        {
+            try
+            {
+                if (_cutoverStore == null) return "Unavailable";
+                var state = await _cutoverStore.ReadVerifiedSnapshotAsync();
+                if (state == null || state.PhaseEvidence == null || !new[] { "Uninitialized", "ReceiveOnly", "Replay", "Normal" }.Contains(state.Phase)) return "Unavailable";
+                // A failed Normal qualification may never become a successful hold.
+                if (requireSelectedAuthority && (state.Phase == "Normal" || !state.HasMigration55)) return "Unavailable";
+                if (requireSelectedAuthority || _configuration.GetValue<bool>("App:AQGreenV2:Commissioning:Enabled") ||
+                    state.Phase == "Normal" || state.PhaseEvidence.Any(e => e.Phase == "Normal"))
+                {
+                    if (_cutoverReleaseGate == null) return "Unavailable";
+                    await _cutoverStore.ReadOnlyAsync(() => _cutoverReleaseGate.VerifyHeldReadinessAsync());
+                }
+                return "Held"; // No business lease and no payment capability.
+            }
+            catch { return "Unavailable"; }
         }
 
         private string[] GetContractCapabilities(string paymentAvailability)

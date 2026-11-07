@@ -346,6 +346,7 @@ namespace AqualLifeStyle.Tests.WebHost
             using var context = CreateOpenSqliteContext(connection);
             var provider = Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>(); provider.GetDbContextAsync().Returns(context);
             var store = Substitute.For<IYocoCutoverStore>(); var release = Substitute.For<IYocoCutoverReleaseGate>();
+            store.ReadVerifiedSnapshotAsync().Returns(new YocoCutoverSnapshot { HasMigration55 = true });
             var configuration = BuildConfiguration(null, new Dictionary<string, string>
             {
                 [YocoCutoverOptions.Prefix + "Enabled"] = "true", [YocoCutoverOptions.Prefix + "OperatorUserId"] = pinnedOperator,
@@ -359,6 +360,67 @@ namespace AqualLifeStyle.Tests.WebHost
             response.ContractCapabilities.ShouldNotContain("programme-approval-queue-v1");
             response.ContractCapabilities.ShouldNotContain("direct-onyx-checkout-v1");
             await store.DidNotReceive().EnterBusinessAsync(); await release.DidNotReceive().VerifyAsync();
+        }
+
+        [Theory]
+        [InlineData("Uninitialized")][InlineData("ReceiveOnly")][InlineData("Replay")]
+        public async Task VerifiedArmedPreNormalHoldIsHealthyWithoutPaymentCapabilitiesOrBusinessLease(string phase)
+        {
+            using var connection = new SqliteConnection("DataSource=:memory:"); connection.Open();
+            using var context = CreateOpenSqliteContext(connection);
+            var provider = Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>(); provider.GetDbContextAsync().Returns(context);
+            var store = Substitute.For<IYocoCutoverStore>(); var release = Substitute.For<IYocoCutoverReleaseGate>();
+            store.EnterBusinessAsync().Returns(Task.FromException<IAsyncDisposable>(new InvalidOperationException("YOCO_CUTOVER_BUSINESS_WRITES_FENCED")));
+            var snapshot = new YocoCutoverSnapshot { Phase = phase, HasMigration55 = true };
+            if (phase != "Uninitialized") snapshot.PhaseEvidence.Add(new(){Phase=phase,OperatorUserId=7,CommittedAtUtc=DateTimeOffset.UtcNow.AddSeconds(-1)});
+            store.ReadVerifiedSnapshotAsync().Returns(snapshot);
+            store.ReadOnlyAsync(Arg.Any<Func<Task>>()).Returns(call => call.Arg<Func<Task>>()());
+            var config = BuildConfiguration(null, new Dictionary<string,string> {
+                [YocoCutoverOptions.Prefix+"Enabled"]="true",[YocoCutoverOptions.Prefix+"OperatorUserId"]="7",
+                [RuntimeOperationGuards.FinancialSetting]="true" });
+            var result=(await CreateController(provider,config,Substitute.For<IAbpRedisCacheDatabaseProvider>(),cutoverStore:store,releaseGate:release).Get())
+                .Result.ShouldBeOfType<OkObjectResult>();
+            var body=result.Value.ShouldBeOfType<HealthCheckResponse>();body.Status.ShouldBe("Healthy");body.PaymentAvailability.ShouldBe("Held");
+            body.ContractCapabilities.ShouldNotContain("aqgreen-flexible-joining-v1");body.ContractCapabilities.ShouldNotContain("programme-approval-queue-v1");
+            body.ContractCapabilities.ShouldNotContain("direct-onyx-checkout-v1");
+            await release.Received(1).VerifyHeldReadinessAsync();await release.DidNotReceive().VerifyAsync();
+            await store.DidNotReceive().TransactAsync(Arg.Any<Func<YocoCutoverSnapshot,Task<bool>>>());
+        }
+
+        [Theory]
+        [InlineData("authority")][InlineData("unreadable")][InlineData("unknown-phase")][InlineData("normal")][InlineData("schema")]
+        public async Task PreNormalProbeCannotHideUnverifiableAuthorityStorageOrNormalFailure(string failure)
+        {
+            using var connection=new SqliteConnection("DataSource=:memory:");connection.Open();using var context=CreateOpenSqliteContext(connection);
+            var provider=Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>();provider.GetDbContextAsync().Returns(context);
+            var store=Substitute.For<IYocoCutoverStore>();var release=Substitute.For<IYocoCutoverReleaseGate>();
+            store.EnterBusinessAsync().Returns(Task.FromException<IAsyncDisposable>(new InvalidOperationException("YOCO_CUTOVER_BUSINESS_WRITES_FENCED")));
+            var state=new YocoCutoverSnapshot { HasMigration55=true };
+            if(failure=="unreadable")store.ReadVerifiedSnapshotAsync().Returns(Task.FromException<YocoCutoverSnapshot>(new InvalidOperationException("synthetic corrupt inbox")));
+            else { if(failure=="normal")state.Phase="Normal";if(failure=="unknown-phase")state.Phase="unknown";if(failure=="schema")state.HasMigration55=false;
+                store.ReadVerifiedSnapshotAsync().Returns(state); }
+            store.ReadOnlyAsync(Arg.Any<Func<Task>>()).Returns(call=>call.Arg<Func<Task>>()());
+            if(failure=="authority")release.VerifyHeldReadinessAsync().Returns(Task.FromException(new InvalidOperationException("D10_AUTHORITY_EXPIRED")));
+            var config=BuildConfiguration(null,new Dictionary<string,string> { [YocoCutoverOptions.Prefix+"Enabled"]="true",
+                [YocoCutoverOptions.Prefix+"OperatorUserId"]="7",[RuntimeOperationGuards.FinancialSetting]="true" });
+            var result=(await CreateController(provider,config,Substitute.For<IAbpRedisCacheDatabaseProvider>(),cutoverStore:store,releaseGate:release).Get())
+                .Result.ShouldBeOfType<ObjectResult>();result.StatusCode.ShouldBe(503);
+            result.Value.ShouldBeOfType<HealthCheckResponse>().PaymentAvailability.ShouldBe("Unavailable");
+        }
+
+        [Theory]
+        [InlineData(null,"true")][InlineData("7","false")]
+        public async Task ExplicitHoldCannotHideUnreadableCutoverStorage(string pinnedOperator,string financial)
+        {
+            using var connection=new SqliteConnection("DataSource=:memory:");connection.Open();using var context=CreateOpenSqliteContext(connection);
+            var provider=Substitute.For<IDbContextProvider<AqualLifeStyleDbContext>>();provider.GetDbContextAsync().Returns(context);
+            var store=Substitute.For<IYocoCutoverStore>();
+            store.ReadVerifiedSnapshotAsync().Returns(Task.FromException<YocoCutoverSnapshot>(new InvalidOperationException("synthetic unreadable control")));
+            var config=BuildConfiguration(null,new Dictionary<string,string> { [YocoCutoverOptions.Prefix+"Enabled"]="true",
+                [YocoCutoverOptions.Prefix+"OperatorUserId"]=pinnedOperator,[RuntimeOperationGuards.FinancialSetting]=financial });
+            var result=(await CreateController(provider,config,Substitute.For<IAbpRedisCacheDatabaseProvider>(),cutoverStore:store).Get())
+                .Result.ShouldBeOfType<ObjectResult>();result.StatusCode.ShouldBe(503);
+            result.Value.ShouldBeOfType<HealthCheckResponse>().PaymentAvailability.ShouldBe("Unavailable");
         }
     }
 }

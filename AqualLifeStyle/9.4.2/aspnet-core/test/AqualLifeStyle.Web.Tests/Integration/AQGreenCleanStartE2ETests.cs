@@ -173,6 +173,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             x.Decision.V2EffectiveAtUtc=x.Authority.V2EffectiveAtUtc=DateTime.UtcNow.AddHours(1);
             AQGreenCleanStartCommissioningTests.Sign(x,clean);
             source.Current=AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,clean);
+            await runtime.VerifySelectedStartupAsync(1); // Valid future cutover is ready to be held, not authorized to write.
             (await Should.ThrowAsync<InvalidOperationException>(()=>cutover.SetPhaseAsync("Normal"))).Message.ShouldBe("D10_CUTOVER_WRITE_FENCE");
             (await cutover.StatusAsync()).Phase.ShouldBe("Replay");
             source.Current=current;
@@ -198,11 +199,13 @@ namespace AqualLifeStyle.Web.Tests.Integration
             config[YocoCutoverOptions.Prefix+"ReconciliationJsonBase64"]=null;
             // A bounded test-only authorization really expires on the wall clock;
             // every remaining member/payment/approval/progress operation is later.
-            x.Authority.ExpiresAtUtc=DateTime.UtcNow.AddSeconds(10);
+            x.Authority.ExpiresAtUtc=DateTime.UtcNow.AddSeconds(90);
             AQGreenCleanStartCommissioningTests.Sign(x,clean);
             PostResetOperatorTransportTests.Install(config,x.Decision,x.Authority,clean);
             source.Current=new AqualLifeStyle.Web.Host.Startup.AQGreenD10OperatorEvidenceSource(config).Read();
-            await cutover.SetPhaseAsync("Normal");
+            await cutover.SetPhaseAsync("ReceiveOnly");
+            await AqualLifeStyle.Tests.EntityFrameworkCore.D10ActivationRestartProof.ActivateThroughHostAsync(
+                await UsingDbContextAsync(c=>Task.FromResult(c.Database.GetConnectionString())),config);
             var normal=await cutover.StatusAsync();normal.Phase.ShouldBe("Normal");
             var admission=normal.PhaseEvidence.Last();admission.AdmissionKind.ShouldBe(YocoCutoverPhaseEvidence.EmptyProspectiveV2);
             admission.AdmissionEvidenceDigest.Length.ShouldBe(64);admission.ReconciliationDigest.ShouldBeNull();
