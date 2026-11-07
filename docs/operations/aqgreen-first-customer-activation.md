@@ -79,7 +79,23 @@ prospective LIVE effective instant. V2 VerifiedAuthority records actual verifica
 on/after owner authorization and expires after both verification and effective time.
 Verification may be later than the planned effective instant, but no authority is
 usable before its real verification time and no writes before the effective instant.
-Renewal preserves the Decision/effective epoch and uses genuine current verification.
+
+Commissioning authorization is for **one-time activation**, as explicitly directed
+by the owner. Before first Normal commits, the authorization must remain unexpired;
+the new receipt is checked again at persistence and immediately before commit.
+The existing cutover control JSON atomically records `AQGreenD10ActivationV1` in
+the Normal phase evidence, binding the exact Decision, verified authority, Tenant,
+original timely activation and authorization limit. This adds no database schema.
+
+After that commit, runtime and production startup re-read actual committed state
+and validate its complete phase/activation evidence. Historical authorization
+expiry no longer stops ordinary operations or startup and creates no recurring
+renewal obligation. A later Replay/Normal recovery retains the original activation;
+its independent current reconciliation requirements still apply. Bare, partial,
+foreign, late, future or inconsistent Normal evidence cannot establish activation.
+Removing the commissioning authority after activation also fails closed; it cannot
+silently select V1. Configuration, source/schema, population, Tenant/Area, payment,
+separate approval and financial-worker/payout safeguards remain in force.
 
 `resetBoundaryAuthorizationEvidenceDigest` binds the original reset authority;
 `financialBoundaryEvidenceDigest` binds separate genuine current LIVE authority.

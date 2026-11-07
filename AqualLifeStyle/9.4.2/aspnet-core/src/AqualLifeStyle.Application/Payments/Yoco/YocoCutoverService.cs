@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Abp.Dependency;
 using AqualLifeStyle.Configuration;
 using Microsoft.Extensions.Configuration;
+using AqualLifeStyle.Domain.AQGreen;
 
 namespace AqualLifeStyle.Payments.Yoco
 {
@@ -16,6 +17,7 @@ namespace AqualLifeStyle.Payments.Yoco
     {
         Task VerifyAsync();
         Task<string> VerifyEmptyProspectiveAsync() => Task.FromResult<string>(null);
+        Task<AQGreenD10ActivationReceipt> PrepareActivationAsync(DateTime activationUtc);
     }
     public sealed class YocoCutoverReleaseGate : IYocoCutoverReleaseGate, ITransientDependency
     {
@@ -24,6 +26,7 @@ namespace AqualLifeStyle.Payments.Yoco
         public async Task VerifyAsync()
         { if (!await _runtime.ForTenantAsync(1, true)) throw new InvalidOperationException("YOCO_CUTOVER_D10_RELEASE_REQUIRED"); }
         public Task<string> VerifyEmptyProspectiveAsync() => _runtime.VerifyEmptyProspectiveLaunchAsync();
+        public Task<AQGreenD10ActivationReceipt> PrepareActivationAsync(DateTime activationUtc) => _runtime.PrepareActivationAsync(activationUtc);
     }
     public interface IYocoCutoverDispatcher
     {
@@ -204,8 +207,11 @@ namespace AqualLifeStyle.Payments.Yoco
                     await _release.VerifyAsync(); digest = pin;
                 }
             }
+            var committedAt = DateTimeOffset.UtcNow;
+            var activation = phase == "Normal" ? await _release.PrepareActivationAsync(committedAt.UtcDateTime) : null;
+            if (phase == "Normal" && activation == null) throw new InvalidOperationException("D10_ACTIVATION_RECEIPT_REQUIRED");
             s.PhaseEvidence.Add(new YocoCutoverPhaseEvidence { Phase = phase, OperatorUserId = options.OperatorUserId,
-                CommittedAtUtc = DateTimeOffset.UtcNow, ReconciliationDigest = digest,
+                CommittedAtUtc = committedAt, ReconciliationDigest = digest, D10Activation = activation,
                 AdmissionKind = admissionDigest == null ? null : YocoCutoverPhaseEvidence.EmptyProspectiveV2,
                 AdmissionEvidenceDigest = admissionDigest });
             s.Phase = phase; return true;

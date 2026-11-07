@@ -241,12 +241,12 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             request.Headers.Add("webhook-id",id);request.Headers.Add("webhook-timestamp",ts);request.Headers.Add("webhook-signature",valid?sig:"v1,aW52YWxpZA==");
             return await client.SendAsync(request);
         }
-        private sealed class ReceiverHost : IDisposable
+        internal sealed class ReceiverHost : IDisposable
         {
             private Process _process;private readonly ConcurrentQueue<string> _logs=new();
             public string Address;public string Log=>string.Join("\n",_logs);public int ExitCode=>_process.ExitCode;
             public static Task<ReceiverHost> Start(string dir,string cs,string redis,string cert,bool enabled,HttpClient _,bool operatorConfigured=true,
-                bool cleanStartPending=false)
+                bool cleanStartPending=false,System.Collections.Generic.IReadOnlyDictionary<string,string> environmentOverrides=null)
             {
                 var listener=new TcpListener(IPAddress.Loopback,0);listener.Start();var port=((IPEndPoint)listener.LocalEndpoint).Port;listener.Stop();
                 var host=new ReceiverHost {Address="http://127.0.0.1:"+port};
@@ -271,6 +271,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     start.Environment["App__AQGreenV2__Commissioning__AdmissionMode"]="CLEAN_START";
                     start.Environment["App__AQGreenV2__Commissioning__Enabled"]="false";
                 }
+                if(environmentOverrides!=null)
+                    foreach(var pair in environmentOverrides)start.Environment[pair.Key]=pair.Value;
                 host._process=new Process {StartInfo=start};host._process.OutputDataReceived+=(_,e)=>{if(e.Data!=null)host._logs.Enqueue(e.Data);};
                 host._process.ErrorDataReceived+=(_,e)=>{if(e.Data!=null)host._logs.Enqueue(e.Data);};host._process.Start();host._process.BeginOutputReadLine();host._process.BeginErrorReadLine();return Task.FromResult(host);
             }

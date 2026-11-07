@@ -13,6 +13,7 @@ using AqualLifeStyle.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
+using AqualLifeStyle.Domain.AQGreen;
 
 namespace AqualLifeStyle.EntityFrameworkCore
 {
@@ -31,9 +32,59 @@ namespace AqualLifeStyle.EntityFrameworkCore
             using var uow = _uows.Begin(new UnitOfWorkOptions { Scope = TransactionScopeOption.RequiresNew,
                 IsTransactional = true, IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted });
             var context = await _provider.GetDbContextAsync();
-            var result = await ExecuteAsync(context, action);
+            AQGreenD10ActivationReceipt newActivation = null;
+            var result = await ExecuteAsync(context, async state =>
+            {
+                var wasActivated = state.PhaseEvidence.Any(e => e?.D10Activation != null);
+                var value = await action(state);
+                if (!wasActivated) newActivation = state.PhaseEvidence.FirstOrDefault(e => e?.D10Activation != null)?.D10Activation;
+                return value;
+            });
+            newActivation?.EnsureNewCommitAllowed(DateTime.UtcNow);
             await uow.CompleteAsync(); // No acknowledgement may precede this commit.
             return result;
+        }
+
+        public async Task<YocoCutoverSnapshot> ReadCommittedControlAsync()
+        {
+            // No exclusive lock, save or ambient enlistment: first Normal is not
+            // usable until its owning transaction has actually committed.
+            using var uow = _uows.Begin(new UnitOfWorkOptions { Scope = TransactionScopeOption.RequiresNew,
+                IsTransactional = true, IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted });
+            var context = await _provider.GetDbContextAsync();
+            if (!context.Database.IsNpgsql()) throw new InvalidOperationException("D10_ACTIVATION_REQUIRES_POSTGRESQL");
+            await context.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout='30s'");
+            var controls = await context.Set<BackgroundJobInfo>().AsNoTracking().Where(r => r.JobType == ControlType).Take(2).ToListAsync();
+            if (controls.Count > 1) throw new InvalidOperationException("D10_COMMITTED_ACTIVATION_STORAGE_INVALID");
+            var state = new YocoCutoverSnapshot { HasMigration55 = (await context.Database.GetAppliedMigrationsAsync())
+                .Contains("20261021051549_AddAQGreenSalesEvidenceInvalidation") };
+            if (controls.Count == 1)
+            {
+                var row = controls[0];
+                if (row.IsAbandoned || row.TryCount != 0 || row.NextTryTime != DateTime.MaxValue)
+                    throw new InvalidOperationException("D10_COMMITTED_ACTIVATION_STORAGE_INVALID");
+                using var document = JsonDocument.Parse(row.JobArgs);
+                RejectDuplicateControlFields(document.RootElement);
+                var saved = JsonSerializer.Deserialize<Control>(row.JobArgs);
+                if (saved?.Phase == null || saved.Evidence == null) throw new InvalidOperationException("D10_COMMITTED_ACTIVATION_STORAGE_INVALID");
+                state.Phase = saved.Phase; state.PhaseEvidence = saved.Evidence;
+            }
+            await uow.CompleteAsync(); return state;
+        }
+
+        private static void RejectDuplicateControlFields(JsonElement value)
+        {
+            if (value.ValueKind == JsonValueKind.Object)
+            {
+                var names = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var property in value.EnumerateObject())
+                {
+                    if (!names.Add(property.Name)) throw new InvalidOperationException("D10_COMMITTED_ACTIVATION_STORAGE_INVALID");
+                    RejectDuplicateControlFields(property.Value);
+                }
+            }
+            else if (value.ValueKind == JsonValueKind.Array)
+                foreach (var item in value.EnumerateArray()) RejectDuplicateControlFields(item);
         }
 
         public async Task ReadOnlyAsync(Func<Task> read)
@@ -89,7 +140,10 @@ namespace AqualLifeStyle.EntityFrameworkCore
             }
             if (s.Events.Select(x => x.EventId).Distinct(StringComparer.Ordinal).Count() != s.Events.Count)
                 throw new InvalidOperationException("YOCO_CUTOVER_DUPLICATE_STORAGE_IDENTITY");
+            var hadActivation = s.PhaseEvidence.Any(e => e?.D10Activation != null);
             var result = await action(s);
+            var newActivation = hadActivation ? null : s.PhaseEvidence.FirstOrDefault(e => e?.D10Activation != null)?.D10Activation;
+            newActivation?.EnsureNewCommitAllowed(DateTime.UtcNow);
             if (s.Phase != "Uninitialized")
             {
                 if (control == null) { control = NewRow(ControlType); context.Add(control); }
@@ -103,6 +157,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 if (item.Id == 0) context.Add(row);
             }
             await context.SaveChangesAsync();
+            newActivation?.EnsureNewCommitAllowed(DateTime.UtcNow);
             return result;
         }
 

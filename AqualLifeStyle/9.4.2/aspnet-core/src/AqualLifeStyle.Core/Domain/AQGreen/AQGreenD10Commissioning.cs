@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Abp.Dependency;
+using AqualLifeStyle.Configuration;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json.Serialization;
 
@@ -118,18 +119,40 @@ namespace AqualLifeStyle.Domain.AQGreen
         public DateTime ExpiresAtUtc { get; set; }
     }
 
+    // Stored only by the authorized, atomic Normal transition in the existing
+    // cutover control. It is not a client input, process flag or renewable lease.
+    public sealed class AQGreenD10ActivationReceipt
+    {
+        public const string Contract = "AQGreenD10ActivationV1";
+        [JsonRequired] public string ContractVersion { get; set; }
+        [JsonRequired] public string DecisionDigest { get; set; }
+        [JsonRequired] public string VerifiedAuthorityDigest { get; set; }
+        [JsonRequired] public int TenantId { get; set; }
+        [JsonRequired] public DateTime ActivatedAtUtc { get; set; }
+        [JsonRequired] public DateTime AuthorizationExpiresAtUtc { get; set; }
+
+        public void EnsureNewCommitAllowed(DateTime nowUtc)
+        {
+            AQGreenD10Commissioning.Require(nowUtc.Kind == DateTimeKind.Utc && ActivatedAtUtc.Kind == DateTimeKind.Utc &&
+                AuthorizationExpiresAtUtc.Kind == DateTimeKind.Utc && ActivatedAtUtc <= nowUtc &&
+                nowUtc < AuthorizationExpiresAtUtc, "D10_AUTHORITY_EXPIRED_BEFORE_ACTIVATION_COMMIT");
+        }
+    }
+
     public sealed class AQGreenD10Commissioning
     {
         private readonly byte[] _decision;
         private readonly DateTime _expiresAt;
+        private readonly string _verifiedAuthorityDigest;
         private DateTime? _authorityAuthorizedAt;
         public bool FinancialWorkersCommissioned { get; }
         public AQGreenCleanStartEvidence CleanStartEvidence => _cleanStart == null ? null :
             JsonSerializer.Deserialize<AQGreenCleanStartEvidence>(_cleanStart, AQGreenB6CanonicalEvidence.Options);
         private byte[] _cleanStart;
         public AQGreenD10Decision Decision => JsonSerializer.Deserialize<AQGreenD10Decision>(_decision, AQGreenB6CanonicalEvidence.Options);
-        private AQGreenD10Commissioning(AQGreenD10Decision decision, DateTime expiresAt, bool workersCommissioned)
-        { _decision = AQGreenB6CanonicalEvidence.Bytes(decision); _expiresAt = expiresAt; FinancialWorkersCommissioned = workersCommissioned; }
+        private AQGreenD10Commissioning(AQGreenD10Decision decision, AQGreenD10VerifiedAuthority authority, bool workersCommissioned)
+        { _decision = AQGreenB6CanonicalEvidence.Bytes(decision); _expiresAt = authority.ExpiresAtUtc;
+            _verifiedAuthorityDigest = AQGreenB6CanonicalEvidence.Digest(authority); FinancialWorkersCommissioned = workersCommissioned; }
 
         public static AQGreenD10Commissioning BindVerified(AQGreenD10Decision d,
             AQGreenD10VerifiedAuthority a, JsonObject independentlyVerifiedB6FinalManifest)
@@ -207,7 +230,7 @@ namespace AqualLifeStyle.Domain.AQGreen
                 d.RequiredDatabaseIdentityDigest, d.RequiredSchemaDigest, d.RequiredAssemblyDigest,
                 d.RequiredRuntimeAssemblyDigest }.All(Digest), "D10_PREREQUISITE_EVIDENCE_MISSING");
             Require(a.FinancialWorkersCommissioningEvidenceDigest == null || Digest(a.FinancialWorkersCommissioningEvidenceDigest), "D10_WORKER_AUTHORITY_INVALID");
-            return new AQGreenD10Commissioning(d, a.ExpiresAtUtc, a.FinancialWorkersCommissioningEvidenceDigest != null);
+            return new AQGreenD10Commissioning(d, a, a.FinancialWorkersCommissioningEvidenceDigest != null);
         }
 
         public static AQGreenD10Commissioning BindCleanStartVerified(AQGreenD10Decision d,
@@ -289,14 +312,63 @@ namespace AqualLifeStyle.Domain.AQGreen
                 d.RequiredRuntimeAssemblyDigest }.All(Digest), "D10_PREREQUISITE_EVIDENCE_MISSING");
             Require(a.FinancialWorkersCommissioningEvidenceDigest == null || Digest(a.FinancialWorkersCommissioningEvidenceDigest),
                 "D10_WORKER_AUTHORITY_INVALID");
-            return new AQGreenD10Commissioning(d, a.ExpiresAtUtc, a.FinancialWorkersCommissioningEvidenceDigest != null)
+            return new AQGreenD10Commissioning(d, a, a.FinancialWorkersCommissioningEvidenceDigest != null)
                 { _cleanStart = AQGreenB6CanonicalEvidence.Bytes(e), _authorityAuthorizedAt = postReset ? a.AuthorizedAtUtc : null };
         }
 
         public void EnsureCurrent(DateTime nowUtc)
         {
-            Require(Utc(nowUtc) && nowUtc <= _expiresAt, "D10_AUTHORITY_EXPIRED");
+            Require(Utc(nowUtc) && nowUtc < _expiresAt, "D10_AUTHORITY_EXPIRED");
             Require(!_authorityAuthorizedAt.HasValue || nowUtc >= _authorityAuthorizedAt.Value, "D10_AUTHORITY_NOT_YET_AUTHORIZED");
+        }
+
+        public AQGreenD10ActivationReceipt CreateActivationReceipt(DateTime activationUtc)
+        {
+            EnsureCurrent(activationUtc);
+            Require(activationUtc >= Decision.V2EffectiveAtUtc, "D10_CUTOVER_NOT_EFFECTIVE");
+            return new AQGreenD10ActivationReceipt { ContractVersion = AQGreenD10ActivationReceipt.Contract,
+                DecisionDigest = AQGreenB6CanonicalEvidence.Hash(_decision), VerifiedAuthorityDigest = _verifiedAuthorityDigest,
+                TenantId = Decision.TenantId, ActivatedAtUtc = activationUtc, AuthorizationExpiresAtUtc = _expiresAt };
+        }
+
+        // Null is legitimate only when no Normal activation has ever committed.
+        // A bare/partial Normal record never substitutes for commissioning proof.
+        public AQGreenD10ActivationReceipt VerifyCommittedActivation(YocoCutoverSnapshot state, long operatorUserId, DateTime nowUtc)
+        {
+            const string error = "D10_COMMITTED_ACTIVATION_INVALID";
+            Require(state != null && state.PhaseEvidence != null && Utc(nowUtc) &&
+                new[] { "Uninitialized", "ReceiveOnly", "Replay", "Normal" }.Contains(state.Phase), error);
+            if (state.PhaseEvidence.Count == 0)
+            { Require(state.Phase == "Uninitialized", error); return null; }
+            Require(state.PhaseEvidence.Count <= 256 && state.PhaseEvidence.Last()?.Phase == state.Phase, error);
+            AQGreenD10ActivationReceipt activated = null;
+            DateTimeOffset previousTime = default;
+            string previousPhase = "Uninitialized";
+            foreach (var e in state.PhaseEvidence)
+            {
+                Require(e != null && new[] { "ReceiveOnly", "Replay", "Normal" }.Contains(e.Phase) && e.OperatorUserId > 0 &&
+                    e.CommittedAtUtc != default && e.CommittedAtUtc.Offset == TimeSpan.Zero &&
+                    e.CommittedAtUtc >= previousTime && e.CommittedAtUtc.UtcDateTime <= nowUtc, error);
+                if (e.Phase == "Normal")
+                {
+                    Require(state.HasMigration55 && previousPhase == "Replay" && operatorUserId > 0 && e.OperatorUserId == operatorUserId &&
+                        (Digest(e.ReconciliationDigest) && e.AdmissionKind == null && e.AdmissionEvidenceDigest == null ||
+                         e.ReconciliationDigest == null && e.AdmissionKind == YocoCutoverPhaseEvidence.EmptyProspectiveV2 && Digest(e.AdmissionEvidenceDigest)), error);
+                    var r = e.D10Activation;
+                    Require(r != null && r.ContractVersion == AQGreenD10ActivationReceipt.Contract && r.TenantId == Decision.TenantId &&
+                        r.DecisionDigest == AQGreenB6CanonicalEvidence.Hash(_decision) && r.VerifiedAuthorityDigest == _verifiedAuthorityDigest &&
+                        Utc(r.ActivatedAtUtc) && Utc(r.AuthorizationExpiresAtUtc) && r.AuthorizationExpiresAtUtc == _expiresAt &&
+                        r.ActivatedAtUtc >= Decision.V2EffectiveAtUtc && r.ActivatedAtUtc < _expiresAt &&
+                        (!_authorityAuthorizedAt.HasValue || r.ActivatedAtUtc >= _authorityAuthorizedAt.Value), error);
+                    if (activated == null)
+                    { Require(r.ActivatedAtUtc == e.CommittedAtUtc.UtcDateTime, error); activated = r; }
+                    else Require(AQGreenB6CanonicalEvidence.Digest(activated) == AQGreenB6CanonicalEvidence.Digest(r) &&
+                        r.ActivatedAtUtc <= e.CommittedAtUtc.UtcDateTime, error);
+                }
+                else Require(e.D10Activation == null, error);
+                previousTime = e.CommittedAtUtc; previousPhase = e.Phase;
+            }
+            return activated;
         }
         public bool IsRetiredCleanStartParticipation(AqualLifeStyle.Domain.Onyx.EntryParticipation participant)
         {
