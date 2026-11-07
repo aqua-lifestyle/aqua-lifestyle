@@ -70,7 +70,15 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             { YocoCutoverDispatch.IsAuthorized.ShouldBeTrue();Interlocked.Increment(ref Calls);if(Action!=null) await Action(n,tenant); }
         }
         private sealed class CutoverRelease : IYocoCutoverReleaseGate
-        { public bool Accepted;public Task VerifyAsync(){if(!Accepted)throw new InvalidOperationException("synthetic D10 hold");return Task.CompletedTask;} }
+        {
+            public bool Accepted;
+            public Task VerifyAsync(){if(!Accepted)throw new InvalidOperationException("synthetic D10 hold");return Task.CompletedTask;}
+            public Task<AqualLifeStyle.Domain.AQGreen.AQGreenD10ActivationReceipt> PrepareActivationAsync(DateTime at)=>
+                Task.FromResult(new AqualLifeStyle.Domain.AQGreen.AQGreenD10ActivationReceipt {
+                    ContractVersion=AqualLifeStyle.Domain.AQGreen.AQGreenD10ActivationReceipt.Contract,
+                    DecisionDigest=new string('a',64),VerifiedAuthorityDigest=new string('b',64),TenantId=1,
+                    ActivatedAtUtc=at,AuthorizationExpiresAtUtc=at.AddHours(1)});
+        }
         private sealed class CutoverReconciliation : IYocoCutoverReconciliationSource
         {
             public YocoCutoverReconciliation Manifest;

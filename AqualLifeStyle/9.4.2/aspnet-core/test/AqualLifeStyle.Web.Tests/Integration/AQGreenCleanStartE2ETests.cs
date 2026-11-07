@@ -41,6 +41,8 @@ namespace AqualLifeStyle.Web.Tests.Integration
             var resetBoundary=x.Decision.CleanStartResetBoundaryUtc.Value;
             config["App:FinancialOperations:Enabled"]="true";
             config["App:BackgroundJobs:Enabled"]="false";
+            config["App:AutomaticPayouts:Enabled"]="false";
+            config["Bird:Enabled"]="true";
             config["Yoco:Mode"]="live";
             x.Decision.RequiredConfigurationDigest=AQGreenD10Commissioning.ConfigurationDigest(config);
             x.Decision.CleanStartRootCustomerId=null;
@@ -148,6 +150,25 @@ namespace AqualLifeStyle.Web.Tests.Integration
             var cutover=new YocoCutoverService(store,null,null,new YocoCutoverReconciliationSource(config),config,
                 new YocoCutoverReleaseGate(runtime));
             await cutover.SetPhaseAsync("Replay");
+            var originalExpiry=x.Authority.ExpiresAtUtc;
+            x.Authority.ExpiresAtUtc=DateTime.UtcNow.AddMilliseconds(-1);
+            AQGreenCleanStartCommissioningTests.Sign(x,clean);
+            source.Current=AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,clean);
+            (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.VerifyStartupAsync())).Message.ShouldBe("D10_AUTHORITY_EXPIRED");
+            (await Should.ThrowAsync<InvalidOperationException>(()=>cutover.SetPhaseAsync("Normal"))).Message.ShouldBe("D10_AUTHORITY_EXPIRED");
+            // Even a complete-looking in-flight Normal cannot waive expiry. The
+            // separate read sees only Replay and the owning transaction rolls back.
+            (await Should.ThrowAsync<InvalidOperationException>(()=>store.TransactAsync(async pending=>
+            {
+                var at=x.Authority.ExpiresAtUtc.AddTicks(-1);
+                pending.Phase="Normal";pending.PhaseEvidence.Add(new(){Phase="Normal",OperatorUserId=AbpSession.UserId.Value,
+                    CommittedAtUtc=new DateTimeOffset(at),AdmissionKind=YocoCutoverPhaseEvidence.EmptyProspectiveV2,
+                    AdmissionEvidenceDigest=new string('a',64),D10Activation=source.Current.CreateActivationReceipt(at)});
+                await runtime.VerifyStartupAsync();return true;
+            }))).Message.ShouldBe("D10_AUTHORITY_EXPIRED");
+            (await store.ReadCommittedControlAsync()).Phase.ShouldBe("Replay");
+            x.Authority.ExpiresAtUtc=originalExpiry;AQGreenCleanStartCommissioningTests.Sign(x,clean);
+            source.Current=AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,clean);
             var current=source.Current;var effective=x.Decision.V2EffectiveAtUtc;
             x.Decision.V2EffectiveAtUtc=x.Authority.V2EffectiveAtUtc=DateTime.UtcNow.AddHours(1);
             AQGreenCleanStartCommissioningTests.Sign(x,clean);
@@ -175,10 +196,38 @@ namespace AqualLifeStyle.Web.Tests.Integration
             config[YocoCutoverOptions.Prefix+"ReconciliationPath"]=null;
             config[YocoCutoverOptions.Prefix+"ReconciliationSha256"]=null;
             config[YocoCutoverOptions.Prefix+"ReconciliationJsonBase64"]=null;
+            // A bounded test-only authorization really expires on the wall clock;
+            // every remaining member/payment/approval/progress operation is later.
+            x.Authority.ExpiresAtUtc=DateTime.UtcNow.AddSeconds(10);
+            AQGreenCleanStartCommissioningTests.Sign(x,clean);
+            PostResetOperatorTransportTests.Install(config,x.Decision,x.Authority,clean);
+            source.Current=new AqualLifeStyle.Web.Host.Startup.AQGreenD10OperatorEvidenceSource(config).Read();
             await cutover.SetPhaseAsync("Normal");
             var normal=await cutover.StatusAsync();normal.Phase.ShouldBe("Normal");
             var admission=normal.PhaseEvidence.Last();admission.AdmissionKind.ShouldBe(YocoCutoverPhaseEvidence.EmptyProspectiveV2);
             admission.AdmissionEvidenceDigest.Length.ShouldBe(64);admission.ReconciliationDigest.ShouldBeNull();
+            admission.D10Activation.ShouldNotBeNull();
+            admission.D10Activation.ActivatedAtUtc.ShouldBeLessThan(x.Authority.ExpiresAtUtc);
+            var wait=x.Authority.ExpiresAtUtc-DateTime.UtcNow;
+            if(wait>TimeSpan.Zero)await Task.Delay(wait+TimeSpan.FromMilliseconds(50));
+            Should.Throw<InvalidOperationException>(()=>source.Current.EnsureCurrent(DateTime.UtcNow)).Message.ShouldBe("D10_AUTHORITY_EXPIRED");
+            // Rehydrate the pinned authority and a new transient runtime, exactly
+            // as startup does; no cached in-memory success is carried forward.
+            source.Current=new AqualLifeStyle.Web.Host.Startup.AQGreenD10OperatorEvidenceSource(config).Read();
+            runtime=Resolve<AQGreenD10Runtime>();await runtime.VerifyStartupAsync();
+            var rootAddress=config["App:ServerRootAddress"];config["App:ServerRootAddress"]="https://drift.example.test";
+            (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.VerifyStartupAsync())).Message.ShouldBe("D10_CONFIGURATION_MISMATCH");
+            config["App:ServerRootAddress"]=rootAddress;
+            config["App:AutomaticPayouts:Enabled"]="true";
+            (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.VerifyStartupAsync())).Message.ShouldBe("YOCO_CUTOVER_AUTOMATION_MUST_BE_HELD");
+            config["App:AutomaticPayouts:Enabled"]="false";
+            await runtime.VerifyStartupAsync();
+            var activatedSource=source.Current;source.Current=null;
+            (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.VerifyStartupAsync()))
+                .Message.ShouldBe("D10_AUTHORITY_MISSING_FOR_COMMITTED_ACTIVATION");
+            source.Current=activatedSource;
+            await AqualLifeStyle.Tests.EntityFrameworkCore.D10ActivationRestartProof.VerifyAsync(
+                await UsingDbContextAsync(c=>Task.FromResult(c.Database.GetConnectionString())),config);
             await using var businessLease=await store.EnterBusinessAsync();
             using var businessScope=YocoCutoverDispatch.EnterBusiness();
             // New V1 financial activity on an old shared Customer is not a change

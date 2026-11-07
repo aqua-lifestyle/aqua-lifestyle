@@ -291,6 +291,15 @@ event. Replay rechecks the actual checkout's Tenant/reference/purpose/amount/
 currency/mode, uses the existing payment locks/receipt idempotency and commits
 business effects together with the replay status. Original raw evidence remains.
 Verified test events retain their existing no-business-effect behavior.
+
+The first successful Normal transaction also commits the versioned D10 activation
+binding in the existing phase evidence. Its commissioning authorization must be
+unexpired through that commit. Subsequent operations/startup validate the actual
+committed activation and independent integrity safeguards without imposing the
+historical commissioning deadline on normal business. Later Normal recovery keeps
+the original activation binding. This does not waive the separate current merchant
+manifest expiry or any actual-debt/replay check. See the
+[one-time lifecycle](aqgreen-first-customer-activation.md#post-reset-chronology-and-actual-authority).
 Retired financial-baseline changes, allocation exceptions, missing checkout
 relationships and other unresolved cases remain held. They cannot be silently
 made compatible with the immutable conservation/D10 baseline. Resolve such a

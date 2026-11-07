@@ -175,6 +175,8 @@ namespace AqualLifeStyle.Configuration
         public string AdmissionKind { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string AdmissionEvidenceDigest { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public Domain.AQGreen.AQGreenD10ActivationReceipt D10Activation { get; set; }
     }
 
     public interface IYocoCutoverStore
@@ -186,5 +188,9 @@ namespace AqualLifeStyle.Configuration
         // Reviewed HTTP reads join a bounded, server-enforced read-only UOW.
         // It is rolled back, never used as authorization for business writes.
         Task ReadOnlyAsync(Func<Task> read);
+        // Actual committed control only, without taking the phase-change lock or
+        // joining an activation transaction. Unknown storage must fail closed.
+        Task<YocoCutoverSnapshot> ReadCommittedControlAsync() =>
+            throw new InvalidOperationException("D10_COMMITTED_ACTIVATION_READ_UNAVAILABLE");
     }
 }

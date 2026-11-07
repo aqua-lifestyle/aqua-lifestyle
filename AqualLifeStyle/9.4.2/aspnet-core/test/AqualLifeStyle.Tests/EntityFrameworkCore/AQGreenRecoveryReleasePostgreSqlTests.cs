@@ -296,15 +296,17 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                 }
                 catch { redis.Dispose(); throw; }
             }
-            public static async Task<string> DockerAsync(params string[] arguments)
+            public static Task<string> DockerAsync(params string[] arguments) => DockerAsync(TimeSpan.FromSeconds(30), arguments);
+            public static async Task<string> DockerAsync(TimeSpan maximumDuration, params string[] arguments)
             {
                 var start = new ProcessStartInfo("docker") { UseShellExecute = false,
                     RedirectStandardOutput = true, RedirectStandardError = true };
                 foreach (var argument in arguments) start.ArgumentList.Add(argument);
                 using var process = Process.Start(start); var output = process.StandardOutput.ReadToEndAsync();
                 var error = process.StandardError.ReadToEndAsync();
-                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-                await process.WaitForExitAsync(timeout.Token);
+                using var timeout = new CancellationTokenSource(maximumDuration);
+                try { await process.WaitForExitAsync(timeout.Token); }
+                catch (OperationCanceledException) { if (!process.HasExited) process.Kill(entireProcessTree: true); throw; }
                 if (process.ExitCode != 0) throw new InvalidOperationException("Synthetic Redis command failed: " + await error);
                 return await output;
             }

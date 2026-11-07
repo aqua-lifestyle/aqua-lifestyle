@@ -38,29 +38,34 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         private readonly IRepository<CustomerAreaAssignment, Guid> _areaAssignments;
         private readonly IHostedPaymentCheckoutLock _areaLocks;
         private readonly IRepository<AQGreenProspectiveRootAdmission, Guid> _rootAdmissions;
+        private readonly IYocoCutoverStore _cutover;
         public AQGreenD10Runtime(IAQGreenD10CommissioningSource source, IConfiguration configuration,
             IUnitOfWorkManager uows, IRepository<EntryParticipation, Guid> participations,
             ICustomerRepository customers, IRepository<AQGreenNetworkPlacement, Guid> placements, IAbpSession session,
             IRepository<Membership, int> memberships, IAQGreenReconciliationEvidenceSnapshot snapshot,
             IRepository<EntryCommissionPeriod, Guid> periods, IRepository<EntryWeeklyCommission, Guid> commissions,
             IRepository<Area, Guid> areas, IRepository<CustomerAreaAssignment, Guid> areaAssignments,
-            IHostedPaymentCheckoutLock areaLocks, IRepository<AQGreenProspectiveRootAdmission, Guid> rootAdmissions)
+            IHostedPaymentCheckoutLock areaLocks, IRepository<AQGreenProspectiveRootAdmission, Guid> rootAdmissions,
+            IYocoCutoverStore cutover)
         { _source = source; _configuration = configuration; _uows = uows; _participations = participations;
             _customers = customers; _placements = placements; _session = session; _memberships = memberships; _snapshot = snapshot;
             _periods = periods; _commissions = commissions; _areas = areas; _areaAssignments = areaAssignments; _areaLocks = areaLocks;
-            _rootAdmissions = rootAdmissions; }
+            _rootAdmissions = rootAdmissions; _cutover = cutover; }
 
         public async Task VerifyStartupAsync()
         {
             var authority = _source.Read();
             if (authority == null)
             {
+                var control = await _cutover.ReadCommittedControlAsync();
+                AQGreenD10Commissioning.Require(control.Phase != "Normal" && !control.PhaseEvidence
+                    .Any(e => e?.D10Activation != null || e?.Phase == "Normal"), "D10_AUTHORITY_MISSING_FOR_COMMITTED_ACTIVATION");
                 using var uow = _uows.Begin();
                 using (_uows.Current.DisableFilter(AbpDataFilters.MustHaveTenant, AbpDataFilters.MayHaveTenant))
                     AQGreenD10Commissioning.Require(!await _placements.GetAll().AnyAsync(), "D10_AUTHORITY_MISSING_FOR_EXISTING_V2_STATE");
                 await uow.CompleteAsync(); return;
             }
-            Check(authority);
+            await CheckAsync(authority);
             await VerifyPopulationAsync(authority.Decision, cleanStart: authority.CleanStartEvidence);
             using var check = _uows.Begin();
             using (_uows.Current.DisableFilter(AbpDataFilters.MustHaveTenant, AbpDataFilters.MayHaveTenant))
@@ -69,10 +74,23 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             await check.CompleteAsync();
         }
 
-        private void Check(AQGreenD10Commissioning authority)
+        private async Task<AQGreenD10ActivationReceipt> CheckAsync(AQGreenD10Commissioning authority)
         {
             ApplicationRecoveryMode.DenyBusinessOperation(_configuration);
-            authority.EnsureCurrent(DateTime.UtcNow); authority.EnsureConfiguration(_configuration);
+            var committed = authority.VerifyCommittedActivation(await _cutover.ReadCommittedControlAsync(),
+                new YocoCutoverOptions(_configuration).OperatorUserId, DateTime.UtcNow);
+            if (committed == null) authority.EnsureCurrent(DateTime.UtcNow);
+            authority.EnsureConfiguration(_configuration);
+            return committed;
+        }
+
+        public async Task<AQGreenD10ActivationReceipt> PrepareActivationAsync(DateTime activationUtc)
+        {
+            var authority = _source.Read();
+            AQGreenD10Commissioning.Require(authority != null, "D10_ACTIVATION_AUTHORITY_REQUIRED");
+            // A renewed Normal transition retains the original timely activation;
+            // an uncommitted transaction cannot supply this read's receipt.
+            return await CheckAsync(authority) ?? authority.CreateActivationReceipt(activationUtc);
         }
 
         public async Task EnsureFinancialWorkersAsync()
@@ -83,7 +101,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 await VerifyStartupAsync(); // Uncommissioned V2 state cannot be processed by a legacy worker either.
                 return;
             }
-            Check(authority);
+            await CheckAsync(authority);
             AQGreenD10Commissioning.Require(authority.FinancialWorkersCommissioned && DateTime.UtcNow >= authority.Decision.V2EffectiveAtUtc,
                 "D10_FINANCIAL_WORKER_AUTHORITY_MISSING_OR_NOT_EFFECTIVE");
             await VerifyStartupAsync(); // Verify before either AQGreen or Onyx financial work can start.
@@ -97,13 +115,17 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             var a = _source.Read();
             if (a == null || a.Decision.TenantId != tenantId)
             {
+                var control = await _cutover.ReadCommittedControlAsync();
+                AQGreenD10Commissioning.Require(!(tenantId == 1 && control.Phase == "Normal") && !control.PhaseEvidence
+                    .Any(e => e?.D10Activation?.TenantId == tenantId || tenantId == 1 && e?.Phase == "Normal"),
+                    "D10_AUTHORITY_MISSING_FOR_COMMITTED_ACTIVATION");
                 using var legacy = _uows.Begin();
                 using (_uows.Current.DisableFilter(AbpDataFilters.MustHaveTenant, AbpDataFilters.MayHaveTenant))
                     AQGreenD10Commissioning.Require(!await _placements.GetAll().AnyAsync(p => p.TenantId == tenantId),
                         "D10_AUTHORITY_MISSING_FOR_EXISTING_V2_STATE");
                 await legacy.CompleteAsync(); return false;
             }
-            Check(a); var d = a.Decision;
+            await CheckAsync(a); var d = a.Decision;
             if (financialCutoff.HasValue)
             {
                 AQGreenD10Commissioning.Require(financialCutoff != default(DateTime) && financialCutoff.Value.Kind == DateTimeKind.Utc,
@@ -199,7 +221,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             var authority = _source.Read();
             AQGreenD10Commissioning.Require(authority != null && authority.Decision.TenantId == tenantId,
                 "D10_JOINING_AUTHORITY_CHANGED");
-            Check(authority);
+            await CheckAsync(authority);
             AQGreenD10Commissioning.Require(destinationAreaId != Guid.Empty &&
                 authority.Decision.AuthorizedAreaIds.Contains(destinationAreaId), "D10_JOINING_DESTINATION_OUTSIDE_AUTHORIZED_SCOPE");
             // The invitation resolver owns ordered sponsor/invitee Area-transition locks.

@@ -22,6 +22,11 @@ namespace AqualLifeStyle.Tests.WebHost
             public int EmptyCalls;
             public bool Accepted=true;
             public Task VerifyAsync()=>Task.CompletedTask;
+            public Task<AqualLifeStyle.Domain.AQGreen.AQGreenD10ActivationReceipt> PrepareActivationAsync(DateTime at)=>
+                Task.FromResult(new AqualLifeStyle.Domain.AQGreen.AQGreenD10ActivationReceipt {
+                    ContractVersion=AqualLifeStyle.Domain.AQGreen.AQGreenD10ActivationReceipt.Contract,
+                    DecisionDigest=new string('a',64),VerifiedAuthorityDigest=new string('b',64),TenantId=1,
+                    ActivatedAtUtc=at,AuthorizationExpiresAtUtc=at.AddHours(1)});
             public Task<string> VerifyEmptyProspectiveAsync(){EmptyCalls++;return Task.FromResult(Accepted?new string('b',64):null);}
         }
         private sealed class Manifest : IYocoCutoverReconciliationSource
