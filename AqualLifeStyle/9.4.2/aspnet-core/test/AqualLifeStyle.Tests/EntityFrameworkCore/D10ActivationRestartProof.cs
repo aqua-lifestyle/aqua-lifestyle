@@ -29,7 +29,9 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             overrides["Yoco__SecretKey"]="sk_live_synthetic_restart_not_a_real_credential";
             // Prepare this proof's existing fixture explicitly. Do not depend on
             // a developer cache or change the immutable CI workflow/trust root.
-            await AQGreenMigrationRollbackPostgreSqlTests.RecoveryRedis.DockerAsync("pull","redis:7-alpine");
+            try { await AQGreenMigrationRollbackPostgreSqlTests.RecoveryRedis.DockerAsync("image","inspect","redis:7-alpine"); }
+            catch(InvalidOperationException e) when(e.Message.Contains("No such image: redis:7-alpine",StringComparison.Ordinal))
+            { await AQGreenMigrationRollbackPostgreSqlTests.RecoveryRedis.DockerAsync(TimeSpan.FromMinutes(2),"pull","redis:7-alpine"); }
             using var redis=await AQGreenMigrationRollbackPostgreSqlTests.RecoveryRedis.StartAsync();
             using var rsa=RSA.Create(2048);
             var request=new CertificateRequest("CN=Synthetic D10 restart",rsa,HashAlgorithmName.SHA256,RSASignaturePadding.Pkcs1);

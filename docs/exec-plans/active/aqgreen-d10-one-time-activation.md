@@ -79,3 +79,10 @@ CI `42340527674/1` correctly rejected that immutable mandatory-source change.
 Restore the original workflow bytes and prepare the existing image in the new
 restart proof using the fixture's existing Docker command helper. No trust root,
 production behavior, assertion or fixture's no-pull startup rule is weakened.
+
+The local unconditional preparation pull timed out despite an existing image.
+Preparation now first verifies the exact fixture image locally, and pulls it only
+on Docker's explicit `No such image` result. Other Docker errors remain failures;
+image acquisition has a bounded two-minute setup deadline while existing fixture
+commands retain thirty seconds. This is dependency preparation, not a skipped
+restart proof or an allowed business fallback.
