@@ -319,6 +319,12 @@ namespace AqualLifeStyle.Domain.AQGreen
         public void EnsureCurrent(DateTime nowUtc)
         {
             Require(Utc(nowUtc) && nowUtc < _expiresAt, "D10_AUTHORITY_EXPIRED");
+            EnsureVerificationTime(nowUtc);
+        }
+
+        public void EnsureVerificationTime(DateTime nowUtc)
+        {
+            Require(Utc(nowUtc), "D10_AUTHORITY_TIME_INVALID");
             Require(!_authorityAuthorizedAt.HasValue || nowUtc >= _authorityAuthorizedAt.Value, "D10_AUTHORITY_NOT_YET_AUTHORIZED");
         }
 

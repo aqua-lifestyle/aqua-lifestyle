@@ -65,7 +65,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                     AQGreenD10Commissioning.Require(!await _placements.GetAll().AnyAsync(), "D10_AUTHORITY_MISSING_FOR_EXISTING_V2_STATE");
                 await uow.CompleteAsync(); return;
             }
-            await CheckAsync(authority);
+            await CheckAsync(authority, startupOnly: true);
             await VerifyPopulationAsync(authority.Decision, cleanStart: authority.CleanStartEvidence);
             using var check = _uows.Begin();
             using (_uows.Current.DisableFilter(AbpDataFilters.MustHaveTenant, AbpDataFilters.MayHaveTenant))
@@ -83,12 +83,16 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             await VerifyStartupAsync();
         }
 
-        private async Task<AQGreenD10ActivationReceipt> CheckAsync(AQGreenD10Commissioning authority)
+        private async Task<AQGreenD10ActivationReceipt> CheckAsync(AQGreenD10Commissioning authority, bool startupOnly = false)
         {
             ApplicationRecoveryMode.DenyBusinessOperation(_configuration);
             var committed = authority.VerifyCommittedActivation(await _cutover.ReadCommittedControlAsync(),
                 new YocoCutoverOptions(_configuration).OperatorUserId, DateTime.UtcNow);
-            if (committed == null) authority.EnsureCurrent(DateTime.UtcNow);
+            if (committed == null)
+            {
+                if (startupOnly) authority.EnsureVerificationTime(DateTime.UtcNow);
+                else authority.EnsureCurrent(DateTime.UtcNow);
+            }
             authority.EnsureConfiguration(_configuration);
             return committed;
         }
