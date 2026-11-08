@@ -97,6 +97,15 @@ Removing the commissioning authority after activation also fails closed; it cann
 silently select V1. Configuration, source/schema, population, Tenant/Area, payment,
 separate approval and financial-worker/payout safeguards remain in force.
 
+An expired **unused** grant is also a safe startup/readiness hold: the API keeps
+serving Healthy/Held after verifying its evidence, configuration, release/schema,
+population and actual non-Normal state. Expiry is still enforced by joining,
+financial workers, activation receipt creation and the actual Normal transaction.
+An expired grant cannot commission the programme. Future/unverified, corrupt or
+inconsistent evidence is not converted into a healthy hold. Do not extend/backdate
+an unused grant to recover availability; restore the complete held configuration
+or issue a fresh grant only for a genuinely coordinated activation.
+
 `resetBoundaryAuthorizationEvidenceDigest` binds the original reset authority;
 `financialBoundaryEvidenceDigest` binds separate genuine current LIVE authority.
 Retirement permission is not financial permission. Historical state comparisons and

@@ -154,8 +154,14 @@ namespace AqualLifeStyle.Web.Tests.Integration
             x.Authority.ExpiresAtUtc=DateTime.UtcNow.AddMilliseconds(-1);
             AQGreenCleanStartCommissioningTests.Sign(x,clean);
             source.Current=AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,clean);
-            (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.VerifyStartupAsync())).Message.ShouldBe("D10_AUTHORITY_EXPIRED");
+            await runtime.VerifyStartupAsync(); // Expired unused authority is an available, nonfinancial hold.
+            await runtime.VerifySelectedStartupAsync(1);
             (await Should.ThrowAsync<InvalidOperationException>(()=>cutover.SetPhaseAsync("Normal"))).Message.ShouldBe("D10_AUTHORITY_EXPIRED");
+            (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.ForTenantAsync(1,true))).Message.ShouldBe("D10_AUTHORITY_EXPIRED");
+            PostResetOperatorTransportTests.Install(config,x.Decision,x.Authority,clean);
+            for(var restart=0;restart<2;restart++)
+                await AqualLifeStyle.Tests.EntityFrameworkCore.D10ActivationRestartProof.ActivateThroughHostAsync(
+                    await UsingDbContextAsync(c=>Task.FromResult(c.Database.GetConnectionString())),config,expiredUnused:true);
             // Even a complete-looking in-flight Normal cannot waive expiry. The
             // separate read sees only Replay and the owning transaction rolls back.
             (await Should.ThrowAsync<InvalidOperationException>(()=>store.TransactAsync(async pending=>
@@ -164,10 +170,11 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 pending.Phase="Normal";pending.PhaseEvidence.Add(new(){Phase="Normal",OperatorUserId=AbpSession.UserId.Value,
                     CommittedAtUtc=new DateTimeOffset(at),AdmissionKind=YocoCutoverPhaseEvidence.EmptyProspectiveV2,
                     AdmissionEvidenceDigest=new string('a',64),D10Activation=source.Current.CreateActivationReceipt(at)});
-                await runtime.VerifyStartupAsync();return true;
+                await runtime.ForTenantAsync(1,true);return true;
             }))).Message.ShouldBe("D10_AUTHORITY_EXPIRED");
             (await store.ReadCommittedControlAsync()).Phase.ShouldBe("Replay");
             x.Authority.ExpiresAtUtc=originalExpiry;AQGreenCleanStartCommissioningTests.Sign(x,clean);
+            PostResetOperatorTransportTests.Install(config,x.Decision,x.Authority,clean);
             source.Current=AQGreenD10Commissioning.BindCleanStartVerified(x.Decision,x.Authority,clean);
             var current=source.Current;var effective=x.Decision.V2EffectiveAtUtc;
             x.Decision.V2EffectiveAtUtc=x.Authority.V2EffectiveAtUtc=DateTime.UtcNow.AddHours(1);

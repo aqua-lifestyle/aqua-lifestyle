@@ -23,7 +23,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
     // Real Production child processes, synthetic keys, no provider network calls.
     public static class D10ActivationRestartProof
     {
-        public static async Task ActivateThroughHostAsync(string connectionString,IConfiguration configuration)
+        public static async Task ActivateThroughHostAsync(string connectionString,IConfiguration configuration,bool expiredUnused=false)
         {
             var root=new DirectoryInfo(AppContext.BaseDirectory);
             while(root!=null&&!File.Exists(Path.Combine(root.FullName,"AqualLifeStyle.sln")))root=root.Parent;
@@ -63,6 +63,16 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             (await client.GetAsync(host.Address+"/api/operations/yoco-cutover/status")).StatusCode.ShouldBe(HttpStatusCode.OK);
             async Task<HttpResponseMessage> Phase(string phase)=>await client.PostAsync(host.Address+"/api/operations/yoco-cutover/phase",
                 new StringContent("{\"phase\":\""+phase+"\"}",Encoding.UTF8,"application/json"));
+            if(expiredUnused)
+            {
+                (await Phase("Replay")).StatusCode.ShouldBe(HttpStatusCode.OK);
+                var denied=await Phase("Normal");denied.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+                Payload(await denied.Content.ReadAsStringAsync())["status"].GetValue<string>().ShouldBe("Held");
+                var stillHeld=Payload(await client.GetStringAsync(host.Address+"/api/health"));
+                stillHeld["status"].GetValue<string>().ShouldBe("Healthy");stillHeld["paymentAvailability"].GetValue<string>().ShouldBe("Held");
+                Payload(await client.GetStringAsync(host.Address+"/api/operations/yoco-cutover/status"))["phase"].GetValue<string>().ShouldBe("Replay");
+                return; // No Normal/activation evidence may be created by an expired unused grant.
+            }
             (await Phase("Normal")).StatusCode.ShouldBe(HttpStatusCode.Conflict); // Current source is ReceiveOnly, not Replay.
             foreach(var phase in new[]{"Replay","Normal"})
             {
