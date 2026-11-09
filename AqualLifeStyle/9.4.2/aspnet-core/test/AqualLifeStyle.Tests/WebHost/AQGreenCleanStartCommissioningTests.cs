@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Web.Host.Startup;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Shouldly;
 using Xunit;
 
@@ -388,6 +389,58 @@ namespace AqualLifeStyle.Tests.WebHost
             commissioned.FinancialWorkersCommissioned.ShouldBeTrue();commissioned.EnsureConfiguration(config);
             config["App:AutomaticPayouts:Enabled"]="true";
             Should.Throw<InvalidOperationException>(()=>commissioned.EnsureConfiguration(config)).Message.ShouldBe("D10_CLEAN_START_AUTOMATIC_PAYOUTS_HELD");
+        }
+
+        [Fact]
+        public void IntendedLiveDigestBindsWeeklyOptInWhileKeepingGeneralJobsAndPayoutsHeld()
+        {
+            var held = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string>
+            {
+                ["App:Recovery:Enabled"] = "false",
+                ["App:WeeklyCommissions:Enabled"] = "false",
+                ["App:EntryMonthlyObligations:Enabled"] = "false",
+                ["Bird:Enabled"] = "true",
+                ["Yoco:Mode"] = "live",
+                ["AQGreenV2Demo:Enabled"] = "false",
+                ["AQGreenV2Pilot:Enabled"] = "false",
+                ["App:ServerRootAddress"] = "https://api.example.test",
+                ["App:ClientRootAddress"] = "https://app.example.test",
+                ["App:CorsOrigins"] = "https://app.example.test",
+                ["Deployment:EnvironmentId"] = "held-environment",
+                ["Deployment:BuildId"] = "held-build",
+                ["App:AutomaticPayouts:Enabled"] = "false",
+                ["App:FinancialOperations:Enabled"] = "false",
+                ["App:BackgroundJobs:Enabled"] = "false"
+            }).Build();
+
+            var intended = AQGreenD10Commissioning.IntendedLiveJoiningConfigurationDigest(
+                held, "production-release", new string('a', 40));
+            var liveValues = new Dictionary<string, string>
+            {
+                ["App:Recovery:Enabled"] = "false",
+                ["App:WeeklyCommissions:Enabled"] = "true",
+                ["App:EntryMonthlyObligations:Enabled"] = "false",
+                ["Bird:Enabled"] = "true",
+                ["Yoco:Mode"] = "live",
+                ["AQGreenV2Demo:Enabled"] = "false",
+                ["AQGreenV2Pilot:Enabled"] = "false",
+                ["App:ServerRootAddress"] = "https://api.example.test",
+                ["App:ClientRootAddress"] = "https://app.example.test",
+                ["App:CorsOrigins"] = "https://app.example.test",
+                ["Deployment:EnvironmentId"] = "production-release",
+                ["Deployment:BuildId"] = new string('a', 40),
+                ["App:AutomaticPayouts:Enabled"] = "false",
+                ["App:FinancialOperations:Enabled"] = "true",
+                ["App:BackgroundJobs:Enabled"] = "false"
+            };
+            AQGreenD10Commissioning.ConfigurationDigest(
+                new ConfigurationBuilder().AddInMemoryCollection(liveValues).Build()).ShouldBe(intended);
+
+            held["App:WeeklyCommissions:Enabled"] = "true";
+            Should.Throw<InvalidOperationException>(() =>
+                AQGreenD10Commissioning.IntendedLiveJoiningConfigurationDigest(
+                    held, "production-release", new string('a', 40)))
+                .Message.ShouldBe("D10_CAPTURE_REQUIRES_WEEKLY_COMMISSION_HELD");
         }
 
         [Fact]

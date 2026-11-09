@@ -147,6 +147,28 @@ namespace AqualLifeStyle.Web.Host.Startup
                 IocManager.Resolve<IBackgroundWorkerManager>().Add(
                     IocManager.Resolve<TransactionalEmailOutboxWorker>());
 
+            var cleanStartCommissioning =
+                _appConfiguration["App:AQGreenV2:Commissioning:Enabled"] == "true" &&
+                _appConfiguration["App:AQGreenV2:Commissioning:AdmissionMode"] == "CLEAN_START";
+            if (cleanStartCommissioning)
+            {
+                // The V2 worker is a periodic application worker, not an ABP
+                // queued job. It owns only AQGreen calculation and requires the
+                // committed-Normal/D10 checks at each execution. Never also
+                // register the combined AQGreen+Onyx worker in this profile.
+                var pilot = AQGreenV2PilotConfiguration.Validate(_env, _appConfiguration);
+                var demo = AQGreenV2DemoConfiguration.Validate(_env, _appConfiguration);
+                var cutover = new YocoCutoverOptions(_appConfiguration);
+                if (!pilot && !demo && !ApplicationRecoveryMode.IsEnabled(_appConfiguration) &&
+                    !cutover.CompatibilityReceiver && cutover.Enabled &&
+                    _appConfiguration.GetValue<bool>("App:WeeklyCommissions:Enabled"))
+                {
+                    IocManager.Resolve<IBackgroundWorkerManager>().Add(
+                        IocManager.Resolve<AQGreenV2WeeklyCommissionCalculationWorker>());
+                    return;
+                }
+            }
+
             if (new YocoCutoverOptions(_appConfiguration).Enabled || ApplicationRecoveryMode.IsEnabled(_appConfiguration) ||
                 AQGreenV2PilotConfiguration.Validate(_env, _appConfiguration))
                 return; // Recovery and pilot never register provider or financial workers.
