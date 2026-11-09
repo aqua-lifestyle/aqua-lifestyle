@@ -30,6 +30,31 @@ App__WeeklyCommissions__Enabled=false/unset
 App__EntryMonthlyObligations__Enabled=false/unset
 ```
 
+## AQGreen V2 isolated weekly worker (implemented, not enabled)
+
+The Clean Start V2 profile now has a dedicated AQGreen-only periodic worker
+that calls the existing `CalculateEntryAsync` calculator. Its opt-in is
+`App__WeeklyCommissions__Enabled`; it does not use the ABP general background
+job switch. The combined AQGreen/Onyx worker is not registered when this
+isolated worker is registered. Other profiles retain the existing worker path.
+
+Each run requires the selected D10 financial-worker authority, valid committed
+Yoco Normal, clean cutover business lease, eligible tenant and an eligible
+closed Johannesburg week. An unused first-activation authorization remains
+strictly expiry-bound. A timely committed Normal receipt remains verifiable
+after that first-use expiry. The worker calculates records only; it has no
+Onyx, travel-benefit, payout or provider operation. Release and payment remain
+separately authorized administrative operations.
+
+The intended D10 live configuration binds Weekly=true and
+FinancialOperations=true while keeping BackgroundJobs, monthly obligations
+and automatic payouts false. Capture still requires Weekly=false. Before any
+LIVE enablement, independently verify the effective
+`App__AutomaticPayouts__Enabled=false` setting and qualify all selected D10 and
+financial eligibility evidence. This implementation does not establish that
+production configuration readback, authorize configuration changes, or enable
+the worker.
+
 ## Purpose and boundary
 
 The engine records a deterministic weekly ledger. It does not release a

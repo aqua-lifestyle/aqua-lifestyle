@@ -409,12 +409,15 @@ namespace AqualLifeStyle.Domain.AQGreen
             Require(ConfigurationFields.Where(key => !key.StartsWith("Deployment:", StringComparison.Ordinal))
                 .All(key => !string.IsNullOrWhiteSpace(configuration[key])), "D10_CONFIGURATION_INPUT_UNAVAILABLE");
             Require(configuration["Yoco:Mode"] == "live" && configuration.GetValue<bool>("Bird:Enabled"), "D10_LIVE_CONFIGURATION_REQUIRED");
-            foreach (var key in new[] { "App:Recovery:Enabled", "App:WeeklyCommissions:Enabled", "App:EntryMonthlyObligations:Enabled",
+            foreach (var key in new[] { "App:Recovery:Enabled", "App:EntryMonthlyObligations:Enabled",
                 "App:AutomaticPayouts:Enabled", "App:FinancialOperations:Enabled", "App:BackgroundJobs:Enabled", "AQGreenV2Demo:Enabled", "AQGreenV2Pilot:Enabled" })
                 Require(bool.TryParse(configuration[key], out var enabled) && !enabled, "D10_CAPTURE_REQUIRES_OPERATIONAL_HOLDS");
+            Require(bool.TryParse(configuration["App:WeeklyCommissions:Enabled"], out var weeklyEnabled) && !weeklyEnabled,
+                "D10_CAPTURE_REQUIRES_WEEKLY_COMMISSION_HELD");
             var values = ConfigurationFields.ToDictionary(key => key, key => configuration[key]);
             values["Deployment:EnvironmentId"] = environmentId; values["Deployment:BuildId"] = buildId;
             values["App:FinancialOperations:Enabled"] = "true";
+            values["App:WeeklyCommissions:Enabled"] = "true";
             return ConfigurationDigest(new ConfigurationBuilder().AddInMemoryCollection(values).Build());
         }
         public static string MembershipDigest(IEnumerable<AQGreenD10MemberIdentity> members) => AQGreenB6CanonicalEvidence.Tuples(

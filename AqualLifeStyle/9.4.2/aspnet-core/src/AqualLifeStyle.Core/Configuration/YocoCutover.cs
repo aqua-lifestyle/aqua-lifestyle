@@ -45,7 +45,7 @@ namespace AqualLifeStyle.Configuration
                 }
             }
             if (!Enabled) return;
-            foreach (var key in new[] { "App:BackgroundJobs:Enabled", "App:WeeklyCommissions:Enabled",
+            foreach (var key in new[] { "App:BackgroundJobs:Enabled",
                 "App:EntryMonthlyObligations:Enabled", "App:AutomaticPayouts:Enabled", "AQGreenV2Demo:Enabled", "AQGreenV2Pilot:Enabled", "SEED_DEMO_DATA" })
                 if (configuration.GetValue<bool>(key)) throw new InvalidOperationException("YOCO_CUTOVER_AUTOMATION_MUST_BE_HELD");
             if (ApplicationRecoveryMode.IsEnabled(configuration)) throw new InvalidOperationException("YOCO_CUTOVER_REQUIRES_SEPARATE_RECEIVE_ONLY_MODE");

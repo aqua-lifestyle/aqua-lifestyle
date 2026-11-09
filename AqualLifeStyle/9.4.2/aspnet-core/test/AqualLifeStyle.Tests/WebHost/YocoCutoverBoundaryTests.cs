@@ -110,11 +110,25 @@ namespace AqualLifeStyle.Tests.WebHost
             Should.Throw<InvalidOperationException>(()=>new YocoCutoverOptions(c));
         }
         [Theory]
-        [InlineData("App:BackgroundJobs:Enabled")][InlineData("App:WeeklyCommissions:Enabled")]
+        [InlineData("App:BackgroundJobs:Enabled")]
         [InlineData("App:EntryMonthlyObligations:Enabled")][InlineData("App:AutomaticPayouts:Enabled")]
         [InlineData("AQGreenV2Pilot:Enabled")][InlineData("AQGreenV2Demo:Enabled")][InlineData("SEED_DEMO_DATA")]
         public void ReceiverRejectsAutomationAndPayoutEnablement(string key)
         { var c=Config();c[key]="true";Should.Throw<InvalidOperationException>(()=>new YocoCutoverOptions(c)); }
+
+        [Fact]
+        public void YocoCutoverAllowsOnlyTheDedicatedWeeklyOptInWhileGlobalJobsRemainHeld()
+        {
+            var c = Config();
+            c["App:WeeklyCommissions:Enabled"] = "true";
+            c["App:BackgroundJobs:Enabled"] = "false";
+            c["App:EntryMonthlyObligations:Enabled"] = "false";
+            c["App:AutomaticPayouts:Enabled"] = "false";
+
+            new YocoCutoverOptions(c).Enabled.ShouldBeTrue();
+            RuntimeOperationGuards.CanRunBackgroundWork(c).ShouldBeFalse();
+            RuntimeOperationGuards.CanRunFinancialWorker(c, "App:WeeklyCommissions:Enabled").ShouldBeFalse();
+        }
         [Theory]
         [InlineData("POST","/api/payments/yoco/webhook",true)]
         [InlineData("GET","/api/payments/yoco/webhook",false)]
