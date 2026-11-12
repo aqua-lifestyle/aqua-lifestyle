@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Abp.Dependency;
 using AqualLifeStyle.Domain.AQGreen;
 
 namespace AqualLifeStyle.Application.ProgrammeParticipations
@@ -14,7 +15,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
     /// A durable committed Normal receipt is checked by AQGreenD10Runtime and
     /// remains valid after the first-use authorization expires.
     /// </summary>
-    public sealed class AQGreenV2WeeklyCommissionReadiness : IAQGreenV2WeeklyCommissionReadiness
+    public sealed class AQGreenV2WeeklyCommissionReadiness : IAQGreenV2WeeklyCommissionReadiness, ITransientDependency
     {
         private readonly IAQGreenD10CommissioningSource _source;
         private readonly AQGreenD10Runtime _runtime;
