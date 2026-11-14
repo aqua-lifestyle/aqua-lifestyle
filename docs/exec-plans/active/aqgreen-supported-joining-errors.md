@@ -216,3 +216,69 @@ invitation-path regression was fixed inside the PR (frontend only):
   without duplicate requests). All 601 unit tests, all 24 aqgreen e2e cases and
   the member/auth/pilot/read-cutover e2e specs pass locally (Chrome); lint
   clean except the pre-existing pilot `location.assign` warnings.
+
+## 2026-11-14 D10 compatibility and Customer 13 resolution
+
+### D10 compatibility of a full release at the merge sha (requirement 3)
+
+Verified from existing code and the commissioned package, without new authority
+or a new release mode:
+
+- The commissioned B8 decision (inputs/decision.json, decisionReference
+  AQG-V2-D10-B8-20261114T042429444Z) binds the runtime to
+  requiredAssemblyDigest cd7ae851…9a35 and requiredRuntimeAssemblyDigest
+  8865ebcd…c4d6. The production selector revalidates both against the RUNNING
+  assemblies at every D10 joining operation (AQGreenD10ProductionSelectors.cs
+  VerifyPopulationAsync; D10_DATABASE_SCHEMA_OR_RELEASE_MISMATCH otherwise).
+- The production Dockerfile (docker/api/Dockerfile, sdk 8.0-bookworm-slim) was
+  executed locally against the PR tree (backend sources identical to b8d86e5
+  plus one unpublished test file). The built assemblies hash to exactly the
+  commissioned digests: EntityFrameworkCore cd7ae851…9a35 and the canonical
+  B6TUPLE1 runtime digest 8865ebcd…c4d6. The merge-sha build therefore preserves
+  the committed D10 activation and bindings byte-for-byte.
+- The sha-dependent readiness fields (buildId, IntendedBuildId,
+  IntendedConfigurationDigest) are computed by the deployed runtime from its own
+  deployment metadata (DeploymentMetadata.ResolveBuildId → RENDER_GIT_COMMIT),
+  so a fresh full-mode Render deploy at the merge sha satisfies
+  validateReadiness/validateD10Bindings without any new authority.
+- Residual risk (documented, not assumed away): the base image tag
+  sdk:8.0-bookworm-slim is floating. If the SDK patch drifts before the release
+  build, assemblies could differ; the runtime fails closed (D10 gate), but the
+  executor's readiness check does not compare the reported bindings against the
+  commissioned digests. The existing authorized owner readback should re-verify
+  d10Bindings.requiredAssemblyDigest == cd7ae851…9a35 after the deploy.
+
+### Customer 13 checkout ownership and charge outcome (requirement 4)
+
+Authorized GET-only Host reads (2026-11-14T10:19Z, script
+aqgreen-customer-13-outcome.mjs; no PII or payment references printed):
+
+- Ownership resolved: neither of the two active Tenant-1 AQGreen joining
+  checkouts belongs to customer 13. The Host's own checkout join carries the
+  bound customer's club member number and name (CL…00A, 10-char name, R1200
+  once, created 2026-08-02; CL…H8M, 24-char name, R600 second instalment,
+  created 2026-09-26), and a keyword search for customer 13's exact name
+  returns 0 matches. Customer 13 has no current AQGreen participation
+  (complete-empty Tenant-1 current list) and is not the commissioned clean-start
+  root (cleanStartRootCustomerId null, policy
+  HOST_SELECT_AFTER_REGISTRATION_V1).
+- Charge outcome: no AQGreen payment is attributable to customer 13. Both
+  active checkouts are incomplete (no PaymentId, status AwaitingPayment), the
+  provider event stream received after cutover is empty (0 events, phase
+  Normal, nothing held), and Tenant 1 has zero current AQGreen participations,
+  so no confirmed joining payment exists in the current network. The pre-reset
+  archive (13 participants, 42 protected payment records) is digest-sealed;
+  at reset the owner attested payments were test-only
+  (OWNER_ATTESTED_TEST_ONLY_V1, providerModeVerification
+  NOT_INDEPENDENTLY_VERIFIED). Completed/expired checkout history and provider
+  consumer metadata are not exposed by existing Host DTOs, so the outcome is
+  reported as "no charge established" — never as "no charge occurred".
+- Next legitimate step: none available now. V2 joining requires a sponsor
+  invitation (StartEntry rejects independent/recruiter-only admission), no
+  eligible recruiter exists while the network is empty, and the Host root
+  admission requires c.CreationTime >= v2EffectiveAtUtc
+  (2026-11-14T04:24:29.444Z) per D10_CLEAN_START_ROOT_VERIFIED_REGISTRATION_REQUIRED
+  — customer 13 registered before that boundary, so they cannot be the root,
+  and the accepted boundary is not changed. Customer 13 should wait for an
+  eligible recruiter invitation once the network has a root; no real payment
+  should be attempted for them at this time.
