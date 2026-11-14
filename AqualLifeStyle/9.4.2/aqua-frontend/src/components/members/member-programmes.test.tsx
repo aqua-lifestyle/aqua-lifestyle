@@ -9,6 +9,7 @@ import {
 import { apiEndpoints, httpClient, refreshAccessToken } from "@/src/shared/api";
 import { MemberProgrammes } from "./member-programmes";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
+import { normalizeNetworkError } from "@/src/shared/api/abp-error";
 import { useMyProgrammeJourney } from "@/src/shared/hooks/use-my-programme-journey";
 import {
   createJourneyResponse,
@@ -47,13 +48,26 @@ const authState = (permissions: string[]) => ({
       name: "Club Member",
       permissions,
       role: "Guest",
+      tenantId: 1,
     },
   },
 });
 
+const showAwaitingAQGreen = (pendingAQGreenCheckout: unknown = null, withPaymentFacts = true) => {
+  vi.mocked(httpClient.get).mockResolvedValue({
+    entry: { programmeName: "AQGreen", currency: "ZAR", statusCode: "AwaitingJoiningPayment", status: "Awaiting joining payment", joinedIndependently: true, joiningSchedule: null, joiningPaidAmount: withPaymentFacts ? 0 : undefined, nextPaymentAmount: 1200, canRecruitForThisProgramme: false, isActive: false },
+    onyx: null, pendingAQGreenCheckout,
+  });
+  vi.mocked(useMyProgrammeJourney).mockReturnValue({
+    data: createJourneyResponse(createProgrammeJourney("AQGREEN", { hasParticipation: true, nextActionCode: "CompleteJoiningPayment", nextActionTitle: "Complete AQGreen joining", participationStatus: "Awaiting joining payment" })),
+    errorMessage: undefined, isLoading: false,
+  });
+};
+
 describe("MemberProgrammes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     HTMLDialogElement.prototype.showModal = vi.fn(function (
       this: HTMLDialogElement,
     ) {
@@ -65,7 +79,7 @@ describe("MemberProgrammes", () => {
       this.removeAttribute("open");
     });
     vi.mocked(useAuthState).mockReturnValue(
-      authState(["Aqua.ProgrammeParticipations.ViewSelf"]),
+      authState(["Aqua.ProgrammeParticipations.ViewSelf", "Aqua.ProgrammeParticipations.Join"]),
     );
     vi.mocked(useSystemHealthActions).mockReturnValue({
       checkHealth: vi.fn().mockResolvedValue(undefined),
@@ -124,10 +138,9 @@ describe("MemberProgrammes", () => {
 
     render(<MemberProgrammes />);
 
-    expect(await screen.findByText(/health response did not match/i))
+    expect(await screen.findByText("Payment availability not confirmed"))
       .toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Join AQGreen" }))
-      .toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Join AQGreen" })).not.toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Join Onyx" }))
       .toBeDisabled();
   });
@@ -138,9 +151,9 @@ describe("MemberProgrammes", () => {
       ...current!, health: { ...current!.health!, paymentAvailability: "Held" },
     });
     render(<MemberProgrammes />);
-    expect(await screen.findByText(/temporarily held pending operational authorization/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Payments are temporarily on hold/i)).toBeInTheDocument();
     expect(screen.queryByText(/cannot verify a compatible payment API/i)).not.toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Join AQGreen" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Join AQGreen" })).not.toBeInTheDocument();
     expect(httpClient.post).not.toHaveBeenCalled();
   });
 
@@ -160,7 +173,7 @@ describe("MemberProgrammes", () => {
 
     render(<MemberProgrammes />);
 
-    expect(await screen.findByText(/does not advertise the required member journey capability/i))
+    expect(await screen.findByText("Programme information unavailable"))
       .toBeInTheDocument();
     expect(useMyProgrammeJourney).toHaveBeenCalledWith(false, false);
   });
@@ -226,60 +239,96 @@ describe("MemberProgrammes", () => {
     expect(screen.queryByText(/session-ended/i)).not.toBeInTheDocument();
   });
 
-  it("shows both independent programme joining paths", async () => {
+  it("guides an unapproved prospective founder without offering independent AQGreen admission", async () => {
     render(<MemberProgrammes />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Join AQGreen" }));
-    const dialog = screen.getByRole("dialog", { name: "Join AQGreen" });
-    expect(within(dialog).getByText("Start my own network")).toBeInTheDocument();
-    expect(within(dialog).getByText(/open the secure invitation link they shared/i))
-      .toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(await screen.findByText("Before you join AQGreen")).toBeInTheDocument();
+    expect(screen.getByText(/authorised Host administrator must confirm your founder eligibility/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Contact the club team" })).toHaveAttribute("href", "/contact");
+    expect(screen.queryByRole("button", { name: "Join AQGreen" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /request founder approval/i })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "AQGreen" })).queryByText("Start my own network")).not.toBeInTheDocument();
+    expect(httpClient.post).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Join Onyx" })).toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: "Invite Club Members" }),
     ).not.toBeInTheDocument();
   });
 
-  it("records an independent AQGreen place and continues to one checkout", async () => {
+  it.each([[0, "Pay R1,200 once"], [1, "Pay first R600 instalment"]] as const)("uses an existing Host-authorised root participation for schedule %i without restarting admission", async (schedule, button) => {
+    showAwaitingAQGreen();
     render(<MemberProgrammes />);
 
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Join AQGreen" }),
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Continue to secure payment" }),
-    );
+    fireEvent.click(await screen.findByRole("button", { name: button }));
 
     await waitFor(() =>
       expect(httpClient.post).toHaveBeenCalledWith(
-        apiEndpoints.programmeParticipations.startEntry,
-        { recruiterCustomerId: null },
+        apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+        { schedule },
       ),
     );
-    expect(httpClient.post).toHaveBeenCalledWith(
-      apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
-      { schedule: 0 },
-    );
+    expect(httpClient.post).toHaveBeenCalledOnce();
+    expect(httpClient.post).not.toHaveBeenCalledWith(apiEndpoints.programmeParticipations.startEntry, expect.anything());
     expect(navigateToExternalUrl).toHaveBeenCalledWith(
       "https://payments.example.test/checkout/secure",
     );
   });
 
-  it("offers full or two-instalment AQGreen joining payment", async () => {
+  it("retains the checkout review across refresh even when the deployed member read returns no pending URL", async () => {
+    window.localStorage.setItem("aqua.aqgreenCheckoutReview.1.7", "unpaid");
+    showAwaitingAQGreen();
     render(<MemberProgrammes />);
+    expect(await screen.findByRole("button", { name: "Refresh payment status" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Pay R1,200|Pay first R600/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Continue secure payment" })).not.toBeInTheDocument();
+    expect(httpClient.post).not.toHaveBeenCalled();
+  });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Join AQGreen" }));
-    expect(screen.getByText(/Pay R1,200 once/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("radio", {
-      name: /Pay two R600 instalments/i,
-    }));
-    fireEvent.click(screen.getByRole("button", { name: "Continue to secure payment" }));
-
-    await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
-      apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
-      { schedule: 1 },
+  it("allows the second distinct R600 checkout only after the server confirms the first instalment", async () => {
+    window.localStorage.setItem("aqua.aqgreenCheckoutReview.1.7", "unpaid");
+    showAwaitingAQGreen();
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: { programmeName: "AQGreen", currency: "ZAR", statusCode: "AwaitingActivationPayment", joinedIndependently: true, joiningSchedule: 1, joiningPaidAmount: 600, nextPaymentAmount: 600 },
+      onyx: null, pendingAQGreenCheckout: null,
+    });
+    render(<MemberProgrammes />);
+    fireEvent.click(await screen.findByRole("button", { name: /Complete joining:.*600/ }));
+    await waitFor(() => expect(httpClient.post).toHaveBeenCalledExactlyOnceWith(
+      apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout, { schedule: 1 },
     ));
+    expect(window.localStorage.getItem("aqua.aqgreenCheckoutReview.1.7")).toBe("part-paid");
+  });
+
+  it("does not infer zero paid or a default schedule when the joining facts are unavailable", async () => {
+    showAwaitingAQGreen(null, false);
+    render(<MemberProgrammes />);
+    expect(await screen.findByText("Joining payment details unavailable")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Pay R1,200|Pay first R600|Complete joining:/ })).not.toBeInTheDocument();
+    expect(httpClient.post).not.toHaveBeenCalled();
+  });
+
+  it("does not offer an enabled payment operation when the account lacks joining permission", async () => {
+    showAwaitingAQGreen();
+    vi.mocked(useAuthState).mockReturnValue(authState(["Aqua.ProgrammeParticipations.ViewSelf"]));
+    render(<MemberProgrammes />);
+    expect(await screen.findByText("Joining access needs review")).toBeInTheDocument();
+    const payment = await screen.findByRole("button", { name: "Pay R1,200 once" });
+    expect(payment).toBeDisabled(); fireEvent.click(payment);
+    expect(httpClient.post).not.toHaveBeenCalled();
+    expect(window.localStorage.length).toBe(0);
+  });
+
+  it("keeps an uncertain checkout response actionable without claiming no charge or offering an ordinary retry", async () => {
+    showAwaitingAQGreen();
+    vi.mocked(httpClient.post).mockRejectedValueOnce(normalizeNetworkError());
+    render(<MemberProgrammes />);
+    fireEvent.click(await screen.findByRole("button", { name: "Pay R1,200 once" }));
+    expect(await screen.findByText("Payment status not confirmed")).toBeInTheDocument();
+    expect(screen.getByText(/Do not start a second payment/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh payment status" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pay R1,200 once" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/No payment has been taken/i)).not.toBeInTheDocument();
+    expect(httpClient.post).toHaveBeenCalledOnce();
   });
 
   it("creates an Onyx checkout without claiming participation has started", async () => {
@@ -568,7 +617,7 @@ describe("MemberProgrammes", () => {
 
     render(<MemberProgrammes />);
 
-    expect(await screen.findByText(/authoritative amount/i)).toBeInTheDocument();
+    expect(await screen.findByText("Joining payment details unavailable")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Complete joining/i }))
       .not.toBeInTheDocument();
   });

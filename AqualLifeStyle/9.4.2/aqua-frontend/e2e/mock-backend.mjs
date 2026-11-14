@@ -20,6 +20,7 @@ const memberAccessToken = createAccessToken({
   permissions: [
     "Aqua.ProgrammeParticipations.Invite",
     "Aqua.ProgrammeParticipations.ViewSelf",
+    "Aqua.ProgrammeParticipations.Join",
     "Aqua.Savings.ViewSelf",
     "Aqua.Members.ViewSelf",
     "Aqua.Memberships.ViewSelf",

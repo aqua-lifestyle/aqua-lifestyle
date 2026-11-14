@@ -10,11 +10,12 @@ import {
 } from "@/src/providers";
 import { isAQGreenV2DemoCheckout, isPaymentApiCompatible, isPilotAQGreenJoiningApiCompatible } from "@/src/providers/SystemHealth/contract";
 import { apiEndpoints, httpClient } from "@/src/shared/api";
-import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
+import { getRequestErrorPresentation, type RequestErrorPresentation } from "@/src/shared/api/abp-error";
 import type { ProgrammeInvitationPreview } from "@/src/shared/domain/programme-invitations";
-import type { ProgrammeCheckout } from "@/src/shared/domain/programme-participations";
+import type { ProgrammeCheckout, ProgrammeParticipation } from "@/src/shared/domain/programme-participations";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
+import { useCheckoutReview } from "@/src/shared/hooks/use-checkout-review";
 import { Button, Card, LinkButton, Skeleton, StatusMessage } from "@/src/shared/ui";
 
 const unsupportedProgrammeMessage =
@@ -47,20 +48,24 @@ const getProgrammePaymentExplanation = (programmeKey: string, demo: boolean) => 
 export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string }) => {
   const { isPilot, modeKnown } = usePilotStatus();
   const { session } = useAuthState();
+  const canJoin = session?.user?.permissions?.includes("Aqua.ProgrammeParticipations.Join") ?? false;
+  const checkoutReview = useCheckoutReview(session?.user);
   const healthActions = useSystemHealthActions();
   const healthState = useSystemHealthState();
   const contractCheckAttempted = useRef(false);
-  const [preview, setPreview] = useState<ProgrammeInvitationPreview>();
+  const [loadedPreview, setPreview] = useState<ProgrammeInvitationPreview>();
+  const preview = loadedPreview?.inviteCode.trim().toUpperCase() === inviteCode.trim().toUpperCase()
+    ? loadedPreview : undefined;
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<RequestErrorPresentation>();
   const [aqGreenSchedule, setAQGreenSchedule] = useState<0 | 1>(0);
   const demoCheckout = isAQGreenV2DemoCheckout(healthState.health);
   const paymentApiCompatible = isPilot
     ? isPilotAQGreenJoiningApiCompatible(healthState.health)
     : isPaymentApiCompatible(healthState.health);
   const paymentActionsUnavailable =
-    !modeKnown || healthState.isPending || !paymentApiCompatible || (isPilot && preview?.programmeKey !== "AQGREEN");
+    !canJoin || !modeKnown || healthState.isPending || !paymentApiCompatible || (isPilot && preview?.programmeKey !== "AQGREEN");
 
   useEffect(() => {
     if (
@@ -74,30 +79,39 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
   }, [healthActions, healthState.isPending, healthState.isSuccess]);
 
   useEffect(() => {
+    let current = true;
     void httpClient
       .get<ProgrammeInvitationPreview>(
         apiEndpoints.programmeParticipations.getInvitationPreview(inviteCode),
       )
-      .then(setPreview)
-      .catch((requestError) =>
-        setError(
-          getRequestErrorMessage(requestError, "This invitation could not be opened."),
-        ),
-      )
-      .finally(() => setLoading(false));
+      .then((value) => {
+        if (!current) return;
+        if (value.inviteCode?.trim().toUpperCase() !== inviteCode.trim().toUpperCase())
+          throw new Error("INVITATION_CONTEXT_MISMATCH");
+        setPreview(value);
+        setError(undefined);
+      })
+      .catch((requestError) => {
+        if (current) setError(getRequestErrorPresentation(requestError, "This invitation could not be opened.", "invitation"));
+      })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
   }, [inviteCode]);
 
   const confirm = async () => {
-    if (!preview || paymentActionsUnavailable) return;
+    if (!preview || !preview.recruiterEligible || paymentActionsUnavailable || joining || error ||
+      (preview.programmeKey === "AQGREEN" && checkoutReview.blockedFor())) return;
     const endpoint = getProgrammeJoinEndpoint(preview.programmeKey);
     if (!endpoint) {
-      setError(unsupportedProgrammeMessage);
+      setError({ title: "Programme unavailable", message: unsupportedProgrammeMessage });
       return;
     }
     setJoining(true);
     setError(undefined);
+    let checkoutAttempted = false;
     try {
       if (preview.programmeKey === "ONYX") {
+        checkoutAttempted = true;
         const checkout = await httpClient.post<
           ProgrammeCheckout,
           { inviteCode: string }
@@ -106,7 +120,14 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
         });
         navigateToExternalUrl(checkout.checkoutUrl);
       } else {
-        await httpClient.post(endpoint, { inviteCode: preview.inviteCode });
+        const participation = await httpClient.post<ProgrammeParticipation, { inviteCode: string }>(endpoint, { inviteCode: preview.inviteCode });
+        const stage = participation.joiningPaidAmount === 0 ? "unpaid"
+          : participation.joiningSchedule === 1 && participation.joiningPaidAmount === 600 ? "part-paid" : undefined;
+        if (!stage || !checkoutReview.start(stage)) {
+          setError({ title: "Check your joining status", message: "Your invitation has been processed. Check My programmes for your current joining and payment status before continuing.", reviewPaymentStatus: true });
+          return;
+        }
+        checkoutAttempted = true;
         const checkout = await httpClient.post<
           ProgrammeCheckout,
           { schedule: 0 | 1 }
@@ -119,9 +140,10 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
       }
     } catch (requestError) {
       setError(
-        getRequestErrorMessage(
+        getRequestErrorPresentation(
           requestError,
-          "The programme invitation could not be accepted. No payment has been taken.",
+          "Your joining status could not be confirmed.",
+          checkoutAttempted ? "checkout" : "admission",
         ),
       );
     } finally {
@@ -146,10 +168,10 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
   return (
     <main className="min-h-dvh bg-muted/30 px-4 py-10 sm:px-6">
       <div className="mx-auto max-w-2xl">
-        {loading ? (
+        {loading || (!preview && !error) ? (
           <Skeleton className="h-96" />
         ) : error && !preview ? (
-          <StatusMessage tone="error">{error}</StatusMessage>
+          <StatusMessage title={error.title} tone="error">{error.message}</StatusMessage>
         ) : preview ? (
           <Card className="flex flex-col gap-6">
             <div className="text-center">
@@ -187,7 +209,7 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
               </StatusMessage>
             ) : null}
 
-            {preview.programmeKey === "AQGREEN" && session ? (
+            {preview.programmeKey === "AQGREEN" && session && preview.recruiterEligible ? (
               <fieldset className="grid gap-3">
                 <legend className="text-sm font-semibold">Payment schedule</legend>
                 <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-4">
@@ -212,23 +234,38 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
             ) : null}
 
             {!healthState.isPending && !paymentApiCompatible && session ? (
-              <StatusMessage tone="error">
+              <StatusMessage title="Payments are temporarily unavailable" tone="error">
                 {healthState.health?.paymentAvailability === "Held" ? (
-                  <>Payments are temporarily held pending operational authorization.
-                    New checkouts remain disabled. Contact the club team for an update.</>
-                ) : (<>Payment is unavailable because this frontend cannot verify a
-                  compatible payment API deployment. No payment has been taken.</>)}
+                  <>Payments are temporarily on hold. Please check back later or contact the club team for an update.</>
+                ) : (<>We could not confirm that payments are available. Refresh the page or contact the club team before trying to pay.</>)}
+              </StatusMessage>
+            ) : null}
+            {session && !canJoin ? (
+              <StatusMessage title="Joining access needs review" tone="warning">
+                Contact the club team to check your joining access before continuing. Your invitation does not replace account permissions.
               </StatusMessage>
             ) : null}
 
-            {!programmeJoinEndpoint ? (
+            {session && preview.programmeKey === "AQGREEN" && checkoutReview.blockedFor() && !joining ? (
+              error ? null : (
+              <StatusMessage title="Check your payment status" tone="warning">
+                Review your existing joining or payment status before starting another checkout.
+                <LinkButton className="mt-3" href="/member/programmes">Check my payment status</LinkButton>
+              </StatusMessage>
+              )
+            ) : !preview.recruiterEligible ? (
+              <StatusMessage title="This invitation is not ready to use" tone="warning">
+                The inviting member is not currently eligible to invite you to this programme. Ask them or the club team to check their participation before you continue.
+                <LinkButton className="mt-3" href="/contact">Contact the club team</LinkButton>
+              </StatusMessage>
+            ) : !programmeJoinEndpoint ? (
               <StatusMessage tone="error">
                 {unsupportedProgrammeMessage}
               </StatusMessage>
             ) : session ? (
               <Button
                 disabled={
-                  !preview.recruiterEligible || paymentActionsUnavailable
+                  !preview.recruiterEligible || paymentActionsUnavailable || !!error
                 }
                 isLoading={joining}
                 onClick={() => void confirm()}
@@ -244,7 +281,14 @@ export const ProgrammeInvitationLanding = ({ inviteCode }: { inviteCode: string 
               </div>
             )}
 
-            {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
+            {error ? (
+              <StatusMessage title={error.title} tone="error">
+                <p>{error.message}</p>
+                <LinkButton className="mt-3" href="/member/programmes">
+                  {error.reviewPaymentStatus ? "Check my payment status" : "Return to My programmes"}
+                </LinkButton>
+              </StatusMessage>
+            ) : null}
           </Card>
         ) : null}
       </div>

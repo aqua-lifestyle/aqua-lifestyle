@@ -1419,6 +1419,31 @@ namespace AqualLifeStyle.Tests.Application
             });
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task V2Joining_IndependentOrRecruiterOnlyRequestCannotCreateParticipationCheckoutOrPayment(bool recruiterOnly)
+        {
+            var customerId = await RegisterAndSignInCustomerAsync();
+            var gateway = Substitute.For<AqualLifeStyle.Payments.Yoco.IYocoCheckoutGateway>();
+            LocalIocManager.IocContainer.Register(
+                Component.For<AqualLifeStyle.Payments.Yoco.IYocoCheckoutGateway>()
+                    .Instance(gateway).Named($"rejected-v2-admission-{Guid.NewGuid():N}").IsDefault());
+            var service = ResolveV2JoiningService();
+
+            var exception = await Should.ThrowAsync<UserFriendlyException>(() => service.StartEntryAsync(
+                new StartEntryParticipationInput { RecruiterCustomerId = recruiterOnly ? customerId : null }));
+
+            exception.Details.ShouldBe("Independent admission and recruiter-only joining are unavailable on this path.");
+            gateway.ReceivedCalls().ShouldBeEmpty();
+            await UsingDbContextAsync(1, async context =>
+            {
+                (await context.EntryParticipations.AnyAsync(item => item.CustomerId == customerId)).ShouldBeFalse();
+                (await context.AQGreenJoiningCheckouts.AnyAsync(item => item.CustomerId == customerId)).ShouldBeFalse();
+                (await context.MemberPayments.AnyAsync(item => item.CustomerId == customerId)).ShouldBeFalse();
+            });
+        }
+
         private IClubMemberProgrammeParticipationAppService ResolveV2JoiningService()
         {
             var gate = Substitute.For<IAQGreenPlacementV2JoiningGate>();

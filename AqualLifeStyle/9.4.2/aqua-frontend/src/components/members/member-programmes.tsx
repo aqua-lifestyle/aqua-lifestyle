@@ -18,14 +18,20 @@ import {
   httpClient,
   refreshAccessToken,
 } from "@/src/shared/api";
-import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
+import {
+  aqGreenAdmissionGuidance,
+  getRequestErrorPresentation,
+  type RequestErrorPresentation,
+} from "@/src/shared/api/abp-error";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 import { useMyProgrammeJourney } from "@/src/shared/hooks/use-my-programme-journey";
 import { useMyProgrammeParticipations } from "@/src/shared/hooks/use-my-programme-participations";
 import { usePilotStatus } from "@/src/shared/hooks/use-pilot-status";
+import { useCheckoutReview, type JoiningCheckoutStage } from "@/src/shared/hooks/use-checkout-review";
 import {
   Breadcrumb,
   Button,
+  LinkButton,
   Skeleton,
   StatusMessage,
 } from "@/src/shared/ui";
@@ -47,6 +53,7 @@ export const MemberProgrammes = () => {
   const healthState = useSystemHealthState();
   const canView =
     session?.user?.permissions?.includes(VIEW_PERMISSION) ?? false;
+  const canJoin = session?.user?.permissions?.includes("Aqua.ProgrammeParticipations.Join") ?? false;
   const {
     data: participations,
     errorMessage: loadError,
@@ -63,10 +70,14 @@ export const MemberProgrammes = () => {
     canView && modeKnown && isJourneyContractResolved && journeyApiCompatible,
     isPilot,
   );
-  const [actionError, setActionError] = useState<string>();
+  const [actionError, setActionError] = useState<RequestErrorPresentation>();
   const [success, setSuccess] = useState<string>();
   const [startingAQGreenPayment, setStartingAQGreenPayment] = useState(false);
   const [accessRefreshFinished, setAccessRefreshFinished] = useState(false);
+  const checkoutReview = useCheckoutReview(session?.user);
+  const joiningStage: JoiningCheckoutStage | undefined = participations?.entry?.joiningPaidAmount === 0
+    ? "unpaid" : participations?.entry?.joiningSchedule === 1 && participations.entry.joiningPaidAmount === 600
+      ? "part-paid" : undefined;
   const accessRefreshAttempted = useRef(false);
   const contractCheckAttempted = useRef(false);
   const hasActiveInvitationAccess = Boolean(
@@ -82,7 +93,7 @@ export const MemberProgrammes = () => {
     ? isPilotAQGreenJoiningApiCompatible(healthState.health)
     : isPaymentApiCompatible(healthState.health);
   const paymentActionsUnavailable =
-    !modeKnown || !isJourneyContractResolved || healthState.isPending || !paymentApiCompatible;
+    !canJoin || !modeKnown || !isJourneyContractResolved || healthState.isPending || !paymentApiCompatible;
   const entryCanAcceptJoiningPayment = [
     "AwaitingJoiningPayment",
     "AwaitingActivationPayment",
@@ -125,9 +136,9 @@ export const MemberProgrammes = () => {
       })
       .catch(() => {
         setAccessRefreshFinished(true);
-        setActionError(
+        setActionError({ title: "Refresh your account access", message:
           "Your programme is active, but your updated account access could not be loaded. Check your connection and try signing in again.",
-        );
+        });
       });
   }, [hasActiveInvitationAccess, hasInvitationPermission]);
 
@@ -137,22 +148,20 @@ export const MemberProgrammes = () => {
       const programme = new URLSearchParams(window.location.search).get("programme");
       if (paymentResult === "success") {
         setSuccess(
-          programme === "aqgreen"
-            ? "Payment submitted. Once the provider confirms it, the Area team will review your AQGreen participation before it activates."
-            : "Payment submitted. Once the provider confirms it, the Area team will review your Onyx participation before it is created.",
+          "You have returned from checkout. Your verified payment and membership status are shown below; returning here does not confirm payment or activation.",
         );
       } else if (paymentResult === "cancelled") {
-        setActionError(
+        setActionError({ title: "Payment status not confirmed", reviewPaymentStatus: true, message:
           programme === "aqgreen"
-            ? "You returned without payment confirmation. Your checkout remains locked until Yoco reports a terminal result or an authorised administrator reviews it."
+            ? "The browser return does not confirm your payment result. Review your current joining status below. Do not start another payment unless the existing result has been confirmed."
             : "You returned without payment confirmation. No Onyx participation was created; the existing checkout remains pending.",
-        );
+        });
       } else if (paymentResult === "failed") {
-        setActionError(
+        setActionError({ title: "Payment status not confirmed", reviewPaymentStatus: true, message:
           programme === "aqgreen"
-            ? "The browser returned from payment, but this does not confirm failure. Your AQGreen checkout remains locked while the provider result is verified."
+            ? "The browser return does not confirm payment failure. Review your current joining status below. Do not start another payment unless the existing result has been confirmed."
             : "The browser returned from payment, but this does not confirm failure. No Onyx participation was created and the checkout remains pending.",
-        );
+        });
       }
     }, 0);
     return () => window.clearTimeout(task);
@@ -160,8 +169,12 @@ export const MemberProgrammes = () => {
 
   const startAQGreenPayment = async (selectedSchedule?: 0 | 1) => {
     if (paymentActionsUnavailable) return;
-    const schedule = selectedSchedule ??
-      (participations?.entry?.joiningSchedule === 1 ? 1 : 0);
+    const schedule = selectedSchedule ?? participations?.entry?.joiningSchedule;
+    if (schedule !== 0 && schedule !== 1) return;
+    if (!joiningStage || !checkoutReview.start(joiningStage)) {
+      setActionError({ title: "Check your payment status", message: "Your previous checkout or browser payment status needs to be checked. Refresh My programmes or contact the club team before starting another payment.", reviewPaymentStatus: true });
+      return;
+    }
     setStartingAQGreenPayment(true);
     setActionError(undefined);
     try {
@@ -176,9 +189,10 @@ export const MemberProgrammes = () => {
       else navigateToExternalUrl(checkout.checkoutUrl);
     } catch (requestError) {
       setActionError(
-        getRequestErrorMessage(
+        getRequestErrorPresentation(
           requestError,
-          "AQGreen payment could not be started. No payment has been taken.",
+          "Your AQGreen payment status could not be confirmed.",
+          "checkout",
         ),
       );
     } finally {
@@ -196,14 +210,25 @@ export const MemberProgrammes = () => {
       await reloadParticipations();
       window.location.reload();
     } catch (error) {
-      setActionError(getRequestErrorMessage(error, "Test payment could not be verified."));
+      setActionError(getRequestErrorPresentation(error, "Test payment could not be verified.", "checkout"));
     } finally { setStartingAQGreenPayment(false); }
   };
+
+  const paymentStatusNotice = (
+    <StatusMessage title="Check your payment status" tone="warning">
+      <p>Your existing checkout or payment result needs to be checked before a new payment is started. Contact the club team if it remains unclear.</p>
+      <Button className="mt-3" onClick={() => window.location.reload()} variant="outline">
+        Refresh payment status
+      </Button>
+    </StatusMessage>
+  );
 
   const aqGreenPaymentAction = journeyAcceptsAQGreenPayment &&
     participations?.entry &&
     entryCanAcceptJoiningPayment ? (
       participations.pendingAQGreenCheckout ? (
+        participations.pendingAQGreenCheckout.status !== "Awaiting payment" ||
+        !participations.pendingAQGreenCheckout.checkoutUrl ? paymentStatusNotice : (
         isPilot ? (
           <Button disabled={paymentActionsUnavailable || !participations.pendingAQGreenCheckout.checkoutId}
             isLoading={startingAQGreenPayment}
@@ -219,9 +244,11 @@ export const MemberProgrammes = () => {
           >
             {demoCheckout ? "Continue test checkout" : "Continue secure payment"}
           </a>
-        )
-      ) : participations.entry.joiningSchedule == null &&
-        (participations.entry.joiningPaidAmount ?? 0) === 0 ? (
+        ))
+      ) : (actionError?.reviewPaymentStatus && !checkoutReview.advancedTo(joiningStage)) ||
+        (!startingAQGreenPayment && checkoutReview.blockedFor(joiningStage)) ? paymentStatusNotice
+      : participations.entry.joiningSchedule == null &&
+        participations.entry.joiningPaidAmount === 0 ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <Button
             disabled={paymentActionsUnavailable}
@@ -239,7 +266,8 @@ export const MemberProgrammes = () => {
             Pay first R600 instalment
           </Button>
         </div>
-      ) : participations.entry.nextPaymentAmount != null &&
+      ) : (participations.entry.joiningSchedule === 0 || participations.entry.joiningSchedule === 1) &&
+        participations.entry.nextPaymentAmount != null &&
         participations.entry.nextPaymentAmount > 0 ? (
         <Button
           className="w-full"
@@ -253,28 +281,21 @@ export const MemberProgrammes = () => {
           )}
         </Button>
       ) : (
-        <StatusMessage tone="error">
-          The next joining-payment amount is unavailable. No payment can be
-          started until the API provides the authoritative amount.
+        <StatusMessage title="Joining payment details unavailable" tone="error">
+          We could not confirm your next joining payment. Refresh My programmes or contact the club team before trying to pay.
         </StatusMessage>
       )
     ) : undefined;
 
-  const aqGreenJoinAction = !participations?.entry && (isPilot || demoCheckout) ? (
-    <StatusMessage tone="info">
-      {isPilot
-        ? "Open your sponsor’s invitation to join this pilot. Independent admission requires authorized prospective-root administration."
-        : "In this test environment, open a valid AQGreen sponsor invitation to begin."}
+  const aqGreenJoinAction = !participations?.entry ? (
+    <StatusMessage title={aqGreenAdmissionGuidance.title} tone="info">
+      <p>{aqGreenAdmissionGuidance.message}</p>
+      <LinkButton className="mt-3" href="/contact">Contact the club team</LinkButton>
     </StatusMessage>
-  ) : !participations?.entry ? (
-    <JoinProgrammeDialog
-      disabled={paymentActionsUnavailable}
-      programme="AQGreen"
-    />
   ) : undefined;
 
   const onyxJoinAction = isPilot ? undefined : participations?.pendingDirectOnyxCheckout ? (
-    paymentActionsUnavailable ? (
+    !participations.pendingDirectOnyxCheckout.checkoutUrl ? paymentStatusNotice : paymentActionsUnavailable ? (
       <Button className="w-full" disabled>Continue secure payment</Button>
     ) : (
       <a
@@ -321,11 +342,19 @@ export const MemberProgrammes = () => {
           </p>
         </header>
 
-        {[loadError, journeyError, actionError].filter(Boolean).map((message) => (
-          <StatusMessage key={message} tone="error">{message}</StatusMessage>
+        {[loadError, journeyError].filter(Boolean).map((message) => (
+          <StatusMessage key={message} title="Programme details unavailable" tone="error">{message}</StatusMessage>
         ))}
+        {actionError ? (
+          <StatusMessage title={actionError.title} tone="error">{actionError.message}</StatusMessage>
+        ) : null}
         {success ? (
           <StatusMessage tone="info">{success}</StatusMessage>
+        ) : null}
+        {!canJoin ? (
+          <StatusMessage title="Joining access needs review" tone="warning">
+            Your account does not currently have access to start a joining payment. Contact the club team to check your access before continuing.
+          </StatusMessage>
         ) : null}
 
         {participations?.pendingDirectOnyxCheckout && !participations.onyx ? (
@@ -337,28 +366,22 @@ export const MemberProgrammes = () => {
         ) : null}
 
         {healthState.isSuccess && !paymentApiCompatible ? (
-          <StatusMessage tone="error">
+          <StatusMessage title="Payments are temporarily unavailable" tone="error">
             {healthState.health?.paymentAvailability === "Held" ? (
-              <>Payments are temporarily held pending operational authorization.
-                New checkouts remain disabled. Contact the club team for an update.</>
-            ) : (<>Payments are unavailable because this frontend cannot verify a
-            compatible payment API deployment. No payment has been taken. Ask
-            an operator to deploy and verify the matching database, API, and
-            frontend versions.</>)}
+              <>Payments are temporarily on hold. Please check back later or contact the club team for an update.</>
+            ) : (<>We could not confirm that payments are available. Refresh My programmes or contact the club team. If you have already tried to pay, check that payment&apos;s status before starting another one.</>)}
           </StatusMessage>
         ) : null}
 
         {healthState.isError ? (
-          <StatusMessage tone="error">
-            {healthState.errorMessage ?? "The API capability check could not be completed."}
+          <StatusMessage title="Payment availability not confirmed" tone="error">
+            We could not confirm that payments are available. Refresh the page or contact the club team before trying to pay.
           </StatusMessage>
         ) : null}
 
         {!healthState.isPending && healthState.isSuccess && !journeyApiCompatible ? (
-          <StatusMessage tone="error">
-            The programme journey is unavailable because this API does not
-            advertise the required member journey capability. Payment controls
-            remain fail-closed on this page.
+          <StatusMessage title="Programme information unavailable" tone="error">
+            Your programme information could not be confirmed. Refresh My programmes or contact the club team before joining or paying.
           </StatusMessage>
         ) : null}
 

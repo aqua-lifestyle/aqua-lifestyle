@@ -111,8 +111,9 @@ describe("invitation provider composition", () => {
               email: "invitee@example.test",
               id: 2,
               name: "Invitee",
-              permissions: [],
+              permissions: ["Aqua.ProgrammeParticipations.Join"],
               role: "Guest",
+              tenantId: 1,
             },
           }),
           { status: 200, headers: { "content-type": "application/json" } },
@@ -145,8 +146,10 @@ describe("invitation provider composition", () => {
       </AppProviders>,
     );
 
-    expect(await screen.findByText("This invitation link is not valid."))
+    expect(await screen.findByText("Invitation unavailable"))
       .toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("ask them for a valid invitation");
+    expect(screen.queryByRole("button", { name: /confirm and continue/i })).not.toBeInTheDocument();
     expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
   });
 });
