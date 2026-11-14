@@ -55,4 +55,37 @@ describe("checkout review reminder", () => {
     });
     expect(result.current.blockedFor("unpaid")).toBe(true);
   });
+
+  it("retires the first-stage reminder only on authoritative first-instalment settlement", () => {
+    window.localStorage.setItem("aqua.aqgreenCheckoutReview.1.7", "unpaid");
+    const retained = renderHook(() => useCheckoutReview({ id: 7, tenantId: 1 }, { firstInstalmentConfirmed: false }));
+    expect(retained.result.current.blockedFor("unpaid")).toBe(true);
+    expect(window.localStorage.getItem("aqua.aqgreenCheckoutReview.1.7")).toBe("unpaid");
+    retained.unmount();
+    const settled = renderHook(() => useCheckoutReview({ id: 7, tenantId: 1 }, { firstInstalmentConfirmed: true }));
+    expect(settled.result.current.blockedFor("unpaid")).toBe(false);
+    expect(window.localStorage.getItem("aqua.aqgreenCheckoutReview.1.7")).toBeNull();
+  });
+
+  it("keeps the second-stage reminder while only the first instalment is confirmed", () => {
+    window.localStorage.setItem("aqua.aqgreenCheckoutReview.1.7", "part-paid");
+    const { result } = renderHook(() => useCheckoutReview({ id: 7, tenantId: 1 }, { firstInstalmentConfirmed: true }));
+    expect(result.current.blockedFor("part-paid")).toBe(true);
+    expect(window.localStorage.getItem("aqua.aqgreenCheckoutReview.1.7")).toBe("part-paid");
+  });
+
+  it("retires every reminder once the joining total is confirmed, including a corrupt value", () => {
+    window.localStorage.setItem("aqua.aqgreenCheckoutReview.1.7", "unknown-value");
+    const { result } = renderHook(() => useCheckoutReview({ id: 7, tenantId: 1 }, { joiningFullyPaid: true }));
+    expect(result.current.blockedFor("part-paid")).toBe(false);
+    expect(result.current.blockedFor("unpaid")).toBe(false);
+    expect(window.localStorage.getItem("aqua.aqgreenCheckoutReview.1.7")).toBeNull();
+  });
+
+  it("does not treat a missing joining payment as settled evidence", () => {
+    window.localStorage.setItem("aqua.aqgreenCheckoutReview.1.7", "part-paid");
+    const { result } = renderHook(() => useCheckoutReview({ id: 7, tenantId: 1 }, { joiningFullyPaid: false }));
+    expect(result.current.blockedFor("part-paid")).toBe(true);
+    expect(window.localStorage.getItem("aqua.aqgreenCheckoutReview.1.7")).toBe("part-paid");
+  });
 });

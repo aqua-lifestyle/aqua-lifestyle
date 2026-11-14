@@ -286,6 +286,117 @@ describe("ProgrammeInvitationLanding", () => {
     expect(await screen.findByRole("link", { name: /create my account/i }))
       .toHaveAttribute("href", "/signup");
   });
+
+  const partPaidRecord = {
+    statusCode: "AwaitingActivationPayment",
+    joiningSchedule: 1,
+    joiningPaidAmount: 600,
+    nextPaymentAmount: 600,
+    currency: "ZAR",
+    programmeName: "AQGreen",
+  };
+  const mockSecondCheckout = (checkoutUrl: string) => {
+    vi.mocked(httpClient.post).mockImplementation(async (requestUrl) =>
+      requestUrl === apiEndpoints.programmeParticipations.startEntry
+        ? partPaidRecord
+        : { amount: 600, checkoutUrl, currency: "ZAR" });
+  };
+
+  it("continues a replayed invitation on its recorded two-instalment plan without defaulting to R1,200 once", async () => {
+    mockSecondCheckout("https://payments.example.test/checkout/second");
+    render(<ProgrammeInvitationLanding inviteCode="AQ7G2X9KLMNP" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /confirm and continue/i }));
+
+    await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
+      apiEndpoints.programmeParticipations.startEntry,
+      { inviteCode: "AQ7G2X9KLMNP" },
+    ));
+    expect(await screen.findByRole("button", { name: /Complete joining:.*600/ })).toBeEnabled();
+    expect(httpClient.post).not.toHaveBeenCalledWith(
+      apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+      expect.anything(),
+    );
+    expect(screen.queryByRole("radio", { name: /Pay R1,200 once/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Complete joining:.*600/ }));
+    await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
+      apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+      { schedule: 1 },
+    ));
+    expect(navigateToExternalUrl).toHaveBeenCalledWith("https://payments.example.test/checkout/second");
+    expect(window.localStorage.getItem("aqua.aqgreenCheckoutReview.1.2")).toBe("part-paid");
+  });
+
+  it("retires a settled first-stage reminder when the invitation returns the confirmed first instalment", async () => {
+    window.localStorage.setItem("aqua.aqgreenCheckoutReview.1.2", "unpaid");
+    mockSecondCheckout("https://payments.example.test/checkout/second");
+    render(<ProgrammeInvitationLanding inviteCode="AQ7G2X9KLMNP" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /confirm and continue/i }));
+
+    expect(await screen.findByRole("button", { name: /Complete joining:.*600/ })).toBeEnabled();
+    expect(window.localStorage.getItem("aqua.aqgreenCheckoutReview.1.2")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Complete joining:.*600/ }));
+    await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
+      apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+      { schedule: 1 },
+    ));
+    expect(navigateToExternalUrl).toHaveBeenCalledWith("https://payments.example.test/checkout/second");
+  });
+
+  it("continues a started-but-unpaid recorded plan instead of restarting schedule selection", async () => {
+    vi.mocked(httpClient.post).mockImplementation(async (requestUrl) =>
+      requestUrl === apiEndpoints.programmeParticipations.startEntry
+        ? { ...partPaidRecord, statusCode: "AwaitingJoiningPayment", joiningPaidAmount: 0 }
+        : { amount: 600, checkoutUrl: "https://payments.example.test/checkout/first", currency: "ZAR" });
+    render(<ProgrammeInvitationLanding inviteCode="AQ7G2X9KLMNP" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /confirm and continue/i }));
+
+    await screen.findByRole("button", { name: /Complete joining:.*600/ });
+    expect(screen.queryByRole("radio", { name: /Pay R1,200 once/i })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: /Complete joining:.*600/ }));
+    await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
+      apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
+      { schedule: 1 },
+    ));
+    expect(window.localStorage.getItem("aqua.aqgreenCheckoutReview.1.2")).toBe("unpaid");
+  });
+
+  it("does not open another checkout for a replayed invitation whose joining is already complete", async () => {
+    vi.mocked(httpClient.post).mockResolvedValueOnce({
+      ...partPaidRecord,
+      statusCode: "PaymentConfirmedAwaitingApproval",
+      joiningPaidAmount: 1200,
+      nextPaymentAmount: null,
+    });
+    render(<ProgrammeInvitationLanding inviteCode="AQ7G2X9KLMNP" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /confirm and continue/i }));
+
+    expect(await screen.findByText("Check your joining status")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Complete joining|confirm and continue/i })).not.toBeInTheDocument();
+    expect(httpClient.post).toHaveBeenCalledExactlyOnceWith(
+      apiEndpoints.programmeParticipations.startEntry,
+      { inviteCode: "AQ7G2X9KLMNP" },
+    );
+  });
+
+  it("keeps a same-stage reminder blocking a replayed invitation until the status is reviewed", async () => {
+    window.localStorage.setItem("aqua.aqgreenCheckoutReview.1.2", "part-paid");
+    vi.mocked(httpClient.post).mockResolvedValueOnce(partPaidRecord);
+    render(<ProgrammeInvitationLanding inviteCode="AQ7G2X9KLMNP" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /confirm and continue/i }));
+
+    expect(await screen.findByText("Check your payment status")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Complete joining/i })).not.toBeInTheDocument();
+    expect(httpClient.post).toHaveBeenCalledExactlyOnceWith(
+      apiEndpoints.programmeParticipations.startEntry,
+      { inviteCode: "AQ7G2X9KLMNP" },
+    );
+    expect(window.localStorage.getItem("aqua.aqgreenCheckoutReview.1.2")).toBe("part-paid");
+  });
 });
 
 // These existing cases exercise ordinary deployments. Pilot-specific cases use

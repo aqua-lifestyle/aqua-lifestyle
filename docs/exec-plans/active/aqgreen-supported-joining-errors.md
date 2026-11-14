@@ -133,3 +133,86 @@ No root, invitation, payment or membership state was changed in production.
 Review the draft PR and complete required hosted/backend gates before authorizing
 a frontend-only release. Resolve the separately recorded genuine-customer
 eligibility/readback limits before any real joining payment or Host mutation.
+
+## 2026-11-14 protected-CI review and release verdict (NO-GO)
+
+- Final protected CI for 7ff1d25…: run 43571825810 (pull_request, attempt 1),
+  conclusion success, completed 2026-11-14T07:52:28Z. All 17 jobs succeeded,
+  including every backend application/web shard, the PostgreSQL
+  transactional-invitation regressions and the frontend quality job
+  ("Test Files 134 passed (134)", "found 0 vulnerabilities",
+  "Compiled successfully").
+- Actual diff re-verified from the PR patch: 17 files (+911/−238); backend
+  runtime sources, .github/workflows and frontend package/lock files remain
+  byte-identical to commissioned b8d86e5… (git diff --exit-code clean). The only
+  backend change is the test-project regression
+  V2Joining_IndependentOrRecruiterOnlyRequestCannotCreateParticipationCheckoutOr
+  Payment. Admission/D10/Yoco/Tenant/Area/approval safeguards unchanged.
+- New release blocker found by a temporary local counterexample
+  (/tmp/opencode/pr131-invitation-replay.spec.cjs, 1 passed, no production
+  calls): replayed invitation after one confirmed R600 instalment. Backend
+  StartEntry is idempotent for an existing participation
+  (ClubMemberProgrammeParticipationAppService.cs:247-258), so the landing page
+  reaches the schedule step with joiningSchedule=1 and 600 paid. The landing
+  keeps the default "Pay R1,200 once" radio and posts
+  CreateAQGreenJoiningCheckout {schedule: 0}; the domain forbids a schedule
+  change after a verified payment (EntryParticipation.cs:214-218) and rejects
+  it. The page writes the part-paid checkout-review marker BEFORE the checkout
+  succeeds (programme-invitation-landing.tsx:124-130) and nothing clears or
+  advances the marker (use-checkout-review.ts allows only unpaid→part-paid), so
+  My programmes then blocks the legitimate second-instalment action
+  (member-programmes.tsx:174,249). The user is left without an in-app path to
+  pay the second R600. Pre-PR behaviour recovered via My programmes; the marker
+  introduces a regression on the invitation path and defeats the PR's
+  "prevent unsupported checkout" property.
+- Release-path constraints verified in the qualified executor: the only release
+  modes are full and the pinned schema54-member-reads-v1 pair (deploy.yml:20-27;
+  member-release.json pins frontend 53341b57…, receiver 4eba3799…). The partial
+  mode additionally requires the live Render deploy already at the qualified
+  sha (release-control.mjs:1458-1459). Neither mode retains the commissioned
+  Render deployment unchanged for a new sha; full mode deploys Render at the
+  merge sha (backend sources identical, but still a fresh Render deployment).
+- validateRun requires the qualifying CI to be a main-push run of
+  .github/workflows/ci.yml named "Continuous integration" at the merge sha
+  (release-control.mjs:83-86). The PR's green pull_request run cannot qualify a
+  release; a fresh main CI run after merge is required.
+- Verdict for this review: NO-GO for release as-is. The invitation-path
+  regression must be fixed and re-verified first (a frontend-only fix remains
+  compatible with the pinned backend). Customer-specific checkout
+  reconciliation stays unresolved independently: existing Host DTOs do not bind
+  active checkouts to the identified customer by ID and the historical provider
+  charge outcome is not established, so no real payment is recommended and no
+  Tenant-wide record is attributed.
+
+## 2026-11-14 instalment-regression fix (PR #131 update)
+
+Per the owner's "finish PR #131 without expanding scope" instruction, the proven
+invitation-path regression was fixed inside the PR (frontend only):
+
+- `use-checkout-review.ts`: the reminder lifecycle now takes authoritative
+  `CheckoutReviewEvidence` from the caller's server reads. A marker is retired
+  only on proven settlement: the first-stage (`unpaid`) reminder retires when the
+  record shows the first joining instalment confirmed (`joiningPaidAmount > 0`);
+  any reminder retires when the joining total is confirmed (statusCode
+  PaymentConfirmedAwaitingApproval/Active). Ambiguous states (e.g. the deployed
+  member read hiding PreparingCheckout without a URL) are never cleared by a
+  refresh alone, preserving the established fail-closed doctrine.
+- `programme-invitation-landing.tsx`: the AQGreen confirm is now two-phase. The
+  confirm button runs idempotent StartEntry only; the authoritative record then
+  selects the view: a part-paid record offers the legitimate second instalment
+  ("Complete joining: R{nextPaymentAmount}") posting the recorded schedule 1; a
+  paid-0 record with a persisted schedule continues that recorded plan; only a
+  fresh record (paid 0, no schedule) auto-posts the visitor's selected schedule;
+  complete or inconsistent records show status guidance without amounts.
+  Schedule radios no longer render once a participation exists, so a replay can
+  never default to R1,200 once or submit a schedule change.
+- `member-programmes.tsx`: passes the same server-read evidence to the hook, so
+  a confirmed first instalment retires a settled reminder and keeps an
+  unresolved second-stage reminder fail-closed.
+- Coverage: 5 new hook tests, 5 new landing tests, 2 new member-programmes
+  tests, 7 new e2e cases (replayed invitation second R600, recorded-but-unpaid
+  plan, completed replay, settled reminder retired through the invitation,
+  second payment after re-sign-in, unresolved reminder surviving re-sign-in
+  without duplicate requests). All 601 unit tests, all 24 aqgreen e2e cases and
+  the member/auth/pilot/read-cutover e2e specs pass locally (Chrome); lint
+  clean except the pre-existing pilot `location.assign` warnings.

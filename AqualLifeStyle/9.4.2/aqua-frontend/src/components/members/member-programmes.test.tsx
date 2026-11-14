@@ -299,6 +299,32 @@ describe("MemberProgrammes", () => {
     expect(window.localStorage.getItem("aqua.aqgreenCheckoutReview.1.7")).toBe("part-paid");
   });
 
+  it("retires a settled first-stage reminder when the confirmed first instalment leaves no open checkout", async () => {
+    window.localStorage.setItem("aqua.aqgreenCheckoutReview.1.7", "unpaid");
+    showAwaitingAQGreen();
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: { programmeName: "AQGreen", currency: "ZAR", statusCode: "AwaitingActivationPayment", status: "Awaiting second joining instalment", joinedIndependently: true, joiningSchedule: 1, joiningPaidAmount: 600, nextPaymentAmount: 600, canRecruitForThisProgramme: false, isActive: false },
+      onyx: null, pendingAQGreenCheckout: null,
+    });
+    render(<MemberProgrammes />);
+    expect(await screen.findByRole("button", { name: /Complete joining:.*600/ })).toBeEnabled();
+    expect(window.localStorage.getItem("aqua.aqgreenCheckoutReview.1.7")).toBeNull();
+  });
+
+  it("keeps an unresolved second-instalment reminder even after the first instalment is confirmed", async () => {
+    window.localStorage.setItem("aqua.aqgreenCheckoutReview.1.7", "part-paid");
+    showAwaitingAQGreen();
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: { programmeName: "AQGreen", currency: "ZAR", statusCode: "AwaitingActivationPayment", status: "Awaiting second joining instalment", joinedIndependently: true, joiningSchedule: 1, joiningPaidAmount: 600, nextPaymentAmount: 600, canRecruitForThisProgramme: false, isActive: false },
+      onyx: null, pendingAQGreenCheckout: null,
+    });
+    render(<MemberProgrammes />);
+    expect(await screen.findByRole("button", { name: "Refresh payment status" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Complete joining/ })).not.toBeInTheDocument();
+    expect(window.localStorage.getItem("aqua.aqgreenCheckoutReview.1.7")).toBe("part-paid");
+    expect(httpClient.post).not.toHaveBeenCalled();
+  });
+
   it("does not infer zero paid or a default schedule when the joining facts are unavailable", async () => {
     showAwaitingAQGreen(null, false);
     render(<MemberProgrammes />);

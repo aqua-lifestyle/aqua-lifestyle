@@ -74,10 +74,16 @@ export const MemberProgrammes = () => {
   const [success, setSuccess] = useState<string>();
   const [startingAQGreenPayment, setStartingAQGreenPayment] = useState(false);
   const [accessRefreshFinished, setAccessRefreshFinished] = useState(false);
-  const checkoutReview = useCheckoutReview(session?.user);
   const joiningStage: JoiningCheckoutStage | undefined = participations?.entry?.joiningPaidAmount === 0
     ? "unpaid" : participations?.entry?.joiningSchedule === 1 && participations.entry.joiningPaidAmount === 600
       ? "part-paid" : undefined;
+  const joiningFullyPaid = ["PaymentConfirmedAwaitingApproval", "Active"].includes(
+    participations?.entry?.statusCode ?? "",
+  );
+  const checkoutReview = useCheckoutReview(session?.user, {
+    firstInstalmentConfirmed: (participations?.entry?.joiningPaidAmount ?? 0) > 0,
+    joiningFullyPaid,
+  });
   const accessRefreshAttempted = useRef(false);
   const contractCheckAttempted = useRef(false);
   const hasActiveInvitationAccess = Boolean(
