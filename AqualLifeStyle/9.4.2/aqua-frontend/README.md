@@ -2,6 +2,47 @@
 
 Next.js App Router frontend for the AquaLifeStyle ABP backend.
 
+## AQGreen Clean Start joining
+
+- An account without AQGreen participation is directed to a valid eligible-member
+  invitation, or to the club team for the existing Host-selected first-root process.
+  There is no customer-operated independent-root action or approval-request API.
+- A Host-authorised root uses its existing participation to choose R1,200 once or
+  two distinct R600 instalments. An invited customer retains the original invitation
+  through registration/sign-in, admission, and checkout. Admission must succeed
+  before checkout is requested. Account permissions and payment availability still
+  gate the controls; backend authorization remains authoritative.
+- Errors reuse the ABP normalizer and existing accessible `StatusMessage`/dialog
+  components. Known joining errors have customer-facing titles and next actions;
+  diagnostic metadata stays on the normalized error rather than on screen.
+- A browser checkout reminder is written before each AQGreen checkout attempt,
+  scoped to the authenticated Tenant/account. It survives refresh and observes
+  other tabs. It stores only a stage label, not credentials, payment references,
+  URLs, amounts, names or email addresses. It is not provider confirmation, business
+  authorization or a distributed payment lock. Server-confirmed progress from the
+  first instalment permits the second distinct instalment; a browser return URL
+  cannot confirm payment or activation.
+- The current backend member read can omit a preparing checkout without a URL.
+  A missing URL must not clear an observed uncertain attempt. Customers check
+  My programmes and contact the club team when the result remains unclear; there
+  is no automatic reminder reset that asserts a failed or absent payment. The
+  existing authorized provider/reference reconciliation remains necessary for
+  indeterminate or terminal-failure recovery. Clearing browser storage is not
+  payment evidence. Existing backend duplicate protection remains authoritative.
+
+Focused local browser coverage uses the established mock backend and intercepted
+`payments.example.test` navigation, never a real customer or production payment:
+
+```bash
+PLAYWRIGHT_CHANNEL=chrome npm run test:e2e -- e2e/aqgreen-supported-joining.spec.ts --workers=1 --reporter=line
+```
+
+A release of this frontend correction must retain the currently commissioned API
+artifact. Backend runtime sources are unchanged; do not rebuild/deploy the API or
+change its activation bindings as part of a frontend-only release. Release
+authorization and a genuine customer/provider journey are separate from local
+browser/component evidence.
+
 ## Admin UI validation
 
 Run the checks in the repository's `docs/development/validation.md` with Node 24.

@@ -3,139 +3,60 @@
 import { useState, type FormEvent } from "react";
 
 import { apiEndpoints, httpClient } from "@/src/shared/api";
-import { getRequestErrorMessage } from "@/src/shared/api/abp-error";
+import { getRequestErrorPresentation, type RequestErrorPresentation } from "@/src/shared/api/abp-error";
 import type { ProgrammeCheckout } from "@/src/shared/domain/programme-participations";
 import { navigateToExternalUrl } from "@/src/shared/browser/navigation";
 import { Button, Dialog, StatusMessage } from "@/src/shared/ui";
 
-type Programme = "AQGreen" | "Onyx";
-
 type JoinProgrammeDialogProps = {
   disabled?: boolean;
-  programme: Programme;
+  // AQGreen admission is invitation-based or separately Host-authorised.
+  programme: "Onyx";
 };
 
-export const JoinProgrammeDialog = ({
-  disabled = false,
-  programme,
-}: JoinProgrammeDialogProps) => {
+export const JoinProgrammeDialog = ({ disabled = false, programme }: JoinProgrammeDialogProps) => {
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<RequestErrorPresentation>();
   const [submitting, setSubmitting] = useState(false);
-  const [aqGreenSchedule, setAQGreenSchedule] = useState<0 | 1>(0);
-
   const close = () => {
     if (submitting) return;
     setOpen(false);
-    setError(undefined);
+    // Retain an uncertain outcome until the member checks the existing status.
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (disabled) return;
+    if (disabled || submitting || error?.reviewPaymentStatus) return;
     setSubmitting(true);
     setError(undefined);
     try {
-      if (programme === "AQGreen") {
-        await httpClient.post(apiEndpoints.programmeParticipations.startEntry, {
-          recruiterCustomerId: null,
-        });
-        const checkout = await httpClient.post<
-          ProgrammeCheckout,
-          { schedule: 0 | 1 }
-        >(
-          apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
-          { schedule: aqGreenSchedule },
-        );
-        navigateToExternalUrl(checkout.checkoutUrl);
-      } else {
-        const checkout = await httpClient.post<
-          ProgrammeCheckout,
-          { recruiterCustomerId: null }
-        >(
-          apiEndpoints.programmeParticipations.createDirectOnyxCheckout,
-          { recruiterCustomerId: null },
-        );
-        navigateToExternalUrl(checkout.checkoutUrl);
-      }
-    } catch (requestError) {
-      setError(
-        getRequestErrorMessage(
-          requestError,
-          `${programme} participation could not be started. No payment has been taken.`,
-        ),
+      const checkout = await httpClient.post<ProgrammeCheckout, { recruiterCustomerId: null }>(
+        apiEndpoints.programmeParticipations.createDirectOnyxCheckout,
+        { recruiterCustomerId: null },
       );
-    } finally {
-      setSubmitting(false);
-    }
+      navigateToExternalUrl(checkout.checkoutUrl);
+    } catch (requestError) {
+      setError(getRequestErrorPresentation(requestError, "Your Onyx checkout status could not be confirmed.", "checkout"));
+    } finally { setSubmitting(false); }
   };
 
   return (
     <>
-      <Button disabled={disabled} onClick={() => setOpen(true)}>
-        Join {programme}
-      </Button>
+      <Button disabled={disabled} onClick={() => setOpen(true)}>Join {programme}</Button>
       <Dialog onClose={close} open={open} title={`Join ${programme}`}>
         <form className="flex flex-col gap-5" onSubmit={submit}>
           <div className="rounded-lg bg-muted/60 p-4 text-sm text-muted-foreground">
-            {programme === "AQGreen"
-              ? "AQGreen joining is R1,200. Pay once or as two R600 instalments. Provider confirmation is followed by Area Administrator review before activation."
-              : "Joining Onyx directly requires one full payment of R6,120. Provider confirmation is followed by Area Administrator review before activation."}
+            Joining Onyx directly requires one full payment of R6,120. Provider confirmation is followed by Area Administrator review before activation.
           </div>
-
-          {programme === "AQGreen" ? (
-            <fieldset className="grid gap-3">
-              <legend className="text-sm font-semibold">Payment schedule</legend>
-              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-4">
-                <input
-                  checked={aqGreenSchedule === 0}
-                  className="mt-1"
-                  name="aqgreen-payment-schedule"
-                  onChange={() => setAQGreenSchedule(0)}
-                  type="radio"
-                />
-                <span>
-                  <span className="block font-medium">Pay R1,200 once</span>
-                  <span className="text-sm text-muted-foreground">
-                    Complete the joining obligation in one payment.
-                  </span>
-                </span>
-              </label>
-              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-4">
-                <input
-                  checked={aqGreenSchedule === 1}
-                  className="mt-1"
-                  name="aqgreen-payment-schedule"
-                  onChange={() => setAQGreenSchedule(1)}
-                  type="radio"
-                />
-                <span>
-                  <span className="block font-medium">Pay two R600 instalments</span>
-                  <span className="text-sm text-muted-foreground">
-                    Area review starts only after both instalments are confirmed.
-                  </span>
-                </span>
-              </label>
-            </fieldset>
-          ) : null}
-
           <div className="rounded-lg border border-border p-4">
             <p className="font-medium">Start my own network</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              You will be the starting point of your own network. To join under
-              another Club Member, open the secure invitation link they shared.
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">To join under another Club Member, open the secure invitation link they shared.</p>
           </div>
-
-          {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
-
+          {error ? <StatusMessage title={error.title} tone="error">{error.message}</StatusMessage> : null}
+          {error?.reviewPaymentStatus ? <Button onClick={() => window.location.reload()} variant="outline">Check my payment status</Button> : null}
           <div className="flex justify-end gap-3">
-            <Button disabled={submitting} onClick={close} variant="outline">
-              Cancel
-            </Button>
-            <Button disabled={disabled} isLoading={submitting} type="submit">
-              Continue to secure payment
-            </Button>
+            <Button disabled={submitting} onClick={close} variant="outline">Cancel</Button>
+            <Button disabled={disabled || error?.reviewPaymentStatus} isLoading={submitting} type="submit">Continue to secure payment</Button>
           </div>
         </form>
       </Dialog>

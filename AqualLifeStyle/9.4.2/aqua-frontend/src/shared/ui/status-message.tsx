@@ -19,7 +19,7 @@ const toneConfig: Record<
   error: {
     icon: AlertCircle,
     className: "bg-error/10 text-error border-error/20",
-    title: "Error",
+    title: "We couldn't complete that action",
   },
   info: {
     icon: Info,

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AbpHttpError,
   getRequestErrorMessage,
+  getRequestErrorPresentation,
   normalizeAbpError,
   normalizeNetworkError,
   unwrapAbpResponse,
@@ -87,9 +88,9 @@ describe("normalizeNetworkError", () => {
     expect(error).toBeInstanceOf(AbpHttpError);
     expect(error.status).toBe(0);
     expect(error.code).toBe("Aqua:Network");
-    expect(error.message).toContain("Unable to reach the backend API");
-    expect(error.message).toContain("HTTPS certificate");
-    expect(error.message).toContain("CORS");
+    expect(error.message).toContain("Aqua Lifestyle Club");
+    expect(error.message).toContain("Check your connection");
+    expect(error.message).not.toMatch(/CORS|certificate|localhost/);
   });
 
   it("returns a TLS-specific message for certificate failures", () => {
@@ -100,8 +101,69 @@ describe("normalizeNetworkError", () => {
     expect(error).toBeInstanceOf(AbpHttpError);
     expect(error.status).toBe(0);
     expect(error.code).toBe("Aqua:Tls");
-    expect(error.message).toContain("HTTPS certificate is not trusted");
-    expect(error.message).toContain("http://localhost:21021");
+    expect(error.message).toContain("secure connection");
+    expect(error.message).toContain("contact the club team");
+    expect(error.message).not.toMatch(/localhost|dev-certs|accept the certificate/);
+  });
+});
+
+describe("customer-facing domain error presentation", () => {
+  it.each([
+    ["Independent admission and recruiter-only joining are unavailable on this path.", "Before you join AQGreen", "authorised Host administrator"],
+    ["The invitation code was not found.", "Invitation unavailable", "original link"],
+    ["The inviting Club Member is not currently eligible to invite members to this programme.", "This invitation is not ready to use", "check their participation"],
+    ["Your email address is not confirmed.", "Verify your email to continue", "Resend verification email"],
+    ["Online payment is temporarily unavailable.", "Payments are temporarily unavailable", "check that payment's status"],
+    ["Payment failed.", "Payment could not be completed", "If money left your account"],
+    ["Your AQGreen payment checkout is still being prepared.", "Check your payment status", "Do not start a second payment"],
+  ])("maps the recognised domain response %s", (details, title, nextAction) => {
+    const error = new AbpHttpError(500, { message: "The request failed.", details });
+    // A confirmed business failure is not replaced with generic success or retry.
+    const result = getRequestErrorPresentation(error, "Please contact the club team.");
+    expect(result.title).toBe(title);
+    expect(result.message).toContain(nextAction);
+    expect(getRequestErrorMessage(error, "Fallback")).toBe(result.message);
+  });
+
+  it("keeps a lost checkout response uncertain, including generic HTTP failures", () => {
+    for (const error of [normalizeNetworkError(), new AbpHttpError(503, {}), new Error("Lost response")]) {
+      const result = getRequestErrorPresentation(error, "Fallback", "checkout");
+      expect(result.title).toBe("Payment status not confirmed");
+      expect(result.reviewPaymentStatus).toBe(true);
+      expect(result.message).toContain("Do not start a second payment");
+      expect(result.message).not.toMatch(/No payment has been taken|retry|try again shortly/i);
+    }
+  });
+
+  it("does not misdiagnose a composite founder-registration rejection as an unverified email", () => {
+    const result = getRequestErrorPresentation(new AbpHttpError(500, {
+      message: "D10_CLEAN_START_ROOT_VERIFIED_REGISTRATION_REQUIRED",
+    }), "Fallback");
+    expect(result.title).toBe("Founder eligibility needs review");
+    expect(result.message).toContain("current first-founder registration requirements");
+    expect(result.message).not.toContain("Open the verification email");
+    expect(result.message).not.toContain("D10_");
+  });
+
+  it("does not print internal codes or exception diagnostics from any display field", () => {
+    const error = new AbpHttpError(500, {
+      code: "D10_CURRENT_JOINING_AREA_UNVERIFIABLE", correlationId: "diagnostic-reference",
+      message: "D10_CURRENT_JOINING_AREA_UNVERIFIABLE",
+      details: "Npgsql exception in /src/Application/Service.cs",
+      validationErrors: [{ message: "YOCO_CUTOVER_BUSINESS_STATE_UNKNOWN" }],
+    });
+    const result = getRequestErrorPresentation(error, "Please contact the club team.");
+    expect(result.message).toBe("Please contact the club team.");
+    expect(JSON.stringify(result)).not.toMatch(/D10_|YOCO_|Npgsql|diagnostic-reference|\/src\//);
+    expect(error.code).toBe("D10_CURRENT_JOINING_AREA_UNVERIFIABLE");
+    expect(error.correlationId).toBe("diagnostic-reference");
+  });
+
+  it("keeps an unexpected invitation service error actionable without revealing its internals", () => {
+    const result = getRequestErrorPresentation(new Error("TypeError: cannot read properties"), "Fallback", "invitation");
+    expect(result.title).toBe("Invitation unavailable");
+    expect(result.message).toContain("contact the club team");
+    expect(result.message).not.toContain("TypeError");
   });
 });
 
