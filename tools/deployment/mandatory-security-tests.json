@@ -1269,7 +1269,7 @@
     },
     {
       "path": "tools/deployment/runtime-restart-probe.sh",
-      "sha256": "5b7cc9c225ae5279555e2c6f5658e56a5a258b743bed0d99fda04a858d6466a7"
+      "sha256": "e5626ea6cd0efa8f03f1d71ebbb5bf4bbecf1522b74e44e47434396d4e697de0"
     },
     {
       "path": "docker/api/Dockerfile",

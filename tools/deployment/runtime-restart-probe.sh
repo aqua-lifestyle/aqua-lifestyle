@@ -271,9 +271,13 @@ check_held_state() {
   [[ $(printf 'SELECT "Status" || '"'"':'"'"' || "AttemptCount" FROM "TransactionalEmailOutboxMessages" WHERE "IdempotencyKey"='"'"'runtime-held'"'"';\n' | admin_sql) == 0:0 ]]
 }
 probe_phase=first_start
+probe_history=$(printf 'SELECT count(*) FROM "__EFMigrationsHistory";\n' | admin_sql)
 start_api
 wait_healthy
-"${probe_docker[@]}" exec "$probe_api" sh -c 'test ! -e /app/AqualLifeStyle.Migrator.dll && test ! -d /app/migrator'
+# The candidate one-off schema job shares this image, but the API process itself
+# must remain the host and must never migrate or repair.
+"${probe_docker[@]}" exec "$probe_api" sh -c 'grep -a -q "AqualLifeStyle.Web.Host.dll" /proc/1/cmdline'
+[[ $(printf 'SELECT count(*) FROM "__EFMigrationsHistory";\n' | admin_sql) == "$probe_history" ]]
 check_held_state
 passed 'normal Production API starts without recovery and preserves held outbox/business state beyond the dispatch interval'
 probe_phase=container_restart
