@@ -109,7 +109,7 @@ describe("normalizeNetworkError", () => {
 
 describe("customer-facing domain error presentation", () => {
   it.each([
-    ["Independent admission and recruiter-only joining are unavailable on this path.", "Before you join AQGreen", "authorised Host administrator"],
+    ["Choose an AQGreen invitation or explicitly request an independent network.", "Before you join AQGreen", "Area administrator approval"],
     ["The invitation code was not found.", "Invitation unavailable", "original link"],
     ["The inviting Club Member is not currently eligible to invite members to this programme.", "This invitation is not ready to use", "check their participation"],
     ["Your email address is not confirmed.", "Verify your email to continue", "Resend verification email"],

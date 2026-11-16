@@ -90,6 +90,11 @@ printf 'ASPNETCORE_ENVIRONMENT=Production\nConnectionStrings__Default=Host=%s;Da
 "${probe_docker[@]}" run --name "$probe_migration" --network "$probe_network" --env-file "$probe_dir/migrator.env" \
   "$probe_migrator_image" -q >"$probe_dir/migration-private.log" 2>&1
 passed 'separate maintenance image initializes only the disposable application schema with its own identity'
+if [[ ${GITHUB_ACTIONS:-} == true ]]; then
+  node "$probe_root/tools/deployment/backend-successor-integrity.mjs" "$probe_pg" "$probe_api_image" \
+    "$probe_endpoint" "$probe_root/TestResults/runtime-authority/backend-successor-integrity.json"
+  passed 'qualified image assemblies and migrated PostgreSQL schema recorded for the exact CI source'
+fi
 probe_phase=runtime_grants
 printf "CREATE ROLE aqua_runtime_api LOGIN PASSWORD '%s' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;\n" "$probe_api_password" | admin_sql >/dev/null
 admin_sql >/dev/null <<'SQL'
@@ -266,9 +271,13 @@ check_held_state() {
   [[ $(printf 'SELECT "Status" || '"'"':'"'"' || "AttemptCount" FROM "TransactionalEmailOutboxMessages" WHERE "IdempotencyKey"='"'"'runtime-held'"'"';\n' | admin_sql) == 0:0 ]]
 }
 probe_phase=first_start
+probe_history=$(printf 'SELECT count(*) FROM "__EFMigrationsHistory";\n' | admin_sql)
 start_api
 wait_healthy
-"${probe_docker[@]}" exec "$probe_api" sh -c 'test ! -e /app/AqualLifeStyle.Migrator.dll && test ! -d /app/migrator'
+# The candidate one-off schema job shares this image, but the API process itself
+# must remain the host and must never migrate or repair.
+"${probe_docker[@]}" exec "$probe_api" sh -c 'grep -a -q "AqualLifeStyle.Web.Host.dll" /proc/1/cmdline'
+[[ $(printf 'SELECT count(*) FROM "__EFMigrationsHistory";\n' | admin_sql) == "$probe_history" ]]
 check_held_state
 passed 'normal Production API starts without recovery and preserves held outbox/business state beyond the dispatch interval'
 probe_phase=container_restart

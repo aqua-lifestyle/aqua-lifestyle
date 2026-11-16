@@ -24,8 +24,8 @@ namespace AqualLifeStyle.Web.Host.Models
 
         public static string ResolveBuildId(IConfiguration configuration) =>
             FirstSafeIdentifier(
-                configuration["Deployment:BuildId"],
                 configuration["RENDER_GIT_COMMIT"],
+                configuration["Deployment:BuildId"],
                 configuration["SOURCE_VERSION"],
                 configuration["GIT_COMMIT"]);
 

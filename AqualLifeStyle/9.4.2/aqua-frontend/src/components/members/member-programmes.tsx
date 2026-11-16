@@ -73,6 +73,7 @@ export const MemberProgrammes = () => {
   const [actionError, setActionError] = useState<RequestErrorPresentation>();
   const [success, setSuccess] = useState<string>();
   const [startingAQGreenPayment, setStartingAQGreenPayment] = useState(false);
+  const [startingIndependentRoot, setStartingIndependentRoot] = useState(false);
   const [accessRefreshFinished, setAccessRefreshFinished] = useState(false);
   const joiningStage: JoiningCheckoutStage | undefined = participations?.entry?.joiningPaidAmount === 0
     ? "unpaid" : participations?.entry?.joiningSchedule === 1 && participations.entry.joiningPaidAmount === 600
@@ -206,6 +207,19 @@ export const MemberProgrammes = () => {
     }
   };
 
+  const requestIndependentRoot = async () => {
+    if (paymentActionsUnavailable || isPilot || participations?.entry || startingIndependentRoot) return;
+    setStartingIndependentRoot(true);
+    setActionError(undefined);
+    try {
+      await httpClient.post(apiEndpoints.programmeParticipations.startEntry, { requestIndependentRoot: true });
+      await reloadParticipations();
+      setSuccess("Your independent AQGreen network request was recorded. Refresh My programmes to see joining payment options. Your Area administrator must approve after verified payment before your network exists or you can invite members.");
+    } catch (error) {
+      setActionError(getRequestErrorPresentation(error, "Your independent AQGreen request could not be confirmed."));
+    } finally { setStartingIndependentRoot(false); }
+  };
+
   const confirmTestPayment = async (checkoutId?: string) => {
     if (!isPilot || !checkoutId || paymentActionsUnavailable) return;
     setStartingAQGreenPayment(true);
@@ -296,6 +310,12 @@ export const MemberProgrammes = () => {
   const aqGreenJoinAction = !participations?.entry ? (
     <StatusMessage title={aqGreenAdmissionGuidance.title} tone="info">
       <p>{aqGreenAdmissionGuidance.message}</p>
+      {!isPilot ? (
+        <Button className="mt-3" disabled={paymentActionsUnavailable}
+          isLoading={startingIndependentRoot} onClick={() => void requestIndependentRoot()}>
+          Start my own network
+        </Button>
+      ) : null}
       <LinkButton className="mt-3" href="/contact">Contact the club team</LinkButton>
     </StatusMessage>
   ) : undefined;

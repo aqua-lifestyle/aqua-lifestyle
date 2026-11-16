@@ -54,7 +54,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await using var c = new NpgsqlConnection(lease.ConnectionString()); await c.OpenAsync();
             await using var context = _fixture.CreateDbContext(c);
             var migrations = context.Database.GetMigrations().OrderBy(x => x, StringComparer.Ordinal).ToArray();
-            migrations.Length.ShouldBe(55);
+            migrations.Length.ShouldBe(56);
             checks.ShouldContain(AQGreenB6CanonicalEvidence.Hash(Encoding.UTF8.GetBytes(string.Join("\n", migrations.Take(54)))));
         }
 

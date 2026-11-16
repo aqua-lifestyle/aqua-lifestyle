@@ -1587,6 +1587,37 @@ namespace AqualLifeStyle.Migrations
                     b.ToTable("AbpUsers");
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenIndependentRootRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("RequestedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ParticipantId")
+                        .IsUnique();
+
+                    b.ToTable("AQGreenIndependentRootRequests", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AQGIndependentRoot_Actor", "\"RequestedByUserId\" > 0");
+
+                            t.HasCheckConstraint("CK_AQGIndependentRoot_Tenant", "\"TenantId\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenNetworkPlacement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5703,6 +5734,16 @@ namespace AqualLifeStyle.Migrations
                     b.Navigation("DeleterUser");
 
                     b.Navigation("LastModifierUser");
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenIndependentRootRequest", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.EntryParticipation", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ParticipantId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenNetworkPlacement", b =>

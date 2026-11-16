@@ -38,6 +38,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         private readonly IRepository<CustomerAreaAssignment, Guid> _areaAssignments;
         private readonly IHostedPaymentCheckoutLock _areaLocks;
         private readonly IRepository<AQGreenProspectiveRootAdmission, Guid> _rootAdmissions;
+        private readonly IRepository<AQGreenIndependentRootRequest, Guid> _rootRequests;
         private readonly IYocoCutoverStore _cutover;
         public AQGreenD10Runtime(IAQGreenD10CommissioningSource source, IConfiguration configuration,
             IUnitOfWorkManager uows, IRepository<EntryParticipation, Guid> participations,
@@ -46,11 +47,12 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             IRepository<EntryCommissionPeriod, Guid> periods, IRepository<EntryWeeklyCommission, Guid> commissions,
             IRepository<Area, Guid> areas, IRepository<CustomerAreaAssignment, Guid> areaAssignments,
             IHostedPaymentCheckoutLock areaLocks, IRepository<AQGreenProspectiveRootAdmission, Guid> rootAdmissions,
+            IRepository<AQGreenIndependentRootRequest, Guid> rootRequests,
             IYocoCutoverStore cutover)
         { _source = source; _configuration = configuration; _uows = uows; _participations = participations;
             _customers = customers; _placements = placements; _session = session; _memberships = memberships; _snapshot = snapshot;
             _periods = periods; _commissions = commissions; _areas = areas; _areaAssignments = areaAssignments; _areaLocks = areaLocks;
-            _rootAdmissions = rootAdmissions; _cutover = cutover; }
+            _rootAdmissions = rootAdmissions; _rootRequests = rootRequests; _cutover = cutover; }
 
         public async Task VerifyStartupAsync()
         {
@@ -249,15 +251,23 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         private async Task VerifyPopulationAsync(AQGreenD10Decision d, bool stabilizeAreas = false,
             AQGreenCleanStartEvidence cleanStart = null)
         {
+            var independentRootStorage = false;
             // Reuse the existing PostgreSQL source-boundary reader in its own read-only snapshot;
             // never mark an approval/calculation transaction read-only or observe its uncommitted writes.
             using (var sourceUow = _uows.Begin(new UnitOfWorkOptions { Scope = TransactionScopeOption.RequiresNew,
                 IsTransactional = true, IsolationLevel = IsolationLevel.RepeatableRead }))
             {
                 var boundary = await _snapshot.CaptureAsync();
+                independentRootStorage = await _snapshot.HasIndependentRootStorageAsync();
+                var historicalBinaryAndSchema = boundary.SourceSchemaVersion == d.RequiredSchemaDigest &&
+                    boundary.SourceAssemblyDigest == d.RequiredAssemblyDigest &&
+                    RuntimeAssemblyDigest(boundary.SourceAssemblyDigest) == d.RequiredRuntimeAssemblyDigest;
+                // The commissioned database identity stays absolute. Only a successor
+                // input staged by the protected release pipeline, re-verified here
+                // against the original decision, lets the binary/schema pins move.
                 AQGreenD10Commissioning.Require(boundary.SourceDatabaseIdentityEvidence == d.RequiredDatabaseIdentityDigest &&
-                    boundary.SourceSchemaVersion == d.RequiredSchemaDigest && boundary.SourceAssemblyDigest == d.RequiredAssemblyDigest &&
-                    RuntimeAssemblyDigest(boundary.SourceAssemblyDigest) == d.RequiredRuntimeAssemblyDigest,
+                    (historicalBinaryAndSchema ||
+                        AQGreenD10BackendSuccessor.Accept(d, boundary, _configuration)),
                     "D10_DATABASE_SCHEMA_OR_RELEASE_MISMATCH");
                 if (d.AdmissionMode == "CLEAN_START")
                 {
@@ -298,12 +308,32 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                             "D10_CLEAN_START_UNBOUND_POPULATION_NOT_EMPTY");
                     else
                     {
-                        AQGreenD10Commissioning.Require(await roots.CountAsync() == 1 &&
-                            await (from r in roots join p in live on r.ParticipantId equals p.Id
-                                where r.AdministratorUserId > 0 && p.StartedAt >= d.V2EffectiveAtUtc &&
-                                    r.AuthorizedAt >= p.StartedAt
-                                select r.Id).CountAsync() == 1,
-                            "D10_CLEAN_START_AUTHORIZED_ROOT_REQUIRED");
+                        if (!independentRootStorage)
+                            AQGreenD10Commissioning.Require(await roots.CountAsync() == 1 &&
+                                await (from r in roots join p in live on r.ParticipantId equals p.Id
+                                    where r.AdministratorUserId > 0 && p.StartedAt >= d.V2EffectiveAtUtc &&
+                                        r.AuthorizedAt >= p.StartedAt select r.Id).CountAsync() == 1,
+                                "D10_CLEAN_START_AUTHORIZED_ROOT_REQUIRED");
+                        else
+                        {
+                            var requests = _rootRequests.GetAll().AsNoTracking().Where(r => r.TenantId == d.TenantId);
+                            var historical = roots.Where(r => !requests.Any(q => q.ParticipantId == r.ParticipantId));
+                            AQGreenD10Commissioning.Require(await historical.CountAsync() == 1 &&
+                                await (from r in historical join p in live on r.ParticipantId equals p.Id
+                                    where r.AdministratorUserId > 0 && p.StartedAt >= d.V2EffectiveAtUtc &&
+                                        r.AuthorizedAt >= p.StartedAt select r.Id).CountAsync() == 1,
+                                "D10_CLEAN_START_AUTHORIZED_ROOT_REQUIRED");
+                            var later = from r in roots join q in requests on r.ParticipantId equals q.ParticipantId
+                                join p in live on r.ParticipantId equals p.Id
+                                join c in _customers.GetAll().AsNoTracking() on p.CustomerId equals c.Id
+                                where q.TenantId == p.TenantId && c.TenantId == p.TenantId &&
+                                    c.UserId == q.RequestedByUserId && !c.IsDeleted && !p.RecruiterCustomerId.HasValue &&
+                                    q.RequestedAt >= p.StartedAt && r.AuthorizedAt >= q.RequestedAt &&
+                                    q.RequestedByUserId > 0 && r.AdministratorUserId > 0
+                                select r.Id;
+                            AQGreenD10Commissioning.Require(await later.CountAsync() == await roots.CountAsync() - 1,
+                                "D10_CLEAN_START_INDEPENDENT_ROOT_CHANGED");
+                        }
                     }
                 }
                 if (stabilizeAreas)

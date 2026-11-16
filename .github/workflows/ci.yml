@@ -509,6 +509,13 @@ jobs:
           path: TestResults/runtime-authority
           if-no-files-found: error
           retention-days: 90
+      - name: Retain qualified backend successor integrity evidence
+        uses: actions/upload-artifact@v6
+        with:
+          name: backend-successor-integrity-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: TestResults/runtime-authority/backend-successor-integrity.json
+          if-no-files-found: error
+          retention-days: 90
       - name: Build web image
         uses: docker/build-push-action@v6
         with:

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Text.Json;
@@ -70,6 +71,15 @@ namespace AqualLifeStyle.EntityFrameworkCore
                 SourceAssemblyDigest = AQGreenB6CanonicalEvidence.Hash(File.ReadAllBytes(GetType().Assembly.Location)),
                 TransactionMode = "REPEATABLE READ READ ONLY"
             };
+        }
+
+        public async Task<bool> HasIndependentRootStorageAsync()
+        {
+            var context = await _provider.GetDbContextAsync();
+            if (!context.Database.IsNpgsql() || context.Database.CurrentTransaction == null)
+                throw new InvalidOperationException("Independent root storage requires a PostgreSQL transaction.");
+            return (await context.Database.GetAppliedMigrationsAsync())
+                .Contains("20261115113914_AddAQGreenIndependentRootRequests");
         }
     }
 }

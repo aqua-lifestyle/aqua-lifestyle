@@ -19,6 +19,8 @@ using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Tests.WebHost;
 using Castle.MicroKernel.Registration;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Shouldly;
 using Xunit;
@@ -33,9 +35,45 @@ namespace AqualLifeStyle.Web.Tests.Integration
         public async Task CleanStart_EmptyTenantCommissions_ExplicitRootThenSixInvitedMembers_SpilloverAndReplay()
         {
             await AssertFreshPostgreSqlDatabaseAsync();LoginAsDefaultTenantAdmin();
+            string successorSchemaDigest;
+            using(var schemaUow=Resolve<IUnitOfWorkManager>().Begin(new UnitOfWorkOptions{Scope=TransactionScopeOption.RequiresNew,
+                IsTransactional=true,IsolationLevel=IsolationLevel.RepeatableRead}))
+            {successorSchemaDigest=(await Resolve<IAQGreenReconciliationEvidenceSnapshot>().CaptureAsync()).SourceSchemaVersion;
+                await schemaUow.CompleteAsync();}
+            // The candidate has an additive migration available, but its first
+            // boot must tolerate the commissioned schema still at migration 55.
+            await UsingDbContextAsync(c=>c.GetService<IMigrator>().MigrateAsync("20261021051549_AddAQGreenSalesEvidenceInvalidation"));
+            using(var beforeStage=Resolve<AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>())
+                Should.Throw<InvalidOperationException>(()=>AqualLifeStyle.EntityFrameworkCore.DatabaseReleasePreflight.Verify(beforeStage));
             var area=await UsingDbContextAsync(async c=>await (from a in c.AreaAdminAssignments join r in c.Areas
                 on a.AreaId equals r.Id where a.TenantId==1 && a.UserId==AbpSession.UserId && !a.RevokedAt.HasValue && r.IsActive select r.Id).FirstAsync());
             var (x,clean)=AQGreenCleanStartCommissioningTests.Create();var config=AQGreenD10SyntheticEvidence.Configuration();
+            void StageSuccessor(string transition, string expectedSchema)
+            {
+                var d=x.Decision;
+                var payload=new System.Collections.Generic.Dictionary<string,object>{
+                    ["contractVersion"]=AQGreenD10BackendSuccessor.ContractVersion,
+                    ["predecessorDecisionSha256"]=AQGreenB6CanonicalEvidence.Digest(d),
+                    ["predecessorSchemaSha256"]=d.RequiredSchemaDigest,
+                    ["predecessorAssemblySha256"]=d.RequiredAssemblyDigest,
+                    ["predecessorRuntimeAssemblySha256"]=d.RequiredRuntimeAssemblyDigest,
+                    ["predecessorDatabaseIdentitySha256"]=d.RequiredDatabaseIdentityDigest,
+                    ["predecessorBuildId"]=config["Deployment:BuildId"],
+                    ["successorRevisionSha256"]=new string('a',40),
+                    ["successorSchemaSha256"]=expectedSchema,
+                    ["successorAssemblySha256"]=d.RequiredAssemblyDigest,
+                    ["successorApplicationSha256"]=AQGreenB6CanonicalEvidence.Hash(File.ReadAllBytes(typeof(AQGreenD10Runtime).Assembly.Location)),
+                    ["successorCoreSha256"]=AQGreenB6CanonicalEvidence.Hash(File.ReadAllBytes(typeof(AQGreenD10Decision).Assembly.Location)),
+                    ["schemaTransition"]=transition,
+                    ["releaseRunId"]=43429695806L,["releaseRunAttempt"]=1,
+                    ["ciRunId"]=43429695777L,["ciRunAttempt"]=1,
+                    ["executorSha256"]=new string('b',64)
+                };
+                var bytes=System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(payload);
+                config[AQGreenD10BackendSuccessor.PayloadKey]=Convert.ToBase64String(bytes);
+                config[AQGreenD10BackendSuccessor.PayloadPinKey]=AQGreenB6CanonicalEvidence.Hash(bytes);
+                config["RENDER_GIT_COMMIT"]=new string('a',40);
+            }
             AQGreenCleanStartCommissioningTests.OwnerAttest(clean);
             AQGreenCleanStartCommissioningTests.PostReset(x,clean);
             var resetBoundary=x.Decision.CleanStartResetBoundaryUtc.Value;
@@ -102,6 +140,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             AQGreenCleanStartCommissioningTests.Sign(x,clean);
             PostResetOperatorTransportTests.Install(config,x.Decision,x.Authority,clean);
             var source=new CleanStartTestSource{Current=new AqualLifeStyle.Web.Host.Startup.AQGreenD10OperatorEvidenceSource(config).Read()};
+            StageSuccessor(AQGreenD10BackendSuccessor.SchemaTransitionNone,x.Decision.RequiredSchemaDigest);
             var key=Guid.NewGuid().ToString("N");
             IocManager.IocContainer.Register(Component.For<IConfiguration>().Instance(config).Named("clean-config-"+key).IsDefault(),
                 Component.For<IAQGreenD10CommissioningSource>().Instance(source).Named("clean-source-"+key).IsDefault(),
@@ -238,7 +277,9 @@ namespace AqualLifeStyle.Web.Tests.Integration
             source.Current=activatedSource;
             await AqualLifeStyle.Tests.EntityFrameworkCore.D10ActivationRestartProof.VerifyAsync(
                 await UsingDbContextAsync(c=>Task.FromResult(c.Database.GetConnectionString())),config);
-            await using var businessLease=await store.EnterBusinessAsync();
+            var businessLease=await store.EnterBusinessAsync();
+            try
+            {
             using var businessScope=YocoCutoverDispatch.EnterBusiness();
             // New V1 financial activity on an old shared Customer is not a change
             // to the accepted historical reset facts and must not freeze V2.
@@ -325,6 +366,116 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 rows.Single(p=>p.ParticipantId==children[5].ParticipationId).PlacementParentParticipantId.ShouldBe(children[0].ParticipationId);
                 (await c.EntryWeeklyCommissions.CountAsync()).ShouldBe(0);
             });
+            var beforeMigration=await RegisterCleanStartCustomerAsync(area,"independent-before-migration",expectEmptyNetwork:false);
+            using(AbpSession.Use(1,beforeMigration.UserId))
+                await Should.ThrowAsync<Abp.UI.UserFriendlyException>(()=>InUnitOfWorkAsync(()=>
+                    StartLeanAsync(new StartEntryParticipationInput{RequestIndependentRoot=true})));
+            await UsingDbContextAsync(async c=>
+                (await c.EntryParticipations.CountAsync(p=>p.CustomerId==beforeMigration.CustomerId)).ShouldBe(0));
+            StageSuccessor(AQGreenD10BackendSuccessor.SchemaTransitionNone,x.Decision.RequiredSchemaDigest);
+            var historicalSchema=x.Decision.RequiredSchemaDigest;
+            historicalSchema.ShouldNotBe(successorSchemaDigest);
+            using(var c=Resolve<AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>())
+                AqualLifeStyle.EntityFrameworkCore.DatabaseReleasePreflight.Verify(c,config);
+            await UsingDbContextAsync(c=>c.Database.MigrateAsync());
+            (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.VerifyStartupAsync()))
+                .Message.ShouldBe("D10_BACKEND_SUCCESSOR_SCHEMA_TRANSITION_MISMATCH");
+            StageSuccessor(AQGreenD10BackendSuccessor.SchemaTransitionAdditive,successorSchemaDigest);
+            var stagedBytes=Convert.FromBase64String(config[AQGreenD10BackendSuccessor.PayloadKey]);
+            var tampered=System.Text.Json.Nodes.JsonNode.Parse(stagedBytes).AsObject();
+            tampered["successorSchemaSha256"]=AQGreenD10SyntheticEvidence.Hash("unapproved-schema");
+            var altered=System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(tampered);
+            config[AQGreenD10BackendSuccessor.PayloadKey]=Convert.ToBase64String(altered);
+            config[AQGreenD10BackendSuccessor.PayloadPinKey]=AQGreenB6CanonicalEvidence.Hash(altered);
+            (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.VerifyStartupAsync()))
+                .Message.ShouldBe("D10_BACKEND_SUCCESSOR_OBSERVED_RELEASE_MISMATCH");
+            StageSuccessor(AQGreenD10BackendSuccessor.SchemaTransitionAdditive,successorSchemaDigest);
+            await runtime.VerifyStartupAsync();
+            // A fresh Production child process must be able to start on the
+            // migrated schema. Release only this test's long-lived business
+            // advisory lease while it starts, then reacquire for joining.
+            await businessLease.DisposeAsync();businessLease=null;
+            await AqualLifeStyle.Tests.EntityFrameworkCore.D10ActivationRestartProof.VerifyAsync(
+                await UsingDbContextAsync(c=>Task.FromResult(c.Database.GetConnectionString())),config);
+            businessLease=await store.EnterBusinessAsync();
+            // Independent intent has its own durable member/time fact; neither
+            // omission nor a conflicting invitation can manufacture that fact.
+            var newRoots=new System.Collections.Generic.List<ParticipantFixture>();
+            for(var i=0;i<2;i++)
+            {
+                var applicant=await RegisterCleanStartCustomerAsync(area,"independent-root-"+i,expectEmptyNetwork:false);
+                using(AbpSession.Use(1,applicant.UserId))
+                {
+                    await Should.ThrowAsync<Abp.UI.UserFriendlyException>(()=>InUnitOfWorkAsync(() =>
+                        StartLeanAsync(new StartEntryParticipationInput())));
+                    await Should.ThrowAsync<Abp.UI.UserFriendlyException>(()=>InUnitOfWorkAsync(() =>
+                        StartLeanAsync(new StartEntryParticipationInput{InviteCode="INVALID",RequestIndependentRoot=true})));
+                    await InUnitOfWorkAsync(()=>StartLeanAsync(new StartEntryParticipationInput{RequestIndependentRoot=true}));
+                    var id=await UsingDbContextAsync(async c=>await c.EntryParticipations
+                        .Where(p=>p.TenantId==1 && p.CustomerId==applicant.CustomerId).Select(p=>p.Id).SingleAsync());
+                    applicant=applicant with{ParticipationId=id};
+                }
+                LoginAsDefaultTenantAdmin();
+                await Should.ThrowAsync<AQGreenPlacementConflictException>(()=>ApproveAsync(applicant.ParticipationId));
+                await ConfirmJoiningPaymentAsync(applicant);await AssertAwaitingApprovalAsync(applicant.ParticipationId);
+                newRoots.Add(applicant);
+            }
+            LoginAsDefaultTenantAdmin();
+            await Task.WhenAll(newRoots.Select(applicant=>Task.Run(()=>ApproveAsync(applicant.ParticipationId))));
+            foreach(var applicant in newRoots)
+            {
+                await ApproveAsync(applicant.ParticipationId);await AssertActiveApprovalAsync(applicant,true);
+                var branch=new System.Collections.Generic.List<ParticipantFixture>();
+                string code;
+                using(AbpSession.Use(1,applicant.UserId))
+                    code=(await InUnitOfWorkAsync(()=>Resolve<IProgrammeInvitationAppService>().GetMyInvitationsAsync())).Invitations.Single().Code;
+                for(var i=0;i<6;i++)
+                {
+                    var child=await SeedLeanMemberIdentityAsync(area,"independent-child-"+applicant.CustomerId+"-"+i);
+                    using(AbpSession.Use(1,child.UserId))
+                    {
+                        await InUnitOfWorkAsync(()=>StartLeanAsync(new StartEntryParticipationInput{InviteCode=code}));
+                        var id=await UsingDbContextAsync(async c=>await c.EntryParticipations
+                            .Where(p=>p.TenantId==1 && p.CustomerId==child.CustomerId).Select(p=>p.Id).SingleAsync());
+                        child=child with{ParticipationId=id,SponsorParticipationId=applicant.ParticipationId};
+                    }
+                    await ConfirmJoiningPaymentAsync(child);
+                    LoginAsDefaultTenantAdmin();await ApproveAsync(child.ParticipationId);
+                    branch.Add(child);
+                }
+                await UsingDbContextAsync(async c=>
+                {
+                    var scope=(await c.AQGreenNetworkPlacements.SingleAsync(p=>p.ParticipantId==applicant.ParticipationId)).PlacementTreeScopeId;
+                    var rows=await c.AQGreenNetworkPlacements.Where(p=>p.PlacementTreeScopeId==scope).ToListAsync();
+                    rows.Count.ShouldBe(7);rows.Count(p=>p.PlacementParentParticipantId==applicant.ParticipationId).ShouldBe(5);
+                    rows.Single(p=>p.ParticipantId==branch[5].ParticipationId).PlacementParentParticipantId.ShouldBe(branch[0].ParticipationId);
+                });
+            }
+            await UsingDbContextAsync(async c=>
+            {
+                (await c.AQGreenNetworkPlacements.CountAsync(p=>p.TenantId==1)).ShouldBe(21);
+                (await c.AQGreenPlacementTreeScopes.CountAsync(s=>s.TenantId==1)).ShouldBe(3);
+                (await c.EntryWeeklyCommissions.CountAsync()).ShouldBe(0);
+            });
+            (await Should.ThrowAsync<Exception>(()=>UsingDbContextAsync(c=>
+                c.GetService<IMigrator>().MigrateAsync("20261021051549_AddAQGreenSalesEvidenceInvalidation"))))
+                .Message.ShouldContain("AQGREEN_INDEPENDENT_ROOT_HISTORY_PRESENT");
+            await UsingDbContextAsync(async c=>
+            {
+                (await c.AQGreenIndependentRootRequests.CountAsync()).ShouldBe(2);
+                (await c.Database.GetAppliedMigrationsAsync()).Last().ShouldBe("20261115113914_AddAQGreenIndependentRootRequests");
+            });
+            await UsingDbContextAsync(async c=>
+            {
+                var intent=await c.AQGreenIndependentRootRequests.FirstAsync();
+                foreach(var state in new[]{EntityState.Modified,EntityState.Deleted})
+                {
+                    c.Entry(intent).State=state;
+                    (await Should.ThrowAsync<InvalidOperationException>(()=>c.SaveChangesAsync()))
+                        .Message.ShouldBe("AQGreen recruitment attribution evidence is append-only.");
+                    c.Entry(intent).State=EntityState.Unchanged;
+                }
+            });
             await runtime.VerifyStartupAsync();source.Current.FinancialWorkersCommissioned.ShouldBeFalse();
             source.Current.CleanStartEvidence.State.BoundaryUtc.Value.UtcDateTime.ShouldBe(resetBoundary);
             (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.ForTenantAsync(1,false,x.Decision.V2EffectiveAtUtc.AddTicks(-1))))
@@ -338,10 +489,12 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 (await c.AQGreenJoiningCheckouts.SingleAsync(p=>p.ProviderCheckoutId=="SYNTHETIC-RETIRED-CHECKOUT")).PaymentId.ShouldBe(oldPaymentId);
             });
             File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("REPRO_MARKER_DIR"),"clean-start-commissioning.ran"),
-                "PostgreSQL: immutable historical reset, later owner/independent LIVE authority, future-effective Normal held, post-reset gap denied, root-unbound registration/verification, protected root, payment/cover/approval/placement, retries and retained history; no real provider or automatic payouts.");
+                "PostgreSQL: immutable reset and Host-root evidence; candidate starts on migration 55, applied migration 56 changes the observed schema, wrong transition and repinned schema fail, additive restart succeeds; two explicit customer roots plus six invited members per root preserve isolated five-wide spillover, payment/Area approval, rollback denial on occupied intent, and zero commission rows; synthetic provider only.");
+            }
+            finally { if(businessLease!=null)await businessLease.DisposeAsync(); }
         }
 
-        private async Task<ParticipantFixture> RegisterCleanStartCustomerAsync(Guid area, string label)
+        private async Task<ParticipantFixture> RegisterCleanStartCustomerAsync(Guid area, string label, bool expectEmptyNetwork=true)
         {
             await Resolve<ISettingManager>().ChangeSettingForTenantAsync(1,"Abp.Account.IsSelfRegistrationEnabled","true");
             var name="clean_register_"+Guid.NewGuid().ToString("N");
@@ -355,7 +508,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             await UsingDbContextAsync(async c=>
             {
                 (await c.EntryParticipations.AnyAsync(p=>p.CustomerId==identity.Id)).ShouldBeFalse();
-                (await c.AQGreenNetworkPlacements.AnyAsync()).ShouldBeFalse();
+                if(expectEmptyNetwork)(await c.AQGreenNetworkPlacements.AnyAsync()).ShouldBeFalse();
                 (await c.MemberPayments.AnyAsync(p=>p.CustomerId==identity.Id)).ShouldBeFalse();
                 (await c.AQGreenFuneralCoverEntitlements.AnyAsync(p=>p.CustomerId==identity.Id)).ShouldBeFalse();
             });

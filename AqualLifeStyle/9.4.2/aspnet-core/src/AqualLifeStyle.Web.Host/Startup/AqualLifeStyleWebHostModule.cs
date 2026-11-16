@@ -117,7 +117,7 @@ namespace AqualLifeStyle.Web.Host.Startup
                 var manager = IocManager.Resolve<IUnitOfWorkManager>();
                 using (var uow = manager.Begin())
                 {
-                    DatabaseReleasePreflight.Verify(manager.Current.GetDbContext<AqualLifeStyleDbContext>());
+                    DatabaseReleasePreflight.Verify(manager.Current.GetDbContext<AqualLifeStyleDbContext>(), _appConfiguration);
                     uow.Complete();
                 }
                 if (!ApplicationRecoveryMode.IsEnabled(_appConfiguration))
