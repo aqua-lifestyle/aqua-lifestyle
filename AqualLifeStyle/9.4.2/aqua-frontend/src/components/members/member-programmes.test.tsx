@@ -239,20 +239,25 @@ describe("MemberProgrammes", () => {
     expect(screen.queryByText(/session-ended/i)).not.toBeInTheDocument();
   });
 
-  it("guides an unapproved prospective founder without offering independent AQGreen admission", async () => {
+  it("offers explicit independent AQGreen admission without creating a payment or placement", async () => {
     render(<MemberProgrammes />);
 
     expect(await screen.findByText("Before you join AQGreen")).toBeInTheDocument();
-    expect(screen.getByText(/authorised Host administrator must confirm your founder eligibility/i)).toBeInTheDocument();
+    expect(screen.getByText(/verified joining payment and Area administrator approval/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Contact the club team" })).toHaveAttribute("href", "/contact");
     expect(screen.queryByRole("button", { name: "Join AQGreen" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /request founder approval/i })).not.toBeInTheDocument();
-    expect(within(screen.getByRole("article", { name: "AQGreen" })).queryByText("Start my own network")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "AQGreen" })).getByRole("button", { name: "Start my own network" })).toBeEnabled();
     expect(httpClient.post).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Join Onyx" })).toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: "Invite Club Members" }),
     ).not.toBeInTheDocument();
+    vi.mocked(httpClient.post).mockResolvedValueOnce({});
+    fireEvent.click(screen.getByRole("button", { name: "Start my own network" }));
+    await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(
+      apiEndpoints.programmeParticipations.startEntry, { requestIndependentRoot: true }));
+    expect(screen.getByText(/Area administrator must approve after verified payment before your network exists/i)).toBeInTheDocument();
   });
 
   it.each([[0, "Pay R1,200 once"], [1, "Pay first R600 instalment"]] as const)("uses an existing Host-authorised root participation for schedule %i without restarting admission", async (schedule, button) => {

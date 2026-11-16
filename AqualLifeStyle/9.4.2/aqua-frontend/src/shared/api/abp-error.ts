@@ -43,14 +43,14 @@ export type RequestErrorPresentation = {
 
 export const aqGreenAdmissionGuidance: RequestErrorPresentation = {
   title: "Before you join AQGreen",
-  message: "Open a valid AQGreen invitation from an eligible Club Member to join their network. If you are being considered as the first network founder, contact the club team: an authorised Host administrator must confirm your founder eligibility and authorise the qualifying registered, email-verified account before you can pay. After authorisation, refresh My programmes to see your joining options.",
+  message: "Open an AQGreen invitation from an eligible Club Member to join their network, or explicitly start your own network. Both require verified joining payment and Area administrator approval before placement or invitations become available.",
 };
 
 const getDomainError = (error: unknown): RequestErrorPresentation | undefined => {
   if (!(error instanceof Error)) return;
   const abp = error instanceof AbpHttpError ? error : undefined;
   const text = `${abp?.code ?? ""} ${error.message} ${abp?.details ?? ""} ${abp?.validationErrors.map(item => item.message).join(" ") ?? ""}`;
-  if (/Independent admission and recruiter-only joining|joining requires a sponsor invitation|Root admission is a separate privileged action|D10_CLEAN_START_ROOT_CUSTOMER_REQUIRED_OR_MISMATCHED/.test(text))
+  if (/Choose an AQGreen invitation|Independent admission and recruiter-only joining|joining requires a sponsor invitation|Root admission is a separate privileged action|D10_CLEAN_START_ROOT_CUSTOMER_REQUIRED_OR_MISMATCHED/.test(text))
     return aqGreenAdmissionGuidance;
   if (/inviting Club Member.*not currently eligible|recruiter.*not.*eligible|active.*recruiter.*required/i.test(text))
     return { title: "This invitation is not ready to use", message: "The inviting member is not currently eligible to invite you to this programme. Ask them or the club team to check their participation before you continue." };

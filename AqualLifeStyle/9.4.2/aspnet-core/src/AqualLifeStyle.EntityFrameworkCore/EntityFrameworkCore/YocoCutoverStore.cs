@@ -148,9 +148,13 @@ namespace AqualLifeStyle.EntityFrameworkCore
             await context.Database.ExecuteSqlRawAsync(lockingSql, LockKey);
             var history = await context.Database.GetAppliedMigrationsAsync();
             const string migration55 = "20261021051549_AddAQGreenSalesEvidenceInvalidation";
-            var prefix = context.Database.GetMigrations().Where(x => x != migration55).ToArray();
+            const string independentRootMigration = "20261115113914_AddAQGreenIndependentRootRequests";
+            var migrations = context.Database.GetMigrations().ToArray();
             var ids = history.ToArray();
-            if (prefix.Length != 54 || !(ids.SequenceEqual(prefix) || ids.SequenceEqual(prefix.Concat(new[] { migration55 }))))
+            if (migrations.Length != 56 || migrations[54] != migration55 ||
+                migrations[55] != independentRootMigration ||
+                !(ids.SequenceEqual(migrations.Take(54)) || ids.SequenceEqual(migrations.Take(55)) ||
+                  ids.SequenceEqual(migrations)))
                 throw new InvalidOperationException("YOCO_CUTOVER_SCHEMA_NOT_SUPPORTED");
             var rows = await context.Set<BackgroundJobInfo>().Where(x => x.JobType == EventType || x.JobType == ControlType)
                 .OrderBy(x => x.Id).Take(10001).ToListAsync();

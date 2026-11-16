@@ -32,13 +32,15 @@ ENV ASPNETCORE_HTTP_PORTS=8080 \
 USER $APP_UID
 
 # Maintenance uses its own image and separately supplied database identity.
-# The default API image contains no migrator executable.
 FROM runtime-base AS migrator
 COPY --from=publish --chown=$APP_UID:$APP_UID /out/migrator/ ./
 ENTRYPOINT ["dotnet", "AqualLifeStyle.Migrator.dll"]
 
 FROM runtime-base AS runtime
 COPY --from=publish --chown=$APP_UID:$APP_UID /out/api/ ./
+# Render's one-off schema job runs in this same service image. Keep the
+# migrator's dependencies isolated from the API's published assemblies.
+COPY --from=publish --chown=$APP_UID:$APP_UID /out/migrator/ ./migrator/
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=8s --start-period=30s --retries=3 \

@@ -33,6 +33,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             _customerAreaAssignmentRepository;
         private readonly IMembershipRepository _membershipRepository;
         private readonly IRepository<EntryParticipation, Guid> _entryParticipationRepository;
+        private readonly IRepository<AQGreenIndependentRootRequest, Guid> _independentRootRequests;
+        private readonly IAQGreenReconciliationEvidenceSnapshot _sourceSnapshot;
         private readonly IRepository<OnyxParticipation, Guid> _onyxParticipationRepository;
         private readonly IRepository<DirectOnyxCheckoutIntent, Guid>
             _directOnyxCheckoutIntentRepository;
@@ -60,6 +62,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             IRepository<CustomerAreaAssignment, Guid> customerAreaAssignmentRepository,
             IMembershipRepository membershipRepository,
             IRepository<EntryParticipation, Guid> entryParticipationRepository,
+            IRepository<AQGreenIndependentRootRequest, Guid> independentRootRequests,
+            IAQGreenReconciliationEvidenceSnapshot sourceSnapshot,
             IRepository<OnyxParticipation, Guid> onyxParticipationRepository,
             IRepository<DirectOnyxCheckoutIntent, Guid> directOnyxCheckoutIntentRepository,
             IRepository<AQGreenJoiningCheckout, Guid> aqGreenJoiningCheckoutRepository,
@@ -78,6 +82,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             _customerAreaAssignmentRepository = customerAreaAssignmentRepository;
             _membershipRepository = membershipRepository;
             _entryParticipationRepository = entryParticipationRepository;
+            _independentRootRequests = independentRootRequests;
+            _sourceSnapshot = sourceSnapshot;
             _onyxParticipationRepository = onyxParticipationRepository;
             _directOnyxCheckoutIntentRepository = directOnyxCheckoutIntentRepository;
             _aqGreenJoiningCheckoutRepository = aqGreenJoiningCheckoutRepository;
@@ -209,11 +215,14 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             if (useV2Joining && CurrentUnitOfWork?.Options.IsTransactional != true)
                 throw new InvalidOperationException(
                     "AQGreen V2 invitation acceptance requires a transactional unit of work.");
-            if (useV2Joining && (string.IsNullOrWhiteSpace(input.InviteCode) ||
-                                 input.RecruiterCustomerId.HasValue))
+            if (useV2Joining && (input.RecruiterCustomerId.HasValue ||
+                                 string.IsNullOrWhiteSpace(input.InviteCode) != input.RequestIndependentRoot))
                 throw new UserFriendlyException(
-                    "AQGreen V2 joining requires a sponsor invitation.",
-                    "Independent admission and recruiter-only joining are unavailable on this path.");
+                    "Choose an AQGreen invitation or explicitly request an independent network.",
+                    "Missing or conflicting invitations cannot create a network root.");
+            if (useV2Joining && input.RequestIndependentRoot &&
+                !await _sourceSnapshot.HasIndependentRootStorageAsync())
+                throw new UserFriendlyException("Independent AQGreen network requests are not available during the schema transition.");
             if (PilotMode.IsEnabled)
             {
                 if (input.RecruiterCustomerId.HasValue || string.IsNullOrWhiteSpace(input.InviteCode))
@@ -236,8 +245,9 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             var recruiterCustomerId = requestedPlacement.RecruiterCustomerId;
             if (useV2Joining)
             {
-                await _v2JoiningGate.ValidateDestinationAsync(tenantId,
-                    requestedPlacement.InvitationPlacement.RecruiterArea.Id);
+                if (!input.RequestIndependentRoot)
+                    await _v2JoiningGate.ValidateDestinationAsync(tenantId,
+                        requestedPlacement.InvitationPlacement.RecruiterArea.Id);
                 await EnsureNoLegacyAQGreenMembershipAsync(customer);
             }
             await ClearLegacyProgrammeMembershipAssignmentAsync(
@@ -250,8 +260,17 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
             {
                 EnsureSameRecruiter(existing.RecruiterCustomerId, recruiterCustomerId, "AQGreen");
                 if (useV2Joining)
-                    await _attributionRecorder.RecordAsync(existing,
+                {
+                    if (input.RequestIndependentRoot)
+                    {
+                        var request = await _independentRootRequests.GetAll().AsNoTracking().SingleOrDefaultAsync(r =>
+                            r.TenantId == tenantId && r.ParticipantId == existing.Id);
+                        if (request?.RequestedByUserId != AbpSession.GetUserId() || request.RequestedAt < existing.StartedAt)
+                            throw new InvalidOperationException("The independent network request is absent or conflicts with joining.");
+                    }
+                    else await _attributionRecorder.RecordAsync(existing,
                         requestedPlacement.InvitationPlacement, AbpSession.GetUserId(), UtcNow, isNew: false);
+                }
                 if (PilotMode.IsEnabled)
                     await ProspectiveJoiningRecorder.ValidateReplayAsync(existing, input.InviteCode);
                 return Map(existing, await GetClubMemberNumberAsync(existing.RecruiterCustomerId));
@@ -296,8 +315,13 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
             await _entryParticipationRepository.InsertAsync(participation);
             if (useV2Joining)
-                await _attributionRecorder.RecordAsync(participation,
+            {
+                if (input.RequestIndependentRoot)
+                    await _independentRootRequests.InsertAsync(AQGreenIndependentRootRequest.Record(
+                        tenantId, participation.Id, AbpSession.GetUserId(), UtcNow));
+                else await _attributionRecorder.RecordAsync(participation,
                     requestedPlacement.InvitationPlacement, AbpSession.GetUserId(), UtcNow, isNew: true);
+            }
             await CurrentUnitOfWork.SaveChangesAsync();
             if (PilotMode.IsEnabled)
             {

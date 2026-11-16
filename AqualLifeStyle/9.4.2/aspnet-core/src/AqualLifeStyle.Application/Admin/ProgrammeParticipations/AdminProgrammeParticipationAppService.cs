@@ -67,6 +67,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             _attributionRepository;
         private readonly IRepository<AQGreenRecruitmentAttributionConfirmation, Guid>
             _attributionConfirmationRepository;
+        private readonly IRepository<AQGreenIndependentRootRequest, Guid> _independentRootRequests;
+        private readonly IRepository<AQGreenProspectiveRootAdmission, Guid> _rootAdmissions;
         private readonly IRepository<AQGreenNetworkPlacement, Guid> _networkPlacementRepository;
         private readonly IRepository<AQGreenPlacementTreeScope, Guid> _placementTreeScopeRepository;
         private readonly IAQGreenGraduationStructuralModelSelector
@@ -109,6 +111,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             IRepository<AQGreenRecruitmentAttribution, Guid> attributionRepository,
             IRepository<AQGreenRecruitmentAttributionConfirmation, Guid>
                 attributionConfirmationRepository,
+            IRepository<AQGreenIndependentRootRequest, Guid> independentRootRequests,
+            IRepository<AQGreenProspectiveRootAdmission, Guid> rootAdmissions,
             IRepository<AQGreenNetworkPlacement, Guid> networkPlacementRepository,
             IRepository<AQGreenPlacementTreeScope, Guid> placementTreeScopeRepository,
             IAQGreenGraduationStructuralModelSelector graduationStructuralModelSelector,
@@ -148,6 +152,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             _placementAllocator = placementAllocator;
             _attributionRepository = attributionRepository;
             _attributionConfirmationRepository = attributionConfirmationRepository;
+            _independentRootRequests = independentRootRequests;
+            _rootAdmissions = rootAdmissions;
             _networkPlacementRepository = networkPlacementRepository;
             _placementTreeScopeRepository = placementTreeScopeRepository;
             _graduationStructuralModelSelector = graduationStructuralModelSelector;
@@ -886,7 +892,32 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 
             await EnsureCanAdministerAreaAsync(customer);
             await ValidateAQGreenJoiningPaymentAsync(entry);
-            var attribution = await GetAQGreenAttributionAsync(entry);
+            // The additive intent table is absent during the candidate's
+            // verified old-schema staging window. Existing sponsored approvals
+            // retain their old-schema path; root requests require applied v56.
+            var request = await _reconciliationEvidenceSnapshot.HasIndependentRootStorageAsync() ?
+                await _independentRootRequests.GetAll().AsNoTracking().SingleOrDefaultAsync(r =>
+                    r.TenantId == entry.TenantId && r.ParticipantId == entry.Id) : null;
+            var attribution = await _attributionRepository.GetAll().AsNoTracking().SingleOrDefaultAsync(a =>
+                a.TenantId == entry.TenantId && a.ParticipantId == entry.Id);
+            if (request != null)
+            {
+                if (!entry.JoinedIndependently || request.RequestedAt < entry.StartedAt ||
+                    request.RequestedByUserId != customer.UserId ||
+                    request.RequestedAt >= DateTime.UtcNow)
+                    throw new AQGreenPlacementConflictException("Independent root request is not bound to this customer.");
+                if (attribution == null)
+                    return await ApproveIndependentRootAsync(customer, entry, request, administratorUserId);
+                var admission = await _rootAdmissions.GetAll().AsNoTracking().SingleOrDefaultAsync(r =>
+                    r.TenantId == entry.TenantId && r.ParticipantId == entry.Id);
+                if (admission == null || admission.Id != attribution.SourceReferenceId ||
+                    admission.AuthorizedAt < request.RequestedAt ||
+                    attribution.AttributionKind != AQGreenRecruitmentAttributionKind.AuthorisedProspectiveRoot)
+                    throw new AQGreenPlacementConflictException("Independent root authorization evidence changed.");
+                return await ApplyAQGreenRootBootstrapAsync(customer, entry, attribution, administratorUserId);
+            }
+            if (attribution == null)
+                throw new AQGreenPlacementAllocationNotFoundException(AQGreenPlacementMissingFact.Attribution);
             if (attribution.AttributionKind ==
                 AQGreenRecruitmentAttributionKind.AuthorisedProspectiveRoot)
             {
@@ -947,6 +978,33 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 
             entry.ApproveByAdministrator(administratorUserId, DateTime.UtcNow);
             return (customer, entry.Id, true);
+        }
+
+        private async Task<(Customer Customer, Guid ParticipationId, bool DecisionApplied)> ApproveIndependentRootAsync(
+            Customer customer, EntryParticipation entry, AQGreenIndependentRootRequest request, long administratorUserId)
+        {
+            if (entry.Status != EntryParticipationStatus.PaymentConfirmedAwaitingApproval ||
+                !entry.IsJoiningObligationSatisfied || request.RequestedByUserId != customer.UserId ||
+                await _rootAdmissions.GetAll().AnyAsync(r => r.TenantId == entry.TenantId && r.ParticipantId == entry.Id))
+                throw new AQGreenPlacementConflictException("Independent root requires verified payment and one pending member request.");
+            var now = await _placementClock.GetUtcNowAsync();
+            var admission = AQGreenProspectiveRootAdmission.Record(entry.TenantId, entry.Id, administratorUserId,
+                now, "Area approval of customer-requested independent network");
+            await _rootAdmissions.InsertAsync(admission);
+            var attribution = AQGreenRecruitmentAttribution.Create(entry.TenantId, entry.Id, null,
+                AQGreenRecruitmentAttributionKind.AuthorisedProspectiveRoot,
+                AQGreenAcquisitionSource.AuthorisedDirectAdmission, admission.Id, now,
+                administratorUserId, admission.Reason, AQGreenRecruitmentAttributionRules.CurrentVersion);
+            await _attributionRepository.InsertAsync(attribution);
+            await _attributionConfirmationRepository.InsertAsync(AQGreenRecruitmentAttributionConfirmation.Confirm(
+                attribution, now, administratorUserId,
+                AQGreenAttributionConfirmationMethod.AuthorisedProspectiveRootConfirmation,
+                admission.Id, AQGreenRecruitmentAttributionRules.CurrentVersion));
+            // The existing root validator uses an AsNoTracking read inside this
+            // same decision transaction; persist the immutable facts before it
+            // reads them, without committing the approval or scope separately.
+            await CurrentUnitOfWork.SaveChangesAsync();
+            return await ApplyAQGreenRootBootstrapAsync(customer, entry, attribution, administratorUserId);
         }
 
         private async Task<(Customer Customer, Guid ParticipationId, bool DecisionApplied)>

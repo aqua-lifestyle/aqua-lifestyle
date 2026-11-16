@@ -90,6 +90,11 @@ printf 'ASPNETCORE_ENVIRONMENT=Production\nConnectionStrings__Default=Host=%s;Da
 "${probe_docker[@]}" run --name "$probe_migration" --network "$probe_network" --env-file "$probe_dir/migrator.env" \
   "$probe_migrator_image" -q >"$probe_dir/migration-private.log" 2>&1
 passed 'separate maintenance image initializes only the disposable application schema with its own identity'
+if [[ ${GITHUB_ACTIONS:-} == true ]]; then
+  node "$probe_root/tools/deployment/backend-successor-integrity.mjs" "$probe_pg" "$probe_api_image" \
+    "$probe_endpoint" "$probe_root/TestResults/runtime-authority/backend-successor-integrity.json"
+  passed 'qualified image assemblies and migrated PostgreSQL schema recorded for the exact CI source'
+fi
 probe_phase=runtime_grants
 printf "CREATE ROLE aqua_runtime_api LOGIN PASSWORD '%s' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;\n" "$probe_api_password" | admin_sql >/dev/null
 admin_sql >/dev/null <<'SQL'

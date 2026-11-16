@@ -9,6 +9,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
     {
         public int? RecruiterCustomerId { get; set; }
 
+        public bool RequestIndependentRoot { get; set; }
+
         [StringLength(ProgrammeInvitation.CodeLength, MinimumLength = ProgrammeInvitation.CodeLength)]
         public string InviteCode { get; set; }
     }
