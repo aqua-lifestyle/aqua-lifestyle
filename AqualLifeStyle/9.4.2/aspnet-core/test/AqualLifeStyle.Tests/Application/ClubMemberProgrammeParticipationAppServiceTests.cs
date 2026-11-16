@@ -1434,7 +1434,7 @@ namespace AqualLifeStyle.Tests.Application
             var exception = await Should.ThrowAsync<UserFriendlyException>(() => service.StartEntryAsync(
                 new StartEntryParticipationInput { RecruiterCustomerId = recruiterOnly ? customerId : null }));
 
-            exception.Details.ShouldBe("Independent admission and recruiter-only joining are unavailable on this path.");
+            exception.Details.ShouldBe("Missing or conflicting invitations cannot create a network root.");
             gateway.ReceivedCalls().ShouldBeEmpty();
             await UsingDbContextAsync(1, async context =>
             {
