@@ -249,8 +249,8 @@ namespace AqualLifeStyle.Web.Tests.Integration
             (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.VerifyStartupAsync()))
                 .Message.ShouldBe("D10_AUTHORITY_MISSING_FOR_COMMITTED_ACTIVATION");
             source.Current=activatedSource;
-            await AqualLifeStyle.Tests.EntityFrameworkCore.D10ActivationRestartProof.VerifyAsync(
-                await UsingDbContextAsync(c=>Task.FromResult(c.Database.GetConnectionString())),config);
+            // The process restart proof runs once the migration-56 schema is
+            // applied below; the host must reject this still-pending state.
             var businessLease=await store.EnterBusinessAsync();
             try
             {
