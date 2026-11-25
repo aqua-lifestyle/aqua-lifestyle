@@ -45,7 +45,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await context.SaveChangesAsync();
 
             (await context.EntryParticipations.CountAsync(
-                item => item.TenantId == 1 && item.CustomerId == 64)).ShouldBe(1);
+                item => item.TenantId == 1 && item.CustomerId == 64 && !item.IsDeleted)).ShouldBe(1);
 
             var history = await context.EntryParticipations.IgnoreQueryFilters()
                 .Where(item => item.TenantId == 1 && item.CustomerId == 64)
