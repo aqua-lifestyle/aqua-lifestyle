@@ -40,8 +40,8 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 IsTransactional=true,IsolationLevel=IsolationLevel.RepeatableRead}))
             {successorSchemaDigest=(await Resolve<IAQGreenReconciliationEvidenceSnapshot>().CaptureAsync()).SourceSchemaVersion;
                 await schemaUow.CompleteAsync();}
-            // The candidate has an additive migration available, but its first
-            // boot must tolerate the commissioned schema still at migration 55.
+            // This fixture holds migration history at 55 while exercising the
+            // in-process legacy boundary; the production host must reject it.
             await UsingDbContextAsync(c=>c.GetService<IMigrator>().MigrateAsync("20261021051549_AddAQGreenSalesEvidenceInvalidation"));
             using(var beforeStage=Resolve<AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>())
                 Should.Throw<InvalidOperationException>(()=>AqualLifeStyle.EntityFrameworkCore.DatabaseReleasePreflight.Verify(beforeStage));
@@ -349,7 +349,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             var historicalSchema=x.Decision.RequiredSchemaDigest;
             historicalSchema.ShouldNotBe(successorSchemaDigest);
             using(var c=Resolve<AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>())
-                AqualLifeStyle.EntityFrameworkCore.DatabaseReleasePreflight.Verify(c);
+                Should.Throw<InvalidOperationException>(()=>AqualLifeStyle.EntityFrameworkCore.DatabaseReleasePreflight.Verify(c));
             await UsingDbContextAsync(c=>c.Database.MigrateAsync());
             using(var migratedContext=Resolve<AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>())
                 AqualLifeStyle.EntityFrameworkCore.DatabaseReleasePreflight.Verify(migratedContext);
@@ -456,7 +456,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 (await c.AQGreenJoiningCheckouts.SingleAsync(p=>p.ProviderCheckoutId=="SYNTHETIC-RETIRED-CHECKOUT")).PaymentId.ShouldBe(oldPaymentId);
             });
             File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("REPRO_MARKER_DIR"),"clean-start-commissioning.ran"),
-                "PostgreSQL: immutable reset and Host-root evidence; candidate starts on migration 55, applied migration 56 changes the observed schema, wrong transition and repinned schema fail, additive restart succeeds; two explicit customer roots plus six invited members per root preserve isolated five-wide spillover, payment/Area approval, rollback denial on occupied intent, and zero commission rows; synthetic provider only.");
+                "PostgreSQL: immutable reset and Host-root evidence; production preflight rejects migration 55, applied migration 56 changes the observed schema, wrong transition and repinned schema fail, additive restart succeeds; two explicit customer roots plus six invited members per root preserve isolated five-wide spillover, payment/Area approval, rollback denial on occupied intent, and zero commission rows; synthetic provider only.");
             }
             finally { if(businessLease!=null)await businessLease.DisposeAsync(); }
         }
