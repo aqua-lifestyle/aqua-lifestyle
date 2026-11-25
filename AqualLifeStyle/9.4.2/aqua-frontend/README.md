@@ -4,9 +4,11 @@ Next.js App Router frontend for the AquaLifeStyle ABP backend.
 
 ## AQGreen Clean Start joining
 
-- An account without AQGreen participation is directed to a valid eligible-member
-  invitation, or to the club team for the existing Host-selected first-root process.
-  There is no customer-operated independent-root action or approval-request API.
+- An account without AQGreen participation can request an independent root through
+  My programmes when the production joining/payment contract is available. The
+  request is recorded by the backend; the existing Area administrator must approve
+  after verified joining payment before the network is created or invitations are
+  enabled. Backend authorization remains authoritative.
 - A Host-authorised root uses its existing participation to choose R1,200 once or
   two distinct R600 instalments. An invited customer retains the original invitation
   through registration/sign-in, admission, and checkout. Admission must succeed

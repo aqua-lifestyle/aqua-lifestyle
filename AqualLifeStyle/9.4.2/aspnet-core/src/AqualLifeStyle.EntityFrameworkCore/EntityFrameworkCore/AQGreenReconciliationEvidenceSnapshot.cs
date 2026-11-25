@@ -59,16 +59,32 @@ namespace AqualLifeStyle.EntityFrameworkCore
                         E'\n' ORDER BY table_name, ordinal_position)
                      FROM information_schema.columns WHERE table_schema = 'public')
                 """;
-            using var reader = await command.ExecuteReaderAsync();
-            if (!await reader.ReadAsync() || reader.GetString(0) != "on" || reader.GetString(1) != "repeatable read")
-                throw new InvalidOperationException("Frozen evidence snapshot is not REPEATABLE READ READ ONLY.");
+            DateTime observedAtUtc;
+            string serverVersion;
+            string snapshotEvidence;
+            string databaseIdentityEvidence;
+            string schemaVersion;
+            using (var reader = await command.ExecuteReaderAsync())
+            {
+                if (!await reader.ReadAsync() || reader.GetString(0) != "on" || reader.GetString(1) != "repeatable read")
+                    throw new InvalidOperationException("Frozen evidence snapshot is not REPEATABLE READ READ ONLY.");
+                observedAtUtc = reader.GetDateTime(2);
+                serverVersion = reader.GetString(3);
+                snapshotEvidence = reader.GetString(4);
+                databaseIdentityEvidence = reader.GetString(5);
+                schemaVersion = reader.GetString(6);
+            }
             string Hash(string value) => AQGreenB6CanonicalEvidence.Hash(Encoding.UTF8.GetBytes(value));
+            var expectedMigrations = context.Database.GetMigrations().ToArray();
+            var appliedMigrations = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
             return new AQGreenReconciliationSourceBoundary
             {
-                SourceObservedAtUtc = reader.GetDateTime(2), SourcePostgreSqlVersion = reader.GetString(3),
-                SourceMvccSnapshotEvidence = Hash(reader.GetString(4)),
-                SourceDatabaseIdentityEvidence = Hash(reader.GetString(5)), SourceSchemaVersion = Hash(reader.GetString(6)),
+                SourceObservedAtUtc = observedAtUtc, SourcePostgreSqlVersion = serverVersion,
+                SourceMvccSnapshotEvidence = Hash(snapshotEvidence),
+                SourceDatabaseIdentityEvidence = Hash(databaseIdentityEvidence), SourceSchemaVersion = Hash(schemaVersion),
                 SourceAssemblyDigest = AQGreenB6CanonicalEvidence.Hash(File.ReadAllBytes(GetType().Assembly.Location)),
+                ExpectedMigrations = expectedMigrations,
+                AppliedMigrations = appliedMigrations,
                 TransactionMode = "REPEATABLE READ READ ONLY"
             };
         }

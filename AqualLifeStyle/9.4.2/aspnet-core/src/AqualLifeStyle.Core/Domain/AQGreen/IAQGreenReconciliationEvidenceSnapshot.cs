@@ -19,6 +19,8 @@ namespace AqualLifeStyle.Domain.AQGreen
         public string SourceDatabaseIdentityEvidence { get; set; }
         public string SourceSchemaVersion { get; set; }
         public string SourceAssemblyDigest { get; set; }
+        public string[] ExpectedMigrations { get; set; }
+        public string[] AppliedMigrations { get; set; }
         public string TransactionMode { get; set; }
     }
 }

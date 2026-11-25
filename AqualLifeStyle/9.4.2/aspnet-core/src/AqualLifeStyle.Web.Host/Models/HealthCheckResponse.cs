@@ -74,6 +74,12 @@ namespace AqualLifeStyle.Web.Host.Models
         public string PaymentAvailability { get; set; }
 
         /// <summary>
+        /// D10 operational readiness, independent of general API availability.
+        /// Values are NotCommissioned, Ready, or Unavailable.
+        /// </summary>
+        public string AQGreenOperationalReadiness { get; set; }
+
+        /// <summary>
         /// Gets or sets the configured release date for this application version.
         /// </summary>
         public DateTime ReleaseDate { get; set; }
