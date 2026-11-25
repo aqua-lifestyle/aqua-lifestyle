@@ -57,6 +57,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 await migratedBoundaryUow.CompleteAsync();
             }
             migratedBoundary.SourceSchemaVersion.ShouldBe(currentSchemaDigest);
+            migratedBoundary.SourceSchemaVersion.ShouldBe(AQGreenD10BackendSuccessor.IndependentRootSchemaSha256);
             var area=await UsingDbContextAsync(async c=>await (from a in c.AreaAdminAssignments join r in c.Areas
                 on a.AreaId equals r.Id where a.TenantId==1 && a.UserId==AbpSession.UserId && !a.RevokedAt.HasValue && r.IsActive select r.Id).FirstAsync());
             var (x,clean)=AQGreenCleanStartCommissioningTests.Create();var config=AQGreenD10SyntheticEvidence.Configuration();
@@ -124,6 +125,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 x.Decision.RequiredRuntimeAssemblyDigest=AQGreenD10Runtime.RuntimeAssemblyDigest(boundary.SourceAssemblyDigest);
                 await uow.CompleteAsync();
             }
+            AQGreenD10BackendSuccessor.Accept(x.Decision, migratedBoundary, config).ShouldBeTrue();
             AQGreenCleanStartCommissioningTests.Sign(x,clean);
             PostResetOperatorTransportTests.Install(config,x.Decision,x.Authority,clean);
             var source=new CleanStartTestSource{Current=new AqualLifeStyle.Web.Host.Startup.AQGreenD10OperatorEvidenceSource(config).Read()};

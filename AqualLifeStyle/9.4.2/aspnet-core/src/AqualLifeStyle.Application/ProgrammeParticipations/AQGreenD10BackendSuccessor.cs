@@ -24,7 +24,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         // authorization credential. A future schema release must add its own
         // reviewed migration and expected fingerprint.
         public const string IndependentRootSchemaSha256 =
-            "48be3ea9e597fe7f5a5474472a757ef20143574f7114029189dba65cb7e95301";
+            "27c55cd3dfbb93319aeeb17b463912fc7c366367a056aee7d0fc7aa629ad3664";
 
         private static readonly Regex RenderRevision = new("\\A[0-9a-f]{40}\\z", RegexOptions.CultureInvariant);
 

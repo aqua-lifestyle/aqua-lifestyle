@@ -25,10 +25,16 @@ customer transition.
 ## Migration-56 schema binding
 
 The accepted independent-root schema fingerprint is the SHA-256 of the public
-`information_schema.columns` snapshot captured from the already-authorized
-Render PostgreSQL connection on 2026-11-25. The query is read-only and covers
-column name, type, nullability, and deterministic table/column order. It returns
-no customer or financial rows. Production reported database `aqualifestyle`, 56
+`information_schema.columns` snapshot used by
+`AQGreenReconciliationEvidenceSnapshot.CaptureAsync`: UTF-8 bytes of
+`table_name:column_name:data_type:is_nullable`, joined with newlines in
+`table_name, ordinal_position` order. Protected CI measured
+`27c55cd3dfbb93319aeeb17b463912fc7c366367a056aee7d0fc7aa629ad3664`; the
+owner's read-only production query using the same calculation returned the same
+value. The previously committed `48be3ea9…` value was incorrect and is not
+supported by a retained query result. Production reported database
+`aqualifestyle`, database identity SHA-256
+`1be505af7b4ba8efd991448f8ab301c771deb4c962c5eb02c459b14bd6f0c6fe`, 56
 applied migrations, latest `20261115113914_AddAQGreenIndependentRootRequests`,
 and the independent-root request table present.
 
