@@ -40,8 +40,8 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 IsTransactional=true,IsolationLevel=IsolationLevel.RepeatableRead}))
             {currentSchemaDigest=(await Resolve<IAQGreenReconciliationEvidenceSnapshot>().CaptureAsync()).SourceSchemaVersion;
                 await schemaUow.CompleteAsync();}
-            // Verify the production preflight rejects migration 56 while
-            // pending, then restore the test database to its supported head
+            // Verify the production preflight rejects the pending independent-root
+            // migrations, then restore the test database to its supported head
             // before commissioning synthetic D10 evidence against that schema.
             await UsingDbContextAsync(c=>c.GetService<IMigrator>().MigrateAsync("20261021051549_AddAQGreenSalesEvidenceInvalidation"));
             using(var beforeStage=Resolve<AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>())
@@ -186,9 +186,9 @@ namespace AqualLifeStyle.Web.Tests.Integration
             (await Should.ThrowAsync<InvalidOperationException>(()=>cutover.SetPhaseAsync("Normal"))).Message.ShouldBe("D10_AUTHORITY_EXPIRED");
             (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.ForTenantAsync(1,true))).Message.ShouldBe("D10_AUTHORITY_EXPIRED");
             PostResetOperatorTransportTests.Install(config,x.Decision,x.Authority,clean);
-            // A production host is intentionally refused while migration 56 is
-            // pending. Expired-authority behavior is exercised in-process here;
-            // fresh-process readiness is verified below after migration 56.
+            // A production host is intentionally refused while the independent-root
+            // schema migrations are pending. Expired-authority behavior is exercised
+            // in-process here; fresh-process readiness is verified after migration 57.
             // Even a complete-looking in-flight Normal cannot waive expiry. The
             // separate read sees only Replay and the owning transaction rolls back.
             (await Should.ThrowAsync<InvalidOperationException>(()=>store.TransactAsync(async pending=>
@@ -427,7 +427,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             await UsingDbContextAsync(async c=>
             {
                 (await c.AQGreenIndependentRootRequests.CountAsync()).ShouldBe(2);
-                (await c.Database.GetAppliedMigrationsAsync()).Last().ShouldBe("20261115113914_AddAQGreenIndependentRootRequests");
+                (await c.Database.GetAppliedMigrationsAsync()).Last().ShouldBe("20261125202325_UseLiveEntryParticipationUniqueIndex");
             });
             await UsingDbContextAsync(async c=>
             {
@@ -453,7 +453,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 (await c.AQGreenJoiningCheckouts.SingleAsync(p=>p.ProviderCheckoutId=="SYNTHETIC-RETIRED-CHECKOUT")).PaymentId.ShouldBe(oldPaymentId);
             });
             File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("REPRO_MARKER_DIR"),"clean-start-commissioning.ran"),
-                "PostgreSQL: immutable reset and Host-root evidence; production preflight rejects pending migration 56; migration 56 is applied before synthetic commissioning and the observed schema is unchanged; restart succeeds on the exact commissioned schema; two explicit customer roots plus six invited members per root preserve isolated five-wide spillover, payment/Area approval, rollback denial on occupied intent, and zero commission rows; synthetic provider only.");
+                "PostgreSQL: immutable reset and Host-root evidence; production preflight rejects pending independent-root schema migrations; migration 57 is applied before synthetic commissioning and the column schema remains unchanged; restart succeeds on the exact commissioned schema; two explicit customer roots plus six invited members per root preserve isolated five-wide spillover, payment/Area approval, rollback denial on occupied intent, and zero commission rows; synthetic provider only.");
             }
             finally { if(businessLease!=null)await businessLease.DisposeAsync(); }
         }

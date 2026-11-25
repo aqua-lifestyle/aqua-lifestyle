@@ -3667,7 +3667,8 @@ namespace AqualLifeStyle.Migrations
                     b.HasIndex("RegistrationPaymentId");
 
                     b.HasIndex("TenantId", "CustomerId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("EntryParticipations", (string)null);
                 });

@@ -22,7 +22,7 @@ customer transition.
   transition requires a reviewed application change with a separately verified
   fingerprint; this code does not admit arbitrary schema drift.
 
-## Migration-56 schema binding
+## Migration-57 schema binding
 
 The accepted independent-root schema fingerprint is the SHA-256 of the public
 `information_schema.columns` snapshot used by
@@ -38,10 +38,17 @@ supported by a retained query result. Production reported database
 applied migrations, latest `20261115113914_AddAQGreenIndependentRootRequests`,
 and the independent-root request table present.
 
-The accepted migration history must contain exactly the backend's 56 migrations,
-ending with migration 55
-`20261021051549_AddAQGreenSalesEvidenceInvalidation` and migration 56
-`20261115113914_AddAQGreenIndependentRootRequests`. A pending, missing, or
+The production defect was a unique index that included soft-deleted
+`EntryParticipations`. Migration 57 changes only its predicate to
+`"IsDeleted" = false`, preserving retired membership and payment rows while
+allowing one current participation per customer. Because this index-only
+change does not alter public columns, the accepted public-column fingerprint
+remains `27c55cd3dfbb93319aeeb17b463912fc7c366367a056aee7d0fc7aa629ad3664`.
+
+The accepted migration history must contain exactly the backend's 57
+migrations, ending with migration 56
+`20261115113914_AddAQGreenIndependentRootRequests` and migration 57
+`20261125202325_UseLiveEntryParticipationUniqueIndex`. A pending, missing, or
 unexpected migration or any different public-column fingerprint holds D10.
 
 ## Health probe
@@ -55,22 +62,23 @@ does not grant those capabilities.
 
 ## Production completion sequence
 
-1. Merge this application correction only after its focused and existing CI
-   checks pass.
+1. Merge this application correction only after its PostgreSQL regression and
+   existing protected CI checks pass.
 2. With Render auto-deploy disabled, an owner explicitly deploys the merged
-   backend commit. No migration, seed, or environment change is required. Render
-   restarts the single existing API instance as part of deployment.
-3. Confirm Render stays live and `/api/health` returns HTTP 200. Require
+   backend commit. The general API remains available while D10 readiness holds
+   on migration 56. The application does not migrate or seed during startup.
+3. Apply migration 57 through the existing owner-authorized migration-only
+   mechanism. It replaces one index and does not update, delete, or seed rows.
+4. Confirm Render stays live and `/api/health` returns HTTP 200. Require
    `AQGreenOperationalReadiness=Ready`, `PaymentAvailability=Available`, and the
    `aqgreen-flexible-joining-v1` plus `programme-approval-queue-v1` capabilities.
    `Ready` means D10 authority and integrity checks pass; it does not override a
    held payment/joining contract. If any condition is missing, stop before the
    frontend release and inspect the actual hold without changing financial or
    commissioning configuration.
-4. Once backend readiness is verified, an owner deploys the already-approved
-   frontend source `58b18b2f5a76769a660c2ae834bd6e0c02263ebf` to Vercel Production.
-   Confirm deployment `READY` and that the production alias serves that revision.
-5. An owner verifies the real member independent-root request and administrative
+5. The matching frontend is already deployed from
+   `6c8404af96931417369f6656d6dd415ad00ddd77`. An owner verifies the real member
+   independent-root request and administrative
    approval journey, including resulting root/network placement, using an
    authorized customer account. Do not create synthetic payment transactions or
    payouts. Stop on any authorization, tenant/area, root-provenance, placement,
