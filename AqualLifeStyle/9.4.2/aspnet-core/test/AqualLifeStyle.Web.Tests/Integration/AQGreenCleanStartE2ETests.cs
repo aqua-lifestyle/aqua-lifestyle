@@ -353,7 +353,13 @@ namespace AqualLifeStyle.Web.Tests.Integration
             await UsingDbContextAsync(c=>c.Database.MigrateAsync());
             using(var migratedContext=Resolve<AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>())
                 AqualLifeStyle.EntityFrameworkCore.DatabaseReleasePreflight.Verify(migratedContext);
-            var migratedBoundary = await Resolve<IAQGreenReconciliationEvidenceSnapshot>().CaptureAsync();
+            AqualLifeStyle.Domain.AQGreen.AQGreenReconciliationSourceBoundary migratedBoundary;
+            using (var migratedBoundaryUow = Resolve<IUnitOfWorkManager>().Begin(new UnitOfWorkOptions
+            { Scope = TransactionScopeOption.RequiresNew, IsTransactional = true, IsolationLevel = IsolationLevel.RepeatableRead }))
+            {
+                migratedBoundary = await Resolve<IAQGreenReconciliationEvidenceSnapshot>().CaptureAsync();
+                await migratedBoundaryUow.CompleteAsync();
+            }
             migratedBoundary.SourceSchemaVersion.ShouldBe(successorSchemaDigest);
             AqualLifeStyle.Application.ProgrammeParticipations.AQGreenD10BackendSuccessor.Accept(
                 x.Decision, migratedBoundary, config).ShouldBeTrue();
