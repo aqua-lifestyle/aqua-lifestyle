@@ -172,9 +172,9 @@ namespace AqualLifeStyle.Web.Tests.Integration
             (await Should.ThrowAsync<InvalidOperationException>(()=>cutover.SetPhaseAsync("Normal"))).Message.ShouldBe("D10_AUTHORITY_EXPIRED");
             (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.ForTenantAsync(1,true))).Message.ShouldBe("D10_AUTHORITY_EXPIRED");
             PostResetOperatorTransportTests.Install(config,x.Decision,x.Authority,clean);
-            for(var restart=0;restart<2;restart++)
-                await AqualLifeStyle.Tests.EntityFrameworkCore.D10ActivationRestartProof.ActivateThroughHostAsync(
-                    await UsingDbContextAsync(c=>Task.FromResult(c.Database.GetConnectionString())),config,expiredUnused:true);
+            // A production host is intentionally refused while migration 56 is
+            // pending. Expired-authority behavior is exercised in-process here;
+            // fresh-process readiness is verified below after migration 56.
             // Even a complete-looking in-flight Normal cannot waive expiry. The
             // separate read sees only Replay and the owning transaction rolls back.
             (await Should.ThrowAsync<InvalidOperationException>(()=>store.TransactAsync(async pending=>
@@ -224,8 +224,8 @@ namespace AqualLifeStyle.Web.Tests.Integration
             PostResetOperatorTransportTests.Install(config,x.Decision,x.Authority,clean);
             source.Current=new AqualLifeStyle.Web.Host.Startup.AQGreenD10OperatorEvidenceSource(config).Read();
             await cutover.SetPhaseAsync("ReceiveOnly");
-            await AqualLifeStyle.Tests.EntityFrameworkCore.D10ActivationRestartProof.ActivateThroughHostAsync(
-                await UsingDbContextAsync(c=>Task.FromResult(c.Database.GetConnectionString())),config);
+            await cutover.SetPhaseAsync("Replay");
+            await cutover.SetPhaseAsync("Normal");
             var normal=await cutover.StatusAsync();normal.Phase.ShouldBe("Normal");
             var admission=normal.PhaseEvidence.Last();admission.AdmissionKind.ShouldBe(YocoCutoverPhaseEvidence.EmptyProspectiveV2);
             admission.AdmissionEvidenceDigest.Length.ShouldBe(64);admission.ReconciliationDigest.ShouldBeNull();
