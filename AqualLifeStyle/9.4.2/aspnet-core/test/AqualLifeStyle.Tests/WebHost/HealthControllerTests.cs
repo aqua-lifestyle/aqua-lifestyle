@@ -24,9 +24,8 @@ using StackExchange.Redis;
 namespace AqualLifeStyle.Tests.WebHost
 {
     /// <summary>
-    /// Covers the Redis-awareness added to <see cref="HealthController"/>: the endpoint now
-    /// reports database *and* Redis reachability, treats an unconfigured Redis cache as healthy,
-    /// and returns HTTP 503 with a "Degraded" status whenever a configured dependency is down.
+    /// Covers host liveness separately from AQGreen/payment readiness. Render probes
+    /// this endpoint; business subsystem holds must not make the general API unhealthy.
     /// </summary>
     public class HealthControllerTests
     {
@@ -111,6 +110,7 @@ namespace AqualLifeStyle.Tests.WebHost
             response.DataProtectionKeyStoreStatus.ShouldBe("Healthy");
             response.IsRedisReachable.ShouldBeTrue();
             response.RedisStatus.ShouldBe("NotConfigured");
+            response.AQGreenOperationalReadiness.ShouldBe("NotCommissioned");
         }
 
         [Fact]
@@ -273,9 +273,9 @@ namespace AqualLifeStyle.Tests.WebHost
         }
 
         [Theory]
-        [InlineData("YOCO_CUTOVER_BUSINESS_WRITES_FENCED", "Unavailable", 503)]
-        [InlineData("YOCO_CUTOVER_RECONCILIATION_HELD", "Unavailable", 503)]
-        [InlineData("synthetic corrupt/unreadable state", "Unavailable", 503)]
+        [InlineData("YOCO_CUTOVER_BUSINESS_WRITES_FENCED", "Unavailable", 200)]
+        [InlineData("YOCO_CUTOVER_RECONCILIATION_HELD", "Unavailable", 200)]
+        [InlineData("synthetic corrupt/unreadable state", "Unavailable", 200)]
         [InlineData(null, "Available", 200)]
         public async Task CutoverCapabilitiesRequireNormalLeaseAndCurrentReleaseAuthority(
             string failure, string expectedAvailability, int status)
@@ -293,6 +293,7 @@ namespace AqualLifeStyle.Tests.WebHost
             {
                 [YocoCutoverOptions.Prefix + "Enabled"] = "true",
                 [YocoCutoverOptions.Prefix + "OperatorUserId"] = "7",
+                ["App:AQGreenV2:Commissioning:Enabled"] = "true",
                 [RuntimeOperationGuards.FinancialSetting] = "true"
             });
             var controller = CreateController(provider, configuration, Substitute.For<IAbpRedisCacheDatabaseProvider>(),
@@ -303,7 +304,9 @@ namespace AqualLifeStyle.Tests.WebHost
                 : actionResult.Result.ShouldBeOfType<ObjectResult>();
             result.StatusCode.ShouldBe(status);
             var response = result.Value.ShouldBeOfType<HealthCheckResponse>();
+            response.Status.ShouldBe("Healthy");
             response.PaymentAvailability.ShouldBe(expectedAvailability);
+            response.AQGreenOperationalReadiness.ShouldBe(expectedAvailability == "Unavailable" ? "Unavailable" : "Ready");
             response.ContractCapabilities.Contains("aqgreen-flexible-joining-v1").ShouldBe(failure == null);
             if (failure == null)
             {
@@ -328,12 +331,14 @@ namespace AqualLifeStyle.Tests.WebHost
             var configuration = BuildConfiguration(null, new Dictionary<string, string>
             {
                 [YocoCutoverOptions.Prefix + "Enabled"] = "true", [YocoCutoverOptions.Prefix + "OperatorUserId"] = "7",
+                ["App:AQGreenV2:Commissioning:Enabled"] = "true",
                 [RuntimeOperationGuards.FinancialSetting] = "true"
             });
             var result = (await CreateController(provider, configuration, Substitute.For<IAbpRedisCacheDatabaseProvider>(),
-                cutoverStore: store, releaseGate: release).Get()).Result.ShouldBeOfType<ObjectResult>();
-            result.StatusCode.ShouldBe(503);
-            result.Value.ShouldBeOfType<HealthCheckResponse>().PaymentAvailability.ShouldBe("Unavailable");
+                cutoverStore: store, releaseGate: release).Get()).Result.ShouldBeOfType<OkObjectResult>();
+            var response = result.Value.ShouldBeOfType<HealthCheckResponse>();
+            response.PaymentAvailability.ShouldBe("Unavailable");
+            response.AQGreenOperationalReadiness.ShouldBe("Unavailable");
             await lease.Received(1).DisposeAsync();
         }
 
@@ -402,10 +407,13 @@ namespace AqualLifeStyle.Tests.WebHost
             store.ReadOnlyAsync(Arg.Any<Func<Task>>()).Returns(call=>call.Arg<Func<Task>>()());
             if(failure=="authority")release.VerifyHeldReadinessAsync().Returns(Task.FromException(new InvalidOperationException("D10_AUTHORITY_EXPIRED")));
             var config=BuildConfiguration(null,new Dictionary<string,string> { [YocoCutoverOptions.Prefix+"Enabled"]="true",
+                ["App:AQGreenV2:Commissioning:Enabled"]="true",
                 [YocoCutoverOptions.Prefix+"OperatorUserId"]="7",[RuntimeOperationGuards.FinancialSetting]="true" });
             var result=(await CreateController(provider,config,Substitute.For<IAbpRedisCacheDatabaseProvider>(),cutoverStore:store,releaseGate:release).Get())
-                .Result.ShouldBeOfType<ObjectResult>();result.StatusCode.ShouldBe(503);
-            result.Value.ShouldBeOfType<HealthCheckResponse>().PaymentAvailability.ShouldBe("Unavailable");
+                .Result.ShouldBeOfType<OkObjectResult>();
+            var response=result.Value.ShouldBeOfType<HealthCheckResponse>();
+            response.PaymentAvailability.ShouldBe("Unavailable");
+            response.AQGreenOperationalReadiness.ShouldBe("Unavailable");
         }
 
         [Theory]
@@ -419,7 +427,7 @@ namespace AqualLifeStyle.Tests.WebHost
             var config=BuildConfiguration(null,new Dictionary<string,string> { [YocoCutoverOptions.Prefix+"Enabled"]="true",
                 [YocoCutoverOptions.Prefix+"OperatorUserId"]=pinnedOperator,[RuntimeOperationGuards.FinancialSetting]=financial });
             var result=(await CreateController(provider,config,Substitute.For<IAbpRedisCacheDatabaseProvider>(),cutoverStore:store).Get())
-                .Result.ShouldBeOfType<ObjectResult>();result.StatusCode.ShouldBe(503);
+                .Result.ShouldBeOfType<OkObjectResult>();
             result.Value.ShouldBeOfType<HealthCheckResponse>().PaymentAvailability.ShouldBe("Unavailable");
         }
     }

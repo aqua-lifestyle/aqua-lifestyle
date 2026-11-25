@@ -87,7 +87,16 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             foreach(var e in corrupt["Evidence"].AsArray())if(e["Phase"]?.GetValue<string>()=="Normal")e.AsObject().Remove("D10Activation");
             async Task Save(string value){await using var cmd=new NpgsqlCommand("UPDATE \"AbpBackgroundJobs\" SET \"JobArgs\"=@value WHERE \"JobType\"='Aqua.YocoCutover.ControlV1'",connection);
                 cmd.Parameters.AddWithValue("value",value);(await cmd.ExecuteNonQueryAsync()).ShouldBe(1);}
-            try {await Save(corrupt.ToJsonString());(await client.GetAsync(host.Address+"/api/health")).StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);}
+            try
+            {
+                await Save(corrupt.ToJsonString());
+                var unavailable = await client.GetAsync(host.Address+"/api/health");
+                unavailable.StatusCode.ShouldBe(HttpStatusCode.OK);
+                var readiness = Payload(await unavailable.Content.ReadAsStringAsync());
+                readiness["status"].GetValue<string>().ShouldBe("Healthy");
+                readiness["paymentAvailability"].GetValue<string>().ShouldBe("Unavailable");
+                readiness["aqGreenOperationalReadiness"].GetValue<string>().ShouldBe("Unavailable");
+            }
             finally {await Save(original);}
             (await client.GetAsync(host.Address+"/api/health")).StatusCode.ShouldBe(HttpStatusCode.OK);
         }
@@ -135,10 +144,17 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             try
             {
                 await Save(corrupt.ToJsonString());
-                using var rejected=await AQGreenCleanStartPostgreSqlTests.ReceiverHost.Start(directory,connectionString,redis.Endpoint,
+                using var degraded=await AQGreenCleanStartPostgreSqlTests.ReceiverHost.Start(directory,connectionString,redis.Endpoint,
                     certificate,true,client,environmentOverrides:overrides);
-                await rejected.Exited();rejected.ExitCode.ShouldNotBe(0);
-                rejected.Log.ShouldContain("D10_COMMITTED_ACTIVATION_INVALID");
+                await degraded.Ready(client);
+                var response=await client.GetAsync(degraded.Address+"/api/health");
+                response.StatusCode.ShouldBe(HttpStatusCode.OK,degraded.Log);
+                var health=JsonNode.Parse(await response.Content.ReadAsStringAsync());
+                var result=health["result"]??health;
+                result["status"].GetValue<string>().ShouldBe("Healthy");
+                result["paymentAvailability"].GetValue<string>().ShouldBe("Unavailable");
+                result["aqGreenOperationalReadiness"].GetValue<string>().ShouldBe("Unavailable");
+                degraded.Kill();
             }
             finally { await Save(original); }
         }

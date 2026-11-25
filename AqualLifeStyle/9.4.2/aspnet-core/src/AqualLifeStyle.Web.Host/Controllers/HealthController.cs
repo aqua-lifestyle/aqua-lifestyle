@@ -81,7 +81,10 @@ namespace AqualLifeStyle.Web.Host.Controllers
             var paymentAvailability = await GetPaymentAvailabilityAsync();
             var isHealthy = isDatabaseReachable &&
                 isDataProtectionKeyStoreReachable &&
-                isRedisReachable && paymentAvailability != "Unavailable";
+                isRedisReachable;
+            var aqGreenCommissioned = _configuration.GetValue<bool>("App:AQGreenV2:Commissioning:Enabled");
+            var aqGreenReadiness = !aqGreenCommissioned ? "NotCommissioned" :
+                paymentAvailability == "Available" || paymentAvailability == "Held" ? "Ready" : "Unavailable";
 
             var response = new HealthCheckResponse
             {
@@ -100,6 +103,7 @@ namespace AqualLifeStyle.Web.Host.Controllers
                 PaymentContractVersion = DeploymentMetadata.PaymentContractVersion,
                 ContractCapabilities = GetContractCapabilities(paymentAvailability),
                 PaymentAvailability = paymentAvailability,
+                AQGreenOperationalReadiness = aqGreenReadiness,
                 ReleaseDate = AppVersionHelper.ReleaseDate,
                 CheckedAtUtc = DateTime.UtcNow,
                 Environment = _environment.EnvironmentName,

@@ -63,12 +63,16 @@ namespace AqualLifeStyle.EntityFrameworkCore
             if (!await reader.ReadAsync() || reader.GetString(0) != "on" || reader.GetString(1) != "repeatable read")
                 throw new InvalidOperationException("Frozen evidence snapshot is not REPEATABLE READ READ ONLY.");
             string Hash(string value) => AQGreenB6CanonicalEvidence.Hash(Encoding.UTF8.GetBytes(value));
+            var expectedMigrations = context.Database.GetMigrations().ToArray();
+            var appliedMigrations = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
             return new AQGreenReconciliationSourceBoundary
             {
                 SourceObservedAtUtc = reader.GetDateTime(2), SourcePostgreSqlVersion = reader.GetString(3),
                 SourceMvccSnapshotEvidence = Hash(reader.GetString(4)),
                 SourceDatabaseIdentityEvidence = Hash(reader.GetString(5)), SourceSchemaVersion = Hash(reader.GetString(6)),
                 SourceAssemblyDigest = AQGreenB6CanonicalEvidence.Hash(File.ReadAllBytes(GetType().Assembly.Location)),
+                ExpectedMigrations = expectedMigrations,
+                AppliedMigrations = appliedMigrations,
                 TransactionMode = "REPEATABLE READ READ ONLY"
             };
         }

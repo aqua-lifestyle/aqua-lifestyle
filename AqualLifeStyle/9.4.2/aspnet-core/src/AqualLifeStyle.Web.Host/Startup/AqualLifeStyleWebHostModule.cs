@@ -19,11 +19,11 @@ using AqualLifeStyle.Domain.AQGreen;
 using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Web.Host.AQGreenV2Demo;
 using AqualLifeStyle.Web.Host.AQGreenV2Pilot;
+using AqualLifeStyle.Application.ProgrammeParticipations;
 using Microsoft.Extensions.Hosting;
 using Abp.Domain.Uow;
 using Abp.EntityFrameworkCore.Uow;
 using AqualLifeStyle.EntityFrameworkCore;
-using AqualLifeStyle.Application.ProgrammeParticipations;
 
 namespace AqualLifeStyle.Web.Host.Startup
 {
@@ -117,11 +117,13 @@ namespace AqualLifeStyle.Web.Host.Startup
                 var manager = IocManager.Resolve<IUnitOfWorkManager>();
                 using (var uow = manager.Begin())
                 {
-                    DatabaseReleasePreflight.Verify(manager.Current.GetDbContext<AqualLifeStyleDbContext>(), _appConfiguration);
+                    DatabaseReleasePreflight.Verify(manager.Current.GetDbContext<AqualLifeStyleDbContext>());
                     uow.Complete();
                 }
-                if (!ApplicationRecoveryMode.IsEnabled(_appConfiguration))
-                    IocManager.Resolve<AQGreenD10Runtime>().VerifyStartupAsync().GetAwaiter().GetResult();
+                // AQGreen D10 integrity is checked by its operational gates and
+                // reported as subsystem readiness. It must never terminate the
+                // general API host. Database migration compatibility remains a
+                // host-start precondition above.
             }
             // PostInitialize is called after ABP modules are started. Resolve the
             // ErrorInfoBuilder here and add our converter so ABP will build
