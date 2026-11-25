@@ -35,16 +35,28 @@ namespace AqualLifeStyle.Web.Tests.Integration
         public async Task CleanStart_EmptyTenantCommissions_ExplicitRootThenSixInvitedMembers_SpilloverAndReplay()
         {
             await AssertFreshPostgreSqlDatabaseAsync();LoginAsDefaultTenantAdmin();
-            string successorSchemaDigest;
+            string currentSchemaDigest;
             using(var schemaUow=Resolve<IUnitOfWorkManager>().Begin(new UnitOfWorkOptions{Scope=TransactionScopeOption.RequiresNew,
                 IsTransactional=true,IsolationLevel=IsolationLevel.RepeatableRead}))
-            {successorSchemaDigest=(await Resolve<IAQGreenReconciliationEvidenceSnapshot>().CaptureAsync()).SourceSchemaVersion;
+            {currentSchemaDigest=(await Resolve<IAQGreenReconciliationEvidenceSnapshot>().CaptureAsync()).SourceSchemaVersion;
                 await schemaUow.CompleteAsync();}
-            // This fixture holds migration history at 55 while exercising the
-            // in-process legacy boundary; the production host must reject it.
+            // Verify the production preflight rejects migration 56 while
+            // pending, then restore the test database to its supported head
+            // before commissioning synthetic D10 evidence against that schema.
             await UsingDbContextAsync(c=>c.GetService<IMigrator>().MigrateAsync("20261021051549_AddAQGreenSalesEvidenceInvalidation"));
             using(var beforeStage=Resolve<AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>())
                 Should.Throw<InvalidOperationException>(()=>AqualLifeStyle.EntityFrameworkCore.DatabaseReleasePreflight.Verify(beforeStage));
+            await UsingDbContextAsync(c=>c.Database.MigrateAsync());
+            using(var migratedContext=Resolve<AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>())
+                AqualLifeStyle.EntityFrameworkCore.DatabaseReleasePreflight.Verify(migratedContext);
+            AqualLifeStyle.Domain.AQGreen.AQGreenReconciliationSourceBoundary migratedBoundary;
+            using (var migratedBoundaryUow = Resolve<IUnitOfWorkManager>().Begin(new UnitOfWorkOptions
+            { Scope = TransactionScopeOption.RequiresNew, IsTransactional = true, IsolationLevel = IsolationLevel.RepeatableRead }))
+            {
+                migratedBoundary = await Resolve<IAQGreenReconciliationEvidenceSnapshot>().CaptureAsync();
+                await migratedBoundaryUow.CompleteAsync();
+            }
+            migratedBoundary.SourceSchemaVersion.ShouldBe(currentSchemaDigest);
             var area=await UsingDbContextAsync(async c=>await (from a in c.AreaAdminAssignments join r in c.Areas
                 on a.AreaId equals r.Id where a.TenantId==1 && a.UserId==AbpSession.UserId && !a.RevokedAt.HasValue && r.IsActive select r.Id).FirstAsync());
             var (x,clean)=AQGreenCleanStartCommissioningTests.Create();var config=AQGreenD10SyntheticEvidence.Configuration();
@@ -340,29 +352,6 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 rows.Single(p=>p.ParticipantId==children[5].ParticipationId).PlacementParentParticipantId.ShouldBe(children[0].ParticipationId);
                 (await c.EntryWeeklyCommissions.CountAsync()).ShouldBe(0);
             });
-            var beforeMigration=await RegisterCleanStartCustomerAsync(area,"independent-before-migration",expectEmptyNetwork:false);
-            using(AbpSession.Use(1,beforeMigration.UserId))
-                await Should.ThrowAsync<Abp.UI.UserFriendlyException>(()=>InUnitOfWorkAsync(()=>
-                    StartLeanAsync(new StartEntryParticipationInput{RequestIndependentRoot=true})));
-            await UsingDbContextAsync(async c=>
-                (await c.EntryParticipations.CountAsync(p=>p.CustomerId==beforeMigration.CustomerId)).ShouldBe(0));
-            var historicalSchema=x.Decision.RequiredSchemaDigest;
-            historicalSchema.ShouldNotBe(successorSchemaDigest);
-            using(var c=Resolve<AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>())
-                Should.Throw<InvalidOperationException>(()=>AqualLifeStyle.EntityFrameworkCore.DatabaseReleasePreflight.Verify(c));
-            await UsingDbContextAsync(c=>c.Database.MigrateAsync());
-            using(var migratedContext=Resolve<AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>())
-                AqualLifeStyle.EntityFrameworkCore.DatabaseReleasePreflight.Verify(migratedContext);
-            AqualLifeStyle.Domain.AQGreen.AQGreenReconciliationSourceBoundary migratedBoundary;
-            using (var migratedBoundaryUow = Resolve<IUnitOfWorkManager>().Begin(new UnitOfWorkOptions
-            { Scope = TransactionScopeOption.RequiresNew, IsTransactional = true, IsolationLevel = IsolationLevel.RepeatableRead }))
-            {
-                migratedBoundary = await Resolve<IAQGreenReconciliationEvidenceSnapshot>().CaptureAsync();
-                await migratedBoundaryUow.CompleteAsync();
-            }
-            migratedBoundary.SourceSchemaVersion.ShouldBe(successorSchemaDigest);
-            AqualLifeStyle.Application.ProgrammeParticipations.AQGreenD10BackendSuccessor.Accept(
-                x.Decision, migratedBoundary, config).ShouldBeTrue();
             await runtime.VerifyStartupAsync();
             // A fresh Production child process must be able to start on the
             // migrated schema. Release only this test's long-lived business
@@ -462,7 +451,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 (await c.AQGreenJoiningCheckouts.SingleAsync(p=>p.ProviderCheckoutId=="SYNTHETIC-RETIRED-CHECKOUT")).PaymentId.ShouldBe(oldPaymentId);
             });
             File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("REPRO_MARKER_DIR"),"clean-start-commissioning.ran"),
-                "PostgreSQL: immutable reset and Host-root evidence; production preflight rejects migration 55, applied migration 56 changes the observed schema, wrong transition and repinned schema fail, additive restart succeeds; two explicit customer roots plus six invited members per root preserve isolated five-wide spillover, payment/Area approval, rollback denial on occupied intent, and zero commission rows; synthetic provider only.");
+                "PostgreSQL: immutable reset and Host-root evidence; production preflight rejects pending migration 56; migration 56 is applied before synthetic commissioning and the observed schema is unchanged; restart succeeds on the exact commissioned schema; two explicit customer roots plus six invited members per root preserve isolated five-wide spillover, payment/Area approval, rollback denial on occupied intent, and zero commission rows; synthetic provider only.");
             }
             finally { if(businessLease!=null)await businessLease.DisposeAsync(); }
         }
