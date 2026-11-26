@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Transactions;
 using Abp.Domain.Uow;
+using Abp.EntityFrameworkCore;
 using Abp.Configuration;
 using AqualLifeStyle.Authorization.Accounts;
 using AqualLifeStyle.Authorization.Accounts.Dto;
@@ -17,11 +18,16 @@ using AqualLifeStyle.Domain.Onyx;
 using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.Payments.Yoco;
 using AqualLifeStyle.Tests.WebHost;
+using AqualLifeStyle.Web.Host.Controllers;
+using AqualLifeStyle.Web.Host.Models;
 using Castle.MicroKernel.Registration;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
+using NSubstitute;
 using Shouldly;
 using Xunit;
 
@@ -156,7 +162,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 c.EntryParticipations.Add(p);await c.SaveChangesAsync();return p.Id;
             });
             (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.VerifyStartupAsync()))
-                .Message.ShouldBe("D10_CLEAN_START_AUTHORIZED_ROOT_REQUIRED");
+                .Message.ShouldBe("D10_CLEAN_START_INDEPENDENT_ROOT_REQUEST_REQUIRED");
             await UsingDbContextAsync(async c=>{c.EntryParticipations.Remove(await c.EntryParticipations.SingleAsync(p=>p.Id==unauthorizedId));});
             await runtime.VerifyStartupAsync();
             await Should.ThrowAsync<InvalidOperationException>(()=>runtime.EnsureFinancialWorkersAsync());
@@ -285,51 +291,64 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 await uow.CompleteAsync();
             }
             await runtime.VerifyStartupAsync();
-            // This uses actual registration/verification after valid commissioning,
-            // not a pre-created root Customer. Synthetic provider/source authority
-            // remains test-only; this is not merchant acceptance or live delivery.
+            // Start with the actual production shape: retained retired history,
+            // no authorized roots, and a member-created first-root request.
             var root=await RegisterCleanStartCustomerAsync(area,"after-launch-root");
             var other=await RegisterCleanStartCustomerAsync(area,"other-registered-customer");
-            // A Tenant administrator cannot nominate or create the root.
             LoginAsDefaultTenantAdmin();
             await Should.ThrowAsync<Abp.Authorization.AbpAuthorizationException>(()=>InUnitOfWorkAsync(()=>
                 Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(new CleanStartRootInput{TenantId=1,CustomerId=root.CustomerId,Reason="Synthetic Host-selected first root"})));
-            LoginAsHostAdmin();var request=new CleanStartRootInput{TenantId=1,CustomerId=root.CustomerId,Reason="Synthetic Host-selected first root"};
+            LoginAsHostAdmin();
+            var hostRequest=new CleanStartRootInput{TenantId=1,CustomerId=root.CustomerId,Reason="Synthetic Host-selected first root"};
             (await Should.ThrowAsync<InvalidOperationException>(()=>InUnitOfWorkAsync(()=>
-                Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(new CleanStartRootInput{TenantId=1,Reason=request.Reason}))))
+                Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(new CleanStartRootInput{TenantId=1,Reason=hostRequest.Reason}))))
                 .Message.ShouldBe("D10_CLEAN_START_ROOT_CUSTOMER_REQUIRED_OR_MISMATCHED");
-            var attempts=await Task.WhenAll(new[]{root,other}.Select(candidate=>Task.Run(async ()=>
+            await AssertCleanStartPaymentReadinessAsync();
+            using(AbpSession.Use(1,root.UserId))
             {
-                try
-                {
-                    var id=await InUnitOfWorkAsync(()=>Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(
-                        new CleanStartRootInput{TenantId=1,CustomerId=candidate.CustomerId,Reason=request.Reason}));
-                    return (Customer:candidate,Id:(Guid?)id);
-                }
-                catch(InvalidOperationException e)
-                {
-                    e.Message.ShouldBe("D10_CLEAN_START_ROOT_POPULATION_NOT_EMPTY");
-                    return (Customer:candidate,Id:(Guid?)null);
-                }
-            })));
-            var winner=attempts.Where(a=>a.Id.HasValue).ShouldHaveSingleItem();
-            root=winner.Customer;var rootId=winner.Id.Value;request.CustomerId=root.CustomerId;
-            (await InUnitOfWorkAsync(()=>Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(request))).ShouldBe(rootId);
-            root=root with{ParticipationId=rootId};await AssertAwaitingApprovalOrPaymentAsync(rootId);
+                await Should.ThrowAsync<Abp.UI.UserFriendlyException>(()=>InUnitOfWorkAsync(()=>
+                    StartLeanAsync(new StartEntryParticipationInput())));
+                await Should.ThrowAsync<Abp.UI.UserFriendlyException>(()=>InUnitOfWorkAsync(()=>
+                    StartLeanAsync(new StartEntryParticipationInput{InviteCode="INVALID",RequestIndependentRoot=true})));
+                var firstRequest=await InUnitOfWorkAsync(()=>StartLeanAsync(new StartEntryParticipationInput{RequestIndependentRoot=true}));
+                var replay=await InUnitOfWorkAsync(()=>StartLeanAsync(new StartEntryParticipationInput{RequestIndependentRoot=true}));
+                replay.JoinedIndependently.ShouldBeTrue();replay.StatusCode.ShouldBe(firstRequest.StatusCode);
+                var id=await UsingDbContextAsync(async c=>await c.EntryParticipations
+                    .Where(p=>p.TenantId==1 && p.CustomerId==root.CustomerId).Select(p=>p.Id).SingleAsync());
+                root=root with{ParticipationId=id};
+            }
+            var rootId=root.ParticipationId;
+            await AssertAwaitingApprovalOrPaymentAsync(rootId);
+            await AssertCleanStartPaymentReadinessAsync();
+            await UsingDbContextAsync(async c=>
+            {
+                var participation=await c.EntryParticipations.SingleAsync(p=>p.Id==rootId);
+                participation.Status.ShouldBe(EntryParticipationStatus.AwaitingJoiningPayment);
+                (await c.AQGreenIndependentRootRequests.CountAsync()).ShouldBe(1);
+                (await c.AQGreenIndependentRootRequests.CountAsync(r=>r.ParticipantId==rootId)).ShouldBe(1);
+                (await c.AQGreenProspectiveRootAdmissions.CountAsync()).ShouldBe(0);
+                (await c.AQGreenNetworkPlacements.CountAsync()).ShouldBe(0);
+                (await c.MemberPayments.CountAsync(p=>p.CustomerId==root.CustomerId)).ShouldBe(0);
+                (await c.EntryParticipations.IgnoreQueryFilters().CountAsync(p=>p.IsDeleted)).ShouldBe(1);
+            });
             (await Should.ThrowAsync<InvalidOperationException>(()=>runtime.VerifyEmptyProspectiveLaunchAsync()))
                 .Message.ShouldBe("D10_PROSPECTIVE_WORK_REQUIRES_RECONCILIATION");
             (await Should.ThrowAsync<AQGreenPlacementConflictException>(()=>ApproveAsync(rootId)))
                 .Message.ShouldBe("AQGreen approval requires a fully satisfied joining obligation.");
+            await AssertCleanStartPaymentReadinessAsync();
             await ConfirmJoiningPaymentAsync(root);await AssertAwaitingApprovalAsync(rootId);
+            await AssertCleanStartPaymentReadinessAsync();
             await UsingDbContextAsync(async c=>
             {
                 var cover=await c.AQGreenFuneralCoverEntitlements.SingleAsync(e=>e.CustomerId==root.CustomerId);
                 cover.FuneralCoverAmount.ShouldBe(30000m);
             });
+            LoginAsHostAdmin();
             (await Should.ThrowAsync<InvalidOperationException>(()=>InUnitOfWorkAsync(()=>
-                Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(new CleanStartRootInput{TenantId=1,CustomerId=unauthorized.CustomerId,Reason="Synthetic attempted replacement"}))))
+                Resolve<IAQGreenCleanStartRootAppService>().AuthorizeRootAsync(new CleanStartRootInput{TenantId=1,CustomerId=other.CustomerId,Reason="Synthetic attempted replacement"}))))
                 .Message.ShouldBe("D10_CLEAN_START_ROOT_POPULATION_NOT_EMPTY");
-            LoginAsHostAdmin();await ApproveAsync(rootId);await AssertActiveApprovalAsync(root,true);
+            LoginAsDefaultTenantAdmin();await ApproveAsync(rootId);await AssertActiveApprovalAsync(root,true);
+            await AssertCleanStartPaymentReadinessAsync();
             var children=new System.Collections.Generic.List<ParticipantFixture>();
             for(var i=0;i<6;i++)
             {
@@ -379,9 +398,11 @@ namespace AqualLifeStyle.Web.Tests.Integration
                         .Where(p=>p.TenantId==1 && p.CustomerId==applicant.CustomerId).Select(p=>p.Id).SingleAsync());
                     applicant=applicant with{ParticipationId=id};
                 }
+                await AssertCleanStartPaymentReadinessAsync();
                 LoginAsDefaultTenantAdmin();
                 await Should.ThrowAsync<AQGreenPlacementConflictException>(()=>ApproveAsync(applicant.ParticipationId));
                 await ConfirmJoiningPaymentAsync(applicant);await AssertAwaitingApprovalAsync(applicant.ParticipationId);
+                await AssertCleanStartPaymentReadinessAsync();
                 newRoots.Add(applicant);
             }
             LoginAsDefaultTenantAdmin();
@@ -389,6 +410,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
             foreach(var applicant in newRoots)
             {
                 await ApproveAsync(applicant.ParticipationId);await AssertActiveApprovalAsync(applicant,true);
+                await AssertCleanStartPaymentReadinessAsync();
                 var branch=new System.Collections.Generic.List<ParticipantFixture>();
                 string code;
                 using(AbpSession.Use(1,applicant.UserId))
@@ -407,6 +429,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                     LoginAsDefaultTenantAdmin();await ApproveAsync(child.ParticipationId);
                     branch.Add(child);
                 }
+                await AssertCleanStartPaymentReadinessAsync();
                 await UsingDbContextAsync(async c=>
                 {
                     var scope=(await c.AQGreenNetworkPlacements.SingleAsync(p=>p.ParticipantId==applicant.ParticipationId)).PlacementTreeScopeId;
@@ -426,7 +449,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 .Message.ShouldContain("AQGREEN_INDEPENDENT_ROOT_HISTORY_PRESENT");
             await UsingDbContextAsync(async c=>
             {
-                (await c.AQGreenIndependentRootRequests.CountAsync()).ShouldBe(2);
+                (await c.AQGreenIndependentRootRequests.CountAsync()).ShouldBe(3);
                 (await c.Database.GetAppliedMigrationsAsync()).Last().ShouldBe("20261125202325_UseLiveEntryParticipationUniqueIndex");
             });
             await UsingDbContextAsync(async c=>
@@ -453,9 +476,28 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 (await c.AQGreenJoiningCheckouts.SingleAsync(p=>p.ProviderCheckoutId=="SYNTHETIC-RETIRED-CHECKOUT")).PaymentId.ShouldBe(oldPaymentId);
             });
             File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("REPRO_MARKER_DIR"),"clean-start-commissioning.ran"),
-                "PostgreSQL: immutable reset and Host-root evidence; production preflight rejects pending independent-root schema migrations; migration 57 is applied before synthetic commissioning and the column schema remains unchanged; restart succeeds on the exact commissioned schema; two explicit customer roots plus six invited members per root preserve isolated five-wide spillover, payment/Area approval, rollback denial on occupied intent, and zero commission rows; synthetic provider only.");
+                "PostgreSQL: immutable reset with retained soft-deleted history and no initial root admissions; production preflight rejects pending independent-root schema migrations; migration 57 is applied before synthetic commissioning and the column schema remains unchanged; restart succeeds on the exact commissioned schema; the first member-requested root completes payment and Area approval, then two further independent roots and six invited members per root preserve isolated five-wide spillover, immutable intent, rollback denial on occupied intent, and zero commission rows; synthetic provider only.");
             }
             finally { if(businessLease!=null)await businessLease.DisposeAsync(); }
+        }
+
+        private async Task AssertCleanStartPaymentReadinessAsync()
+        {
+            var environment=Substitute.For<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>();
+            environment.EnvironmentName.Returns("Production");
+            var keyStore=Substitute.For<AqualLifeStyle.Web.Host.Health.IDataProtectionKeyStoreReadinessProbe>();
+            keyStore.IsReadyAsync().Returns(Task.FromResult(true));
+            var controller=new HealthController(Resolve<IDbContextProvider<AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>>(),
+                environment,Resolve<IConfiguration>(),Substitute.For<Abp.Runtime.Caching.Redis.IAbpRedisCacheDatabaseProvider>(),
+                keyStore,
+                Resolve<IYocoCutoverStore>(),Resolve<IYocoCutoverReleaseGate>());
+            controller.ControllerContext=new ControllerContext{HttpContext=new DefaultHttpContext()};
+            var action=await controller.Get();
+            var response=action.Result.ShouldBeOfType<ObjectResult>().Value.ShouldBeOfType<HealthCheckResponse>();
+            response.AQGreenOperationalReadiness.ShouldBe("Ready");
+            response.PaymentAvailability.ShouldBe("Available");
+            response.ContractCapabilities.ShouldContain("aqgreen-flexible-joining-v1");
+            response.ContractCapabilities.ShouldContain("programme-approval-queue-v1");
         }
 
         private async Task<ParticipantFixture> RegisterCleanStartCustomerAsync(Guid area, string label, bool expectEmptyNetwork=true)

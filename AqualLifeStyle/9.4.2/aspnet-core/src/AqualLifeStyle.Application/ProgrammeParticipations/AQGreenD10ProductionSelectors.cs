@@ -297,9 +297,10 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         p.StartedAt < d.V2EffectiveAtUtc), "D10_UNAUTHORIZED_RESET_TO_COMMISSIONING_POPULATION");
                 if (cleanStart != null && d.CleanStartRootSelectionPolicy == AQGreenD10Decision.HostSelectRootAfterRegistration)
                 {
-                    // The signed empty baseline authorizes launch, not adoption of a
-                    // populated network. Later population needs the immutable Host
-                    // root admission created after this effective boundary.
+                    // The signed empty baseline authorizes launch, not adoption of
+                    // unrelated populated state. A requested independent root can
+                    // be the first population; its payment and Area approval still
+                    // own activation and placement.
                     var roots = _rootAdmissions.GetAll().AsNoTracking().Where(r =>
                         r.TenantId == d.TenantId && r.AuthorizedAt >= d.V2EffectiveAtUtc);
                     if (!await live.AnyAsync())
@@ -318,10 +319,12 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                         {
                             var requests = _rootRequests.GetAll().AsNoTracking().Where(r => r.TenantId == d.TenantId);
                             var historical = roots.Where(r => !requests.Any(q => q.ParticipantId == r.ParticipantId));
-                            AQGreenD10Commissioning.Require(await historical.CountAsync() == 1 &&
-                                await (from r in historical join p in live on r.ParticipantId equals p.Id
-                                    where r.AdministratorUserId > 0 && p.StartedAt >= d.V2EffectiveAtUtc &&
-                                        r.AuthorizedAt >= p.StartedAt select r.Id).CountAsync() == 1,
+                            var historicalCount = await historical.CountAsync();
+                            var validHistoricalCount = await (from r in historical join p in live on r.ParticipantId equals p.Id
+                                where r.AdministratorUserId > 0 && p.StartedAt >= d.V2EffectiveAtUtc &&
+                                    r.AuthorizedAt >= p.StartedAt select r.Id).CountAsync();
+                            AQGreenD10Commissioning.Require(historicalCount <= 1 &&
+                                (historicalCount == 0 || validHistoricalCount == 1),
                                 "D10_CLEAN_START_AUTHORIZED_ROOT_REQUIRED");
                             var later = from r in roots join q in requests on r.ParticipantId equals q.ParticipantId
                                 join p in live on r.ParticipantId equals p.Id
@@ -331,8 +334,33 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                                     q.RequestedAt >= p.StartedAt && r.AuthorizedAt >= q.RequestedAt &&
                                     q.RequestedByUserId > 0 && r.AdministratorUserId > 0
                                 select r.Id;
-                            AQGreenD10Commissioning.Require(await later.CountAsync() == await roots.CountAsync() - 1,
+                            var rootCount = await roots.CountAsync();
+                            AQGreenD10Commissioning.Require(await later.CountAsync() == rootCount - historicalCount,
                                 "D10_CLEAN_START_INDEPENDENT_ROOT_CHANGED");
+                            if (rootCount == 0 && historicalCount == 0)
+                            {
+                                // Before the first admission, live population may
+                                // consist only of member-requested independent roots
+                                // awaiting payment or Area approval. The immutable
+                                // intent must match the same live participant/account;
+                                // no recruiter or placement can enter ahead of a root.
+                                var independentApplicants = live.Where(p =>
+                                    !ids.Contains(p.Id) && !p.RecruiterCustomerId.HasValue);
+                                var requestedApplicants = from q in requests
+                                    join p in independentApplicants on q.ParticipantId equals p.Id
+                                    join c in _customers.GetAll().AsNoTracking() on p.CustomerId equals c.Id
+                                    where q.TenantId == p.TenantId && c.TenantId == p.TenantId &&
+                                        c.UserId == q.RequestedByUserId && !c.IsDeleted &&
+                                        q.RequestedByUserId > 0 && q.RequestedAt >= p.StartedAt &&
+                                        p.Status != EntryParticipationStatus.Active
+                                    select p.Id;
+                                var liveCount = await live.CountAsync();
+                                var independentCount = await independentApplicants.CountAsync();
+                                AQGreenD10Commissioning.Require(liveCount == independentCount &&
+                                    await requestedApplicants.Distinct().CountAsync() == liveCount &&
+                                    !await _placements.GetAll().AnyAsync(p => p.TenantId == d.TenantId),
+                                    "D10_CLEAN_START_INDEPENDENT_ROOT_REQUEST_REQUIRED");
+                            }
                         }
                     }
                 }
