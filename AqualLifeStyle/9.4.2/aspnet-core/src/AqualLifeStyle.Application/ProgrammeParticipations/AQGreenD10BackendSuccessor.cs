@@ -16,13 +16,12 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
     /// </summary>
     public static class AQGreenD10BackendSuccessor
     {
-        public const string IndependentRootMigration = "20261115113914_AddAQGreenIndependentRootRequests";
-        public const string PreviousMigration = "20261021051549_AddAQGreenSalesEvidenceInvalidation";
+        public const string IndependentRootMigration = "20261125202325_UseLiveEntryParticipationUniqueIndex";
+        public const string PreviousMigration = "20261115113914_AddAQGreenIndependentRootRequests";
 
-        // Read-only SHA-256 of the production public-column snapshot after the
-        // independently authorized migration 56. It is a schema pin, not an
-        // authorization credential. A future schema release must add its own
-        // reviewed migration and expected fingerprint.
+        // Read-only SHA-256 of the production public-column snapshot. Migration
+        // 57 changes only an index predicate, so it preserves this column-schema
+        // fingerprint while the exact migration-history pin advances.
         public const string IndependentRootSchemaSha256 =
             "27c55cd3dfbb93319aeeb17b463912fc7c366367a056aee7d0fc7aa629ad3664";
 
@@ -40,7 +39,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
             var expected = boundary.ExpectedMigrations;
             var applied = boundary.AppliedMigrations;
-            Require(expected != null && applied != null && expected.Length == 56 &&
+            Require(expected != null && applied != null && expected.Length == 57 &&
                 expected[^2] == PreviousMigration && expected[^1] == IndependentRootMigration &&
                 expected.SequenceEqual(applied, StringComparer.Ordinal),
                 "D10_BACKEND_SUCCESSOR_MIGRATION_HISTORY_MISMATCH");

@@ -26,7 +26,7 @@ namespace AqualLifeStyle.Tests.Application
 
         private static string[] ExpectedMigrations()
         {
-            var prior = Enumerable.Range(1, 54).Select(i => $"202601010000{i:00}_PriorMigration{i:00}");
+            var prior = Enumerable.Range(1, 55).Select(i => $"202601010000{i:00}_PriorMigration{i:00}");
             return prior.Append(AQGreenD10BackendSuccessor.PreviousMigration)
                 .Append(AQGreenD10BackendSuccessor.IndependentRootMigration).ToArray();
         }
@@ -50,7 +50,7 @@ namespace AqualLifeStyle.Tests.Application
                 .Message.ShouldBe(code);
 
         [Fact]
-        public void ExactProductionSchemaAndCompleteMigration56HistoryAreAcceptedWithoutRuntimePayload()
+        public void ExactProductionSchemaAndCompleteMigration57HistoryAreAcceptedWithoutRuntimePayload()
         {
             var evidence = Evidence();
             AQGreenD10BackendSuccessor.Accept(evidence.Decision, Boundary(), Configuration()).ShouldBeTrue();

@@ -34,7 +34,8 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
             builder.Property(participation => participation.Currency).HasMaxLength(3).IsRequired();
 
             builder.HasIndex(participation => new { participation.TenantId, participation.CustomerId })
-                .IsUnique();
+                .IsUnique()
+                .HasFilter("\"IsDeleted\" = false");
             builder.HasAlternateKey(participation => new
                 { participation.TenantId, participation.Id });
             builder.HasIndex(participation => participation.RecruiterCustomerId);
