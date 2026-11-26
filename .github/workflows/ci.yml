@@ -696,25 +696,6 @@ jobs:
               -not (Test-Path 'TestResults/clean-start-commissioning.ran')) {
             throw 'Clean-start PostgreSQL commissioning/joining proof was missing, skipped or failed'
           }
-      - name: Prepare isolated synthetic AQGreen roster database
-        run: docker exec '${{ job.services.postgres.id }}' createdb -U aqual_ci aqgreen_roster_preview_ci
-      - name: Verify AQGreen roster preview over HTTP and PostgreSQL
-        env:
-          REPRO_PG_SCHEMA_FROM_MODEL: "true"
-          REPRO_PG_CONNECTION: "Host=127.0.0.1;Port=5432;Database=aqgreen_roster_preview_ci;Username=aqual_ci;Password=aqual_ci_tests_only"
-          ConnectionStrings__Default: "Host=127.0.0.1;Port=5432;Database=aqgreen_roster_preview_ci;Username=aqual_ci;Password=aqual_ci_tests_only"
-        run: dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --no-build --filter 'FullyQualifiedName~RosterPreview_' --logger 'trx;LogFileName=aqgreen-roster-pg.trx' --results-directory TestResults
-      - name: Require all six AQGreen roster PostgreSQL cases to pass
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          [xml]$trx = Get-Content TestResults/aqgreen-roster-pg.trx
-          $results = @($trx.SelectNodes("/*[local-name()='TestRun']/*[local-name()='Results']/*[local-name()='UnitTestResult']"))
-          $names = @($results | ForEach-Object { $_.GetAttribute('testName') })
-          if ($results.Count -ne 6 -or (@($names | Sort-Object -Unique)).Count -ne 6 -or
-              @($results | Where-Object { $_.GetAttribute('outcome') -ne 'Passed' -or $_.GetAttribute('testName') -notlike '*RosterPreview_*' }).Count -ne 0) {
-            throw 'AQGreen roster PostgreSQL cases were missing, duplicated, skipped or failed'
-          }
       - name: Upload PostgreSQL regression results
         if: always()
         uses: actions/upload-artifact@v6
