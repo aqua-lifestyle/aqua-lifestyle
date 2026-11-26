@@ -6,6 +6,7 @@ namespace AqualLifeStyle.Domain.AQGreen
     public interface IAQGreenReconciliationEvidenceSnapshot
     {
         Task<AQGreenReconciliationSourceBoundary> CaptureAsync();
+        Task RequireReadOnlyTransactionAsync();
         Task<bool> HasIndependentRootStorageAsync();
         Task<AQGreenCleanStartState> CaptureCleanStartAsync(int tenantId, DateTime boundaryUtc, string resetId) =>
             throw new InvalidOperationException("D10_CLEAN_START_PROVIDER_VERIFICATION_UNAVAILABLE");

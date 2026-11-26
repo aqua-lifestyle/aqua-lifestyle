@@ -40,7 +40,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             return JsonSerializer.Deserialize<AQGreenCleanStartState>((string)await command.ExecuteScalarAsync(), AQGreenB6CanonicalEvidence.Options);
         }
 
-        public async Task<AQGreenReconciliationSourceBoundary> CaptureAsync()
+        public async Task RequireReadOnlyTransactionAsync()
         {
             var context = await _provider.GetDbContextAsync();
             if (!context.Database.IsNpgsql() || context.Database.CurrentTransaction == null)
@@ -49,6 +49,12 @@ namespace AqualLifeStyle.EntityFrameworkCore
             await context.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY");
             await context.Database.ExecuteSqlRawAsync("SET LOCAL statement_timeout = '10min'");
             await context.Database.ExecuteSqlRawAsync("SET LOCAL lock_timeout = '5s'");
+        }
+
+        public async Task<AQGreenReconciliationSourceBoundary> CaptureAsync()
+        {
+            await RequireReadOnlyTransactionAsync();
+            var context = await _provider.GetDbContextAsync();
             using var command = context.Database.GetDbConnection().CreateCommand();
             command.Transaction = context.Database.CurrentTransaction.GetDbTransaction();
             command.CommandText = """

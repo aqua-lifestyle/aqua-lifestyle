@@ -30,7 +30,7 @@ namespace AqualLifeStyle.Application.Admin.Import
     public class CustomerImportAppService : AqualLifeStyleAppServiceBase, ICustomerImportAppService
     {
         private const int MaxFileBytes = 5 * 1024 * 1024;
-        private const int MaxRows = 1000;
+        internal const int MaxRows = 1000;
         private const int PreviewRows = 10;
         private const string CacheName = "CustomerImportPreviews";
         private static readonly TimeSpan PreviewLifetime = TimeSpan.FromMinutes(15);
@@ -70,7 +70,7 @@ namespace AqualLifeStyle.Application.Admin.Import
             var safeFileName = Path.GetFileName(input.FileName ?? string.Empty);
             var extension = Path.GetExtension(safeFileName).ToLowerInvariant();
             var errors = new List<CustomerImportErrorDto>();
-            var importResult = await ParseAsync(DecodeAndValidateFile(input.ContentBase64, extension), extension);
+            var importResult = await ReadFileAsync<CustomerImportFileRow>(input.ContentBase64, extension);
 
             AddParserErrors(importResult, errors);
             var parsedRows = importResult.Data?.ToList() ?? new List<CustomerImportFileRow>();
@@ -260,15 +260,23 @@ namespace AqualLifeStyle.Application.Admin.Import
             return rows;
         }
 
-        private static async Task<ImportResult<CustomerImportFileRow>> ParseAsync(byte[] bytes, string extension)
+        internal static async Task<ImportResult<T>> ReadFileAsync<T>(string base64, string extension,
+            Action<Stream> inspectWorkbook = null)
+            where T : class, new()
         {
+            var bytes = DecodeAndValidateFile(base64, extension);
             using (var stream = new MemoryStream(bytes, false))
             {
-                IImporter importer = extension == ".csv" ? (IImporter)new CsvImporter() : new ExcelImporter();
-                try { return await importer.Import<CustomerImportFileRow>(stream); }
-                catch (Exception exception)
+                if (extension == ".xlsx" && inspectWorkbook != null)
                 {
-                    throw new UserFriendlyException("Import preview failed.", "The file could not be parsed. Verify the template and try again.", exception);
+                    inspectWorkbook(stream);
+                    stream.Position = 0;
+                }
+                IImporter importer = extension == ".csv" ? (IImporter)new CsvImporter() : new ExcelImporter();
+                try { return await importer.Import<T>(stream); }
+                catch (Exception)
+                {
+                    throw new UserFriendlyException("Import preview failed.", "The file could not be parsed. Verify the template and try again.");
                 }
             }
         }
@@ -291,9 +299,9 @@ namespace AqualLifeStyle.Application.Admin.Import
             {
                 if (bytes.Contains((byte)0)) throw new UserFriendlyException("Import preview failed.", "The CSV file contains binary data.");
                 try { StrictUtf8.GetString(bytes); }
-                catch (DecoderFallbackException exception)
+                catch (DecoderFallbackException)
                 {
-                    throw new UserFriendlyException("Import preview failed.", "CSV files must use UTF-8 encoding.", exception);
+                    throw new UserFriendlyException("Import preview failed.", "CSV files must use UTF-8 encoding.");
                 }
             }
             return bytes;

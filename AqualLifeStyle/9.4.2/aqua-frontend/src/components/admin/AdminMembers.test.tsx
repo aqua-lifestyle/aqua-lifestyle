@@ -30,6 +30,37 @@ const authState = (permissions: string[]) => ({
   },
 });
 
+const rosterPermissions = [
+  "Aqua.Admin.Members.View",
+  "Aqua.Admin.Customers.Import",
+  "Aqua.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation",
+];
+
+const association = {
+  rowNumber: 2, oldMemberId: "0007", disposition: "Ambiguous",
+  networkOwnerName: "Synthetic network owner", networkOwnerOldMemberId: "0001",
+  recordedNetworkPosition: "Depth 2 / 17", issues: ["NetworkAssociationNeedsClarification"],
+};
+
+const rosterPreview = {
+  tenantId: 1, acceptedRows: 0, duplicateRows: 1, unmatchedRows: 1, ambiguousRows: 1,
+  rows: [association,
+    { rowNumber: 3, oldMemberId: "0008", disposition: "Duplicate", issues: ["RepeatedOldMemberId"] },
+    { rowNumber: 4, oldMemberId: "0009", disposition: "Unmatched", issues: ["NoVisibleAccountMatch"] }],
+};
+
+const openRosterDialog = () => {
+  HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) { this.setAttribute("open", ""); });
+  HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) { this.removeAttribute("open"); });
+  fireEvent.click(screen.getByRole("button", { name: "Import Existing Members" }));
+};
+
+const selectRoster = async (name: string, type: string) => {
+  const file = new File(["synthetic data"], name, { type });
+  fireEvent.change(screen.getByLabelText("Existing member roster file"), { target: { files: [file] } });
+  await screen.findByText(name);
+};
+
 describe("AdminMembers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -43,6 +74,66 @@ describe("AdminMembers", () => {
 
     expect(screen.getByText("You do not have permission to view members.")).toBeInTheDocument();
     expect(httpClient.get).not.toHaveBeenCalled();
+  });
+
+  it.each(["Aqua.Admin.Customers.Import", "Aqua.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation"])(
+    "hides roster preview without %s", async (permission) => {
+      vi.mocked(useAuthState).mockReturnValue(authState(rosterPermissions.filter((item) => item !== permission)));
+      vi.mocked(httpClient.get).mockResolvedValue({ items: [], totalCount: 0 });
+      render(<AdminMembers />);
+      await screen.findByText("0 accessible members");
+      expect(screen.queryByRole("button", { name: "Import Existing Members" })).not.toBeInTheDocument();
+    },
+  );
+
+  it("reviews CSV roster rows on the Members page without offering an apply action", async () => {
+    vi.mocked(useAuthState).mockReturnValue(authState(rosterPermissions));
+    vi.mocked(httpClient.get).mockResolvedValue({ items: [], totalCount: 0 });
+    vi.mocked(httpClient.post).mockResolvedValue(rosterPreview);
+    render(<AdminMembers />);
+    openRosterDialog();
+    expect(screen.getByRole("button", { name: "Preview file" })).toBeDisabled();
+    await selectRoster("roster.csv", "text/csv");
+    fireEvent.click(screen.getByRole("button", { name: "Preview file" }));
+
+    expect(await screen.findByText("3 rows checked. No members were imported.")).toBeInTheDocument();
+    expect(httpClient.post).toHaveBeenCalledExactlyOnceWith(
+      "/api/services/app/AdminProgrammeParticipation/PreviewLegacyAQGreenRoster",
+      { contentBase64: btoa("synthetic data"), fileName: "roster.csv", layout: "NetworkAssociations", tenantId: 1 },
+    );
+    expect(screen.getByText("Listed under: Synthetic network owner · 0001")).toBeInTheDocument();
+    expect(screen.getByText("Recorded position: Depth 2 / 17")).toBeInTheDocument();
+    expect(screen.getByText("The listed network does not establish a placement or sponsor.")).toBeInTheDocument();
+    expect(screen.getByText("No matching account was visible in your scope.")).toBeInTheDocument();
+    expect(screen.queryByText(/^Placement parent:/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Filter by outcome"), { target: { value: "Duplicate" } });
+    expect(screen.getByText("The old member ID is repeated in the file.")).toBeInTheDocument();
+    expect(screen.queryByText("0007")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /approve|confirm import|apply batch/i })).not.toBeInTheDocument();
+  });
+
+  it("requires a host tenant selection and discards an earlier result when the tenant changes", async () => {
+    const host = authState([...rosterPermissions, "Aqua.Admin.AllTenants", "Aqua.Admin.Tenants.View"]);
+    vi.mocked(useAuthState).mockReturnValue({ ...host, session: { ...host.session, user: { ...host.session.user, tenantId: null } } });
+    vi.mocked(httpClient.get).mockImplementation(async (url) => url.includes("AdminTenant") ? {
+      items: [{ id: 1, name: "Synthetic One", tenancyName: "synthetic-one" }, { id: 2, name: "Synthetic Two", tenancyName: "synthetic-two" }],
+      totalCount: 2,
+    } : { items: [], totalCount: 0 });
+    let finishPreview: (value: unknown) => void = () => {};
+    vi.mocked(httpClient.post).mockReturnValueOnce(new Promise((resolve) => { finishPreview = resolve; }));
+    render(<AdminMembers />);
+    openRosterDialog();
+    await screen.findByRole("option", { name: "Synthetic One (synthetic-one)" });
+    await selectRoster("roster.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    expect(screen.getByRole("button", { name: "Preview file" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Tenant"), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview file" }));
+    await waitFor(() => expect(httpClient.post).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ tenantId: 1, fileName: "roster.xlsx" })));
+
+    fireEvent.change(screen.getByLabelText("Tenant"), { target: { value: "2" } });
+    await act(async () => { finishPreview(rosterPreview); });
+    expect(screen.queryByText("Preview summary")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview file" })).toBeEnabled();
   });
 
   it("loads members and hides mutation controls without their granular permissions", async () => {

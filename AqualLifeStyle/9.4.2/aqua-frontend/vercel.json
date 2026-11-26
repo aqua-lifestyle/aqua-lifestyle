@@ -8,7 +8,8 @@
       "main": false,
       "fix/aqgreen-supported-joining-errors": false,
       "feature/aqgreen-v2-accepted-mvp": false,
-      "feature/aqgreen-v2-main-integration": false
+      "feature/aqgreen-v2-main-integration": false,
+      "feature/aqgreen-existing-member-preview": false
     }
   }
 }
