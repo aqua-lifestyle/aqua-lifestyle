@@ -71,6 +71,28 @@ describe("ImportCustomersDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: /confirm import of 1 customers/i }));
 
     await waitFor(() => expect(httpClient.post).toHaveBeenCalledTimes(2));
+    expect(httpClient.post).toHaveBeenLastCalledWith("/api/services/app/CustomerImport/Import", { previewId: "preview-1" });
     expect(await screen.findByText(/Imported 1 of 1 customers/i)).toBeInTheDocument();
+  });
+
+  it("does not offer confirmation when a previous file's preview arrives after replacement", async () => {
+    vi.mocked(useAuthState).mockReturnValue(authState(["Aqua.Admin.Customers.Import"]));
+    let finishPreview: (value: unknown) => void = () => {};
+    vi.mocked(httpClient.post).mockReturnValueOnce(new Promise((resolve) => { finishPreview = resolve; }));
+    render(<ImportCustomersDialog />);
+    fireEvent.click(screen.getByRole("button", { name: /import customers/i }));
+    const select = (name: string) => act(() => { dropzone.onDropAccepted?.([new File(["synthetic"], name, { type: "text/csv" })]); });
+    select("first.csv");
+    fireEvent.click(screen.getByRole("button", { name: /preview file/i }));
+    await waitFor(() => expect(httpClient.post).toHaveBeenCalledTimes(1));
+
+    select("replacement.csv");
+    await act(async () => {
+      finishPreview({ canImport: true, errors: [], previewId: "stale", rows: [], totalRows: 1, validRows: 1 });
+    });
+    expect(screen.getByText("replacement.csv")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /confirm import/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /preview file/i })).toBeEnabled();
+    expect(httpClient.post).toHaveBeenCalledExactlyOnceWith("/api/services/app/CustomerImport/Preview", expect.objectContaining({ fileName: "first.csv" }));
   });
 });

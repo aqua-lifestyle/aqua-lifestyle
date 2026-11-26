@@ -1,8 +1,12 @@
 # AQGreen existing-member roster preview
 
-The preview compares a roster with account and AQGreen evidence visible to the operator. It returns issues and counts without provisioning accounts, changing participation, moving placements, or creating financial records. There is no apply action or approval token.
+The preview compares a roster with account and AQGreen evidence visible to the operator. It shares the customer importer's upload dialog, file handling, preview request lifecycle, base permission, and backend CSV/XLSX parser. Members has the specialised read-only review for existing rosters; Customers retains the existing account-creation flow. This preview has no apply action or approval token. Use the Members entry for existing-member rosters; the Customers import creates accounts and does not reconcile AQGreen participation or network evidence.
 
 ## Evaluate a file
+
+In the Aqua Admin Portal, open **Members → Import Existing Members**. Select the roster format, choose a CSV or XLSX file, and select **Preview file**. Review the preview summary and filter the rows by outcome. Use the old member ID and row number to find the original entry in the workbook. The dialog provides downloadable CSV headings for each format. Tenant administrators use their session Tenant; authorised host administrators select a Tenant and also need `Aqua.Admin.Tenants.View` for the existing Tenant picker.
+
+Batch approval, import, and the post-import summary are pending. **Preview summary** reports only the read-only evaluation.
 
 Use the local or separately authorised validation API: `POST /api/services/app/AdminProgrammeParticipation/PreviewLegacyAQGreenRoster`. Supply `tenantId`, `fileName` and the base64 file bytes in `contentBase64`. Use the existing authenticated API client and a named operator account. The action requires both `Aqua.Admin.Customers.Import` and `Aqua.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation`. Tenant operators can only compare with records in their active, effective assigned Areas. Host operators need `Aqua.Admin.AllTenants` and must select one Tenant.
 

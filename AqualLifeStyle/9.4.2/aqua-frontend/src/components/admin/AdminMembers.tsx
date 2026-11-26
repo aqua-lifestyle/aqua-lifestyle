@@ -11,6 +11,8 @@ import { AdminJustificationDialog } from "./AdminJustificationDialog";
 import { ChangeMemberTierDialog } from "./ChangeMemberTierDialog";
 import { EditMemberProfileDialog } from "./EditMemberProfileDialog";
 import { AdminActionDisclosure } from "./AdminActionDisclosure";
+import { ImportExistingMembersDialog } from "./ImportExistingMembersDialog";
+import { CUSTOMER_IMPORT_PERMISSION } from "./ImportSpreadsheetDialog";
 
 type AdminMember = {
   areaId: string | null;
@@ -49,6 +51,10 @@ export const AdminMembers = () => {
   const canEdit = permissions.includes("Aqua.Admin.Members.Edit");
   const canSuspend = permissions.includes("Aqua.Admin.Members.Suspend");
   const canChangeTier = permissions.includes("Aqua.Admin.Members.ChangeTier");
+  const tenantId = session?.user?.tenantId ?? undefined;
+  const canPreviewRoster = permissions.includes(CUSTOMER_IMPORT_PERMISSION) &&
+    permissions.includes("Aqua.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation") &&
+    (tenantId !== undefined || (permissions.includes("Aqua.Admin.AllTenants") && permissions.includes("Aqua.Admin.Tenants.View")));
 
   const scopeKey = `${session?.user?.id}:${session?.user?.tenantId}:${permissions.join(",")}`;
   const invalidateRequests = useCallback(() => { latestRequest.current++; }, []);
@@ -115,7 +121,10 @@ export const AdminMembers = () => {
   ];
 
   return <main className="min-h-dvh px-4 py-6 sm:px-6 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-6">
-    <header><Breadcrumb items={[{ href: "/admin/dashboard", label: "Administration" }, { label: "Club members" }]} /><h1 className="mt-2 text-3xl font-bold">Club members</h1><p className="mt-2 text-muted-foreground">Maintain club member profiles, membership plans, and account access.</p></header>
+    <header className="flex flex-wrap items-end justify-between gap-3">
+      <div><Breadcrumb items={[{ href: "/admin/dashboard", label: "Administration" }, { label: "Club members" }]} /><h1 className="mt-2 text-3xl font-bold">Club members</h1><p className="mt-2 text-muted-foreground">Maintain club member profiles, membership plans, and account access.</p></div>
+      {canPreviewRoster ? <ImportExistingMembersDialog fixedTenantId={tenantId} key={scopeKey} /> : null}
+    </header>
     <Card><div className="flex items-center gap-3"><UsersRound className="size-5 text-accent" /><div><p className="text-sm text-muted-foreground">Club members</p><p className="text-2xl font-bold">{loading ? "Loading…" : error ? "Unavailable" : totalCount ?? "Unavailable"}</p></div></div></Card>
     {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
     <TextField label="Search club members" name="memberSearch" type="search" value={keyword} onChange={(event) => { setKeyword(event.target.value); setPage(1); }} />
