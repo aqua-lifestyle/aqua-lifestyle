@@ -25,6 +25,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         Task<PagedResultDto<LegacyAQGreenReconciliationDto>>
             GetLegacyAQGreenReconciliationAsync(
                 LegacyAQGreenReconciliationListInput input);
+        Task<LegacyAQGreenRosterPreviewDto> PreviewLegacyAQGreenRosterAsync(
+            PreviewLegacyAQGreenRosterInput input);
         Task<PagedResultDto<MonthlyObligationCheckoutReconciliationDto>>
             GetMonthlyObligationCheckoutReconciliationAsync(
                 MonthlyObligationCheckoutReconciliationListInput input);

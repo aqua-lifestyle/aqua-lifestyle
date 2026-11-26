@@ -93,6 +93,16 @@ namespace AqualLifeStyle.Tests.Application
         }
 
         [Fact]
+        public void LegacyAQGreenRosterPreview_ShouldRequireBothImportAndLegacyReconciliationPermissions()
+        {
+            var authorization = GetAuthorizeAttribute(typeof(AdminProgrammeParticipationAppService),
+                nameof(AdminProgrammeParticipationAppService.PreviewLegacyAQGreenRosterAsync));
+            authorization.RequireAllPermissions.ShouldBeTrue();
+            authorization.Permissions.ShouldContain(AquaPermissions.Admin.Customers.Import);
+            authorization.Permissions.ShouldContain(AquaPermissions.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation);
+        }
+
+        [Fact]
         public void AdminCustomerAppService_ShouldRequireGranularPermissionOnEveryMethod()
         {
             AssertAuthorizeAttribute(typeof(AdminCustomerAppService), nameof(AdminCustomerAppService.GetAllAsync), AquaPermissions.Admin.Customers.View);

@@ -327,7 +327,8 @@ namespace AqualLifeStyle.Web.Tests.Controllers
             (await BusinessSnapshotAsync()).ShouldBe(before);
         }
 
-        private async Task<Fixture> SeedAsync(bool permission = true, bool central = false, bool allTenants = false, bool exportPermission = false)
+        private async Task<Fixture> SeedAsync(bool permission = true, bool central = false, bool allTenants = false,
+            bool exportPermission = false, bool importPermission = false)
         {
             return await UsingDbContextAsync(async context =>
             {
@@ -350,6 +351,7 @@ namespace AqualLifeStyle.Web.Tests.Controllers
                 var permissions = new List<string> { AquaPermissions.Admin.Default, AquaPermissions.Admin.ProgrammeParticipations.Default };
                 if (permission) permissions.Add(AquaPermissions.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation);
                 if (exportPermission) permissions.Add(AquaPermissions.Admin.ProgrammeParticipations.ExportLegacyReconciliationEvidence);
+                if (importPermission) permissions.Add(AquaPermissions.Admin.Customers.Import);
                 if (allTenants) permissions.Add(AquaPermissions.Admin.AllTenants);
                 context.Permissions.AddRange(permissions.Select(name => new RolePermissionSetting
                 { TenantId = reviewer.TenantId, RoleId = role.Id, Name = name, IsGranted = true }));

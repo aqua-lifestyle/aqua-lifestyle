@@ -27,7 +27,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 {
     [Audited]
-    public class AdminProgrammeParticipationAppService
+    public partial class AdminProgrammeParticipationAppService
         : AdminAppServiceBase, IAdminProgrammeParticipationAppService
     {
         public IAQGreenD10CommissioningSource D10Source { get; set; } = UncommissionedAQGreenD10Source.Instance;
@@ -2372,7 +2372,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 .ToDictionary(payment => payment.Id);
         }
 
-        private async Task<Guid[]> GetAuthorizedAreaScopeAsync(Guid? requestedAreaId)
+        private async Task<Guid[]> GetAuthorizedAreaScopeAsync(Guid? requestedAreaId, DateTime? effectiveAt = null)
         {
             if (!AbpSession.TenantId.HasValue)
             {
@@ -2389,6 +2389,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
 
             var query = ActiveAreaAdministratorAssignments(
                 _areaAdminAssignmentRepository, _areaRepository);
+            if (effectiveAt.HasValue)
+                query = query.Where(assignment => assignment.EffectiveFrom <= effectiveAt.Value);
             if (requestedAreaId.HasValue)
                 query = query.Where(assignment => assignment.AreaId == requestedAreaId.Value);
             return await query.Select(assignment => assignment.AreaId).Distinct().ToArrayAsync();
