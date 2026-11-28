@@ -7,6 +7,7 @@ import { httpClient } from "@/src/shared/api";
 import { Button, DataTable, Dialog, DialogActions, SelectField, StatusMessage } from "@/src/shared/ui";
 import { AdminAreaSelectionField } from "./AdminAreaSelectionField";
 import { ImportSpreadsheetPicker, useSpreadsheetPreview } from "./ImportSpreadsheetDialog";
+import { AQGreenAdmissionForm } from "./AQGreenAdmissionForm";
 
 type Layout = "NetworkAssociations" | "ExplicitRelationships";
 type Disposition = "Accepted" | "Duplicate" | "Unmatched" | "Ambiguous";
@@ -123,10 +124,12 @@ const RosterReview = ({ preview, layout }: { preview: RosterPreview; layout: Lay
   </section>;
 };
 
-export const AddToNetworkDialog = ({ fixedTenantId, canPreviewRoster, canApprove }: {
+export const AddToNetworkDialog = ({ fixedTenantId, canPreviewRoster, canApprove, canRegisterCompany, canClearHistory }: {
   fixedTenantId?: number;
   canPreviewRoster: boolean;
   canApprove: boolean;
+  canRegisterCompany: boolean;
+  canClearHistory: boolean;
 }) => {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
@@ -137,11 +140,13 @@ export const AddToNetworkDialog = ({ fixedTenantId, canPreviewRoster, canApprove
       {open ? <>
         {canApprove ? <section aria-labelledby="company-member-heading" className="space-y-2">
           <h2 className="font-semibold" id="company-member-heading">Add New Member Recruited by Aqualifestyle Club</h2>
-          <StatusMessage title="Not available" tone="info">This route requires verified Yoco joining payment and approval before placement, without crediting an individual recruiter. Registration and payment links for this route are not available.</StatusMessage>
+          {canRegisterCompany ? <AQGreenAdmissionForm mode="company" fixedTenantId={fixedTenantId} /> :
+            <StatusMessage title="Not available" tone="info">Registration and payment links for this route are not available with your current permissions.</StatusMessage>}
         </section> : null}
         {canPreviewRoster ? <section aria-labelledby="transfer-member-heading" className="space-y-3">
           <h2 className="font-semibold" id="transfer-member-heading">Transfer Existing Member</h2>
           <ExistingMemberRosterPreview close={close} fixedTenantId={fixedTenantId} />
+          {canClearHistory ? <AQGreenAdmissionForm mode="historical" /> : null}
         </section> : <DialogActions><Button onClick={close} variant="ghost">Close</Button></DialogActions>}
       </> : null}
     </Dialog>

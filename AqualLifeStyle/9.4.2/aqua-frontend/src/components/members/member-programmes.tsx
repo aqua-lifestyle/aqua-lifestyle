@@ -174,8 +174,10 @@ export const MemberProgrammes = () => {
     return () => window.clearTimeout(task);
   }, []);
 
+  const [acceptCompanyRegistration, setAcceptCompanyRegistration] = useState(false);
+  const companyAcceptanceMissing = Boolean(participations?.entry?.requiresCompanyAcceptance && !acceptCompanyRegistration);
   const startAQGreenPayment = async (selectedSchedule?: 0 | 1) => {
-    if (paymentActionsUnavailable) return;
+    if (paymentActionsUnavailable || companyAcceptanceMissing) return;
     const schedule = selectedSchedule ?? participations?.entry?.joiningSchedule;
     if (schedule !== 0 && schedule !== 1) return;
     if (!joiningStage || !checkoutReview.start(joiningStage)) {
@@ -187,10 +189,10 @@ export const MemberProgrammes = () => {
     try {
       const checkout = await httpClient.post<
         { checkoutUrl: string; checkoutId: string },
-        { schedule: 0 | 1 }
+        { schedule: 0 | 1; acceptCompanyRegistration?: boolean }
       >(
         apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout,
-        { schedule },
+        participations?.entry?.requiresCompanyAcceptance ? { schedule, acceptCompanyRegistration: true } : { schedule },
       );
       if (isPilot) await reloadParticipations();
       else navigateToExternalUrl(checkout.checkoutUrl);
@@ -269,16 +271,20 @@ export const MemberProgrammes = () => {
         (!startingAQGreenPayment && checkoutReview.blockedFor(joiningStage)) ? paymentStatusNotice
       : participations.entry.joiningSchedule == null &&
         participations.entry.joiningPaidAmount === 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+         <div className="grid gap-3 sm:grid-cols-2">
+           {participations.entry.requiresCompanyAcceptance ? <label className="flex items-start gap-2 text-sm sm:col-span-2">
+             <input checked={acceptCompanyRegistration} onChange={(event) => setAcceptCompanyRegistration(event.target.checked)} type="checkbox" />
+             I accept the AQGreen registration prepared by Aqualifestyle Club and wish to continue to joining payment.
+           </label> : null}
           <Button
-            disabled={paymentActionsUnavailable}
+             disabled={paymentActionsUnavailable || companyAcceptanceMissing}
             isLoading={startingAQGreenPayment}
             onClick={() => void startAQGreenPayment(0)}
           >
             Pay R1,200 once
           </Button>
           <Button
-            disabled={paymentActionsUnavailable}
+             disabled={paymentActionsUnavailable || companyAcceptanceMissing}
             isLoading={startingAQGreenPayment}
             onClick={() => void startAQGreenPayment(1)}
             variant="outline"
@@ -291,7 +297,7 @@ export const MemberProgrammes = () => {
         participations.entry.nextPaymentAmount > 0 ? (
         <Button
           className="w-full"
-          disabled={paymentActionsUnavailable}
+           disabled={paymentActionsUnavailable || companyAcceptanceMissing}
           isLoading={startingAQGreenPayment}
           onClick={() => void startAQGreenPayment()}
         >

@@ -6,7 +6,8 @@ namespace AqualLifeStyle.Domain.AQGreen
     public enum AQGreenAttributionConfirmationMethod
     {
         MemberInvitationAcceptance = 1,
-        AuthorisedProspectiveRootConfirmation = 2
+        AuthorisedProspectiveRootConfirmation = 2,
+        CompanyAdmissionAcceptance = 3
     }
 
     /// <summary>
@@ -44,7 +45,8 @@ namespace AqualLifeStyle.Domain.AQGreen
         {
             if (attribution == null) throw new ArgumentNullException(nameof(attribution));
             if (confirmationMethod != AQGreenAttributionConfirmationMethod.MemberInvitationAcceptance &&
-                confirmationMethod != AQGreenAttributionConfirmationMethod.AuthorisedProspectiveRootConfirmation)
+                confirmationMethod != AQGreenAttributionConfirmationMethod.AuthorisedProspectiveRootConfirmation &&
+                confirmationMethod != AQGreenAttributionConfirmationMethod.CompanyAdmissionAcceptance)
                 throw new ArgumentOutOfRangeException(
                     nameof(confirmationMethod),
                     confirmationMethod,
@@ -52,7 +54,10 @@ namespace AqualLifeStyle.Domain.AQGreen
             if ((confirmationMethod == AQGreenAttributionConfirmationMethod.MemberInvitationAcceptance &&
                  attribution.AttributionKind != AQGreenRecruitmentAttributionKind.SponsoredParticipant) ||
                 (confirmationMethod == AQGreenAttributionConfirmationMethod.AuthorisedProspectiveRootConfirmation &&
-                 attribution.AttributionKind != AQGreenRecruitmentAttributionKind.AuthorisedProspectiveRoot))
+                 attribution.AttributionKind != AQGreenRecruitmentAttributionKind.AuthorisedProspectiveRoot) ||
+                (confirmationMethod == AQGreenAttributionConfirmationMethod.CompanyAdmissionAcceptance &&
+                 (attribution.AttributionKind != AQGreenRecruitmentAttributionKind.CompanyAdmission ||
+                  evidenceReferenceId != attribution.SourceReferenceId || !confirmedByUserId.HasValue)))
                 throw new InvalidOperationException(
                     "The confirmation method does not match the attribution source.");
             if (confirmedAt == default || confirmedAt.Kind != DateTimeKind.Utc)

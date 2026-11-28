@@ -18,6 +18,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
     {
         public const string IndependentRootMigration = "20261125202325_UseLiveEntryParticipationUniqueIndex";
         public const string PreviousMigration = "20261115113914_AddAQGreenIndependentRootRequests";
+        public const string AdministratorAdmissionMigration = "20261128123707_AddAQGreenAdministratorAdmission";
+        public const string AdministratorAdmissionSchemaSha256 = "68aa40dd42169d4c52ed03011bc070bea4b319af7015cadf7e84c8981d788159";
 
         // Read-only SHA-256 of the production public-column snapshot. Migration
         // 57 changes only an index predicate, so it preserves this column-schema
@@ -34,14 +36,15 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 "D10_BACKEND_SUCCESSOR_SCOPE_UNAVAILABLE");
             Require(boundary.SourceDatabaseIdentityEvidence == decision.RequiredDatabaseIdentityDigest,
                 "D10_BACKEND_SUCCESSOR_DATABASE_IDENTITY_MISMATCH");
-            Require(boundary.SourceSchemaVersion == IndependentRootSchemaSha256,
-                "D10_BACKEND_SUCCESSOR_SCHEMA_MISMATCH");
-
             var expected = boundary.ExpectedMigrations;
             var applied = boundary.AppliedMigrations;
-            Require(expected != null && applied != null && expected.Length == 57 &&
-                expected[^2] == PreviousMigration && expected[^1] == IndependentRootMigration &&
-                expected.SequenceEqual(applied, StringComparer.Ordinal),
+            var admission = expected?.Length == 58 && expected[^3] == PreviousMigration &&
+                expected[^2] == IndependentRootMigration && expected[^1] == AdministratorAdmissionMigration;
+            var independent = expected?.Length == 57 && expected[^2] == PreviousMigration &&
+                expected[^1] == IndependentRootMigration;
+            Require(boundary.SourceSchemaVersion == (admission ? AdministratorAdmissionSchemaSha256 : IndependentRootSchemaSha256),
+                "D10_BACKEND_SUCCESSOR_SCHEMA_MISMATCH");
+            Require((admission || independent) && applied != null && expected.SequenceEqual(applied, StringComparer.Ordinal),
                 "D10_BACKEND_SUCCESSOR_MIGRATION_HISTORY_MISMATCH");
 
             // Render supplies the immutable source revision for the selected

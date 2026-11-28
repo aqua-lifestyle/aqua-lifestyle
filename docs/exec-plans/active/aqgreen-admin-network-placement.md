@@ -6,9 +6,10 @@
 ## Goal and authority
 
 Use the existing AQGreen system for historical transfers and ongoing company
-acquisition. The owner's PR #139 continuation authorizes investigation,
-integration and non-production development and prohibits merge and production
-operations. Follow [placement V2](../../aqua-system/aqgreen-network-placement-specification.md),
+acquisition. The owner's latest PR #139 message approves the historical hold and
+clearance rules, company acquisition without sponsor credit, consent, verified
+payment, Area approval and existing placement rules. It prohibits merge and
+production operations. Follow [placement V2](../../aqua-system/aqgreen-network-placement-specification.md),
 [historical evidence](../../aqua-system/05-data-history-migrations-and-legacy-members.md),
 [payment and approval](../../aqua-system/04-payments-approval-and-yoco.md), and
 [D10 admission](../../operations/d10-api-availability-and-independent-root-release.md).
@@ -26,8 +27,8 @@ Acquisition, recruitment credit and structural placement are separate facts.
 
 ## Completed and tested on the PR branch
 
-- Existing scoped `Add to Network` roster preview from the first PR commit flags
-  active placement gaps and dependent rows. The company route is unavailable.
+- Existing scoped `Add to Network` roster preview flags active placement gaps
+  and dependent rows.
 - The continuation shares the existing membership-evidence join between roster
   preview and reconciliation/export. The roster now flags same-Tenant and shared
   legacy AQGreen assignments (including records with no current participation)
@@ -37,24 +38,32 @@ Acquisition, recruitment credit and structural placement are separate facts.
   command and test evidence. Reconciliation tests use synthetic records on
   disposable PostgreSQL; there is no provider or production acceptance evidence.
 
-## Blocked write paths and next action
+- The owner-approved continuation adds scoped historical holds and atomic
+  placement/clearance for existing paid active records in established trees.
+  Company registration extends the existing attribution plus member acceptance
+  records, then reuses member checkout, Area approval and canonical allocation.
+- Migration 58 changes the controlled attribution shape and adds historical hold
+  and reference tables. The fully migrated disposable PostgreSQL column digest
+  is `68aa40dd42169d4c52ed03011bc070bea4b319af7015cadf7e84c8981d788159`.
+  Application startup and D10 keep exact migration/preflight checks; the
+  receive/replay store also retains the bounded set of older recovery prefixes.
+- The administrator PostgreSQL application test covers held approval, invalid
+  historical evidence, exact placement and replay, company Area denial, consent,
+  checkout and payment processor replay, approval and follow-on spillover.
 
-- **Historical:** Obtain the approved source identity/evidence mapping,
-  root/parent/slot and business-effective dates (D03B/D09). Decide which reviewed
-  scopes remain held and who can clear them. An eventual apply should use the
-  existing account, topology and audit boundaries, with admission and automatic
-  allocation interlocked under the existing tree lock. Decide historical payment
-  and activation treatment from evidence; do not synthesize settled transactions.
-- **Company:** Confirm whether admission into an established tree without an
-  individual sponsor is required, what proves acquisition/member consent, and
-  what authorizes the target Area and placement. For established-tree admission,
-  the two-value attribution constraint plus the allocator's invitation-only
-  branch prove a model gap. Proposed only: extend the existing attribution and
-  approval model, reusing the checkout, Area validation, placement persistence and
-  constraints. Do not impersonate the member, synthesize an invitation, or create
-  an independent root as an implicit fallback. Any schema successor needs
-  migration and D10 review before production authority can be requested.
+## Remaining verification and release boundaries
+
+- Membership whose identity, paid activation, root or historical dates cannot be
+  proved using the retained record is not activated or placed here. The historical
+  UI is for an established tree and requires reviewed placement data, not just a
+  roster preview. New historical topology in a commissioned Tenant requires the
+  separate D10 reconciliation path. A previously calculated commission period
+  is never rewritten by transfer.
+- Offer the signed-in member's existing checkout, with explicit consent. Exact
+  manual slots for new company acquisitions and admin-sent checkout links are
+  not used in this implementation. A live provider end-to-end run is not authorized.
+- Use protected CI evidence at the exact candidate; it is not production release
+  authority. No production migration, import, payment or deployment is authorized.
 
 Branch `feat/aqgreen-admin-network-placement`, based on protected `main`
-`32a6852` (merged #138). Continue in the same draft PR; owner decisions come
-before write-path implementation and acceptance tests.
+`32a6852` (merged #138). Continue in the same draft PR.

@@ -11,6 +11,8 @@ export type ProgrammeParticipation = {
   joiningSchedule?: AQGreenJoiningPaymentSchedule | null;
   joiningTotalAmount?: number;
   joinedIndependently: boolean;
+  companyRegistered?: boolean;
+  requiresCompanyAcceptance?: boolean;
   nextPaymentAmount: number | null;
   nextPaymentDescription: string | null;
   programmeName: "AQGreen" | "Onyx";

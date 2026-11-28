@@ -1587,6 +1587,87 @@ namespace AqualLifeStyle.Migrations
                     b.ToTable("AbpUsers");
                 });
 
+            modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenHistoricalMemberReference", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OriginalReference")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReferenceKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("ReviewId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ParticipantId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "ReferenceKey")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "ReviewId");
+
+                    b.ToTable("AQGreenHistoricalMemberReferences", (string)null);
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenHistoricalTreeReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ClearedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("ClearedBy")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("EvidenceReference")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("ExpectedMembers")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("OpenedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("OpenedBy")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ScopeId")
+                        .IsUnique();
+
+                    b.ToTable("AQGreenHistoricalTreeReviews", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AQGHistory_Review", "\"ExpectedMembers\" BETWEEN 1 AND 1000 AND \"OpenedBy\" > 0 AND ((\"ClearedBy\" IS NULL AND \"ClearedAt\" IS NULL) OR (\"ClearedBy\" IS NOT NULL AND \"ClearedBy\" > 0 AND \"ClearedAt\" IS NOT NULL AND \"ClearedAt\" >= \"OpenedAt\"))");
+                        });
+                });
+
             modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenIndependentRootRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1790,17 +1871,17 @@ namespace AqualLifeStyle.Migrations
                         {
                             t.HasCheckConstraint("CK_AQGRecruitAttr_Actor", "\"AttributedByUserId\" IS NULL OR \"AttributedByUserId\" > 0");
 
-                            t.HasCheckConstraint("CK_AQGRecruitAttr_Kind", "\"AttributionKind\" IN (1, 2)");
+                            t.HasCheckConstraint("CK_AQGRecruitAttr_Kind", "\"AttributionKind\" IN (1, 2, 3)");
 
                             t.HasCheckConstraint("CK_AQGRecruitAttr_NoSelfSponsor", "\"CreditedSponsorParticipantId\" IS NULL OR \"ParticipantId\" <> \"CreditedSponsorParticipantId\"");
 
                             t.HasCheckConstraint("CK_AQGRecruitAttr_Rules_NotBlank", "length(trim(\"RulesVersion\")) > 0");
 
-                            t.HasCheckConstraint("CK_AQGRecruitAttr_Source", "\"AcquisitionSource\" IN (1, 2)");
+                            t.HasCheckConstraint("CK_AQGRecruitAttr_Source", "\"AcquisitionSource\" IN (1, 2, 3)");
 
                             t.HasCheckConstraint("CK_AQGRecruitAttr_SourceRef", "\"SourceReferenceId\" <> '00000000-0000-0000-0000-000000000000'");
 
-                            t.HasCheckConstraint("CK_AQGRecruitAttr_SourceShape", "(\"AttributionKind\" = 1 AND \"AcquisitionSource\" = 1 AND \"CreditedSponsorParticipantId\" IS NOT NULL AND \"AssignmentReason\" IS NULL) OR (\"AttributionKind\" = 2 AND \"AcquisitionSource\" = 2 AND \"CreditedSponsorParticipantId\" IS NULL AND \"AttributedByUserId\" IS NOT NULL AND \"AssignmentReason\" IS NOT NULL AND length(trim(\"AssignmentReason\")) > 0)");
+                            t.HasCheckConstraint("CK_AQGRecruitAttr_SourceShape", "(\"AttributionKind\" = 1 AND \"AcquisitionSource\" = 1 AND \"CreditedSponsorParticipantId\" IS NOT NULL AND \"AssignmentReason\" IS NULL) OR (\"AttributionKind\" = 2 AND \"AcquisitionSource\" = 2 AND \"CreditedSponsorParticipantId\" IS NULL AND \"AttributedByUserId\" IS NOT NULL AND \"AssignmentReason\" IS NOT NULL AND length(trim(\"AssignmentReason\")) > 0) OR (\"AttributionKind\" = 3 AND \"AcquisitionSource\" = 3 AND \"CreditedSponsorParticipantId\" IS NULL AND \"AttributedByUserId\" IS NOT NULL AND \"AssignmentReason\" IS NOT NULL AND length(trim(\"AssignmentReason\")) > 0)");
 
                             t.HasCheckConstraint("CK_AQGRecruitAttr_Tenant_Positive", "\"TenantId\" > 0");
                         });
@@ -1847,7 +1928,7 @@ namespace AqualLifeStyle.Migrations
 
                             t.HasCheckConstraint("CK_AQGRecruitConfirm_EvidenceRef", "\"EvidenceReferenceId\" <> '00000000-0000-0000-0000-000000000000'");
 
-                            t.HasCheckConstraint("CK_AQGRecruitConfirm_Method", "\"ConfirmationMethod\" IN (1, 2)");
+                            t.HasCheckConstraint("CK_AQGRecruitConfirm_Method", "\"ConfirmationMethod\" IN (1, 2, 3)");
 
                             t.HasCheckConstraint("CK_AQGRecruitConfirm_Rules_NotBlank", "length(trim(\"RulesVersion\")) > 0");
 
@@ -5735,6 +5816,33 @@ namespace AqualLifeStyle.Migrations
                     b.Navigation("DeleterUser");
 
                     b.Navigation("LastModifierUser");
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenHistoricalMemberReference", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.Onyx.EntryParticipation", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ParticipantId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AqualLifeStyle.Domain.AQGreen.AQGreenHistoricalTreeReview", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ReviewId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenHistoricalTreeReview", b =>
+                {
+                    b.HasOne("AqualLifeStyle.Domain.AQGreen.AQGreenPlacementTreeScope", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ScopeId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("AqualLifeStyle.Domain.AQGreen.AQGreenIndependentRootRequest", b =>

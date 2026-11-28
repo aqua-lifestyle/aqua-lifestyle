@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Abp.Application.Services;
@@ -25,6 +27,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         Task<PagedResultDto<LegacyAQGreenReconciliationDto>>
             GetLegacyAQGreenReconciliationAsync(
                 LegacyAQGreenReconciliationListInput input);
+        Task<Guid> RegisterAQGreenCompanyAdmissionAsync(RegisterAQGreenCompanyAdmissionInput input);
+        Task<List<AQGreenAdmissionTreeDto>> GetAQGreenAdmissionTreesAsync(int tenantId);
+        Task<Guid> OpenAQGreenHistoricalReviewAsync(OpenAQGreenHistoricalReviewInput input);
+        Task CompleteAQGreenHistoricalReviewAsync(CompleteAQGreenHistoricalReviewInput input);
         Task<LegacyAQGreenRosterPreviewDto> PreviewLegacyAQGreenRosterAsync(
             PreviewLegacyAQGreenRosterInput input);
         Task<PagedResultDto<MonthlyObligationCheckoutReconciliationDto>>

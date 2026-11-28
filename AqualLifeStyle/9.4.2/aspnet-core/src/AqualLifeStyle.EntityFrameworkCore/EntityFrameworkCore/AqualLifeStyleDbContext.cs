@@ -56,6 +56,8 @@ namespace AqualLifeStyle.EntityFrameworkCore
         public virtual DbSet<InternalAccountInvitation> InternalAccountInvitations { get; set; }
         public virtual DbSet<EntryParticipation> EntryParticipations { get; set; }
         public virtual DbSet<AQGreenPlacementTreeScope> AQGreenPlacementTreeScopes { get; set; }
+        public virtual DbSet<AQGreenHistoricalTreeReview> AQGreenHistoricalTreeReviews { get; set; }
+        public virtual DbSet<AQGreenHistoricalMemberReference> AQGreenHistoricalMemberReferences { get; set; }
         public virtual DbSet<AQGreenNetworkPlacement> AQGreenNetworkPlacements { get; set; }
         public virtual DbSet<AQGreenRecruitmentAttribution> AQGreenRecruitmentAttributions { get; set; }
         public virtual DbSet<AQGreenProspectiveRootAdmission> AQGreenProspectiveRootAdmissions { get; set; }

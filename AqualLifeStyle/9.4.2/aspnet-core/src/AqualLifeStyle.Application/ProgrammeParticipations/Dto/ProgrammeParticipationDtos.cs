@@ -27,6 +27,7 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
     {
         [Required]
         public AQGreenJoiningPaymentSchedule? Schedule { get; set; }
+        public bool AcceptCompanyRegistration { get; set; }
     }
 
     public class ProgrammeCheckoutDto
@@ -56,6 +57,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations.Dto
         public string Status { get; set; }
         public bool IsActive { get; set; }
         public bool JoinedIndependently { get; set; }
+        public bool CompanyRegistered { get; set; }
+        public bool RequiresCompanyAcceptance { get; set; }
         public string RecruiterClubMemberNumber { get; set; }
         public DateTime StartedAt { get; set; }
         public DateTime? ActivatedAt { get; set; }
