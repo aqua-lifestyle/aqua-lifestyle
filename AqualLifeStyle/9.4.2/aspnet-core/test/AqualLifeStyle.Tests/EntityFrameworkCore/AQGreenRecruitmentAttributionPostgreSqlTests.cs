@@ -415,7 +415,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
 
         [Theory]
         [InlineData(0)]
-        [InlineData(3)]
+        [InlineData(4)]
         public async Task Attribution_RejectsUndefinedAcquisitionSources(int source)
         {
             await ExpectRejectedAsync(
@@ -430,7 +430,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
 
         [Theory]
         [InlineData(0)]
-        [InlineData(3)]
+        [InlineData(4)]
         public async Task Attribution_RejectsUndefinedAttributionKinds(int kind)
         {
             await ExpectRejectedAsync(
@@ -570,7 +570,7 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
                     transaction,
                     attributionId,
                     tenantId: invalid == 6 ? 0 : 1,
-                    method: invalid == 1 ? 3 : 1,
+                    method: invalid == 1 ? 4 : 1,
                     evidenceReferenceId: invalid == 2 ? Guid.Empty : Guid.NewGuid(),
                     rulesVersion: invalid == 3 ? "\t" :
                         AQGreenRecruitmentAttributionRules.CurrentVersion,

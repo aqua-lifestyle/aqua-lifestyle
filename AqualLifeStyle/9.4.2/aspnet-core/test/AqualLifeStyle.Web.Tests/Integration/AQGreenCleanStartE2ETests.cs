@@ -427,8 +427,13 @@ namespace AqualLifeStyle.Web.Tests.Integration
             await UsingDbContextAsync(async c=>
             {
                 (await c.AQGreenIndependentRootRequests.CountAsync()).ShouldBe(2);
-                (await c.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(AQGreenD10BackendSuccessor.AdministratorAdmissionMigration);
+                // The empty admission extension can roll back. The independent-
+                // root migration must still refuse to remove its recorded evidence.
+                (await c.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(AQGreenD10BackendSuccessor.IndependentRootMigration);
             });
+            await UsingDbContextAsync(c => c.Database.MigrateAsync());
+            using (var currentContext = Resolve<AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>())
+                AqualLifeStyle.EntityFrameworkCore.DatabaseReleasePreflight.Verify(currentContext);
             await UsingDbContextAsync(async c=>
             {
                 var intent=await c.AQGreenIndependentRootRequests.FirstAsync();
