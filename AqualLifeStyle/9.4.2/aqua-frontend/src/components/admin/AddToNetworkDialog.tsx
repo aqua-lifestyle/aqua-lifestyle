@@ -1,11 +1,12 @@
 "use client";
 
+import { Network } from "lucide-react";
 import { useState } from "react";
 
 import { httpClient } from "@/src/shared/api";
-import { Button, DataTable, DialogActions, SelectField, StatusMessage } from "@/src/shared/ui";
+import { Button, DataTable, Dialog, DialogActions, SelectField, StatusMessage } from "@/src/shared/ui";
 import { AdminAreaSelectionField } from "./AdminAreaSelectionField";
-import { ImportSpreadsheetDialog, ImportSpreadsheetPicker, useSpreadsheetPreview } from "./ImportSpreadsheetDialog";
+import { ImportSpreadsheetPicker, useSpreadsheetPreview } from "./ImportSpreadsheetDialog";
 
 type Layout = "NetworkAssociations" | "ExplicitRelationships";
 type Disposition = "Accepted" | "Duplicate" | "Unmatched" | "Ambiguous";
@@ -68,6 +69,7 @@ const issueMessages: Record<string, string> = {
   ExistingPlacementConflict: "The supplied placement conflicts with a recorded Aqua placement.",
   ExistingCreditedSponsorConflict: "The supplied sponsor conflicts with a recorded Aqua sponsor.",
   ExistingPlacementSlotOccupied: "The supplied slot is already occupied in Aqua.",
+  ActiveParticipationMissingPlacement: "This active AQGreen participation has no recorded placement in Aqua. Reconcile the historical position before relying on this network.",
 };
 
 const humanize = (value: string) => value.replace(/([a-z])([A-Z])/g, "$1 $2");
@@ -119,11 +121,30 @@ const RosterReview = ({ preview, layout }: { preview: RosterPreview; layout: Lay
   </section>;
 };
 
-export const ImportExistingMembersDialog = ({ fixedTenantId }: { fixedTenantId?: number }) => (
-  <ImportSpreadsheetDialog title="Import Existing Members">
-    {(close) => <ExistingMemberRosterPreview close={close} fixedTenantId={fixedTenantId} />}
-  </ImportSpreadsheetDialog>
-);
+export const AddToNetworkDialog = ({ fixedTenantId, canPreviewRoster, canApprove }: {
+  fixedTenantId?: number;
+  canPreviewRoster: boolean;
+  canApprove: boolean;
+}) => {
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+
+  return <>
+    <Button onClick={() => setOpen(true)} variant="outline"><Network aria-hidden="true" className="size-4" />Add to Network</Button>
+    <Dialog onClose={close} open={open} size="xl" title="Add to Network">
+      {open ? <>
+        {canApprove ? <section aria-labelledby="company-member-heading" className="space-y-2">
+          <h2 className="font-semibold" id="company-member-heading">Add New Member Recruited by Aqualifestyle Club</h2>
+          <StatusMessage title="Not available" tone="info">This route requires verified Yoco joining payment and approval before placement, without crediting an individual recruiter. Registration and payment links for this route are not available.</StatusMessage>
+        </section> : null}
+        {canPreviewRoster ? <section aria-labelledby="transfer-member-heading" className="space-y-3">
+          <h2 className="font-semibold" id="transfer-member-heading">Transfer Existing Member</h2>
+          <ExistingMemberRosterPreview close={close} fixedTenantId={fixedTenantId} />
+        </section> : <DialogActions><Button onClick={close} variant="ghost">Close</Button></DialogActions>}
+      </> : null}
+    </Dialog>
+  </>;
+};
 
 const ExistingMemberRosterPreview = ({ fixedTenantId, close }: { fixedTenantId?: number; close: () => void }) => {
   const [selectedTenant, setSelectedTenant] = useState("");
@@ -146,7 +167,7 @@ const ExistingMemberRosterPreview = ({ fixedTenantId, close }: { fixedTenantId?:
   };
 
   return <>
-    <StatusMessage title="Preview only" tone="info">Review the uploaded rows here. Batch approval and import are not available yet.</StatusMessage>
+    <StatusMessage title="Preview only" tone="info">Compare old member IDs, accounts and recorded placements before transfer. This check does not transfer members, charge a fee, or clear slots for automatic placement. Resolve gaps and conflicts before relying on the recorded network.</StatusMessage>
     <div className="grid gap-3 sm:grid-cols-2">
       <AdminAreaSelectionField fixedAreaId={fixedTenantId} scopeLabel="Tenant" value={selectedTenant}
         onChange={(value) => { setSelectedTenant(value); clearPreview(); }} />

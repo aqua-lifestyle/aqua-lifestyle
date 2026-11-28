@@ -9,6 +9,7 @@ using System.Transactions;
 using Abp.Domain.Uow;
 using Abp.EntityFrameworkCore;
 using AqualLifeStyle.Domain.AQGreen;
+using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -53,6 +54,58 @@ namespace AqualLifeStyle.Web.Tests.Controllers
             foreach (var row in reported.Skip(1)) row.GetProperty("matchedCustomerId").ValueKind.ShouldBe(JsonValueKind.Null);
             reported[5].GetProperty("issues").EnumerateArray().Select(issue => issue.GetString())
                 .ShouldContain("AccountMatchRequiresCorroboration");
+            (await BusinessSnapshotAsync()).ShouldBe(before);
+        }
+
+        [DiscoveryPostgreSqlFact]
+        public async Task RosterPreview_ReportsAnActivePlacementGapAndDependentRowsWithoutWritingHistory()
+        {
+            var fixture = await SeedAsync(importPermission: true);
+            var rows = await UsingDbContextAsync(async context =>
+            {
+                var subjects = new[] { fixture.Unversioned, fixture.Both, fixture.V2Only };
+                var ids = subjects.Select(subject => subject.CustomerId).ToArray();
+                var customers = await context.Customers.IgnoreQueryFilters().Where(c => ids.Contains(c.Id))
+                    .ToDictionaryAsync(c => c.Id);
+                foreach (var subject in new[] { fixture.Unversioned, fixture.V2Only })
+                {
+                    var entry = await context.EntryParticipations.IgnoreQueryFilters()
+                        .SingleAsync(item => item.Id == subject.ParticipationId);
+                    var payment = MemberPayment.CreatePending(1, subject.CustomerId, MemberPaymentPurpose.AQGreenJoining,
+                        1200m, "Synthetic", Guid.NewGuid().ToString("N"), RecordedAt);
+                    payment.Confirm(RecordedAt.AddMinutes(1));
+                    context.MemberPayments.Add(payment);
+                    entry.ApplyConfirmedJoiningPayment(payment);
+                    entry.ApproveByAdministrator(fixture.Reviewer.Id, RecordedAt.AddMinutes(2));
+                    if (subject == fixture.V2Only)
+                    {
+                        var scope = AQGreenPlacementTreeScope.Create(1);
+                        context.AQGreenPlacementTreeScopes.Add(scope);
+                        context.AQGreenNetworkPlacements.Add(AQGreenNetworkPlacement.CreateRoot(scope, entry.Id,
+                            entry.ActivatedAt.Value, AQGreenPlacementRules.CurrentVersion));
+                    }
+                }
+                var root = customers[fixture.Unversioned.CustomerId];
+                var child = customers[fixture.Both.CustomerId];
+                var recordedRoot = customers[fixture.V2Only.CustomerId];
+                return new[] { ExplicitRow("0001", root.Email.Value, root.ClubMemberNumber),
+                    $"0002,Synthetic,Child,{child.Email.Value},,,{child.ClubMemberNumber},AQGreen,Active,0001,0001,1,false",
+                    ExplicitRow("0003", recordedRoot.Email.Value, recordedRoot.ClubMemberNumber) };
+            });
+            await SignInAsync(fixture.Reviewer);
+            var before = await BusinessSnapshotAsync();
+
+            var result = await PostRosterAsync("example.csv", Csv(rows));
+
+            result.GetProperty("ambiguousRows").GetInt32().ShouldBe(2);
+            result.GetProperty("acceptedRows").GetInt32().ShouldBe(1);
+            var reported = result.GetProperty("rows").EnumerateArray().ToArray();
+            reported[0].GetProperty("existingParticipationStatus").GetString().ShouldBe("Active");
+            reported[0].GetProperty("issues").EnumerateArray().Select(issue => issue.GetString())
+                .ShouldContain("ActiveParticipationMissingPlacement");
+            reported[1].GetProperty("issues").EnumerateArray().Select(issue => issue.GetString())
+                .ShouldContain("NetworkDependencyRequiresReview");
+            reported[2].GetProperty("issues").GetArrayLength().ShouldBe(0);
             (await BusinessSnapshotAsync()).ShouldBe(before);
         }
 

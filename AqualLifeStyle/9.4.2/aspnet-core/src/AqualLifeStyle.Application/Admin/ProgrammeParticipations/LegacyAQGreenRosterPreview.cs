@@ -178,6 +178,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     var existing = topology[row.Participation.Id].ToArray();
                     if (existing.Length > 1) row.Issues.Add("MultipleExistingPlacements");
                     else if (existing.Length == 1) row.ExistingPlacement = existing[0];
+                    else if (row.Participation.Status == EntryParticipationStatus.Active)
+                        row.Issues.Add("ActiveParticipationMissingPlacement");
                 }
             }
 

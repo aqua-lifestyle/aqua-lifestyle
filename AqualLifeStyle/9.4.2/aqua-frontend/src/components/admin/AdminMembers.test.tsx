@@ -35,6 +35,7 @@ const rosterPermissions = [
   "Aqua.Admin.Customers.Import",
   "Aqua.Admin.ProgrammeParticipations.ViewLegacyPaymentReconciliation",
 ];
+const approvePermission = "Aqua.Admin.ProgrammeParticipations.Approve";
 
 const association = {
   rowNumber: 2, oldMemberId: "0007", disposition: "Ambiguous",
@@ -52,7 +53,7 @@ const rosterPreview = {
 const openRosterDialog = () => {
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) { this.setAttribute("open", ""); });
   HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) { this.removeAttribute("open"); });
-  fireEvent.click(screen.getByRole("button", { name: "Import Existing Members" }));
+  fireEvent.click(screen.getByRole("button", { name: "Add to Network" }));
 };
 
 const selectRoster = async (name: string, type: string) => {
@@ -82,7 +83,7 @@ describe("AdminMembers", () => {
       vi.mocked(httpClient.get).mockResolvedValue({ items: [], totalCount: 0 });
       render(<AdminMembers />);
       await screen.findByText("0 accessible members");
-      expect(screen.queryByRole("button", { name: "Import Existing Members" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add to Network" })).not.toBeInTheDocument();
     },
   );
 
@@ -92,6 +93,8 @@ describe("AdminMembers", () => {
     vi.mocked(httpClient.post).mockResolvedValue(rosterPreview);
     render(<AdminMembers />);
     openRosterDialog();
+    expect(screen.getByRole("heading", { name: "Transfer Existing Member" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Add New Member Recruited by Aqualifestyle Club" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Preview file" })).toBeDisabled();
     await selectRoster("roster.csv", "text/csv");
     fireEvent.click(screen.getByRole("button", { name: "Preview file" }));
@@ -110,6 +113,41 @@ describe("AdminMembers", () => {
     expect(screen.getByText("The old member ID is repeated in the file.")).toBeInTheDocument();
     expect(screen.queryByText("0007")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /approve|confirm import|apply batch/i })).not.toBeInTheDocument();
+  });
+
+  it("does not expose registration or checkout controls for the blocked company route", async () => {
+    vi.mocked(useAuthState).mockReturnValue(authState(["Aqua.Admin.Members.View", approvePermission]));
+    vi.mocked(httpClient.get).mockResolvedValue({ items: [], totalCount: 0 });
+    render(<AdminMembers />);
+    await screen.findByText("0 accessible members");
+    openRosterDialog();
+
+    expect(screen.getByRole("heading", { name: "Add New Member Recruited by Aqualifestyle Club" })).toBeInTheDocument();
+    expect(screen.getByText(/Registration and payment links for this route are not available/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Transfer Existing Member" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Generate Payment Link|Copy Link|Register/i })).not.toBeInTheDocument();
+    expect(httpClient.post).not.toHaveBeenCalled();
+  });
+
+  it("shows a historical placement gap without suggesting slots are cleared for automatic placement", async () => {
+    vi.mocked(useAuthState).mockReturnValue(authState([...rosterPermissions, approvePermission]));
+    vi.mocked(httpClient.get).mockResolvedValue({ items: [], totalCount: 0 });
+    vi.mocked(httpClient.post).mockResolvedValue({
+      tenantId: 1, acceptedRows: 0, duplicateRows: 0, unmatchedRows: 0, ambiguousRows: 1,
+      rows: [{ rowNumber: 2, oldMemberId: "0001", existingParticipationStatus: "Active",
+        disposition: "Ambiguous", issues: ["ActiveParticipationMissingPlacement"] }],
+    });
+    render(<AdminMembers />);
+    openRosterDialog();
+    expect(screen.getByRole("heading", { name: "Transfer Existing Member" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Add New Member Recruited by Aqualifestyle Club" })).toBeInTheDocument();
+    expect(screen.getByText(/does not transfer members, charge a fee, or clear slots/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Roster format"), { target: { value: "ExplicitRelationships" } });
+    await selectRoster("roster.csv", "text/csv");
+    fireEvent.click(screen.getByRole("button", { name: "Preview file" }));
+
+    expect(await screen.findByText(/active AQGreen participation has no recorded placement/)).toBeInTheDocument();
+    expect(httpClient.post).toHaveBeenCalledTimes(1);
   });
 
   it("requires a host tenant selection and discards an earlier result when the tenant changes", async () => {
