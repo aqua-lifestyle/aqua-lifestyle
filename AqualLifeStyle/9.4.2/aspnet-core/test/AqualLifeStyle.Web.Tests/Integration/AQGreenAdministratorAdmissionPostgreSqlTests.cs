@@ -18,6 +18,7 @@ using AqualLifeStyle.Payments.Yoco;
 using Castle.MicroKernel.Registration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Npgsql;
 using Shouldly;
 
 namespace AqualLifeStyle.Web.Tests.Integration
@@ -61,7 +62,8 @@ namespace AqualLifeStyle.Web.Tests.Integration
             dates.ActivatedAtUtc = dates.ActivatedAtUtc.AddTicks(-(dates.ActivatedAtUtc.Ticks % 10));
             dates.PlacedAtUtc = dates.ActivatedAtUtc;
             var open = new OpenAQGreenHistoricalReviewInput { TenantId = TenantId, ScopeId = scope.PlacementTreeScopeId,
-                EvidenceReference = "synthetic-reviewed-register-v1", ExpectedMembers = 1 };
+                EvidenceReference = "synthetic-reviewed-register-v1", ExpectedMembers = 1,
+                OriginalReferences = new[] { "00042" }, AllowPrecautionaryCancellation = true };
             await Should.ThrowAsync<AbpAuthorizationException>(() => Resolve<IAdminProgrammeParticipationAppService>().OpenAQGreenHistoricalReviewAsync(open));
             LoginAsHostAdmin();
             await UsingDbContextAsync(async c =>
@@ -72,13 +74,41 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 await c.SaveChangesAsync();
             });
             var admin = Resolve<IAdminProgrammeParticipationAppService>();
-            var reviewId = await admin.OpenAQGreenHistoricalReviewAsync(open);
-            (await admin.OpenAQGreenHistoricalReviewAsync(open)).ShouldBe(reviewId);
+            var precautionary = new OpenAQGreenHistoricalReviewInput { TenantId = TenantId, ScopeId = open.ScopeId,
+                EvidenceReference = "synthetic-preliminary-screen", ExpectedMembers = 1, AllowPrecautionaryCancellation = true };
+            var cancelledId = await admin.OpenAQGreenHistoricalReviewAsync(precautionary);
+            var cancel = new CancelAQGreenHistoricalReviewInput { TenantId = TenantId, ScopeId = open.ScopeId,
+                EvidenceReference = precautionary.EvidenceReference, NoConflictEvidenceReference = "synthetic-no-conflict-check",
+                Reason = "Preliminary import withdrawn after checking the source register", NoOutstandingConflictConfirmed = true };
+            using (AbpSession.Use(TenantId, tenantAdminId))
+                await Should.ThrowAsync<AbpAuthorizationException>(() => admin.CancelAQGreenHistoricalReviewAsync(cancel));
+            cancel.NoOutstandingConflictConfirmed = false;
+            await Should.ThrowAsync<UserFriendlyException>(() => admin.CancelAQGreenHistoricalReviewAsync(cancel));
+            cancel.NoOutstandingConflictConfirmed = true;
 
             var invited = await RegisterSyntheticInviteAsync(root, "invited-during-hold");
             await PaySyntheticAdministratorJoinAsync(invited, acceptCompany: false);
             using (ApprovalGate.Enable(invited.ParticipationId))
                 await Should.ThrowAsync<AQGreenPlacementConflictException>(() => ApproveAsync(invited.ParticipationId));
+            await admin.CancelAQGreenHistoricalReviewAsync(cancel);
+            await admin.CancelAQGreenHistoricalReviewAsync(cancel);
+            await Should.ThrowAsync<UserFriendlyException>(() => admin.OpenAQGreenHistoricalReviewAsync(precautionary));
+            await UsingDbContextAsync(async c =>
+            {
+                var cancelled = await c.AQGreenHistoricalTreeReviews.SingleAsync(r => r.Id == cancelledId);
+                cancelled.CancelledAt.ShouldNotBeNull();
+                cancelled.CancelledBy.ShouldBe(AbpSession.GetUserId());
+                cancelled.CancellationReason.ShouldBe(cancel.Reason);
+                cancelled.CancellationEvidenceReference.ShouldBe(cancel.NoConflictEvidenceReference);
+                cancelled.ClearedAt.ShouldBeNull();
+                (await c.AQGreenNetworkPlacements.Where(p => p.PlacementTreeScopeId == open.ScopeId).Select(p => p.Id).ToArrayAsync())
+                    .ShouldBe(new[] { scope.Id });
+                (await c.AQGreenHistoricalMemberReferences.AnyAsync(r => r.ReviewId == cancelledId)).ShouldBeFalse();
+            });
+            using (ApprovalGate.Enable(invited.ParticipationId)) await ApproveAsync(invited.ParticipationId);
+
+            var reviewId = await admin.OpenAQGreenHistoricalReviewAsync(open);
+            (await admin.OpenAQGreenHistoricalReviewAsync(open)).ShouldBe(reviewId);
 
             var complete = new CompleteAQGreenHistoricalReviewInput { TenantId = TenantId, ScopeId = scope.PlacementTreeScopeId,
                 EvidenceReference = open.EvidenceReference, Members = new[] { dates } };
@@ -88,7 +118,15 @@ namespace AqualLifeStyle.Web.Tests.Integration
             dates.PlacedAtUtc = correctDate;
             dates.ParentParticipantId = Guid.NewGuid();
             await Should.ThrowAsync<UserFriendlyException>(() => admin.CompleteAQGreenHistoricalReviewAsync(complete));
+            cancel.EvidenceReference = open.EvidenceReference;
+            await Should.ThrowAsync<UserFriendlyException>(() => admin.CancelAQGreenHistoricalReviewAsync(cancel));
             dates.ParentParticipantId = root.ParticipationId;
+            dates.Slot = 1;
+            await Should.ThrowAsync<UserFriendlyException>(() => admin.CompleteAQGreenHistoricalReviewAsync(complete));
+            dates.Slot = 3;
+            dates.OriginalReference = "00043";
+            await Should.ThrowAsync<UserFriendlyException>(() => admin.CompleteAQGreenHistoricalReviewAsync(complete));
+            dates.OriginalReference = "00042";
             await admin.CompleteAQGreenHistoricalReviewAsync(complete);
             await admin.CompleteAQGreenHistoricalReviewAsync(complete);
             dates.Slot = 2;
@@ -99,7 +137,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 p.CanonicalPath.ShouldBe("3");
                 p.PlacedAt.ShouldBe(dates.ActivatedAtUtc);
                 (await c.AQGreenHistoricalMemberReferences.SingleAsync()).OriginalReference.ShouldBe("00042");
-                (await c.AQGreenHistoricalTreeReviews.SingleAsync()).ClearedAt.ShouldNotBeNull();
+                (await c.AQGreenHistoricalTreeReviews.SingleAsync(r => r.Id == reviewId)).ClearedAt.ShouldNotBeNull();
                 (await c.MemberPayments.CountAsync(p => p.CustomerId == historical.CustomerId)).ShouldBe(1);
                 (await c.EntryParticipations.SingleAsync(e => e.Id == historical.ParticipationId)).RecruiterCustomerId.ShouldBe(root.CustomerId);
             });
@@ -161,6 +199,75 @@ namespace AqualLifeStyle.Web.Tests.Integration
             using (ApprovalGate.Enable(companyInvite.ParticipationId)) await ApproveAsync(companyInvite.ParticipationId);
             (await UsingDbContextAsync(c => c.AQGreenNetworkPlacements.SingleAsync(p => p.ParticipantId == companyInvite.ParticipationId)))
                 .CanonicalPath.ShouldBe("21");
+        }
+
+        [IsolatedPostgreSqlFact]
+        public async Task AdministratorAdmission_CancellationRejectsAnyCommittedReferenceOrTopologyChange()
+        {
+            await AssertFreshPostgreSqlDatabaseAsync();
+            Resolve<IConfiguration>()["App:FinancialOperations:Enabled"] = "true";
+            LoginAsHostAdmin();
+            await UsingDbContextAsync(async c =>
+            {
+                c.Set<Abp.Authorization.Users.UserPermissionSetting>().Add(new Abp.Authorization.Users.UserPermissionSetting
+                {
+                    UserId = AbpSession.GetUserId(), Name = AquaPermissions.Admin.ProgrammeParticipations.ExportLegacyReconciliationEvidence,
+                    IsGranted = true
+                });
+                await c.SaveChangesAsync();
+            });
+            var admin = Resolve<IAdminProgrammeParticipationAppService>();
+            foreach (var writeReference in new[] { true, false })
+            {
+                LoginAsDefaultTenantAdmin();
+                var terms = EntryProgrammeTerms.CreateSingleJoiningPayment("synthetic-recovery", DateTime.UtcNow.AddDays(-1), 1200m, 600m, 7);
+                var root = await SeedAwaitingPaymentParticipantAsync(terms, null, $"recovery-root-{writeReference}", authorisedProspectiveRoot: true);
+                await ConfirmJoiningPaymentAsync(root);
+                LoginAsHostAdmin();
+                using (ApprovalGate.Enable(root.ParticipationId)) await ApproveAsync(root.ParticipationId);
+                LoginAsDefaultTenantAdmin();
+                var child = await SeedAwaitingPaymentParticipantAsync(terms, root, $"recovery-child-{writeReference}", authorisedProspectiveRoot: false);
+                LoginAsHostAdmin();
+                var anchor = await UsingDbContextAsync(c => c.AQGreenNetworkPlacements.SingleAsync(p => p.ParticipantId == root.ParticipationId));
+                var evidence = $"synthetic-recovery-{writeReference}";
+                var reviewId = await admin.OpenAQGreenHistoricalReviewAsync(new OpenAQGreenHistoricalReviewInput
+                {
+                    TenantId = TenantId, ScopeId = anchor.PlacementTreeScopeId, ExpectedMembers = 1, EvidenceReference = evidence,
+                    AllowPrecautionaryCancellation = true
+                });
+                // Simulate unexpected durable evidence from outside the normal atomic apply path.
+                await UsingDbContextAsync(async c =>
+                {
+                    if (writeReference)
+                    {
+                        var review = await c.AQGreenHistoricalTreeReviews.SingleAsync(r => r.Id == reviewId);
+                        c.AQGreenHistoricalMemberReferences.Add(new AQGreenHistoricalMemberReference(review, child.ParticipationId, "partial-01"));
+                    }
+                    else
+                        c.AQGreenNetworkPlacements.Add(AQGreenNetworkPlacement.CreateChild(anchor, child.ParticipationId,
+                            4, DateTime.UtcNow, AQGreenPlacementRules.CurrentVersion));
+                    await c.SaveChangesAsync();
+                });
+
+                var cancel = new CancelAQGreenHistoricalReviewInput { TenantId = TenantId, ScopeId = anchor.PlacementTreeScopeId,
+                    EvidenceReference = evidence, NoConflictEvidenceReference = "synthetic-no-conflict-check", Reason = "Withdraw preliminary review",
+                    NoOutstandingConflictConfirmed = true };
+                await Should.ThrowAsync<UserFriendlyException>(() => admin.CancelAQGreenHistoricalReviewAsync(cancel));
+                var denied = await Should.ThrowAsync<PostgresException>(() => UsingDbContextAsync(c => c.Database.ExecuteSqlInterpolatedAsync($"""
+                    UPDATE "AQGreenHistoricalTreeReviews" SET "CancelledAt" = clock_timestamp(), "CancelledBy" = {AbpSession.GetUserId()},
+                        "CancellationReason" = 'synthetic justification', "CancellationEvidenceReference" = 'synthetic other evidence'
+                    WHERE "Id" = {reviewId}
+                    """)));
+                denied.SqlState.ShouldBe(PostgresErrorCodes.RaiseException);
+                await UsingDbContextAsync(async c =>
+                {
+                    var review = await c.AQGreenHistoricalTreeReviews.SingleAsync(r => r.Id == reviewId);
+                    review.CancelledAt.ShouldBeNull();
+                    review.ClearedAt.ShouldBeNull();
+                    (await c.AQGreenHistoricalMemberReferences.AnyAsync(r => r.ReviewId == reviewId)).ShouldBe(writeReference);
+                    (await c.AQGreenNetworkPlacements.AnyAsync(p => p.ParticipantId == child.ParticipationId)).ShouldBe(!writeReference);
+                });
+            }
         }
 
         private async Task<ParticipantFixture> RegisterSyntheticInviteAsync(ParticipantFixture sponsor, string label)

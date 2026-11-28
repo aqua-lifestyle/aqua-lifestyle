@@ -23,6 +23,18 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
         public Guid ScopeId { get; set; }
         public string EvidenceReference { get; set; }
         public int ExpectedMembers { get; set; }
+        public string[] OriginalReferences { get; set; }
+        public bool AllowPrecautionaryCancellation { get; set; }
+    }
+
+    public sealed class CancelAQGreenHistoricalReviewInput
+    {
+        public int TenantId { get; set; }
+        public Guid ScopeId { get; set; }
+        public string EvidenceReference { get; set; }
+        public string NoConflictEvidenceReference { get; set; }
+        public string Reason { get; set; }
+        public bool NoOutstandingConflictConfirmed { get; set; }
     }
 
     public sealed class CompleteAQGreenHistoricalReviewInput

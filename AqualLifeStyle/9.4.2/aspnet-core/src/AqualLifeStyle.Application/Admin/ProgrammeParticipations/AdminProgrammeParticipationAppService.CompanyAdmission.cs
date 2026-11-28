@@ -41,7 +41,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     select new AQGreenAdmissionTreeDto { ScopeId = placement.PlacementTreeScopeId,
                         RootMemberNumber = customer.ClubMemberNumber,
                         HistoricalHold = HistoricalTreeReviews.GetAll().Any(r => r.TenantId == tenantId &&
-                            r.ScopeId == placement.PlacementTreeScopeId && !r.ClearedAt.HasValue) };
+                            r.ScopeId == placement.PlacementTreeScopeId && !r.ClearedAt.HasValue && !r.CancelledAt.HasValue) };
                 return await roots.OrderBy(t => t.RootMemberNumber).ToListAsync();
             }
         }
@@ -106,7 +106,8 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                         throw Failed("Company registration", "Existing AQGreen records must be reconciled before requesting a joining payment.");
                 }
 
-                if (await HistoricalTreeReviews.GetAll().AnyAsync(r => r.TenantId == input.TenantId && r.ScopeId == input.ScopeId && !r.ClearedAt.HasValue))
+                if (await HistoricalTreeReviews.GetAll().AnyAsync(r => r.TenantId == input.TenantId && r.ScopeId == input.ScopeId &&
+                    !r.ClearedAt.HasValue && !r.CancelledAt.HasValue))
                     throw Failed("Company registration", "The selected network is held for historical review.");
                 var now = await _placementClock.GetUtcNowAsync();
                 var entry = EntryParticipation.StartIndependently(input.TenantId, customer.Id, CompanyJoiningTerms.GetEntryTerms(), now);

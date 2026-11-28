@@ -25,12 +25,15 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.Approve,
             AquaPermissions.Admin.ProgrammeParticipations.ExportLegacyReconciliationEvidence,
             AquaPermissions.Admin.AllTenants, RequireAllPermissions = true)]
+        [DisableAuditing] // The register contains original member references; retain its digest only.
         [UnitOfWork(IsDisabled = true)]
         public async Task<Guid> OpenAQGreenHistoricalReviewAsync(OpenAQGreenHistoricalReviewInput input)
         {
             RequireHistoricalHost(input?.TenantId ?? 0, input?.ScopeId ?? Guid.Empty, input?.EvidenceReference);
             if (input.ExpectedMembers < 1 || input.ExpectedMembers > 1000)
                 throw Failed("Historical review", "Supply the verified roster member count (1–1000).");
+            var evidence = input.EvidenceReference.Trim();
+            var rosterDigest = input.OriginalReferences == null ? null : HistoricalRosterDigest(input.OriginalReferences, input.ExpectedMembers);
 
             using var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions { IsTransactional = true, IsolationLevel = IsolationLevel.ReadCommitted });
             using (DisableAllTenantDataFiltersForHost())
@@ -39,19 +42,75 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 if (!await _networkPlacementRepository.GetAll().AnyAsync(p => p.TenantId == input.TenantId &&
                     p.PlacementTreeScopeId == input.ScopeId && !p.PlacementParentParticipantId.HasValue))
                     throw Failed("Historical review", "Select an established tree in the requested Tenant.");
-                var review = await HistoricalTreeReviews.FirstOrDefaultAsync(r => r.TenantId == input.TenantId && r.ScopeId == input.ScopeId);
+                var review = await ActiveHistoricalReviewAsync(input.TenantId, input.ScopeId);
                 if (review == null)
                 {
-                    review = new AQGreenHistoricalTreeReview(input.TenantId, input.ScopeId, input.EvidenceReference.Trim(),
-                        input.ExpectedMembers, AbpSession.GetUserId(), await _placementClock.GetUtcNowAsync());
+                    if (await HistoricalTreeReviews.GetAll().AnyAsync(r => r.TenantId == input.TenantId &&
+                        r.ScopeId == input.ScopeId && r.EvidenceReference == evidence))
+                        throw Failed("Historical review", "That evidence reference belongs to a cancelled review. Use a new review reference.");
+                    long? baseline = input.AllowPrecautionaryCancellation ? await CountHistoricalTreePlacementsAsync(input.TenantId, input.ScopeId) : null;
+                    review = new AQGreenHistoricalTreeReview(input.TenantId, input.ScopeId, evidence,
+                        input.ExpectedMembers, AbpSession.GetUserId(), await _placementClock.GetUtcNowAsync(), rosterDigest, baseline);
                     await HistoricalTreeReviews.InsertAsync(review);
                 }
-                else if (review.EvidenceReference != input.EvidenceReference.Trim() || review.ExpectedMembers != input.ExpectedMembers)
+                else if (review.EvidenceReference != evidence || review.ExpectedMembers != input.ExpectedMembers ||
+                    (rosterDigest != null && review.RosterDigest != null && review.RosterDigest != rosterDigest))
                     throw Failed("Historical review", "A different review already owns this tree.");
                 else if (review.ClearedAt.HasValue)
                     throw Failed("Historical review", "This review is already cleared; no new hold was applied.");
+                else
+                {
+                    if (rosterDigest != null && review.RosterDigest == null)
+                    {
+                        review.BindRoster(rosterDigest);
+                        await CurrentUnitOfWork.SaveChangesAsync();
+                    }
+                    if (!input.AllowPrecautionaryCancellation && review.PlacementCountAtOpen.HasValue && !review.ProtectedAt.HasValue)
+                        review.Protect(await _placementClock.GetUtcNowAsync());
+                }
                 await uow.CompleteAsync();
                 return review.Id;
+            }
+        }
+
+        [AbpAuthorize(AquaPermissions.Admin.ProgrammeParticipations.Approve,
+            AquaPermissions.Admin.ProgrammeParticipations.ExportLegacyReconciliationEvidence,
+            AquaPermissions.Admin.AllTenants, RequireAllPermissions = true)]
+        [DisableAuditing] // The terminal row records the actor, time, justification and evidence reference.
+        [UnitOfWork(IsDisabled = true)]
+        public async Task CancelAQGreenHistoricalReviewAsync(CancelAQGreenHistoricalReviewInput input)
+        {
+            RequireHistoricalHost(input?.TenantId ?? 0, input?.ScopeId ?? Guid.Empty, input?.EvidenceReference);
+            var reason = input.Reason?.Trim();
+            var noConflictEvidence = input.NoConflictEvidenceReference?.Trim();
+            if (!input.NoOutstandingConflictConfirmed || string.IsNullOrWhiteSpace(reason) || reason.Length > 500 ||
+                string.IsNullOrWhiteSpace(noConflictEvidence) || noConflictEvidence.Length > 128 || noConflictEvidence == input.EvidenceReference.Trim())
+                throw Failed("Historical review cancellation", "Record the separate no-conflict evidence reference and why the precautionary hold can be withdrawn.");
+
+            using var uow = BeginHistoricalReviewTransaction();
+            using (DisableAllTenantDataFiltersForHost())
+            {
+                await _placementTreeLock.AcquireAsync(input.ScopeId);
+                var reference = input.EvidenceReference.Trim();
+                var review = await HistoricalTreeReviews.FirstOrDefaultAsync(r => r.TenantId == input.TenantId &&
+                    r.ScopeId == input.ScopeId && r.EvidenceReference == reference);
+                var actor = AbpSession.GetUserId();
+                if (review == null) throw Failed("Historical review cancellation", "The specified tree review was not found.");
+                if (review.CancelledAt.HasValue)
+                {
+                    if (review.CancelledBy != actor || review.CancellationReason != reason ||
+                        review.CancellationEvidenceReference != noConflictEvidence)
+                        throw Failed("Historical review cancellation", "The review already has a different recorded cancellation.");
+                }
+                else
+                {
+                    if (review.ClearedAt.HasValue || review.ProtectedAt.HasValue || !review.PlacementCountAtOpen.HasValue ||
+                        await HistoricalMemberReferences.GetAll().AnyAsync(r => r.TenantId == input.TenantId && r.ReviewId == review.Id) ||
+                        await CountHistoricalTreePlacementsAsync(input.TenantId, input.ScopeId) != review.PlacementCountAtOpen.Value)
+                        throw Failed("Historical review cancellation", "This review is protected or has placement or reference changes. Keep the hold and reconcile the evidence.");
+                    review.Cancel(actor, await _placementClock.GetUtcNowAsync(), reason, noConflictEvidence);
+                }
+                await uow.CompleteAsync();
             }
         }
 
@@ -63,6 +122,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         public async Task CompleteAQGreenHistoricalReviewAsync(CompleteAQGreenHistoricalReviewInput input)
         {
             RequireHistoricalHost(input?.TenantId ?? 0, input?.ScopeId ?? Guid.Empty, input?.EvidenceReference);
+            // Record the approval attempt before running the apply transaction. An
+            // aborted apply (including one which discovered a collision) must not
+            // undo the cancellation barrier alongside the placement changes.
+            var reviewId = await ProtectHistoricalReviewForApprovalAsync(input);
             var rows = input.Members;
             if (rows == null || rows.Length < 1 || rows.Length > 1000 || rows.Any(r => r == null ||
                 r.ParticipantId == Guid.Empty || r.CustomerId <= 0 || string.IsNullOrWhiteSpace(r.OriginalReference) ||
@@ -81,8 +144,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 // Area transition locks precede the tree lock, as in ordinary approval.
                 await _hostedPaymentCheckoutLock.AcquireCustomerAreaTransitionsAsync(rows.Select(r => r.CustomerId).OrderBy(i => i).ToArray());
                 await _placementTreeLock.AcquireAsync(input.ScopeId);
-                var review = await HistoricalTreeReviews.FirstOrDefaultAsync(r => r.TenantId == input.TenantId && r.ScopeId == input.ScopeId);
-                if (review == null || review.EvidenceReference != input.EvidenceReference.Trim() || review.ExpectedMembers != rows.Length)
+                var review = await ActiveHistoricalReviewAsync(input.TenantId, input.ScopeId);
+                if (review == null || review.Id != reviewId || review.ExpectedMembers != rows.Length ||
+                    (!review.ClearedAt.HasValue && review.RosterDigest == null) ||
+                    (review.RosterDigest != null && review.RosterDigest != HistoricalRosterDigest(rows.Select(r => r.OriginalReference), review.ExpectedMembers)))
                     throw Failed("Historical review", "Approve the complete verified roster for the open tree review.");
                 var now = await _placementClock.GetUtcNowAsync();
                 var ids = rows.Select(r => r.ParticipantId).ToArray();
@@ -173,6 +238,42 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 }
                 await uow.CompleteAsync();
             }
+        }
+
+        private async Task<Guid> ProtectHistoricalReviewForApprovalAsync(CompleteAQGreenHistoricalReviewInput input)
+        {
+            using var uow = BeginHistoricalReviewTransaction();
+            using (DisableAllTenantDataFiltersForHost())
+            {
+                await _placementTreeLock.AcquireAsync(input.ScopeId);
+                var review = await ActiveHistoricalReviewAsync(input.TenantId, input.ScopeId);
+                if (review == null || review.EvidenceReference != input.EvidenceReference.Trim())
+                    throw Failed("Historical review", "Select the current review and its evidence reference.");
+                if (!review.ClearedAt.HasValue && !review.ProtectedAt.HasValue)
+                    review.Protect(await _placementClock.GetUtcNowAsync());
+                await uow.CompleteAsync();
+                return review.Id;
+            }
+        }
+
+        private IUnitOfWorkCompleteHandle BeginHistoricalReviewTransaction() => _unitOfWorkManager.Begin(new UnitOfWorkOptions
+            { Scope = TransactionScopeOption.RequiresNew, IsTransactional = true, IsolationLevel = IsolationLevel.ReadCommitted });
+
+        private Task<AQGreenHistoricalTreeReview> ActiveHistoricalReviewAsync(int tenantId, Guid scopeId) =>
+            HistoricalTreeReviews.FirstOrDefaultAsync(r => r.TenantId == tenantId && r.ScopeId == scopeId && !r.CancelledAt.HasValue);
+
+        // Existing PostgreSQL placement triggers forbid update, delete and truncate.
+        // With the tree lock held, an equal count proves no immutable row was added.
+        private Task<long> CountHistoricalTreePlacementsAsync(int tenantId, Guid scopeId) => _networkPlacementRepository.GetAll()
+            .LongCountAsync(p => p.TenantId == tenantId && p.PlacementTreeScopeId == scopeId);
+
+        private static string HistoricalRosterDigest(IEnumerable<string> references, int expected)
+        {
+            var keys = references.Take(1001).Select(r => r?.Trim().ToUpperInvariant()).ToArray();
+            if (keys.Length != expected || keys.Any(k => string.IsNullOrWhiteSpace(k) || k.Length > 128) ||
+                keys.Distinct(StringComparer.Ordinal).Count() != keys.Length)
+                throw Failed("Historical review", "The independently reviewed register must contain the declared number of distinct original references.");
+            return AQGreenB6CanonicalEvidence.Digest(keys.OrderBy(k => k, StringComparer.Ordinal).ToArray());
         }
 
         private void RequireHistoricalHost(int tenantId, Guid scopeId, string evidence)

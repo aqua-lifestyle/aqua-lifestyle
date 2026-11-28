@@ -771,7 +771,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                                 throw Failed("Participation approval", "Company registration requires AQGreen V2 authority.");
                             if (await (from entry in _entryParticipationRepository.GetAll()
                                 join review in HistoricalTreeReviews.GetAll() on entry.TenantId equals review.TenantId
-                                where entry.Id == input.ParticipationId && !review.ClearedAt.HasValue
+                                where entry.Id == input.ParticipationId && !review.ClearedAt.HasValue && !review.CancelledAt.HasValue
                                 select review.Id).AnyAsync())
                                 throw Failed("Participation approval", "Resolve historical holds or use authorized AQGreen V2 placement.");
                         }

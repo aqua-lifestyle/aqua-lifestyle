@@ -31,6 +31,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         Task<List<AQGreenAdmissionTreeDto>> GetAQGreenAdmissionTreesAsync(int tenantId);
         Task<Guid> OpenAQGreenHistoricalReviewAsync(OpenAQGreenHistoricalReviewInput input);
         Task CompleteAQGreenHistoricalReviewAsync(CompleteAQGreenHistoricalReviewInput input);
+        Task CancelAQGreenHistoricalReviewAsync(CancelAQGreenHistoricalReviewInput input);
         Task<LegacyAQGreenRosterPreviewDto> PreviewLegacyAQGreenRosterAsync(
             PreviewLegacyAQGreenRosterInput input);
         Task<PagedResultDto<MonthlyObligationCheckoutReconciliationDto>>

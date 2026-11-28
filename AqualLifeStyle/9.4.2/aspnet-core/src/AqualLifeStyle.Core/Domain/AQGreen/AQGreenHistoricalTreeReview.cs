@@ -13,10 +13,18 @@ namespace AqualLifeStyle.Domain.AQGreen
         public DateTime OpenedAt { get; private set; }
         public long? ClearedBy { get; private set; }
         public DateTime? ClearedAt { get; private set; }
+        public string RosterDigest { get; private set; }
+        public long? PlacementCountAtOpen { get; private set; }
+        public DateTime? ProtectedAt { get; private set; }
+        public long? CancelledBy { get; private set; }
+        public DateTime? CancelledAt { get; private set; }
+        public string CancellationReason { get; private set; }
+        public string CancellationEvidenceReference { get; private set; }
 
         private AQGreenHistoricalTreeReview() { }
 
-        public AQGreenHistoricalTreeReview(int tenantId, Guid scopeId, string evidenceReference, int expectedMembers, long actor, DateTime now)
+        public AQGreenHistoricalTreeReview(int tenantId, Guid scopeId, string evidenceReference, int expectedMembers,
+            long actor, DateTime now, string rosterDigest, long? placementCountAtOpen)
         {
             Id = Guid.NewGuid();
             TenantId = tenantId;
@@ -25,13 +33,41 @@ namespace AqualLifeStyle.Domain.AQGreen
             ExpectedMembers = expectedMembers;
             OpenedBy = actor;
             OpenedAt = now;
+            RosterDigest = rosterDigest;
+            PlacementCountAtOpen = placementCountAtOpen;
+        }
+
+        public void BindRoster(string digest)
+        {
+            if (ClearedAt.HasValue || CancelledAt.HasValue || RosterDigest != null || string.IsNullOrWhiteSpace(digest))
+                throw new InvalidOperationException("Invalid historical register binding.");
+            RosterDigest = digest;
+        }
+
+        public void Protect(DateTime now)
+        {
+            if (ClearedAt.HasValue || CancelledAt.HasValue || now < OpenedAt)
+                throw new InvalidOperationException("Invalid historical hold protection.");
+            ProtectedAt ??= now;
         }
 
         public void Clear(long actor, DateTime now)
         {
-            if (ClearedAt.HasValue || now < OpenedAt) throw new InvalidOperationException("Invalid historical clearance.");
+            if (ClearedAt.HasValue || CancelledAt.HasValue || RosterDigest == null || !ProtectedAt.HasValue || now < ProtectedAt.Value)
+                throw new InvalidOperationException("Invalid historical clearance.");
             ClearedBy = actor;
             ClearedAt = now;
+        }
+
+        public void Cancel(long actor, DateTime now, string reason, string evidenceReference)
+        {
+            if (ClearedAt.HasValue || CancelledAt.HasValue || ProtectedAt.HasValue || !PlacementCountAtOpen.HasValue ||
+                now < OpenedAt || actor <= 0 || string.IsNullOrWhiteSpace(reason) || string.IsNullOrWhiteSpace(evidenceReference))
+                throw new InvalidOperationException("Invalid historical cancellation.");
+            CancelledBy = actor;
+            CancelledAt = now;
+            CancellationReason = reason;
+            CancellationEvidenceReference = evidenceReference;
         }
     }
 

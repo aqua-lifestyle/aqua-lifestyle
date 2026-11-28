@@ -1631,6 +1631,20 @@ namespace AqualLifeStyle.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CancellationEvidenceReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CancelledBy")
+                        .HasColumnType("bigint");
+
                     b.Property<DateTime?>("ClearedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1651,6 +1665,16 @@ namespace AqualLifeStyle.Migrations
                     b.Property<long>("OpenedBy")
                         .HasColumnType("bigint");
 
+                    b.Property<long?>("PlacementCountAtOpen")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("ProtectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RosterDigest")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<Guid>("ScopeId")
                         .HasColumnType("uuid");
 
@@ -1660,10 +1684,16 @@ namespace AqualLifeStyle.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "ScopeId")
+                        .IsUnique()
+                        .HasFilter("\"CancelledAt\" IS NULL");
+
+                    b.HasIndex("TenantId", "ScopeId", "EvidenceReference")
                         .IsUnique();
 
                     b.ToTable("AQGreenHistoricalTreeReviews", null, t =>
                         {
+                            t.HasCheckConstraint("CK_AQGHistory_Cancellation", "(\"PlacementCountAtOpen\" IS NULL OR \"PlacementCountAtOpen\" > 0) AND (\"ProtectedAt\" IS NULL OR \"ProtectedAt\" >= \"OpenedAt\") AND ((\"CancelledAt\" IS NULL AND \"CancelledBy\" IS NULL AND \"CancellationReason\" IS NULL AND \"CancellationEvidenceReference\" IS NULL) OR (\"CancelledAt\" IS NOT NULL AND \"CancelledAt\" >= \"OpenedAt\" AND \"CancelledBy\" IS NOT NULL AND \"CancelledBy\" > 0 AND \"ClearedAt\" IS NULL AND \"ProtectedAt\" IS NULL AND \"PlacementCountAtOpen\" IS NOT NULL AND \"CancellationReason\" IS NOT NULL AND length(trim(\"CancellationReason\")) > 0 AND \"CancellationEvidenceReference\" IS NOT NULL AND length(trim(\"CancellationEvidenceReference\")) > 0))");
+
                             t.HasCheckConstraint("CK_AQGHistory_Review", "\"ExpectedMembers\" BETWEEN 1 AND 1000 AND \"OpenedBy\" > 0 AND ((\"ClearedBy\" IS NULL AND \"ClearedAt\" IS NULL) OR (\"ClearedBy\" IS NOT NULL AND \"ClearedBy\" > 0 AND \"ClearedAt\" IS NOT NULL AND \"ClearedAt\" >= \"OpenedAt\"))");
                         });
                 });

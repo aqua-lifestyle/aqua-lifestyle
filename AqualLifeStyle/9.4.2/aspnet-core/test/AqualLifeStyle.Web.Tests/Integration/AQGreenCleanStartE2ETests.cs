@@ -57,7 +57,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 await migratedBoundaryUow.CompleteAsync();
             }
             migratedBoundary.SourceSchemaVersion.ShouldBe(currentSchemaDigest);
-            migratedBoundary.SourceSchemaVersion.ShouldBe(AQGreenD10BackendSuccessor.AdministratorAdmissionSchemaSha256);
+            migratedBoundary.SourceSchemaVersion.ShouldBe(AQGreenD10BackendSuccessor.HistoricalReviewCancellationSchemaSha256);
             var area=await UsingDbContextAsync(async c=>await (from a in c.AreaAdminAssignments join r in c.Areas
                 on a.AreaId equals r.Id where a.TenantId==1 && a.UserId==AbpSession.UserId && !a.RevokedAt.HasValue && r.IsActive select r.Id).FirstAsync());
             var (x,clean)=AQGreenCleanStartCommissioningTests.Create();var config=AQGreenD10SyntheticEvidence.Configuration();

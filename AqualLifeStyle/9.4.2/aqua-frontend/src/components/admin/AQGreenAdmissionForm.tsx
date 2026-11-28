@@ -60,13 +60,28 @@ function AdmissionForTenant({ mode, tenantId }: { mode: "company" | "historical"
         setCustomers(matches);
         if (!matches.length) setNotice("No matching active customer was found in your scope.");
       } else if (historical && action === "hold") {
-        await httpClient.post(`${api}OpenAQGreenHistoricalReview`, { tenantId, scopeId, evidenceReference, expectedMembers: Number(values.get("expectedMembers")) });
-        setNotice("Network held. Review the complete roster before approving clearance.");
+        const originalReferences = String(values.get("registerReferences") ?? "").split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+        await httpClient.post(`${api}OpenAQGreenHistoricalReview`, {
+          tenantId, scopeId, evidenceReference, expectedMembers: Number(values.get("expectedMembers")),
+          originalReferences: originalReferences.length ? originalReferences : null,
+          allowPrecautionaryCancellation: values.has("precautionary"),
+        });
+        setTrees(current => current.map(tree => tree.scopeId === scopeId ? { ...tree, historicalHold: true } : tree));
+        setNotice("Network held. Bind the independently reviewed register before approving clearance.");
+      } else if (historical && action === "cancel") {
+        await httpClient.post(`${api}CancelAQGreenHistoricalReview`, {
+          tenantId, scopeId, evidenceReference, reason: String(values.get("cancellationReason") ?? "").trim(),
+          noConflictEvidenceReference: String(values.get("noConflictEvidence") ?? "").trim(),
+          noOutstandingConflictConfirmed: values.has("noConflictConfirmed"),
+        });
+        setTrees(current => current.map(tree => tree.scopeId === scopeId ? { ...tree, historicalHold: false } : tree));
+        setNotice("The precautionary hold was cancelled. Existing placements are unchanged.");
       } else if (historical) {
         if (!file || file.size > 1024 * 1024) throw new Error("Select the verified placement file (up to 1 MB).");
         const members: unknown = JSON.parse(await file.text());
         if (!Array.isArray(members) || !members.length || members.length > 1000) throw new Error("Use an array of 1–1,000 verified rows.");
         await httpClient.post(`${api}CompleteAQGreenHistoricalReview`, { tenantId, scopeId, evidenceReference, members });
+        setTrees(current => current.map(tree => tree.scopeId === scopeId ? { ...tree, historicalHold: false } : tree));
         setNotice("The reviewed positions were recorded and the historical placement hold was cleared.");
       } else {
         await httpClient.post(`${api}RegisterAQGreenCompanyAdmission`, { tenantId, scopeId, customerId: Number(customerId), acquisitionEvidence: evidenceReference });
@@ -91,11 +106,24 @@ function AdmissionForTenant({ mode, tenantId }: { mode: "company" | "historical"
     </SelectField>
     <TextField label={historical ? "Reviewed roster evidence reference" : "Acquisition evidence reference"} name="evidence" maxLength={historical ? 128 : 500} required />
     {historical ? <>
-      <TextField label="Verified member count" name="expectedMembers" type="number" min="1" max="1000" required />
-      <Button type="submit" value="hold" disabled={busy || !scopeId} variant="outline">Hold network for review</Button>
+      <TextField label="Member count from the reviewed register" name="expectedMembers" type="number" min="1" max="1000" required />
+      <label className="block text-sm">Original references from the reviewed register (one per line)
+        <textarea className="block w-full rounded border bg-background p-2" name="registerReferences" rows={3} maxLength={130000} />
+      </label>
+      <p className="text-sm">Use the separately verified register for the whole affected tree and cutoff. Do not derive this list or count from the placement upload.</p>
+      <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="precautionary" /> This hold is precautionary only; no outstanding placement conflict is known.</label>
+      <Button type="submit" value="hold" disabled={busy || !scopeId} variant="outline">Hold network or update review evidence</Button>
       <a className="block text-sm underline" download="aqgreen-verified-placements.json" href={`data:application/json;charset=utf-8,${encodeURIComponent(template)}`}>Download verified placement template</a>
       <label className="block text-sm">Verified placement file <input className="block" type="file" accept=".json,application/json" onChange={e => setFile(e.target.files?.[0])} /></label>
-      <Button type="submit" value="clear" disabled={busy || !file || !scopeId}>Approve placement and clear hold</Button>
+      <p className="text-sm">Starting approval makes the hold non-cancellable even if the placement file fails validation.</p>
+      <Button type="submit" value="clear" disabled={busy || !file || !scopeId} formNoValidate>Approve placement and clear hold</Button>
+      <details className="space-y-3">
+        <summary className="cursor-pointer">Cancel an incomplete precautionary hold</summary>
+        <TextField label="Separate no-conflict evidence reference" name="noConflictEvidence" maxLength={128} />
+        <TextField label="Cancellation reason" name="cancellationReason" maxLength={500} />
+        <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="noConflictConfirmed" /> I verified there is no outstanding placement conflict or integrity issue requiring this hold.</label>
+        <Button type="submit" value="cancel" disabled={busy || !scopeId} variant="outline" formNoValidate>Cancel precautionary hold</Button>
+      </details>
     </> : <Button type="submit" value="register" disabled={busy || !scopeId || !customerId}>Register company recruit</Button>}
     {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
     {notice ? <StatusMessage tone="info">{notice}</StatusMessage> : null}

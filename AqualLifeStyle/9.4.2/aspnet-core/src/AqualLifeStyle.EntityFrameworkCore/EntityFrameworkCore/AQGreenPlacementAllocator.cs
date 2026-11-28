@@ -114,7 +114,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
             }
 
             if (await context.AQGreenHistoricalTreeReviews.AsNoTracking().AnyAsync(r =>
-                r.TenantId == tenantId && r.ScopeId == scopeHint && !r.ClearedAt.HasValue, cancellationToken))
+                r.TenantId == tenantId && r.ScopeId == scopeHint && !r.ClearedAt.HasValue && !r.CancelledAt.HasValue, cancellationToken))
                 throw new AQGreenPlacementConflictException("This AQGreen tree is held for historical placement review.");
 
             var vacancy = FindFirstVacancy(subtree);

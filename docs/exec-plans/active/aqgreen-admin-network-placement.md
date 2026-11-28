@@ -53,6 +53,15 @@ Acquisition, recruitment credit and structural placement are separate facts.
 
 ## Remaining verification and release boundaries
 
+- Owner review of `e92ea03` confirmed the missing terminal path for an incomplete
+  historical review. The recovery change adds guarded cancellation of a precautionary
+  hold and binds clearance to a separately reviewed register's reference-set digest.
+  Known conflicts and attempted approvals stay protected. The same tree lock and
+  PostgreSQL checks reject cancellation after durable reference or topology changes.
+  Migration 59 leaves earlier evidence intact and pins the measured test schema.
+  The fresh migrated PostgreSQL recovery/continued-allocation test, injected partial
+  reference/topology denial test, and CLEAN_START journey passed locally. Source
+  register authenticity and whole-scope completeness remain reviewer responsibilities.
 - Membership whose identity, paid activation, root or historical dates cannot be
   proved using the retained record is not activated or placed here. The historical
   UI is for an established tree and requires reviewed placement data, not just a
