@@ -52,6 +52,7 @@ type AdminProgrammeParticipation = {
   expectedJoiningAmount: number;
   isActive: boolean;
   joinedIndependently: boolean;
+  companyRegistered?: boolean;
   nextPaymentAmount: number | null;
   nextPaymentDescription: string | null;
   participationId: string;
@@ -410,7 +411,7 @@ export const AdminProgrammeParticipations = () => {
             {item.status}
           </Badge>
           <span className="text-xs text-muted-foreground">
-            {item.joinedIndependently
+            {item.companyRegistered ? "Recruited by Aqualifestyle Club" : item.joinedIndependently
               ? "Independent network"
               : `Invited by ${item.recruiterClubMemberNumber ?? "a verified Club Member"}`}
           </span>

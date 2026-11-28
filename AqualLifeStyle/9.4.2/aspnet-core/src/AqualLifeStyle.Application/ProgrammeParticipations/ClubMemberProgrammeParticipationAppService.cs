@@ -56,6 +56,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
         protected virtual DateTime UtcNow => DateTime.UtcNow;
 
         public IAQGreenProspectiveJoiningRecorder ProspectiveJoiningRecorder { get; set; }
+        public IRepository<AQGreenRecruitmentAttribution, Guid> RecruitmentAttributions { get; set; }
+        public IRepository<AQGreenRecruitmentAttributionConfirmation, Guid> AttributionConfirmations { get; set; }
 
         public ClubMemberProgrammeParticipationAppService(
             ICustomerRepository customerRepository,
@@ -133,14 +135,22 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 await _funeralCoverRepository.FirstOrDefaultAsync(
                     entitlement => entitlement.CustomerId == customer.Id);
 
+            var entryDto = entry == null ? null : Map(entry, await GetClubMemberNumberAsync(entry.RecruiterCustomerId));
+            if (entryDto != null && await FindCompanyRegistrationAsync(entry) is { } company)
+            {
+                entryDto.CompanyRegistered = true;
+                entryDto.JoinedIndependently = false;
+                entryDto.RequiresCompanyAcceptance = !await AttributionConfirmations.GetAll().AnyAsync(c =>
+                    c.TenantId == entry.TenantId && c.AttributionId == company.Id && c.ConfirmedByUserId == customer.UserId &&
+                    c.ConfirmationMethod == AQGreenAttributionConfirmationMethod.CompanyAdmissionAcceptance &&
+                    c.EvidenceReferenceId == company.SourceReferenceId);
+            }
             return new MyProgrammeParticipationsDto
             {
                 ClubMemberNumber = customer.ClubMemberNumber,
                 AreaId = customer.AreaId,
                 AreaName = customer.Area?.Name,
-                Entry = entry == null
-                    ? null
-                    : Map(entry, await GetClubMemberNumberAsync(entry.RecruiterCustomerId)),
+                Entry = entryDto,
                 Onyx = onyx == null
                     ? null
                     : Map(onyx, await GetClubMemberNumberAsync(onyx.RecruiterCustomerId)),
@@ -357,7 +367,8 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 var customerId = await GetCurrentActiveCustomerIdAsync();
                 await _hostedPaymentCheckoutLock.AcquireCustomerAreaTransitionsAsync(customerId);
                 var customer = await GetCurrentActiveCustomerAsync();
-                if (await _v2JoiningGate.IsEnabledAsync(tenantId))
+                var v2Joining = await _v2JoiningGate.IsEnabledAsync(tenantId);
+                if (v2Joining)
                     await EnsureNoLegacyAQGreenMembershipAsync(customer);
                 var participation = await _entryParticipationRepository.FirstOrDefaultAsync(
                     candidate => candidate.CustomerId == customer.Id);
@@ -379,6 +390,25 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
 
                 await _hostedPaymentCheckoutLock.AcquireAQGreenParticipationAsync(
                     participation.Id);
+                if (await FindCompanyRegistrationAsync(participation) is { } company)
+                {
+                    if (!v2Joining || !customer.AreaId.HasValue)
+                        throw new UserFriendlyException("Company registration requires an authorized AQGreen Area and V2 joining.");
+                    await _v2JoiningGate.ValidateDestinationAsync(tenantId, customer.AreaId.Value);
+                    var consent = await AttributionConfirmations.FirstOrDefaultAsync(c => c.TenantId == tenantId && c.AttributionId == company.Id);
+                    if (consent == null)
+                    {
+                        if (!input.AcceptCompanyRegistration)
+                            throw new UserFriendlyException("Accept your company registration before starting payment.");
+                        await AttributionConfirmations.InsertAsync(AQGreenRecruitmentAttributionConfirmation.Confirm(company,
+                            UtcNow, customer.UserId, AQGreenAttributionConfirmationMethod.CompanyAdmissionAcceptance,
+                            company.SourceReferenceId, AQGreenRecruitmentAttributionRules.CurrentVersion));
+                    }
+                    else if (consent.ConfirmedByUserId != customer.UserId ||
+                        consent.ConfirmationMethod != AQGreenAttributionConfirmationMethod.CompanyAdmissionAcceptance ||
+                        consent.EvidenceReferenceId != company.SourceReferenceId)
+                        throw new UserFriendlyException("The registration acceptance requires reconciliation.");
+                }
 
                 var activeCheckouts = await _aqGreenJoiningCheckoutRepository.GetAll()
                     .Where(checkout =>
@@ -628,6 +658,10 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 Currency = checkout.Currency,
                 CheckoutUrl = checkout.CheckoutUrl
             };
+
+        private Task<AQGreenRecruitmentAttribution> FindCompanyRegistrationAsync(EntryParticipation entry) =>
+            RecruitmentAttributions.FirstOrDefaultAsync(a => a.TenantId == entry.TenantId && a.ParticipantId == entry.Id &&
+                a.AttributionKind == AQGreenRecruitmentAttributionKind.CompanyAdmission);
 
         private async Task EnsureNoLegacyAQGreenMembershipAsync(Customer customer)
         {

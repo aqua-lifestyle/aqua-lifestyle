@@ -85,7 +85,7 @@ namespace AqualLifeStyle.Tests.Domain
 
         [Theory]
         [InlineData(0)]
-        [InlineData(3)]
+        [InlineData(4)]
         public void Attribution_RejectsUndefinedAcquisitionSource(int value)
         {
             Should.Throw<ArgumentOutOfRangeException>(() =>
@@ -104,7 +104,7 @@ namespace AqualLifeStyle.Tests.Domain
 
         [Theory]
         [InlineData(0)]
-        [InlineData(3)]
+        [InlineData(4)]
         public void Attribution_RejectsUndefinedAttributionKind(int value)
         {
             Should.Throw<ArgumentOutOfRangeException>(() =>
@@ -247,7 +247,9 @@ namespace AqualLifeStyle.Tests.Domain
 
             Should.Throw<ArgumentNullException>(() => Confirm(null));
             Should.Throw<ArgumentOutOfRangeException>(() =>
-                Confirm(attribution, method: (AQGreenAttributionConfirmationMethod)3));
+                Confirm(attribution, method: (AQGreenAttributionConfirmationMethod)4));
+            Should.Throw<InvalidOperationException>(() =>
+                Confirm(attribution, method: AQGreenAttributionConfirmationMethod.CompanyAdmissionAcceptance));
             Should.Throw<InvalidOperationException>(() => Confirm(root));
             Should.Throw<InvalidOperationException>(() =>
                 Confirm(

@@ -57,7 +57,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 await migratedBoundaryUow.CompleteAsync();
             }
             migratedBoundary.SourceSchemaVersion.ShouldBe(currentSchemaDigest);
-            migratedBoundary.SourceSchemaVersion.ShouldBe(AQGreenD10BackendSuccessor.IndependentRootSchemaSha256);
+            migratedBoundary.SourceSchemaVersion.ShouldBe(AQGreenD10BackendSuccessor.HistoricalReviewCancellationSchemaSha256);
             var area=await UsingDbContextAsync(async c=>await (from a in c.AreaAdminAssignments join r in c.Areas
                 on a.AreaId equals r.Id where a.TenantId==1 && a.UserId==AbpSession.UserId && !a.RevokedAt.HasValue && r.IsActive select r.Id).FirstAsync());
             var (x,clean)=AQGreenCleanStartCommissioningTests.Create();var config=AQGreenD10SyntheticEvidence.Configuration();
@@ -427,8 +427,13 @@ namespace AqualLifeStyle.Web.Tests.Integration
             await UsingDbContextAsync(async c=>
             {
                 (await c.AQGreenIndependentRootRequests.CountAsync()).ShouldBe(2);
-                (await c.Database.GetAppliedMigrationsAsync()).Last().ShouldBe("20261125202325_UseLiveEntryParticipationUniqueIndex");
+                // The empty admission extension can roll back. The independent-
+                // root migration must still refuse to remove its recorded evidence.
+                (await c.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(AQGreenD10BackendSuccessor.IndependentRootMigration);
             });
+            await UsingDbContextAsync(c => c.Database.MigrateAsync());
+            using (var currentContext = Resolve<AqualLifeStyle.EntityFrameworkCore.AqualLifeStyleDbContext>())
+                AqualLifeStyle.EntityFrameworkCore.DatabaseReleasePreflight.Verify(currentContext);
             await UsingDbContextAsync(async c=>
             {
                 var intent=await c.AQGreenIndependentRootRequests.FirstAsync();
@@ -453,7 +458,7 @@ namespace AqualLifeStyle.Web.Tests.Integration
                 (await c.AQGreenJoiningCheckouts.SingleAsync(p=>p.ProviderCheckoutId=="SYNTHETIC-RETIRED-CHECKOUT")).PaymentId.ShouldBe(oldPaymentId);
             });
             File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("REPRO_MARKER_DIR"),"clean-start-commissioning.ran"),
-                "PostgreSQL: immutable reset and Host-root evidence; production preflight rejects pending independent-root schema migrations; migration 57 is applied before synthetic commissioning and the column schema remains unchanged; restart succeeds on the exact commissioned schema; two explicit customer roots plus six invited members per root preserve isolated five-wide spillover, payment/Area approval, rollback denial on occupied intent, and zero commission rows; synthetic provider only.");
+                "PostgreSQL: immutable reset and Host-root evidence; production preflight rejects pending migrations; the current, pinned schema is applied before synthetic commissioning; restart succeeds on the exact commissioned schema; two explicit customer roots plus six invited members per root preserve isolated five-wide spillover, payment/Area approval, rollback denial on occupied intent, and zero commission rows; synthetic provider only.");
             }
             finally { if(businessLease!=null)await businessLease.DisposeAsync(); }
         }

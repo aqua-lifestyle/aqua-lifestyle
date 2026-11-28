@@ -9,6 +9,9 @@ using System.Transactions;
 using Abp.Domain.Uow;
 using Abp.EntityFrameworkCore;
 using AqualLifeStyle.Domain.AQGreen;
+using AqualLifeStyle.Domain.Enums;
+using AqualLifeStyle.Domain.Memberships;
+using AqualLifeStyle.Domain.Payments;
 using AqualLifeStyle.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -29,11 +32,11 @@ namespace AqualLifeStyle.Web.Tests.Controllers
         {
             var fixture = await SeedAsync(importPermission: true);
             var keys = await UsingDbContextAsync(async db => await db.Customers.IgnoreQueryFilters()
-                .Where(c => new[] { fixture.Both.CustomerId, fixture.OtherArea.CustomerId, fixture.Foreign.CustomerId,
+                .Where(c => new[] { fixture.V2Only.CustomerId, fixture.OtherArea.CustomerId, fixture.Foreign.CustomerId,
                     fixture.LegacyOnly.CustomerId }.Contains(c.Id))
                 .ToDictionaryAsync(c => c.Id, c => new { c.ClubMemberNumber, Email = c.Email.Value }));
             string Matched(string id, Subject subject) => ExplicitRow(id, keys[subject.CustomerId].Email, keys[subject.CustomerId].ClubMemberNumber);
-            var rows = new[] { Matched("0001", fixture.Both), ExplicitRow("0002"), ExplicitRow("0002"),
+            var rows = new[] { Matched("0001", fixture.V2Only), ExplicitRow("0002"), ExplicitRow("0002"),
                 Matched("0003", fixture.OtherArea), Matched("0004", fixture.Foreign),
                 ExplicitRow("0005", keys[fixture.LegacyOnly.CustomerId].Email) };
             await SignInAsync(fixture.Reviewer);
@@ -48,11 +51,107 @@ namespace AqualLifeStyle.Web.Tests.Controllers
             var reported = result.GetProperty("rows").EnumerateArray().ToArray();
             reported.Select(row => row.GetProperty("oldMemberId").GetString())
                 .ShouldBe(new[] { "0001", "0002", "0002", "0003", "0004", "0005" });
-            reported[0].GetProperty("matchedCustomerId").GetInt32().ShouldBe(fixture.Both.CustomerId);
-            reported[0].GetProperty("existingParticipationId").GetGuid().ShouldBe(fixture.Both.ParticipationId.Value);
+            reported[0].GetProperty("matchedCustomerId").GetInt32().ShouldBe(fixture.V2Only.CustomerId);
+            reported[0].GetProperty("existingParticipationId").GetGuid().ShouldBe(fixture.V2Only.ParticipationId.Value);
             foreach (var row in reported.Skip(1)) row.GetProperty("matchedCustomerId").ValueKind.ShouldBe(JsonValueKind.Null);
             reported[5].GetProperty("issues").EnumerateArray().Select(issue => issue.GetString())
                 .ShouldContain("AccountMatchRequiresCorroboration");
+            (await BusinessSnapshotAsync()).ShouldBe(before);
+        }
+
+        [DiscoveryPostgreSqlFact]
+        public async Task RosterPreview_UsesExistingMembershipEvidenceWithoutExposingForeignPlansOrWritingHistory()
+        {
+            var fixture = await SeedAsync(importPermission: true);
+            var rows = await UsingDbContextAsync(async context =>
+            {
+                var shared = Membership.Create(null, "Synthetic shared AQGreen", "Fixture", MembershipType.AQGreen);
+                var foreign = Membership.Create(fixture.ForeignTenantId, "Synthetic foreign AQGreen", "Fixture", MembershipType.AQGreen);
+                context.Memberships.AddRange(shared, foreign);
+                await context.SaveChangesAsync();
+
+                var ids = new[] { fixture.LegacyOnly.CustomerId, fixture.Both.CustomerId,
+                    fixture.Unversioned.CustomerId, fixture.OtherArea.CustomerId };
+                var customers = await context.Customers.IgnoreQueryFilters().Where(c => ids.Contains(c.Id))
+                    .ToDictionaryAsync(c => c.Id);
+                customers[fixture.LegacyOnly.CustomerId].ChangeMembership(shared.Id);
+                customers[fixture.Unversioned.CustomerId].ChangeMembership(foreign.Id);
+                return ids.Select((id, index) => ExplicitRow($"000{index + 1}", customers[id].Email.Value,
+                    customers[id].ClubMemberNumber)).ToArray();
+            });
+            await SignInAsync(fixture.Reviewer);
+            var before = await BusinessSnapshotAsync();
+
+            var result = await PostRosterAsync("example.csv", Csv(rows));
+
+            result.GetProperty("acceptedRows").GetInt32().ShouldBe(0);
+            result.GetProperty("ambiguousRows").GetInt32().ShouldBe(3);
+            result.GetProperty("unmatchedRows").GetInt32().ShouldBe(1);
+            var reported = result.GetProperty("rows").EnumerateArray().ToArray();
+            string[] RosterIssues(int index) => reported[index].GetProperty("issues").EnumerateArray()
+                .Select(issue => issue.GetString()).ToArray();
+            reported[0].GetProperty("matchedCustomerId").GetInt32().ShouldBe(fixture.LegacyOnly.CustomerId);
+            reported[0].GetProperty("existingParticipationId").ValueKind.ShouldBe(JsonValueKind.Null);
+            RosterIssues(0).ShouldBe(new[] { "LegacyAQGreenAssignmentRequiresReconciliation" });
+            reported[1].GetProperty("existingParticipationId").GetGuid().ShouldBe(fixture.Both.ParticipationId.Value);
+            RosterIssues(1).ShouldBe(new[] { "LegacyAQGreenAssignmentRequiresReconciliation" });
+            RosterIssues(2).ShouldBe(new[] { "MembershipAssignmentUnverifiable" });
+            reported[2].TryGetProperty("legacyMembershipId", out _).ShouldBeFalse();
+            result.GetRawText().ShouldNotContain("Synthetic foreign AQGreen");
+            reported[3].GetProperty("matchedCustomerId").ValueKind.ShouldBe(JsonValueKind.Null);
+            RosterIssues(3).ShouldBe(new[] { "NoVisibleAccountMatch" });
+            (await BusinessSnapshotAsync()).ShouldBe(before);
+        }
+
+        [DiscoveryPostgreSqlFact]
+        public async Task RosterPreview_ReportsAnActivePlacementGapAndDependentRowsWithoutWritingHistory()
+        {
+            var fixture = await SeedAsync(importPermission: true);
+            var rows = await UsingDbContextAsync(async context =>
+            {
+                var subjects = new[] { fixture.Unversioned, fixture.Both, fixture.V2Only };
+                var ids = subjects.Select(subject => subject.CustomerId).ToArray();
+                var customers = await context.Customers.IgnoreQueryFilters().Where(c => ids.Contains(c.Id))
+                    .ToDictionaryAsync(c => c.Id);
+                foreach (var subject in new[] { fixture.Unversioned, fixture.V2Only })
+                {
+                    var entry = await context.EntryParticipations.IgnoreQueryFilters()
+                        .SingleAsync(item => item.Id == subject.ParticipationId);
+                    var payment = MemberPayment.CreatePending(1, subject.CustomerId, MemberPaymentPurpose.AQGreenJoining,
+                        1200m, "Synthetic", Guid.NewGuid().ToString("N"), RecordedAt);
+                    payment.Confirm(RecordedAt.AddMinutes(1));
+                    context.MemberPayments.Add(payment);
+                    entry.ApplyConfirmedJoiningPayment(payment);
+                    entry.ApproveByAdministrator(fixture.Reviewer.Id, RecordedAt.AddMinutes(2));
+                    if (subject == fixture.V2Only)
+                    {
+                        var scope = AQGreenPlacementTreeScope.Create(1);
+                        context.AQGreenPlacementTreeScopes.Add(scope);
+                        context.AQGreenNetworkPlacements.Add(AQGreenNetworkPlacement.CreateRoot(scope, entry.Id,
+                            entry.ActivatedAt.Value, AQGreenPlacementRules.CurrentVersion));
+                    }
+                }
+                var root = customers[fixture.Unversioned.CustomerId];
+                var child = customers[fixture.Both.CustomerId];
+                var recordedRoot = customers[fixture.V2Only.CustomerId];
+                return new[] { ExplicitRow("0001", root.Email.Value, root.ClubMemberNumber),
+                    $"0002,Synthetic,Child,{child.Email.Value},,,{child.ClubMemberNumber},AQGreen,Active,0001,0001,1,false",
+                    ExplicitRow("0003", recordedRoot.Email.Value, recordedRoot.ClubMemberNumber) };
+            });
+            await SignInAsync(fixture.Reviewer);
+            var before = await BusinessSnapshotAsync();
+
+            var result = await PostRosterAsync("example.csv", Csv(rows));
+
+            result.GetProperty("ambiguousRows").GetInt32().ShouldBe(2);
+            result.GetProperty("acceptedRows").GetInt32().ShouldBe(1);
+            var reported = result.GetProperty("rows").EnumerateArray().ToArray();
+            reported[0].GetProperty("existingParticipationStatus").GetString().ShouldBe("Active");
+            reported[0].GetProperty("issues").EnumerateArray().Select(issue => issue.GetString())
+                .ShouldContain("ActiveParticipationMissingPlacement");
+            reported[1].GetProperty("issues").EnumerateArray().Select(issue => issue.GetString())
+                .ShouldContain("NetworkDependencyRequiresReview");
+            reported[2].GetProperty("issues").GetArrayLength().ShouldBe(0);
             (await BusinessSnapshotAsync()).ShouldBe(before);
         }
 

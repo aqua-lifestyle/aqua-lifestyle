@@ -764,6 +764,17 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     {
                         await _hostedPaymentCheckoutLock
                             .AcquireProgrammeParticipationDecisionAsync(input.ParticipationId);
+                        if (!usePlacementV2 && input.Programme == AdminProgrammeType.Entry)
+                        {
+                            if (await _attributionRepository.GetAll().AnyAsync(a => a.ParticipantId == input.ParticipationId &&
+                                    a.AttributionKind == AQGreenRecruitmentAttributionKind.CompanyAdmission))
+                                throw Failed("Participation approval", "Company registration requires AQGreen V2 authority.");
+                            if (await (from entry in _entryParticipationRepository.GetAll()
+                                join review in HistoricalTreeReviews.GetAll() on entry.TenantId equals review.TenantId
+                                where entry.Id == input.ParticipationId && !review.ClearedAt.HasValue && !review.CancelledAt.HasValue
+                                select review.Id).AnyAsync())
+                                throw Failed("Participation approval", "Resolve historical holds or use authorized AQGreen V2 placement.");
+                        }
                         if (usePlacementV2 &&
                             !await _placementV2ApprovalGate.IsEnabledAsync(AbpSession.TenantId, input.ParticipationId))
                             throw new InvalidOperationException("D10_APPROVAL_AUTHORITY_CHANGED_BEFORE_COMMIT");
@@ -875,6 +886,22 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             ValidateRequestedTenant(hint.TenantId, "Participation approval");
 
             var administratorUserId = AbpSession.GetUserId();
+            var company = await _attributionRepository.GetAll().AsNoTracking().SingleOrDefaultAsync(a =>
+                a.TenantId == hint.TenantId && a.ParticipantId == participationId &&
+                a.AttributionKind == AQGreenRecruitmentAttributionKind.CompanyAdmission);
+            if (company != null)
+            {
+                var destination = await GetCompanyRootCustomerAsync(hint.TenantId, company.SourceReferenceId);
+                await _hostedPaymentCheckoutLock.AcquireCustomerAreaTransitionsAsync(hint.CustomerId, destination.Id);
+                // Unlike a member invitation, the administrator selected this network;
+                // they must also have current authority over its root's Area.
+                var destinationArea = await _approvalAuthorityStabilizer.StabilizeAsync(hint.TenantId, destination.Id,
+                    AbpSession.TenantId.HasValue ? administratorUserId : (long?)null);
+                var current = await GetCompanyRootCustomerAsync(hint.TenantId, company.SourceReferenceId);
+                if (current.Id != destination.Id || current.AreaId != destinationArea)
+                    throw new AQGreenPlacementConflictException("The company registration destination changed.");
+                await EnsureCanAdministerAreaAsync(current);
+            }
             var stabilizedAreaId = await _approvalAuthorityStabilizer.StabilizeAsync(
                 hint.TenantId,
                 hint.CustomerId,
@@ -929,13 +956,22 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     administratorUserId);
             }
             if (attribution.AttributionKind !=
-                AQGreenRecruitmentAttributionKind.SponsoredParticipant)
+                AQGreenRecruitmentAttributionKind.SponsoredParticipant && company == null)
                 throw new AQGreenPlacementUnsupportedAttributionException(
                     attribution.AttributionKind);
 
-            var scopeHint = await ResolveAQGreenPlacementScopeAsync(entry);
+            if (company != null)
+            {
+                var consent = await _attributionConfirmationRepository.GetAll().AsNoTracking().SingleOrDefaultAsync(c =>
+                    c.TenantId == entry.TenantId && c.AttributionId == company.Id);
+                if (entry.RecruiterCustomerId.HasValue || consent?.ConfirmedByUserId != customer.UserId ||
+                    consent.ConfirmationMethod != AQGreenAttributionConfirmationMethod.CompanyAdmissionAcceptance ||
+                    consent.EvidenceReferenceId != company.SourceReferenceId)
+                    throw new AQGreenPlacementConflictException("The member must accept this company registration.");
+            }
+            var scopeHint = company?.SourceReferenceId ?? await ResolveAQGreenPlacementScopeAsync(entry);
             await _placementTreeLock.AcquireAsync(scopeHint);
-            var authoritativeScope = await ResolveAQGreenPlacementScopeAsync(entry);
+            var authoritativeScope = company?.SourceReferenceId ?? await ResolveAQGreenPlacementScopeAsync(entry);
             if (authoritativeScope != scopeHint)
                 throw new AQGreenPlacementConflictException(
                     "The credited sponsor placement-tree scope changed before approval.");
@@ -1592,6 +1628,24 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             return await ReadLegacyAQGreenDiscoveryPageAsync(input);
         }
 
+        // Callers disable MayHaveTenant to distinguish an unverifiable assignment
+        // from a shared or same-Tenant definition. Never return foreign plan details.
+        private IQueryable<LegacyAQGreenMembershipEvidence> QueryLegacyAQGreenMembershipEvidence(
+            IQueryable<Customer> customers) =>
+            from customer in customers
+            join membership in _membershipRepository.GetAll().AsNoTracking()
+                on customer.MembershipId equals (int?)membership.Id into memberships
+            from membership in memberships.DefaultIfEmpty()
+            let validAssignment = membership != null &&
+                (!membership.TenantId.HasValue || membership.TenantId == customer.TenantId)
+            select new LegacyAQGreenMembershipEvidence
+            {
+                Customer = customer,
+                LegacyMembershipId = validAssignment && membership.MembershipType == MembershipType.AQGreen
+                    ? (int?)membership.Id : null,
+                MembershipAssignmentUnverifiable = customer.MembershipId.HasValue && !validAssignment
+            };
+
         private async Task<PagedResultDto<LegacyAQGreenReconciliationDto>> ReadLegacyAQGreenDiscoveryPageAsync(
             LegacyAQGreenReconciliationListInput input, Guid? requestedAreaId = null,
             List<AQGreenReconciliationEvidenceRecord> exportRecords = null, Guid[] exportAreaScope = null)
@@ -1611,28 +1665,22 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 // Customer is the inventory identity. Composite ownership joins and
                 // existing uniqueness constraints preserve one row when sources overlap.
                 var query =
-                    from customer in _customerRepository.GetAll().AsNoTracking()
-                    where customer.TenantId.HasValue
+                    from evidence in QueryLegacyAQGreenMembershipEvidence(
+                        _customerRepository.GetAll().AsNoTracking().Where(customer => customer.TenantId.HasValue))
+                    let customer = evidence.Customer
                     join participation in _entryParticipationRepository
                         .GetAllIncluding(item => item.ApprovalDecisions, item => item.RecruiterCorrections).AsNoTracking()
                         on new { customer.TenantId, CustomerId = customer.Id }
                         equals new { TenantId = (int?)participation.TenantId, participation.CustomerId }
                         into participations
                     from participation in participations.DefaultIfEmpty()
-                    join membership in _membershipRepository.GetAll().AsNoTracking()
-                        on customer.MembershipId equals (int?)membership.Id into memberships
-                    from membership in memberships.DefaultIfEmpty()
-                    let validAssignment = membership != null &&
-                        (!membership.TenantId.HasValue || membership.TenantId == customer.TenantId)
-                    let legacyAssignment = validAssignment && membership.MembershipType == MembershipType.AQGreen
-                    let unverifiableAssignment = customer.MembershipId.HasValue && !validAssignment
-                    where legacyAssignment || unverifiableAssignment || participation != null
+                    where evidence.LegacyMembershipId.HasValue || evidence.MembershipAssignmentUnverifiable || participation != null
                     select new LegacyAQGreenDiscoveryRow
                     {
                         Participation = participation,
                         Customer = customer,
-                        LegacyMembershipId = legacyAssignment ? (int?)membership.Id : null,
-                        MembershipAssignmentUnverifiable = unverifiableAssignment
+                        LegacyMembershipId = evidence.LegacyMembershipId,
+                        MembershipAssignmentUnverifiable = evidence.MembershipAssignmentUnverifiable
                     };
                 if (AbpSession.TenantId.HasValue)
                 {
@@ -2215,9 +2263,19 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             var areaNames = await GetAreaNamesAsync(
                 rows.Select(row => row.Customer.AreaId));
 
+            var participantIds = rows.Select(r => r.Participation.Id).ToArray();
+            var companyIds = (await _attributionRepository.GetAll().AsNoTracking().Where(a =>
+                participantIds.Contains(a.ParticipantId) && a.AttributionKind == AQGreenRecruitmentAttributionKind.CompanyAdmission)
+                .Select(a => a.ParticipantId).ToListAsync()).ToHashSet();
             return new PagedResultDto<AdminProgrammeParticipationDto>(
                 total,
-                rows.Select(row => Map(row.Participation, row.Customer, payments, memberNumbers, areaNames)).ToList());
+                rows.Select(row =>
+                {
+                    var dto = Map(row.Participation, row.Customer, payments, memberNumbers, areaNames);
+                    dto.CompanyRegistered = companyIds.Contains(row.Participation.Id);
+                    if (dto.CompanyRegistered) dto.JoinedIndependently = false;
+                    return dto;
+                }).ToList());
         }
 
         private async Task<PagedResultDto<AdminProgrammeParticipationDto>>
@@ -2565,6 +2623,13 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             public EntryParticipation Participation { get; init; }
             public Customer Customer { get; init; }
+        }
+
+        private sealed class LegacyAQGreenMembershipEvidence
+        {
+            public Customer Customer { get; init; }
+            public int? LegacyMembershipId { get; init; }
+            public bool MembershipAssignmentUnverifiable { get; init; }
         }
 
         private sealed class LegacyAQGreenDiscoveryRow

@@ -289,6 +289,25 @@ describe("MemberProgrammes", () => {
     expect(httpClient.post).not.toHaveBeenCalled();
   });
 
+  it("requires company registration acceptance before opening the existing member checkout", async () => {
+    showAwaitingAQGreen();
+    vi.mocked(httpClient.get).mockResolvedValue({
+      entry: { programmeName: "AQGreen", currency: "ZAR", statusCode: "AwaitingJoiningPayment", status: "Awaiting joining payment",
+        joinedIndependently: false, companyRegistered: true, requiresCompanyAcceptance: true, joiningSchedule: null,
+        joiningPaidAmount: 0, nextPaymentAmount: 1200, canRecruitForThisProgramme: false, isActive: false },
+      onyx: null, pendingAQGreenCheckout: null,
+    });
+    render(<MemberProgrammes />);
+    const pay = await screen.findByRole("button", { name: "Pay R1,200 once" });
+    expect(pay).toBeDisabled();
+    expect(httpClient.post).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("checkbox", { name: /I accept the AQGreen registration/ }));
+    fireEvent.click(pay);
+    await waitFor(() => expect(httpClient.post).toHaveBeenCalledExactlyOnceWith(
+      apiEndpoints.programmeParticipations.createAQGreenJoiningCheckout, { schedule: 0, acceptCompanyRegistration: true },
+    ));
+  });
+
   it("allows the second distinct R600 checkout only after the server confirms the first instalment", async () => {
     window.localStorage.setItem("aqua.aqgreenCheckoutReview.1.7", "unpaid");
     showAwaitingAQGreen();

@@ -6,13 +6,15 @@ namespace AqualLifeStyle.Domain.AQGreen
     public enum AQGreenAcquisitionSource
     {
         MemberInvitation = 1,
-        AuthorisedDirectAdmission = 2
+        AuthorisedDirectAdmission = 2,
+        CompanyAcquisition = 3
     }
 
     public enum AQGreenRecruitmentAttributionKind
     {
         SponsoredParticipant = 1,
-        AuthorisedProspectiveRoot = 2
+        AuthorisedProspectiveRoot = 2,
+        CompanyAdmission = 3
     }
 
     public static class AQGreenRecruitmentAttributionRules
@@ -137,7 +139,8 @@ namespace AqualLifeStyle.Domain.AQGreen
             AQGreenRecruitmentAttributionKind attributionKind)
         {
             if (attributionKind != AQGreenRecruitmentAttributionKind.SponsoredParticipant &&
-                attributionKind != AQGreenRecruitmentAttributionKind.AuthorisedProspectiveRoot)
+                attributionKind != AQGreenRecruitmentAttributionKind.AuthorisedProspectiveRoot &&
+                attributionKind != AQGreenRecruitmentAttributionKind.CompanyAdmission)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(attributionKind),
@@ -149,7 +152,8 @@ namespace AqualLifeStyle.Domain.AQGreen
         private static void EnsureControlledSource(AQGreenAcquisitionSource acquisitionSource)
         {
             if (acquisitionSource != AQGreenAcquisitionSource.MemberInvitation &&
-                acquisitionSource != AQGreenAcquisitionSource.AuthorisedDirectAdmission)
+                acquisitionSource != AQGreenAcquisitionSource.AuthorisedDirectAdmission &&
+                acquisitionSource != AQGreenAcquisitionSource.CompanyAcquisition)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(acquisitionSource),
@@ -217,7 +221,8 @@ namespace AqualLifeStyle.Domain.AQGreen
                 return;
             }
 
-            if (acquisitionSource != AQGreenAcquisitionSource.AuthorisedDirectAdmission)
+            if (acquisitionSource != (attributionKind == AQGreenRecruitmentAttributionKind.CompanyAdmission
+                    ? AQGreenAcquisitionSource.CompanyAcquisition : AQGreenAcquisitionSource.AuthorisedDirectAdmission))
                 throw new InvalidOperationException(
                     "Authorised-root attribution requires direct-admission provenance.");
             if (creditedSponsorParticipantId.HasValue)

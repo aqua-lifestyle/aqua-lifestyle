@@ -56,19 +56,40 @@ namespace AqualLifeStyle.EntityFrameworkCore
             AQGreenPlacementTreeLock.EnsureActiveTransaction(context);
             EnsureReadCommittedTransaction(context);
 
-            var scopeHint = await ResolveScopeHintAsync(
+            var company = await context.AQGreenRecruitmentAttributions.AsNoTracking().SingleOrDefaultAsync(a =>
+                a.TenantId == tenantId && a.ParticipantId == participantId &&
+                a.AttributionKind == AQGreenRecruitmentAttributionKind.CompanyAdmission, cancellationToken);
+            var scopeHint = company?.SourceReferenceId ?? await ResolveScopeHintAsync(
                 context,
                 tenantId,
                 participantId,
                 cancellationToken);
             await _placementTreeLock.AcquireAsync(scopeHint, cancellationToken);
 
-            var facts = await ReadAuthoritativeFactsAsync(
-                context,
-                tenantId,
-                participantId,
-                cancellationToken);
-            if (facts.SponsorPlacement.PlacementTreeScopeId != scopeHint)
+            AQGreenNetworkPlacement anchor;
+            AQGreenNetworkPlacement existingPlacement;
+            if (company == null)
+            {
+                var facts = await ReadAuthoritativeFactsAsync(context, tenantId, participantId, cancellationToken);
+                anchor = facts.SponsorPlacement;
+                existingPlacement = facts.ExistingPlacement;
+            }
+            else
+            {
+                await RequireParticipantAsync(context, tenantId, participantId, AQGreenPlacementMissingFact.Participant, cancellationToken);
+                var confirmed = await context.AQGreenRecruitmentAttributionConfirmations.AsNoTracking().AnyAsync(c =>
+                    c.TenantId == tenantId && c.AttributionId == company.Id &&
+                    c.ConfirmationMethod == AQGreenAttributionConfirmationMethod.CompanyAdmissionAcceptance &&
+                    c.EvidenceReferenceId == scopeHint && c.ConfirmedByUserId.HasValue, cancellationToken);
+                if (!confirmed) throw new AQGreenPlacementAttributionNotConfirmedException();
+                anchor = await context.AQGreenNetworkPlacements.AsNoTracking().SingleOrDefaultAsync(p =>
+                    p.TenantId == tenantId && p.PlacementTreeScopeId == scopeHint &&
+                    !p.PlacementParentParticipantId.HasValue, cancellationToken);
+                if (anchor == null) throw new AQGreenPlacementAllocationNotFoundException(AQGreenPlacementMissingFact.PlacementTreeScope);
+                existingPlacement = await context.AQGreenNetworkPlacements.AsNoTracking().SingleOrDefaultAsync(p =>
+                    p.TenantId == tenantId && p.ParticipantId == participantId, cancellationToken);
+            }
+            if (anchor.PlacementTreeScopeId != scopeHint)
             {
                 throw new AQGreenPlacementConflictException(
                     "The credited sponsor placement-tree scope changed before allocation could be locked.");
@@ -77,20 +98,24 @@ namespace AqualLifeStyle.EntityFrameworkCore
             var subtree = await _topologyReader.GetSubtreeInCanonicalOrderAsync(
                 tenantId,
                 scopeHint,
-                facts.Attribution.CreditedSponsorParticipantId.Value,
+                anchor.ParticipantId,
                 cancellationToken);
 
-            if (facts.ExistingPlacement != null)
+            if (existingPlacement != null)
             {
                 EnsureExistingPlacementMatches(
-                    facts.ExistingPlacement,
+                    existingPlacement,
                     scopeHint,
                     participantId,
                     subtree);
                 return new AQGreenPlacementAllocationResult(
-                    facts.ExistingPlacement,
+                    existingPlacement,
                     wasAlreadyPlaced: true);
             }
+
+            if (await context.AQGreenHistoricalTreeReviews.AsNoTracking().AnyAsync(r =>
+                r.TenantId == tenantId && r.ScopeId == scopeHint && !r.ClearedAt.HasValue && !r.CancelledAt.HasValue, cancellationToken))
+                throw new AQGreenPlacementConflictException("This AQGreen tree is held for historical placement review.");
 
             var vacancy = FindFirstVacancy(subtree);
             var parent = await context.AQGreenNetworkPlacements
@@ -131,7 +156,7 @@ namespace AqualLifeStyle.EntityFrameworkCore
                     tenantId,
                     participantId,
                     scopeHint,
-                    facts.Attribution.CreditedSponsorParticipantId.Value,
+                    anchor.ParticipantId,
                     vacancy,
                     constraintName,
                     cancellationToken);

@@ -18,6 +18,10 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
     {
         public const string IndependentRootMigration = "20261125202325_UseLiveEntryParticipationUniqueIndex";
         public const string PreviousMigration = "20261115113914_AddAQGreenIndependentRootRequests";
+        public const string AdministratorAdmissionMigration = "20261128123707_AddAQGreenAdministratorAdmission";
+        public const string AdministratorAdmissionSchemaSha256 = "68aa40dd42169d4c52ed03011bc070bea4b319af7015cadf7e84c8981d788159";
+        public const string HistoricalReviewCancellationMigration = "20261128142657_GuardAQGreenHistoricalReviewCancellation";
+        public const string HistoricalReviewCancellationSchemaSha256 = "e61faf284d84b64278f4c808c2fbc858916bcb76ace9f436b04a2139059a1dd8";
 
         // Read-only SHA-256 of the production public-column snapshot. Migration
         // 57 changes only an index predicate, so it preserves this column-schema
@@ -34,14 +38,19 @@ namespace AqualLifeStyle.Application.ProgrammeParticipations
                 "D10_BACKEND_SUCCESSOR_SCOPE_UNAVAILABLE");
             Require(boundary.SourceDatabaseIdentityEvidence == decision.RequiredDatabaseIdentityDigest,
                 "D10_BACKEND_SUCCESSOR_DATABASE_IDENTITY_MISMATCH");
-            Require(boundary.SourceSchemaVersion == IndependentRootSchemaSha256,
-                "D10_BACKEND_SUCCESSOR_SCHEMA_MISMATCH");
-
             var expected = boundary.ExpectedMigrations;
             var applied = boundary.AppliedMigrations;
-            Require(expected != null && applied != null && expected.Length == 57 &&
-                expected[^2] == PreviousMigration && expected[^1] == IndependentRootMigration &&
-                expected.SequenceEqual(applied, StringComparer.Ordinal),
+            var cancellation = expected?.Length == 59 && expected[^4] == PreviousMigration &&
+                expected[^3] == IndependentRootMigration && expected[^2] == AdministratorAdmissionMigration &&
+                expected[^1] == HistoricalReviewCancellationMigration;
+            var admission = expected?.Length == 58 && expected[^3] == PreviousMigration &&
+                expected[^2] == IndependentRootMigration && expected[^1] == AdministratorAdmissionMigration;
+            var independent = expected?.Length == 57 && expected[^2] == PreviousMigration &&
+                expected[^1] == IndependentRootMigration;
+            Require(boundary.SourceSchemaVersion == (cancellation ? HistoricalReviewCancellationSchemaSha256 :
+                    admission ? AdministratorAdmissionSchemaSha256 : IndependentRootSchemaSha256),
+                "D10_BACKEND_SUCCESSOR_SCHEMA_MISMATCH");
+            Require((cancellation || admission || independent) && applied != null && expected.SequenceEqual(applied, StringComparer.Ordinal),
                 "D10_BACKEND_SUCCESSOR_MIGRATION_HISTORY_MISMATCH");
 
             // Render supplies the immutable source revision for the selected

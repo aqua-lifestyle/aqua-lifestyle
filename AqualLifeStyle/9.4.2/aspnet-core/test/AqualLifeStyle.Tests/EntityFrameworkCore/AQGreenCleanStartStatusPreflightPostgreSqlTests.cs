@@ -54,7 +54,8 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await using var c = new NpgsqlConnection(lease.ConnectionString()); await c.OpenAsync();
             await using var context = _fixture.CreateDbContext(c);
             var migrations = context.Database.GetMigrations().OrderBy(x => x, StringComparer.Ordinal).ToArray();
-            migrations.Length.ShouldBe(57);
+            migrations.Length.ShouldBe(59);
+            migrations[^1].ShouldBe("20261128142657_GuardAQGreenHistoricalReviewCancellation");
             checks.ShouldContain(AQGreenB6CanonicalEvidence.Hash(Encoding.UTF8.GetBytes(string.Join("\n", migrations.Take(54)))));
         }
 

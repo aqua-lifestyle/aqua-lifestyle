@@ -152,11 +152,13 @@ namespace AqualLifeStyle.EntityFrameworkCore
             const string independentRootMigration = "20261125202325_UseLiveEntryParticipationUniqueIndex";
             var migrations = context.Database.GetMigrations().ToArray();
             var ids = history.ToArray();
-            if (migrations.Length != 57 || migrations[54] != migration55 ||
+            if (migrations.Length != 59 || migrations[54] != migration55 ||
                 migrations[55] != migration56 || migrations[56] != independentRootMigration ||
+                migrations[57] != "20261128123707_AddAQGreenAdministratorAdmission" ||
+                migrations[58] != "20261128142657_GuardAQGreenHistoricalReviewCancellation" ||
                 !(ids.SequenceEqual(migrations.Take(54)) || ids.SequenceEqual(migrations.Take(55)) ||
-                  ids.SequenceEqual(migrations.Take(56)) ||
-                  ids.SequenceEqual(migrations)))
+                  ids.SequenceEqual(migrations.Take(56)) || ids.SequenceEqual(migrations.Take(57)) ||
+                  ids.SequenceEqual(migrations.Take(58)) || ids.SequenceEqual(migrations)))
                 throw new InvalidOperationException("YOCO_CUTOVER_SCHEMA_NOT_SUPPORTED");
             var rows = await context.Set<BackgroundJobInfo>().Where(x => x.JobType == EventType || x.JobType == ControlType)
                 .OrderBy(x => x.Id).Take(10001).ToListAsync();

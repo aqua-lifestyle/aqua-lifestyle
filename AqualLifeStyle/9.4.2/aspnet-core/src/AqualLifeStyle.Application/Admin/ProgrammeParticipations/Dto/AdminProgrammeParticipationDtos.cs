@@ -65,6 +65,7 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations.Dto
         public string Status { get; set; }
         public bool IsActive { get; set; }
         public bool JoinedIndependently { get; set; }
+        public bool CompanyRegistered { get; set; }
         public string RecruiterClubMemberNumber { get; set; }
         public DateTime StartedAt { get; set; }
         public DateTime? ActivatedAt { get; set; }

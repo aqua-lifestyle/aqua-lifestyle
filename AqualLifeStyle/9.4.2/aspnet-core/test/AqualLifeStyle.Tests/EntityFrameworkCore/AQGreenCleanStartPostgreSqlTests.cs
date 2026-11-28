@@ -184,10 +184,12 @@ namespace AqualLifeStyle.Tests.EntityFrameworkCore
             await Should.ThrowAsync<PostgresException>(()=>SqlAsync(c,migration));await SqlAsync(c,"ROLLBACK");
             await using var context=_fixture.CreateDbContext(c);await context.GetService<IMigrator>().MigrateAsync();
             context.Database.HasPendingModelChanges().ShouldBeFalse(); // Uses pinned EF 8.0.8, not a global CLI.
-            Convert.ToInt64(await SqlAsync(c,"SELECT count(*) FROM \"__EFMigrationsHistory\"")).ShouldBe(57);
+            Convert.ToInt64(await SqlAsync(c,"SELECT count(*) FROM \"__EFMigrationsHistory\"")).ShouldBe(59);
             Convert.ToInt64(await SqlAsync(c,"SELECT count(*) FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\"='20261021051549_AddAQGreenSalesEvidenceInvalidation'")).ShouldBe(1);
             Convert.ToInt64(await SqlAsync(c,"SELECT count(*) FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\"='20261115113914_AddAQGreenIndependentRootRequests'")).ShouldBe(1);
             Convert.ToInt64(await SqlAsync(c,"SELECT count(*) FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\"='20261125202325_UseLiveEntryParticipationUniqueIndex'")).ShouldBe(1);
+            Convert.ToInt64(await SqlAsync(c,"SELECT count(*) FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\"='20261128123707_AddAQGreenAdministratorAdmission'")).ShouldBe(1);
+            Convert.ToInt64(await SqlAsync(c,"SELECT count(*) FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\"='20261128142657_GuardAQGreenHistoricalReviewCancellation'")).ShouldBe(1);
             ((bool)await SqlAsync(c,"SELECT to_regclass('public.\"AQGreenSalesEvidenceInvalidations\"') IS NOT NULL")).ShouldBeTrue();
         }
 

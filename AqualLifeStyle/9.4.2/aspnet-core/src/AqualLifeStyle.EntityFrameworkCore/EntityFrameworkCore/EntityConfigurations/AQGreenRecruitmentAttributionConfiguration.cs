@@ -24,11 +24,12 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
                     "CK_AQGRecruitAttr_Kind",
                     $"\"AttributionKind\" IN (" +
                     $"{(int)AQGreenRecruitmentAttributionKind.SponsoredParticipant}, " +
-                    $"{(int)AQGreenRecruitmentAttributionKind.AuthorisedProspectiveRoot})");
+                    $"{(int)AQGreenRecruitmentAttributionKind.AuthorisedProspectiveRoot}, " +
+                    $"{(int)AQGreenRecruitmentAttributionKind.CompanyAdmission})");
                 table.HasCheckConstraint(
                     "CK_AQGRecruitAttr_Source",
                     $"\"AcquisitionSource\" IN ({(int)AQGreenAcquisitionSource.MemberInvitation}, " +
-                    $"{(int)AQGreenAcquisitionSource.AuthorisedDirectAdmission})");
+                    $"{(int)AQGreenAcquisitionSource.AuthorisedDirectAdmission}, {(int)AQGreenAcquisitionSource.CompanyAcquisition})");
                 table.HasCheckConstraint(
                     "CK_AQGRecruitAttr_SourceRef",
                     "\"SourceReferenceId\" <> '00000000-0000-0000-0000-000000000000'");
@@ -49,7 +50,11 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
                     "AND \"CreditedSponsorParticipantId\" IS NULL " +
                     "AND \"AttributedByUserId\" IS NOT NULL " +
                     "AND \"AssignmentReason\" IS NOT NULL " +
-                    "AND length(trim(\"AssignmentReason\")) > 0)");
+                    "AND length(trim(\"AssignmentReason\")) > 0) OR " +
+                    $"(\"AttributionKind\" = {(int)AQGreenRecruitmentAttributionKind.CompanyAdmission} " +
+                    $"AND \"AcquisitionSource\" = {(int)AQGreenAcquisitionSource.CompanyAcquisition} " +
+                    "AND \"CreditedSponsorParticipantId\" IS NULL AND \"AttributedByUserId\" IS NOT NULL " +
+                    "AND \"AssignmentReason\" IS NOT NULL AND length(trim(\"AssignmentReason\")) > 0)");
             });
 
             builder.Property(attribution => attribution.TenantId).IsRequired();
@@ -127,7 +132,8 @@ namespace AqualLifeStyle.EntityFrameworkCore.EntityFrameworkCore.EntityConfigura
                     "CK_AQGRecruitConfirm_Method",
                     $"\"ConfirmationMethod\" IN (" +
                     $"{(int)AQGreenAttributionConfirmationMethod.MemberInvitationAcceptance}, " +
-                    $"{(int)AQGreenAttributionConfirmationMethod.AuthorisedProspectiveRootConfirmation})");
+                    $"{(int)AQGreenAttributionConfirmationMethod.AuthorisedProspectiveRootConfirmation}, " +
+                    $"{(int)AQGreenAttributionConfirmationMethod.CompanyAdmissionAcceptance})");
                 table.HasCheckConstraint(
                     "CK_AQGRecruitConfirm_EvidenceRef",
                     "\"EvidenceReferenceId\" <> '00000000-0000-0000-0000-000000000000'");
