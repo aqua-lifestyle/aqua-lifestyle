@@ -70,6 +70,8 @@ const issueMessages: Record<string, string> = {
   ExistingCreditedSponsorConflict: "The supplied sponsor conflicts with a recorded Aqua sponsor.",
   ExistingPlacementSlotOccupied: "The supplied slot is already occupied in Aqua.",
   ActiveParticipationMissingPlacement: "This active AQGreen participation has no recorded placement in Aqua. Reconcile the historical position before relying on this network.",
+  LegacyAQGreenAssignmentRequiresReconciliation: "This account already has a legacy AQGreen membership assignment. Reconcile its membership and payment evidence before requesting another joining payment.",
+  MembershipAssignmentUnverifiable: "The account's current membership assignment could not be verified. Review it before proceeding.",
 };
 
 const humanize = (value: string) => value.replace(/([a-z])([A-Z])/g, "$1 $2");

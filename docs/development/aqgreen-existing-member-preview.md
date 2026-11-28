@@ -46,6 +46,8 @@ Keep real input and results in restricted custody. The API returns the legacy re
 
 `ActiveParticipationMissingPlacement` means a corroborated AQGreen participant is Active in Aqua but has no visible placement in the snapshot. Dependent roster rows require review too. A clean row does not prove that an entire historical roster was supplied, that a slot is available, or that a reservation exists. The automatic allocator does not read uploads or preview results.
 
+`LegacyAQGreenAssignmentRequiresReconciliation` means a corroborated account is assigned to a shared or same-Tenant AQGreen membership definition. This may occur with or without a current participation. The preview shares the membership evidence query with `GetLegacyAQGreenReconciliation`. The assignment is not proof of activation or payment; reconcile it before requesting a joining payment. A missing or foreign definition is `MembershipAssignmentUnverifiable`; the preview returns no plan details from another Tenant.
+
 ## Decisions needed before enabling transfers or company recruitment
 
 This section records implementation evidence and open decisions; it does not grant authority.
@@ -57,4 +59,4 @@ This section records implementation evidence and open decisions; it does not gra
 
 ## Re-run the PostgreSQL checks
 
-Use an empty, disposable, authorised PostgreSQL test database. The test harness creates the model schema and seeds synthetic fixtures. Set `REPRO_PG=true`, `REPRO_TRANSACTIONAL=true`, `REPRO_PG_SCHEMA_FROM_MODEL=true`, `REPRO_PG_CONNECTION` and `ConnectionStrings__Default` to the fixture settings. From `aspnet-core/`, run `dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --filter 'FullyQualifiedName~RosterPreview_'`. Expect seven passing cases and zero skips. The existing protected workflow does not opt in to this specific PostgreSQL fixture; run it separately from the default web shard.
+Use an empty, disposable, authorised PostgreSQL test database. The test harness creates the model schema and seeds synthetic fixtures. Set `REPRO_PG=true`, `REPRO_TRANSACTIONAL=true`, `REPRO_PG_SCHEMA_FROM_MODEL=true`, `REPRO_PG_CONNECTION` and `ConnectionStrings__Default` to the fixture settings. From `aspnet-core/`, run `dotnet test test/AqualLifeStyle.Web.Tests/AqualLifeStyle.Web.Tests.csproj --configuration Release --filter 'FullyQualifiedName~RosterPreview_'`. Expect eight passing cases and zero skips. The existing protected workflow does not opt in to this specific PostgreSQL fixture; run it separately from the default web shard.

@@ -54,14 +54,20 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     if (areas != null)
                         visibleCustomers = visibleCustomers.Where(customer => customer.AreaId.HasValue && areas.Contains(customer.AreaId.Value));
 
-                    var accounts = await visibleCustomers.Where(customer =>
+                    var matches = visibleCustomers.Where(customer =>
                             clubNumbers.Contains(customer.ClubMemberNumber.ToUpper()) || emails.Contains(customer.Email.Value.ToUpper()) ||
-                            (customer.User.TenantId == input.TenantId && emails.Contains(customer.User.NormalizedEmailAddress)))
-                        .Select(customer => new LegacyAQGreenRosterAccount(input.TenantId, customer.Id, customer.ClubMemberNumber,
-                            customer.Email.Value, customer.User.TenantId == input.TenantId ? customer.User.EmailAddress : null,
-                            !customer.IsDeleted && customer.IsActive && customer.User.TenantId == input.TenantId &&
-                            !customer.User.IsDeleted && customer.User.IsActive && customer.User.IsEmailConfirmed))
-                        .ToListAsync();
+                            (customer.User.TenantId == input.TenantId && emails.Contains(customer.User.NormalizedEmailAddress)));
+                    List<LegacyAQGreenRosterAccount> accounts;
+                    using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
+                    {
+                        accounts = await (from evidence in QueryLegacyAQGreenMembershipEvidence(matches)
+                            let customer = evidence.Customer
+                            select new LegacyAQGreenRosterAccount(input.TenantId, customer.Id, customer.ClubMemberNumber,
+                                customer.Email.Value, customer.User.TenantId == input.TenantId ? customer.User.EmailAddress : null,
+                                !customer.IsDeleted && customer.IsActive && customer.User.TenantId == input.TenantId &&
+                                !customer.User.IsDeleted && customer.User.IsActive && customer.User.IsEmailConfirmed,
+                                evidence.LegacyMembershipId.HasValue, evidence.MembershipAssignmentUnverifiable)).ToListAsync();
+                    }
                     var customerIds = accounts.Select(account => account.CustomerId).ToArray();
                     var tenantParticipations = _entryParticipationRepository.GetAll().AsNoTracking()
                         .Where(item => item.TenantId == input.TenantId);

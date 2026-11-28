@@ -143,6 +143,10 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                     row.CustomerId = clubMatches[0].CustomerId;
                     if (row.IsAQGreen)
                     {
+                        if (clubMatches[0].HasLegacyAQGreenAssignment)
+                            row.Issues.Add("LegacyAQGreenAssignmentRequiresReconciliation");
+                        if (clubMatches[0].MembershipAssignmentUnverifiable)
+                            row.Issues.Add("MembershipAssignmentUnverifiable");
                         var existing = history[row.CustomerId.Value].ToArray();
                         if (existing.Any(item => item.IsDeleted)) row.Issues.Add("RetiredParticipationExists");
                         var live = existing.Where(item => !item.IsDeleted).ToArray();
@@ -325,5 +329,6 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
     }
 
     public sealed record LegacyAQGreenRosterAccount(int TenantId, int CustomerId, string ClubMemberNumber,
-        string CustomerEmail, string UserEmail, bool AccountAvailable);
+        string CustomerEmail, string UserEmail, bool AccountAvailable, bool HasLegacyAQGreenAssignment = false,
+        bool MembershipAssignmentUnverifiable = false);
 }

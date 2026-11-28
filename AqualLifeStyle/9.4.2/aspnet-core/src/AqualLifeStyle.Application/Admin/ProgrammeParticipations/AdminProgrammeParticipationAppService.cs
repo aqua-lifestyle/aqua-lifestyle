@@ -1592,6 +1592,24 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
             return await ReadLegacyAQGreenDiscoveryPageAsync(input);
         }
 
+        // Callers disable MayHaveTenant to distinguish an unverifiable assignment
+        // from a shared or same-Tenant definition. Never return foreign plan details.
+        private IQueryable<LegacyAQGreenMembershipEvidence> QueryLegacyAQGreenMembershipEvidence(
+            IQueryable<Customer> customers) =>
+            from customer in customers
+            join membership in _membershipRepository.GetAll().AsNoTracking()
+                on customer.MembershipId equals (int?)membership.Id into memberships
+            from membership in memberships.DefaultIfEmpty()
+            let validAssignment = membership != null &&
+                (!membership.TenantId.HasValue || membership.TenantId == customer.TenantId)
+            select new LegacyAQGreenMembershipEvidence
+            {
+                Customer = customer,
+                LegacyMembershipId = validAssignment && membership.MembershipType == MembershipType.AQGreen
+                    ? (int?)membership.Id : null,
+                MembershipAssignmentUnverifiable = customer.MembershipId.HasValue && !validAssignment
+            };
+
         private async Task<PagedResultDto<LegacyAQGreenReconciliationDto>> ReadLegacyAQGreenDiscoveryPageAsync(
             LegacyAQGreenReconciliationListInput input, Guid? requestedAreaId = null,
             List<AQGreenReconciliationEvidenceRecord> exportRecords = null, Guid[] exportAreaScope = null)
@@ -1611,28 +1629,22 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
                 // Customer is the inventory identity. Composite ownership joins and
                 // existing uniqueness constraints preserve one row when sources overlap.
                 var query =
-                    from customer in _customerRepository.GetAll().AsNoTracking()
-                    where customer.TenantId.HasValue
+                    from evidence in QueryLegacyAQGreenMembershipEvidence(
+                        _customerRepository.GetAll().AsNoTracking().Where(customer => customer.TenantId.HasValue))
+                    let customer = evidence.Customer
                     join participation in _entryParticipationRepository
                         .GetAllIncluding(item => item.ApprovalDecisions, item => item.RecruiterCorrections).AsNoTracking()
                         on new { customer.TenantId, CustomerId = customer.Id }
                         equals new { TenantId = (int?)participation.TenantId, participation.CustomerId }
                         into participations
                     from participation in participations.DefaultIfEmpty()
-                    join membership in _membershipRepository.GetAll().AsNoTracking()
-                        on customer.MembershipId equals (int?)membership.Id into memberships
-                    from membership in memberships.DefaultIfEmpty()
-                    let validAssignment = membership != null &&
-                        (!membership.TenantId.HasValue || membership.TenantId == customer.TenantId)
-                    let legacyAssignment = validAssignment && membership.MembershipType == MembershipType.AQGreen
-                    let unverifiableAssignment = customer.MembershipId.HasValue && !validAssignment
-                    where legacyAssignment || unverifiableAssignment || participation != null
+                    where evidence.LegacyMembershipId.HasValue || evidence.MembershipAssignmentUnverifiable || participation != null
                     select new LegacyAQGreenDiscoveryRow
                     {
                         Participation = participation,
                         Customer = customer,
-                        LegacyMembershipId = legacyAssignment ? (int?)membership.Id : null,
-                        MembershipAssignmentUnverifiable = unverifiableAssignment
+                        LegacyMembershipId = evidence.LegacyMembershipId,
+                        MembershipAssignmentUnverifiable = evidence.MembershipAssignmentUnverifiable
                     };
                 if (AbpSession.TenantId.HasValue)
                 {
@@ -2565,6 +2577,13 @@ namespace AqualLifeStyle.Application.Admin.ProgrammeParticipations
         {
             public EntryParticipation Participation { get; init; }
             public Customer Customer { get; init; }
+        }
+
+        private sealed class LegacyAQGreenMembershipEvidence
+        {
+            public Customer Customer { get; init; }
+            public int? LegacyMembershipId { get; init; }
+            public bool MembershipAssignmentUnverifiable { get; init; }
         }
 
         private sealed class LegacyAQGreenDiscoveryRow

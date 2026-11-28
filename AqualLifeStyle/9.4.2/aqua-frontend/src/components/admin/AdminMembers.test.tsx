@@ -135,7 +135,7 @@ describe("AdminMembers", () => {
     vi.mocked(httpClient.post).mockResolvedValue({
       tenantId: 1, acceptedRows: 0, duplicateRows: 0, unmatchedRows: 0, ambiguousRows: 1,
       rows: [{ rowNumber: 2, oldMemberId: "0001", existingParticipationStatus: "Active",
-        disposition: "Ambiguous", issues: ["ActiveParticipationMissingPlacement"] }],
+        disposition: "Ambiguous", issues: ["ActiveParticipationMissingPlacement", "LegacyAQGreenAssignmentRequiresReconciliation"] }],
     });
     render(<AdminMembers />);
     openRosterDialog();
@@ -147,6 +147,7 @@ describe("AdminMembers", () => {
     fireEvent.click(screen.getByRole("button", { name: "Preview file" }));
 
     expect(await screen.findByText(/active AQGreen participation has no recorded placement/)).toBeInTheDocument();
+    expect(screen.getByText(/Reconcile its membership and payment evidence before requesting another joining payment/)).toBeInTheDocument();
     expect(httpClient.post).toHaveBeenCalledTimes(1);
   });
 
